@@ -45,30 +45,20 @@
         $maintTabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
     @endphp
 
-    {{-- General server console banner — the same one every other workspace page
-         shows. Surfaces the maintenance webserver apply (suspend/resume, kind
-         `webserver_config`) for this server's sites while it runs on the queue,
-         and renders nothing when idle. Kind-filtered so unrelated site console
-         actions (env pushes, uptime checks) never show up here. --}}
-    @php
-        $maintenanceConsoleRun = \App\Models\ConsoleAction::query()
-            ->where('subject_type', (new \App\Models\Site)->getMorphClass())
-            ->whereIn('subject_id', $server->sites->pluck('id'))
-            ->where('kind', 'webserver_config')
-            ->whereNull('dismissed_at')
-            ->orderByDesc('created_at')
-            ->first();
-    @endphp
-
-    {{-- Bridge poll: a just-queued apply hasn't written its console row yet, so
-         nudge a few re-renders after a toggle until the banner can self-poll. --}}
+    {{-- The one shared console-action banner for everything that runs on this
+         page — host-upkeep ops (apt/cleanup/reboot, vhost prune) AND the
+         webserver applies a maintenance toggle queues. Same component every
+         other workspace op uses; no per-page output box. --}}
+    {{-- Bridge poll: a just-queued webserver apply hasn't written its console
+         row yet, so nudge a few re-renders after a toggle until the banner can
+         self-poll. Op/prune rows are seeded synchronously and need no bridge. --}}
     @if ($watchApply)
         <div wire:poll.2s="tickApplyWatch" class="hidden" aria-hidden="true"></div>
     @endif
 
     @include('livewire.partials.console-action-banner-static', [
-        'run' => $maintenanceConsoleRun,
-        'kindLabels' => (array) config('console_actions.kinds', []),
+        'run' => $consoleRun,
+        'kindLabels' => $consoleKindLabels,
     ])
 
     <div class="mb-6 border-b border-brand-ink/10">
@@ -418,20 +408,13 @@
             </div>
 
             <div class="space-y-6 px-6 py-6 sm:px-7">
-                {{-- apt/host operations use a separate cache-streamed remote task
-                     (not console_actions), so they keep their own banner here on
-                     the Operations tab. Guarded so it never renders an empty shell. --}}
-                @if ($maintenanceRemoteTaskId)
-                    <x-workspace-console-banner
-                        :status="$bannerStatus"
-                        :message="$maintenanceActionLabel ?? __('Maintenance operation')"
-                        :output="$bannerOutputLines"
-                        :busy="$bannerBusy"
-                        :dismiss-action="$bannerBusy ? null : 'dismissMaintenanceTask'"
-                        :poll-action="$bannerBusy ? 'syncMaintenanceRemoteTaskFromCache' : null"
-                        poll-interval="2s"
-                        :default-expanded="true"
-                    />
+                {{-- Host-upkeep ops render in the shared console-action banner at
+                     the top of the page (same as every other workspace op).
+                     While one is in flight we disable the Run buttons; this poll
+                     re-enables them once the mirrored ConsoleAction reaches a
+                     terminal state. --}}
+                @if ($opBusy)
+                    <div wire:poll.3s class="hidden" aria-hidden="true"></div>
                 @endif
 
                 @if (! $opsReady)
@@ -468,7 +451,7 @@
                                                 <button
                                                     type="button"
                                                     wire:click="confirmAction('{{ $action['key'] }}')"
-                                                    @disabled(! $opsReady || $bannerBusy)
+                                                    @disabled(! $opsReady || $opBusy)
                                                     @class([
                                                         'inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
                                                         'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50' => $action['danger'],
@@ -485,6 +468,39 @@
                         </div>
                     </div>
                 @endforeach
+
+                {{-- Webserver hygiene: sweep orphaned dply vhosts (dply-*.conf
+                     whose owning site is gone). A stale suspended block left by a
+                     site recreate can shadow a live site's vhost and silently keep
+                     it on the maintenance page — this removes them and reloads. --}}
+                <div wire:key="maint-ops-vhost-hygiene">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Webserver hygiene') }}</p>
+                    <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
+                        <table class="w-full table-auto text-sm">
+                            <tbody class="divide-y divide-brand-ink/10">
+                                <tr class="align-top">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-brand-ink">{{ __('Prune orphaned vhosts') }}</span>
+                                        </div>
+                                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Remove dply-managed nginx configs whose site no longer exists, then reload. Fixes a stale block shadowing a live site (e.g. a recreate left it stuck on the maintenance page). Never touches hand-authored configs.') }}</p>
+                                    </td>
+                                    <td class="w-px whitespace-nowrap px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            wire:click="pruneOrphanVhosts"
+                                            wire:loading.attr="disabled"
+                                            @disabled(! $opsReady || $opBusy)
+                                            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {{ __('Scan & prune') }}
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
                 <div class="border-t border-brand-ink/10 pt-5">
                     @livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server], key('recent-actions-log-'.$server->id))
