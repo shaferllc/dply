@@ -400,16 +400,35 @@
             </div>
 
             <form class="space-y-5 p-6 sm:p-7">
-                <div>
+                <div
+                    x-data="{ tz: '' }"
+                    x-init="
+                        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || @js(config('app.timezone'));
+                        $wire.set('maintenance_timezone', tz, false);
+                        if ($refs.until && $refs.until.value) {
+                            const utc = new Date($refs.until.value + 'Z');
+                            if (! isNaN(utc.getTime())) {
+                                const local = new Date(utc.getTime() - utc.getTimezoneOffset() * 60000);
+                                $refs.until.value = local.toISOString().slice(0, 16);
+                            }
+                        }
+                    "
+                >
                     <x-input-label for="maintenance_until_local" :value="__('End automatically at (optional)')" />
                     <input
+                        x-ref="until"
                         id="maintenance_until_local"
                         type="datetime-local"
                         wire:model="maintenance_until_local"
                         @disabled($active)
                         class="mt-1 block w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:bg-brand-sand/30"
                     />
-                    <p class="mt-1.5 text-xs text-brand-moss">{{ __('Times use :tz. Leave empty for a manual clear-only window.', ['tz' => config('app.timezone')]) }}</p>
+                    <p class="mt-1.5 text-xs text-brand-moss">
+                        <span x-text="tz
+                            ? @js(__('Times use your local timezone')) + ' (' + tz + ').'
+                            : @js(__('Times use your local timezone.'))"></span>
+                        {{ __('Leave empty for a manual clear-only window.') }}
+                    </p>
                     <x-input-error :messages="$errors->get('maintenance_until_local')" class="mt-1" />
                 </div>
 

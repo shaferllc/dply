@@ -52,6 +52,13 @@ class WorkspaceMaintenance extends Component
 
     public string $maintenance_until_local = '';
 
+    /**
+     * IANA timezone of the operator's browser, captured client-side so the
+     * end-time field reads as local wall-clock instead of UTC. Falls back to
+     * the app timezone when JS is unavailable or sends a bad value.
+     */
+    public string $maintenance_timezone = '';
+
     public string $maintenance_note = '';
 
     public string $maintenance_message = '';
@@ -88,8 +95,10 @@ class WorkspaceMaintenance extends Component
             $until = $state['until'] ?? null;
             if (is_string($until) && $until !== '') {
                 try {
+                    // Render as a UTC wall-clock string; the field's Alpine
+                    // wrapper re-localizes it to the operator's browser tz.
                     $this->maintenance_until_local = Carbon::parse($until)
-                        ->timezone(config('app.timezone'))
+                        ->utc()
                         ->format('Y-m-d\TH:i');
                 } catch (\Throwable) {
                     $this->maintenance_until_local = '';
@@ -132,6 +141,11 @@ class WorkspaceMaintenance extends Component
     public function openEnableModal(): void
     {
         $this->authorize('update', $this->server);
+
+        // Validate the window up front so an invalid end time surfaces inline
+        // under the field instead of silently failing behind the open modal.
+        $this->resolveMaintenanceUntil();
+
         $this->dispatch('open-modal', 'enable-maintenance-confirmation');
     }
 
@@ -161,38 +175,23 @@ class WorkspaceMaintenance extends Component
             return;
         }
 
-        $validated = $this->validate([
-            'maintenance_until_local' => ['nullable', 'string'],
-            'maintenance_note' => ['nullable', 'string', 'max:500'],
-            'maintenance_message' => ['nullable', 'string', 'max:500'],
-        ]);
+        // Re-validate at confirm time; if the window has since gone invalid,
+        // close the modal so the inline error is visible rather than hidden
+        // behind it.
+        try {
+            $until = $this->resolveMaintenanceUntil();
+        } catch (ValidationException $e) {
+            $this->closeEnableModal();
 
-        $until = null;
-        if (trim($validated['maintenance_until_local']) !== '') {
-            try {
-                $until = Carbon::parse(
-                    $validated['maintenance_until_local'],
-                    config('app.timezone'),
-                )->utc();
-            } catch (\Throwable) {
-                throw ValidationException::withMessages([
-                    'maintenance_until_local' => __('Enter a valid date and time.'),
-                ]);
-            }
-
-            if ($until->lte(now())) {
-                throw ValidationException::withMessages([
-                    'maintenance_until_local' => __('The end time must be in the future.'),
-                ]);
-            }
+            throw $e;
         }
 
         try {
             $result = $maintenance->enable(
                 $this->server,
                 $until,
-                (string) ($validated['maintenance_note'] ?? ''),
-                (string) ($validated['maintenance_message'] ?? ''),
+                $this->maintenance_note,
+                $this->maintenance_message,
                 auth()->user(),
             );
         } catch (\RuntimeException $e) {
@@ -209,6 +208,62 @@ class WorkspaceMaintenance extends Component
             $result['suspended'],
             ['count' => $result['suspended']],
         ).' '.__('Webserver configs queued.'));
+    }
+
+    /**
+     * Validate the maintenance form and resolve the optional end time to UTC.
+     *
+     * Shared by {@see openEnableModal()} (gate before the confirm modal opens)
+     * and {@see enableMaintenance()} (re-check at confirm). Throws a
+     * {@see ValidationException} with an inline message when the end time is
+     * unparseable or not in the future.
+     */
+    protected function resolveMaintenanceUntil(): ?Carbon
+    {
+        $validated = $this->validate([
+            'maintenance_until_local' => ['nullable', 'string'],
+            'maintenance_note' => ['nullable', 'string', 'max:500'],
+            'maintenance_message' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (trim($validated['maintenance_until_local']) === '') {
+            return null;
+        }
+
+        try {
+            $until = Carbon::parse(
+                $validated['maintenance_until_local'],
+                $this->operatorTimezone(),
+            )->utc();
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'maintenance_until_local' => __('Enter a valid date and time.'),
+            ]);
+        }
+
+        if ($until->lte(now())) {
+            throw ValidationException::withMessages([
+                'maintenance_until_local' => __('The end time must be in the future.'),
+            ]);
+        }
+
+        return $until;
+    }
+
+    /**
+     * Resolve the timezone the operator's end time is expressed in. Trusts the
+     * browser-supplied {@see $maintenance_timezone} only when it is a known
+     * IANA identifier; otherwise falls back to the app timezone (UTC).
+     */
+    protected function operatorTimezone(): string
+    {
+        $tz = trim($this->maintenance_timezone);
+
+        if ($tz !== '' && in_array($tz, timezone_identifiers_list(), true)) {
+            return $tz;
+        }
+
+        return config('app.timezone');
     }
 
     public function disableMaintenance(ServerMaintenanceWindow $maintenance): void

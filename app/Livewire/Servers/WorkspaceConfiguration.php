@@ -11,6 +11,7 @@ use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerConfigRevisions;
+use App\Livewire\Servers\Concerns\ManagesServerLogo;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -42,6 +43,7 @@ class WorkspaceConfiguration extends Component
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesServerConfigRevisions;
+    use ManagesServerLogo;
     use RendersWorkspacePlaceholder;
 
     #[Url(as: 'file', except: null, history: true)]

@@ -45,6 +45,10 @@
         </div>
     @endif
 
+    <div class="mb-6">
+        @include('livewire.servers.partials.server-logo-card', ['server' => $server])
+    </div>
+
     @if (! $opsReady)
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @else
