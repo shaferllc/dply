@@ -24,6 +24,18 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'server_maintenance_op' => [
+            'running' => 'Running host maintenance on :host …',
+            'completed' => 'Host maintenance finished.',
+            'failed' => 'Host maintenance failed.',
+            'stale' => 'Host maintenance did not finish.',
+        ],
+        'vhost_prune' => [
+            'running' => 'Scanning :host for orphaned vhosts …',
+            'completed' => 'Orphaned vhosts pruned.',
+            'failed' => 'Orphan vhost prune failed.',
+            'stale' => 'Orphan vhost prune did not finish.',
+        ],
         'error_reference_lookup' => [
             'running' => 'Searching :host logs for the reference …',
             'completed' => 'Reference resolved.',

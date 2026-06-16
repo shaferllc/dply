@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\ServerMaintenancePageTest;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
 use App\Livewire\Servers\WorkspaceMaintenance;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerManageAction;
@@ -141,16 +143,23 @@ test('running an allowlisted operation queues the manage job and logs activity',
 
     Livewire::actingAs($user)
         ->test(WorkspaceMaintenance::class, ['server' => $server])
-        ->call('runMaintenanceAction', 'apt_clean')
-        ->assertSet('remote_error', null)
-        ->assertSet('maintenanceActionLabel', config('server_manage.service_actions.apt_clean.label'));
+        ->call('runMaintenanceAction', 'apt_clean');
 
+    // The job carries the ConsoleAction id so it can mirror live output into the
+    // row the shared console-action banner renders (same system as every other
+    // workspace op — no bespoke per-page output box).
     Bus::assertDispatched(ServerManageRemoteSshJob::class, function (ServerManageRemoteSshJob $job): bool {
-        return $job->taskName === 'manage-action:apt_clean';
+        return $job->taskName === 'manage-action:apt_clean'
+            && $job->consoleActionId !== null;
     });
 
     expect(ServerManageAction::where('server_id', $server->id)
         ->where('task_name', 'manage-action:apt_clean')
+        ->exists())->toBeTrue();
+
+    expect(ConsoleAction::where('subject_type', $server->getMorphClass())
+        ->where('subject_id', $server->getKey())
+        ->where('kind', RunsServerMaintenanceActions::OP_CONSOLE_KIND)
         ->exists())->toBeTrue();
 });
 
@@ -164,7 +173,7 @@ test('an action outside the maintenance allowlist is rejected', function (): voi
     Livewire::actingAs($user)
         ->test(WorkspaceMaintenance::class, ['server' => $server])
         ->call('runMaintenanceAction', 'restart_nginx')
-        ->assertSet('remote_error', __('Unknown action.'));
+        ->assertDispatched('notify', type: 'error', message: __('Unknown action.'));
 
     Bus::assertNotDispatched(ServerManageRemoteSshJob::class);
 });

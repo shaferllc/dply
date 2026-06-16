@@ -10,8 +10,10 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesMaintenanceNotifications;
 use App\Livewire\Servers\Concerns\ManagesPreferredMaintenanceSchedule;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
 use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\PruneServerOrphanVhostsJob;
 use App\Models\AuditLog;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -47,6 +49,7 @@ class WorkspaceMaintenance extends Component
     use ManagesPreferredMaintenanceSchedule;
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
+    use RunsServerConsoleActions;
     use RunsServerMaintenanceActions;
 
     protected string $requiredFeature = 'workspace.server_maintenance';
@@ -75,10 +78,11 @@ class WorkspaceMaintenance extends Component
     public ?string $pendingActionKey = null;
 
     /**
-     * Briefly nudge re-renders after an enable/disable so the general console
-     * banner surfaces the queued webserver-config apply the instant its row is
-     * written (a freshly-queued job has no console row yet, so without this the
-     * banner — which only self-polls once a run exists — wouldn't appear).
+     * Briefly nudge re-renders after an enable/disable/re-apply so the shared
+     * console-action banner surfaces the queued webserver-config apply the
+     * instant its row is written (a freshly-queued job has no console row yet,
+     * so without this the banner — which only self-polls once a run exists —
+     * wouldn't appear).
      */
     public bool $watchApply = false;
 
@@ -90,6 +94,39 @@ class WorkspaceMaintenance extends Component
         if (++$this->applyWatchTicks >= 15) {
             $this->watchApply = false;
         }
+    }
+
+    /**
+     * Latest non-dismissed console-action for this server, feeding the one
+     * shared `console-action-banner-static`. Covers BOTH host-upkeep ops
+     * (Server subject, {@see self::OP_CONSOLE_KIND}) and the webserver applies
+     * a maintenance toggle queues (Site subjects, kind `webserver_config`), so
+     * the page never grows a second, special-cased output box.
+     */
+    protected function maintenanceConsoleRun(): ?ConsoleAction
+    {
+        $siteIds = $this->server->sites->pluck('id');
+
+        return ConsoleAction::query()
+            ->with('subject')
+            ->whereNull('dismissed_at')
+            ->where(function ($q) use ($siteIds): void {
+                $q->where(function ($inner): void {
+                    $inner->where('subject_type', $this->server->getMorphClass())
+                        ->where('subject_id', $this->server->getKey())
+                        ->whereIn('kind', [self::OP_CONSOLE_KIND, 'vhost_prune']);
+                });
+
+                if ($siteIds->isNotEmpty()) {
+                    $q->orWhere(function ($inner) use ($siteIds): void {
+                        $inner->where('subject_type', (new Site)->getMorphClass())
+                            ->whereIn('subject_id', $siteIds)
+                            ->where('kind', 'webserver_config');
+                    });
+                }
+            })
+            ->orderByDesc('created_at')
+            ->first();
     }
 
     protected function beginWatchingApply(): void
@@ -498,7 +535,41 @@ class WorkspaceMaintenance extends Component
         }
 
         ApplySiteWebserverConfigJob::dispatch((string) $site->id, (string) auth()->id());
+        $this->beginWatchingApply();
         $this->toastSuccess(__('Re-applying webserver config for :site…', ['site' => $site->name]));
+    }
+
+    /**
+     * Sweep the server for orphaned dply vhost files (`dply-*.conf` whose owning
+     * site is gone) and reload nginx. This is the proactive companion to the
+     * apply-time self-heal — it removes orphans even when none is currently
+     * shadowing a live site, so a stale suspended block can't lie in wait.
+     */
+    public function pruneOrphanVhosts(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot run maintenance operations on servers.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before pruning vhosts.'));
+
+            return;
+        }
+
+        // Seeds the ConsoleAction synchronously, so the shared console-action
+        // banner (fed by maintenanceConsoleRun()) surfaces it on this same
+        // response — same system as every other op on the page. The job mirrors
+        // its output into the same row.
+        $runId = $this->seedConsoleActionRun($this->server, 'vhost_prune', __('Pruning orphaned vhosts'));
+
+        PruneServerOrphanVhostsJob::dispatch((string) $this->server->id, (string) auth()->id(), $runId);
+
+        $this->toastSuccess(__('Scanning for orphaned vhosts…'));
     }
 
     public function render(ServerMaintenanceWindow $maintenance): View
@@ -524,12 +595,6 @@ class WorkspaceMaintenance extends Component
                 ->firstWhere('key', $this->pendingActionKey)
             : null;
 
-        $bannerStatus = match ($this->maintenanceTaskStatus) {
-            'finished' => 'completed',
-            'failed' => 'failed',
-            default => 'running',
-        };
-
         return view('livewire.servers.workspace-maintenance', [
             'report' => $report,
             'active' => $report['active'],
@@ -547,11 +612,9 @@ class WorkspaceMaintenance extends Component
             'operationGroups' => $this->maintenanceOperationGroups(),
             'opsReady' => $this->serverOpsReady() && ! $this->currentUserIsDeployer(),
             'pendingAction' => $pendingAction,
-            'bannerStatus' => $bannerStatus,
-            'bannerBusy' => $this->maintenanceTaskBusy(),
-            'bannerOutputLines' => $this->remote_output !== null && $this->remote_output !== ''
-                ? preg_split('/\r\n|\r|\n/', rtrim($this->remote_output))
-                : [],
+            'opBusy' => $this->maintenanceOpBusy(),
+            'consoleRun' => $this->maintenanceConsoleRun(),
+            'consoleKindLabels' => (array) config('console_actions.kinds', []),
             'notifChannels' => $this->maintenance_tab === 'notifications' ? $this->assignableMaintenanceNotificationChannels() : collect(),
             'notifSubscriptions' => $this->maintenance_tab === 'notifications' ? $this->maintenanceNotificationSubscriptions() : collect(),
             'notifEventLabels' => $this->maintenance_tab === 'notifications' ? $this->maintenanceEventLabels() : [],

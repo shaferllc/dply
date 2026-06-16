@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Services\Servers\ServerAptLockBash;
@@ -22,24 +23,21 @@ use Livewire\Component;
  * and label the task `manage-action:{key}` so RecentActionsLog resolves the
  * human label from server_manage config exactly like WorkspaceManage does.
  *
+ * Live output renders through the SAME shared {@see ConsoleAction} banner
+ * (`console-action-banner-static`) that every other workspace operation uses —
+ * no per-page output box. Each run seeds a {@see ConsoleAction} (kind
+ * {@see self::OP_CONSOLE_KIND}) and the job mirrors its progress into that row
+ * via {@see \App\Services\ConsoleActions\ConsoleEmitter}. The host component
+ * must compose {@see RunsServerConsoleActions} for {@see seedConsoleActionRun()}.
+ *
  * @phpstan-require-extends Component
  *
  * @property Server $server
  */
 trait RunsServerMaintenanceActions
 {
-    public ?string $remote_output = null;
-
-    public ?string $remote_error = null;
-
-    /** Cache-task id while a maintenance action is queued/running. */
-    public ?string $maintenanceRemoteTaskId = null;
-
-    /** Terminal/in-flight status of the current task: queued|running|finished|failed. */
-    public ?string $maintenanceTaskStatus = null;
-
-    /** Human label of the action currently shown in the console banner. */
-    public ?string $maintenanceActionLabel = null;
+    /** ConsoleAction kind for host-upkeep ops streamed into the console drawer. */
+    public const OP_CONSOLE_KIND = 'server_maintenance_op';
 
     /**
      * Flat allowlist of action keys permitted on the Maintenance page.
@@ -75,30 +73,28 @@ trait RunsServerMaintenanceActions
     public function runMaintenanceAction(string $key): void
     {
         $this->authorize('update', $this->server);
-        $this->remote_output = null;
-        $this->remote_error = null;
 
         if ($this->currentUserIsDeployer()) {
-            $this->remote_error = __('Deployers cannot run maintenance operations on servers.');
+            $this->toastError(__('Deployers cannot run maintenance operations on servers.'));
 
             return;
         }
 
         if (! in_array($key, $this->maintenanceActionKeys(), true)) {
-            $this->remote_error = __('Unknown action.');
+            $this->toastError(__('Unknown action.'));
 
             return;
         }
 
         $def = $this->maintenanceActionDef($key);
         if ($def === null) {
-            $this->remote_error = __('Unknown action.');
+            $this->toastError(__('Unknown action.'));
 
             return;
         }
 
         if (! $this->serverOpsReady()) {
-            $this->remote_error = __('Provisioning and SSH must be ready before running maintenance operations.');
+            $this->toastError(__('Provisioning and SSH must be ready before running maintenance operations.'));
 
             return;
         }
@@ -120,63 +116,21 @@ trait RunsServerMaintenanceActions
         );
     }
 
-    public function syncMaintenanceRemoteTaskFromCache(): void
+    /**
+     * True while a host-upkeep op for this server is queued or running. Drives
+     * the Run-button disabled state (and its refresh poll) now that live output
+     * lives in the console drawer rather than an inline banner. Read off the
+     * mirrored {@see ConsoleAction} row so it survives a page reload.
+     */
+    public function maintenanceOpBusy(): bool
     {
-        if ($this->maintenanceRemoteTaskId === null || $this->maintenanceRemoteTaskId === '') {
-            return;
-        }
-
-        $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->maintenanceRemoteTaskId));
-        if (! is_array($payload)) {
-            return;
-        }
-
-        $status = (string) ($payload['status'] ?? '');
-        $out = (string) ($payload['output'] ?? '');
-        $this->maintenanceTaskStatus = $status;
-
-        $this->remote_output = $out !== ''
-            ? $out
-            : match ($status) {
-                'queued' => __('Task queued…'),
-                'running' => __('Running on server…'),
-                default => '',
-            };
-
-        $err = $payload['error'] ?? null;
-        $this->remote_error = is_string($err) && $err !== '' ? $err : null;
-
-        if (! in_array($status, ['finished', 'failed'], true)) {
-            return;
-        }
-
-        if ($status === 'finished') {
-            $flash = $payload['flash_success'] ?? null;
-            if (is_string($flash) && $flash !== '') {
-                $this->toastSuccess($flash);
-            }
-        }
-
-        // Keep the completed/failed banner (with its output) on screen until the
-        // operator dismisses it. We drop the cache entry and let the terminal
-        // status stop the poll; the ServerManageAction row persists the run.
-        Cache::forget(ServerManageRemoteSshJob::cacheKey($this->maintenanceRemoteTaskId));
-    }
-
-    public function dismissMaintenanceTask(): void
-    {
-        $this->maintenanceRemoteTaskId = null;
-        $this->maintenanceTaskStatus = null;
-        $this->maintenanceActionLabel = null;
-        $this->remote_output = null;
-        $this->remote_error = null;
-    }
-
-    /** True while a maintenance action is queued or running (drives spinner + poll). */
-    public function maintenanceTaskBusy(): bool
-    {
-        return $this->maintenanceRemoteTaskId !== null
-            && in_array((string) $this->maintenanceTaskStatus, ['', 'queued', 'running'], true);
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', self::OP_CONSOLE_KIND)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->exists();
     }
 
     protected function dispatchQueuedMaintenanceScript(
@@ -187,8 +141,6 @@ trait RunsServerMaintenanceActions
         ?string $flashSuccess,
         string $label,
     ): void {
-        $this->maintenanceRemoteTaskId = null;
-
         $id = (string) Str::uuid();
         $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);
 
@@ -219,6 +171,13 @@ trait RunsServerMaintenanceActions
             'status' => ServerManageAction::STATUS_QUEUED,
         ]);
 
+        // Seed a ConsoleAction so the job can mirror live output into it. The
+        // page renders this row through the shared console-action banner — the
+        // same component used for webserver applies and every other workspace
+        // op — instead of a bespoke per-page output box. The job advances the
+        // row through running → completed/failed via ConsoleEmitter.
+        $consoleActionId = $this->seedConsoleActionRun($server, self::OP_CONSOLE_KIND, $label);
+
         ServerManageRemoteSshJob::dispatch(
             $server->id,
             $id,
@@ -227,12 +186,8 @@ trait RunsServerMaintenanceActions
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
             $logRow->id,
+            null,
+            $consoleActionId,
         );
-
-        $this->maintenanceRemoteTaskId = $id;
-        $this->maintenanceTaskStatus = 'queued';
-        $this->maintenanceActionLabel = $label;
-        $this->remote_output = __('Task queued. This page will update when the server responds.');
-        $this->remote_error = null;
     }
 }

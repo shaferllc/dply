@@ -160,7 +160,15 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         // the other vhost and the config we just wrote is dead on arrival.
         // Reporting "reload OK" here is how a stale duplicate vhost turned into an
         // invisible, hours-long outage (see the tracely.cloud orphan). Detect it.
-        $shadowed = $this->shadowedServerNames($out, $config, $server, $ssh, basename((string) $confFile));
+        $ourBasename = basename((string) $confFile);
+        $shadowed = $this->shadowedServerNames($out, $config, $server, $ssh, $ourBasename);
+        if ($shadowed !== []) {
+            // Self-heal: when the vhost(s) loading ahead of ours are ORPHANED dply
+            // files (their owning site is gone — exactly the tracely.cloud case),
+            // remove them and re-check before failing. A real conflict with another
+            // *live* site is left to the operator.
+            $shadowed = $this->healShadowingOrphans($server, $ssh, $shadowed, $ourBasename, $emit);
+        }
         if ($shadowed !== []) {
             $names = implode(', ', $shadowed);
             $emit->error('nginx reloaded but is IGNORING this vhost: '.$names
@@ -250,6 +258,55 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $first = trim((string) (preg_split('/\r\n|\r|\n/', $out)[0] ?? ''));
 
         return $first !== '' ? $first : null;
+    }
+
+    /**
+     * Given the server_names nginx is serving from a vhost OTHER than ours,
+     * remove the ones whose winning vhost is an orphaned dply file (no live
+     * owning site), reload, and return the server_names STILL shadowed after
+     * the heal. An empty return means the conflict cleared and this apply can
+     * proceed; a non-empty return means a real conflict with a live site
+     * remains and the caller should fail loudly.
+     *
+     * @param  list<string>  $shadowedNames
+     * @return list<string>
+     */
+    protected function healShadowingOrphans(Server $server, SshConnection $ssh, array $shadowedNames, string $ourBasename, ConsoleEmitter $emit): array
+    {
+        $winners = [];
+        foreach ($shadowedNames as $name) {
+            $winner = $this->firstEnabledVhostFor($server, $ssh, $name);
+            if ($winner !== null && $winner !== $ourBasename) {
+                $winners[$winner] = true;
+            }
+        }
+        if ($winners === []) {
+            return $shadowedNames;
+        }
+
+        $emit->step('nginx', 'this vhost is shadowed — checking whether the conflicting vhost(s) are orphans');
+
+        $result = (new NginxOrphanVhostPruner)->pruneShadowing($server, $ssh, array_keys($winners), $emit);
+        if ($result['removed'] === []) {
+            // The shadowing vhost(s) belong to live sites — a genuine conflict we
+            // must not auto-resolve. Leave every name shadowed for the caller.
+            return $shadowedNames;
+        }
+
+        // Re-check which names are still served by someone other than us.
+        $stillShadowed = [];
+        foreach ($shadowedNames as $name) {
+            $winner = $this->firstEnabledVhostFor($server, $ssh, $name);
+            if ($winner !== null && $winner !== $ourBasename) {
+                $stillShadowed[] = $name;
+            }
+        }
+
+        if ($stillShadowed === []) {
+            $emit->success('removed orphan vhost(s) that were shadowing this site — now serving correctly', 'nginx');
+        }
+
+        return $stillShadowed;
     }
 
     /**
