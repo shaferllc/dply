@@ -44,6 +44,33 @@
         $maintTabOn = 'border-brand-forest text-brand-ink';
         $maintTabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
     @endphp
+
+    {{-- General server console banner — the same one every other workspace page
+         shows. Surfaces the maintenance webserver apply (suspend/resume, kind
+         `webserver_config`) for this server's sites while it runs on the queue,
+         and renders nothing when idle. Kind-filtered so unrelated site console
+         actions (env pushes, uptime checks) never show up here. --}}
+    @php
+        $maintenanceConsoleRun = \App\Models\ConsoleAction::query()
+            ->where('subject_type', (new \App\Models\Site)->getMorphClass())
+            ->whereIn('subject_id', $server->sites->pluck('id'))
+            ->where('kind', 'webserver_config')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+    @endphp
+
+    {{-- Bridge poll: a just-queued apply hasn't written its console row yet, so
+         nudge a few re-renders after a toggle until the banner can self-poll. --}}
+    @if ($watchApply)
+        <div wire:poll.2s="tickApplyWatch" class="hidden" aria-hidden="true"></div>
+    @endif
+
+    @include('livewire.partials.console-action-banner-static', [
+        'run' => $maintenanceConsoleRun,
+        'kindLabels' => (array) config('console_actions.kinds', []),
+    ])
+
     <div class="mb-6 border-b border-brand-ink/10">
         <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Maintenance sections') }}">
             <button type="button" wire:click="setMaintenanceTab('window')" @class([$maintTabBase, $maintenance_tab === 'window' ? $maintTabOn : $maintTabOff])>
@@ -391,6 +418,9 @@
             </div>
 
             <div class="space-y-6 px-6 py-6 sm:px-7">
+                {{-- apt/host operations use a separate cache-streamed remote task
+                     (not console_actions), so they keep their own banner here on
+                     the Operations tab. Guarded so it never renders an empty shell. --}}
                 @if ($maintenanceRemoteTaskId)
                     <x-workspace-console-banner
                         :status="$bannerStatus"
@@ -467,21 +497,6 @@
         {{-- Enable / settings form (window tab) --}}
         <div @class(['hidden' => $maintenance_tab !== 'window'])>
 
-        {{-- Live apply console: the suspend/resume webserver config runs over SSH
-             per affected site. Surface each run here so a failed nginx -t/reload
-             is visible in real time instead of silently leaving the window
-             half-applied. Briefly nudge re-renders after a toggle so the banner
-             appears as soon as the queued job creates its console row. --}}
-        @if ($watchApply)
-            <div wire:poll.2s="tickApplyWatch" class="hidden" aria-hidden="true"></div>
-        @endif
-        @foreach (collect($report['site_rows'])->where('status', '!=', 'excluded') as $maintApplyRow)
-            @livewire(
-                'console-action-banner',
-                ['subjectType' => \App\Models\Site::class, 'subjectId' => (string) $maintApplyRow['id']],
-                key('maint-apply-banner-'.$maintApplyRow['id'])
-            )
-        @endforeach
 
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">

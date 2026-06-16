@@ -75,10 +75,10 @@ class WorkspaceMaintenance extends Component
     public ?string $pendingActionKey = null;
 
     /**
-     * Briefly poll after an enable/disable so the per-site apply console banners
-     * surface as soon as the queued webserver-config job creates its row (a
-     * freshly-mounted banner isn't polling yet, so without this nudge the live
-     * "reaching out to the server" output wouldn't appear until the next render).
+     * Briefly nudge re-renders after an enable/disable so the general console
+     * banner surfaces the queued webserver-config apply the instant its row is
+     * written (a freshly-queued job has no console row yet, so without this the
+     * banner — which only self-polls once a run exists — wouldn't appear).
      */
     public bool $watchApply = false;
 
@@ -309,7 +309,7 @@ class WorkspaceMaintenance extends Component
         $this->authorize('update', $this->server);
 
         try {
-            $result = $maintenance->disable($this->server, auth()->user());
+            $result = $maintenance->disable($this->server, request()->user());
         } catch (\RuntimeException $e) {
             $this->toastError($e->getMessage());
 
