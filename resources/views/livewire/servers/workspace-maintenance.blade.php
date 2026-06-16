@@ -466,6 +466,23 @@
 
         {{-- Enable / settings form (window tab) --}}
         <div @class(['hidden' => $maintenance_tab !== 'window'])>
+
+        {{-- Live apply console: the suspend/resume webserver config runs over SSH
+             per affected site. Surface each run here so a failed nginx -t/reload
+             is visible in real time instead of silently leaving the window
+             half-applied. Briefly nudge re-renders after a toggle so the banner
+             appears as soon as the queued job creates its console row. --}}
+        @if ($watchApply)
+            <div wire:poll.2s="tickApplyWatch" class="hidden" aria-hidden="true"></div>
+        @endif
+        @foreach (collect($report['site_rows'])->where('status', '!=', 'excluded') as $maintApplyRow)
+            @livewire(
+                'console-action-banner',
+                ['subjectType' => \App\Models\Site::class, 'subjectId' => (string) $maintApplyRow['id']],
+                key('maint-apply-banner-'.$maintApplyRow['id'])
+            )
+        @endforeach
+
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <x-icon-badge tone="amber">

@@ -74,6 +74,30 @@ class WorkspaceMaintenance extends Component
     /** Action key awaiting confirmation in the operations confirm modal. */
     public ?string $pendingActionKey = null;
 
+    /**
+     * Briefly poll after an enable/disable so the per-site apply console banners
+     * surface as soon as the queued webserver-config job creates its row (a
+     * freshly-mounted banner isn't polling yet, so without this nudge the live
+     * "reaching out to the server" output wouldn't appear until the next render).
+     */
+    public bool $watchApply = false;
+
+    public int $applyWatchTicks = 0;
+
+    /** Bounded poll target: stop nudging after ~30s so quiet pages go idle. */
+    public function tickApplyWatch(): void
+    {
+        if (++$this->applyWatchTicks >= 15) {
+            $this->watchApply = false;
+        }
+    }
+
+    protected function beginWatchingApply(): void
+    {
+        $this->watchApply = true;
+        $this->applyWatchTicks = 0;
+    }
+
     public function mount(Server $server): void
     {
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
@@ -215,6 +239,7 @@ class WorkspaceMaintenance extends Component
 
         $this->server->refresh();
         $this->closeEnableModal();
+        $this->beginWatchingApply();
 
         $this->toastSuccess(trans_choice(
             'Maintenance enabled — :count site suspended.|Maintenance enabled — :count sites suspended.',
@@ -293,6 +318,7 @@ class WorkspaceMaintenance extends Component
 
         $this->server->refresh();
         $this->closeDisableModal();
+        $this->beginWatchingApply();
 
         $this->toastSuccess(trans_choice(
             'Maintenance cleared — :count site resumed.|Maintenance cleared — :count sites resumed.',
