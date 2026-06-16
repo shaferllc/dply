@@ -418,32 +418,40 @@
                 @foreach ($operationGroups as $group)
                     <div wire:key="maint-ops-{{ \Illuminate\Support\Str::slug($group['title']) }}">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __($group['title']) }}</p>
-                        <div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            @foreach ($group['actions'] as $action)
-                                <div wire:key="maint-op-{{ $action['key'] }}" class="flex flex-col rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <p class="text-sm font-semibold text-brand-ink">{{ $action['label'] }}</p>
-                                        @if ($action['danger'])
-                                            <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
-                                        @endif
-                                    </div>
-                                    @if ($action['description'] !== '')
-                                        <p class="mt-1 flex-1 text-xs leading-relaxed text-brand-moss">{{ $action['description'] }}</p>
-                                    @endif
-                                    <button
-                                        type="button"
-                                        wire:click="confirmAction('{{ $action['key'] }}')"
-                                        @disabled(! $opsReady || $bannerBusy)
-                                        @class([
-                                            'mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
-                                            'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50' => $action['danger'],
-                                            'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $action['danger'],
-                                        ])
-                                    >
-                                        {{ __('Run') }}
-                                    </button>
-                                </div>
-                            @endforeach
+                        <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
+                            <table class="w-full table-auto text-sm">
+                                <tbody class="divide-y divide-brand-ink/10">
+                                    @foreach ($group['actions'] as $action)
+                                        <tr wire:key="maint-op-{{ $action['key'] }}" class="align-top">
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-semibold text-brand-ink">{{ $action['label'] }}</span>
+                                                    @if ($action['danger'])
+                                                        <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
+                                                    @endif
+                                                </div>
+                                                @if ($action['description'] !== '')
+                                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $action['description'] }}</p>
+                                                @endif
+                                            </td>
+                                            <td class="w-px whitespace-nowrap px-4 py-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    wire:click="confirmAction('{{ $action['key'] }}')"
+                                                    @disabled(! $opsReady || $bannerBusy)
+                                                    @class([
+                                                        'inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
+                                                        'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50' => $action['danger'],
+                                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $action['danger'],
+                                                    ])
+                                                >
+                                                    {{ __('Run') }}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 @endforeach
