@@ -151,6 +151,28 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             throw new \RuntimeException('Nginx test or reload failed. Output: '.Str::limit($out, 2000));
         }
 
+        // nginx -t passed and reloaded, but a clean exit is NOT proof this site
+        // is actually being served. When two enabled vhosts declare the same
+        // server_name, nginx keeps the one that loads first (sites-enabled is
+        // globbed in sorted order) and logs the rest as "conflicting server name
+        // ... ignored" — a *warning*, not an error, so the exit code is still 0.
+        // If the ignored block is ours, every request for that host is served by
+        // the other vhost and the config we just wrote is dead on arrival.
+        // Reporting "reload OK" here is how a stale duplicate vhost turned into an
+        // invisible, hours-long outage (see the tracely.cloud orphan). Detect it.
+        $shadowed = $this->shadowedServerNames($out, $config, $server, $ssh, basename((string) $confFile));
+        if ($shadowed !== []) {
+            $names = implode(', ', $shadowed);
+            $emit->error('nginx reloaded but is IGNORING this vhost: '.$names
+                .' is already served by another enabled server block that loads first. '
+                .'The config was written but serves nothing until the conflicting vhost is removed.', 'nginx');
+
+            // Deliberately no rollback: our vhost is correct — the stale/duplicate
+            // one is the problem. Rolling back would only discard the right config.
+            throw new \RuntimeException('nginx is ignoring this site\'s vhost — conflicting server_name(s) served by another enabled vhost: '.$names
+                .'. Remove the duplicate vhost in /etc/nginx/sites-enabled and re-apply.');
+        }
+
         $emit->success('reload OK', 'nginx');
 
         $site->update([
@@ -159,6 +181,75 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         ]);
 
         return $out;
+    }
+
+    /**
+     * Given the nginx -t/reload output and the vhost we just wrote, return the
+     * server_names that nginx reported as conflicting AND that resolve to a
+     * *different* enabled vhost loading ahead of ours — i.e. the hostnames this
+     * site declares but no longer actually serves. Empty when there is no
+     * conflict, or when the conflict exists but ours is the winning block (a
+     * fragile-but-currently-working duplicate, surfaced as a warning by the
+     * caller's normal output streaming rather than a hard failure).
+     *
+     * Read-only: the sites-enabled files are world-readable, so this needs no
+     * privileged shell.
+     *
+     * @return list<string>
+     */
+    protected function shadowedServerNames(string $out, string $config, Server $server, SshConnection $ssh, string $ourBasename): array
+    {
+        if (! preg_match_all('/conflicting server name "([^"]+)"/i', $out, $m)) {
+            return [];
+        }
+        $conflicted = array_values(array_unique(array_map('strtolower', $m[1])));
+
+        // Restrict to names THIS vhost declares — a conflict on some unrelated
+        // host on the box is not this apply's problem.
+        $ours = [];
+        if (preg_match_all('/^\s*server_name\s+([^;]+);/mi', $config, $sm)) {
+            foreach ($sm[1] as $list) {
+                foreach (preg_split('/\s+/', trim($list)) ?: [] as $name) {
+                    if ($name !== '' && $name !== '_') {
+                        $ours[strtolower($name)] = true;
+                    }
+                }
+            }
+        }
+        $conflicted = array_values(array_filter($conflicted, static fn (string $n): bool => isset($ours[$n])));
+        if ($conflicted === []) {
+            return [];
+        }
+
+        // For each conflicted name, find which enabled vhost loads first (nginx
+        // includes sites-enabled/*.conf in sorted order, so first-sorted wins).
+        // If the winner isn't our file, this site is shadowed for that name.
+        $shadowed = [];
+        foreach ($conflicted as $name) {
+            $winner = $this->firstEnabledVhostFor($server, $ssh, $name);
+            if ($winner !== null && $winner !== $ourBasename) {
+                $shadowed[] = $name;
+            }
+        }
+
+        return $shadowed;
+    }
+
+    /**
+     * Basename of the first (sorted) file in sites-enabled whose server_name
+     * directive lists $name — i.e. the vhost nginx actually serves it from.
+     * Null when none matched (parsing differences, edge layouts).
+     */
+    protected function firstEnabledVhostFor(Server $server, SshConnection $ssh, string $name): ?string
+    {
+        $script = 'for f in $(ls -1 /etc/nginx/sites-enabled/ 2>/dev/null | sort); do '
+            .'if grep -Eiq "server_name[^;]*([[:space:]]|;|^)'.preg_replace('/[^a-z0-9.\-]/i', '', $name).'([[:space:].]|;|$)" '
+            ."/etc/nginx/sites-enabled/\"\$f\" 2>/dev/null; then echo \"\$f\"; break; fi; done";
+
+        $out = trim($ssh->exec($script, 30));
+        $first = trim((string) (preg_split('/\r\n|\r|\n/', $out)[0] ?? ''));
+
+        return $first !== '' ? $first : null;
     }
 
     /**
