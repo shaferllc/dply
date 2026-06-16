@@ -8,9 +8,14 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesMaintenanceNotifications;
+use App\Livewire\Servers\Concerns\ManagesPreferredMaintenanceSchedule;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
+use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Models\AuditLog;
+use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Models\Site;
 use App\Services\Servers\ServerMaintenanceWindow;
 use App\Support\Servers\MaintenanceWindow;
 use Illuminate\Contracts\View\View;
@@ -38,6 +43,7 @@ class WorkspaceMaintenance extends Component
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesMaintenanceNotifications;
+    use ManagesPreferredMaintenanceSchedule;
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use RunsServerMaintenanceActions;
@@ -82,6 +88,7 @@ class WorkspaceMaintenance extends Component
         }
 
         $this->bootWorkspace($server);
+        $this->loadPreferredMaintenanceSchedule();
 
         $maintenance = app(ServerMaintenanceWindow::class);
         $maintenance->refreshExpired($server, auth()->user());
@@ -359,6 +366,109 @@ class WorkspaceMaintenance extends Component
         return $resolved;
     }
 
+    /**
+     * Recent visitor-maintenance enable/disable events for this server, read
+     * from the audit log (already written by ServerMaintenanceWindow).
+     *
+     * @return list<array{action: string, label: string, at: \Illuminate\Support\Carbon, by: ?string, detail: ?string, ok: bool}>
+     */
+    protected function maintenanceHistory(int $limit = 12): array
+    {
+        $rows = AuditLog::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->whereIn('action', ['server.maintenance.enabled', 'server.maintenance.disabled'])
+            ->with('user:id,name,email')
+            ->latest()
+            ->limit($limit)
+            ->get();
+
+        return $rows->map(function (AuditLog $row): array {
+            $values = is_array($row->new_values) ? $row->new_values : [];
+            $enabled = $row->action === 'server.maintenance.enabled';
+
+            if ($enabled) {
+                $count = (int) ($values['suspended_count'] ?? 0);
+                $detail = trans_choice(':count site suspended|:count sites suspended', $count, ['count' => $count]);
+                if (! empty($values['auto_expired'])) {
+                    $detail .= ' · '.__('auto-expired');
+                }
+            } else {
+                $count = (int) ($values['resumed_count'] ?? 0);
+                $detail = trans_choice(':count site resumed|:count sites resumed', $count, ['count' => $count]);
+                if (! empty($values['auto_expired'])) {
+                    $detail .= ' · '.__('auto-cleared on expiry');
+                }
+            }
+
+            return [
+                'action' => $row->action,
+                'label' => $enabled ? __('Maintenance enabled') : __('Maintenance cleared'),
+                'at' => $row->created_at,
+                'by' => $row->user?->name ?: $row->user?->email,
+                'detail' => $detail,
+                'ok' => ! $enabled,
+            ];
+        })->all();
+    }
+
+    /**
+     * Sites on this server whose most recent webserver-config apply failed —
+     * the silent failure mode that can leave a box broken after a maintenance
+     * toggle. Surfaced with a one-click re-apply.
+     *
+     * @return list<array{site_id: string, name: string, error: string, at: ?\Illuminate\Support\Carbon}>
+     */
+    protected function recentApplyFailures(): array
+    {
+        $siteIds = $this->server->sites->pluck('id')->map(fn ($id): string => (string) $id)->all();
+        if ($siteIds === []) {
+            return [];
+        }
+
+        $latest = ConsoleAction::query()
+            ->where('kind', 'webserver_config')
+            ->whereIn('subject_id', $siteIds)
+            ->whereIn('id', function ($q) use ($siteIds): void {
+                $q->selectRaw('max(id)')
+                    ->from('console_actions')
+                    ->where('kind', 'webserver_config')
+                    ->whereIn('subject_id', $siteIds)
+                    ->groupBy('subject_id');
+            })
+            ->where('status', 'failed')
+            ->whereNull('dismissed_at')
+            ->get();
+
+        $names = $this->server->sites->keyBy(fn (Site $s): string => (string) $s->id);
+
+        return $latest->map(fn (ConsoleAction $a): array => [
+            'site_id' => (string) $a->subject_id,
+            'name' => $names->get((string) $a->subject_id)?->name ?? (string) $a->subject_id,
+            'error' => trim((string) ($a->error ?? '')) ?: __('Webserver config apply failed.'),
+            'at' => $a->finished_at ?? $a->created_at,
+        ])->values()->all();
+    }
+
+    /**
+     * Re-dispatch the webserver-config apply for a site whose last apply failed
+     * (e.g. a maintenance toggle left it broken).
+     */
+    public function reapplyWebserverConfig(string $siteId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $site = $this->server->sites->firstWhere('id', $siteId);
+        if ($site === null) {
+            $this->toastError(__('Unknown site.'));
+
+            return;
+        }
+
+        ApplySiteWebserverConfigJob::dispatch((string) $site->id, (string) auth()->id());
+        $this->toastSuccess(__('Re-applying webserver config for :site…', ['site' => $site->name]));
+    }
+
     public function render(ServerMaintenanceWindow $maintenance): View
     {
         if ($this->comingSoonPreview) {
@@ -395,6 +505,10 @@ class WorkspaceMaintenance extends Component
             'preview' => $report['preview'],
             'eligibleCount' => $report['summary']['eligible'],
             'recurringWindow' => $recurringWindow,
+            'maintenanceWeekdays' => config('server_settings.maintenance_weekdays', []),
+            'maintenanceHistory' => $this->maintenanceHistory(),
+            'applyFailures' => $this->recentApplyFailures(),
+            'canEditSchedule' => ! $this->currentUserIsDeployer(),
             'cronMaintenanceActive' => $cronMaintenanceActive,
             'cronMaintenanceUntil' => $org?->cron_maintenance_until,
             'cronMaintenanceNote' => $org?->cron_maintenance_note,

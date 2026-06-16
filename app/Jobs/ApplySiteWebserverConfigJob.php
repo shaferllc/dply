@@ -8,7 +8,7 @@ use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBasicAuthUser;
 use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -16,11 +16,16 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
+class ApplySiteWebserverConfigJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
-    public int $tries = 1;
+    /**
+     * Retry transient apply failures (SSH blips, mid-reload races). A rapid
+     * maintenance suspend→resume toggle previously left the box broken when a
+     * single attempt failed and nothing retried or surfaced it.
+     */
+    public int $tries = 3;
 
     public function __construct(
         public string $siteId,
@@ -30,6 +35,17 @@ class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
 
     /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
     public int $uniqueFor = 300;
+
+    /**
+     * Back off between retries (seconds). Gives a flapping nginx/SSH state a
+     * moment to settle before re-testing and reloading.
+     *
+     * @return list<int>
+     */
+    public function backoff(): array
+    {
+        return [5, 20];
+    }
 
     public function uniqueId(): string
     {

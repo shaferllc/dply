@@ -375,76 +375,8 @@
         </div>
     </div>
 
-    <div id="settings-maintenance" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Advisory only — the days and hours you\'d prefer Dply to run disruptive work (upgrades, reboots). Dply uses it to warn before risky actions; it doesn\'t pause cron or suspend sites. Times use your Dply timezone preference above, not the server OS clock.') }}
-                </p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
-        <form wire:submit="saveMaintenanceWindow" class="space-y-5">
-            <fieldset @disabled(! $this->canEditServerSettings)>
-                <legend class="text-sm font-medium text-brand-ink">{{ __('Preferred days') }}</legend>
-                <div class="mt-2 flex flex-wrap gap-3">
-                    @foreach ($maintenanceWeekdays as $key => $label)
-                        <label class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-sm">
-                            <input type="checkbox" wire:model="settingsMaintenanceDays" value="{{ $key }}" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage" />
-                            <span>{{ $label }}</span>
-                        </label>
-                    @endforeach
-                </div>
-                <x-input-error :messages="$errors->get('settingsMaintenanceDays')" class="mt-2" />
-            </fieldset>
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div>
-                    <x-input-label for="settings-maint-start" value="{{ __('Start (local)') }}" />
-                    <input
-                        id="settings-maint-start"
-                        type="time"
-                        wire:model="settingsMaintenanceStart"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        @disabled(! $this->canEditServerSettings)
-                    />
-                    <x-input-error :messages="$errors->get('settingsMaintenanceStart')" class="mt-2" />
-                </div>
-                <div>
-                    <x-input-label for="settings-maint-end" value="{{ __('End (local)') }}" />
-                    <input
-                        id="settings-maint-end"
-                        type="time"
-                        wire:model="settingsMaintenanceEnd"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        @disabled(! $this->canEditServerSettings)
-                    />
-                    <x-input-error :messages="$errors->get('settingsMaintenanceEnd')" class="mt-2" />
-                </div>
-            </div>
-            <div>
-                <x-input-label for="settings-maint-note" value="{{ __('Note') }}" />
-                <textarea
-                    id="settings-maint-note"
-                    wire:model="settingsMaintenanceNote"
-                    rows="3"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                    @disabled(! $this->canEditServerSettings)
-                ></textarea>
-                <x-input-error :messages="$errors->get('settingsMaintenanceNote')" class="mt-2" />
-            </div>
-            @if ($this->canEditServerSettings)
-                <div class="flex justify-end">
-                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save preferred schedule') }}</x-primary-button>
-                </div>
-            @endif
-        </form>
-        </div>
-    </div>
+    {{-- The preferred maintenance schedule editor moved to the server
+         Maintenance workspace → Schedule tab (servers.maintenance). --}}
 
     @if ($showRepairCard)
         <div id="settings-connection-repair" class="{{ $card }} scroll-mt-24">
