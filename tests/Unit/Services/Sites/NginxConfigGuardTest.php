@@ -33,6 +33,20 @@ test('foreignDirectives lists hand-added directives an overwrite would remove', 
         ->toContain('server > location /internal');
 });
 
+test('a dply-managed on-disk file never reports foreign directives', function () use ($server) {
+    // The on-disk vhost was written by an earlier dply generation that emitted an
+    // error-page block and security headers; the new generation drops them. These
+    // are dply's own directives, not hand edits, so nothing should be flagged.
+    $current = $this->guard->stamp($server('    listen 80;
+    add_header X-Content-Type-Options nosniff always;
+    error_page 500 502 503 504 /__dply__/errors/500.html;
+    location = /__dply__/errors/500.html { internal; }'), 'tracely.example.com');
+
+    $incoming = $this->guard->stamp($server('    listen 80;'), 'tracely.example.com');
+
+    expect($this->guard->foreignDirectives($current, $incoming))->toBe([]);
+});
+
 test('the ownership marker comment is not treated as a foreign directive', function () use ($server) {
     $config = $server('    listen 80;');
     $stamped = $this->guard->stamp($config, 'example.com');

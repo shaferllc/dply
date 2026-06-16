@@ -37,16 +37,24 @@ final class NginxConfigGuard
 
     /**
      * Directive signatures present in $current that the $incoming config would
-     * remove. Empty when there is nothing on disk yet, when the incoming config
-     * is a structural superset, or when either side fails to parse (we never
-     * block on a parse failure — `nginx -t` is the real gate).
+     * remove. Empty when there is nothing on disk yet, when the on-disk file is
+     * already dply-managed (see below), when the incoming config is a structural
+     * superset, or when either side fails to parse (we never block on a parse
+     * failure — `nginx -t` is the real gate).
+     *
+     * A *foreign* directive is one in a file dply did NOT author. If the on-disk
+     * file carries our ownership marker, dply wrote it, so any directive it drops
+     * between generations is a dply-vs-dply difference — never a hand edit. Without
+     * this gate, flipping a feature that conditionally emits a block (managed error
+     * pages, security headers, before/after includes) makes the guard brand dply's
+     * own previous output as "manual directives not produced by dply".
      *
      * @return list<string>
      */
     public function foreignDirectives(?string $current, string $incoming): array
     {
         $current = trim((string) $current);
-        if ($current === '') {
+        if ($current === '' || $this->isManaged($current)) {
             return [];
         }
 
