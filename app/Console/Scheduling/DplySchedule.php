@@ -27,6 +27,7 @@ use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
+use App\Console\Commands\MeterServerLogUsageCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
@@ -165,6 +166,19 @@ final class DplySchedule
         $schedule->command(CollectRealtimeUsageCommand::class)
             ->hourly()
             ->name('realtime-usage-today')
+            ->withoutOverlapping();
+
+        // dply Logs ingest metering (read-only; no billing yet). Hourly keeps the
+        // current day's GB/day fresh in the UI; the nightly pass finalizes the prior
+        // day after late-arriving lines settle, before the 02:10 billing snapshot.
+        $schedule->command(MeterServerLogUsageCommand::class)
+            ->hourly()
+            ->name('server-log-usage-today')
+            ->withoutOverlapping();
+
+        $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday' => true])
+            ->dailyAt('02:05')
+            ->name('server-log-usage-finalize')
             ->withoutOverlapping();
 
         $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);

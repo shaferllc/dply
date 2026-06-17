@@ -9,6 +9,8 @@ use App\Jobs\InstallLogAgentJob;
 use App\Jobs\UninstallLogAgentJob;
 use App\Models\Server;
 use App\Models\ServerLogAgent;
+use App\Models\ServerLogUsageDaily;
+use App\Services\Logs\ServerLogEntitlements;
 
 /**
  * The single code path for the dply Logs add-on lifecycle — enable, re-sync,
@@ -25,6 +27,8 @@ use App\Models\ServerLogAgent;
  */
 class ManageServerLogShipping
 {
+    public function __construct(private ServerLogEntitlements $entitlements) {}
+
     /**
      * Enable shipping on a server: create the agent row if needed and dispatch
      * the install. Idempotent-ish — re-enabling an existing-but-idle agent simply
@@ -35,7 +39,7 @@ class ManageServerLogShipping
      */
     public function enable(Server $server, ?array $sources = null): ServerLogAgent
     {
-        $this->assertAddonAvailable();
+        $this->assertAddonAvailable($server);
         $this->assertVmHost($server);
 
         $agent = ServerLogAgent::query()->firstOrCreate(
@@ -68,7 +72,7 @@ class ManageServerLogShipping
      */
     public function resync(Server $server): ServerLogAgent
     {
-        $this->assertAddonAvailable();
+        $this->assertAddonAvailable($server);
 
         $agent = $server->logAgent;
         if ($agent === null) {
@@ -138,6 +142,9 @@ class ManageServerLogShipping
             ? trim((string) $aggregator->endpoint)
             : trim((string) config('server_logs.aggregator_endpoint', ''));
 
+        $entitlement = $this->entitlements->forOrganization($server->organization);
+        $monthBytes = $this->monthToDateBytes($server);
+
         return [
             'server_id' => $server->id,
             'addon_enabled' => (bool) config('server_logs.enabled', false),
@@ -151,13 +158,40 @@ class ManageServerLogShipping
                 : ServerLogAgent::configuredSourceDefaults(),
             'destination' => $endpoint !== '' ? $endpoint : 'blackhole (no aggregator endpoint configured)',
             'shipping' => $endpoint !== '',
+            'entitlement' => $entitlement->toArray(),
+            // Org-wide ingest this calendar month (the org is the billing unit;
+            // metered from server_log_usage_daily — PR A). null included = unlimited.
+            'usage' => [
+                'month_bytes' => $monthBytes,
+                'included_bytes' => $entitlement->includedBytes(),
+                'over_included' => $entitlement->isOverIncluded($monthBytes),
+                'retention_days' => $entitlement->retentionDays,
+            ],
         ];
     }
 
-    private function assertAddonAvailable(): void
+    /**
+     * Sum the org's metered ingest bytes for the current calendar month (UTC),
+     * across every server it ships from. Source of truth = {@see ServerLogUsageDaily}.
+     */
+    private function monthToDateBytes(Server $server): int
     {
+        return (int) ServerLogUsageDaily::query()
+            ->where('organization_id', $server->organization_id)
+            ->whereDate('day', '>=', now()->startOfMonth()->toDateString())
+            ->sum('bytes');
+    }
+
+    private function assertAddonAvailable(Server $server): void
+    {
+        // Environment kill-switch first (ships the add-on dark before the
+        // aggregator/ClickHouse tier exists in an env), then the per-org plan gate.
         if (! (bool) config('server_logs.enabled', false)) {
             throw new LogShippingException('The dply Logs add-on is not enabled in this environment.');
+        }
+
+        if (! $this->entitlements->forOrganization($server->organization)->available) {
+            throw new LogShippingException('The dply Logs add-on is not available on your current plan.');
         }
     }
 
