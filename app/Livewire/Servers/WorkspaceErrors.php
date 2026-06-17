@@ -12,6 +12,7 @@ use App\Livewire\Servers\Concerns\ManagesErrorsNotifications;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ErrorEvent;
 use App\Models\Server;
+use App\Services\Logs\ServerLogCorrelator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
@@ -46,9 +47,49 @@ class WorkspaceErrors extends Component
     #[Url(as: 'tab', except: 'stream')]
     public string $errorsTab = 'stream';
 
+    /** True when this server ships logs — gates the per-error "Logs" correlation jump. */
+    public bool $showLogCorrelation = false;
+
+    /** Drawer state for the "logs around this error" slice (Tier-1 correlation). */
+    public bool $errorLogsOpen = false;
+
+    public ?string $errorLogsLabel = null;
+
+    /** @var array{instant:string,from:string,to:string,logs:list<array<string,mixed>>}|null */
+    public ?array $errorLogsResult = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->showLogCorrelation = $server->logAgent()->exists();
+    }
+
+    /**
+     * Open the "logs around this error" drawer: the host log slice surrounding
+     * when the error occurred, on this server. A ClickHouse READ (like the Logs
+     * explorer), not SSH — safe to run inline. Errors not on this server, or with
+     * no shipped logs in the window, simply show an empty drawer.
+     */
+    public function openLogsForError(string $errorId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $error = ErrorEvent::query()->forServer((string) $this->server->id)->find($errorId);
+        if ($error === null) {
+            return;
+        }
+
+        $instant = $error->occurred_at ?? $error->created_at;
+        $this->errorLogsLabel = $instant?->toDayDateTimeString();
+        $this->errorLogsResult = app(ServerLogCorrelator::class)->forErrorEvent($error);
+        $this->errorLogsOpen = true;
+    }
+
+    public function closeLogsForError(): void
+    {
+        $this->errorLogsOpen = false;
+        $this->errorLogsResult = null;
+        $this->errorLogsLabel = null;
     }
 
     public function setErrorsWorkspaceTab(string $tab): void

@@ -39,4 +39,6 @@
     @include('livewire.partials.confirm-action-modal')
 
     @include('livewire.partials.create-notification-channel-modal')
+
+    @include('livewire.servers.partials.errors.logs-drawer')
 </x-server-workspace-layout>

@@ -118,6 +118,21 @@ Ordered by willingness-to-pay. Each is independently shippable once the gate exi
 | **Search power** | extend `LogExplorerQuery` | Saved searches, live tail, longer ranges, aggregations. |
 | **Advanced redaction / compliance** | existing edge VRL redaction | Custom PII patterns, audit, residency — enterprise toggle. |
 
+### Cross-signal correlation — the moat (partially BUILT)
+The differentiator no standalone log tool can copy: dply already owns the deploys,
+the errors stream, uptime incidents, and metrics, so it can jump from any of those
+straight into the log slice that surrounded the event.
+- **Shared primitive (BUILT):** `LogExplorerQuery::window($server, $from, $to)` +
+  `::around($server, $instant, ±s)` — bounded, chronological, org+server-scoped reads.
+  `ServerLogCorrelator` maps domain signals onto them (`forErrorEvent()`, `inWindow()`).
+- **Error → logs (BUILT):** the server Errors stream has a per-row **Logs** button
+  (`WorkspaceErrors::openLogsForError()`) that opens a drawer of the host logs around
+  `occurred_at`. Gated on `showLogCorrelation` (server ships logs) so site error views
+  are untouched. A ClickHouse read, not SSH — inline like the explorer.
+- **Deploy / uptime → logs (primitive ready, UI pending):** the deploy timeline and
+  uptime-incident views call `ServerLogCorrelator::inWindow($server, $start, $end)` with
+  the event's timestamps — same drawer, not yet wired.
+
 ---
 
 ## Phase 3 — Trust features (table stakes once money is attached)
