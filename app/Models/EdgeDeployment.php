@@ -160,7 +160,7 @@ class EdgeDeployment extends Model
 
     public function readBuildLog(?Site $site = null): ?string
     {
-        if ($this->build_log_path === '') {
+        if (blank($this->build_log_path)) {
             return null;
         }
 
