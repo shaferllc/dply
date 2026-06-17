@@ -40,7 +40,7 @@ class PaginatedDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -76,7 +76,8 @@ class PaginatedDecorator
     }
 
     /**
-     * Paginate a query builder.
+     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @return LengthAwarePaginator<int, \Illuminate\Database\Eloquent\Model>
      */
     protected function paginate(Builder $query): LengthAwarePaginator
     {

@@ -6,6 +6,7 @@ namespace App\Actions\Console;
 
 use App\Actions\ActionRegistry;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class GenerateActionDocsCommand extends Command
@@ -69,7 +70,10 @@ class GenerateActionDocsCommand extends Command
         return Command::SUCCESS;
     }
 
-    protected function generateMarkdown($actions): string
+    /**
+     * @param  Collection<int, string>  $actions
+     */
+    protected function generateMarkdown(Collection $actions): string
     {
         $docs = "# Actions Documentation\n\n";
         $docs .= 'Generated: '.now()->toDateTimeString()."\n\n";
@@ -113,7 +117,10 @@ class GenerateActionDocsCommand extends Command
         return $docs;
     }
 
-    protected function generateOpenApi($actions): string
+    /**
+     * @param  Collection<int, string>  $actions
+     */
+    protected function generateOpenApi(Collection $actions): string
     {
         $openapi = [
             'openapi' => '3.0.0',
@@ -161,7 +168,10 @@ class GenerateActionDocsCommand extends Command
         return json_encode($openapi, JSON_PRETTY_PRINT);
     }
 
-    protected function generateJson($actions): string
+    /**
+     * @param  Collection<int, string>  $actions
+     */
+    protected function generateJson(Collection $actions): string
     {
         $data = [];
 
@@ -180,6 +190,10 @@ class GenerateActionDocsCommand extends Command
         return json_encode($data, JSON_PRETTY_PRINT);
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $params
+     * @return array<string, array<string, string>>
+     */
     protected function buildParameterSchema(array $params): array
     {
         $properties = [];

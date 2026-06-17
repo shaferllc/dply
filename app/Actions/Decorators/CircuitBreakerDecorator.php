@@ -17,7 +17,7 @@ class CircuitBreakerDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -31,7 +31,7 @@ class CircuitBreakerDecorator
         }
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $key = $this->getCircuitBreakerKey();
 
@@ -124,7 +124,7 @@ class CircuitBreakerDecorator
     /**
      * Handle when circuit is open.
      */
-    protected function onCircuitOpen(string $key, ...$arguments)
+    protected function onCircuitOpen(string $key, mixed ...$arguments): mixed
     {
         if ($this->hasMethod('onCircuitOpen')) {
             return $this->callMethod('onCircuitOpen', array_merge([$key], $arguments));
@@ -179,6 +179,8 @@ class CircuitBreakerDecorator
 
     /**
      * Get the current circuit breaker state.
+     *
+     * @return array{failures: int, last_failure: int|null, state: string}
      */
     public function getCircuitState(): array
     {

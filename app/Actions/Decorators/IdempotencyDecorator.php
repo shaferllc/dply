@@ -12,12 +12,12 @@ class IdempotencyDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $key = $this->getIdempotencyKey(...$arguments);
         $cacheKey = $this->getCacheKey($key);
@@ -49,7 +49,7 @@ class IdempotencyDecorator
         ], $this->getTtl());
     }
 
-    protected function getIdempotencyKey(...$arguments): string
+    protected function getIdempotencyKey(mixed ...$arguments): string
     {
         if ($this->hasMethod('getIdempotencyKey')) {
             return $this->callMethod('getIdempotencyKey', $arguments);

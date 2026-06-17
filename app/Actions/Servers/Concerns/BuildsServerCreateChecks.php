@@ -21,6 +21,22 @@ trait BuildsServerCreateChecks
 
 
     /**
+     * @param  array{
+     *     credentials: \Illuminate\Support\Collection<int, mixed>,
+     *     regions: list<array<string, mixed>>,
+     *     sizes: list<array<string, mixed>>,
+     *     region_label: string,
+     *     size_label: string
+     * }  $catalog
+     * @param  array{
+     *     server_roles: list<array<string, mixed>>,
+     *     cache_services: list<array<string, mixed>>,
+     *     webservers: list<array<string, mixed>>,
+     *     php_versions: list<array<string, mixed>>,
+     *     databases: list<array<string, mixed>>
+     * }  $provisionOptions
+     * @param  array<string, mixed>|null  $providerHealth
+     * @param  array<string, array{state: string, label: string, detail: string}>  $sizeRecommendations
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
     private function cloudChecks(
@@ -88,18 +104,18 @@ trait BuildsServerCreateChecks
 
         $checks = [...$checks, ...$this->selectionChecks(
             value: $form->region,
-            options: $catalog['regions'] ?? [],
+            options: $catalog['regions'],
             field: 'region',
-            label: (string) ($catalog['region_label'] ?? __('Region')),
+            label: $catalog['region_label'],
             missingDetail: __('Choose a region before creating the server.'),
             unavailableDetail: __('The selected region is not available for the current catalog response.')
         )];
 
         $checks = [...$checks, ...$this->selectionChecks(
             value: $form->size,
-            options: $catalog['sizes'] ?? [],
+            options: $catalog['sizes'],
             field: 'size',
-            label: (string) ($catalog['size_label'] ?? __('Plan / size')),
+            label: $catalog['size_label'],
             missingDetail: __('Choose a size before creating the server.'),
             unavailableDetail: __('The selected size is not available for the current catalog response.')
         )];
@@ -130,18 +146,20 @@ trait BuildsServerCreateChecks
             }
         }
 
-        if (($catalog['regions'] ?? []) === [] && $form->provider_credential_id !== '') {
+        if ($catalog['regions'] === [] && $form->provider_credential_id !== '') {
             $checks[] = $this->check('regions_unverified', 'warning', __('Region availability could not be verified'), __('The provider catalog did not return regions just now. You can continue if you trust the current selection.'), false, 'region');
         }
 
-        if (($catalog['sizes'] ?? []) === [] && $form->provider_credential_id !== '') {
+        if ($catalog['sizes'] === [] && $form->provider_credential_id !== '') {
             $checks[] = $this->check('sizes_unverified', 'warning', __('Size availability could not be verified'), __('The provider catalog did not return plan or size data just now. You can continue if you trust the current selection.'), false, 'size');
         }
 
         $sizeValue = $form->size;
         if ($sizeValue !== '' && isset($sizeRecommendations[$sizeValue])) {
             $recommendation = $sizeRecommendations[$sizeValue];
-            $role = collect(config('server_provision_options.server_roles', []))
+            /** @var list<array{id: string, label?: string}> $serverRoles */
+            $serverRoles = config('server_provision_options.server_roles', []);
+            $role = collect($serverRoles)
                 ->firstWhere('id', $form->server_role);
             $roleLabel = is_array($role) && filled($role['label'] ?? null)
                 ? (string) $role['label']
@@ -171,6 +189,7 @@ trait BuildsServerCreateChecks
     }
 
     /**
+     * @param  array<string, mixed>  $customConnectionTest
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
     private function customChecks(ServerCreateForm $form, bool $canCreateServer, bool $hasUserSshKeys, bool $hasProvisionableUserSshKeys, array $customConnectionTest, bool $hasLinkedCredential): array
@@ -214,7 +233,9 @@ trait BuildsServerCreateChecks
         }
 
         $scriptKeys = array_keys(config('setup_scripts.scripts', []));
-        $installProfileIds = collect(config('server_provision_options.install_profiles', []))->pluck('id')->filter()->values()->all();
+        /** @var list<array{id: string}> $installProfiles */
+        $installProfiles = config('server_provision_options.install_profiles', []);
+        $installProfileIds = array_values(array_filter(array_column($installProfiles, 'id'), 'is_string'));
 
         try {
             Validator::make(
@@ -259,9 +280,10 @@ trait BuildsServerCreateChecks
                 false
             );
         } elseif (($customConnectionTest['matches_current_form'] ?? false) && in_array(($customConnectionTest['state'] ?? 'idle'), ['warning', 'error'], true)) {
+            $connectionState = (string) $customConnectionTest['state'];
             $checks[] = $this->check(
                 'custom_verification',
-                (string) (($customConnectionTest['state'] ?? 'warning') === 'error' ? 'error' : 'warning'),
+                $connectionState === 'error' ? 'error' : 'warning',
                 __('SSH test failed'),
                 (string) ($customConnectionTest['message'] ?? __('The most recent SSH test failed for these connection details.')),
                 false
@@ -280,6 +302,14 @@ trait BuildsServerCreateChecks
     }
 
     /**
+     * @param  array{
+     *     credentials: \Illuminate\Support\Collection<int, mixed>,
+     *     regions: list<array<string, mixed>>,
+     *     sizes: list<array<string, mixed>>,
+     *     region_label: string,
+     *     size_label: string
+     * }  $catalog
+     * @param  array<string, mixed>|null  $providerHealth
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
     private function digitalOceanFunctionsChecks(
@@ -365,6 +395,14 @@ trait BuildsServerCreateChecks
     }
 
     /**
+     * @param  array{
+     *     credentials: \Illuminate\Support\Collection<int, mixed>,
+     *     regions: list<array<string, mixed>>,
+     *     sizes: list<array<string, mixed>>,
+     *     region_label: string,
+     *     size_label: string
+     * }  $catalog
+     * @param  array<string, mixed>|null  $providerHealth
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
     private function digitalOceanKubernetesChecks(
@@ -487,6 +525,14 @@ trait BuildsServerCreateChecks
     }
 
     /**
+     * @param  array{
+     *     credentials: \Illuminate\Support\Collection<int, mixed>,
+     *     regions: list<array<string, mixed>>,
+     *     sizes: list<array<string, mixed>>,
+     *     region_label: string,
+     *     size_label: string
+     * }  $catalog
+     * @param  array<string, mixed>|null  $providerHealth
      * @return list<array{key:string,severity:'error'|'warning'|'info',label:string,detail:string,blocking:bool,field:?string}>
      */
     private function awsLambdaChecks(

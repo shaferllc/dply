@@ -40,7 +40,7 @@ class DistributedLockDecorator
 
     protected ?bool $lockAcquired = false;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -128,7 +128,7 @@ class DistributedLockDecorator
     /**
      * Get the lock key to use.
      */
-    protected function getLockKey(...$arguments): string
+    protected function getLockKey(mixed ...$arguments): string
     {
         if ($this->hasMethod('getLockKey')) {
             return $this->callMethod('getLockKey', $arguments);

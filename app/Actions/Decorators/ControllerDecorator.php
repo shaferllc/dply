@@ -22,11 +22,12 @@ class ControllerDecorator
 
     protected Route $route;
 
+    /** @var array<int, mixed> */
     protected array $middleware = [];
 
     protected bool $executedAtLeastOne = false;
 
-    public function __construct($action, Route $route)
+    public function __construct(mixed $action, Route $route)
     {
         $this->container = Container::getInstance();
         $this->route = $route;
@@ -43,6 +44,9 @@ class ControllerDecorator
         return $this->route;
     }
 
+    /**
+     * @return array<int, array{middleware: mixed, options: array<string, mixed>}>
+     */
     public function getMiddleware(): array
     {
         return array_map(function ($middleware) {
@@ -53,12 +57,15 @@ class ControllerDecorator
         }, $this->middleware);
     }
 
-    public function callAction($method, $parameters)
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    public function callAction(string $method, array $parameters): mixed
     {
         return $this->__invoke($method);
     }
 
-    public function __invoke(string $method)
+    public function __invoke(string $method): mixed
     {
         $this->refreshAction();
         $request = $this->refreshRequest();
@@ -131,11 +138,13 @@ class ControllerDecorator
         return ! in_array($method, ['asController', 'handle', '__invoke']);
     }
 
-    protected function run(string $method)
+    protected function run(string $method): mixed
     {
         if ($this->hasMethod($method)) {
             return $this->resolveFromRouteAndCall($method);
         }
+
+        return null;
     }
 
     protected function shouldValidateRequest(string $method): bool
@@ -154,7 +163,7 @@ class ControllerDecorator
             || $this->hasMethod('getValidator');
     }
 
-    protected function resolveFromRouteAndCall($method)
+    protected function resolveFromRouteAndCall(string $method): mixed
     {
         $this->container = Container::getInstance();
 
@@ -172,6 +181,10 @@ class ControllerDecorator
         return $this->action->{$method}(...array_values($arguments));
     }
 
+    /**
+     * @param  array<string, mixed>  $parameters
+     * @return array<string, mixed>
+     */
     protected function resolveRouteModelBindings(array $parameters, string $method): array
     {
         foreach ($parameters as $key => $value) {

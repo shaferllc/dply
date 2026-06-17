@@ -32,7 +32,7 @@ class LockDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -77,15 +77,15 @@ class LockDecorator
     /**
      * Get the lock key to use.
      */
-    protected function getLockKey(...$arguments): string
+    protected function getLockKey(mixed ...$arguments): string
     {
-        return $this->fromActionMethod('getLockKey', $this->getDefaultLockKey(...$arguments), $arguments);
+        return (string) $this->fromActionMethod('getLockKey', $arguments, $this->getDefaultLockKey(...$arguments));
     }
 
     /**
-     * Get the default lock key if not customized.
+     * @param  mixed  ...$arguments
      */
-    protected function getDefaultLockKey(...$arguments): string
+    protected function getDefaultLockKey(mixed ...$arguments): string
     {
         $class = get_class($this->action);
         $args = serialize($arguments);

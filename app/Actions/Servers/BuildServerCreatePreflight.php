@@ -36,6 +36,9 @@ final class BuildServerCreatePreflight
      *     php_versions: list<array<string, mixed>>,
      *     databases: list<array<string, mixed>>
      * }  $provisionOptions
+     * @param  array<string, mixed>|null  $providerHealth
+     * @param  array<string, mixed>  $customConnectionTest
+     * @param  array<string, array{state: string, label: string, detail: string}>  $sizeRecommendations
      * @return array{
      *     status: 'ready'|'warning'|'blocked',
      *     can_submit: bool,

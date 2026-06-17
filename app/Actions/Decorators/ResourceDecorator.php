@@ -3,6 +3,7 @@
 namespace App\Actions\Decorators;
 
 use App\Actions\Concerns\DecorateActions;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -50,7 +51,10 @@ class ResourceDecorator extends JsonResource
         return parent::toArray($request);
     }
 
-    public static function collection($resource)
+    /**
+     * @param  mixed  $resource
+     */
+    public static function collection($resource): AnonymousResourceCollection
     {
         // Use parent collection method if available
         if (method_exists(parent::class, 'collection')) {
@@ -61,11 +65,11 @@ class ResourceDecorator extends JsonResource
         $actionClass = static::class;
         $actionInstance = app($actionClass);
 
-        /** @var \Illuminate\Support\Collection<int, mixed> $items */
-        $items = collect($resource);
+        $items = [];
+        foreach (is_iterable($resource) ? $resource : [$resource] as $item) {
+            $items[] = new $actionClass($actionInstance, $item);
+        }
 
-        return $items->map(function ($item) use ($actionClass, $actionInstance) {
-            return new $actionClass($actionInstance, $item);
-        });
+        return new AnonymousResourceCollection($items, static::class);
     }
 }

@@ -61,6 +61,9 @@ class SeedProvisionedEnginesForServer
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $meta
+     */
     private function seedCacheService(Server $server, string $engine, array $meta): bool
     {
         $engine = trim($engine);

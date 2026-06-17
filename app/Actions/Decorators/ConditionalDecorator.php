@@ -16,7 +16,7 @@ class ConditionalDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -30,7 +30,7 @@ class ConditionalDecorator
         }
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         if (! $this->shouldExecute(...$arguments)) {
             return $this->onSkipped(...$arguments);
@@ -59,7 +59,7 @@ class ConditionalDecorator
      * @param  mixed  ...$arguments  The arguments passed to handle()
      * @return mixed
      */
-    protected function onSkipped(...$arguments)
+    protected function onSkipped(mixed ...$arguments): mixed
     {
         if ($this->hasMethod('onSkipped')) {
             return $this->callMethod('onSkipped', $arguments);

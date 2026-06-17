@@ -33,6 +33,10 @@ class ABTestableDecorator
         }
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         // If variant is explicitly provided, use it
@@ -54,7 +58,7 @@ class ABTestableDecorator
         return $result;
     }
 
-    public function selectVariant($user): string
+    public function selectVariant(mixed $user): string
     {
         $variants = $this->getVariants();
         $distribution = $this->getVariantDistribution();
@@ -74,7 +78,7 @@ class ABTestableDecorator
         return $variants[array_rand($variants)];
     }
 
-    public function getUserVariant($user): ?string
+    public function getUserVariant(mixed $user): ?string
     {
         if (! $user) {
             return null;
@@ -85,7 +89,7 @@ class ABTestableDecorator
         return Cache::get($key);
     }
 
-    public function trackVariant($user, string $variant): void
+    public function trackVariant(mixed $user, string $variant): void
     {
         $key = $this->getVariantTrackingKey($user);
         Cache::put($key, $variant, $this->getVariantTrackingTtl());
@@ -96,6 +100,9 @@ class ABTestableDecorator
         }
     }
 
+    /**
+     * @param  array<string, float>  $distribution
+     */
     protected function selectVariantByDistribution(array $distribution): string
     {
         $random = mt_rand() / mt_getrandmax();
@@ -112,6 +119,9 @@ class ABTestableDecorator
         return array_key_first($distribution);
     }
 
+    /**
+     * @return array<int, string>
+     */
     protected function getVariants(): array
     {
         if ($this->hasMethod('getVariants')) {
@@ -121,6 +131,9 @@ class ABTestableDecorator
         return ['A', 'B']; // Default: A and B
     }
 
+    /**
+     * @return array<string, float>
+     */
     protected function getVariantDistribution(): array
     {
         if ($this->hasMethod('getVariantDistribution')) {
@@ -134,6 +147,9 @@ class ABTestableDecorator
         return array_fill_keys($variants, $probability);
     }
 
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
     protected function getUserFromArguments(array $arguments): mixed
     {
         // Try to find user in arguments
@@ -147,14 +163,14 @@ class ABTestableDecorator
         return Auth::user();
     }
 
-    protected function isVariantArgument($arg): bool
+    protected function isVariantArgument(mixed $arg): bool
     {
         $variants = $this->getVariants();
 
         return in_array($arg, $variants, true);
     }
 
-    protected function getVariantTrackingKey($user): string
+    protected function getVariantTrackingKey(mixed $user): string
     {
         $userId = is_object($user) && method_exists($user, 'getAuthIdentifier')
             ? $user->getAuthIdentifier()
@@ -181,7 +197,7 @@ class ABTestableDecorator
         return config('actions.ab_testing.track_in_database', false);
     }
 
-    protected function recordVariantInDatabase($user, string $variant): void
+    protected function recordVariantInDatabase(mixed $user, string $variant): void
     {
         if ($this->hasMethod('recordVariantInDatabase')) {
             $this->callMethod('recordVariantInDatabase', [$user, $variant]);

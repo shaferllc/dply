@@ -391,9 +391,7 @@ namespace App\Actions\Concerns;
 trait AsSerializable
 {
     /**
-     * Serialize the action to an array.
-     * This method is aliased to serializeToArray() in AsAction to avoid
-     * conflicts with AsResource::toArray(Request $request).
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
@@ -405,6 +403,9 @@ trait AsSerializable
         return get_object_vars($this);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function jsonSerialize(): array
     {
         if ($this->hasMethod('jsonSerialize')) {
@@ -421,6 +422,9 @@ trait AsSerializable
         return $this->serializeToArray();
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public function __unserialize(array $data): void
     {
         foreach ($data as $key => $value) {

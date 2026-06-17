@@ -10,12 +10,12 @@ class MiddlewareDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): mixed
     {
         // Try asMiddleware() method first
         if ($this->hasMethod('asMiddleware')) {

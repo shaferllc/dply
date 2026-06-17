@@ -18,7 +18,7 @@ class ApiVersionDecorator
 
     protected ?string $apiVersion = null;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -32,6 +32,10 @@ class ApiVersionDecorator
         }
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         // Detect and set API version before execution

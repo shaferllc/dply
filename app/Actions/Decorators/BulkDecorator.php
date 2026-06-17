@@ -18,7 +18,7 @@ class BulkDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -32,6 +32,10 @@ class BulkDecorator
         }
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         return $this->callMethod('handle', $arguments);
@@ -40,7 +44,7 @@ class BulkDecorator
     /**
      * Process items in bulk with automatic batching.
      *
-     * @param  Collection  $items  Collection of items to process
+     * @param  Collection<int, mixed>  $items  Collection of items to process
      * @param  callable|null  $mapper  Optional mapper function to transform items
      */
     public function bulk(Collection $items, ?callable $mapper = null): void
@@ -66,6 +70,8 @@ class BulkDecorator
 
     /**
      * Process a batch of items, optionally in a transaction.
+     *
+     * @param  Collection<int, mixed>  $batch
      */
     protected function processBatch(Collection $batch): void
     {
@@ -80,6 +86,8 @@ class BulkDecorator
 
     /**
      * Execute a batch by calling handle() for each item.
+     *
+     * @param  Collection<int, mixed>  $batch
      */
     protected function executeBatch(Collection $batch): void
     {

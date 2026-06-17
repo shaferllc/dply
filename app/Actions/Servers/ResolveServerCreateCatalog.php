@@ -100,9 +100,6 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     */
     private function catalogDigitalOcean(Collection $credentials, ?ProviderCredential $credential, string $selectedRegion = ''): array
     {
         $regions = [];
@@ -410,6 +407,9 @@ final class ResolveServerCreateCatalog
      * Pull a per-location price from a Hetzner server_type payload. Falls
      * back to null when the requested location is missing — callers then
      * use prices.0.* as the catalog-default price.
+     */
+    /**
+     * @param  array<string, mixed>  $serverType
      */
     private function priceForLocation(array $serverType, string $location, string $key): ?float
     {

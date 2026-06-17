@@ -39,7 +39,7 @@ class LifecycleDecorator
 
     protected ?float $startTime = null;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -87,7 +87,7 @@ class LifecycleDecorator
     }
 
     /**
-     * Call a lifecycle method if it exists.
+     * @param  array<int, mixed>  $arguments
      */
     protected function callLifecycleMethod(string $method, array $arguments): void
     {

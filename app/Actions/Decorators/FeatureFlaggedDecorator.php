@@ -39,7 +39,7 @@ class FeatureFlaggedDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -76,6 +76,8 @@ class FeatureFlaggedDecorator
 
     /**
      * Handle when feature is disabled.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function handleFeatureDisabled(array $arguments): mixed
     {

@@ -35,9 +35,10 @@ class LazyDecorator
 
     protected bool $lazyExecuted = false;
 
+    /** @var array<int, mixed> */
     protected array $lazyArguments = [];
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -104,7 +105,7 @@ class LazyDecorator
     }
 
     /**
-     * Get the stored arguments.
+     * @return array<int, mixed>
      */
     public function getArguments(): array
     {
@@ -114,7 +115,7 @@ class LazyDecorator
     /**
      * Magic method to access result properties.
      */
-    public function __get(string $name)
+    public function __get(string $name): mixed
     {
         $result = $this->get();
 
@@ -128,7 +129,10 @@ class LazyDecorator
     /**
      * Magic method to call result methods.
      */
-    public function __call(string $method, array $arguments)
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    public function __call(string $method, array $arguments): mixed
     {
         $result = $this->get();
 

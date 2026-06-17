@@ -8,12 +8,12 @@ class EventDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle($event)
+    public function handle(mixed $event): mixed
     {
         // Try asEventListener() method first
         if ($this->hasMethod('asEventListener')) {
@@ -33,7 +33,7 @@ class EventDecorator
         return null;
     }
 
-    public function __invoke($event)
+    public function __invoke(mixed $event): mixed
     {
         return $this->handle($event);
     }

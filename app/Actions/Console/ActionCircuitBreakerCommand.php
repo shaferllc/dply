@@ -71,15 +71,17 @@ class ActionCircuitBreakerCommand extends Command
         if (! empty($dashboard['circuits'])) {
             $this->line('');
             $this->info('Circuit States:');
+            /** @var list<array<string, mixed>> $circuits */
+            $circuits = $dashboard['circuits'];
             $this->table(
                 ['Action', 'State', 'Failures', 'Threshold', 'Timeout'],
-                collect($dashboard['circuits'])->map(fn ($c) => [
+                array_map(fn (array $c): array => [
                     class_basename($c['action']),
                     $c['state'],
                     $c['failures'],
                     $c['threshold'],
                     $c['timeout'].'s',
-                ])->toArray()
+                ], $circuits)
             );
         }
     }

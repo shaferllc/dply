@@ -33,28 +33,32 @@ return [
         ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Overview', 'group' => 'overview', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'run', 'route' => 'servers.run', 'preview_route' => 'servers.run-preview', 'icon' => 'play-circle', 'label' => 'Run', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.run', 'preview_feature' => 'workspace.run_preview'],
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites', 'group' => 'overview'],
-        // monitor (alphabetical by label)
+        // monitor — standalone items (Deploys, Errors) lead, then the cluster
+        // members: Monitoring (health/metrics/insights/hygiene/shared-host) and
+        // Security (certs/patches/security-digest). Cluster reps land at their
+        // first listed member, so order here drives sidebar order, not alphabet.
         // Activity was merged into the Logs page as a tab (servers.logs?tab=activity).
-        ['key' => 'cert-inventory', 'route' => 'servers.cert-inventory', 'icon' => 'lock-closed', 'label' => 'Certificates', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cert_inventory'],
         ['key' => 'deploys', 'route' => 'servers.deploys', 'icon' => 'rocket-launch', 'label' => 'Deploys', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'errors', 'route' => 'servers.errors', 'icon' => 'exclamation-triangle', 'label' => 'Errors', 'group' => 'monitor'],
         ['key' => 'health', 'route' => 'servers.health', 'icon' => 'heart', 'label' => 'Health', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.health'],
-        ['key' => 'hygiene', 'route' => 'servers.hygiene', 'preview_route' => 'servers.hygiene', 'icon' => 'archive-box', 'label' => 'Hygiene', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.release_hygiene', 'preview_feature' => 'workspace.release_hygiene_preview'],
-        ['key' => 'insights', 'route' => 'servers.insights', 'preview_route' => 'servers.insights', 'icon' => 'light-bulb', 'label' => 'Insights', 'group' => 'monitor', 'feature' => 'workspace.insights', 'preview_feature' => 'workspace.insights_preview'],
         ['key' => 'monitor', 'route' => 'servers.monitor', 'icon' => 'chart-bar', 'label' => 'Metrics', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes']],
-        ['key' => 'patches', 'route' => 'servers.patches', 'icon' => 'shield-check', 'label' => 'Patches', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.patch_advisor'],
-        ['key' => 'security-digest', 'route' => 'servers.security-digest', 'preview_route' => 'servers.security-digest', 'icon' => 'shield-exclamation', 'label' => 'Security', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.security_digest', 'preview_feature' => 'workspace.security_digest_preview'],
+        ['key' => 'insights', 'route' => 'servers.insights', 'preview_route' => 'servers.insights', 'icon' => 'light-bulb', 'label' => 'Insights', 'group' => 'monitor', 'feature' => 'workspace.insights', 'preview_feature' => 'workspace.insights_preview'],
+        ['key' => 'hygiene', 'route' => 'servers.hygiene', 'preview_route' => 'servers.hygiene', 'icon' => 'archive-box', 'label' => 'Hygiene', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.release_hygiene', 'preview_feature' => 'workspace.release_hygiene_preview'],
         ['key' => 'shared-host', 'route' => 'servers.shared-host', 'preview_route' => 'servers.shared-host', 'icon' => 'signal', 'label' => 'Shared Host', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'requires_min_sites' => 2, 'feature' => 'workspace.shared_host', 'preview_feature' => 'workspace.shared_host_preview'],
-        // stacks (alphabetical by label)
-        ['key' => 'caches', 'route' => 'servers.caches', 'icon' => 'bolt', 'label' => 'Caches', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.caches'],
-        ['key' => 'configuration', 'route' => 'servers.configuration', 'icon' => 'document-text', 'label' => 'Configuration', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'security-digest', 'route' => 'servers.security-digest', 'preview_route' => 'servers.security-digest', 'icon' => 'shield-exclamation', 'label' => 'Security', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.security_digest', 'preview_feature' => 'workspace.security_digest_preview'],
+        ['key' => 'patches', 'route' => 'servers.patches', 'icon' => 'shield-check', 'label' => 'Patches', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.patch_advisor'],
+        ['key' => 'cert-inventory', 'route' => 'servers.cert-inventory', 'icon' => 'lock-closed', 'label' => 'Certificates', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cert_inventory'],
+        // stacks — standalone resources (Databases, Caches, Services) lead, then
+        // the Runtime (php/configuration/tools) and Web (webserver/edge-proxy/docker) clusters.
         ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases', 'group' => 'stacks', 'requires_any_tags' => ['postgres', 'mysql'], 'except_host_kinds' => ['kubernetes']],
-        ['key' => 'docker', 'route' => 'servers.docker', 'preview_route' => 'servers.docker', 'icon' => 'square-3-stack-3d', 'label' => 'Docker', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.docker', 'preview_feature' => 'workspace.docker_preview', 'soon_badge' => true],
-        ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'soon_badge' => true],
-        ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'caches', 'route' => 'servers.caches', 'icon' => 'bolt', 'label' => 'Caches', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.caches'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.services'],
+        ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'configuration', 'route' => 'servers.configuration', 'icon' => 'document-text', 'label' => 'Configuration', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'tools', 'route' => 'servers.tools', 'icon' => 'wrench-screwdriver', 'label' => 'Tools', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'webserver', 'route' => 'servers.webserver', 'icon' => 'globe-alt', 'label' => 'Webserver', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'soon_badge' => true],
+        ['key' => 'docker', 'route' => 'servers.docker', 'preview_route' => 'servers.docker', 'icon' => 'square-3-stack-3d', 'label' => 'Docker', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.docker', 'preview_feature' => 'workspace.docker_preview', 'soon_badge' => true],
         // background (alphabetical by label)
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
@@ -69,19 +73,20 @@ return [
         ['key' => 'networking', 'route' => 'servers.networking', 'icon' => 'share', 'label' => 'Networking', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'system-users', 'route' => 'servers.system-users', 'icon' => 'user-group', 'label' => 'System users', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.system_users'],
-        // admin (alphabetical by label)
-        ['key' => 'cli', 'route' => 'servers.cli', 'preview_route' => 'servers.cli-preview', 'icon' => 'command-line', 'label' => 'CLI', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cli', 'preview_feature' => 'workspace.cli_preview', 'soon_badge' => true],
-        ['key' => 'blueprint', 'route' => 'servers.blueprint', 'preview_route' => 'servers.blueprint', 'icon' => 'document-duplicate', 'label' => 'Blueprint', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_blueprint', 'preview_feature' => 'workspace.server_blueprint_preview'],
+        // admin — standalone (Logs, Files) lead, then the Settings
+        // (settings/notifications/maintenance) and Automation (blueprint/cli) clusters.
         // Deploy windows merged into the Deploys page (servers.deploys?tab=deploy-windows).
-        ['key' => 'files', 'route' => 'servers.files', 'preview_route' => 'servers.files', 'icon' => 'folder', 'label' => 'Files', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.files', 'preview_feature' => 'workspace.files_preview'],
-        ['key' => 'logs', 'route' => 'servers.logs', 'icon' => 'clipboard-document-list', 'label' => 'Logs', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
-        ['key' => 'maintenance', 'route' => 'servers.maintenance', 'preview_route' => 'servers.maintenance', 'icon' => 'wrench', 'label' => 'Maintenance', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_maintenance', 'preview_feature' => 'workspace.server_maintenance_preview'],
         // 'manage' nav entry retired: the Manage workspace was dissolved. Tools is
         // now its own Stacks entry (servers.tools); Updates lives on Patches,
         // reboot/stuck-task on Tools, and the host state strip on Overview. The
         // servers.manage route stays registered as a back-compat redirector.
-        ['key' => 'notifications', 'route' => 'servers.notifications', 'icon' => 'bell', 'label' => 'Notifications', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'logs', 'route' => 'servers.logs', 'icon' => 'clipboard-document-list', 'label' => 'Logs', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'files', 'route' => 'servers.files', 'preview_route' => 'servers.files', 'icon' => 'folder', 'label' => 'Files', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.files', 'preview_feature' => 'workspace.files_preview'],
         ['key' => 'settings', 'route' => 'servers.settings', 'icon' => 'cog-8-tooth', 'label' => 'Settings', 'group' => 'admin'],
+        ['key' => 'notifications', 'route' => 'servers.notifications', 'icon' => 'bell', 'label' => 'Notifications', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'maintenance', 'route' => 'servers.maintenance', 'preview_route' => 'servers.maintenance', 'icon' => 'wrench', 'label' => 'Maintenance', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_maintenance', 'preview_feature' => 'workspace.server_maintenance_preview'],
+        ['key' => 'blueprint', 'route' => 'servers.blueprint', 'preview_route' => 'servers.blueprint', 'icon' => 'document-duplicate', 'label' => 'Blueprint', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_blueprint', 'preview_feature' => 'workspace.server_blueprint_preview'],
+        ['key' => 'cli', 'route' => 'servers.cli', 'preview_route' => 'servers.cli-preview', 'icon' => 'command-line', 'label' => 'CLI', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cli', 'preview_feature' => 'workspace.cli_preview', 'soon_badge' => true],
     ],
 
     /*
@@ -200,6 +205,39 @@ return [
             'label' => 'Scheduled tasks',
             'icon' => 'clock',
             'members' => ['cron', 'schedule'],
+        ],
+        'monitoring' => [
+            'label' => 'Monitoring',
+            'icon' => 'chart-bar',
+            'members' => ['health', 'monitor', 'insights', 'hygiene', 'shared-host'],
+            'tab_labels' => ['monitor' => 'Metrics'],
+        ],
+        'security' => [
+            'label' => 'Security',
+            'icon' => 'shield-check',
+            'members' => ['security-digest', 'patches', 'cert-inventory'],
+            'tab_labels' => ['security-digest' => 'Overview', 'cert-inventory' => 'Certificates'],
+        ],
+        'web' => [
+            'label' => 'Web',
+            'icon' => 'globe-alt',
+            'members' => ['webserver', 'edge-proxy', 'docker'],
+        ],
+        'runtime' => [
+            'label' => 'Runtime',
+            'icon' => 'command-line',
+            'members' => ['php', 'configuration', 'tools'],
+        ],
+        'settings' => [
+            'label' => 'Settings',
+            'icon' => 'cog-8-tooth',
+            'members' => ['settings', 'notifications', 'maintenance'],
+            'tab_labels' => ['settings' => 'General'],
+        ],
+        'automation' => [
+            'label' => 'Automation',
+            'icon' => 'document-duplicate',
+            'members' => ['blueprint', 'cli'],
         ],
     ],
 

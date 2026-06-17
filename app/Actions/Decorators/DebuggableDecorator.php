@@ -38,7 +38,7 @@ class DebuggableDecorator
 
     protected ?int $memoryStart = null;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -96,6 +96,8 @@ class DebuggableDecorator
 
     /**
      * Debug action start.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function debugStart(array $arguments): void
     {
@@ -115,8 +117,10 @@ class DebuggableDecorator
 
     /**
      * Debug successful execution.
+     *
+     * @param  array<int, mixed>  $arguments
      */
-    protected function debugSuccess(array $arguments, $result): void
+    protected function debugSuccess(array $arguments, mixed $result): void
     {
         $timeEnd = microtime(true);
         $memoryEnd = memory_get_usage(true);
@@ -138,6 +142,8 @@ class DebuggableDecorator
 
     /**
      * Debug failure/exception.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function debugFailure(array $arguments, \Throwable $exception): void
     {

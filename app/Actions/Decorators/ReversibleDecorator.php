@@ -42,9 +42,10 @@ class ReversibleDecorator
 
     protected ?string $reversalId = null;
 
+    /** @var array<string, mixed>|null */
     protected ?array $reversalData = null;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }

@@ -60,7 +60,9 @@ final class StoreServerFromCreateForm
 
         if ($form->type === 'custom') {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
-            $installProfileIds = collect(config('server_provision_options.install_profiles', []))->pluck('id')->filter()->values()->all();
+            /** @var list<array{id: string}> $installProfiles */
+            $installProfiles = config('server_provision_options.install_profiles', []);
+            $installProfileIds = array_values(array_filter(array_column($installProfiles, 'id'), 'is_string'));
             Validator::make(
                 [
                     'install_profile' => $form->install_profile,

@@ -35,7 +35,7 @@ class LoggerDecorator
 
     protected ?float $logStartTime = null;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -76,7 +76,7 @@ class LoggerDecorator
     }
 
     /**
-     * Log action start.
+     * @param  array<int, mixed>  $arguments
      */
     protected function logActionStart(array $arguments): void
     {
@@ -91,9 +91,9 @@ class LoggerDecorator
     }
 
     /**
-     * Log action success.
+     * @param  array<int, mixed>  $arguments
      */
-    protected function logActionSuccess(array $arguments, $result): void
+    protected function logActionSuccess(array $arguments, mixed $result): void
     {
         $channel = $this->getLogChannel();
         $level = $this->getLogLevel();
@@ -109,7 +109,7 @@ class LoggerDecorator
     }
 
     /**
-     * Log action failure.
+     * @param  array<int, mixed>  $arguments
      */
     protected function logActionFailure(array $arguments, \Throwable $exception): void
     {
@@ -143,7 +143,7 @@ class LoggerDecorator
     }
 
     /**
-     * Get sensitive parameters that should be redacted.
+     * @return array<int, string>
      */
     protected function getSensitiveParameters(): array
     {
@@ -151,7 +151,8 @@ class LoggerDecorator
     }
 
     /**
-     * Sanitize parameters by redacting sensitive data.
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, mixed>
      */
     protected function sanitizeParameters(array $arguments): array
     {
@@ -171,7 +172,9 @@ class LoggerDecorator
     }
 
     /**
-     * Recursively sanitize array data.
+     * @param  array<string, mixed>  $data
+     * @param  array<int, string>  $sensitive
+     * @return array<string, mixed>
      */
     protected function sanitizeArray(array $data, array $sensitive): array
     {
@@ -186,10 +189,7 @@ class LoggerDecorator
         return $data;
     }
 
-    /**
-     * Sanitize result for logging.
-     */
-    protected function sanitizeResult($result)
+    protected function sanitizeResult(mixed $result): mixed
     {
         if (is_object($result)) {
             return get_class($result).' (object)';

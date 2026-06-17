@@ -427,7 +427,7 @@ use Illuminate\Contracts\Validation\Rule;
  */
 trait AsRule
 {
-    public function passes($attribute, $value): bool
+    public function passes(mixed $attribute, mixed $value): bool
     {
         return $this->handle($attribute, $value);
     }

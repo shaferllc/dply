@@ -79,7 +79,7 @@ trait ProvidesEditActionTelemetry
      * Automatically includes action class name and trace information.
      *
      * @param  string  $message  The log message
-     * @param  array  $context  Additional context
+     * @param  array<string, mixed>  $context  Additional context
      */
     protected function logInfo(string $message, array $context = []): void
     {
@@ -96,7 +96,7 @@ trait ProvidesEditActionTelemetry
      *
      * @param  string  $message  The log message
      * @param  \Throwable|null  $exception  Optional exception
-     * @param  array  $context  Additional context
+     * @param  array<string, mixed>  $context  Additional context
      */
     protected function logError(string $message, ?\Throwable $exception = null, array $context = []): void
     {
@@ -126,7 +126,7 @@ trait ProvidesEditActionTelemetry
      * Note: This is an instance method that wraps ActionMetrics::getMetrics().
      * Use static::getMetrics() for the static method from AsMetrics trait.
      *
-     * @return array Performance metrics
+     * @return array<string, mixed> Performance metrics
      */
     public function getActionMetrics(): array
     {
@@ -195,10 +195,10 @@ trait ProvidesEditActionTelemetry
      *
      * @param  mixed  $result  The updated resource
      * @param  string  $message  Success message
-     * @param  array  $metadata  Additional metadata
-     * @return array Standardized response data
+     * @param  array<string, mixed>  $metadata  Additional metadata
+     * @return array<string, mixed> Standardized response data
      */
-    protected function successResponseData($result, string $message = 'Updated successfully', array $metadata = []): array
+    protected function successResponseData(mixed $result, string $message = 'Updated successfully', array $metadata = []): array
     {
         return [
             'success' => true,
@@ -220,9 +220,9 @@ trait ProvidesEditActionTelemetry
      * Use AsResponse concern for HTTP responses.
      *
      * @param  string  $message  Error message
-     * @param  array  $errors  Validation errors or additional error details
+     * @param  array<string, mixed>  $errors  Validation errors or additional error details
      * @param  int  $code  Error code
-     * @return array Standardized error response data
+     * @return array<string, mixed> Standardized error response data
      */
     protected function errorResponseData(string $message, array $errors = [], int $code = 400): array
     {

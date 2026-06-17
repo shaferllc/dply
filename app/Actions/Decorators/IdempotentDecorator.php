@@ -41,7 +41,7 @@ class IdempotentDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -82,6 +82,8 @@ class IdempotentDecorator
 
     /**
      * Handle idempotent cache hit.
+     *
+     * @param  array<int, mixed>  $arguments
      */
     protected function handleIdempotentHit(string $cacheKey, array $arguments): mixed
     {
@@ -110,7 +112,7 @@ class IdempotentDecorator
     /**
      * Get the idempotency key from arguments.
      */
-    protected function getIdempotencyKey(...$arguments): string
+    protected function getIdempotencyKey(mixed ...$arguments): string
     {
         return $this->fromActionMethod('getIdempotencyKey', $arguments, $this->getDefaultIdempotencyKey(...$arguments));
     }
@@ -118,7 +120,7 @@ class IdempotentDecorator
     /**
      * Get the default idempotency key (hash of arguments).
      */
-    protected function getDefaultIdempotencyKey(...$arguments): string
+    protected function getDefaultIdempotencyKey(mixed ...$arguments): string
     {
         return hash('sha256', serialize($arguments));
     }

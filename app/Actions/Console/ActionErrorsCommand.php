@@ -63,13 +63,15 @@ class ActionErrorsCommand extends Command
         if (! empty($dashboard['actions'])) {
             $this->line('');
             $this->info('Actions with Errors:');
+            /** @var list<array<string, mixed>> $actions */
+            $actions = $dashboard['actions'];
             $this->table(
                 ['Action', 'Total Errors', 'Unique Errors'],
-                collect($dashboard['actions'])->take(20)->map(fn ($a) => [
+                array_map(fn (array $a): array => [
                     class_basename($a['action']),
                     number_format($a['total_errors']),
                     number_format($a['unique_errors']),
-                ])->toArray()
+                ], array_slice($actions, 0, 20))
             );
         }
     }
@@ -91,13 +93,15 @@ class ActionErrorsCommand extends Command
         if (! empty($summary['most_common'])) {
             $this->line('');
             $this->warn('Most Common Errors:');
+            /** @var list<array<string, mixed>> $mostCommon */
+            $mostCommon = $summary['most_common'];
             $this->table(
                 ['Exception', 'Message', 'Count'],
-                collect($summary['most_common'])->map(fn ($e) => [
+                array_map(fn (array $e): array => [
                     class_basename($e['exception']),
                     substr($e['message'], 0, 50),
                     number_format($e['count']),
-                ])->toArray()
+                ], $mostCommon)
             );
         }
     }

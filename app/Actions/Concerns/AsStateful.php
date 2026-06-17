@@ -664,8 +664,12 @@ use Illuminate\Support\Facades\Cache;
  */
 trait AsStateful
 {
+    /** @var array<string, mixed>|null */
     protected ?array $state = null;
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getState(): array
     {
         if ($this->state === null) {
@@ -676,6 +680,9 @@ trait AsStateful
         return $this->state;
     }
 
+    /**
+     * @param  array<string, mixed>  $state
+     */
     protected function setState(array $state): void
     {
         $this->state = $state;

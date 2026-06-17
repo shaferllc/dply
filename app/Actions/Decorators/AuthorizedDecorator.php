@@ -17,11 +17,15 @@ class AuthorizedDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         $ability = $this->getAuthorizationAbility();
@@ -59,6 +63,10 @@ class AuthorizedDecorator
         return strtolower(class_basename($this->action));
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return array<int, mixed>
+     */
     protected function getAuthorizationArguments(...$arguments): array
     {
         if ($this->hasMethod('getAuthorizationArguments')) {

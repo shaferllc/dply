@@ -362,13 +362,13 @@ use Illuminate\Support\Facades\DB;
  */
 trait AsReversible
 {
-    // Properties that the decorator will set and access
+    /** @var array<string, mixed>|null */
     protected ?array $reversalData = null;
 
     protected ?string $reversalId = null;
 
     /**
-     * Set reversal data to be stored by the decorator.
+     * @param  array<string, mixed>  $data
      */
     protected function setReversalData(array $data): void
     {
@@ -376,7 +376,7 @@ trait AsReversible
     }
 
     /**
-     * Get reversal data (for use in reverse() method).
+     * @return array<string, mixed>|null
      */
     protected function getReversalData(): ?array
     {
@@ -394,7 +394,7 @@ trait AsReversible
     }
 
     /**
-     * Load reversal data from database (used by reverseById).
+     * @return array<string, mixed>|null
      */
     protected function loadReversalData(string $reversalId): ?array
     {

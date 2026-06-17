@@ -217,7 +217,9 @@ final class ListExistingProviderServers
     {
         static $labels = null;
         if ($labels === null) {
-            $labels = collect(config('server_provision_options.server_roles', []))
+            /** @var list<array{id: string, label?: string}> $serverRoles */
+            $serverRoles = config('server_provision_options.server_roles', []);
+            $labels = collect($serverRoles)
                 ->keyBy('id')
                 ->map(fn (array $role): string => (string) ($role['label'] ?? $role['id']))
                 ->all();

@@ -19,12 +19,12 @@ class GateDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function __invoke(...$arguments): bool
+    public function __invoke(mixed ...$arguments): bool
     {
         // Gates typically receive the user as first argument
         // If no user provided, try to inject it

@@ -75,6 +75,9 @@ trait ValidateActions
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function validationData(): array
     {
         return $this->hasMethod('getValidationData')
@@ -82,6 +85,9 @@ trait ValidateActions
             : $this->getDefaultValidationData();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return $this->hasMethod('rules')
@@ -89,6 +95,9 @@ trait ValidateActions
             : [];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function messages(): array
     {
         return $this->hasMethod('getValidationMessages')
@@ -96,6 +105,9 @@ trait ValidateActions
             : [];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function attributes(): array
     {
         return $this->hasMethod('getValidationAttributes')
@@ -103,10 +115,12 @@ trait ValidateActions
             : [];
     }
 
-    protected function failedValidation(Validator $validator)
+    protected function failedValidation(Validator $validator): void
     {
         if ($this->hasMethod('getValidationFailure')) {
-            return $this->resolveAndCallMethod('getValidationFailure', compact('validator'));
+            $this->resolveAndCallMethod('getValidationFailure', compact('validator'));
+
+            return;
         }
 
         throw (new ValidationException($validator))
@@ -114,7 +128,7 @@ trait ValidateActions
             ->redirectTo($this->getRedirectUrl());
     }
 
-    protected function getRedirectUrl()
+    protected function getRedirectUrl(): ?string
     {
         $url = $this->redirector->getUrlGenerator();
 
@@ -162,15 +176,15 @@ trait ValidateActions
         $response->authorize();
     }
 
-    public function validated($key = null, $default = null): mixed
+    public function validated(mixed $key = null, mixed $default = null): mixed
     {
         return data_get($this->validator->validated(), $key, $default);
     }
 
-    protected function prepareForValidation()
+    protected function prepareForValidation(): void
     {
         if ($this->hasMethod('prepareForValidation')) {
-            return $this->resolveAndCallMethod('prepareForValidation');
+            $this->resolveAndCallMethod('prepareForValidation');
         }
     }
 }

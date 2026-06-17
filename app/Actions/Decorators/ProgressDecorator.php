@@ -3,7 +3,7 @@
 namespace App\Actions\Decorators;
 
 use App\Actions\Concerns\DecorateActions;
-use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -19,12 +19,16 @@ class ProgressDecorator
 
     protected int $totalProgress = 100;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
+    public function handle(mixed ...$arguments): mixed
     {
         $this->progressId = $this->generateProgressId();
         $this->initializeProgress();
@@ -74,6 +78,9 @@ class ProgressDecorator
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
     protected function updateProgressCache(float $percentage, string $status = 'running', array $metadata = []): void
     {
         $key = $this->getProgressCacheKey();
@@ -88,18 +95,46 @@ class ProgressDecorator
         ], 3600);
     }
 
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
     protected function broadcastProgress(float $percentage, string $status = 'running', array $metadata = []): void
     {
-        if ($this->shouldBroadcast()) {
-            Broadcast::channel($this->getProgressChannel(), [
-                'progress_id' => $this->progressId,
-                'percentage' => $percentage,
-                'status' => $status,
-                'current' => $this->currentProgress,
-                'total' => $this->totalProgress,
-                'metadata' => $metadata,
-            ]);
+        if (! $this->shouldBroadcast()) {
+            return;
         }
+
+        $payload = [
+            'progress_id' => $this->progressId,
+            'percentage' => $percentage,
+            'status' => $status,
+            'current' => $this->currentProgress,
+            'total' => $this->totalProgress,
+            'metadata' => $metadata,
+        ];
+
+        broadcast(new class($this->getProgressChannel(), 'progress.updated', $payload) extends Channel
+        {
+            public function __construct(
+                public string $channelName,
+                public string $eventName,
+                /** @var array<string, mixed> */
+                public array $payload,
+            ) {
+                parent::__construct($channelName);
+            }
+
+            public function broadcastAs(): string
+            {
+                return $this->eventName;
+            }
+
+            /** @return array<string, mixed> */
+            public function broadcastWith(): array
+            {
+                return $this->payload;
+            }
+        });
     }
 
     protected function generateProgressId(): string

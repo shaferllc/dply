@@ -92,13 +92,15 @@ class ActionRegistryCommand extends Command
 
         if (! empty($metadata['handle_params'])) {
             $this->line('Parameters:');
+            /** @var list<array<string, mixed>> $handleParams */
+            $handleParams = $metadata['handle_params'];
             $this->table(
                 ['Name', 'Type', 'Optional'],
-                collect($metadata['handle_params'])->map(fn ($p) => [
+                array_map(fn (array $p): array => [
                     $p['name'],
                     $p['type'] ?? 'mixed',
                     $p['optional'] ? 'Yes' : 'No',
-                ])->toArray()
+                ], $handleParams)
             );
         }
 

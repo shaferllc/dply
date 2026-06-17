@@ -14,12 +14,12 @@ class DTODecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         // Convert array arguments to DTOs
         $arguments = $this->convertArgumentsToDTOs($arguments);
@@ -30,6 +30,9 @@ class DTODecorator
 
     /**
      * Convert array arguments to DTO objects.
+     *
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, mixed>
      */
     protected function convertArgumentsToDTOs(array $arguments): array
     {
@@ -119,6 +122,8 @@ class DTODecorator
      *
      * First checks for a custom createDTO method, then attempts to create
      * the DTO using the constructor with spread operator.
+     *
+     * @param  array<string, mixed>  $data
      */
     protected function createDTO(array $data, ?string $dtoClass = null): object
     {

@@ -438,6 +438,9 @@ class CreateEdgePreviewSite
             ->get();
     }
 
+    /**
+     * @return Builder<Site>
+     */
     private static function livePreviewQuery(Site $parent): Builder
     {
         return Site::query()

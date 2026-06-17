@@ -78,7 +78,11 @@ class ActionDependenciesCommand extends Command
         };
     }
 
-    protected function outputText(string $actionClass, array $dependencies, $dependents): void
+    /**
+     * @param  list<string>  $dependencies
+     * @param  Collection<int, string>  $dependents
+     */
+    protected function outputText(string $actionClass, array $dependencies, Collection $dependents): void
     {
         $this->line("Dependencies for: {$actionClass}");
         $this->line('');
@@ -103,6 +107,10 @@ class ActionDependenciesCommand extends Command
         }
     }
 
+    /**
+     * @param  list<string>  $dependencies
+     * @param  Collection<int, string>  $dependents
+     */
     protected function outputGraphviz(string $actionClass, array $dependencies, Collection $dependents): void
     {
         $this->line('digraph ActionDependencies {');
@@ -119,6 +127,10 @@ class ActionDependenciesCommand extends Command
         $this->line('}');
     }
 
+    /**
+     * @param  list<string>  $dependencies
+     * @param  Collection<int, string>  $dependents
+     */
     protected function outputJson(string $actionClass, array $dependencies, Collection $dependents): void
     {
         $data = [
@@ -130,6 +142,9 @@ class ActionDependenciesCommand extends Command
         $this->line(json_encode($data, JSON_PRETTY_PRINT));
     }
 
+    /**
+     * @param  array<string, list<string>>  $allDeps
+     */
     protected function outputTextAll(array $allDeps): void
     {
         foreach ($allDeps as $action => $deps) {
@@ -141,6 +156,9 @@ class ActionDependenciesCommand extends Command
         }
     }
 
+    /**
+     * @param  array<string, list<string>>  $allDeps
+     */
     protected function outputGraphvizAll(array $allDeps): void
     {
         $this->line('digraph ActionDependencies {');
@@ -155,6 +173,9 @@ class ActionDependenciesCommand extends Command
         $this->line('}');
     }
 
+    /**
+     * @param  array<string, list<string>>  $allDeps
+     */
     protected function outputJsonAll(array $allDeps): void
     {
         $this->line(json_encode($allDeps, JSON_PRETTY_PRINT));

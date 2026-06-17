@@ -386,6 +386,10 @@ trait AsSanitizer
         return $data;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function sanitizeArray(array $data): array
     {
         $rules = $this->getSanitizationRules();
@@ -419,6 +423,9 @@ trait AsSanitizer
         return $value;
     }
 
+    /**
+     * @param  string|array<int, string>  $rules
+     */
     protected function applySanitizationRules(mixed $value, string|array $rules): mixed
     {
         if (is_string($rules)) {
@@ -441,6 +448,9 @@ trait AsSanitizer
         return $value;
     }
 
+    /**
+     * @return array<string, string|array<int, string>>
+     */
     protected function getSanitizationRules(): array
     {
         return $this->hasMethod('getSanitizationRules')

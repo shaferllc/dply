@@ -76,26 +76,30 @@ class ActionMetricsCommand extends Command
         if (! empty($dashboard['slowest'])) {
             $this->line('');
             $this->info('Slowest Actions:');
+            /** @var list<array<string, mixed>> $slowest */
+            $slowest = $dashboard['slowest'];
             $this->table(
                 ['Action', 'Avg Duration (ms)', 'Calls'],
-                collect($dashboard['slowest'])->map(fn ($a) => [
+                array_map(fn (array $a): array => [
                     class_basename($a['action']),
                     number_format($a['avg_duration_ms'], 2),
                     number_format($a['calls']),
-                ])->toArray()
+                ], $slowest)
             );
         }
 
         if (! empty($dashboard['most_called'])) {
             $this->line('');
             $this->info('Most Called Actions:');
+            /** @var list<array<string, mixed>> $mostCalled */
+            $mostCalled = $dashboard['most_called'];
             $this->table(
                 ['Action', 'Calls', 'Avg Duration (ms)'],
-                collect($dashboard['most_called'])->map(fn ($a) => [
+                array_map(fn (array $a): array => [
                     class_basename($a['action']),
                     number_format($a['calls']),
                     number_format($a['avg_duration_ms'], 2),
-                ])->toArray()
+                ], $mostCalled)
             );
         }
     }

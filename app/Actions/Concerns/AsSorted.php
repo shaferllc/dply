@@ -343,6 +343,9 @@ trait AsSorted
     // The actual sorting logic is handled by SortedDecorator
     // which is automatically applied via SortedDesignPattern.
 
+    /**
+     * @return array<int, string>
+     */
     protected function getSortableColumns(): array
     {
         if ($this->hasMethod('getSortableColumns')) {

@@ -19,11 +19,11 @@ final class ServerProvisionPreferenceRules
         $o = FilterServerProvisionOptionsForCreateForm::run($formType, $hasLinkedCredentialForProvider, $serverRole);
 
         return [
-            'server_role' => ['required', Rule::in(collect($o['server_roles'] ?? [])->pluck('id')->all())],
-            'cache_service' => ['required', Rule::in(collect($o['cache_services'] ?? [])->pluck('id')->all())],
-            'webserver' => ['required', Rule::in(collect($o['webservers'] ?? [])->pluck('id')->all())],
-            'php_version' => ['required', Rule::in(collect($o['php_versions'] ?? [])->pluck('id')->all())],
-            'database' => ['required', Rule::in(collect($o['databases'] ?? [])->pluck('id')->all())],
+            'server_role' => ['required', Rule::in(array_column($o['server_roles'] ?? [], 'id'))],
+            'cache_service' => ['required', Rule::in(array_column($o['cache_services'] ?? [], 'id'))],
+            'webserver' => ['required', Rule::in(array_column($o['webservers'] ?? [], 'id'))],
+            'php_version' => ['required', Rule::in(array_column($o['php_versions'] ?? [], 'id'))],
+            'database' => ['required', Rule::in(array_column($o['databases'] ?? [], 'id'))],
         ];
     }
 }
