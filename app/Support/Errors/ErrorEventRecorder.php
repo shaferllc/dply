@@ -130,6 +130,12 @@ class ErrorEventRecorder
                 'reference' => $reference,
             ],
             [
+                // http_5xx rows have no Eloquent source model (they're swept from
+                // the access log), but source_type/source_id are NOT NULL and
+                // carry a unique index. Key them on the globally-unique reference
+                // so the insert satisfies the constraint and stays idempotent.
+                'source_type' => 'http_5xx',
+                'source_id' => $reference,
                 'organization_id' => $site->organization_id,
                 'server_id' => $site->server_id,
                 'title' => __('HTTP :status — :request', ['status' => $status, 'request' => Str::limit($request, 120, '')]),
