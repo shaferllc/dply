@@ -128,18 +128,26 @@
                         />
                         <div class="flex flex-wrap gap-1.5">
                             @foreach (['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'] as $exampleCidr)
+                                @php
+                                    $current = trim((string) $form->database_allowed_from);
+                                    $nextAllowedFrom = $current === '' ? $exampleCidr : $current.', '.$exampleCidr;
+                                @endphp
                                 <button
                                     type="button"
-                                    wire:click="$set('form.database_allowed_from', trim('{{ $form->database_allowed_from }}' === '' ? '{{ $exampleCidr }}' : '{{ $form->database_allowed_from }}, {{ $exampleCidr }}', ', '))"
+                                    wire:click="$set('form.database_allowed_from', @js($nextAllowedFrom))"
                                     class="rounded-full bg-brand-sand/40 px-2.5 py-1 font-mono text-[11px] font-medium text-brand-forest transition hover:bg-brand-sage/15 hover:ring-1 hover:ring-brand-sage/30"
                                 >
                                     + {{ $exampleCidr }}
                                 </button>
                             @endforeach
                             @if (! empty($operatorPublicIp ?? null))
+                                @php
+                                    $currentForIp = trim((string) $form->database_allowed_from);
+                                    $nextWithIp = $currentForIp === '' ? $operatorPublicIp.'/32' : $currentForIp.', '.$operatorPublicIp.'/32';
+                                @endphp
                                 <button
                                     type="button"
-                                    wire:click="$set('form.database_allowed_from', trim('{{ $form->database_allowed_from }}' === '' ? '{{ $operatorPublicIp }}/32' : '{{ $form->database_allowed_from }}, {{ $operatorPublicIp }}/32', ', '))"
+                                    wire:click="$set('form.database_allowed_from', @js($nextWithIp))"
                                     class="rounded-full bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-200 transition hover:bg-emerald-100"
                                 >
                                     + {{ __('your IP') }} ({{ $operatorPublicIp }}/32)
