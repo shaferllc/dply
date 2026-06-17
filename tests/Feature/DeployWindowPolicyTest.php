@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-usesFeatures('workspace.deploy_windows');
+// Deploy windows are GA — no feature flag gates enforcement.
 
 test('deploy job is skipped when server deploy window blocks', function (): void {
     Queue::fake();
@@ -52,6 +52,8 @@ test('deploy job is skipped when server deploy window blocks', function (): void
 
     expect($deployment)->not->toBeNull()
         ->and($deployment->status)->toBe(SiteDeployment::STATUS_SKIPPED)
+        ->and($deployment->skip_reason)->toBe(SiteDeployment::SKIP_REASON_DEPLOY_WINDOW)
+        ->and($deployment->skip_rule_summary)->not->toBeNull()
         ->and($deployment->log_output)->toContain('Weekend freeze active');
 
     Carbon::setTestNow();

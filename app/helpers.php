@@ -523,25 +523,6 @@ if (! function_exists('workspace_server_maintenance_preview_active')) {
     }
 }
 
-if (! function_exists('workspace_deploy_windows_preview_active')) {
-    /**
-     * True when the deploy windows surface is off but the coming-soon teaser
-     * should surface in nav and the preview workspace page.
-     */
-    function workspace_deploy_windows_preview_active(?Organization $organization = null): bool
-    {
-        if ($organization === null
-            ? Feature::active('workspace.deploy_windows')
-            : Feature::for($organization)->active('workspace.deploy_windows')) {
-            return false;
-        }
-
-        return $organization === null
-            ? Feature::active('workspace.deploy_windows_preview')
-            : Feature::for($organization)->active('workspace.deploy_windows_preview');
-    }
-}
-
 if (! function_exists('workspace_security_digest_preview_active')) {
     /**
      * True when the security digest surface is off but the coming-soon teaser

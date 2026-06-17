@@ -1,0 +1,22 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - app
+        - config
+        - database
+        - routes
+
+    # Test files that live under app/ (PSR-4 namespace mismatches + a Pest guard
+    # stub) — analysed via the test suite, not here.
+    excludePaths:
+        - app/*/Tests/*
+        - app/**/Tests/*
+
+    # Existing violations are captured in phpstan-baseline.neon so the suite is
+    # green today; new code is held to the level above. Regenerate the baseline
+    # with: composer analyse:baseline

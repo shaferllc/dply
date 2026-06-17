@@ -91,7 +91,9 @@
         @elseif ($tab === 'coverage')
             @include('livewire.servers.partials.deploys.coverage-tab')
         @elseif ($tab === 'notifications')
-            @include('livewire.servers.partials.deploy-policy.notifications-tab')
+            <div class="mt-6">
+                @include('livewire.servers.partials.deploy-policy.notifications-tab')
+            </div>
         @endif
     </div>
 

@@ -62,6 +62,7 @@
         "brianium/paratest": "^7.0",
         "doctrine/dbal": "^4.0",
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.0",
         "laravel/breeze": "^2.4",
         "laravel/pail": "^1.2.5",
         "laravel/pint": "^1.27",

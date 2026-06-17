@@ -22,7 +22,7 @@ return [
         'security-digest' => 'server-security',
         'blueprint' => 'server-blueprint',
         'maintenance' => 'server-maintenance',
-        'deploy-policy' => 'server-deploy-windows',
+        'deploys' => 'server-deploy-windows',
         'insights' => 'server-insights',
         'monitor' => 'server-metrics',
         // Activity is now a tab on the Logs page; its doc is surfaced via the

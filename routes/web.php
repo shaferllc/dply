@@ -138,8 +138,6 @@ use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDaemonSlo;
 use App\Livewire\Servers\WorkspaceDatabases;
-use App\Livewire\Servers\WorkspaceDeployPolicy;
-use App\Livewire\Servers\WorkspaceDeployPolicyPreview;
 use App\Livewire\Servers\WorkspaceDocker;
 use App\Livewire\Servers\WorkspaceDockerPreview;
 use App\Livewire\Servers\WorkspaceEdgeProxy;
@@ -856,11 +854,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.cert_inventory')->group(function (): void {
         Route::livewire('servers/{server}/cert-inventory', WorkspaceCertInventory::class)->name('servers.cert-inventory');
     });
-    // No feature middleware: the component renders the full workspace when
-    // workspace.deploy_windows is on, or the coming-soon teaser when it is
-    // off but workspace.deploy_windows_preview is on (else 404).
-    Route::livewire('servers/{server}/deploy-policy', WorkspaceDeployPolicy::class)->name('servers.deploy-policy');
-    Route::livewire('servers/{server}/deploy-policy-preview', WorkspaceDeployPolicyPreview::class)->name('servers.deploy-policy-preview');
+    // Deploy windows are GA and now live as tabs on the unified Deploys page
+    // (servers.deploys?tab=deploy-windows) — see App\Livewire\Servers\Deploys.
     // No feature middleware: the component renders the full workspace when
     // workspace.ssh_access_graph is on, or the coming-soon teaser when it is
     // off but workspace.ssh_access_graph_preview is on (else 404).

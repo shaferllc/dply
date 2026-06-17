@@ -160,10 +160,8 @@ return [
         'daemon_slo' => env('FEATURE_WORKSPACE_DAEMON_SLO', true),
         // exit: ship once server cert inventory + bulk renew validated on three VM hosts
         'cert_inventory' => env('FEATURE_WORKSPACE_CERT_INVENTORY', true),
-        // exit: ship once deploy window policy validated blocking/allowing deploy jobs
-        'deploy_windows' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS', true),
-        // exit: ship alongside deploy windows GA; teaser only when deploy windows is off
-        'deploy_windows_preview' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS_PREVIEW', false),
+        // deploy_windows: GA'd — deploy windows now live as tabs on the Deploys
+        // page (servers.deploys?tab=deploy-windows) with no feature gate.
         // exit: ship once SSH access graph validated against authorized_keys panel
         'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
         // exit: ship alongside SSH access graph GA; teaser only when it is off

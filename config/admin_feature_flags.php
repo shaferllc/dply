@@ -28,10 +28,6 @@ $serverWorkspaceSections = [
         'workspace.insights' => 'Full workspace',
         'workspace.insights_preview' => 'Coming soon preview',
     ],
-    'Deploy windows' => [
-        'workspace.deploy_windows' => 'Deploy windows',
-        'workspace.deploy_windows_preview' => 'Coming soon preview',
-    ],
     'Maintenance' => [
         'workspace.server_maintenance' => 'Server maintenance',
         'workspace.server_maintenance_preview' => 'Coming soon preview',
@@ -247,7 +243,6 @@ return [
         'workspace.run' => 'workspace.run_preview',
         'workspace.release_hygiene' => 'workspace.release_hygiene_preview',
         'workspace.security_digest' => 'workspace.security_digest_preview',
-        'workspace.deploy_windows' => 'workspace.deploy_windows_preview',
         'workspace.server_maintenance' => 'workspace.server_maintenance_preview',
         'workspace.docker' => 'workspace.docker_preview',
         'workspace.backups' => 'workspace.backups_preview',

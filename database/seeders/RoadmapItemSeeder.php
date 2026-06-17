@@ -304,7 +304,7 @@ class RoadmapItemSeeder extends Seeder
             [
                 'title' => 'Deploy windows',
                 'summary' => 'Allow or block deploys by schedule on servers and sites.',
-                'description' => 'Deploy window policies integrated with RunSiteDeploymentJob — workspace.deploy_windows.',
+                'description' => 'Deploy window policies integrated with RunSiteDeploymentJob — GA on the server Deploys page (Deploy windows tab).',
                 'status' => RoadmapItem::STATUS_PLANNED,
                 'area' => 'servers',
                 'sort_order' => 13,

@@ -3,7 +3,7 @@
 namespace App\Services\Notifications;
 
 use App\Jobs\RunSiteDeploymentJob;
-use App\Livewire\Servers\WorkspaceDeployPolicy;
+use App\Livewire\Servers\Deploys;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerDeployPolicyNotificationKeys;
@@ -11,7 +11,7 @@ use App\Support\ServerDeployPolicyNotificationKeys;
 /**
  * Publishes notifications for the server-wide deploy window policy — a deploy
  * blocked by a deny window ({@see RunSiteDeploymentJob}) and enforcement
- * toggled on / off ({@see WorkspaceDeployPolicy}).
+ * toggled on / off ({@see Deploys}).
  *
  * Mirrors {@see ServerCertInventoryNotificationDispatcher}. Subject is the
  * {@see Server} the policy belongs to; the per-kind title is the config label.
@@ -62,7 +62,7 @@ final class ServerDeployPolicyNotificationDispatcher
             subject: $server,
             title: $title,
             body: implode("\n", $lines),
-            url: route('servers.deploy-policy', $server, absolute: true),
+            url: route('servers.deploys', ['server' => $server, 'tab' => 'deploy-windows'], absolute: true),
             metadata: array_merge([
                 'server_id' => $server->id,
                 'kind' => $kind,

@@ -35,7 +35,7 @@
         </div>
         <div class="px-6 py-5 text-sm sm:px-7">
             <a
-                href="{{ route('servers.deploy-policy', $server) }}"
+                href="{{ route('servers.deploys', ['server' => $server, 'tab' => 'deploy-windows']) }}"
                 wire:navigate
                 class="inline-flex items-center gap-1 text-xs font-semibold text-brand-moss hover:text-brand-ink"
             >
