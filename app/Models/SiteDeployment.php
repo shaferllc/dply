@@ -52,6 +52,7 @@ class SiteDeployment extends Model
         'trigger',
         'status',
         'skip_reason',
+        'skip_rule_summary',
         'git_sha',
         'release_folder',
         'resume_of_deployment_id',
@@ -81,6 +82,17 @@ class SiteDeployment extends Model
     {
         return $this->status === self::STATUS_SKIPPED
             && $this->skip_reason === self::SKIP_REASON_BILLING_PAUSED;
+    }
+
+    /**
+     * True when this deployment was skipped by a server deploy-window deny
+     * rule — drives the distinct "Deploy window" chip plus the blocking-rule
+     * summary on the Deploys history timeline.
+     */
+    public function isDeployWindowBlocked(): bool
+    {
+        return $this->status === self::STATUS_SKIPPED
+            && $this->skip_reason === self::SKIP_REASON_DEPLOY_WINDOW;
     }
 
     /**

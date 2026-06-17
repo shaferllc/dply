@@ -35,7 +35,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 
 class RunSiteDeploymentJob implements ShouldQueue
 {
@@ -134,28 +133,30 @@ class RunSiteDeploymentJob implements ShouldQueue
             return;
         }
 
-        if (Feature::active('workspace.deploy_windows')) {
-            $policyDecision = app(ServerDeployPolicyGuard::class)->evaluate($this->site);
-            if (! $policyDecision['allowed']) {
-                $deployment = SiteDeployment::query()->create([
-                    'site_id' => $this->site->id,
-                    'project_id' => $this->site->project_id,
-                    'trigger' => $this->trigger,
-                    'status' => SiteDeployment::STATUS_SKIPPED,
-                    'skip_reason' => SiteDeployment::SKIP_REASON_DEPLOY_WINDOW,
-                    'exit_code' => null,
-                    'log_output' => (string) ($policyDecision['reason'] ?? 'Deploy blocked by server deploy window policy.'),
-                    'started_at' => now(),
-                    'finished_at' => now(),
-                    'idempotency_key' => $this->apiIdempotencyHash,
-                ]);
-                $this->auditDeploy($deployment);
-                $this->clearIdempotencyInflight();
-                $this->notifyStakeholders($deployment, $notificationPublisher);
-                $this->notifyDeployWindowBlocked($policyDecision);
+        // Deploy windows are GA — always evaluate. The guard returns allowed=true
+        // when the server has no policy or enforcement is disabled, so this is a
+        // no-op for servers that never configured deny windows.
+        $policyDecision = app(ServerDeployPolicyGuard::class)->evaluate($this->site);
+        if (! $policyDecision['allowed']) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_DEPLOY_WINDOW,
+                'skip_rule_summary' => $policyDecision['rule_summary'] ?? null,
+                'exit_code' => null,
+                'log_output' => (string) ($policyDecision['reason'] ?? 'Deploy blocked by server deploy window policy.'),
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+            $this->notifyStakeholders($deployment, $notificationPublisher);
+            $this->notifyDeployWindowBlocked($policyDecision);
 
-                return;
-            }
+            return;
         }
 
         $lock = Cache::lock('site-deploy:'.$this->site->id, $this->timeout);
@@ -709,7 +710,7 @@ class RunSiteDeploymentJob implements ShouldQueue
      * subscribed on the deploy-window workspace. Best-effort: never let a
      * notification failure derail the (already-skipped) deploy.
      *
-     * @param  array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}  $policyDecision
+     * @param  array{allowed: bool, reason: ?string, rule_summary: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}  $policyDecision
      */
     protected function notifyDeployWindowBlocked(array $policyDecision): void
     {

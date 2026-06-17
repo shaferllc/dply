@@ -9,6 +9,7 @@ use App\Modules\TaskRunner\PendingTask;
 use App\Modules\TaskRunner\ProcessOutput;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use RuntimeException;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.

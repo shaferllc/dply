@@ -69,6 +69,7 @@
         "nunomaduro/collision": "^8.6",
         "pestphp/pest": "^4.7",
         "pestphp/pest-plugin-drift": "^4.1",
+        "phpstan/phpstan": "^2.2",
         "phpunit/phpunit": "^12.5.12",
         "soloterm/solo": "dev-main"
     },

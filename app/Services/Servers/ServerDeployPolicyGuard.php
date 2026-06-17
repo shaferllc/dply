@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
 final class ServerDeployPolicyGuard
 {
     /**
-     * @return array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}
+     * @return array{allowed: bool, reason: ?string, rule_summary: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}
      */
     public function evaluateServer(Server $server, ?Carbon $at = null): array
     {
@@ -26,19 +26,19 @@ final class ServerDeployPolicyGuard
     }
 
     /**
-     * @return array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}
+     * @return array{allowed: bool, reason: ?string, rule_summary: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}
      */
     public function evaluate(Site $site, ?Carbon $at = null): array
     {
         $at ??= now();
         $server = $site->server;
         if ($server === null) {
-            return ['allowed' => true, 'reason' => null, 'policy' => $this->defaultPolicy(), 'next_allowed_at' => null];
+            return ['allowed' => true, 'reason' => null, 'rule_summary' => null, 'policy' => $this->defaultPolicy(), 'next_allowed_at' => null];
         }
 
         $policy = $this->policyForServer($server);
         if (! ($policy['enabled'] ?? false)) {
-            return ['allowed' => true, 'reason' => null, 'policy' => $policy, 'next_allowed_at' => null];
+            return ['allowed' => true, 'reason' => null, 'rule_summary' => null, 'policy' => $policy, 'next_allowed_at' => null];
         }
 
         $timezone = (string) ($policy['timezone'] ?? config('app.timezone'));
@@ -53,13 +53,17 @@ final class ServerDeployPolicyGuard
                 return [
                     'allowed' => false,
                     'reason' => (string) ($policy['message'] ?? __('Deploys are blocked by this server\'s deploy window policy.')),
+                    // The specific deny window that matched, captured so a skipped
+                    // deployment can record WHICH rule blocked it (the message is a
+                    // blanket policy string and doesn't identify the window).
+                    'rule_summary' => $this->formatRuleSummary($rule),
                     'policy' => $policy,
                     'next_allowed_at' => $this->nextAllowedAt($server, $at),
                 ];
             }
         }
 
-        return ['allowed' => true, 'reason' => null, 'policy' => $policy, 'next_allowed_at' => null];
+        return ['allowed' => true, 'reason' => null, 'rule_summary' => null, 'policy' => $policy, 'next_allowed_at' => null];
     }
 
     /**

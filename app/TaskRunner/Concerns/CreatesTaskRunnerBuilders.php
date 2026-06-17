@@ -8,6 +8,7 @@ use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\Task;
+use Throwable;
 use Illuminate\Support\Facades\Log;
 
 /**

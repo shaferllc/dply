@@ -9,6 +9,7 @@ use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\ParallelTaskExecutor;
 use App\Modules\TaskRunner\Task;
 use App\Modules\TaskRunner\TaskChain;
+use Throwable;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
