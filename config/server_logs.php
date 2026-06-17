@@ -157,6 +157,19 @@ return [
     ],
 
     /**
+     * Billing master switch (docs/SERVER_LOGS_BILLING.md §1.3 / PR C). When OFF
+     * the usage cost calculator returns 0 regardless of metered volume, so the
+     * full metering → estimate → Stripe path can land dark and be exercised in
+     * prod without charging anyone. Even when ON, an org is only billed if its
+     * plan carries a non-zero `entitlements.*.overage_per_gb_cents` (all 0 today)
+     * AND a `subscription.standard.stripe.server_log_usage` price id is set.
+     * Flip on only after dogfooding calibrates real bytes/day against cost.
+     */
+    'billing' => [
+        'enabled' => (bool) env('SERVER_LOGS_BILLING_ENABLED', false),
+    ],
+
+    /**
      * Deploy user the agent's config/state is owned by; the binary + unit are
      * installed system-wide as root. Mirrors server_provision.deploy_ssh_user.
      */
