@@ -83,7 +83,7 @@ class SyncCloudWorkersJob implements ShouldQueue
             ->get();
 
         foreach ($workers as $worker) {
-            $meta = is_array($worker->meta) ? $worker->meta : [];
+            $meta = $worker->meta;
             if ($error !== null) {
                 $meta['error'] = $error;
                 $meta['error_at'] = now()->toIso8601String();

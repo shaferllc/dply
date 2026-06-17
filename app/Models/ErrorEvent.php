@@ -14,13 +14,34 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One row in the dedicated error stream surfaced on the site/server "Errors"
- * views. Written by {@see ErrorEventRecorder} from failed
- * ConsoleActions and SiteDeployments. Append-only; triage is a shared
- * {@see $dismissed_at}.
+ *                      One row in the dedicated error stream surfaced on the site/server "Errors"
+ *                      views. Written by {@see ErrorEventRecorder} from failed
+ *                      ConsoleActions and SiteDeployments. Append-only; triage is a shared
+ *                      {@see $dismissed_at}.
+ * @property string $category
+ * @property string $detail
+ * @property ?Carbon $dismissed_at
+ * @property ?string $dismissed_by
+ * @property ?string $link_url
+ * @property ?Carbon $occurred_at
+ * @property ?string $organization_id
+ * @property string $reference
+ * @property string $remediation_code
+ * @property ?string $server_id
+ * @property ?string $site_id
+ * @property ?string $source_id
+ * @property string $source_type
+ * @property string $title
+ * @property-read ?Organization $organization
+ * @property-read ?Server $server
+ * @property-read ?Site $site
+ * @property-read ?User $dismisser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ErrorEvent extends Model
 {
@@ -53,40 +74,57 @@ class ErrorEvent extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return MorphTo<Model, $this> */
     public function source(): MorphTo
     {
         return $this->morphTo();
     }
 
     /** @return BelongsTo<User, $this> */
-    public function dismisser(): BelongsTo {
+    public function dismisser(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'dismissed_by');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeForServer(Builder $query, string $serverId): Builder
     {
         return $query->where('server_id', $serverId);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeForSite(Builder $query, string $siteId): Builder
     {
         return $query->where('site_id', $siteId);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeUndismissed(Builder $query): Builder
     {
         return $query->whereNull('dismissed_at');

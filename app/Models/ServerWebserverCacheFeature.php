@@ -7,16 +7,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * Per (server, webserver) install state for the webserver's NATIVE cache module.
- *
- * Varnish is a separate HTTP-front daemon and lives on `server_cache_services`
- * with engine='varnish'; this table is only for caches that ship inside (or
- * extend) the chosen webserver — nginx zone sizes, Apache mod_cache, Caddy
- * souin, OLS LSCache. The row is created lazily the first time a site enables
- * a cache method that needs it.
+ *                      Per (server, webserver) install state for the webserver's NATIVE cache module.
+ *                      Varnish is a separate HTTP-front daemon and lives on `server_cache_services`
+ *                      with engine='varnish'; this table is only for caches that ship inside (or
+ *                      extend) the chosen webserver — nginx zone sizes, Apache mod_cache, Caddy
+ *                      souin, OLS LSCache. The row is created lazily the first time a site enables
+ *                      a cache method that needs it.
+ * @property bool $apache_mod_cache_enabled
+ * @property bool $caddy_souin_built
+ * @property string $caddy_souin_version
+ * @property ?Carbon $last_probed_at
+ * @property int $nginx_fcgi_zone_size_mb
+ * @property int $nginx_proxy_zone_size_mb
+ * @property int $nginx_zone_inactive_minutes
+ * @property int $nginx_zone_max_size_gb
+ * @property bool $ols_lscache_module_present
+ * @property ?string $server_id
+ * @property string $webserver
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerWebserverCacheFeature extends Model
 {
@@ -65,7 +79,8 @@ class ServerWebserverCacheFeature extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 

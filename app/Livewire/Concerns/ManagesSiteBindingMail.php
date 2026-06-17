@@ -149,12 +149,6 @@ trait ManagesSiteBindingMail
             return;
         }
 
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
-            $this->toastError(__('Sending a test email is available from the deploy hub.'));
-
-            return;
-        }
-
         $recipient = trim($this->mailTestRecipient) ?: (string) (auth()->user()?->email ?? '');
         if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
             $this->toastError(__('Enter a valid email address to send the test to.'));

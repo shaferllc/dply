@@ -111,7 +111,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             $emitter->info(sprintf('[cutover]  stop %s, bind %s to :80', $edgeProxy, $previousWebserver));
             $this->executeStageCutover($server, $edgeProxy, $previousWebserver);
 
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             unset($meta['edge_proxy'], $meta['edge_proxy_previous_webserver']);
             $meta['webserver'] = $previousWebserver;
             $server->update(['meta' => $meta]);

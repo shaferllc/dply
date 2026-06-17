@@ -10,12 +10,24 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * User-supplied Personal Access Token for a Git provider. Paired with
- * {@see SocialAccount} (OAuth) behind the {@see GitIdentity} contract so
- * the SourceControl service layer treats both kinds the same.
+ *                      User-supplied Personal Access Token for a Git provider. Paired with
+ *                      {@see SocialAccount} (OAuth) behind the {@see GitIdentity} contract so
+ *                      the SourceControl service layer treats both kinds the same.
+ * @property string $access_token
+ * @property string $api_base_url
+ * @property string $label
+ * @property ?Carbon $last_validated_at
+ * @property string $nickname
+ * @property string $provider
+ * @property ?string $provider_id
+ * @property ?string $user_id
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class GitProviderToken extends Model implements GitIdentity
 {
@@ -47,7 +59,8 @@ class GitProviderToken extends Model implements GitIdentity
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

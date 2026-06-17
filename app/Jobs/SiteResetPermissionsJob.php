@@ -70,7 +70,7 @@ class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
 
             // Old job stamped a `system_user_operation` site.meta entry on
             // failure as a side-channel for the system-user UI. Preserve that.
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['system_user_operation'] = [
                 'status' => 'error',
                 'message' => $e->getMessage(),

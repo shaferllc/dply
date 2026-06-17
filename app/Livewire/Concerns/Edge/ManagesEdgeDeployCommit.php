@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
-use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Edge\DeployEdgeCommit;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\SourceControl\GitIdentityResolver;
@@ -23,6 +23,7 @@ use Livewire\Component;
 trait ManagesEdgeDeployCommit
 {
     use DispatchesToastNotifications;
+
     public string $edge_deploy_commit_sha = '';
 
     public ?string $edge_deploy_commit_branch = null;
@@ -53,9 +54,7 @@ trait ManagesEdgeDeployCommit
 
         $sha = trim($this->edge_deploy_commit_sha);
         if ($sha === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Enter a commit SHA to deploy.'));
-            }
+            $this->toastError(__('Enter a commit SHA to deploy.'));
 
             return;
         }
@@ -63,9 +62,7 @@ trait ManagesEdgeDeployCommit
         try {
             (new DeployEdgeCommit)->handle($this->site, $sha, $this->edge_deploy_commit_branch);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -73,9 +70,7 @@ trait ManagesEdgeDeployCommit
         $this->edge_deploy_commit_sha = '';
         $this->edge_deploy_commit_branch = null;
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Deploy started for that commit.'));
-        }
+        $this->toastSuccess(__('Deploy started for that commit.'));
     }
 
     public function openEdgeDeployRefPicker(): void

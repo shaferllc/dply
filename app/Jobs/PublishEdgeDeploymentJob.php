@@ -140,7 +140,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             $site->update([
                 'status' => Site::STATUS_EDGE_ACTIVE,
                 'edge_backend_id' => (string) ($site->edge_backend_id ?: $deployment->id),
-                'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+                'meta' => array_merge($site->meta, ['edge' => $meta]),
             ]);
 
             try {
@@ -239,7 +239,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
         $meta['last_error_at'] = now()->toIso8601String();
         $site->update([
             'status' => Site::STATUS_EDGE_FAILED,
-            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+            'meta' => array_merge($site->meta, ['edge' => $meta]),
         ]);
         $deployment->update([
             'status' => EdgeDeployment::STATUS_FAILED,

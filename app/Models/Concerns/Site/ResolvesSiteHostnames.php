@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns\Site;
 
+use App\Jobs\DetectSiteCloudflareTlsJob;
 use App\Livewire\Sites\Settings;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
@@ -16,9 +17,23 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property ?string $server_id
+ * @property ?SiteDomain $primaryDomainCache
+ * @property bool $primaryDomainResolved
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomain> $domains
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SitePreviewDomain> $previewDomains
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomainAlias> $domainAliases
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteTenantDomain> $tenantDomains
  */
 trait ResolvesSiteHostnames
 {
+    /** Memoized result of the lazy-load path in primaryDomain(). */
+    private ?SiteDomain $primaryDomainCache = null;
+
+    private bool $primaryDomainResolved = false;
+
     public function primaryDomain(): ?SiteDomain
     {
         // Avoid re-querying when callers have already eager-loaded `domains`
@@ -62,10 +77,8 @@ trait ResolvesSiteHostnames
             return (string) $previewDomain->hostname;
         }
 
-        $meta = is_array($this->meta) ? $this->meta : [];
-        $hostname = $meta['testing_hostname']['hostname'] ?? '';
-
-        return is_string($hostname) ? $hostname : '';
+        $meta = $this->meta ?? [];
+        return (string) ($meta['testing_hostname']['hostname'] ?? '');
     }
 
     public function testingHostnameStatus(): ?string
@@ -75,20 +88,20 @@ trait ResolvesSiteHostnames
             return $previewDomain->dns_status;
         }
 
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $status = $meta['testing_hostname']['status'] ?? null;
 
         return is_string($status) ? $status : null;
     }
 
     /**
-     * Last Cloudflare-edge TLS probe result (see {@see \App\Jobs\DetectSiteCloudflareTlsJob}).
+     * Last Cloudflare-edge TLS probe result (see {@see DetectSiteCloudflareTlsJob}).
      *
      * @return array<string, mixed>
      */
     public function cloudflareTlsMeta(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return is_array($meta['cloudflare_tls'] ?? null) ? $meta['cloudflare_tls'] : [];
     }
@@ -115,7 +128,7 @@ trait ResolvesSiteHostnames
      */
     public function setCloudflareTlsResult(bool $terminating, string $hostname, ?string $server, ?string $cfRay): void
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $meta['cloudflare_tls'] = [
             'terminating' => $terminating,
             'hostname' => $hostname,
@@ -147,7 +160,7 @@ trait ResolvesSiteHostnames
             return strtolower(trim($previewZone));
         }
 
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $zone = $meta['testing_hostname']['zone'] ?? null;
 
         return is_string($zone) && trim($zone) !== '' ? strtolower(trim($zone)) : null;
@@ -181,18 +194,18 @@ trait ResolvesSiteHostnames
         return $this->coveringServerWildcard() !== null;
     }
 
+    /** @return Collection<int, non-empty-string> */
     public function sslDomainHostnames(): Collection
     {
         $previewDomains = $this->relationLoaded('previewDomains')
             ? $this->previewDomains
             : $this->previewDomains()->get();
-        $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)?->hostname
-            ?? $previewDomains->first()?->hostname;
-        if (is_string($primaryPreviewHostname) && $primaryPreviewHostname !== '') {
-            return collect([$primaryPreviewHostname]);
+        $primaryPreview = $previewDomains->firstWhere('is_primary', true) ?? $previewDomains->first();
+        if ($primaryPreview !== null && $primaryPreview->hostname !== '') {
+            return collect([$primaryPreview->hostname]);
         }
 
-        $domains = $this->domains instanceof Collection
+        $domains = $this->relationLoaded('domains')
             ? $this->domains
             : $this->domains()->get();
 
@@ -209,7 +222,7 @@ trait ResolvesSiteHostnames
      */
     public function customerDomainHostnames(): array
     {
-        $domains = $this->domains instanceof Collection
+        $domains = $this->relationLoaded('domains')
             ? $this->domains
             : $this->domains()->get();
 
@@ -318,7 +331,7 @@ trait ResolvesSiteHostnames
      */
     public function ownTestingHostnames(): array
     {
-        $testing = is_array($this->meta) ? ($this->meta['testing_hostname'] ?? null) : null;
+        $testing = ($this->meta ?? [])['testing_hostname'] ?? null;
         if (! is_array($testing)) {
             return [];
         }

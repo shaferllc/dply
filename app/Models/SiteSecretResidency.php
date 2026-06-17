@@ -11,21 +11,29 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * One env var a site keeps OUT of the loose plaintext-in-DB `.env` blob —
- * the unit of "I don't want this secret sitting decryptable in your database."
- *
- * The loose `env_file_content` carries only a {@see placeholder()} for the key;
- * the real value is resolved just-in-time at push/deploy by
- * {@see SecretResidencyResolver}. Two modes:
- *
- *   - {@see MODE_ESCROW}: `$ciphertext` is an `age` blob encrypted to the org's
- *     recipient. NOTE this is intentionally NOT an `encrypted` cast — the whole
- *     point is that it is NOT readable under the platform APP_KEY. Whether dply
- *     can open it depends on who holds the org's age identity (see OrgSecretKey,
- *     PR1+). A customer-held identity ⇒ ciphertext dply cannot decrypt.
- *   - {@see MODE_EXTERNAL}: `$store_id` + `$reference` point at the customer's
- *     own secret store (Vault / AWS Secrets Manager / Doppler). The value never
- *     enters dply; it is fetched at deploy (by dply or on the box).
+ *                      One env var a site keeps OUT of the loose plaintext-in-DB `.env` blob —
+ *                      the unit of "I don't want this secret sitting decryptable in your database."
+ *                      The loose `env_file_content` carries only a {@see placeholder()} for the key;
+ *                      the real value is resolved just-in-time at push/deploy by
+ *                      {@see SecretResidencyResolver}. Two modes:
+ *                      - {@see MODE_ESCROW}: `$ciphertext` is an `age` blob encrypted to the org's
+ *                      recipient. NOTE this is intentionally NOT an `encrypted` cast — the whole
+ *                      point is that it is NOT readable under the platform APP_KEY. Whether dply
+ *                      can open it depends on who holds the org's age identity (see OrgSecretKey,
+ *                      PR1+). A customer-held identity ⇒ ciphertext dply cannot decrypt.
+ *                      - {@see MODE_EXTERNAL}: `$store_id` + `$reference` point at the customer's
+ *                      own secret store (Vault / AWS Secrets Manager / Doppler). The value never
+ *                      enters dply; it is fetched at deploy (by dply or on the box).
+ * @property string $ciphertext
+ * @property string $key
+ * @property ?string $meta
+ * @property string $mode
+ * @property string $reference
+ * @property ?string $site_id
+ * @property ?string $store_id
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteSecretResidency extends Model
 {
@@ -66,7 +74,8 @@ class SiteSecretResidency extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 }

@@ -3,18 +3,25 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $server_provision_run_id
+ * @property string $type
+ * @property string $key
+ * @property ?string $label
+ * @property ?string $content
+ * @property array<string, mixed> $metadata
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property-read ServerProvisionRun $run
  */
-
 class ServerProvisionArtifact extends Model
 {
-    /** @use HasFactory<ServerProvisionArtifactFactory> */
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     protected $fillable = [
         'server_provision_run_id',
@@ -34,7 +41,8 @@ class ServerProvisionArtifact extends Model
     }
 
     /** @return BelongsTo<ServerProvisionRun, $this> */
-    public function run(): BelongsTo {
+    public function run(): BelongsTo
+    {
         return $this->belongsTo(ServerProvisionRun::class, 'server_provision_run_id');
     }
 }

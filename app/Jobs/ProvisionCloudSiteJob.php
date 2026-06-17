@@ -58,7 +58,7 @@ class ProvisionCloudSiteJob implements ShouldQueue
             throw $e;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'live_url' => $result['live_url'],
             'backend' => $backend->providerKey(),
@@ -77,7 +77,7 @@ class ProvisionCloudSiteJob implements ShouldQueue
 
     private function markFailed(Site $site, string $message): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'last_error' => $message,
             'last_error_at' => now()->toIso8601String(),

@@ -16,6 +16,7 @@ class SshKeyRotationDueNotification extends Notification implements ShouldQueue
         public NotificationEvent $event
     ) {}
 
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
         return ['mail'];
@@ -33,6 +34,6 @@ class SshKeyRotationDueNotification extends Notification implements ShouldQueue
                 'key' => $keyName,
                 'server' => $serverName,
             ]))
-            ->when(filled($this->event->url), fn (MailMessage $m) => $m->action(__('Open SSH keys'), $this->event->url));
+            ->when($this->event->url !== '', fn (MailMessage $m) => $m->action(__('Open SSH keys'), $this->event->url));
     }
 }

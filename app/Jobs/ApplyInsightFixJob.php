@@ -186,7 +186,7 @@ class ApplyInsightFixJob implements ShouldQueue
 
     private function markApplied(InsightFinding $finding, User $user, string $output): void
     {
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = $finding->meta;
         $meta['fix_applied_at'] = now()->toIso8601String();
         $meta['fix_applied_by'] = $user->id;
         $meta['fix_output'] = $output;
@@ -201,7 +201,7 @@ class ApplyInsightFixJob implements ShouldQueue
 
     private function annotateResolvedByFix(InsightFinding $finding, User $user, string $output): void
     {
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = $finding->meta;
         $meta['fix_applied_at'] = now()->toIso8601String();
         $meta['fix_applied_by'] = $user->id;
         $meta['fix_output'] = $output;
@@ -216,7 +216,7 @@ class ApplyInsightFixJob implements ShouldQueue
             'finding_id' => $finding->id,
             'reason' => $reason,
         ]);
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = $finding->meta;
         $meta['fix_failed_at'] = now()->toIso8601String();
         $meta['fix_failed_by'] = $user->id;
         $meta['fix_failure_reason'] = $reason;
@@ -230,7 +230,7 @@ class ApplyInsightFixJob implements ShouldQueue
 
     private function recordRefusal(InsightFinding $finding, User $user, string $reason): void
     {
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = $finding->meta;
         $meta['fix_refused_at'] = now()->toIso8601String();
         $meta['fix_refused_by'] = $user->id;
         $meta['fix_refusal_reason'] = $reason;

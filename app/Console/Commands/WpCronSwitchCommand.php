@@ -66,7 +66,7 @@ class WpCronSwitchCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['wp_cron'] = ['handler' => $target === 'system' ? 'system_cron' : 'wp_cron', 'switched_at' => now()->toISOString()];
         $site->meta = $meta;
         $site->save();

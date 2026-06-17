@@ -4,16 +4,26 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\SiteAccessGatePasswordFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $label
+ * @property string $password_salt
+ * @property string $password_verifier
+ * @property ?Carbon $pending_removal_at
+ * @property ?string $site_id
+ * @property string $sort_order
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteAccessGatePassword extends Model
 {
     /** @use HasFactory<SiteAccessGatePasswordFactory> */
@@ -37,13 +47,18 @@ class SiteAccessGatePassword extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /**
      * @param  Builder<SiteAccessGatePassword>  $query
      * @return Builder<SiteAccessGatePassword>
+     */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeNotPendingRemoval(Builder $query): Builder
     {

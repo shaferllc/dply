@@ -2,20 +2,41 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property bool $auto_ssl
+ * @property string $dns_status
+ * @property string $hostname
+ * @property bool $https_redirect
+ * @property bool $is_primary
+ * @property string $label
+ * @property ?Carbon $last_dns_checked_at
+ * @property ?Carbon $last_ssl_checked_at
+ * @property bool $managed_by_dply
+ * @property array<string, mixed> $meta
+ * @property ?string $provider_record_id
+ * @property string $provider_type
+ * @property string $record_data
+ * @property string $record_name
+ * @property string $record_type
+ * @property ?string $site_id
+ * @property string $ssl_status
+ * @property string $zone
+ * @property-read ?Site $site
+ * @property-read Collection<int, SiteCertificate> $certificates
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SitePreviewDomain extends Model
 {
-    /** @use HasFactory<SitePreviewDomainFactory> */
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     protected $fillable = [
         'site_id',
@@ -53,12 +74,14 @@ class SitePreviewDomain extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return HasMany<SiteCertificate, $this> */
-    public function certificates(): HasMany {
+    public function certificates(): HasMany
+    {
         return $this->hasMany(SiteCertificate::class, 'preview_domain_id');
     }
 }

@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
 
 /**
  * Persistent record of a single wp-cli or php artisan invocation.
- *
  * Created when the operator (or a system pipeline) invokes a command
  * via the {@see RemoteCli} service. Sync runs
  * complete in-process before insert returns; async runs are inserted
@@ -36,6 +35,12 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $started_at
  * @property Carbon|null $finished_at
  * @property Carbon|null $cancelled_at
+ * @property string $mode
+ * @property string $status
+ * @property-read ?Site $site
+ * @property-read ?User $queuedByUser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class RemoteCliRun extends Model
 {
@@ -89,12 +94,14 @@ class RemoteCliRun extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function queuedByUser(): BelongsTo {
+    public function queuedByUser(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'queued_by_user_id');
     }
 

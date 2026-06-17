@@ -72,7 +72,7 @@ class ApplyCloudSiteExtras
             return;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $container['alerts'] = $input;
         $meta['container'] = $container;
@@ -405,7 +405,7 @@ class ApplyCloudSiteExtras
         // container_backend_id — too early and AttachCloudDomainJob no-ops.
         // Stage the desired hostnames on meta; PollCloudStatusJob fans out
         // the actual attach jobs when the site flips to active.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $existing = is_array($container['pending_domains'] ?? null) ? $container['pending_domains'] : [];
         $merged = array_values(array_unique(array_merge(

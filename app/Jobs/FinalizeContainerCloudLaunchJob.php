@@ -181,7 +181,7 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
         string $level = 'info',
         array $context = [],
     ): void {
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $launch = is_array($meta['container_launch'] ?? null) ? $meta['container_launch'] : [];
         $events = is_array($launch['events'] ?? null) ? $launch['events'] : [];
         $lastEvent = end($events);

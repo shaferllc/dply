@@ -7,12 +7,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One serving point of a multi-backend Site: the logical Site → a backend app
- * server (and the derived child Site holding the code there). The prerequisite
- * for rolling + canary deploys. See docs/MULTI_BACKEND_SITES.md.
+ *                      One serving point of a multi-backend Site: the logical Site → a backend app
+ *                      server (and the derived child Site holding the code there). The prerequisite
+ *                      for rolling + canary deploys. See docs/MULTI_BACKEND_SITES.md.
+ * @property ?string $backend_site_id
+ * @property ?Carbon $drained_at
+ * @property array<string, mixed> $meta
+ * @property string $role
+ * @property ?string $server_id
+ * @property ?string $site_id
+ * @property string $state
+ * @property int $weight
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteBackend extends Model
 {
@@ -58,23 +69,29 @@ class SiteBackend extends Model
     }
 
     /** The logical Site that owns the backend group. *
- * @return BelongsTo<Site, $this>
- */
-    public function site(): BelongsTo {
+     * @return BelongsTo<Site, $this>
+     */
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** The app server this backend runs on. *
- * @return BelongsTo<Server, $this>
- */
-    public function server(): BelongsTo {
+     * @return BelongsTo<Server, $this>
+     */
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** The derived child Site holding the code on the backend server (nullable). *
- * @return BelongsTo<Site, $this>
- */
-    public function backendSite(): BelongsTo {
+     * @return BelongsTo<Site, $this>
+     */
+    /** @return BelongsTo<Site, $this> */
+    public function backendSite(): BelongsTo
+    {
         return $this->belongsTo(Site::class, 'backend_site_id');
     }
 

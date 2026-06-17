@@ -81,7 +81,7 @@ class AssignSystemUserToSiteJob implements ShouldBeUnique, ShouldQueue
             $this->failConsoleAction($e->getMessage());
 
             // Side-channel for the system-user UI banner — keep behavior parity.
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['system_user_operation'] = [
                 'status' => 'error',
                 'message' => $e->getMessage(),

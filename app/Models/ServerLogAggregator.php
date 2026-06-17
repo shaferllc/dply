@@ -4,21 +4,37 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Jobs\InstallLogAggregatorJob;
+use App\Support\Servers\VectorLogAgentInstallScripts;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * The dply Logs Vector aggregator — the ingest tier that authenticates edges over
- * mTLS, stamps tenant identity, and bulk-inserts into ClickHouse. At most one per
- * server (the box designated as the aggregator), enforced by the unique index on
- * server_id. Stood up by {@see \App\Jobs\InstallLogAggregatorJob}.
- *
- * Holds the edge mTLS material (CA + client cert/key) the install generated ON the
- * box and handed back, so the edge installer ({@see \App\Support\Servers\VectorLogAgentInstallScripts})
- * can configure shipping without any manual env. The cert material is encrypted at
- * rest. See docs/SERVER_LOGS_ADDON.md.
+ *                      The dply Logs Vector aggregator — the ingest tier that authenticates edges over
+ *                      mTLS, stamps tenant identity, and bulk-inserts into ClickHouse. At most one per
+ *                      server (the box designated as the aggregator), enforced by the unique index on
+ *                      server_id. Stood up by {@see InstallLogAggregatorJob}.
+ *                      Holds the edge mTLS material (CA + client cert/key) the install generated ON the
+ *                      box and handed back, so the edge installer ({@see VectorLogAgentInstallScripts})
+ *                      can configure shipping without any manual env. The cert material is encrypted at
+ *                      rest. See docs/SERVER_LOGS_ADDON.md.
+ * @property string $edge_ca_cert_b64
+ * @property string $edge_client_cert_b64
+ * @property string $edge_client_key_b64
+ * @property string $endpoint
+ * @property ?string $error_message
+ * @property string $install_output
+ * @property ?Carbon $last_seen_at
+ * @property int $listen_port
+ * @property ?string $server_id
+ * @property string $status
+ * @property string $version
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerLogAggregator extends Model
 {
@@ -63,7 +79,8 @@ class ServerLogAggregator extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 

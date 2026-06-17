@@ -24,7 +24,7 @@ class NotificationChannels extends Component
         $this->syncNotificationChannelTypeDefaults();
     }
 
-    protected function owner(): User|Organization|Team
+    protected function owner(): User
     {
         return Auth::user();
     }

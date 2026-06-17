@@ -72,7 +72,7 @@ class CloudDoctorCommand extends Command
      */
     private function compileReport(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
 
         $backend = CloudRouter::backendFor($site);

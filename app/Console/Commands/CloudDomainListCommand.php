@@ -40,7 +40,7 @@ class CloudDomainListCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $domains = is_array($meta['container']['domains'] ?? null) ? $meta['container']['domains'] : [];
 
         $rows = [];

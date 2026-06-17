@@ -42,7 +42,7 @@ class GetServerMetaCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $key = $this->argument('key');
 
         if ($key === null) {

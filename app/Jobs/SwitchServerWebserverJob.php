@@ -177,7 +177,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
             $this->executeStageDisableOld($server, $from);
 
             // Persist the new webserver as the server's truth.
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             $meta['webserver'] = $this->target;
             $server->update(['meta' => $meta]);
 

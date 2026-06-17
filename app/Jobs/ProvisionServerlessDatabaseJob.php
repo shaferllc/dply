@@ -44,7 +44,7 @@ class ProvisionServerlessDatabaseJob implements ShouldQueue
         $site->loadMissing('server.providerCredential');
         $server = $site->server;
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $database = is_array($serverless['database'] ?? null) ? $serverless['database'] : [];
 
@@ -143,7 +143,7 @@ class ProvisionServerlessDatabaseJob implements ShouldQueue
      */
     private function persist(Site $site, array $database): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $serverless['database'] = $database;
         $meta['serverless'] = $serverless;

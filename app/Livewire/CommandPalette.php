@@ -4,28 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Jobs\RedeployCloudSiteJob;
-use App\Jobs\RunServerInsightsJob;
-use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\BuildsCommandPaletteGroups;
 use App\Livewire\Concerns\ManagesCommandPaletteStack;
 use App\Livewire\Concerns\ResolvesCommandPaletteItems;
 use App\Livewire\Concerns\RunsCommandPaletteActions;
-use App\Models\CloudDatabase;
-use App\Models\Organization;
-use App\Models\RecentResource;
 use App\Models\Server;
-use App\Models\ServerDatabase;
 use App\Models\Site;
-use App\Models\SiteDeployment;
 use App\Support\Docs\ContextualDocResolver;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Livewire\Component;
 
 /**
@@ -86,15 +72,6 @@ class CommandPalette extends Component
      */
     public array $deploySyncSelected = [];
 
-    /** Per-list result cap so a broad context can't balloon the payload. */
-    private const LIST_LIMIT = 50;
-
-    /** Smaller cap for the root direct-hit search across every resource. */
-    private const SEARCH_LIMIT = 6;
-
-    /** Tighter cap for per-result quick actions in root search (e.g. deploy). */
-    private const SEARCH_ACTION_LIMIT = 3;
-
     /**
      * Capture the current page's resource so the palette opens in context.
      * Runs once per page render (the palette re-mounts on each wire:navigate, so
@@ -131,7 +108,6 @@ class CommandPalette extends Component
         }
     }
 
-
     public function render(): View
     {
         $context = $this->stack === [] ? null : $this->stack[array_key_last($this->stack)];
@@ -145,28 +121,4 @@ class CommandPalette extends Component
             'placeholder' => $placeholder,
         ]);
     }
-
-
-    // ── Root ────────────────────────────────────────────────────────────────
-
-
-    /** How many recents the empty-query root surfaces. */
-    private const RECENT_LIMIT = 5;
-
-
-    // ── Resource lists (one level down) ──────────────────────────────────────
-
-
-    // ── Single-resource sub-pages (two levels down) ──────────────────────────
-
-
-    // ── Command contexts (settings / admin) ──────────────────────────────────
-
-
-    // ── Command specs ────────────────────────────────────────────────────────
-
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-
 }

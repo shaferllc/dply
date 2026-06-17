@@ -10,14 +10,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A persisted resource binding for a site: a managed attachment (database,
- * redis, queue, object storage, scheduler, workers, publication) that
- * contributes connection variables to the deploy environment.
- *
- * The connection vars live in {@see $injected_env} (encrypted) and are merged
- * into the deployment environment at deploy time only — they are intentionally
- * kept out of the editable Variables list so the binding stays the source of
- * truth for them.
+ *                      A persisted resource binding for a site: a managed attachment (database,
+ *                      redis, queue, object storage, scheduler, workers, publication) that
+ *                      contributes connection variables to the deploy environment.
+ *                      The connection vars live in {@see $injected_env} (encrypted) and are merged
+ *                      into the deployment environment at deploy time only — they are intentionally
+ *                      kept out of the editable Variables list so the binding stays the source of
+ *                      truth for them.
+ * @property array<string, mixed> $config
+ * @property array<string, mixed> $injected_env
+ * @property string $last_error
+ * @property string $mode
+ * @property string $name
+ * @property ?string $site_id
+ * @property string $status
+ * @property ?string $target_id
+ * @property string $target_type
+ * @property string $type
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteBinding extends Model
 {
@@ -78,7 +90,8 @@ class SiteBinding extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
@@ -90,13 +103,10 @@ class SiteBinding extends Model
     public function connectionEnv(): array
     {
         $env = $this->injected_env;
-        if (! is_array($env)) {
-            return [];
-        }
 
         $clean = [];
         foreach ($env as $key => $value) {
-            if (is_string($key) && $key !== '') {
+            if ($key !== '') {
                 $clean[$key] = (string) $value;
             }
         }

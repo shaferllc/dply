@@ -10,8 +10,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property array<string, mixed> $changes
+ * @property array<string, mixed> $desired_state
+ * @property ?string $error_message
+ * @property int $monthly_total_cents
+ * @property ?string $organization_id
+ * @property string $status
+ * @property string $trigger
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class BillingSubscriptionSyncEvent extends Model
 {
     use HasUlids;
@@ -43,7 +52,8 @@ class BillingSubscriptionSyncEvent extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 }

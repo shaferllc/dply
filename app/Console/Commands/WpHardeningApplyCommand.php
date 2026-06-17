@@ -74,7 +74,7 @@ class WpHardeningApplyCommand extends Command
 
         // Mirror the meta update that the Hardening tab writes so the
         // sub-tab UI reflects what the CLI just did.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $opinionRows = [
             ['key' => 'disallow_file_edit', 'enabled' => in_array('DISALLOW_FILE_EDIT', $applied, true)],
             ['key' => 'force_ssl_admin', 'enabled' => in_array('FORCE_SSL_ADMIN', $applied, true)],

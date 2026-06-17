@@ -73,7 +73,7 @@ class PushWorkerPoolAgentConfigJob implements ShouldQueue
      */
     private function agentEnvVars(WorkerPool $pool): array
     {
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $token = (string) ($meta['event_token'] ?? '');
         if ($token === '') {
             $token = bin2hex(random_bytes(24));

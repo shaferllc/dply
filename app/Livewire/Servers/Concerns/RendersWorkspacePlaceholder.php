@@ -5,6 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 /**
  * Provides the Livewire lazy-load placeholder() for server workspace tab
@@ -16,6 +17,8 @@ use Illuminate\Support\Str;
  * server_workspace nav map, so a component only needs `use` + #[Lazy] —
  * no per-component metadata. Falls back to deriving the tab key from the
  * route name (servers.settings -> "settings") for routes absent from the nav.
+ *
+ * @phpstan-require-extends Component
  *
  * @property Server|null $server Set in mount() by InteractsWithServerWorkspace.
  */

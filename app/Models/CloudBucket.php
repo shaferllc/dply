@@ -5,31 +5,40 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * @property string $id
- * Object-storage bucket attached to one or more Cloud sites.
- *
- * v1 backend is DigitalOcean Spaces; AWS S3 and Cloudflare R2 are
- * planned follow-ups. The shape mirrors {@see CloudDatabase} on purpose
- * so the attach / detach / multi-site story works the same way: each
- * pivot row carries its own env_prefix and connectionEnvVars() emits
- * a Laravel-style S3 connection block under that prefix.
- *
- * This model is created in 'pending' state when the user adds a bucket
- * on the create page. Actual provider provisioning (creating the
- * Spaces/S3 bucket, generating a scoped access key) happens in a
- * follow-up PR — until then the connection blob is empty and
- * connectionEnvVars() returns [].
+ *                      Object-storage bucket attached to one or more Cloud sites.
+ *                      v1 backend is DigitalOcean Spaces; AWS S3 and Cloudflare R2 are
+ *                      planned follow-ups. The shape mirrors {@see CloudDatabase} on purpose
+ *                      so the attach / detach / multi-site story works the same way: each
+ *                      pivot row carries its own env_prefix and connectionEnvVars() emits
+ *                      a Laravel-style S3 connection block under that prefix.
+ *                      This model is created in 'pending' state when the user adds a bucket
+ *                      on the create page. Actual provider provisioning (creating the
+ *                      Spaces/S3 bucket, generating a scoped access key) happens in a
+ *                      follow-up PR — until then the connection blob is empty and
+ *                      connectionEnvVars() returns [].
+ * @property string $backend
+ * @property ?string $backend_id
+ * @property array<string, mixed> $connection
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $organization_id
+ * @property ?string $provider_credential_id
+ * @property string $region
+ * @property string $status
+ * @property-read ?Organization $organization
+ * @property-read ?ProviderCredential $providerCredential
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class CloudBucket extends Model
 {
-    /** @use HasFactory<CloudBucketFactory> */
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const STATUS_PENDING = 'pending';
 
@@ -69,17 +78,20 @@ class CloudBucket extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<ProviderCredential, $this> */
-    public function providerCredential(): BelongsTo {
+    public function providerCredential(): BelongsTo
+    {
         return $this->belongsTo(ProviderCredential::class, 'provider_credential_id');
     }
 
-    /** @return BelongsToMany<Site, $this> */
-    public function sites(): BelongsToMany {
+    /** @return BelongsToMany<Site, $this, CloudBucketSite, 'pivot'> */
+    public function sites(): BelongsToMany
+    {
         return $this->belongsToMany(Site::class, 'cloud_bucket_site')
             ->using(CloudBucketSite::class)
             ->withPivot('env_prefix')

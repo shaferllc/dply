@@ -10,10 +10,25 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property string $id
- * One run of the post-deploy AI roadmap updater — both an audit record and the
- * cursor the next run reads from. {@see latestCompletedToCommit()} returns the
- * commit the previous successful run stopped at, so each deploy only reasons
- * about commits it hasn't processed yet.
+ *                      One run of the post-deploy AI roadmap updater — both an audit record and the
+ *                      cursor the next run reads from. {@see latestCompletedToCommit()} returns the
+ *                      commit the previous successful run stopped at, so each deploy only reasons
+ *                      about commits it hasn't processed yet.
+ * @property int $commits_considered
+ * @property int $completion_tokens
+ * @property string $from_commit
+ * @property int $items_created
+ * @property int $items_shipped
+ * @property int $latency_ms
+ * @property ?string $note
+ * @property array<string, mixed> $plan
+ * @property int $prompt_tokens
+ * @property string $status
+ * @property int $suggestions_triaged
+ * @property int $summaries_updated
+ * @property string $to_commit
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class RoadmapAiRun extends Model
 {
@@ -59,6 +74,10 @@ class RoadmapAiRun extends Model
         ];
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_COMPLETED);

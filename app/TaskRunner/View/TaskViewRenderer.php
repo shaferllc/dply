@@ -88,6 +88,7 @@ class TaskViewRenderer
 
     /**
      * Prepare data for the view.
+     * @return array<string, mixed>
      */
     protected function prepareViewData(): array
     {
@@ -146,6 +147,7 @@ class TaskViewRenderer
 
     /**
      * Get helper functions for the view.
+     * @return array<string, mixed>
      */
     protected function getHelperFunctions(): array
     {
@@ -166,7 +168,7 @@ class TaskViewRenderer
                 return implode(' ', array_map(fn ($arg) => escapeshellarg($arg), $args));
             },
             'env' => function ($key, $default = null) {
-                return env($key, $default);
+                return config($key, $default);
             },
             'config' => function ($key, $default = null) {
                 return config($key, $default);
@@ -232,6 +234,7 @@ class TaskViewRenderer
 
     /**
      * Get view compilation statistics.
+     * @return array<string, mixed>
      */
     public function getStats(): array
     {
@@ -301,6 +304,7 @@ class TaskViewRenderer
 
     /**
      * Get available views for tasks.
+     * @return array<string, mixed>
      */
     public static function getAvailableViews(): array
     {
@@ -322,6 +326,7 @@ class TaskViewRenderer
 
     /**
      * Precompile all task views.
+     * @return array<string, mixed>
      */
     public static function precompileViews(): array
     {

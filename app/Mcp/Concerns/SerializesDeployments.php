@@ -28,7 +28,7 @@ trait SerializesDeployments
             'exit_code' => $d->exit_code,
             'started_at' => $d->started_at?->toIso8601String(),
             'finished_at' => $d->finished_at?->toIso8601String(),
-            'created_at' => $d->created_at?->toIso8601String(),
+            'created_at' => $d->created_at->toIso8601String(),
         ];
     }
 

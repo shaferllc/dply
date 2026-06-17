@@ -44,7 +44,7 @@ class ShowSiteDeployCommand extends Command
         }
 
         $phaseFilter = $this->option('phase');
-        $phaseResults = is_array($deployment->phase_results ?? null) ? $deployment->phase_results : [];
+        $phaseResults = $deployment->phase_results ?? [];
         if ($phaseFilter !== null) {
             $phaseResults = array_intersect_key($phaseResults, [$phaseFilter => true]);
         }

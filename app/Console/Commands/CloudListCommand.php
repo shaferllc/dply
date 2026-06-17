@@ -89,7 +89,7 @@ class CloudListCommand extends Command
         }
 
         $rows = $sites->map(function (Site $site): array {
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $source = is_array($meta['container']['source'] ?? null) ? $meta['container']['source'] : null;
             $sourceLabel = $source !== null
                 ? sprintf('%s@%s', (string) ($source['repo'] ?? '?'), (string) ($source['branch'] ?? 'main'))

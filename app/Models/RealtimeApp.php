@@ -5,23 +5,40 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Services\Realtime\RealtimeBackend;
+use Database\Factories\RealtimeAppFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
  * @property string $id
- * A managed realtime app — a Pusher/Reverb-compatible channel application that
- * runs on the dply realtime Worker (packages/realtime-worker). One row per app;
- * the row's ULID is the Worker-side `app_id` used for Durable Object routing,
- * publishing, and stats. `app_key` is the public connection key and `app_secret`
- * signs channel auth + REST publishes.
- *
- * Provisioning writes the credentials into the Worker's APPS KV namespace via a
- * {@see RealtimeBackend}. Billed per active app by connection tier — see
- * config('realtime.tiers') and {@see tierConfig()}.
+ *                      A managed realtime app — a Pusher/Reverb-compatible channel application that
+ *                      runs on the dply realtime Worker (packages/realtime-worker). One row per app;
+ *                      the row's ULID is the Worker-side `app_id` used for Durable Object routing,
+ *                      publishing, and stats. `app_key` is the public connection key and `app_secret`
+ *                      signs channel auth + REST publishes.
+ *                      Provisioning writes the credentials into the Worker's APPS KV namespace via a
+ *                      {@see RealtimeBackend}. Billed per active app by connection tier — see
+ *                      config('realtime.tiers') and {@see tierConfig()}.
+ * @property string $app_key
+ * @property string $app_secret
+ * @property string $backend
+ * @property ?string $error_message
+ * @property string $host
+ * @property ?Carbon $last_stats_at
+ * @property int $max_connections
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $organization_id
+ * @property int $peak_connections
+ * @property string $status
+ * @property string $tier
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class RealtimeApp extends Model
 {
@@ -52,9 +69,6 @@ class RealtimeApp extends Model
         'meta',
     ];
 
-    /**
-     * @return array<string, string>
-     */
     /** @return array<string, string> */
     protected function casts(): array
     {
@@ -68,13 +82,16 @@ class RealtimeApp extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /**
      * Fresh public key + signing secret for a new app. The key is the public
      * identifier clients connect with; the secret signs channel auth + publishes.
+     *
+     * @return array{app_key: string, app_secret: string}
      */
     public static function generateCredentials(): array
     {
@@ -139,8 +156,10 @@ class RealtimeApp extends Model
 
     public function host(): string
     {
-        return $this->host !== null && $this->host !== ''
-            ? $this->host
+        $configured = (string) ($this->getAttributes()['host'] ?? '');
+
+        return $configured !== ''
+            ? $configured
             : (string) config('realtime.host');
     }
 

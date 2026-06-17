@@ -41,7 +41,7 @@ class ProvisionServerlessCacheJob implements ShouldQueue
         $site->loadMissing('server.providerCredential');
         $server = $site->server;
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $cache = is_array($serverless['cache'] ?? null) ? $serverless['cache'] : [];
 
@@ -116,7 +116,7 @@ class ProvisionServerlessCacheJob implements ShouldQueue
      */
     private function persist(Site $site, array $cache): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $serverless['cache'] = $cache;
         $meta['serverless'] = $serverless;

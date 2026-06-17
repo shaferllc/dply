@@ -10,8 +10,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $command
+ * @property array<string, mixed> $env_vars
+ * @property bool $is_active
+ * @property bool $managed_by_manifest
+ * @property string $name
+ * @property int $scale
+ * @property ?string $site_id
+ * @property string $type
+ * @property string $user
+ * @property string $working_directory
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteProcess extends Model
 {
     /** @use HasFactory<SiteProcessFactory> */
@@ -50,7 +62,8 @@ class SiteProcess extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 }

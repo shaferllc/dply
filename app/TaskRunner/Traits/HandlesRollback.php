@@ -52,7 +52,7 @@ trait HandlesRollback
         }
 
         // Check if task failed or timed out
-        if ($this->task && in_array($this->task->status, [TaskStatus::Failed, TaskStatus::Timeout])) {
+        if ($this->taskModel && in_array($this->taskModel->status, [TaskStatus::Failed, TaskStatus::Timeout])) {
             return true;
         }
 
@@ -106,10 +106,10 @@ trait HandlesRollback
     public function getRollbackData(): array
     {
         return array_merge([
-            'task_id' => $this->task?->id,
-            'task_name' => $this->task?->name,
+            'task_id' => $this->taskModel?->id,
+            'task_name' => $this->taskModel?->name,
             'rollback_timestamp' => now()->toISOString(),
-            'original_status' => $this->task?->status?->value,
+            'original_status' => $this->taskModel?->status?->value,
         ], $this->rollbackData);
     }
 
@@ -120,7 +120,7 @@ trait HandlesRollback
     {
         if (! $this->supportsRollback()) {
             Log::warning('Rollback not supported for task', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'task_class' => static::class,
             ]);
 
@@ -131,7 +131,7 @@ trait HandlesRollback
         foreach ($this->getRollbackSafetyChecks() as $check) {
             if (! $this->runSafetyCheck($check)) {
                 Log::error('Rollback safety check failed', [
-                    'task_id' => $this->task?->id,
+                    'task_id' => $this->taskModel?->id,
                     'check' => $check,
                 ]);
 
@@ -142,7 +142,7 @@ trait HandlesRollback
         // Check dependencies
         if (! $this->validateRollbackDependencies()) {
             Log::error('Rollback dependencies not satisfied', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'dependencies' => $this->getRollbackDependencies(),
             ]);
 
@@ -163,7 +163,7 @@ trait HandlesRollback
 
         try {
             $checkpoint = [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'timestamp' => now()->toISOString(),
                 'state' => $this->captureCurrentState(),
                 'backup_data' => $this->createBackup(),
@@ -172,7 +172,7 @@ trait HandlesRollback
             $this->saveCheckpoint($checkpoint);
 
             Log::info('Rollback checkpoint created', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'checkpoint_id' => $checkpoint['timestamp'],
             ]);
 
@@ -180,7 +180,7 @@ trait HandlesRollback
 
         } catch (\Exception $e) {
             Log::error('Failed to create rollback checkpoint', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'error' => $e->getMessage(),
             ]);
 
@@ -199,7 +199,7 @@ trait HandlesRollback
 
         try {
             Log::info('Starting rollback execution', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'reason' => $reason,
             ]);
 
@@ -209,13 +209,13 @@ trait HandlesRollback
             if ($success) {
                 $this->recordRollbackSuccess($reason);
                 Log::info('Rollback completed successfully', [
-                    'task_id' => $this->task?->id,
+                    'task_id' => $this->taskModel?->id,
                     'reason' => $reason,
                 ]);
             } else {
                 $this->recordRollbackFailure($reason);
                 Log::error('Rollback failed', [
-                    'task_id' => $this->task?->id,
+                    'task_id' => $this->taskModel?->id,
                     'reason' => $reason,
                 ]);
             }
@@ -225,7 +225,7 @@ trait HandlesRollback
         } catch (\Exception $e) {
             $this->recordRollbackFailure($reason, $e->getMessage());
             Log::error('Rollback exception', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'reason' => $reason,
                 'error' => $e->getMessage(),
             ]);
@@ -269,7 +269,7 @@ trait HandlesRollback
     {
         if (! $this->isRecoveryPossible()) {
             Log::warning('Recovery not possible for task', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'recovery_type' => $recoveryType,
             ]);
 
@@ -281,7 +281,7 @@ trait HandlesRollback
             $success = $rollbackService->recover($this, $recoveryType);
 
             Log::info('Recovery executed', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'recovery_type' => $recoveryType,
                 'success' => $success,
             ]);
@@ -290,7 +290,7 @@ trait HandlesRollback
 
         } catch (\Exception $e) {
             Log::error('Recovery failed', [
-                'task_id' => $this->task?->id,
+                'task_id' => $this->taskModel?->id,
                 'recovery_type' => $recoveryType,
                 'error' => $e->getMessage(),
             ]);
@@ -380,12 +380,12 @@ trait HandlesRollback
      */
     protected function hasCriticalErrors(): bool
     {
-        if (! $this->task) {
+        if (! $this->taskModel) {
             return false;
         }
 
         // Check exit code
-        if ($this->task->exit_code && $this->task->exit_code !== 0) {
+        if ($this->taskModel->exit_code && $this->taskModel->exit_code !== 0) {
             return true;
         }
 
@@ -398,7 +398,7 @@ trait HandlesRollback
             'critical',
         ];
 
-        $output = strtolower($this->task->output ?? '');
+        $output = strtolower($this->taskModel->output ?? '');
         foreach ($errorPatterns as $pattern) {
             if (str_contains($output, $pattern)) {
                 return true;
@@ -472,9 +472,9 @@ trait HandlesRollback
     protected function captureCurrentState(): array
     {
         return [
-            'task_status' => $this->task?->status?->value,
-            'task_output' => $this->task?->output,
-            'task_exit_code' => $this->task?->exit_code,
+            'task_status' => $this->taskModel?->status?->value,
+            'task_output' => $this->taskModel?->output,
+            'task_exit_code' => $this->taskModel?->exit_code,
             'timestamp' => now()->toISOString(),
         ];
     }
@@ -493,7 +493,7 @@ trait HandlesRollback
      */
     protected function saveCheckpoint(array $checkpoint): void
     {
-        $filename = "rollback_checkpoint_{$this->task?->id}_{$checkpoint['timestamp']}.json";
+        $filename = "rollback_checkpoint_{$this->taskModel?->id}_{$checkpoint['timestamp']}.json";
         Storage::disk('local')->put("task-runner/checkpoints/{$filename}", json_encode($checkpoint));
     }
 

@@ -24,6 +24,9 @@ use Illuminate\Support\Carbon;
  * @property ?string $updated_by_user_id
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property-read ?Server $server
+ * @property-read ?User $creator
+ * @property-read ?User $editor
  */
 class ServerNote extends Model
 {
@@ -46,17 +49,20 @@ class ServerNote extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function creator(): BelongsTo {
+    public function creator(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     /** @return BelongsTo<User, $this> */
-    public function editor(): BelongsTo {
+    public function editor(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'updated_by_user_id');
     }
 }

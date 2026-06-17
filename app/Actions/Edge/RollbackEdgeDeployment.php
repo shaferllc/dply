@@ -68,7 +68,7 @@ class RollbackEdgeDeployment
 
         $site->update([
             'status' => Site::STATUS_EDGE_ACTIVE,
-            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+            'meta' => array_merge($site->meta, ['edge' => $meta]),
         ]);
 
         return $deployment->refresh();

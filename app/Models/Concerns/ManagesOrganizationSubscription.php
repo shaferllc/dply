@@ -16,8 +16,6 @@ use Laravel\Cashier\Billable;
  */
 trait ManagesOrganizationSubscription
 {
-
-
     /**
      * The flat plan the org is currently on, resolved from its billable BYO
      * server count — the same basis the bill uses. Carries the plan's site
@@ -106,10 +104,10 @@ trait ManagesOrganizationSubscription
             ],
         );
 
-        return array_values(array_map(
-            fn ($id) => is_string($id) ? $id : null,
+        return array_map(
+            static fn ($id): ?string => is_string($id) ? $id : null,
             $ids,
-        ));
+        );
     }
 
     /**

@@ -125,7 +125,7 @@ trait ManagesSystemUserNotifications
         // Mirror the settings tab: only let someone detach a channel they can manage,
         // so an org member can't remove a team-owned channel's routing.
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
+        if ($channel !== null) {
             Gate::authorize('manageNotificationChannels', $channel->owner);
         }
 

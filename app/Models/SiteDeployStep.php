@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -17,10 +19,11 @@ use Illuminate\Support\Str;
  * @property ?string $custom_command
  * @property ?int $timeout_seconds
  * @property bool $managed_by_manifest
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  * @property-read Site $site
  * @property-read SiteDeployPipeline $pipeline
  */
-
 class SiteDeployStep extends Model
 {
     use HasUlids;
@@ -154,12 +157,14 @@ class SiteDeployStep extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<SiteDeployPipeline, $this> */
-    public function pipeline(): BelongsTo {
+    public function pipeline(): BelongsTo
+    {
         return $this->belongsTo(SiteDeployPipeline::class, 'pipeline_id');
     }
 
@@ -189,7 +194,11 @@ class SiteDeployStep extends Model
         return self::ALL_PHASES;
     }
 
-    public function scopePhase($query, string $phase)
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopePhase(Builder $query, string $phase): Builder
     {
         return $query->where('phase', $phase);
     }
@@ -315,6 +324,7 @@ class SiteDeployStep extends Model
         return in_array($stepType, [self::TYPE_NPM_RUN, self::TYPE_CUSTOM], true);
     }
 
+    /** @return array<string, string> */
     public static function typeLabels(): array
     {
         return [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\CloudDatabaseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,13 +13,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * @property string $id
- * A managed database — a hosted Postgres / MySQL / Redis instance dply
- * provisions on a cloud provider and attaches to Cloud container sites.
- *
- * v1 backend is DigitalOcean Managed Databases. `backend_id` holds the
- * DO cluster id; once the cluster reports `online` the connection block
- * is stored (encrypted) in `connection`, from which the engine-specific
- * env-var map is derived on attach.
+ *                      A managed database — a hosted Postgres / MySQL / Redis instance dply
+ *                      provisions on a cloud provider and attaches to Cloud container sites.
+ *                      v1 backend is DigitalOcean Managed Databases. `backend_id` holds the
+ *                      DO cluster id; once the cluster reports `online` the connection block
+ *                      is stored (encrypted) in `connection`, from which the engine-specific
+ *                      env-var map is derived on attach.
+ * @property string $backend
+ * @property ?string $backend_id
+ * @property array<string, mixed> $connection
+ * @property string $engine
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $organization_id
+ * @property ?string $provider_credential_id
+ * @property string $region
+ * @property string $size
+ * @property string $status
+ * @property string $version
+ * @property-read ?Organization $organization
+ * @property-read ?ProviderCredential $providerCredential
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class CloudDatabase extends Model
 {
@@ -78,17 +94,20 @@ class CloudDatabase extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<ProviderCredential, $this> */
-    public function providerCredential(): BelongsTo {
+    public function providerCredential(): BelongsTo
+    {
         return $this->belongsTo(ProviderCredential::class, 'provider_credential_id');
     }
 
-    /** @return BelongsToMany<Site, $this> */
-    public function sites(): BelongsToMany {
+    /** @return BelongsToMany<Site, $this, CloudDatabaseSite, 'pivot'> */
+    public function sites(): BelongsToMany
+    {
         return $this->belongsToMany(Site::class, 'cloud_database_site')
             ->using(CloudDatabaseSite::class)
             ->withPivot('env_prefix')

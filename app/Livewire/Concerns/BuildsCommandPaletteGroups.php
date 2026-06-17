@@ -21,9 +21,22 @@ use Laravel\Pennant\Feature;
  */
 trait BuildsCommandPaletteGroups
 {
+    /** Per-list result cap so a broad context can't balloon the payload. */
+    private const LIST_LIMIT = 50;
 
+    /** Smaller cap for the root direct-hit search across every resource. */
+    private const SEARCH_LIMIT = 6;
+
+    /** Tighter cap for per-result quick actions in root search (e.g. deploy). */
+    private const SEARCH_ACTION_LIMIT = 3;
+
+    /** How many recents the empty-query root surfaces. */
+    private const RECENT_LIMIT = 5;
 
     /** Category contexts whose label is static (not derived from a record). */
+    /**
+     * @return array<string, string>
+     */
     private function categoryLabels(): array
     {
         return [

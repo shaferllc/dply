@@ -11,7 +11,6 @@ use Illuminate\Support\Carbon;
 
 /**
  * Append-only audit row for a server-webserver switch (nginx → caddy, etc.).
- *
  * Mirrors {@see SiteAuditEvent} in shape — `action`, `risk`, `transport`,
  * `summary`, `payload`, `result_status` — rather than the older
  * `event`+`meta` pattern used by ServerFirewallAuditEvent. The richer shape
@@ -27,6 +26,11 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $payload
  * @property string $result_status 'success' | 'failure'
  * @property Carbon $created_at
+ * @property string $result_status
+ * @property string $transport
+ * @property-read ?Server $server
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerWebserverAuditEvent extends Model
 {
@@ -78,12 +82,14 @@ class ServerWebserverAuditEvent extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 }

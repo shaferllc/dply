@@ -32,7 +32,7 @@ trait ManagesWorkerPoolScaling
 
         $min = max(1, $this->as_min);
         $max = max($min, min($this->as_max, $pool->max_size));
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $existing = is_array($meta['autoscale'] ?? null) ? $meta['autoscale'] : [];
         $meta['autoscale'] = array_merge($existing, [
             'enabled' => $this->as_enabled,
@@ -72,7 +72,7 @@ trait ManagesWorkerPoolScaling
             return;
         }
 
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $meta['process_manager'] = $newManager;
         $pool->forceFill(['meta' => $meta])->save();
         $this->hz_process_manager = $newManager;

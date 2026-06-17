@@ -87,7 +87,7 @@ class ScanSiteEnvRequirementsJob implements ShouldBeUnique, ShouldQueue
         try {
             $result = $scanner->scan($site);
 
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['env_requirements'] = $result;
             $site->forceFill(['meta' => $meta])->save();
 

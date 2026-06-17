@@ -15,8 +15,6 @@ use Illuminate\Support\Str;
  */
 trait ManagesOrganizationMembership
 {
-
-
     /**
      * Ensure a first team exists (idempotent). Used when model events are disabled (e.g. seeders) and after legacy org rows.
      */
@@ -69,8 +67,9 @@ trait ManagesOrganizationMembership
             return $this->memberRoleMemo[$userId] = self::$memberRoleStaticMemo[$staticKey];
         }
 
-        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
-        $role = $pivot ? (string) $pivot->role : null;
+        $related = $this->users()->where('user_id', $user->id)->first();
+        $pivot = $related?->getRelationValue('pivot');
+        $role = $pivot !== null ? (string) data_get($pivot, 'role') : null;
 
         self::$memberRoleStaticMemo[$staticKey] = $role;
 

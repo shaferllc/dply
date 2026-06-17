@@ -19,6 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $created_by_user_id
  * @property string $name
  * @property array<string, mixed> $snapshot
+ * @property-read ?Organization $organization
+ * @property-read ?Server $sourceServer
+ * @property-read ?User $createdBy
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerBlueprint extends Model
 {
@@ -42,17 +47,20 @@ class ServerBlueprint extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function sourceServer(): BelongsTo {
+    public function sourceServer(): BelongsTo
+    {
         return $this->belongsTo(Server::class, 'source_server_id');
     }
 
     /** @return BelongsTo<User, $this> */
-    public function createdBy(): BelongsTo {
+    public function createdBy(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

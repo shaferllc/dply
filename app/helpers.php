@@ -50,6 +50,8 @@ if (! function_exists('reverb_health_check_url')) {
 if (! function_exists('server_workspace_nav_item_url')) {
     /**
      * URL for a server workspace sidebar item (handles settings default tab segment).
+     *
+     * @param  array<string, mixed>  $item
      */
     function server_workspace_nav_item_url(Server $server, array $item): string
     {
@@ -211,9 +213,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 // Role-focused sidebars explicitly list tag-gated rows (e.g.
                 // databases/backups on a database-role box) — show them even
                 // before installed-service tags catch up after provision.
-                $roleBypassesTagGate = $roleKeyPositions !== null
-                    && is_string($key)
-                    && isset($roleKeyPositions[$key]);
+                $roleBypassesTagGate = $roleKeyPositions !== null;
 
                 if (! $roleBypassesTagGate) {
                     $hasRequiredTag = false;
@@ -358,6 +358,7 @@ if (! function_exists('server_workspace_build_cluster_item')) {
     /**
      * Build the single representative sidebar item for a cluster of nav members.
      *
+     * @param  array<string, mixed>  $cluster
      * @param  list<array<string, mixed>>  $members
      * @return array<string, mixed>
      */
@@ -413,7 +414,7 @@ if (! function_exists('server_workspace_build_cluster_item')) {
             'preview_only' => $allPreview,
             'soon_badge' => false,
             'needs_setup' => $needsSetup,
-            'match_keys' => array_values(array_map(static fn (array $m): string => (string) ($m['key'] ?? ''), $members)),
+            'match_keys' => array_map(static fn (array $m): string => (string) ($m['key'] ?? ''), $members),
             'tabs' => $tabs,
         ];
     }
@@ -881,6 +882,9 @@ if (! function_exists('ai_llm_active')) {
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.
+     *
+     * @param  ?array<string, mixed>  $oldValues
+     * @param  ?array<string, mixed>  $newValues
      */
     function audit_log(
         Organization $organization,

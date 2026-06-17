@@ -168,7 +168,7 @@ class ReconcileSiteBackendsJob implements ShouldQueue
 
     private function markState(SiteBackend $backend, string $state): void
     {
-        $meta = is_array($backend->meta) ? $backend->meta : [];
+        $meta = $backend->meta;
         if (($backend->state ?? null) !== $state) {
             $meta['state_since'] = now()->toIso8601String();
         }

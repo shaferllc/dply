@@ -37,7 +37,7 @@ class CdnRuleRemoveCommand extends Command
             $path = '/'.$path;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $cdn = is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [];
         $rules = ApplySiteCdnJob::normaliseRules(is_array($cdn['rules'] ?? null) ? $cdn['rules'] : []);
 

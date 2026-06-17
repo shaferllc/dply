@@ -15,23 +15,93 @@ use App\Models\Concerns\Site\ResolvesSiteUrls;
 use App\Models\Concerns\Site\ResolvesWebserverConfig;
 use App\Models\Concerns\Site\TracksProvisioningStatus;
 use App\Services\Scaffold\PlaceholderDnsManager;
+use App\Support\Sites\SiteRelationPurger;
+use Database\Factories\SiteFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
  * @property string $id
+ * @property ?string $server_id
+ * @property ?string $user_id
+ * @property ?string $organization_id
+ * @property ?string $workspace_id
+ * @property ?string $project_id
+ * @property ?string $active_deploy_pipeline_id
+ * @property ?string $parent_site_id
+ * @property string $name
+ * @property string $slug
+ * @property string $logo_path
+ * @property SiteType $type
+ * @property string $document_root
+ * @property ?string $repository_path
+ * @property ?string $runtime
+ * @property ?string $runtime_version
+ * @property ?string $database_engine
+ * @property ?string $app_port
+ * @property string $internal_port
+ * @property string $build_command
+ * @property string $start_command
+ * @property string $status
+ * @property string $ssl_status
+ * @property ?Carbon $nginx_installed_at
+ * @property ?Carbon $ssl_installed_at
+ * @property ?Carbon $last_deploy_at
+ * @property ?Carbon $suspended_at
+ * @property string $suspended_reason
+ * @property ?Carbon $scheduled_deletion_at
+ * @property string $git_repository_url
+ * @property string $git_branch
+ * @property string $git_deploy_key_private
+ * @property string $git_deploy_key_public
+ * @property string $webhook_secret
+ * @property array<string, mixed> $webhook_allowed_ips
+ * @property string $post_deploy_command
+ * @property ?string $deploy_script_id
+ * @property string $deploy_strategy
+ * @property string $deploy_method
+ * @property string $releases_to_keep
+ * @property string $nginx_extra_raw
+ * @property bool $engine_http_cache_enabled
+ * @property ?string $octane_port
+ * @property bool $laravel_scheduler
+ * @property bool $restart_supervisor_programs_after_deploy
+ * @property string $deployment_environment
+ * @property string $php_fpm_user
+ * @property string $env_file_content
+ * @property ?Carbon $env_synced_at
+ * @property string $env_cache_origin
+ * @property string $env_file_path
+ * @property string $container_image
+ * @property string $container_registry
+ * @property string $container_port
+ * @property ?string $container_backend
+ * @property ?string $container_backend_id
+ * @property string $container_region
+ * @property string $serverless_backend
+ * @property ?string $serverless_provider_credential_id
+ * @property string $edge_backend
+ * @property ?string $edge_backend_id
+ * @property ?string $edge_provider_credential_id
+ * @property array<string, mixed> $meta
+ * @property ?string $dns_provider_credential_id
+ * @property string $dns_zone
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class Site extends Model
 {
     use DerivesWorkerEnvironment;
     use GuardsSiteAccess;
-    /** @use HasFactory<SiteFactory> */
+
+    /** @use HasFactory<\Database\Factories\SiteFactory> */
     use HasFactory, HasUlids;
+
     use HasSiteRelationships;
     use ManagesEdgeHosting;
     use ManagesServerless;
@@ -224,8 +294,9 @@ class Site extends Model
         // lives in {@see Site::cachingConfig()}, which falls back to the
         // boolean when `meta['caching']` is absent.
         static::saving(function (Site $site): void {
-            $meta = is_array($site->meta) ? $site->meta : [];
-            if (! isset($meta['caching']) || ! is_array($meta['caching'])) {
+            $meta = $site->meta ?? [];
+            $caching = $meta['caching'] ?? null;
+            if (! is_array($caching)) {
                 return;
             }
             $enabled = (bool) ($meta['caching']['enabled'] ?? false);
@@ -250,7 +321,7 @@ class Site extends Model
                     $site->workspace_id = $server->workspace_id;
                 }
             }
-            if ($site->project_id === null && $site->organization_id && $site->user_id) {
+            if (data_get($site->getAttributes(), 'project_id') === null && $site->organization_id && $site->user_id) {
                 // Auto-create a BYO-site Project only when we can satisfy its NOT NULL
                 // owners (organization_id + user_id). In-memory test fixtures and other
                 // edge cases that lack those skip the auto-creation rather than
@@ -299,7 +370,7 @@ class Site extends Model
             // links (console_actions, notification_subscriptions, …) — so a
             // deleted site leaves no orphaned rows (esp. its Errors stream).
             try {
-                app(\App\Support\Sites\SiteRelationPurger::class)->purge($site);
+                app(SiteRelationPurger::class)->purge($site);
             } catch (\Throwable $e) {
                 Log::warning('Site::deleting relation purge failed', [
                     'site_id' => $site->getKey(),
@@ -363,11 +434,6 @@ class Site extends Model
     /** The customer's connected provider account runs (and is billed for) the function. */
     public const SERVERLESS_BACKEND_BYO = 'org_digitalocean';
 
-    /** Memoized result of the lazy-load path in primaryDomain(). */
-    private ?SiteDomain $primaryDomainCache = null;
-
-    private bool $primaryDomainResolved = false;
-
     /**
      * URL the container deployment is reachable at, set by the
      * provisioner once the backend reports an "ingress" hostname
@@ -382,25 +448,18 @@ class Site extends Model
      */
     public const OCTANE_SERVERS = ['swoole', 'roadrunner', 'frankenphp'];
 
-    /**
-     * Site-level caching configuration, materialised with sensible defaults.
-     *
-     * Lives under `meta['caching']`. Pre-migration sites (no `caching` key yet) get a synthetic
-     * structure derived from the legacy `engine_http_cache_enabled` boolean so the rest of the
-     * code can read one shape regardless of migration state.
-     *
-     * @return array<string, mixed>
-     */
     public function resolveRouteBinding($value, $field = null): ?static
     {
         // Accepts slug (human-readable, used by CLI) or primary key (ULID,
         // used by web routes). Tries slug first so CLI commands like
         // `dply sites:show my-site` resolve correctly without changing how
         // web URL generation works (which still uses the primary key).
-        return static::query()
+        $resolved = static::query()
             ->where('slug', $value)
             ->orWhere($this->getKeyName(), $value)
             ->first();
+
+        return $resolved instanceof static ? $resolved : null;
     }
 
     public function ensureUniqueSlug(): void

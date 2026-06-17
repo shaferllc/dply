@@ -40,7 +40,7 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
             return;
         }
 
-        $meta = is_array($cloudSite->meta) ? $cloudSite->meta : [];
+        $meta = $cloudSite->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $stack = is_array($container['hybrid_edge_stack'] ?? null) ? $container['hybrid_edge_stack'] : [];
 
@@ -137,7 +137,7 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
      */
     private function updateStackMeta(Site $cloudSite, array $changes): void
     {
-        $meta = is_array($cloudSite->meta) ? $cloudSite->meta : [];
+        $meta = $cloudSite->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $stack = is_array($container['hybrid_edge_stack'] ?? null) ? $container['hybrid_edge_stack'] : [];
         $container['hybrid_edge_stack'] = array_merge($stack, $changes);

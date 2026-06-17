@@ -14,6 +14,13 @@ use Illuminate\Support\Str;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property string $edge_backend
+ * @property ?string $container_backend
+ * @property string $id
+ * @property string $name
+ * @property string $slug
  */
 trait ManagesEdgeHosting
 {
@@ -36,9 +43,15 @@ trait ManagesEdgeHosting
      */
     public function edgeMeta(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
-        return is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        /** @var mixed $edge */
+        $edge = $meta['edge'] ?? null;
+        if (! is_array($edge)) {
+            $edge = [];
+        }
+
+        return $edge;
     }
 
     public function edgeLiveUrl(): ?string
@@ -70,8 +83,12 @@ trait ManagesEdgeHosting
     {
         $previous = $this->edgeGuardrail()['state'] ?? null;
 
-        $meta = is_array($this->meta) ? $this->meta : [];
-        $edge = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        $meta = $this->meta ?? [];
+        /** @var mixed $edge */
+        $edge = $meta['edge'] ?? null;
+        if (! is_array($edge)) {
+            $edge = [];
+        }
         $edge['guardrail'] = $guardrail;
         $meta['edge'] = $edge;
 
@@ -232,10 +249,10 @@ trait ManagesEdgeHosting
      */
     public function estimatedMonthlyCostUsd(): int
     {
-        if ($this->container_backend === null) {
+        if ($this->container_backend === null || $this->container_backend === '') {
             return 0;
         }
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
         $instances = is_int($meta['container']['instance_count'] ?? null)
             ? (int) $meta['container']['instance_count']
@@ -265,7 +282,7 @@ trait ManagesEdgeHosting
 
     public function containerLiveUrl(): ?string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         // Prefer the branded dply subdomain (e.g. `acme-api-x4k2p.on-dply.cloud`)
         // once it's attached as a PRIMARY domain on the backend. While the
@@ -300,11 +317,15 @@ trait ManagesEdgeHosting
         return $slug.'-'.$shortId.'.on-dply.cloud';
     }
 
+    /**
+     * @param  array<string, mixed>  $patch
+     */
     public function mergeEdgeMeta(array $patch): void
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
-        $current = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
-        $meta['edge'] = array_merge($current, $patch);
+        $meta = $this->meta ?? [];
+        /** @var mixed $current */
+        $current = $meta['edge'] ?? null;
+        $meta['edge'] = array_merge(is_array($current) ? $current : [], $patch);
         $this->meta = $meta;
     }
 }

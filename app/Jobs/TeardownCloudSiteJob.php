@@ -44,7 +44,7 @@ class TeardownCloudSiteJob implements ShouldQueue
         // Mark the site row inactive but don't delete it — keeps
         // audit history of what was deployed where, and lets the
         // operator see the failure path in the dashboard.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'torn_down_at' => now()->toIso8601String(),
         ]);

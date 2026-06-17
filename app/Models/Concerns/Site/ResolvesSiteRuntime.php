@@ -21,6 +21,18 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property ?string $runtime
+ * @property ?string $runtime_version
+ * @property ?string $database_engine
+ * @property ?string $server_id
+ * @property ?string $app_port
+ * @property ?string $octane_port
+ * @property ?string $container_backend
+ * @property string $edge_backend
+ * @property SiteType $type
+ * @property-read ?Server $server
  */
 trait ResolvesSiteRuntime
 {
@@ -33,9 +45,8 @@ trait ResolvesSiteRuntime
      */
     public function runtimeVersion(): ?string
     {
-        $version = $this->runtime_version;
-        if (is_string($version) && $version !== '') {
-            return $version;
+        if (filled($this->runtime_version)) {
+            return $this->runtime_version;
         }
 
         return null;
@@ -52,12 +63,11 @@ trait ResolvesSiteRuntime
      */
     public function runtimeKey(): ?string
     {
-        $runtime = $this->runtime;
-        if (is_string($runtime) && $runtime !== '') {
-            return $runtime;
+        if (filled($this->runtime)) {
+            return $this->runtime;
         }
 
-        return $this->type?->value;
+        return $this->type->value;
     }
 
     /**
@@ -76,9 +86,7 @@ trait ResolvesSiteRuntime
             return null;
         }
 
-        $version = $this->runtime_version;
-
-        return is_string($version) && $version !== '' ? $version : null;
+        return filled($this->runtime_version) ? $this->runtime_version : null;
     }
 
     /**
@@ -94,7 +102,7 @@ trait ResolvesSiteRuntime
      */
     public function databaseEngine(): ?string
     {
-        if (is_string($this->database_engine) && $this->database_engine !== '') {
+        if (filled($this->database_engine)) {
             return $this->database_engine;
         }
 
@@ -121,12 +129,12 @@ trait ResolvesSiteRuntime
      * Reads return runtime_version when the runtime is PHP, null otherwise
      * — matches phpVersion()'s semantics so consumers can call either.
      */
-    public function setPhpVersionAttribute($value): void
+    public function setPhpVersionAttribute(mixed $value): void
     {
         if ($value === null || $value === '') {
             return;
         }
-        if (! is_string($this->runtime) || $this->runtime === '') {
+        if (! filled($this->runtime)) {
             $this->runtime = 'php';
         }
         $this->runtime_version = (string) $value;
@@ -139,11 +147,11 @@ trait ResolvesSiteRuntime
 
     public function runtimeProfile(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $profile = $meta['runtime_profile'] ?? null;
 
-        if (is_string($profile) && $profile !== '') {
-            return $profile;
+        if ($profile !== null && $profile !== '') {
+            return (string) $profile;
         }
 
         if ($this->server?->isDigitalOceanFunctionsHost()) {
@@ -207,7 +215,7 @@ trait ResolvesSiteRuntime
      */
     public function resolvedRuntimeAppDetection(): ?array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         $candidates = [
             ['source' => 'docker', 'blob' => data_get($meta, 'docker_runtime.detected')],
@@ -264,12 +272,12 @@ trait ResolvesSiteRuntime
 
     public function isLaravelFrameworkDetected(): bool
     {
-        return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'laravel';
+        return $this->resolvedRuntimeFrameworkKey() === 'laravel';
     }
 
     public function isRailsFrameworkDetected(): bool
     {
-        return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'rails';
+        return $this->resolvedRuntimeFrameworkKey() === 'rails';
     }
 
     /**
@@ -280,7 +288,7 @@ trait ResolvesSiteRuntime
      */
     public function isWordPressDetected(): bool
     {
-        if (strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'wordpress') {
+        if ($this->resolvedRuntimeFrameworkKey() === 'wordpress') {
             return true;
         }
 
@@ -315,6 +323,13 @@ trait ResolvesSiteRuntime
         }
 
         return $lang !== '' && $lang !== 'unknown';
+    }
+
+    private function resolvedRuntimeFrameworkKey(): string
+    {
+        $resolved = $this->resolvedRuntimeAppDetection();
+
+        return $resolved !== null ? strtolower($resolved['framework']) : '';
     }
 
     public function usesFunctionsRuntime(): bool
@@ -370,7 +385,7 @@ trait ResolvesSiteRuntime
             return true;
         }
 
-        $framework = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $framework = $this->resolvedRuntimeFrameworkKey();
 
         return in_array($framework, [
             'rails',
@@ -402,7 +417,7 @@ trait ResolvesSiteRuntime
             return null;
         }
 
-        if ($this->app_port !== null && (int) $this->app_port > 0 && $this->isLongRunningAppServer()) {
+        if ((int) $this->app_port > 0 && $this->isLongRunningAppServer()) {
             return 'port';
         }
 
@@ -482,7 +497,7 @@ trait ResolvesSiteRuntime
 
     public function usesEdgeRuntime(): bool
     {
-        return is_string($this->edge_backend) && $this->edge_backend !== '';
+        return $this->edge_backend !== '';
     }
 
     /**
@@ -496,8 +511,7 @@ trait ResolvesSiteRuntime
             return false;
         }
 
-        $resolved = $this->resolvedRuntimeAppDetection();
-        $fw = strtolower((string) ($resolved['framework'] ?? ''));
+        $fw = $this->resolvedRuntimeFrameworkKey();
 
         return $this->type === SiteType::Php
             || in_array($fw, ['laravel', 'php_generic', 'symfony'], true);
@@ -508,7 +522,7 @@ trait ResolvesSiteRuntime
      */
     public function runtimePhpProcessSectionTitle(): string
     {
-        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $fw = $this->resolvedRuntimeFrameworkKey();
 
         return match ($fw) {
             'laravel' => __('PHP process & Laravel'),
@@ -516,7 +530,7 @@ trait ResolvesSiteRuntime
             'wordpress' => __('PHP process'),
             'php_generic' => __('PHP process'),
             '' => __('PHP process'),
-            default => __('PHP process (:stack)', ['stack' => str($fw)->replace('_', ' ')->title()]),
+            default => __('PHP process (:stack)', ['stack' => (string) str($fw)->replace('_', ' ')->title()]),
         };
     }
 
@@ -525,7 +539,7 @@ trait ResolvesSiteRuntime
      */
     public function runtimeSchedulerCheckboxLabel(): string
     {
-        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $fw = $this->resolvedRuntimeFrameworkKey();
 
         return $fw === 'laravel'
             ? __('Laravel scheduler (cron)')
@@ -537,7 +551,7 @@ trait ResolvesSiteRuntime
      */
     public function runtimeSchedulerCheckboxHelp(): ?string
     {
-        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $fw = $this->resolvedRuntimeFrameworkKey();
 
         return $fw === 'laravel'
             ? null
@@ -549,7 +563,7 @@ trait ResolvesSiteRuntime
      */
     public function runtimeSchedulerRolloutFormLabel(): string
     {
-        $fw = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $fw = $this->resolvedRuntimeFrameworkKey();
 
         return $fw === 'laravel'
             ? __('Laravel scheduler (schedule:run every minute via server crontab)')
@@ -577,7 +591,7 @@ trait ResolvesSiteRuntime
         // Framework signal from runtime detection OR scaffold meta (mirrors the
         // dual-source approach in isWordPressDetected()), so a scaffolded
         // WordPress/Symfony site is correctly excluded before its first deploy.
-        $detected = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $detected = $this->resolvedRuntimeFrameworkKey();
         $scaffolded = strtolower((string) ($this->meta['scaffold']['framework'] ?? ''));
 
         $confidentlyNonLaravel = ['wordpress', 'symfony', 'drupal', 'rails'];
@@ -644,8 +658,7 @@ trait ResolvesSiteRuntime
             return false;
         }
 
-        $resolved = $this->resolvedRuntimeAppDetection();
-        if ($resolved === null || strtolower((string) ($resolved['framework'] ?? '')) !== 'laravel') {
+        if ($this->resolvedRuntimeFrameworkKey() !== 'laravel') {
             return false;
         }
 
@@ -671,15 +684,12 @@ trait ResolvesSiteRuntime
             return false;
         }
 
-        $resolved = $this->resolvedRuntimeAppDetection();
-        $fw = strtolower((string) ($resolved['framework'] ?? ''));
-
-        return $fw === 'rails';
+        return $this->resolvedRuntimeFrameworkKey() === 'rails';
     }
 
     public function octaneServer(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $lo = is_array($meta['laravel_octane'] ?? null) ? $meta['laravel_octane'] : [];
         $s = strtolower((string) ($lo['server'] ?? 'swoole'));
 
@@ -692,7 +702,7 @@ trait ResolvesSiteRuntime
     public function detectedLaravelPackageKeys(): array
     {
         $resolved = $this->resolvedRuntimeAppDetection();
-        if ($resolved === null || strtolower((string) ($resolved['framework'] ?? '')) !== 'laravel') {
+        if ($resolved === null || $this->resolvedRuntimeFrameworkKey() !== 'laravel') {
             return [];
         }
 
@@ -710,7 +720,7 @@ trait ResolvesSiteRuntime
     public function resolvedLaravelPackageFlag(string $short): bool
     {
         $resolved = $this->resolvedRuntimeAppDetection();
-        if ($resolved === null || strtolower((string) ($resolved['framework'] ?? '')) !== 'laravel') {
+        if ($resolved === null || $this->resolvedRuntimeFrameworkKey() !== 'laravel') {
             return false;
         }
 
@@ -736,7 +746,7 @@ trait ResolvesSiteRuntime
      */
     public function reverbLocalPort(): int
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $r = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
         $p = $r['port'] ?? 8080;
 
@@ -753,7 +763,7 @@ trait ResolvesSiteRuntime
      */
     public function shouldProxyReverbInWebserver(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $hasSavedPort = is_array($meta['laravel_reverb'] ?? null)
             && array_key_exists('port', $meta['laravel_reverb']);
 
@@ -765,7 +775,7 @@ trait ResolvesSiteRuntime
      */
     public function reverbWebSocketPath(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $r = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
         $p = trim((string) ($r['ws_path'] ?? '/app'));
         if ($p === '' || $p[0] !== '/') {
@@ -780,7 +790,7 @@ trait ResolvesSiteRuntime
 
     public function horizonDashboardPath(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $h = is_array($meta['laravel_horizon'] ?? null) ? $meta['laravel_horizon'] : [];
         $p = trim((string) ($h['path'] ?? '/horizon'));
         if ($p === '' || $p[0] !== '/') {
@@ -792,7 +802,7 @@ trait ResolvesSiteRuntime
 
     public function pulseDashboardPath(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $h = is_array($meta['laravel_pulse'] ?? null) ? $meta['laravel_pulse'] : [];
         $p = trim((string) ($h['path'] ?? '/pulse'));
         if ($p === '' || $p[0] !== '/') {
@@ -817,8 +827,8 @@ trait ResolvesSiteRuntime
      */
     public function octaneSupervisorCommand(): string
     {
-        $port = $this->octane_port;
-        if ($port === null || $port < 1) {
+        $port = (int) ($this->octane_port ?? 0);
+        if ($port < 1) {
             $port = 8000;
         }
 
@@ -834,7 +844,7 @@ trait ResolvesSiteRuntime
      */
     public function runtimeTarget(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $target = $meta['runtime_target'] ?? null;
 
         if (is_array($target) && ($target['family'] ?? null)) {
@@ -943,7 +953,7 @@ trait ResolvesSiteRuntime
 
     public function runtimeRepositorySubdirectory(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $subdirectory = data_get($meta, 'runtime_target.repository_subdirectory');
 
         if (! is_string($subdirectory) || trim($subdirectory) === '') {

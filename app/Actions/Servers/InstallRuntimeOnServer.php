@@ -87,7 +87,7 @@ class InstallRuntimeOnServer
 
     private function recordRuntimeDefault(Server $server, string $runtime, string $version): void
     {
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $defaults = is_array($meta['runtime_defaults'] ?? null) ? $meta['runtime_defaults'] : [];
         $defaults[$runtime] = $version;
         $meta['runtime_defaults'] = $defaults;

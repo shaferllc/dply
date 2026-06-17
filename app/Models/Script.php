@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Database\Factories\ScriptFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -18,10 +20,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?string $run_as_user
  * @property string $source
  * @property ?string $marketplace_key
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  * @property-read Organization $organization
  * @property-read ?User $user
+ * @property-read Collection<int, Site> $sitesUsingAsDeploy
  */
-
 class Script extends Model
 {
     public const SOURCE_USER_CREATED = 'user_created';
@@ -42,17 +46,20 @@ class Script extends Model
     ];
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
     /** @return HasMany<Site, $this> */
-    public function sitesUsingAsDeploy(): HasMany {
+    public function sitesUsingAsDeploy(): HasMany
+    {
         return $this->hasMany(Site::class, 'deploy_script_id');
     }
 

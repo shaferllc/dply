@@ -4,15 +4,42 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property ?Carbon $completed_at
+ * @property string $failure_summary
+ * @property array<string, mixed> $manual_review_items
+ * @property ?string $organization_id
+ * @property ?Carbon $paused_nudge_sent_at
+ * @property ?string $provider_credential_id
+ * @property string $source
+ * @property int $source_server_id
+ * @property string $ssh_key_fingerprint
+ * @property string $ssh_key_private_encrypted
+ * @property string $ssh_key_public
+ * @property ?Carbon $ssh_key_pushed_at
+ * @property ?Carbon $ssh_key_revoked_at
+ * @property int $ssh_key_source_id
+ * @property ?Carbon $started_at
+ * @property string $status
+ * @property ?string $target_server_id
+ * @property ?string $user_id
+ * @property-read ?Organization $organization
+ * @property-read ?User $user
+ * @property-read ?ProviderCredential $providerCredential
+ * @property-read ?Server $targetServer
+ * @property-read Collection<int, ImportSiteMigration> $siteMigrations
+ * @property-read Collection<int, ImportMigrationStep> $steps
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ImportServerMigration extends Model
 {
     use HasUlids;
@@ -75,32 +102,38 @@ class ImportServerMigration extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
     /** @return BelongsTo<ProviderCredential, $this> */
-    public function providerCredential(): BelongsTo {
+    public function providerCredential(): BelongsTo
+    {
         return $this->belongsTo(ProviderCredential::class);
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function targetServer(): BelongsTo {
+    public function targetServer(): BelongsTo
+    {
         return $this->belongsTo(Server::class, 'target_server_id');
     }
 
     /** @return HasMany<ImportSiteMigration, $this> */
-    public function siteMigrations(): HasMany {
+    public function siteMigrations(): HasMany
+    {
         return $this->hasMany(ImportSiteMigration::class);
     }
 
     /** @return HasMany<ImportMigrationStep, $this> */
-    public function steps(): HasMany {
+    public function steps(): HasMany
+    {
         return $this->hasMany(ImportMigrationStep::class)->orderBy('sequence');
     }
 }

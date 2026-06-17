@@ -181,8 +181,7 @@ trait CreatesNotificationChannelInline
         $org = match (true) {
             $owner instanceof Organization => $owner,
             $owner instanceof Team => $owner->organization,
-            $owner instanceof User => Auth::user()?->currentOrganization(),
-            default => null,
+            default => Auth::user()?->currentOrganization(),
         };
         if ($org !== null) {
             audit_log($org, Auth::user(), 'notification_channel.created', $channel, null, [

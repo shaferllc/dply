@@ -7,11 +7,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $bytes_egress
+ * @property string $cache_status
+ * @property string $country
+ * @property ?Carbon $created_at
+ * @property string $duration_ms
+ * @property ?string $edge_deployment_id
+ * @property string $hostname
+ * @property string $method
+ * @property ?Carbon $occurred_at
+ * @property ?string $organization_id
+ * @property string $path
+ * @property string $referrer
+ * @property ?string $site_id
+ * @property string $source
+ * @property string $status_code
+ * @property string $user_agent
+ * @property-read ?Site $site
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class EdgeAccessLog extends Model
 {
     use HasUlids;
@@ -46,12 +65,14 @@ class EdgeAccessLog extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 }

@@ -38,7 +38,7 @@ class SendOutboundWebhookJob implements ShouldQueue
     {
         /** @var OutboundWebhookDelivery|null $delivery */
         $delivery = OutboundWebhookDelivery::query()->find($this->deliveryId);
-        if ($delivery === null || $delivery->url === null || $delivery->url === '') {
+        if ($delivery === null || $delivery->url === '') {
             return;
         }
         if ($delivery->status === OutboundWebhookDelivery::STATUS_SENT) {

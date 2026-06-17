@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -18,9 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?int $version
  * @property bool $is_custom
  * @property bool $can_manage
- * @property ?\Illuminate\Support\Carbon $captured_at
+ * @property ?Carbon $captured_at
  * @property ?string $pending_action
- * @property ?\Illuminate\Support\Carbon $pending_action_at
+ * @property ?Carbon $pending_action_at
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  * @property-read Server $server
  */
 class ServerSystemdServiceState extends Model
@@ -54,7 +57,8 @@ class ServerSystemdServiceState extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 }

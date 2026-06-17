@@ -12,11 +12,17 @@ use Illuminate\Support\Str;
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
  * wire:* bindings keep resolving against the composed class.
+ *
+ * @property string $icon_path
+ * @property string $name
+ * @property array<string, mixed> $server_site_preferences
+ * @property array<string, mixed> $database_workspace_settings
+ * @property array<string, mixed> $insights_preferences
+ * @property array<string, mixed> $services_preferences
+ * @property bool $deploy_email_notifications_enabled
  */
 trait ManagesOrganizationPreferences
 {
-
-
     /**
      * Public URL of the org's uploaded icon/logo, or null when none is set —
      * callers fall back to the generated initials avatar. Stored on the
@@ -25,7 +31,7 @@ trait ManagesOrganizationPreferences
     public function iconUrl(): ?string
     {
         $path = $this->icon_path;
-        if (! is_string($path) || $path === '') {
+        if ($path === '') {
             return null;
         }
 
@@ -34,7 +40,7 @@ trait ManagesOrganizationPreferences
 
     public function hasIcon(): bool
     {
-        return is_string($this->icon_path) && $this->icon_path !== '';
+        return $this->icon_path !== '';
     }
 
     /**
@@ -83,12 +89,12 @@ trait ManagesOrganizationPreferences
     }
 
     /**
-     * @return array{digest_non_critical: bool, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
      */
     public function mergedInsightsPreferences(): array
     {
         $defaults = config('insights.organization_defaults', []);
-        $stored = is_array($this->insights_preferences) ? $this->insights_preferences : [];
+        $stored = $this->insights_preferences ?? [];
 
         return array_replace_recursive($defaults, $stored);
     }
@@ -103,10 +109,7 @@ trait ManagesOrganizationPreferences
     public function mergedServicesPreferences(): array
     {
         $defaults = config('server_services.organization_defaults', []);
-        if (! is_array($defaults)) {
-            $defaults = [];
-        }
-        $stored = is_array($this->services_preferences) ? $this->services_preferences : [];
+        $stored = $this->services_preferences ?? [];
 
         $merged = array_replace_recursive($defaults, $stored);
         $digest = (string) ($merged['systemd_notifications_digest'] ?? 'immediate');
@@ -120,13 +123,11 @@ trait ManagesOrganizationPreferences
 
             return strtolower(trim(str_replace('.service', '', $v)));
         };
+        /** @var list<mixed> $globalOnly */
         $globalOnly = config('server_services.systemd_status_only_units', []);
-        $globalOnly = is_array($globalOnly) ? $globalOnly : [];
         $fromGlobal = array_filter(array_map($norm, $globalOnly), static fn (string $v) => $v !== '');
+        /** @var list<mixed> $statusOnly */
         $statusOnly = $merged['systemd_status_only_units'] ?? [];
-        if (! is_array($statusOnly)) {
-            $statusOnly = [];
-        }
         $fromOrg = array_filter(array_map($norm, $statusOnly), static fn (string $v) => $v !== '');
         $statusOnly = array_values(array_unique(array_merge($fromGlobal, $fromOrg)));
 
@@ -139,7 +140,7 @@ trait ManagesOrganizationPreferences
 
     public function allowsDatabaseCredentialShares(): bool
     {
-        return (bool) ($this->mergedDatabaseWorkspaceSettings()['credential_shares_enabled'] ?? true);
+        return (bool) $this->mergedDatabaseWorkspaceSettings()['credential_shares_enabled'];
     }
 
     /**
@@ -149,7 +150,7 @@ trait ManagesOrganizationPreferences
     {
         $global = (int) config('server_database.import_max_bytes', 10485760);
         $raw = $this->mergedDatabaseWorkspaceSettings()['import_max_bytes'] ?? null;
-        if ($raw === null || $raw === '') {
+        if ($raw === null) {
             return $global;
         }
 

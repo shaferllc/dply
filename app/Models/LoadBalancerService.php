@@ -10,8 +10,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property int $destination_port
+ * @property bool $health_check_enabled
+ * @property string $health_check_path
+ * @property int $health_check_port
+ * @property string $health_check_protocol
+ * @property int $listen_port
+ * @property ?string $load_balancer_id
+ * @property array<string, mixed> $meta
+ * @property string $protocol
+ * @property bool $sticky_sessions
+ * @property-read ?LoadBalancer $loadBalancer
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class LoadBalancerService extends Model
 {
     use HasUlids;
@@ -43,7 +55,8 @@ class LoadBalancerService extends Model
     }
 
     /** @return BelongsTo<LoadBalancer, $this> */
-    public function loadBalancer(): BelongsTo {
+    public function loadBalancer(): BelongsTo
+    {
         return $this->belongsTo(LoadBalancer::class);
     }
 }

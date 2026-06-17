@@ -34,7 +34,7 @@ class CloudPreviewListCommand extends Command
         $previews = CreateCloudPreviewSite::listForParent($parent);
 
         $rows = $previews->map(function (Site $site): array {
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
 
             return [

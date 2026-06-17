@@ -5,24 +5,36 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One execution of a CloudDeployTask. For pre/post/failed triggers the
- * run row is created by the deploy-sync pass that scrapes DO's per-job
- * status after each rollout; for MANUAL the row is created inline when
- * the operator hits Run now.
- *
- * The trigger is snapshotted from the parent task at run time so
- * historical runs survive task renames or trigger changes.
+ *                      One execution of a CloudDeployTask. For pre/post/failed triggers the
+ *                      run row is created by the deploy-sync pass that scrapes DO's per-job
+ *                      status after each rollout; for MANUAL the row is created inline when
+ *                      the operator hits Run now.
+ *                      The trigger is snapshotted from the parent task at run time so
+ *                      historical runs survive task renames or trigger changes.
+ * @property ?string $cloud_deploy_task_id
+ * @property ?string $deployment_id
+ * @property int $duration_ms
+ * @property ?string $error
+ * @property int $exit_code
+ * @property ?Carbon $finished_at
+ * @property string $log_tail
+ * @property array<string, mixed> $meta
+ * @property ?Carbon $started_at
+ * @property string $status
+ * @property string $trigger
+ * @property-read ?CloudDeployTask $task
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class CloudDeployTaskRun extends Model
 {
-    /** @use HasFactory<CloudDeployTaskRunFactory> */
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const STATUS_RUNNING = 'running';
 
@@ -59,7 +71,8 @@ class CloudDeployTaskRun extends Model
     }
 
     /** @return BelongsTo<CloudDeployTask, $this> */
-    public function task(): BelongsTo {
+    public function task(): BelongsTo
+    {
         return $this->belongsTo(CloudDeployTask::class, 'cloud_deploy_task_id');
     }
 

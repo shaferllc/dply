@@ -5,12 +5,32 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One row per outbound webhook attempt — including the "would have been sent"
- * placeholder rows for events on servers without a webhook URL configured. Lets
- * users audit exactly what Dply emits even before they wire up an endpoint.
+ *                      One row per outbound webhook attempt — including the "would have been sent"
+ *                      placeholder rows for events on servers without a webhook URL configured. Lets
+ *                      users audit exactly what Dply emits even before they wire up an endpoint.
+ * @property int $attempt_count
+ * @property ?Carbon $completed_at
+ * @property ?string $error_message
+ * @property string $event_key
+ * @property ?Carbon $first_attempt_at
+ * @property string $http_status
+ * @property ?string $organization_id
+ * @property array<string, mixed> $payload
+ * @property string $response_excerpt
+ * @property ?string $server_id
+ * @property bool $signed
+ * @property ?string $signed_at
+ * @property string $status
+ * @property string $summary
+ * @property string $url
+ * @property-read ?Server $server
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class OutboundWebhookDelivery extends Model
 {
@@ -52,18 +72,21 @@ class OutboundWebhookDelivery extends Model
         return [
             'payload' => 'array',
             'signed' => 'boolean',
+            'attempt_count' => 'integer',
             'first_attempt_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 }

@@ -47,7 +47,7 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
 
         // Already provisioned — skip the API call, just (re)deploy functions.
         if (! empty($meta['digitalocean_functions']['api_host'] ?? null)) {

@@ -39,7 +39,7 @@ class ApplySiteCdnJob implements ShouldQueue
             return;
         }
 
-        $cfg = is_array($site->meta) ? ($site->meta['cdn'] ?? []) : [];
+        $cfg = $site->meta['cdn'] ?? [];
         if (! is_array($cfg) || empty($cfg['provider']) || empty($cfg['credential_id'])) {
             return;
         }
@@ -144,7 +144,7 @@ class ApplySiteCdnJob implements ShouldQueue
      */
     private function persist(Site $site, array $patch): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['cdn'] = array_merge(is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [], $patch);
         $site->meta = $meta;
         $site->save();

@@ -8,8 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $folder
+ * @property string $git_sha
+ * @property bool $is_active
+ * @property ?string $site_id
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteRelease extends Model
 {
     use HasUlids;
@@ -30,7 +36,8 @@ class SiteRelease extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 }

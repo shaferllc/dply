@@ -37,7 +37,7 @@ class DetachCloudDomainJob implements ShouldQueue
 
         $backend->detachDomain($site, $credential, $this->hostname);
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         if (isset($meta['container']['domains'][$this->hostname])) {
             unset($meta['container']['domains'][$this->hostname]);
             $site->update(['meta' => $meta]);

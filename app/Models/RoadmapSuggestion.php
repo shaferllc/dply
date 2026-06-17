@@ -14,8 +14,17 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
+ * @property string $admin_notes
+ * @property ?string $description
+ * @property string $email
+ * @property string $ip_address
+ * @property string $name
+ * @property ?string $promoted_roadmap_item_id
+ * @property string $status
+ * @property string $title
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class RoadmapSuggestion extends Model
 {
     /** @use HasFactory<RoadmapSuggestionFactory> */
@@ -46,6 +55,10 @@ class RoadmapSuggestion extends Model
         return array_keys(config('roadmap.suggestion_statuses', []));
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeStatus(Builder $query, ?string $status): Builder
     {
         if ($status === null || $status === '' || $status === 'all') {
@@ -55,6 +68,10 @@ class RoadmapSuggestion extends Model
         return $query->where('status', $status);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeSearch(Builder $query, ?string $search): Builder
     {
         if ($search === null || trim($search) === '') {
@@ -73,6 +90,7 @@ class RoadmapSuggestion extends Model
     /**
      * @return BelongsTo<RoadmapItem, $this>
      */
+    /** @return BelongsTo<RoadmapItem, $this> */
     public function promotedRoadmapItem(): BelongsTo
     {
         return $this->belongsTo(RoadmapItem::class, 'promoted_roadmap_item_id');

@@ -643,7 +643,7 @@ class ProjectApiController extends Controller
             'output' => $run->output,
             'started_at' => $run->started_at?->toIso8601String(),
             'finished_at' => $run->finished_at?->toIso8601String(),
-            'created_at' => $run->created_at?->toIso8601String(),
+            'created_at' => $run->created_at->toIso8601String(),
             'user' => $run->user ? [
                 'id' => (string) $run->user->id,
                 'name' => $run->user->name,

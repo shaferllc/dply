@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\DeployContract\WaiveDeployContractRun;
 use App\Models\DeployContractRun;
 use App\Models\Site;
@@ -19,10 +18,13 @@ use Livewire\Component;
  * @phpstan-require-extends Component
  *
  * @property Site $site
+ *
+ * @method void openConfirmActionModal(string $method, mixed $arguments = [], string $title = 'Confirm action', string $message = 'Are you sure?', string $confirmLabel = 'Confirm', bool $destructive = false, ?list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}> $details = null)
  */
 trait ManagesDeployContract
 {
     use DispatchesToastNotifications;
+
     public string $deployContractWaiverReason = '';
 
     protected function contractParentSite(): Site
@@ -33,9 +35,7 @@ trait ManagesDeployContract
     public function runDeployContract(string $previewSiteId): void
     {
         if (! Feature::active('global.deploy_contract')) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Deploy contract is not enabled for this organization.'));
-            }
+            $this->toastError(__('Deploy contract is not enabled for this organization.'));
 
             return;
         }
@@ -52,9 +52,7 @@ trait ManagesDeployContract
         if ($preview === null
             || $preview->organization_id !== $parent->organization_id
             || ($preview->edgeMeta()['preview_parent_site_id'] ?? null) !== $parent->id) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Preview not found or not a child of this site.'));
-            }
+            $this->toastError(__('Preview not found or not a child of this site.'));
 
             return;
         }
@@ -74,12 +72,10 @@ trait ManagesDeployContract
             ]);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            if ($run->status === DeployContractRun::STATUS_PASSED) {
-                $this->toastSuccess(__('Deploy contract passed — promote is unblocked when review policy is satisfied.'));
-            } else {
-                $this->toastError(__('Deploy contract failed — see check results below.'));
-            }
+        if ($run->status === DeployContractRun::STATUS_PASSED) {
+            $this->toastSuccess(__('Deploy contract passed — promote is unblocked when review policy is satisfied.'));
+        } else {
+            $this->toastError(__('Deploy contract failed — see check results below.'));
         }
     }
 
@@ -90,9 +86,7 @@ trait ManagesDeployContract
         }
 
         if (! (bool) config('deploy_contract.allow_waivers', true)) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Deploy contract waivers are disabled.'));
-            }
+            $this->toastError(__('Deploy contract waivers are disabled.'));
 
             return;
         }
@@ -104,10 +98,6 @@ trait ManagesDeployContract
         }
 
         $this->authorize('update', $parent);
-
-        if (! method_exists($this, 'openConfirmActionModal')) {
-            return;
-        }
 
         $this->openConfirmActionModal(
             'waiveDeployContract',
@@ -137,9 +127,7 @@ trait ManagesDeployContract
         if ($preview === null
             || $preview->organization_id !== $parent->organization_id
             || ($preview->edgeMeta()['preview_parent_site_id'] ?? null) !== $parent->id) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Preview not found or not a child of this site.'));
-            }
+            $this->toastError(__('Preview not found or not a child of this site.'));
 
             return;
         }
@@ -152,9 +140,7 @@ trait ManagesDeployContract
                 $this->deployContractWaiverReason,
             );
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -169,9 +155,7 @@ trait ManagesDeployContract
             ]);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Deploy contract waived — promote is allowed with audit trail.'));
-        }
+        $this->toastSuccess(__('Deploy contract waived — promote is allowed with audit trail.'));
     }
 
     /**

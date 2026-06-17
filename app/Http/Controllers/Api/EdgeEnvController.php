@@ -107,8 +107,8 @@ class EdgeEnvController extends Controller
         return response()->json([
             'data' => $rows->map(fn (EdgeSiteEnvVar $v) => [
                 'key' => $v->key,
-                'updated_at' => $v->updated_at?->toIso8601String(),
-                'created_at' => $v->created_at?->toIso8601String(),
+                'updated_at' => $v->updated_at->toIso8601String(),
+                'created_at' => $v->created_at->toIso8601String(),
             ])->all(),
         ]);
     }
@@ -157,8 +157,8 @@ class EdgeEnvController extends Controller
         return response()->json([
             'data' => [
                 'key' => $row->key,
-                'updated_at' => $row->updated_at?->toIso8601String(),
-                'created_at' => $row->created_at?->toIso8601String(),
+                'updated_at' => $row->updated_at->toIso8601String(),
+                'created_at' => $row->created_at->toIso8601String(),
             ],
         ]);
     }

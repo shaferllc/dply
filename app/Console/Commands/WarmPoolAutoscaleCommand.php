@@ -104,7 +104,7 @@ class WarmPoolAutoscaleCommand extends Command
             // as available() and suppressing refill. Time-bound it to 'failed' so
             // the bucket refills.
             $maxWarming = (int) config('warm_pool.max_warming_seconds', 1800);
-            if ($maxWarming > 0 && $member->created_at && $member->created_at->lt(now()->subSeconds($maxWarming))) {
+            if ($maxWarming > 0 && $member->created_at->lt(now()->subSeconds($maxWarming))) {
                 $this->transition($member, ServerPoolMember::STATUS_FAILED, $dry, "warming > {$maxWarming}s — provision wedged");
             }
         }

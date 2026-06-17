@@ -8,24 +8,38 @@ use App\Jobs\SwitchCacheServiceJob;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One row per (server, engine). Coexistence rules: at most one row from the redis-family
- * ({@see ServerCacheService::FAMILY_REDIS_ENGINES}) per server, plus optionally one Memcached
- * row. Enforced at three layers:
- *
- *   1. DB: `unique(server_id, engine)` + a Postgres partial unique index keyed on `server_id`
- *      where `engine IN (redis,valkey,keydb,dragonfly)`. See the
- *      `collapse_cache_services_to_one_per_family` migration.
- *   2. Model: {@see ServerCacheService::familyOf()} centralises the family check the install
- *      action consumes.
- *   3. Livewire action: `installCacheService()` refuses a second redis-family install on the
- *      same server, pointing the operator at Uninstall or the engine-switch flow instead.
- *
- * The `name` column survives only for legacy data (always `'default'` going forward) and is not
- * exposed in the UI — multi-instance support was removed once it became clear most operators
- * never used it and the templated systemd-unit machinery was producing more bugs than value.
+ *                      One row per (server, engine). Coexistence rules: at most one row from the redis-family
+ *                      ({@see ServerCacheService::FAMILY_REDIS_ENGINES}) per server, plus optionally one Memcached
+ *                      row. Enforced at three layers:
+ *                      1. DB: `unique(server_id, engine)` + a Postgres partial unique index keyed on `server_id`
+ *                      where `engine IN (redis,valkey,keydb,dragonfly)`. See the
+ *                      `collapse_cache_services_to_one_per_family` migration.
+ *                      2. Model: {@see ServerCacheService::familyOf()} centralises the family check the install
+ *                      action consumes.
+ *                      3. Livewire action: `installCacheService()` refuses a second redis-family install on the
+ *                      same server, pointing the operator at Uninstall or the engine-switch flow instead.
+ *                      The `name` column survives only for legacy data (always `'default'` going forward) and is not
+ *                      exposed in the UI — multi-instance support was removed once it became clear most operators
+ *                      never used it and the templated systemd-unit machinery was producing more bugs than value.
+ * @property string $auth_password
+ * @property string $cache_prefix
+ * @property ?Carbon $cancel_requested_at
+ * @property string $engine
+ * @property ?string $error_message
+ * @property string $install_output
+ * @property string $name
+ * @property int $port
+ * @property ?string $server_id
+ * @property string $status
+ * @property string $target_engine
+ * @property string $version
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerCacheService extends Model
 {
@@ -116,7 +130,8 @@ class ServerCacheService extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 

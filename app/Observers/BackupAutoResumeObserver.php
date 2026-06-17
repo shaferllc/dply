@@ -9,7 +9,6 @@ use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * Re-enable a paused {@see ServerBackupSchedule} when a backup against the same
@@ -23,22 +22,16 @@ use Illuminate\Database\Eloquent\Model;
  */
 class BackupAutoResumeObserver
 {
-    public function updated(Model $backup): void
+    public function updated(ServerDatabaseBackup|SiteFileBackup $backup): void
     {
         // Only act on the moment status flips to completed.
         if (! $backup->wasChanged('status') || $backup->status !== 'completed') {
             return;
         }
 
-        [$targetType, $targetId] = match (true) {
-            $backup instanceof ServerDatabaseBackup => [ServerBackupSchedule::TARGET_DATABASE, $backup->server_database_id],
-            $backup instanceof SiteFileBackup => [ServerBackupSchedule::TARGET_SITE_FILES, $backup->site_id],
-            default => [null, null],
-        };
-
-        if ($targetType === null) {
-            return;
-        }
+        [$targetType, $targetId] = $backup instanceof ServerDatabaseBackup
+            ? [ServerBackupSchedule::TARGET_DATABASE, $backup->server_database_id]
+            : [ServerBackupSchedule::TARGET_SITE_FILES, $backup->site_id];
 
         ServerBackupSchedule::query()
             ->where('target_type', $targetType)

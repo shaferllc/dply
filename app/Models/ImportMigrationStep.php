@@ -7,11 +7,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $attempts
+ * @property ?string $error_message
+ * @property ?Carbon $finished_at
+ * @property ?string $import_server_migration_id
+ * @property ?string $import_site_migration_id
+ * @property string $log_object_key
+ * @property array<string, mixed> $result_data
+ * @property string $sequence
+ * @property ?Carbon $started_at
+ * @property string $status
+ * @property string $step_key
+ * @property-read ?ImportServerMigration $serverMigration
+ * @property-read ?ImportSiteMigration $siteMigration
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ImportMigrationStep extends Model
 {
     use HasUlids;
@@ -111,12 +126,14 @@ class ImportMigrationStep extends Model
     }
 
     /** @return BelongsTo<ImportServerMigration, $this> */
-    public function serverMigration(): BelongsTo {
+    public function serverMigration(): BelongsTo
+    {
         return $this->belongsTo(ImportServerMigration::class, 'import_server_migration_id');
     }
 
     /** @return BelongsTo<ImportSiteMigration, $this> */
-    public function siteMigration(): BelongsTo {
+    public function siteMigration(): BelongsTo
+    {
         return $this->belongsTo(ImportSiteMigration::class, 'import_site_migration_id');
     }
 

@@ -78,9 +78,6 @@ class ExportSiteFileBackupJob implements ShouldQueue
         }
 
         $site = $backup->site;
-        if (! $site instanceof Site) {
-            return;
-        }
 
         $emit = new ConsoleEmitter(null);
         if ($this->seededConsoleRunId !== null) {

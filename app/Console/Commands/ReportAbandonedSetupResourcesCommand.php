@@ -40,7 +40,7 @@ class ReportAbandonedSetupResourcesCommand extends Command
             ->orderBy('id')
             ->chunkById(200, function ($bindings) use (&$rows, $cutoff): void {
                 foreach ($bindings as $binding) {
-                    $cfg = is_array($binding->config) ? $binding->config : [];
+                    $cfg = $binding->config;
                     if (($cfg['provisioned_during_setup'] ?? false) !== true) {
                         continue;
                     }
@@ -54,7 +54,7 @@ class ReportAbandonedSetupResourcesCommand extends Command
 
                     $at = $cfg['provisioned_during_setup_at'] ?? null;
                     $provisionedAt = $at !== null ? Carbon::parse((string) $at) : $binding->created_at;
-                    if ($provisionedAt !== null && $provisionedAt->greaterThan($cutoff)) {
+                    if ($provisionedAt->greaterThan($cutoff)) {
                         continue; // still within the grace window
                     }
 
@@ -63,7 +63,7 @@ class ReportAbandonedSetupResourcesCommand extends Command
                         $binding->type,
                         $binding->name ?: '—',
                         $site->firstDeploySetupState() ?: '—',
-                        $provisionedAt?->diffForHumans() ?? '—',
+                        $provisionedAt->diffForHumans(),
                     ];
                 }
             });

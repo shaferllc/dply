@@ -7,7 +7,6 @@ namespace App\Models;
 use App\Console\Commands\RunDueScheduledDeploysCommand;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -24,11 +23,14 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property ?Carbon $dispatched_at
  * @property ?Carbon $canceled_at
+ * @property-read ?Site $site
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ScheduledDeploy extends Model
 {
-    /** @use HasFactory<ScheduledDeployFactory> */
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const STATUS_PENDING = 'pending';
 
@@ -56,12 +58,14 @@ class ScheduledDeploy extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

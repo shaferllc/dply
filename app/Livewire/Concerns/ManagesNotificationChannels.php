@@ -13,8 +13,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Component;
 
 /**
+ * @phpstan-require-extends Component
+ *
  * @property-read Collection<int, NotificationChannel> $channels Livewire computed (access as $this->channels; do not invoke $this->channels()).
  */
 trait ManagesNotificationChannels
@@ -92,7 +95,10 @@ trait ManagesNotificationChannels
 
     public ?string $testing_id = null;
 
-    abstract protected function owner(): User|Organization|Team;
+    /**
+     * @return User|Organization|Team
+     */
+    abstract protected function owner(): Model;
 
     abstract protected function notificationChannelsViewData(): array;
 
@@ -116,6 +122,9 @@ trait ManagesNotificationChannels
         unset($this->channels);
     }
 
+    /**
+     * @return Collection<int, NotificationChannel>
+     */
     #[Computed]
     public function channels(): Collection
     {
@@ -152,7 +161,6 @@ trait ManagesNotificationChannels
             'label' => $this->new_label,
             'config' => $config,
         ]);
-        assert($channel instanceof NotificationChannel);
 
         $this->recordChannelAudit('notification_channel.created', $channel, null, [
             'channel_id' => (string) $channel->id,
@@ -203,7 +211,6 @@ trait ManagesNotificationChannels
     public function startEdit(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
-        assert($channel instanceof NotificationChannel);
         Gate::authorize('update', $channel);
         $this->editing_id = $channel->id;
         $this->edit_type = $channel->type;
@@ -264,7 +271,6 @@ trait ManagesNotificationChannels
     public function saveEdit(): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($this->editing_id);
-        assert($channel instanceof NotificationChannel);
         Gate::authorize('update', $channel);
         $this->resetErrorBag();
 
@@ -301,7 +307,6 @@ trait ManagesNotificationChannels
     public function deleteChannel(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
-        assert($channel instanceof NotificationChannel);
         Gate::authorize('delete', $channel);
         $snapshot = [
             'channel_id' => (string) $channel->id,
@@ -317,7 +322,6 @@ trait ManagesNotificationChannels
     public function sendTest(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
-        assert($channel instanceof NotificationChannel);
         Gate::authorize('update', $channel);
         $this->testing_id = (string) $id;
         $result = $channel->sendTest(Auth::user());
@@ -328,7 +332,7 @@ trait ManagesNotificationChannels
             'type' => $channel->type,
             'label' => $channel->label,
             'result' => $result['ok'] ? 'success' : 'failed',
-            'message' => isset($result['message']) ? (string) $result['message'] : null,
+            'message' => (string) $result['message'],
         ]);
 
         if ($result['ok']) {
@@ -343,8 +347,7 @@ trait ManagesNotificationChannels
      * dispatch the log. Channels owned directly by an Organization or Team
      * route to that org; user-owned (personal) channels route to the user's
      * current org so the action surfaces alongside their other audit events.
-     */
-    /**
+     *
      * @param  array<string, mixed>|null  $oldValues
      * @param  array<string, mixed>|null  $newValues
      */

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -12,8 +13,20 @@ use InvalidArgumentException;
 
 /**
  * @property string $id
+ * @property ?list<string> $abilities
+ * @property ?list<string> $allowed_ips
+ * @property ?Carbon $expires_at
+ * @property ?Carbon $last_used_at
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $token_hash
+ * @property string $token_prefix
+ * @property ?string $user_id
+ * @property-read ?User $user
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ApiToken extends Model
 {
     use HasUlids;
@@ -42,12 +55,14 @@ class ApiToken extends Model
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
@@ -117,7 +132,7 @@ class ApiToken extends Model
         }
 
         foreach ($abilities as $ab) {
-            if (! is_string($ab) || $ab === '') {
+            if ($ab === '') {
                 throw new InvalidArgumentException(__('API token abilities must be non-empty strings.'));
             }
             if (! self::abilityIsAllowedForStorage($ab)) {
@@ -162,6 +177,10 @@ class ApiToken extends Model
 
     /**
      * Create a new token and return the plaintext value (only time it is visible).
+     *
+     * @param  list<string>|null  $abilities
+     * @param  list<string>|null  $allowedIps
+     * @return array{token: self, plaintext: string}
      */
     public static function createToken(
         User $user,
@@ -192,7 +211,7 @@ class ApiToken extends Model
 
     public function isValid(): bool
     {
-        if ($this->expires_at && $this->expires_at->isPast()) {
+        if ($this->expires_at !== null && $this->expires_at->isPast()) {
             return false;
         }
 
@@ -222,9 +241,9 @@ class ApiToken extends Model
 
     protected function tokenAllowsAbility(string $ability): bool
     {
-        $abilities = $this->abilities;
+        $abilities = $this->abilities ?? [];
 
-        if ($abilities === null || $abilities === []) {
+        if ($abilities === []) {
             return true;
         }
 
@@ -236,7 +255,8 @@ class ApiToken extends Model
             return true;
         }
 
-        $prefix = explode('.', $ability, 2)[0] ?? '';
+        $parts = explode('.', $ability, 2);
+        $prefix = $parts[0];
 
         return $prefix !== '' && in_array($prefix.'.*', $abilities, true);
     }

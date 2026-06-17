@@ -15,7 +15,12 @@ use Illuminate\Support\Collection;
  */
 trait ManagesOrganizationQuotas
 {
-
+    /**
+     * Per-request memo for {@see serverIds()}.
+     *
+     * @var Collection<int, string>|null
+     */
+    private ?Collection $serverIdsMemo = null;
 
     /**
      * The org's current plan site ceiling, or null when unlimited.

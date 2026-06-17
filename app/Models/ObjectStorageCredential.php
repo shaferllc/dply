@@ -10,12 +10,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A reusable S3 API key pair for an object-storage provider (DigitalOcean
- * Spaces keys, Hetzner S3 credentials, …), scoped to an organization so the
- * whole team can attach or provision buckets without re-pasting secrets.
- *
- * These are S3 access keys — distinct from {@see ProviderCredential}, which
- * holds the cloud platform API token. The secret is encrypted at rest.
+ *                      A reusable S3 API key pair for an object-storage provider (DigitalOcean
+ *                      Spaces keys, Hetzner S3 credentials, …), scoped to an organization so the
+ *                      whole team can attach or provision buckets without re-pasting secrets.
+ *                      These are S3 access keys — distinct from {@see ProviderCredential}, which
+ *                      holds the cloud platform API token. The secret is encrypted at rest.
+ * @property ?string $access_key_id
+ * @property ?string $created_by_user_id
+ * @property string $endpoint
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $provider
+ * @property string $region
+ * @property string $secret_access_key
+ * @property-read ?Organization $organization
+ * @property-read ?User $createdByUser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ObjectStorageCredential extends Model
 {
@@ -43,12 +54,14 @@ class ObjectStorageCredential extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function createdByUser(): BelongsTo {
+    public function createdByUser(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

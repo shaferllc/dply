@@ -60,7 +60,7 @@ class CdnEnableCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $existing = is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [];
         $meta['cdn'] = array_merge($existing, [
             'enabled' => true,

@@ -44,7 +44,7 @@ class AttachCloudDomainJob implements ShouldQueue
 
         $records = $backend->attachDomain($site, $credential, $this->hostname);
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $domains = is_array($meta['container']['domains'] ?? null) ? $meta['container']['domains'] : [];
         $domains[$this->hostname] = [

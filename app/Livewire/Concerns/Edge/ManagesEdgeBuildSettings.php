@@ -30,6 +30,7 @@ use Livewire\Component;
 trait ManagesEdgeBuildSettings
 {
     use DispatchesToastNotifications;
+
     /**
      * Form input for minting a new deploy hook (P10b). Cleared after
      * a successful mint; the resulting plaintext URL surfaces via
@@ -62,9 +63,7 @@ trait ManagesEdgeBuildSettings
 
         $value = (int) $this->buildForm->edge_releases_to_keep;
         if ($value < 1 || $value > 50) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Releases to keep must be between 1 and 50.'));
-            }
+            $this->toastError(__('Releases to keep must be between 1 and 50.'));
 
             return;
         }
@@ -72,9 +71,7 @@ trait ManagesEdgeBuildSettings
         $this->site->update(['releases_to_keep' => $value]);
         $this->site->refresh();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Retention updated.'));
-        }
+        $this->toastSuccess(__('Retention updated.'));
     }
 
     public function saveEdgeBuildSettings(): void
@@ -129,9 +126,7 @@ trait ManagesEdgeBuildSettings
             }
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Build settings saved. Changes apply on the next deploy.'));
-        }
+        $this->toastSuccess(__('Build settings saved. Changes apply on the next deploy.'));
     }
 
     public function saveEdgeHybridOrigin(): void
@@ -143,9 +138,7 @@ trait ManagesEdgeBuildSettings
 
         $edge = $this->site->edgeMeta();
         if (($edge['runtime_mode'] ?? 'static') !== 'hybrid') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Origin settings only apply to hybrid Edge sites.'));
-            }
+            $this->toastError(__('Origin settings only apply to hybrid Edge sites.'));
 
             return;
         }
@@ -199,9 +192,7 @@ trait ManagesEdgeBuildSettings
         ];
 
         if ($newOrigin === $previousOrigin) {
-            if (method_exists($this, 'toastSuccess')) {
-                $this->toastSuccess(__('Origin settings unchanged.'));
-            }
+            $this->toastSuccess(__('Origin settings unchanged.'));
 
             return;
         }
@@ -227,9 +218,7 @@ trait ManagesEdgeBuildSettings
             }
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Origin settings saved. Worker host map updated.'));
-        }
+        $this->toastSuccess(__('Origin settings saved. Worker host map updated.'));
     }
 
     public function saveEdgeImageOptimization(): void
@@ -260,9 +249,7 @@ trait ManagesEdgeBuildSettings
             }
 
             $this->republishHostMapForActiveDeployment();
-            if (method_exists($this, 'toastSuccess')) {
-                $this->toastSuccess(__('Image optimization disabled.'));
-            }
+            $this->toastSuccess(__('Image optimization disabled.'));
 
             return;
         }
@@ -303,9 +290,7 @@ trait ManagesEdgeBuildSettings
 
         $this->republishHostMapForActiveDeployment();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Image optimization settings saved. Worker host map updated.'));
-        }
+        $this->toastSuccess(__('Image optimization settings saved. Worker host map updated.'));
     }
 
     public function rotateEdgeImageSigningSecret(): void
@@ -319,9 +304,7 @@ trait ManagesEdgeBuildSettings
         $edge = $site->edgeMeta();
         $previousImages = is_array($edge['images'] ?? null) ? $edge['images'] : [];
         if (($previousImages['signing_secret'] ?? '') === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Enable image optimization first.'));
-            }
+            $this->toastError(__('Enable image optimization first.'));
 
             return;
         }
@@ -340,9 +323,7 @@ trait ManagesEdgeBuildSettings
 
         $this->republishHostMapForActiveDeployment();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Image signing secret rotated. Re-sign any pre-rendered URLs.'));
-        }
+        $this->toastSuccess(__('Image signing secret rotated. Re-sign any pre-rendered URLs.'));
     }
 
     public function saveEdgeCommentWidget(): void
@@ -370,9 +351,7 @@ trait ManagesEdgeBuildSettings
 
             $this->republishHostMapForActiveDeployment();
 
-            if (method_exists($this, 'toastSuccess')) {
-                $this->toastSuccess(__('Preview comment widget disabled.'));
-            }
+            $this->toastSuccess(__('Preview comment widget disabled.'));
 
             return;
         }
@@ -399,9 +378,7 @@ trait ManagesEdgeBuildSettings
 
         $this->republishHostMapForActiveDeployment();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Preview comment widget enabled. New previews ship with the widget script injected.'));
-        }
+        $this->toastSuccess(__('Preview comment widget enabled. New previews ship with the widget script injected.'));
     }
 
     public function saveEdgePreviewProtection(): void
@@ -445,9 +422,7 @@ trait ManagesEdgeBuildSettings
             ]);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Preview protection updated.'));
-        }
+        $this->toastSuccess(__('Preview protection updated.'));
     }
 
     /** @return list<string> */
@@ -512,9 +487,14 @@ trait ManagesEdgeBuildSettings
             ]);
         }
 
-        if (method_exists($this, $result['ok'] ? 'toastSuccess' : 'toastError')) {
-            $method = $result['ok'] ? 'toastSuccess' : 'toastError';
-            $this->{$method}($result['message']);
+        if ($result['ok']) {
+
+            $this->toastSuccess($result['message']);
+
+        } else {
+
+            $this->toastError($result['message']);
+
         }
 
         if ($result['ok']) {
@@ -531,9 +511,7 @@ trait ManagesEdgeBuildSettings
 
         $edge = $this->site->edgeMeta();
         if (($edge['runtime_mode'] ?? 'static') === 'hybrid') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Site is already in hybrid mode.'));
-            }
+            $this->toastError(__('Site is already in hybrid mode.'));
 
             return;
         }
@@ -578,9 +556,7 @@ trait ManagesEdgeBuildSettings
         $this->buildForm->edge_convert_origin_url = '';
         $this->mountEdgeBuildSettings($this->site);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Site converted to hybrid. Worker host map updated.'));
-        }
+        $this->toastSuccess(__('Site converted to hybrid. Worker host map updated.'));
     }
 
     public function rotateEdgeHybridOriginSecret(): void
@@ -592,9 +568,7 @@ trait ManagesEdgeBuildSettings
 
         $edge = $this->site->edgeMeta();
         if (($edge['runtime_mode'] ?? 'static') !== 'hybrid') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Origin secret rotation only applies to hybrid Edge sites.'));
-            }
+            $this->toastError(__('Origin secret rotation only applies to hybrid Edge sites.'));
 
             return;
         }
@@ -603,9 +577,7 @@ trait ManagesEdgeBuildSettings
         $edge = $site->edgeMeta();
         $previousOrigin = is_array($edge['origin'] ?? null) ? $edge['origin'] : [];
         if (($previousOrigin['url'] ?? '') === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Set the origin URL first.'));
-            }
+            $this->toastError(__('Set the origin URL first.'));
 
             return;
         }
@@ -630,9 +602,7 @@ trait ManagesEdgeBuildSettings
             }
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Origin auth secret rotated. Update your origin app and redeploy if needed.'));
-        }
+        $this->toastSuccess(__('Origin auth secret rotated. Update your origin app and redeploy if needed.'));
     }
 
     public function enableEdgeGithubWebhook(EdgeGithubWebhookProvisioner $provisioner): void
@@ -643,9 +613,7 @@ trait ManagesEdgeBuildSettings
         $this->authorize('update', $this->site);
 
         if ($this->buildForm->edge_webhook_account_id === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Select a linked GitHub account first.'));
-            }
+            $this->toastError(__('Select a linked GitHub account first.'));
 
             return;
         }
@@ -654,26 +622,20 @@ trait ManagesEdgeBuildSettings
             ? app(GitIdentityResolver::class)->forId(auth()->user(), $this->buildForm->edge_webhook_account_id)
             : null;
         if ($account === null) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('That GitHub account is no longer linked.'));
-            }
+            $this->toastError(__('That GitHub account is no longer linked.'));
 
             return;
         }
 
         $result = $provisioner->enable($this->site->fresh(), $account);
-        if (! ($result['ok'] ?? false)) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError((string) ($result['message'] ?? __('Could not connect GitHub webhook.')));
-            }
+        if (! $result['ok']) {
+            $this->toastError($result['message']);
 
             return;
         }
 
         $this->site->refresh();
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess((string) ($result['message'] ?? __('GitHub webhook connected.')));
-        }
+        $this->toastSuccess($result['message']);
     }
 
     public function disableEdgeGithubWebhook(EdgeGithubWebhookProvisioner $provisioner): void
@@ -691,9 +653,7 @@ trait ManagesEdgeBuildSettings
         $provisioner->disable($this->site->fresh(), $account);
         $this->site->refresh();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('GitHub webhook disconnected.'));
-        }
+        $this->toastSuccess(__('GitHub webhook disconnected.'));
     }
 
     public function mintEdgeDeployHook(): void
@@ -705,9 +665,7 @@ trait ManagesEdgeBuildSettings
 
         $name = trim($this->edge_new_deploy_hook_name);
         if ($name === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Give the hook a name so you can tell yours apart later.'));
-            }
+            $this->toastError(__('Give the hook a name so you can tell yours apart later.'));
 
             return;
         }
@@ -724,9 +682,7 @@ trait ManagesEdgeBuildSettings
             ]);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Deploy hook created. Copy the URL now — dply won\'t show it again.'));
-        }
+        $this->toastSuccess(__('Deploy hook created. Copy the URL now — dply won\'t show it again.'));
     }
 
     public function dismissEdgeDeployHookUrl(): void
@@ -760,9 +716,7 @@ trait ManagesEdgeBuildSettings
             ], null);
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Deploy hook revoked. The URL will return 404 immediately.'));
-        }
+        $this->toastSuccess(__('Deploy hook revoked. The URL will return 404 immediately.'));
     }
 
     /**
@@ -848,9 +802,7 @@ trait ManagesEdgeBuildSettings
         $this->edge_env_var_value = '';
         $this->resetErrorBag(['edge_env_var_key', 'edge_env_var_value']);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Env var saved. Redeploy to apply.'));
-        }
+        $this->toastSuccess(__('Env var saved. Redeploy to apply.'));
     }
 
     public function removeEdgeEnvVar(string $key): void
@@ -876,8 +828,6 @@ trait ManagesEdgeBuildSettings
             );
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Env var removed.'));
-        }
+        $this->toastSuccess(__('Env var removed.'));
     }
 }

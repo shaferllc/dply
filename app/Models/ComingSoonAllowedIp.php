@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\Cache;
  * (see {@see RedirectGuestsToComingSoon}). The effective
  * allow-list is the union of these rows and the COMING_SOON_ALLOWED_IPS env
  * entries — cached, since the gate runs on every request.
+ *
+ * @property string $created_by
+ * @property string $ip
+ * @property string $label
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ComingSoonAllowedIp extends Model
 {

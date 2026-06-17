@@ -8,17 +8,29 @@ use App\Jobs\InstallLogAgentJob;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One row per server enrolled in the dply Logs add-on — the per-server edge
- * Vector agent that ships host + service logs to dply. Mirrors the lifecycle
- * shape of {@see ServerCacheService} (status + install_output + version), but
- * there is at most ONE log agent per server (the add-on is a per-server
- * resource), enforced by the unique index on server_id.
- *
- * Enabling the add-on dispatches {@see InstallLogAgentJob}; the workspace renders
- * `install_output` live while status === installing. See docs/SERVER_LOGS_ADDON.md.
+ *                      One row per server enrolled in the dply Logs add-on — the per-server edge
+ *                      Vector agent that ships host + service logs to dply. Mirrors the lifecycle
+ *                      shape of {@see ServerCacheService} (status + install_output + version), but
+ *                      there is at most ONE log agent per server (the add-on is a per-server
+ *                      resource), enforced by the unique index on server_id.
+ *                      Enabling the add-on dispatches {@see InstallLogAgentJob}; the workspace renders
+ *                      `install_output` live while status === installing. See docs/SERVER_LOGS_ADDON.md.
+ * @property ?Carbon $cancel_requested_at
+ * @property string $client_cert_fingerprint
+ * @property array<string, mixed> $enabled_sources
+ * @property ?string $error_message
+ * @property string $install_output
+ * @property ?Carbon $last_seen_at
+ * @property ?string $server_id
+ * @property string $status
+ * @property string $version
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerLogAgent extends Model
 {
@@ -61,7 +73,8 @@ class ServerLogAgent extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
@@ -94,12 +107,10 @@ class ServerLogAgent extends Model
     {
         $resolved = self::configuredSourceDefaults();
 
-        $saved = is_array($this->enabled_sources) ? $this->enabled_sources : null;
-        if ($saved !== null) {
-            foreach ($resolved as $key => $_default) {
-                if (array_key_exists($key, $saved)) {
-                    $resolved[$key] = (bool) $saved[$key];
-                }
+        $saved = $this->enabled_sources;
+        foreach ($resolved as $key => $_default) {
+            if (array_key_exists($key, $saved)) {
+                $resolved[$key] = (bool) $saved[$key];
             }
         }
 
@@ -113,7 +124,7 @@ class ServerLogAgent extends Model
      */
     public function activeSourceKeys(): array
     {
-        return array_values(array_keys(array_filter($this->resolvedSources())));
+        return array_keys(array_filter($this->resolvedSources()));
     }
 
     public function isRunning(): bool

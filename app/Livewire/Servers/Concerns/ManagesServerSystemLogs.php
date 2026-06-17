@@ -114,7 +114,7 @@ trait ManagesServerSystemLogs
 
         if ($this->scopedSite !== null) {
             $site = $this->scopedSite;
-            if ($server !== null && ! $site->relationLoaded('server')) {
+            if (! $site->relationLoaded('server')) {
                 $site->setRelation('server', $server);
             }
             $id = (string) $site->getKey();

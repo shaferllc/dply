@@ -10,15 +10,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * An organization's `age` keypair for escrowed secrets (see the table migration
- * for the trust model). Encrypt with {@see $public_recipient}; decrypt with the
- * private identity — which dply holds ({@see $dply_identity}, APP_KEY-encrypted)
- * only when {@see HOLDER_DPLY}.
- *
- * `dply_identity` IS an `encrypted` cast (APP_KEY-encrypted at rest) — it is the
- * exception that proves the rule: it is dply's OWN copy of the key, registered
- * in config/secret_vault.php so `secrets:reencrypt` rotates it like any other
- * platform secret. The SiteSecretResidency.ciphertext it opens is NOT.
+ *                      An organization's `age` keypair for escrowed secrets (see the table migration
+ *                      for the trust model). Encrypt with {@see $public_recipient}; decrypt with the
+ *                      private identity — which dply holds ({@see $dply_identity}, APP_KEY-encrypted)
+ *                      only when {@see HOLDER_DPLY}.
+ *                      `dply_identity` IS an `encrypted` cast (APP_KEY-encrypted at rest) — it is the
+ *                      exception that proves the rule: it is dply's OWN copy of the key, registered
+ *                      in config/secret_vault.php so `secrets:reencrypt` rotates it like any other
+ *                      platform secret. The SiteSecretResidency.ciphertext it opens is NOT.
+ * @property string $dply_identity
+ * @property string $fingerprint
+ * @property string $identity_holder
+ * @property ?string $organization_id
+ * @property string $public_recipient
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class OrgSecretKey extends Model
 {
@@ -50,12 +57,12 @@ class OrgSecretKey extends Model
     public function dplyCanDecrypt(): bool
     {
         return $this->identity_holder === self::HOLDER_DPLY
-            && is_string($this->dply_identity)
             && $this->dply_identity !== '';
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 }

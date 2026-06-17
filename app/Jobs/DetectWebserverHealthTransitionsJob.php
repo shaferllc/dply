@@ -61,7 +61,7 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
         $payload = $snapshot->payload;
         $healthBlocks = is_array($payload['webserver_health'] ?? null) ? $payload['webserver_health'] : [];
 
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $alertState = is_array($meta['webserver_health_alert_state'] ?? null)
             ? $meta['webserver_health_alert_state']
             : [];

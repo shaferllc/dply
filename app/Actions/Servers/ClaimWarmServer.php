@@ -126,8 +126,8 @@ class ClaimWarmServer
         }
 
         return DB::transaction(function () use ($pool, $server, $member): bool {
-            $meta = is_array($server->meta) ? $server->meta : [];
-            $poolMeta = is_array($pool->meta) ? $pool->meta : [];
+            $meta = $server->meta;
+            $poolMeta = $pool->meta;
             // Carry the reconciled installed-stack snapshot (overwritten when the
             // personalize re-provision emits a fresh one). Do NOT carry
             // provision_step_snapshots — the journey reads those as step-completion

@@ -35,7 +35,7 @@ class CronJobAlertNotification extends Notification implements ShouldQueue
         $failure = (bool) ($metadata['failure'] ?? false);
         $outputExcerpt = (string) ($metadata['output_excerpt'] ?? '');
         $reason = $failure
-            ? __('Non-zero exit code (:code).', ['code' => (string) ($exitCode ?? '?')])
+            ? __('Non-zero exit code (:code).', ['code' => (string) $exitCode])
             : __('Output matched your alert pattern.');
 
         $mail = (new MailMessage)

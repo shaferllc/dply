@@ -215,7 +215,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
 
             $this->scanLog($site, 'Setup wizard ready — configure resources and environment, then deploy.');
 
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['env_requirements'] = $requirements;
             $meta['setup'] = [
                 'state' => 'needs_setup',
@@ -358,7 +358,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function markScanStep(Site $site, string $step): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $setup = is_array($meta['setup'] ?? null) ? $meta['setup'] : [];
         $setup['state'] = 'scanning';
         $setup['scan_step'] = $step;
@@ -377,7 +377,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function resetScanConsole(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['setup_console'] = [];
         $site->forceFill(['meta' => $meta])->save();
     }
@@ -389,7 +389,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function scanLog(Site $site, string $line): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $log = is_array($meta['setup_console'] ?? null) ? array_values($meta['setup_console']) : [];
         $log[] = ['at' => now()->toIso8601String(), 'line' => $line];
         $meta['setup_console'] = array_slice($log, -self::SCAN_CONSOLE_MAX);
@@ -401,7 +401,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function writeSetup(Site $site, string $state, array $extra = []): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['setup'] = array_merge([
             'state' => $state,
             'scanned_at' => now()->toIso8601String(),

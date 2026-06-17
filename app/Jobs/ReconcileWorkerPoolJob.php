@@ -144,7 +144,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             $surplus = -$deficit;
             $victims = $pool->servers
                 ->filter(fn (Server $s): bool => ! $s->isPoolPrimary() && $s->poolMemberState() !== WorkerPool::MEMBER_DRAINING)
-                ->sortByDesc(fn (Server $s) => $s->created_at?->getTimestamp() ?? 0)
+                ->sortByDesc(fn (Server $s) => $s->created_at->getTimestamp())
                 ->take($surplus);
             foreach ($victims as $victim) {
                 try {
@@ -289,7 +289,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
      */
     private function dispatchReadyDeploys(Server $member, ConsoleEmitter $emit): bool
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $pending = $meta['pool']['pending_deploys'] ?? [];
         if (! is_array($pending) || $pending === []) {
             return true;
@@ -326,7 +326,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
     private function markState(Server $member, string $state): void
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $prev = $meta['pool']['state'] ?? null;
         $meta['pool'] = array_merge($meta['pool'] ?? [], ['state' => $state]);
         // Stamp when we ENTERED this state so guardWedgedMember can measure how
@@ -348,7 +348,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
      */
     private function guardWedgedMember(Server $member, WorkerPool $pool, ConsoleEmitter $emit): bool
     {
-        $sinceRaw = $member->meta['pool']['state_since'] ?? $member->created_at?->toIso8601String();
+        $sinceRaw = $member->meta['pool']['state_since'] ?? $member->created_at->toIso8601String();
         $since = is_string($sinceRaw) ? CarbonImmutable::parse($sinceRaw) : null;
         if ($since === null || $since->gt(now()->subMinutes(self::STUCK_MINUTES))) {
             return false; // not stuck long enough yet

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\WorkspaceFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,8 +15,26 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
+ * @property ?string $description
+ * @property string $name
+ * @property string $notes
+ * @property ?string $organization_id
+ * @property string $slug
+ * @property ?string $user_id
+ * @property-read ?Organization $organization
+ * @property-read ?User $user
+ * @property-read Collection<int, Server> $servers
+ * @property-read Collection<int, Site> $sites
+ * @property-read Collection<int, WorkspaceMember> $members
+ * @property-read Collection<int, WorkspaceEnvironment> $environments
+ * @property-read Collection<int, WorkspaceLabel> $labels
+ * @property-read Collection<int, WorkspaceRunbook> $runbooks
+ * @property-read Collection<int, WorkspaceVariable> $variables
+ * @property-read Collection<int, WorkspaceDeployRun> $deployRuns
+ * @property-read Collection<int, NotificationSubscription> $notificationSubscriptions
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class Workspace extends Model
 {
     /** @use HasFactory<WorkspaceFactory> */
@@ -89,59 +109,70 @@ class Workspace extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
     /** @return HasMany<Server, $this> */
-    public function servers(): HasMany {
+    public function servers(): HasMany
+    {
         return $this->hasMany(Server::class);
     }
 
     /** @return HasMany<Site, $this> */
-    public function sites(): HasMany {
+    public function sites(): HasMany
+    {
         return $this->hasMany(Site::class);
     }
 
     /** @return HasMany<WorkspaceMember, $this> */
-    public function members(): HasMany {
+    public function members(): HasMany
+    {
         return $this->hasMany(WorkspaceMember::class)->orderBy('created_at');
     }
 
     /** @return HasMany<WorkspaceEnvironment, $this> */
-    public function environments(): HasMany {
+    public function environments(): HasMany
+    {
         return $this->hasMany(WorkspaceEnvironment::class)->orderBy('sort_order')->orderBy('name');
     }
 
     /** @return BelongsToMany<WorkspaceLabel, $this> */
-    public function labels(): BelongsToMany {
+    public function labels(): BelongsToMany
+    {
         return $this->belongsToMany(WorkspaceLabel::class, 'workspace_label_assignments')
             ->withTimestamps()
             ->orderBy('name');
     }
 
     /** @return HasMany<WorkspaceRunbook, $this> */
-    public function runbooks(): HasMany {
+    public function runbooks(): HasMany
+    {
         return $this->hasMany(WorkspaceRunbook::class)->orderBy('sort_order')->orderBy('title');
     }
 
     /** @return HasMany<WorkspaceVariable, $this> */
-    public function variables(): HasMany {
+    public function variables(): HasMany
+    {
         return $this->hasMany(WorkspaceVariable::class)->orderBy('env_key');
     }
 
     /** @return HasMany<WorkspaceDeployRun, $this> */
-    public function deployRuns(): HasMany {
+    public function deployRuns(): HasMany
+    {
         return $this->hasMany(WorkspaceDeployRun::class)->orderByDesc('created_at');
     }
 
     /** @return MorphMany<NotificationSubscription, $this> */
-    public function notificationSubscriptions(): MorphMany {
+    public function notificationSubscriptions(): MorphMany
+    {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
     }
 

@@ -10,8 +10,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $access_token
+ * @property string $label
+ * @property string $nickname
+ * @property string $provider
+ * @property ?string $provider_id
+ * @property string $refresh_token
+ * @property ?string $user_id
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SocialAccount extends Model implements GitIdentity
 {
     use AvoidsGitIdentityAttributeRecursion;
@@ -33,7 +42,8 @@ class SocialAccount extends Model implements GitIdentity
     ];
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

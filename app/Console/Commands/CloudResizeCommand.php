@@ -58,7 +58,7 @@ class CloudResizeCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'size_tier' => $size,
         ]);

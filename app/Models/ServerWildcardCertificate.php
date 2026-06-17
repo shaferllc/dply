@@ -6,13 +6,32 @@ use App\Services\Certificates\WildcardCertificateIssuer;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * A wildcard TLS certificate (e.g. *.on-dply.com) issued via DNS-01 and
- * installed on a single server, shared by every testing-hostname site on that
- * server/zone. See the create_server_wildcard_certificates migration and
- * {@see WildcardCertificateIssuer}.
+ *                      A wildcard TLS certificate (e.g. *.on-dply.com) issued via DNS-01 and
+ *                      installed on a single server, shared by every testing-hostname site on that
+ *                      server/zone. See the create_server_wildcard_certificates migration and
+ *                      {@see WildcardCertificateIssuer}.
+ * @property string $cert_path
+ * @property string $key_path
+ * @property ?Carbon $last_installed_at
+ * @property string $last_output
+ * @property ?Carbon $last_renewed_at
+ * @property ?Carbon $last_requested_at
+ * @property string $live_directory
+ * @property array<string, mixed> $meta
+ * @property ?Carbon $not_after
+ * @property string $provider
+ * @property ?string $provider_credential_id
+ * @property ?string $server_id
+ * @property string $status
+ * @property string $zone
+ * @property-read ?Server $server
+ * @property-read ?ProviderCredential $providerCredential
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerWildcardCertificate extends Model
 {
@@ -60,12 +79,14 @@ class ServerWildcardCertificate extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<ProviderCredential, $this> */
-    public function providerCredential(): BelongsTo {
+    public function providerCredential(): BelongsTo
+    {
         return $this->belongsTo(ProviderCredential::class);
     }
 
@@ -83,14 +104,15 @@ class ServerWildcardCertificate extends Model
      */
     public function needsIssuance(int $renewWithinDays = 30): bool
     {
-        if (! $this->isInstalled()) {
+        if ($this->status !== self::STATUS_ACTIVE || $this->last_installed_at === null) {
             return true;
         }
 
-        if ($this->not_after === null) {
+        $notAfter = $this->not_after;
+        if ($notAfter === null) {
             return false;
         }
 
-        return $this->not_after->isBefore(now()->addDays($renewWithinDays));
+        return $notAfter->isBefore(now()->addDays($renewWithinDays));
     }
 }

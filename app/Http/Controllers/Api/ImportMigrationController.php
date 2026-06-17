@@ -95,7 +95,7 @@ class ImportMigrationController extends Controller
             'ssh_key_revoked_at' => $migration->ssh_key_revoked_at?->toIso8601String(),
             'started_at' => $migration->started_at?->toIso8601String(),
             'completed_at' => $migration->completed_at?->toIso8601String(),
-            'created_at' => $migration->created_at?->toIso8601String(),
+            'created_at' => $migration->created_at->toIso8601String(),
             'failure_summary' => $migration->failure_summary,
             'step_counts' => [
                 'succeeded' => (int) ($counts->get('succeeded', 0)),

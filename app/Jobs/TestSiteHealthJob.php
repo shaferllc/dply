@@ -123,7 +123,7 @@ class TestSiteHealthJob implements ShouldQueue
 
     private function persistRemediations(Site $site, bool $ok): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['health'] = [
             'ok' => $ok,
             'checked_at' => now()->toIso8601String(),

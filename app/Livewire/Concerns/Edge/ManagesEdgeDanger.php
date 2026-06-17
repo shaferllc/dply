@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
-use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Jobs\TeardownEdgeSiteJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use Livewire\Component;
 
@@ -17,6 +17,7 @@ use Livewire\Component;
 trait ManagesEdgeDanger
 {
     use DispatchesToastNotifications;
+
     public function openEdgeTeardownModal(): void
     {
         if (! $this->site->usesEdgeRuntime()) {
@@ -35,8 +36,6 @@ trait ManagesEdgeDanger
 
         TeardownEdgeSiteJob::dispatch($this->site->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Edge site teardown queued.'));
-        }
+        $this->toastSuccess(__('Edge site teardown queued.'));
     }
 }

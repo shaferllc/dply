@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,8 +12,25 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
+ * @property string $allowed_from
+ * @property ?string $description
+ * @property string $engine
+ * @property string $host
+ * @property string $mysql_charset
+ * @property string $mysql_collation
+ * @property string $name
+ * @property string $password
+ * @property bool $remote_access
+ * @property ?string $server_id
+ * @property ?string $site_id
+ * @property string $username
+ * @property-read ?Server $server
+ * @property-read Collection<int, ServerDatabaseExtraUser> $extraUsers
+ * @property-read Collection<int, ServerDatabaseCredentialShare> $credentialShares
+ * @property-read Collection<int, ServerDatabaseBackup> $backups
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ServerDatabase extends Model
 {
     use HasUlids;
@@ -44,31 +62,38 @@ class ServerDatabase extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /**
      * The site that owns this database, if any. Server-wide databases
      * (created from the server-level manager) have a null site_id. *
- * @return BelongsTo<Site, $this>
- */
-    public function site(): BelongsTo {
+     *
+     * @return BelongsTo<Site, $this>
+     */
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return HasMany<ServerDatabaseExtraUser, $this> */
-    public function extraUsers(): HasMany {
+    public function extraUsers(): HasMany
+    {
         return $this->hasMany(ServerDatabaseExtraUser::class, 'server_database_id');
     }
 
     /** @return HasMany<ServerDatabaseCredentialShare, $this> */
-    public function credentialShares(): HasMany {
+    public function credentialShares(): HasMany
+    {
         return $this->hasMany(ServerDatabaseCredentialShare::class, 'server_database_id');
     }
 
     /** @return HasMany<ServerDatabaseBackup, $this> */
-    public function backups(): HasMany {
+    public function backups(): HasMany
+    {
         return $this->hasMany(ServerDatabaseBackup::class, 'server_database_id');
     }
 

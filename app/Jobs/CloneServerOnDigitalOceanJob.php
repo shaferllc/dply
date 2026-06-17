@@ -153,7 +153,7 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
                 'size' => $clone->size,
             ]));
 
-            $sourceMeta = is_array($source->meta) ? $source->meta : [];
+            $sourceMeta = $source->meta;
             $doOpts = is_array($sourceMeta['digitalocean'] ?? null) ? $sourceMeta['digitalocean'] : [];
 
             $droplet = $do->createDroplet(

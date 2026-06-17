@@ -7,11 +7,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property int $bytes_egress
+ * @property array<string, mixed> $meta
+ * @property ?string $organization_id
+ * @property Carbon $period_end
+ * @property Carbon $period_start
+ * @property int $r2_class_a_ops
+ * @property int $r2_class_b_ops
+ * @property int $r2_storage_bytes
+ * @property int $requests
+ * @property ?string $site_id
+ * @property string $source
+ * @property-read ?Organization $organization
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class EdgeUsageSnapshot extends Model
 {
     use HasUlids;
@@ -52,12 +67,14 @@ class EdgeUsageSnapshot extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 }

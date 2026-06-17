@@ -15,6 +15,19 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Extracted from {@see \App\Models\Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property SiteType $type
+ * @property ?string $repository_path
+ * @property string $document_root
+ * @property ?string $octane_port
+ * @property string $php_fpm_user
+ * @property string $env_file_path
+ * @property string $env_file_content
+ * @property string $suspended_reason
+ * @property bool $engine_http_cache_enabled
+ * @property string $deploy_strategy
+ * @property-read ?Server $server
  */
 trait ResolvesWebserverConfig
 {
@@ -50,9 +63,7 @@ trait ResolvesWebserverConfig
 
     public function supportsWebserver(): bool
     {
-        return $this->type instanceof SiteType
-            ? $this->type->managesWebserver()
-            : true;
+        return $this->type->managesWebserver();
     }
 
     public function effectiveRepositoryPath(): string
@@ -333,9 +344,6 @@ trait ResolvesWebserverConfig
 
         $missing = [];
         foreach (($this->envRequirements()['keys'] ?? []) as $entry) {
-            if (! is_array($entry)) {
-                continue;
-            }
             $sources = array_values((array) ($entry['sources'] ?? []));
             // Both signals required (see method doc): no-default usage AND
             // declared in .env.example.
@@ -359,8 +367,8 @@ trait ResolvesWebserverConfig
         // explicitly declared them. Manifest is authoritative for env shape.
         $listed = array_flip(array_map(static fn (array $m): string => $m['key'], $missing));
         foreach ($this->manifestEnvDeclarations() as $decl) {
-            $key = (string) ($decl['name'] ?? '');
-            if ($key === '' || ($decl['required'] ?? true) !== true) {
+            $key = (string) $decl['name'];
+            if ($key === '' || $decl['required'] !== true) {
                 continue;
             }
             if (isset($satisfied[$key]) || isset($listed[$key])) {
@@ -418,15 +426,16 @@ trait ResolvesWebserverConfig
      */
     public function cdnConfig(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $cdn = $meta['cdn'] ?? null;
 
         return is_array($cdn) ? $cdn : [];
     }
 
+    /** @return array<string, mixed> */
     public function cachingConfig(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $caching = $meta['caching'] ?? null;
 
         if (is_array($caching)) {
@@ -573,7 +582,7 @@ trait ResolvesWebserverConfig
      */
     public function suspendedPublicMessage(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $fromMeta = trim((string) ($meta['suspended_message'] ?? ''));
 
         if ($fromMeta !== '') {
@@ -601,7 +610,7 @@ trait ResolvesWebserverConfig
      */
     public function webserverConfigBasename(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $stored = trim((string) ($meta['webserver_config_basename'] ?? ''));
 
         return $stored !== '' ? $stored : $this->nginxConfigBasename();
@@ -635,7 +644,7 @@ trait ResolvesWebserverConfig
      */
     public function assignWebserverConfigBasename(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $existing = trim((string) ($meta['webserver_config_basename'] ?? ''));
         if ($existing !== '') {
             return $existing;

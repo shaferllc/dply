@@ -7,12 +7,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * Edge connecting a master {@see ServerCacheService} to a replica
- * {@see ServerCacheService}. Created by the add-replica wizard; kept fresh by
- * {@see App\Console\Commands\PollCacheServiceReplicationCommand}.
+ *                      Edge connecting a master {@see ServerCacheService} to a replica
+ *                      {@see ServerCacheService}. Created by the add-replica wizard; kept fresh by
+ *                      {@see App\Console\Commands\PollCacheServiceReplicationCommand}.
+ * @property ?string $error_message
+ * @property string $last_link_status
+ * @property int $last_observed_offset
+ * @property ?Carbon $last_polled_at
+ * @property ?string $master_cache_service_id
+ * @property ?string $replica_cache_service_id
+ * @property string $status
+ * @property-read ?ServerCacheService $masterCacheService
+ * @property-read ?ServerCacheService $replicaCacheService
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerCacheServiceReplication extends Model
 {
@@ -48,12 +60,14 @@ class ServerCacheServiceReplication extends Model
     }
 
     /** @return BelongsTo<ServerCacheService, $this> */
-    public function masterCacheService(): BelongsTo {
+    public function masterCacheService(): BelongsTo
+    {
         return $this->belongsTo(ServerCacheService::class, 'master_cache_service_id');
     }
 
     /** @return BelongsTo<ServerCacheService, $this> */
-    public function replicaCacheService(): BelongsTo {
+    public function replicaCacheService(): BelongsTo
+    {
         return $this->belongsTo(ServerCacheService::class, 'replica_cache_service_id');
     }
 }

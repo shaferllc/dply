@@ -94,14 +94,14 @@ class InstallServerWebserverJob implements ShouldQueue
             }
         } catch (\Throwable $e) {
             // Clear the UI pending flag so the operator can retry.
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             unset($meta['webserver_install_pending']);
             $meta['webserver_install_error'] = $e->getMessage();
             $server->forceFill(['meta' => $meta])->save();
             throw $e;
         }
 
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $meta['webserver'] = 'caddy';
         $installedStack = is_array($meta['installed_stack'] ?? null) ? $meta['installed_stack'] : [];
         $installedStack['webserver'] = 'caddy';

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\WorkerPoolFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,11 +12,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
- * A worker pool groups a source worker server and its clones so background
- * throughput can be scaled declaratively. Exactly one member is the primary
- * (owns the scheduler / cron / migrations); the rest are queue-worker replicas.
- *
- * See doc/specs/worker-pools/02-specification.md.
+ *                      A worker pool groups a source worker server and its clones so background
+ *                      throughput can be scaled declaratively. Exactly one member is the primary
+ *                      (owns the scheduler / cron / migrations); the rest are queue-worker replicas.
+ *                      See doc/specs/worker-pools/02-specification.md.
+ * @property int $desired_count
+ * @property int $max_size
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $organization_id
+ * @property ?string $primary_server_id
+ * @property ?string $source_server_id
+ * @property string $status
+ * @property-read ?Organization $organization
+ * @property-read ?Server $sourceServer
+ * @property-read ?Server $primaryServer
+ * @property-read Collection<int, Server> $servers
+ * @property-read Collection<int, Server> $replicas
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class WorkerPool extends Model
 {
@@ -96,29 +111,35 @@ class WorkerPool extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function sourceServer(): BelongsTo {
+    public function sourceServer(): BelongsTo
+    {
         return $this->belongsTo(Server::class, 'source_server_id');
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function primaryServer(): BelongsTo {
+    public function primaryServer(): BelongsTo
+    {
         return $this->belongsTo(Server::class, 'primary_server_id');
     }
 
-    /** @return HasMany<Server> */
+    /** @return HasMany<Server, $this> */
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class)->orderBy('created_at');
     }
 
+    /** @return HasMany<Server, $this> */
     public function replicas(): HasMany
     {
-        return $this->servers()->where('pool_role', self::ROLE_REPLICA);
+        return $this->hasMany(Server::class)
+            ->where('pool_role', self::ROLE_REPLICA)
+            ->orderBy('created_at');
     }
 
     /**

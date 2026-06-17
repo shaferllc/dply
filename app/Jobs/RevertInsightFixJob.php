@@ -141,7 +141,7 @@ class RevertInsightFixJob implements ShouldQueue
             'finding_id' => $finding->id,
             'reason' => $reason,
         ]);
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = $finding->meta;
         $meta['revert_failed_at'] = now()->toIso8601String();
         $meta['revert_failed_by'] = $user->id;
         $meta['revert_failure_reason'] = $reason;

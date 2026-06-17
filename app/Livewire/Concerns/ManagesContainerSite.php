@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Cloud\ConfigureCloudAutoscaling;
 use App\Actions\Cloud\ConfigureCloudHealthCheck;
 use App\Actions\Cloud\CreateCloudWorker;
@@ -21,6 +20,7 @@ use App\Models\Site;
 use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\CloudScalingConfig;
 use App\Services\Cloud\ResolvesMetricWindows;
+use Livewire\Component;
 
 /**
  * Methods bolted onto Sites\Settings (and any future container
@@ -28,11 +28,14 @@ use App\Services\Cloud\ResolvesMetricWindows;
  * site. Lives in its own trait so the giant Settings.php class
  * stays focused on its existing PHP/Laravel/Node responsibilities.
  *
- * Assumes a public $site property of type Site on the host class.
+ * @phpstan-require-extends Component
+ *
+ * @property Site $site
  */
 trait ManagesContainerSite
 {
     use DispatchesToastNotifications;
+
     public string $container_image_input = '';
 
     public string $container_domain_input = '';
@@ -153,7 +156,7 @@ trait ManagesContainerSite
 
     public function bootManagesContainerSite(): void
     {
-        if ($this->container_image_input === '' && isset($this->site)) {
+        if ($this->container_image_input === '') {
             $this->container_image_input = (string) ($this->site->container_image ?? '');
         }
 
@@ -163,11 +166,11 @@ trait ManagesContainerSite
         // client snapshot, so hydrating for a read-only viewer would leak
         // the secrets into their browser.
         if ($this->canManageContainerSite()) {
-            if ($this->container_env_file_input === '' && isset($this->site)) {
+            if ($this->container_env_file_input === '') {
                 $this->container_env_file_input = (string) ($this->site->env_file_content ?? '');
             }
-            if ($this->container_build_env_file_input === '' && isset($this->site)) {
-                $meta = is_array($this->site->meta) ? $this->site->meta : [];
+            if ($this->container_build_env_file_input === '') {
+                $meta = $this->site->meta;
                 $this->container_build_env_file_input = (string) ($meta['container']['build_env_file_content'] ?? '');
             }
         }
@@ -176,7 +179,7 @@ trait ManagesContainerSite
         // site's current meta config so the dashboard reflects state.
         // One-time only — boot() runs on every request, so re-running
         // this would discard the operator's unsaved edits.
-        if (isset($this->site) && ! $this->container_scaling_inputs_hydrated) {
+        if (! $this->container_scaling_inputs_hydrated) {
             $this->container_scaling_inputs_hydrated = true;
             $autoscaling = CloudScalingConfig::autoscaling($this->site);
             $this->container_autoscaling_enabled = $autoscaling['enabled'];
@@ -203,8 +206,7 @@ trait ManagesContainerSite
      */
     public function canManageContainerSite(): bool
     {
-        return isset($this->site)
-            && (auth()->user()?->can('update', $this->site) ?? false);
+        return auth()->user()?->can('update', $this->site) ?? false;
     }
 
     public function saveContainerEnvAndRedeploy(): void
@@ -218,7 +220,7 @@ trait ManagesContainerSite
             'container_build_env_file_input' => 'nullable|string|max:65535',
         ]);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta = $this->site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'build_env_file_content' => $this->container_build_env_file_input,
         ]);
@@ -233,9 +235,7 @@ trait ManagesContainerSite
             try {
                 $backend->updateEnvVars($this->site->fresh(), $credential);
             } catch (\Throwable $e) {
-                if (method_exists($this, 'toastError')) {
-                    $this->toastError(__('Saved env vars locally, but pushing to backend failed: :err', ['err' => $e->getMessage()]));
-                }
+                $this->toastError(__('Saved env vars locally, but pushing to backend failed: :err', ['err' => $e->getMessage()]));
 
                 return;
             }
@@ -243,9 +243,7 @@ trait ManagesContainerSite
 
         RedeployCloudSiteJob::dispatch($this->site->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Env vars saved and redeploy queued. The backend will pick up the new values on the next roll.'));
-        }
+        $this->toastSuccess(__('Env vars saved and redeploy queued. The backend will pick up the new values on the next roll.'));
     }
 
     public function redeployContainer(): void
@@ -260,11 +258,9 @@ trait ManagesContainerSite
 
         RedeployCloudSiteJob::dispatch($this->site->id, $changed ? $newImage : null);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess($changed
-                ? __('Image updated and redeploy queued.')
-                : __('Redeploy queued.'));
-        }
+        $this->toastSuccess($changed
+            ? __('Image updated and redeploy queued.')
+            : __('Redeploy queued.'));
     }
 
     public function tearDownContainer(): void
@@ -276,9 +272,7 @@ trait ManagesContainerSite
 
         TeardownCloudSiteJob::dispatch($this->site->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Tear-down queued. The container will be deleted on the backend shortly.'));
-        }
+        $this->toastSuccess(__('Tear-down queued. The container will be deleted on the backend shortly.'));
     }
 
     /**
@@ -297,19 +291,15 @@ trait ManagesContainerSite
         if ($preview === null
             || $preview->organization_id !== $this->site->organization_id
             || ($preview->meta['container']['preview_parent_site_id'] ?? null) !== $this->site->id) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Preview not found or not a child of this site.'));
-            }
+            $this->toastError(__('Preview not found or not a child of this site.'));
 
             return;
         }
 
         TeardownCloudSiteJob::dispatch($preview->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $branch = (string) ($preview->meta['container']['preview_branch'] ?? '');
-            $this->toastSuccess(__('Preview teardown queued for branch :branch.', ['branch' => $branch]));
-        }
+        $branch = (string) ($preview->meta['container']['preview_branch'] ?? '');
+        $this->toastSuccess(__('Preview teardown queued for branch :branch.', ['branch' => $branch]));
     }
 
     public function attachContainerDomain(): void
@@ -323,9 +313,7 @@ trait ManagesContainerSite
         $hostname = preg_replace('#^https?://#', '', (string) $hostname);
         $hostname = rtrim((string) $hostname, '/');
         if ($hostname === '' || ! preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i', $hostname)) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Hostname does not look valid.'));
-            }
+            $this->toastError(__('Hostname does not look valid.'));
 
             return;
         }
@@ -333,9 +321,7 @@ trait ManagesContainerSite
         AttachCloudDomainJob::dispatch($this->site->id, $hostname);
         $this->container_domain_input = '';
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Domain attach queued. DNS validation records will appear here shortly.'));
-        }
+        $this->toastSuccess(__('Domain attach queued. DNS validation records will appear here shortly.'));
     }
 
     public function detachContainerDomain(string $hostname): void
@@ -347,9 +333,7 @@ trait ManagesContainerSite
 
         DetachCloudDomainJob::dispatch($this->site->id, $hostname);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Domain detach queued.'));
-        }
+        $this->toastSuccess(__('Domain detach queued.'));
     }
 
     public function fetchContainerLogs(): void
@@ -401,9 +385,7 @@ trait ManagesContainerSite
             $this->container_deployments_result = $backend->recentDeployments($this->site, $credential, 10);
         } catch (\Throwable $e) {
             $this->container_deployments_result = [];
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Failed to fetch deployments: :err', ['err' => $e->getMessage()]));
-            }
+            $this->toastError(__('Failed to fetch deployments: :err', ['err' => $e->getMessage()]));
         }
     }
 
@@ -600,9 +582,9 @@ trait ManagesContainerSite
             return;
         }
 
-        $lines = is_array($result['lines'] ?? null) ? $result['lines'] : [];
+        $lines = $result['lines'];
         foreach ($lines as $line) {
-            $text = is_array($line) ? (string) ($line['text'] ?? json_encode($line)) : (string) $line;
+            $text = (string) $line;
             $hash = md5($text);
             if (isset($this->container_log_tail_seen[$hash])) {
                 continue;
@@ -631,9 +613,7 @@ trait ManagesContainerSite
 
         $image = trim($image);
         if ($image === '' || $image === $this->site->container_image) {
-            if (method_exists($this, 'toastWarning')) {
-                $this->toastWarning(__('Already on that image — nothing to roll back to.'));
-            }
+            $this->toastWarning(__('Already on that image — nothing to roll back to.'));
 
             return;
         }
@@ -641,9 +621,7 @@ trait ManagesContainerSite
         RedeployCloudSiteJob::dispatch($this->site->id, $image);
         $this->container_image_input = $image;
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Rollback to :image queued.', ['image' => $image]));
-        }
+        $this->toastSuccess(__('Rollback to :image queued.', ['image' => $image]));
     }
 
     /**
@@ -660,9 +638,7 @@ trait ManagesContainerSite
 
         $databaseId = trim($this->container_database_attach_id);
         if ($databaseId === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Pick a database to attach.'));
-            }
+            $this->toastError(__('Pick a database to attach.'));
 
             return;
         }
@@ -672,9 +648,7 @@ trait ManagesContainerSite
             ->where('status', CloudDatabase::STATUS_ACTIVE)
             ->find($databaseId);
         if ($database === null) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Database not found, not active, or not in this organization.'));
-            }
+            $this->toastError(__('Database not found, not active, or not in this organization.'));
 
             return;
         }
@@ -682,9 +656,7 @@ trait ManagesContainerSite
         AttachCloudDatabaseJob::dispatch($database->id, $this->site->id);
         $this->container_database_attach_id = '';
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Database attach queued. The connection env vars will be injected and the app redeployed.'));
-        }
+        $this->toastSuccess(__('Database attach queued. The connection env vars will be injected and the app redeployed.'));
     }
 
     /**
@@ -702,18 +674,14 @@ trait ManagesContainerSite
             ->where('organization_id', $this->site->organization_id)
             ->find($databaseId);
         if ($database === null) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Database not found or not in this organization.'));
-            }
+            $this->toastError(__('Database not found or not in this organization.'));
 
             return;
         }
 
         AttachCloudDatabaseJob::dispatch($database->id, $this->site->id, detach: true);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Database detach queued. The connection env vars will be removed and the app redeployed.'));
-        }
+        $this->toastSuccess(__('Database detach queued. The connection env vars will be removed and the app redeployed.'));
     }
 
     /**
@@ -746,9 +714,7 @@ trait ManagesContainerSite
                 'instance_count' => $this->container_worker_count_input,
             ]);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -757,9 +723,7 @@ trait ManagesContainerSite
         $this->container_worker_size_input = 'small';
         $this->container_worker_count_input = 1;
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Worker added. The backend spec is being updated and a fresh roll queued.'));
-        }
+        $this->toastSuccess(__('Worker added. The backend spec is being updated and a fresh roll queued.'));
     }
 
     /**
@@ -778,16 +742,12 @@ trait ManagesContainerSite
                 'type' => CloudWorker::TYPE_SCHEDULER,
             ]);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Scheduler enabled. The backend spec is being updated and a fresh roll queued.'));
-        }
+        $this->toastSuccess(__('Scheduler enabled. The backend spec is being updated and a fresh roll queued.'));
     }
 
     /** Disable the scheduler — removes the scheduler-type CloudWorker. */
@@ -809,9 +769,7 @@ trait ManagesContainerSite
         $scheduler->delete();
         SyncCloudWorkersJob::dispatch($this->site->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Scheduler disabled. The backend will drop it on the next roll.'));
-        }
+        $this->toastSuccess(__('Scheduler disabled. The backend will drop it on the next roll.'));
     }
 
     /** Scale a worker's instance count, then re-sync the backend spec. */
@@ -830,9 +788,7 @@ trait ManagesContainerSite
         }
 
         if ($worker->isScheduler()) {
-            if (method_exists($this, 'toastWarning')) {
-                $this->toastWarning(__('The scheduler always runs a single instance.'));
-            }
+            $this->toastWarning(__('The scheduler always runs a single instance.'));
 
             return;
         }
@@ -840,12 +796,10 @@ trait ManagesContainerSite
         $count = max(1, $count);
         $max = $worker->maxInstanceCount();
         if ($count > $max) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__(
-                    'The :size worker tier allows at most :max instance(s) on DigitalOcean App Platform. Choose medium or larger for more instances.',
-                    ['size' => $worker->size, 'max' => $max],
-                ));
-            }
+            $this->toastError(__(
+                'The :size worker tier allows at most :max instance(s) on DigitalOcean App Platform. Choose medium or larger for more instances.',
+                ['size' => $worker->size, 'max' => $max],
+            ));
 
             return;
         }
@@ -853,9 +807,7 @@ trait ManagesContainerSite
         $worker->update(['instance_count' => $count]);
         SyncCloudWorkersJob::dispatch($this->site->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Worker scaled to :n instance(s). Re-sync queued.', ['n' => $worker->effectiveInstanceCount()]));
-        }
+        $this->toastSuccess(__('Worker scaled to :n instance(s). Re-sync queued.', ['n' => $worker->effectiveInstanceCount()]));
     }
 
     /** Remove a worker, then re-sync the backend spec without it. */
@@ -876,9 +828,7 @@ trait ManagesContainerSite
         $worker->delete();
         SyncCloudWorkersJob::dispatch($this->site->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Worker removed. The backend will drop the component on the next roll.'));
-        }
+        $this->toastSuccess(__('Worker removed. The backend will drop the component on the next roll.'));
     }
 
     /* ========================================================================
@@ -916,18 +866,14 @@ trait ManagesContainerSite
                 'cpu_percent' => $this->container_autoscaling_cpu,
             ]);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess($this->container_autoscaling_enabled
-                ? __('Autoscaling saved. It supersedes the fixed instance count — a fresh roll is queued.')
-                : __('Autoscaling disabled. The site reverts to its fixed instance count — a fresh roll is queued.'));
-        }
+        $this->toastSuccess($this->container_autoscaling_enabled
+            ? __('Autoscaling saved. It supersedes the fixed instance count — a fresh roll is queued.')
+            : __('Autoscaling disabled. The site reverts to its fixed instance count — a fresh roll is queued.'));
     }
 
     /**
@@ -952,18 +898,14 @@ trait ManagesContainerSite
                 'failure_threshold' => $this->container_health_check_failure,
             ]);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess($this->container_health_check_enabled
-                ? __('Health check saved. The backend spec is being updated and a fresh roll queued.')
-                : __('Health check disabled. The backend will drop it on the next roll.'));
-        }
+        $this->toastSuccess($this->container_health_check_enabled
+            ? __('Health check saved. The backend spec is being updated and a fresh roll queued.')
+            : __('Health check disabled. The backend will drop it on the next roll.'));
     }
 
     public function refreshHybridStackStatus(): void
@@ -972,7 +914,7 @@ trait ManagesContainerSite
             return;
         }
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta = $this->site->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $stack = is_array($container['hybrid_edge_stack'] ?? null) ? $container['hybrid_edge_stack'] : [];
         if ($stack === []) {

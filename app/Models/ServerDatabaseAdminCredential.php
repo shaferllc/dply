@@ -8,8 +8,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $clickhouse_admin_password
+ * @property string $clickhouse_admin_username
+ * @property string $mongodb_admin_password
+ * @property string $mongodb_admin_username
+ * @property string $mysql_root_password
+ * @property string $mysql_root_username
+ * @property string $postgres_password
+ * @property string $postgres_superuser
+ * @property bool $postgres_use_sudo
+ * @property ?string $server_id
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ServerDatabaseAdminCredential extends Model
 {
     use HasUlids;
@@ -42,7 +54,8 @@ class ServerDatabaseAdminCredential extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 }

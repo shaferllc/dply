@@ -8,16 +8,33 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One recorded invocation of a serverless (DigitalOcean Functions) site.
- *
- * The DO activations list API never returns anything, so this table — not
- * that API — is dply's source of truth for "what has hit this function."
- * Rows arrive two ways: dply's own authenticated blocking invokes (ticks +
- * the Logs-page test button) capture the activation inline; organic web
- * traffic is POSTed in by the deployed function handler.
+ *                      One recorded invocation of a serverless (DigitalOcean Functions) site.
+ *                      The DO activations list API never returns anything, so this table — not
+ *                      that API — is dply's source of truth for "what has hit this function."
+ *                      Rows arrive two ways: dply's own authenticated blocking invokes (ticks +
+ *                      the Logs-page test button) capture the activation inline; organic web
+ *                      traffic is POSTed in by the deployed function handler.
+ * @property ?string $activation_id
+ * @property bool $cold
+ * @property array<string, mixed> $context
+ * @property Carbon $created_at
+ * @property int $duration_ms
+ * @property ?string $function_action_id
+ * @property array<string, mixed> $log_lines
+ * @property string $method
+ * @property string $path
+ * @property string $result_excerpt
+ * @property ?string $site_id
+ * @property string $source
+ * @property int $status_code
+ * @property bool $success
+ * @property string $task
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class FunctionInvocation extends Model
 {
@@ -68,34 +85,44 @@ class FunctionInvocation extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** The action this invocation hit — null for rows not yet backfilled. *
- * @return BelongsTo<FunctionAction, $this>
- */
-    public function functionAction(): BelongsTo {
+     * @return BelongsTo<FunctionAction, $this>
+     */
+    /** @return BelongsTo<FunctionAction, $this> */
+    public function functionAction(): BelongsTo
+    {
         return $this->belongsTo(FunctionAction::class);
     }
 
-    /** dply-initiated invocations — what the Activations tab shows. */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOperational(Builder $query): Builder
     {
         return $query->whereIn('source', [self::SOURCE_TICK, self::SOURCE_TEST]);
     }
 
-    /** Organic web traffic — what the Visits tab shows. */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOrganic(Builder $query): Builder
     {
         return $query->where('source', self::SOURCE_WEB);
     }
 
     /** Normalised log lines, always a list of strings. */
+    /** @return list<string> */
     public function logLines(): array
     {
         return array_values(array_filter(
-            is_array($this->log_lines) ? $this->log_lines : [],
+            $this->log_lines,
             'is_string',
         ));
     }
@@ -108,7 +135,7 @@ class FunctionInvocation extends Model
      */
     public function contextPairs(): array
     {
-        $ctx = is_array($this->context) ? $this->context : [];
+        $ctx = $this->context;
 
         $labels = [
             'ip' => 'Client IP',
@@ -166,7 +193,7 @@ class FunctionInvocation extends Model
         $transportFailure = $this->activation_id === null && ! $this->success;
 
         return [
-            'at' => $this->created_at?->toIso8601String(),
+            'at' => $this->created_at->toIso8601String(),
             'task' => $this->task,
             'status' => $this->success ? 'ok' : 'failed',
             'http_status' => $this->status_code,

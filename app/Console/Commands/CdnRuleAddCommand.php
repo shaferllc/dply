@@ -52,7 +52,7 @@ class CdnRuleAddCommand extends Command
             $path = '/'.$path;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $cdn = is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [];
         $rules = is_array($cdn['rules'] ?? null) ? $cdn['rules'] : [];
         $entry = ['path' => $path, 'action' => $action];

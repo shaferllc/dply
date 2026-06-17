@@ -7,11 +7,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $site_id
+ * @property string $pipeline_id
+ * @property int $sort_order
+ * @property string $phase
+ * @property string $hook_kind
+ * @property string $anchor
+ * @property ?string $anchor_step_id
+ * @property ?string $label
+ * @property ?string $notification_event
+ * @property ?string $notification_channel_id
+ * @property ?string $webhook_url
+ * @property ?string $script
+ * @property ?int $timeout_seconds
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property-read Site $site
+ * @property-read SiteDeployPipeline $pipeline
+ * @property-read ?SiteDeployStep $anchorStep
+ * @property-read ?NotificationChannel $notificationChannel
  */
-
 class SiteDeployHook extends Model
 {
     use HasUlids;
@@ -59,22 +78,26 @@ class SiteDeployHook extends Model
     ];
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<SiteDeployPipeline, $this> */
-    public function pipeline(): BelongsTo {
+    public function pipeline(): BelongsTo
+    {
         return $this->belongsTo(SiteDeployPipeline::class, 'pipeline_id');
     }
 
     /** @return BelongsTo<SiteDeployStep, $this> */
-    public function anchorStep(): BelongsTo {
+    public function anchorStep(): BelongsTo
+    {
         return $this->belongsTo(SiteDeployStep::class, 'anchor_step_id');
     }
 
     /** @return BelongsTo<NotificationChannel, $this> */
-    public function notificationChannel(): BelongsTo {
+    public function notificationChannel(): BelongsTo
+    {
         return $this->belongsTo(NotificationChannel::class);
     }
 
@@ -104,7 +127,7 @@ class SiteDeployHook extends Model
 
         return match ($this->hook_kind) {
             self::KIND_WEBHOOK => __('Webhook'),
-            self::KIND_NOTIFICATION => $this->notificationChannel?->label ?? __('Notify'),
+            self::KIND_NOTIFICATION => ($this->notificationChannel !== null ? $this->notificationChannel->label : null) ?? __('Notify'),
             default => match ($this->anchor) {
                 self::ANCHOR_BEFORE_CLONE => __('Shell · before clone'),
                 self::ANCHOR_BEFORE_ACTIVATE => __('Shell · before activate'),

@@ -122,7 +122,7 @@ trait ManagesSshKeyNotifications
         }
 
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
+        if ($channel !== null) {
             Gate::authorize('manageNotificationChannels', $channel->owner);
         }
 

@@ -91,7 +91,7 @@ class SyncSiteCdnMetricsJob implements ShouldQueue
      */
     private function persist(Site $site, array $patch): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $cdn = is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [];
         $metrics = is_array($cdn['metrics'] ?? null) ? $cdn['metrics'] : [];
         $cdn['metrics'] = array_merge($metrics, $patch);

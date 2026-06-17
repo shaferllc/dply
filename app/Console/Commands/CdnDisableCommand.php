@@ -38,7 +38,7 @@ class CdnDisableCommand extends Command
             return self::SUCCESS;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['cdn'] = array_merge($cfg, ['enabled' => false]);
         $site->meta = $meta;
         $site->save();

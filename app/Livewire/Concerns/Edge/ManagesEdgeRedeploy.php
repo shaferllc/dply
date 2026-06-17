@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
-use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Edge\RedeployEdgeSite;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use Livewire\Component;
 
@@ -17,6 +17,7 @@ use Livewire\Component;
 trait ManagesEdgeRedeploy
 {
     use DispatchesToastNotifications;
+
     public function redeployEdge(): void
     {
         if (! $this->site->usesEdgeRuntime()) {
@@ -27,9 +28,7 @@ trait ManagesEdgeRedeploy
         try {
             (new RedeployEdgeSite)->handle($this->site);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -38,8 +37,6 @@ trait ManagesEdgeRedeploy
         // The overview live-progress card and the deploys list both
         // wire:poll, so the new build's status shows up in place —
         // no need to bounce the user to the deployment-detail page.
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Deploy queued.'));
-        }
+        $this->toastSuccess(__('Deploy queued.'));
     }
 }

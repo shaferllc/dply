@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\SiteFileBackupFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,9 +17,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $disk_path
  * @property ?string $remote_path
  * @property ?int $bytes
+ * @property ?string $error_message
  * @property-read Site $site
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteFileBackup extends Model
 {
     /** @use HasFactory<SiteFileBackupFactory> */
@@ -50,12 +54,14 @@ class SiteFileBackup extends Model
     ];
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

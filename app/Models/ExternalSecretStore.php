@@ -10,10 +10,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A customer-owned external secret store dply references but never copies values
- * out of (see the table migration). The connection `config` is APP_KEY-encrypted
- * (auto-covered by secrets:reencrypt) — but it is only credentials TO the store,
- * not the secrets themselves, which never enter dply.
+ *                      A customer-owned external secret store dply references but never copies values
+ *                      out of (see the table migration). The connection `config` is APP_KEY-encrypted
+ *                      (auto-covered by secrets:reencrypt) — but it is only credentials TO the store,
+ *                      not the secrets themselves, which never enter dply.
+ * @property string $config
+ * @property string $driver
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $resolution
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ExternalSecretStore extends Model
 {
@@ -55,7 +63,8 @@ class ExternalSecretStore extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 }

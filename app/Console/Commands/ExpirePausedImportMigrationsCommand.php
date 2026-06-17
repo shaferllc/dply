@@ -170,7 +170,7 @@ class ExpirePausedImportMigrationsCommand extends Command
         // even if the queue is backlogged.
         try {
             $credential = ProviderCredential::find($migration->provider_credential_id);
-            if ($credential !== null && $migration->ssh_key_source_id !== null) {
+            if ($credential !== null && $migration->ssh_key_source_id > 0) {
                 match ($migration->source) {
                     'ploi' => PloiImportDriver::for($credential)
                         ->revokeSshKey($migration->source_server_id, $migration->ssh_key_source_id),

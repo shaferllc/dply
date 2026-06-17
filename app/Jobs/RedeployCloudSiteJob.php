@@ -49,7 +49,7 @@ class RedeployCloudSiteJob implements ShouldQueue
 
         $result = $backend->redeploy($site->fresh(), $credential);
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'last_deployment_id' => $result['deployment_id'],
             'last_deploy_started_at' => now()->toIso8601String(),

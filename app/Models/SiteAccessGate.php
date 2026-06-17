@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,8 +12,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
+ * @property string $cookie_secret
+ * @property string $method
+ * @property string $password_salt
+ * @property string $password_verifier
+ * @property ?string $site_id
+ * @property-read ?Site $site
+ * @property-read Collection<int, SiteAccessGatePassword> $passwords
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteAccessGate extends Model
 {
     use HasUlids;
@@ -32,12 +41,14 @@ class SiteAccessGate extends Model
     ];
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return HasMany<SiteAccessGatePassword, $this> */
-    public function passwords(): HasMany {
+    public function passwords(): HasMany
+    {
         return $this->hasMany(SiteAccessGatePassword::class, 'site_id', 'site_id')
             ->orderBy('sort_order')
             ->orderBy('label');
@@ -55,7 +66,7 @@ class SiteAccessGate extends Model
             return true;
         }
 
-        return is_string($this->password_verifier) && $this->password_verifier !== '';
+        return $this->password_verifier !== '';
     }
 
     public function isOff(): bool

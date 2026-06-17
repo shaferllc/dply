@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\SiteUptimeMonitorFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,11 +11,32 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $check_type
+ * @property array<string, mixed> $config
+ * @property string $label
+ * @property ?Carbon $last_checked_at
+ * @property string $last_error
+ * @property string $last_http_status
+ * @property string $last_latency_ms
+ * @property array<string, mixed> $last_meta
+ * @property bool $last_ok
+ * @property ?string $last_state
+ * @property ?string $path
+ * @property string $probe_region
+ * @property string $probe_worker
+ * @property ?string $site_id
+ * @property string $sort_order
+ * @property-read ?Site $site
+ * @property-read Collection<int, StatusPageMonitor> $statusPageMonitors
+ * @property-read Collection<int, SiteUptimeCheckResult> $checkResults
+ * @property-read Collection<int, SiteUptimeIncident> $incidents
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteUptimeMonitor extends Model
 {
     /** @use HasFactory<SiteUptimeMonitorFactory> */
@@ -70,12 +92,14 @@ class SiteUptimeMonitor extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return MorphMany<StatusPageMonitor, $this> */
-    public function statusPageMonitors(): MorphMany {
+    public function statusPageMonitors(): MorphMany
+    {
         return $this->morphMany(StatusPageMonitor::class, 'monitorable');
     }
 
@@ -92,9 +116,11 @@ class SiteUptimeMonitor extends Model
     }
 
     /** The currently-open (unresolved) incident, if any. *
- * @return HasOne<SiteUptimeIncident, $this>
- */
-    public function ongoingIncident(): HasOne {
+     * @return HasOne<SiteUptimeIncident, $this>
+     */
+    /** @return HasOne<SiteUptimeIncident, $this> */
+    public function ongoingIncident(): HasOne
+    {
         return $this->hasOne(SiteUptimeIncident::class)->whereNull('resolved_at')->latestOfMany('started_at');
     }
 
@@ -106,7 +132,7 @@ class SiteUptimeMonitor extends Model
     /** Keyword body assertion, or null when none is configured. */
     public function keywordAssertion(): ?string
     {
-        $keyword = is_array($this->config) ? ($this->config['keyword'] ?? null) : null;
+        $keyword = $this->config['keyword'] ?? null;
         $keyword = is_string($keyword) ? trim($keyword) : '';
 
         return $keyword === '' ? null : $keyword;
@@ -114,7 +140,7 @@ class SiteUptimeMonitor extends Model
 
     public function keywordMatchMode(): string
     {
-        $mode = is_array($this->config) ? ($this->config['match_mode'] ?? null) : null;
+        $mode = $this->config['match_mode'] ?? null;
 
         return $mode === self::MATCH_NOT_CONTAIN ? self::MATCH_NOT_CONTAIN : self::MATCH_CONTAIN;
     }
@@ -122,7 +148,7 @@ class SiteUptimeMonitor extends Model
     /** Exact HTTP status the check must return, or null to accept any 2xx. */
     public function expectedStatus(): ?int
     {
-        $status = is_array($this->config) ? ($this->config['expected_status'] ?? null) : null;
+        $status = $this->config['expected_status'] ?? null;
 
         return is_numeric($status) && (int) $status > 0 ? (int) $status : null;
     }
@@ -130,7 +156,7 @@ class SiteUptimeMonitor extends Model
     /** Latency ceiling (ms) above which an up monitor reads DEGRADED, or null when off. */
     public function responseThresholdMs(): ?int
     {
-        $threshold = is_array($this->config) ? ($this->config['response_threshold_ms'] ?? null) : null;
+        $threshold = $this->config['response_threshold_ms'] ?? null;
 
         return is_numeric($threshold) && (int) $threshold > 0 ? (int) $threshold : null;
     }
@@ -138,7 +164,7 @@ class SiteUptimeMonitor extends Model
     /** Days before cert expiry to warn (SSL checks); falls back to config default. */
     public function sslWarnDays(): int
     {
-        $days = is_array($this->config) ? ($this->config['ssl_warn_days'] ?? null) : null;
+        $days = $this->config['ssl_warn_days'] ?? null;
         if (is_numeric($days) && (int) $days > 0) {
             return (int) $days;
         }

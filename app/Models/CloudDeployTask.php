@@ -4,31 +4,39 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
- * A one-shot task tied to a Cloud Site's deploy lifecycle — migrations
- * before traffic flips, cache warmers after rollout, cleanup on
- * failure, or ad-hoc commands an operator triggers from the dashboard.
- *
- * Each row maps to a `jobs` component in the DigitalOcean App Platform
- * spec with `kind` matching the task's trigger. AWS App Runner doesn't
- * support jobs — task creation is rejected for App Runner sites.
- *
- * The canonical migrations task is stored as a normal row (name=
- * 'migrate', trigger='pre_deploy', command='php artisan migrate
- * --force'); the Create form's first-class "Run migrations" toggle is
- * just a thin convenience over this row.
+ *                      A one-shot task tied to a Cloud Site's deploy lifecycle — migrations
+ *                      before traffic flips, cache warmers after rollout, cleanup on
+ *                      failure, or ad-hoc commands an operator triggers from the dashboard.
+ *                      Each row maps to a `jobs` component in the DigitalOcean App Platform
+ *                      spec with `kind` matching the task's trigger. AWS App Runner doesn't
+ *                      support jobs — task creation is rejected for App Runner sites.
+ *                      The canonical migrations task is stored as a normal row (name=
+ *                      'migrate', trigger='pre_deploy', command='php artisan migrate
+ *                      --force'); the Create form's first-class "Run migrations" toggle is
+ *                      just a thin convenience over this row.
+ * @property string $command
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $site_id
+ * @property string $size
+ * @property string $status
+ * @property string $trigger
+ * @property-read ?Site $site
+ * @property-read Collection<int, CloudDeployTaskRun> $runs
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class CloudDeployTask extends Model
 {
-    /** @use HasFactory<CloudDeployTaskFactory> */
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const TRIGGER_PRE_DEPLOY = 'pre_deploy';
 
@@ -98,12 +106,14 @@ class CloudDeployTask extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return HasMany<CloudDeployTaskRun, $this> */
-    public function runs(): HasMany {
+    public function runs(): HasMany
+    {
         return $this->hasMany(CloudDeployTaskRun::class);
     }
 

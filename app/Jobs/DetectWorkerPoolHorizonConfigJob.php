@@ -85,7 +85,7 @@ class DetectWorkerPoolHorizonConfigJob implements ShouldQueue
      */
     private function store(WorkerPool $pool, array $detection): void
     {
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $meta['horizon_detection'] = array_merge($detection, [
             'detected_at' => $detection['detected_at'] ?? now()->toIso8601String(),
         ]);

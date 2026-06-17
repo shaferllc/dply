@@ -2,14 +2,27 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string $body
+ * @property array<string, mixed> $metadata
+ * @property ?string $notification_event_id
+ * @property ?Carbon $read_at
+ * @property ?Carbon $saved_at
+ * @property string $title
+ * @property string $url
+ * @property ?string $user_id
+ * @property-read ?NotificationEvent $event
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class NotificationInboxItem extends Model
 {
     use HasUlids;
@@ -38,22 +51,32 @@ class NotificationInboxItem extends Model
     }
 
     /** @return BelongsTo<NotificationEvent, $this> */
-    public function event(): BelongsTo {
+    public function event(): BelongsTo
+    {
         return $this->belongsTo(NotificationEvent::class, 'notification_event_id');
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
-    public function scopeUnread($query)
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeUnread(Builder $query): Builder
     {
         return $query->whereNull('read_at');
     }
 
     /** Starred "save to remember" items — the user's curated keep-list. */
-    public function scopeSaved($query)
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeSaved(Builder $query): Builder
     {
         return $query->whereNotNull('saved_at');
     }
@@ -74,7 +97,7 @@ class NotificationInboxItem extends Model
      */
     public function ctaUrl(): ?string
     {
-        $meta = is_array($this->metadata) ? $this->metadata : [];
+        $meta = $this->metadata ?? [];
         $cta = trim((string) ($meta['cta_url'] ?? ''));
 
         return $cta !== '' ? $cta : ($this->url ?: null);
@@ -91,7 +114,7 @@ class NotificationInboxItem extends Model
             return null;
         }
 
-        $meta = is_array($this->metadata) ? $this->metadata : [];
+        $meta = $this->metadata ?? [];
         $explicit = trim((string) ($meta['cta_label'] ?? ''));
         if ($explicit !== '') {
             return $explicit;

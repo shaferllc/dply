@@ -6,12 +6,23 @@ use App\Services\Status\MonitorOperationalState;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One recorded uptime check. Append-only history behind a monitor's last_*
- * snapshot; powers uptime %, latency trends and incident stitching. `state`
- * mirrors {@see MonitorOperationalState} values.
+ *                      One recorded uptime check. Append-only history behind a monitor's last_*
+ *                      snapshot; powers uptime %, latency trends and incident stitching. `state`
+ *                      mirrors {@see MonitorOperationalState} values.
+ * @property ?Carbon $checked_at
+ * @property ?string $error
+ * @property string $http_status
+ * @property string $latency_ms
+ * @property string $probe_worker
+ * @property ?string $site_uptime_monitor_id
+ * @property string $state
+ * @property-read ?SiteUptimeMonitor $monitor
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteUptimeCheckResult extends Model
 {
@@ -38,7 +49,8 @@ class SiteUptimeCheckResult extends Model
     }
 
     /** @return BelongsTo<SiteUptimeMonitor, $this> */
-    public function monitor(): BelongsTo {
+    public function monitor(): BelongsTo
+    {
         return $this->belongsTo(SiteUptimeMonitor::class, 'site_uptime_monitor_id');
     }
 }

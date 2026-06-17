@@ -156,7 +156,7 @@ trait BuildsSwitchSiteConfigs
             ->get();
 
         foreach ($sites as $site) {
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             if (isset($meta['provisioning']) && is_array($meta['provisioning'])) {
                 $meta['provisioning']['webserver'] = $target;
             }

@@ -8,16 +8,18 @@ use App\Enums\TrialState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
  * wire:* bindings keep resolving against the composed class.
+ *
+ * @property ?Carbon $trial_ends_at
+ * @property bool $is_internal
  */
 trait ManagesOrganizationTrialState
 {
-
-
     /**
      * True while the org is in its 14-day no-card trial window. Distinct from
      * Cashier's onTrial() (which only knows about Stripe-tracked trials) —
@@ -31,7 +33,7 @@ trait ManagesOrganizationTrialState
     /**
      * True when this org is operator-owned and permanently exempt from the
      * trial/soft/hard-pause ladder: dply's own dogfood control plane,
-     * self-managed/self-adopted orgs, staff orgs. Drives {@see trialState}'s
+     * self-managed/self-adopted orgs, staff orgs. Drives {@see TrialState}'s
      * top-priority short-circuit so the platform can never bill-pause itself.
      */
     public function isInternal(): bool
@@ -86,7 +88,7 @@ trait ManagesOrganizationTrialState
                 : TrialState::ExpiredSoft;
         }
 
-        if ($this->trial_ends_at === null) {
+        if (data_get($this->getAttributes(), 'trial_ends_at') === null) {
             return TrialState::NoTrial;
         }
 
@@ -120,11 +122,14 @@ trait ManagesOrganizationTrialState
     private function pauseLadderReference(): ?CarbonInterface
     {
         $subscription = $this->subscription('default');
-        if ($subscription && $subscription->ended() && $subscription->ends_at !== null) {
-            return $subscription->ends_at;
+        if ($subscription && $subscription->ended()) {
+            $endsAt = data_get($subscription->getAttributes(), 'ends_at');
+            if ($endsAt !== null) {
+                return $endsAt instanceof CarbonInterface ? $endsAt : CarbonImmutable::parse($endsAt);
+            }
         }
 
-        if ($this->trial_ends_at !== null && $this->trial_ends_at->isPast()) {
+        if (data_get($this->getAttributes(), 'trial_ends_at') !== null && $this->trial_ends_at->isPast()) {
             return $this->trial_ends_at;
         }
 
@@ -159,7 +164,17 @@ trait ManagesOrganizationTrialState
      */
     public function subscriptionEndsAt(): ?CarbonInterface
     {
-        return $this->subscription('default')?->ends_at;
+        $subscription = $this->subscription('default');
+        if ($subscription === null) {
+            return null;
+        }
+
+        $endsAt = data_get($subscription->getAttributes(), 'ends_at');
+        if ($endsAt === null) {
+            return null;
+        }
+
+        return $endsAt instanceof CarbonInterface ? $endsAt : CarbonImmutable::parse($endsAt);
     }
 
     /**

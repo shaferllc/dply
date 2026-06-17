@@ -115,7 +115,7 @@ class BuildEdgeSiteJob implements ShouldQueue
                 'committed_at' => $buildResult['git_commit_at'] ?? null,
             ], fn ($value) => is_string($value) && $value !== '');
             if ($commitMeta !== []) {
-                $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
+                $existingMeta = $deployment->meta;
                 $updates['meta'] = array_merge($existingMeta, ['commit' => $commitMeta]);
             }
             $deployment->update($updates);
@@ -199,7 +199,7 @@ class BuildEdgeSiteJob implements ShouldQueue
         $meta['last_error_at'] = now()->toIso8601String();
         $site->update([
             'status' => Site::STATUS_EDGE_FAILED,
-            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+            'meta' => array_merge($site->meta, ['edge' => $meta]),
         ]);
         $deployment->update([
             'status' => EdgeDeployment::STATUS_FAILED,

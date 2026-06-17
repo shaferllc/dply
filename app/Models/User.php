@@ -15,11 +15,48 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\PasskeyAuthenticatable;
 
+/**
+ * @property string $id
+ * @property string $name
+ * @property string $email
+ * @property ?Carbon $email_verified_at
+ * @property string $password
+ * @property ?string $country_code
+ * @property ?string $locale
+ * @property ?string $timezone
+ * @property ?string $invoice_email
+ * @property ?string $vat_number
+ * @property ?string $billing_currency
+ * @property ?array<string, mixed> $billing_details
+ * @property ?string $two_factor_secret
+ * @property ?string $two_factor_recovery_codes
+ * @property ?Carbon $two_factor_confirmed_at
+ * @property ?string $referral_code
+ * @property ?Carbon $referral_converted_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property array<string, mixed> $ui_preferences
+ * @property-read Collection<int, Organization> $organizations
+ * @property-read Collection<int, Team> $teams
+ * @property-read Collection<int, SocialAccount> $socialAccounts
+ * @property-read Collection<int, GitProviderToken> $gitProviderTokens
+ * @property-read Collection<int, ProviderCredential> $providerCredentials
+ * @property-read Collection<int, Server> $servers
+ * @property-read Collection<int, RecentResource> $recentResources
+ * @property-read Collection<int, UserSshKey> $sshKeys
+ * @property-read Collection<int, ApiToken> $apiTokens
+ * @property-read Collection<int, NotificationChannel> $notificationChannels
+ * @property-read Collection<int, NotificationInboxItem> $notificationInboxItems
+ * @property-read ?User $referrer
+ * @property-read Collection<int, User> $referredUsers
+ * @property-read Collection<int, ReferralReward> $referralRewardsGranted
+ */
 #[Fillable([
     'name',
     'email',
@@ -38,28 +75,6 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
     'ui_preferences',
 ])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
-/**
- * @property string $id
- * @property string $name
- * @property string $email
- * @property ?\Illuminate\Support\Carbon $email_verified_at
- * @property string $password
- * @property ?string $country_code
- * @property ?string $locale
- * @property ?string $timezone
- * @property ?string $invoice_email
- * @property ?string $vat_number
- * @property ?string $billing_currency
- * @property ?array $billing_details
- * @property ?string $two_factor_secret
- * @property ?string $two_factor_recovery_codes
- * @property ?\Illuminate\Support\Carbon $two_factor_confirmed_at
- * @property ?string $referral_code
- * @property ?\Illuminate\Support\Carbon $referral_converted_at
- * @property \Illuminate\Support\Carbon $created_at
- * @property array $ui_preferences
- */
-
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
@@ -68,7 +83,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     protected static function booted(): void
     {
         static::creating(function (User $user): void {
-            if (empty($user->referral_code)) {
+            if (blank(data_get($user->getAttributes(), 'referral_code'))) {
                 $user->referral_code = static::newUniqueReferralCode();
             }
         });
@@ -76,7 +91,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     public static function newUniqueReferralCode(): string
     {
-        if (! Schema::hasTable((new static)->getTable())) {
+        if (! Schema::hasTable((new self)->getTable())) {
             return Str::lower(Str::random(20));
         }
 
@@ -88,74 +103,87 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /** @return BelongsToMany<Organization, $this> */
-    public function organizations(): BelongsToMany {
+    public function organizations(): BelongsToMany
+    {
         return $this->belongsToMany(Organization::class, 'organization_user')
             ->withPivot('role')
             ->withTimestamps();
     }
 
     /** @return BelongsToMany<Team, $this> */
-    public function teams(): BelongsToMany {
+    public function teams(): BelongsToMany
+    {
         return $this->belongsToMany(Team::class, 'team_user')
             ->withPivot('role')
             ->withTimestamps();
     }
 
     /** @return HasMany<SocialAccount, $this> */
-    public function socialAccounts(): HasMany {
+    public function socialAccounts(): HasMany
+    {
         return $this->hasMany(SocialAccount::class);
     }
 
     /** @return HasMany<GitProviderToken, $this> */
-    public function gitProviderTokens(): HasMany {
+    public function gitProviderTokens(): HasMany
+    {
         return $this->hasMany(GitProviderToken::class);
     }
 
     /** @return HasMany<ProviderCredential, $this> */
-    public function providerCredentials(): HasMany {
+    public function providerCredentials(): HasMany
+    {
         return $this->hasMany(ProviderCredential::class, 'user_id');
     }
 
     /** @return HasMany<Server, $this> */
-    public function servers(): HasMany {
+    public function servers(): HasMany
+    {
         return $this->hasMany(Server::class, 'user_id');
     }
 
     /** @return HasMany<RecentResource, $this> */
-    public function recentResources(): HasMany {
+    public function recentResources(): HasMany
+    {
         return $this->hasMany(RecentResource::class);
     }
 
     /** @return HasMany<UserSshKey, $this> */
-    public function sshKeys(): HasMany {
+    public function sshKeys(): HasMany
+    {
         return $this->hasMany(UserSshKey::class);
     }
 
     /** @return HasMany<ApiToken, $this> */
-    public function apiTokens(): HasMany {
+    public function apiTokens(): HasMany
+    {
         return $this->hasMany(ApiToken::class);
     }
 
     /** @return MorphMany<NotificationChannel, $this> */
-    public function notificationChannels(): MorphMany {
+    public function notificationChannels(): MorphMany
+    {
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 
     /** @return HasMany<NotificationInboxItem, $this> */
-    public function notificationInboxItems(): HasMany {
+    public function notificationInboxItems(): HasMany
+    {
         return $this->hasMany(NotificationInboxItem::class)->latest();
     }
 
     /** @return BelongsTo<User, $this> */
-    public function referrer(): BelongsTo {
+    public function referrer(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'referred_by_user_id');
     }
 
     /**
      * Users who registered with this user’s referral code.
      *
-     * @return HasMany<User, User>
+     * @return HasMany<User, $this>
      */
+    /** @return HasMany<User, $this> */
     public function referredUsers(): HasMany
     {
         return $this->hasMany(User::class, 'referred_by_user_id');
@@ -166,6 +194,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      *
      * @return HasMany<ReferralReward, User>
      */
+    /** @return HasMany<ReferralReward, $this> */
     public function referralRewardsGranted(): HasMany
     {
         return $this->hasMany(ReferralReward::class, 'referrer_user_id');
@@ -219,10 +248,11 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     private function primeOrganizationMemberRole(?Organization $organization): ?Organization
     {
-        if ($organization !== null
-            && $organization->relationLoaded('pivot')
-            && $organization->pivot !== null) {
-            $organization->rememberMemberRoleFor($this, (string) $organization->pivot->role);
+        if ($organization !== null && $organization->relationLoaded('pivot')) {
+            $role = data_get($organization->getRelation('pivot'), 'role');
+            if ($role !== null) {
+                $organization->rememberMemberRoleFor($this, (string) $role);
+            }
         }
 
         return $organization;
@@ -306,21 +336,11 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             ->count();
     }
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     public function hasTwoFactorEnabled(): bool
     {
-        return $this->two_factor_confirmed_at !== null;
+        return data_get($this->getAttributes(), 'two_factor_confirmed_at') !== null;
     }
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     /** @return array<string, string> */
     protected function casts(): array
     {

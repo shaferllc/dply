@@ -12,6 +12,13 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property string $dns_zone
+ * @property string $logo_path
+ * @property string $git_repository_url
+ * @property string $ssl_status
+ * @property string $edge_backend
  */
 trait ResolvesSiteUrls
 {
@@ -75,7 +82,7 @@ trait ResolvesSiteUrls
      */
     public function gitRefKind(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $value = $meta['git_ref_kind'] ?? null;
 
         return in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
@@ -140,7 +147,7 @@ trait ResolvesSiteUrls
     public function logoUrl(): ?string
     {
         $path = $this->logo_path;
-        if (! is_string($path) || $path === '') {
+        if ($path === '') {
             return null;
         }
 
@@ -149,7 +156,7 @@ trait ResolvesSiteUrls
 
     public function hasLogo(): bool
     {
-        return is_string($this->logo_path) && $this->logo_path !== '';
+        return $this->logo_path !== '';
     }
 
     /**
@@ -249,7 +256,7 @@ trait ResolvesSiteUrls
      */
     public function repositoryMeta(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
     }
@@ -259,7 +266,7 @@ trait ResolvesSiteUrls
      */
     public function mergeRepositoryMeta(array $patch): void
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $current = is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
         $meta['repository'] = array_merge($current, $patch);
         $this->meta = $meta;

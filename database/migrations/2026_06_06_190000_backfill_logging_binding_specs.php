@@ -23,7 +23,7 @@ return new class extends Migration
     public function up(): void
     {
         SiteBinding::query()->where('type', 'logging')->cursor()->each(function (SiteBinding $binding): void {
-            $config = is_array($binding->config) ? $binding->config : [];
+            $config = $binding->config;
             if (LoggingSpec::isV2($config)) {
                 return;
             }
@@ -33,7 +33,7 @@ return new class extends Migration
             $binding->config = ['provider' => $provider] + $spec;
 
             if ($provider === 'dply_realtime') {
-                $env = is_array($binding->injected_env) ? $binding->injected_env : [];
+                $env = $binding->injected_env;
                 $env['DPLY_LOG_DRAIN_HOST'] = (string) config('log_drains.dply_realtime.host', '');
                 $env['DPLY_LOG_DRAIN_PORT'] = (string) config('log_drains.dply_realtime.port', '');
                 $binding->injected_env = array_filter($env, fn ($v) => (string) $v !== '');
@@ -46,7 +46,7 @@ return new class extends Migration
     public function down(): void
     {
         SiteBinding::query()->where('type', 'logging')->cursor()->each(function (SiteBinding $binding): void {
-            $config = is_array($binding->config) ? $binding->config : [];
+            $config = $binding->config;
             if (! LoggingSpec::isV2($config)) {
                 return;
             }

@@ -8,8 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property ?string $comment
+ * @property string $hostname
+ * @property bool $is_primary
+ * @property ?string $site_id
+ * @property bool $www_redirect
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class SiteDomain extends Model
 {
     use HasUlids;
@@ -34,7 +41,8 @@ class SiteDomain extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 }

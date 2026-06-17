@@ -173,7 +173,6 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
         return match ($monitor->last_ok) {
             true => MonitorOperationalState::OPERATIONAL,
             false => MonitorOperationalState::OUTAGE,
-            default => MonitorOperationalState::OPERATIONAL,
         };
     }
 

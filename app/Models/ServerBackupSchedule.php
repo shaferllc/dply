@@ -6,11 +6,25 @@ use App\Models\Concerns\DescribesCronExpression;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property ?string $backup_configuration_id
+ * @property string $cron_expression
+ * @property bool $is_active
+ * @property ?Carbon $last_run_at
+ * @property bool $notify_on_failure
+ * @property ?string $server_cron_job_id
+ * @property ?string $server_id
+ * @property ?string $target_id
+ * @property string $target_type
+ * @property-read ?Server $server
+ * @property-read ?BackupConfiguration $backupConfiguration
+ * @property-read ?ServerCronJob $serverCronJob
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ServerBackupSchedule extends Model
 {
     use DescribesCronExpression, HasUlids;
@@ -44,17 +58,20 @@ class ServerBackupSchedule extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<BackupConfiguration, $this> */
-    public function backupConfiguration(): BelongsTo {
+    public function backupConfiguration(): BelongsTo
+    {
         return $this->belongsTo(BackupConfiguration::class);
     }
 
     /** @return BelongsTo<ServerCronJob, $this> */
-    public function serverCronJob(): BelongsTo {
+    public function serverCronJob(): BelongsTo
+    {
         return $this->belongsTo(ServerCronJob::class);
     }
 

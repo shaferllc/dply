@@ -20,6 +20,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $value
  * @property string $scope
  * @property ?string $created_by_user_id
+ * @property string $value_encrypted
+ * @property-read ?Site $site
+ * @property-read ?User $creator
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class EdgeSiteEnvVar extends Model
 {
@@ -66,12 +71,14 @@ class EdgeSiteEnvVar extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function creator(): BelongsTo {
+    public function creator(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 

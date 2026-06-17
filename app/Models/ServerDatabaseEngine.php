@@ -11,14 +11,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A database engine (postgres / mysql / mariadb / etc.) installed on a
- * server. Distinct from {@see ServerDatabase}, which represents a named
- * database schema + credentials *on top of* an engine.
- *
- * One row per (server_id, engine) — multi-engine servers have multiple
- * rows, single-engine servers have one. Exactly one row per server may be
- * marked `is_default`; the Site `database_engine` field defaults to that
- * unless overridden.
+ *                      A database engine (postgres / mysql / mariadb / etc.) installed on a
+ *                      server. Distinct from {@see ServerDatabase}, which represents a named
+ *                      database schema + credentials *on top of* an engine.
+ *                      One row per (server_id, engine) — multi-engine servers have multiple
+ *                      rows, single-engine servers have one. Exactly one row per server may be
+ *                      marked `is_default`; the Site `database_engine` field defaults to that
+ *                      unless overridden.
+ * @property string $allowed_from
+ * @property string $engine
+ * @property ?string $error_message
+ * @property bool $is_default
+ * @property int $port
+ * @property bool $remote_access
+ * @property ?string $server_id
+ * @property string $status
+ * @property string $version
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerDatabaseEngine extends Model
 {
@@ -61,7 +72,8 @@ class ServerDatabaseEngine extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 

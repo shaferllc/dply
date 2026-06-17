@@ -7,12 +7,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * One row per (server, php_version) — PHP OPcache lives per PHP version, not
- * per site. The row drives `ServerOpcacheConfigEditor`, which renders
- * `opcache.ini` from the structured fields and ships it to the host.
+ *                      One row per (server, php_version) — PHP OPcache lives per PHP version, not
+ *                      per site. The row drives `ServerOpcacheConfigEditor`, which renders
+ *                      `opcache.ini` from the structured fields and ships it to the host.
+ * @property bool $enabled
+ * @property string $extra_ini_raw
+ * @property int $interned_strings_buffer_mb
+ * @property string $jit
+ * @property int $jit_buffer_size_mb
+ * @property ?Carbon $last_applied_at
+ * @property string $last_error
+ * @property int $max_accelerated_files
+ * @property int $memory_consumption_mb
+ * @property string $php_version
+ * @property int $revalidate_freq
+ * @property ?string $server_id
+ * @property string $status
+ * @property bool $validate_timestamps
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerPhpOpcacheProfile extends Model
 {
@@ -70,7 +88,8 @@ class ServerPhpOpcacheProfile extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 

@@ -8,8 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $env_key
+ * @property ?string $env_value
+ * @property bool $is_secret
+ * @property ?string $workspace_id
+ * @property-read ?Workspace $workspace
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class WorkspaceVariable extends Model
 {
     use HasUlids;
@@ -31,7 +37,8 @@ class WorkspaceVariable extends Model
     }
 
     /** @return BelongsTo<Workspace, $this> */
-    public function workspace(): BelongsTo {
+    public function workspace(): BelongsTo
+    {
         return $this->belongsTo(Workspace::class);
     }
 }

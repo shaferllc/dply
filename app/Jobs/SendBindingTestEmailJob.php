@@ -72,7 +72,7 @@ class SendBindingTestEmailJob implements ShouldQueue
 
         try {
             $env = $binding->connectionEnv();
-            $provider = strtolower(trim((string) (is_array($binding->config) ? ($binding->config['provider'] ?? '') : '')));
+            $provider = strtolower(trim((string) ($binding->config['provider'] ?? '')));
 
             if ($provider === 'log') {
                 $emit->info('The "log" mailer writes to the application log and never delivers — there is nothing to test.');
@@ -81,7 +81,7 @@ class SendBindingTestEmailJob implements ShouldQueue
                 return;
             }
 
-            $legs = is_array($binding->config) && is_array($binding->config['legs'] ?? null)
+            $legs = is_array($binding->config['legs'] ?? null)
                 ? array_values($binding->config['legs'])
                 : [];
             $dsn = $this->buildDsn($provider, $env, $legs);

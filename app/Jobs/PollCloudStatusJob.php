@@ -60,7 +60,7 @@ class PollCloudStatusJob implements ShouldQueue
             // be rate limiting us, or the region/account briefly
             // out. Don't transition status; record the most
             // recent error for visibility.
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['container'] = is_array($meta['container'] ?? null) ? $meta['container'] : [];
             $meta['container']['last_poll_error'] = $e->getMessage();
             $meta['container']['last_poll_at'] = now()->toIso8601String();
@@ -77,7 +77,7 @@ class PollCloudStatusJob implements ShouldQueue
             $update['status'] = $newStatus;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $meta['container']['last_phase'] = $result['phase'];
         $meta['container']['last_poll_at'] = now()->toIso8601String();

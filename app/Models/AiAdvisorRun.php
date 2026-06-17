@@ -25,6 +25,10 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property ?int $latency_ms
  * @property ?string $error_message
  * @property ?Carbon $finished_at
+ * @property-read ?Organization $organization
+ * @property-read ?User $triggeredBy
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class AiAdvisorRun extends Model
 {
@@ -69,17 +73,20 @@ class AiAdvisorRun extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return MorphTo<Model, $this> */
     public function subject(): MorphTo
     {
         return $this->morphTo();
     }
 
     /** @return BelongsTo<User, $this> */
-    public function triggeredBy(): BelongsTo {
+    public function triggeredBy(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'triggered_by_user_id');
     }
 

@@ -55,7 +55,7 @@ class CloudEnvCommand extends Command
         }
 
         if ($this->option('build')) {
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['container'] = array_merge($meta['container'] ?? [], [
                 'build_env_file_content' => $newContent,
             ]);

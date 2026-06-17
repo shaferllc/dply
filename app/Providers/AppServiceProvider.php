@@ -369,21 +369,25 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ImportServerMigration::class, ImportServerMigrationPolicy::class);
 
         Gate::define('manageNotificationChannels', function (User $user, User|Organization|Team $owner): bool {
-            return match (true) {
-                $owner instanceof User => $user->id === $owner->id,
-                $owner instanceof Organization => $owner->hasAdminAccess($user),
-                $owner instanceof Team => $owner->userCanManageNotificationChannels($user),
-                default => false,
-            };
+            if ($owner instanceof User) {
+                return $user->id === $owner->id;
+            }
+            if ($owner instanceof Organization) {
+                return $owner->hasAdminAccess($user);
+            }
+
+            return $owner->userCanManageNotificationChannels($user);
         });
 
         Gate::define('viewNotificationChannels', function (User $user, User|Organization|Team $owner): bool {
-            return match (true) {
-                $owner instanceof User => $user->id === $owner->id,
-                $owner instanceof Organization => $owner->hasAdminAccess($user),
-                $owner instanceof Team => $owner->organization->hasMember($user) && $owner->hasMember($user),
-                default => false,
-            };
+            if ($owner instanceof User) {
+                return $user->id === $owner->id;
+            }
+            if ($owner instanceof Organization) {
+                return $owner->hasAdminAccess($user);
+            }
+
+            return $owner->organization->hasMember($user) && $owner->hasMember($user);
         });
 
         Gate::define('viewPlatformAdmin', function (?User $user): bool {
@@ -489,7 +493,7 @@ class AppServiceProvider extends ServiceProvider
                             'name' => $site->name,
                             'primary_domain' => $site->primaryDomain()?->hostname,
                             'webserver' => $site->webserver(),
-                            'application_type' => $site->application_type,
+                            'application_type' => $site->type->value,
                         ],
                     ],
                     'Site '.$site->name.' created'

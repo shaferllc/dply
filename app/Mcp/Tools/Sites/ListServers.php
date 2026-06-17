@@ -41,7 +41,7 @@ class ListServers extends AbstractDplyTool
                 'status' => $s->status,
                 'ip_address' => $s->ip_address,
                 'provider' => $s->provider->value,
-                'created_at' => $s->created_at?->toIso8601String(),
+                'created_at' => $s->created_at->toIso8601String(),
             ])->all(),
         ]);
     }

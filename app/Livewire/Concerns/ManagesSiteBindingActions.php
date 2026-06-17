@@ -24,6 +24,9 @@ use Illuminate\Support\Facades\Gate;
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
  * wire:* bindings keep resolving against the composed class.
+ *
+ * @method \App\Models\ConsoleAction seedQueuedConsoleAction(string $kind, ?string $label = null)
+ * @method void watchConsoleAction(\App\Models\ConsoleAction $run, string $successToast, ?string $failureToast = null)
  */
 trait ManagesSiteBindingActions
 {
@@ -238,11 +241,6 @@ trait ManagesSiteBindingActions
         if (! $binding instanceof SiteBinding) {
             return;
         }
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
-            $this->toastError(__('Connectivity fixes are available from the deploy hub.'));
-
-            return;
-        }
 
         $run = $this->seedQueuedConsoleAction('binding_connectivity_fix', __('Fixing connectivity'));
         FixSiteBindingConnectivityJob::dispatch(
@@ -362,7 +360,7 @@ trait ManagesSiteBindingActions
                     ->whereKey($value)
                     ->first();
                 if ($cred instanceof SearchCredential) {
-                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $c = $cred->credentials;
                     foreach (['app_id', 'secret', 'host', 'key', 'api_key', 'port', 'protocol'] as $f) {
                         $this->bindingForm[$f] = (string) ($c[$f] ?? $this->bindingForm[$f] ?? '');
                     }
@@ -386,7 +384,7 @@ trait ManagesSiteBindingActions
                     ->whereKey($value)
                     ->first();
                 if ($cred instanceof PaymentCredential) {
-                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $c = $cred->credentials;
                     foreach (['key', 'secret', 'currency', 'api_key', 'client_side_token', 'sandbox', 'webhook_secret'] as $f) {
                         $this->bindingForm[$f] = (string) ($c[$f] ?? '');
                     }
@@ -410,7 +408,7 @@ trait ManagesSiteBindingActions
                     ->whereKey($value)
                     ->first();
                 if ($cred instanceof OauthCredential) {
-                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $c = $cred->credentials;
                     $this->bindingForm['client_id'] = (string) ($c['client_id'] ?? '');
                     $this->bindingForm['client_secret'] = (string) ($c['client_secret'] ?? '');
                 }
@@ -433,7 +431,7 @@ trait ManagesSiteBindingActions
                     ->whereKey($value)
                     ->first();
                 if ($cred instanceof AiCredential) {
-                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $c = $cred->credentials;
                     $this->bindingForm['api_key'] = (string) ($c['api_key'] ?? '');
                     $this->bindingForm['organization'] = (string) ($c['organization'] ?? '');
                 }
@@ -456,7 +454,7 @@ trait ManagesSiteBindingActions
                     ->whereKey($value)
                     ->first();
                 if ($cred instanceof CaptchaCredential) {
-                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $c = $cred->credentials;
                     $this->bindingForm['site_key'] = (string) ($c['site_key'] ?? '');
                     $this->bindingForm['secret_key'] = (string) ($c['secret_key'] ?? '');
                 }
@@ -479,7 +477,7 @@ trait ManagesSiteBindingActions
                     ->whereKey($value)
                     ->first();
                 if ($cred instanceof SmsCredential) {
-                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $c = $cred->credentials;
                     foreach (['sid', 'auth_token', 'from', 'key', 'secret', 'server_key'] as $f) {
                         $this->bindingForm[$f] = (string) ($c[$f] ?? '');
                     }
@@ -505,7 +503,7 @@ trait ManagesSiteBindingActions
                     ->first();
 
                 if ($cred instanceof ErrorTrackingCredential) {
-                    $credentials = is_array($cred->credentials) ? $cred->credentials : [];
+                    $credentials = $cred->credentials;
                     $this->bindingForm['dsn'] = (string) ($credentials['dsn'] ?? '');
                     $this->bindingForm['traces_sample_rate'] = (string) ($credentials['traces_sample_rate'] ?? '');
                     $this->bindingForm['api_key'] = (string) ($credentials['api_key'] ?? '');
@@ -533,7 +531,7 @@ trait ManagesSiteBindingActions
                     ->first();
 
                 if ($cred instanceof LogDrainCredential) {
-                    $credentials = is_array($cred->credentials) ? $cred->credentials : [];
+                    $credentials = $cred->credentials;
                     $this->bindingForm['host'] = (string) ($credentials['host'] ?? '');
                     $this->bindingForm['port'] = (string) ($credentials['port'] ?? '');
                     $this->bindingForm['source_token'] = (string) ($credentials['source_token'] ?? '');

@@ -7,11 +7,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property ?string $error_message
+ * @property ?Carbon $finished_at
+ * @property ?string $organization_id
+ * @property ?string $parent_site_id
+ * @property ?string $preview_deployment_id
+ * @property ?string $preview_site_id
+ * @property array<string, mixed> $results
+ * @property string $sample_limit
+ * @property array<string, mixed> $samples
+ * @property ?Carbon $started_at
+ * @property string $status
+ * @property array<string, mixed> $summary
+ * @property ?string $triggered_by_user_id
+ * @property string $window_minutes
+ * @property-read ?Site $parentSite
+ * @property-read ?Site $previewSite
+ * @property-read ?User $triggeredBy
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class EdgeDeployReplay extends Model
 {
     use HasUlids;
@@ -54,17 +73,20 @@ class EdgeDeployReplay extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function parentSite(): BelongsTo {
+    public function parentSite(): BelongsTo
+    {
         return $this->belongsTo(Site::class, 'parent_site_id');
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function previewSite(): BelongsTo {
+    public function previewSite(): BelongsTo
+    {
         return $this->belongsTo(Site::class, 'preview_site_id');
     }
 
     /** @return BelongsTo<User, $this> */
-    public function triggeredBy(): BelongsTo {
+    public function triggeredBy(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'triggered_by_user_id');
     }
 }

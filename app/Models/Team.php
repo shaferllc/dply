@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\TeamFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,8 +14,18 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property string $id
+ * @property string $name
+ * @property ?string $organization_id
+ * @property array<string, mixed> $preferences
+ * @property string $slug
+ * @property-read ?Organization $organization
+ * @property-read Collection<int, User> $users
+ * @property-read Collection<int, Server> $servers
+ * @property-read Collection<int, TeamSshKey> $sshKeys
+ * @property-read Collection<int, NotificationChannel> $notificationChannels
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -62,19 +73,22 @@ class Team extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsToMany<User, $this> */
-    public function users(): BelongsToMany {
+    public function users(): BelongsToMany
+    {
         return $this->belongsToMany(User::class, 'team_user')
             ->withPivot('role')
             ->withTimestamps();
     }
 
     /** @return HasMany<Server, $this> */
-    public function servers(): HasMany {
+    public function servers(): HasMany
+    {
         return $this->hasMany(Server::class);
     }
 
@@ -104,12 +118,14 @@ class Team extends Model
     }
 
     /** @return HasMany<TeamSshKey, $this> */
-    public function sshKeys(): HasMany {
+    public function sshKeys(): HasMany
+    {
         return $this->hasMany(TeamSshKey::class);
     }
 
     /** @return MorphMany<NotificationChannel, $this> */
-    public function notificationChannels(): MorphMany {
+    public function notificationChannels(): MorphMany
+    {
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 }

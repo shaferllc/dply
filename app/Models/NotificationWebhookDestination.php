@@ -8,8 +8,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $driver
+ * @property bool $enabled
+ * @property array<string, mixed> $events
+ * @property string $name
+ * @property ?string $organization_id
+ * @property ?string $site_id
+ * @property string $webhook_url
+ * @property-read ?Organization $organization
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class NotificationWebhookDestination extends Model
 {
     use HasUlids;
@@ -43,19 +53,21 @@ class NotificationWebhookDestination extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     public function wantsEvent(string $event): bool
     {
         $events = $this->events;
-        if (! is_array($events) || $events === []) {
+        if ($events === []) {
             return true;
         }
 

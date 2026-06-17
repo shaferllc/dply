@@ -42,7 +42,7 @@ class SiteResourceApiController extends Controller
                 'git_branch' => $site->git_branch,
                 'ssl_status' => $site->ssl_status,
                 'last_deploy_at' => $site->last_deploy_at?->toIso8601String(),
-                'created_at' => $site->created_at?->toIso8601String(),
+                'created_at' => $site->created_at->toIso8601String(),
             ],
         ]);
     }

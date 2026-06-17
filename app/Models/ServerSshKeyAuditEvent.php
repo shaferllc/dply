@@ -8,8 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $event
+ * @property string $ip_address
+ * @property array<string, mixed> $meta
+ * @property ?string $server_id
+ * @property ?string $user_id
+ * @property-read ?Server $server
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ServerSshKeyAuditEvent extends Model
 {
     use HasUlids;
@@ -49,12 +57,14 @@ class ServerSshKeyAuditEvent extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 }

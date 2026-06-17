@@ -102,7 +102,7 @@ class ProvisionCloudDatabaseJob implements ShouldQueue
         // Online — persist the connection block (encrypted) and the
         // non-secret provisioning facts.
         $connection = $cluster['connection'];
-        $meta = is_array($database->meta) ? $database->meta : [];
+        $meta = $database->meta;
         unset($meta['error'], $meta['error_at']);
         $meta['provisioned_at'] = now()->toIso8601String();
 
@@ -137,7 +137,7 @@ class ProvisionCloudDatabaseJob implements ShouldQueue
 
     private function markFailed(CloudDatabase $database, string $error): void
     {
-        $meta = is_array($database->meta) ? $database->meta : [];
+        $meta = $database->meta;
         $meta['error'] = $error;
         $meta['error_at'] = now()->toIso8601String();
 

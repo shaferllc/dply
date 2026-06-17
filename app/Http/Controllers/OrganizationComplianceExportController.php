@@ -94,14 +94,14 @@ class OrganizationComplianceExportController extends Controller
             ['occurred_at', 'actor_name', 'actor_email', 'action', 'subject_type', 'subject_id', 'old_values_json', 'new_values_json', 'ip_address'],
             $query,
             fn (AuditLog $row) => [
-                $row->created_at?->toIso8601String() ?? '',
+                $row->created_at->toIso8601String(),
                 (string) ($row->user->name ?? ''),
                 (string) ($row->user->email ?? ''),
                 (string) $row->action,
                 (string) ($row->subject_type ?? ''),
                 (string) ($row->subject_id ?? ''),
-                $row->old_values === null ? '' : json_encode($row->old_values, JSON_UNESCAPED_SLASHES),
-                $row->new_values === null ? '' : json_encode($row->new_values, JSON_UNESCAPED_SLASHES),
+                json_encode($row->old_values, JSON_UNESCAPED_SLASHES),
+                json_encode($row->new_values, JSON_UNESCAPED_SLASHES),
                 (string) ($row->ip_address ?? ''),
             ],
         );
@@ -134,7 +134,7 @@ class OrganizationComplianceExportController extends Controller
                     (string) $row->status,
                     (string) ($row->trigger ?? ''),
                     (string) ($row->git_sha ?? ''),
-                    $row->exit_code === null ? '' : (string) $row->exit_code,
+                    $row->exit_code !== '' ? (string) $row->exit_code : '',
                     (string) $duration,
                 ];
             },
@@ -189,9 +189,9 @@ class OrganizationComplianceExportController extends Controller
                 (string) ($row->site !== null ? $row->site->name : ''),
                 (string) $row->site_id,
                 (string) $row->mode,
-                $row->allowed_emails === null ? '' : json_encode($row->allowed_emails, JSON_UNESCAPED_SLASHES),
-                $row->created_at?->toIso8601String() ?? '',
-                $row->updated_at?->toIso8601String() ?? '',
+                json_encode($row->allowed_emails, JSON_UNESCAPED_SLASHES),
+                $row->created_at->toIso8601String(),
+                $row->updated_at->toIso8601String(),
             ],
         );
     }

@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Services\Backups\BackupStagingS3ClientFactory;
 use App\Services\Servers\QuickDownloadNotifier;
 use App\Services\Servers\QuickDownloadStreamer;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
@@ -32,6 +33,7 @@ use Livewire\Component;
 trait QueuesQuickDownloads
 {
     use DispatchesToastNotifications;
+
     /** The quick-download row currently being prepared/polled, if any. */
     public ?string $qdId = null;
 
@@ -45,21 +47,21 @@ trait QueuesQuickDownloads
     /** @var array<string, string> */
     public array $qdErrors = [];
 
-    public function requestSiteQuickDownload(string $siteId, string $artifact): mixed
+    public function requestSiteQuickDownload(string $siteId, string $artifact): void
     {
         if (! in_array($artifact, QuickDownloadStreamer::SITE_ARTIFACTS, true)) {
-            return null;
+            return;
         }
 
         $site = Site::query()->with('server')->whereKey($siteId)->first();
         if ($site === null || ! $site->server instanceof Server) {
             $this->toastError(__('Site not found.'));
 
-            return null;
+            return;
         }
         $this->authorizeQuickDownloadServer($site->server);
 
-        return $this->queueQuickDownload([
+        $this->queueQuickDownload([
             'organization_id' => $site->server->organization_id,
             'server_id' => $site->server_id,
             'site_id' => $site->id,
@@ -68,17 +70,17 @@ trait QueuesQuickDownloads
         ], 'site:'.$site->id.':'.$artifact);
     }
 
-    public function requestDatabaseQuickDownload(string $databaseId): mixed
+    public function requestDatabaseQuickDownload(string $databaseId): void
     {
         $database = ServerDatabase::query()->with('server')->whereKey($databaseId)->first();
         if ($database === null || ! $database->server instanceof Server) {
             $this->toastError(__('Database not found.'));
 
-            return null;
+            return;
         }
         $this->authorizeQuickDownloadServer($database->server);
 
-        return $this->queueQuickDownload([
+        $this->queueQuickDownload([
             'organization_id' => $database->server->organization_id,
             'server_id' => $database->server_id,
             'site_id' => $database->site_id,
@@ -88,13 +90,13 @@ trait QueuesQuickDownloads
         ], 'db:'.$database->id);
     }
 
-    public function requestAdhocQuickDownload(string $serverId, string $engine, string $name): mixed
+    public function requestAdhocQuickDownload(string $serverId, string $engine, string $name): void
     {
         $server = Server::query()->whereKey($serverId)->first();
         if ($server === null) {
             $this->toastError(__('Server not found.'));
 
-            return null;
+            return;
         }
         $this->authorizeQuickDownloadServer($server);
 
@@ -102,10 +104,10 @@ trait QueuesQuickDownloads
         if ($name === '' || ! in_array($engine, ['mysql', 'mariadb', 'postgres'], true)) {
             $this->toastError(__('Unsupported database for quick download.'));
 
-            return null;
+            return;
         }
 
-        return $this->queueQuickDownload([
+        $this->queueQuickDownload([
             'organization_id' => $server->organization_id,
             'server_id' => $server->id,
             'kind' => QuickDownload::KIND_ADHOC_DATABASE,
@@ -114,17 +116,17 @@ trait QueuesQuickDownloads
         ], 'adhoc:'.$engine.':'.$name);
     }
 
-    public function pollQuickDownload(): mixed
+    public function pollQuickDownload(): void
     {
         if ($this->qdId === null) {
-            return null;
+            return;
         }
 
         $row = QuickDownload::find($this->qdId);
         if ($row === null) {
             $this->resetQuickDownloadState();
 
-            return null;
+            return;
         }
 
         if ($row->isDownloadable()) {
@@ -135,7 +137,7 @@ trait QueuesQuickDownloads
             // this page — we just stop polling and clear the spinner here.
             $this->resetQuickDownloadState();
 
-            return null;
+            return;
         }
 
         if ($row->status === QuickDownload::STATUS_FAILED) {
@@ -146,7 +148,7 @@ trait QueuesQuickDownloads
             }
             $this->resetQuickDownloadState();
 
-            return null;
+            return;
         }
 
         // Already consumed/expired (e.g. grabbed from the email link first).
@@ -154,18 +156,18 @@ trait QueuesQuickDownloads
             $this->resetQuickDownloadState();
         }
 
-        return null; // still pending/building — keep polling
+        // still pending/building — keep polling
     }
 
     /**
      * @param  array<string, mixed>  $attrs
      */
-    private function queueQuickDownload(array $attrs, string $targetKey): mixed
+    private function queueQuickDownload(array $attrs, string $targetKey): void
     {
         if (! app(BackupStagingS3ClientFactory::class)->enabled()) {
             $this->toastError(__('Downloads aren’t configured yet — the staging bucket is missing.'));
 
-            return null;
+            return;
         }
 
         unset($this->qdErrors[$targetKey]);
@@ -180,7 +182,7 @@ trait QueuesQuickDownloads
             $this->qdTargetKey = $targetKey;
             $this->qdLabel = QuickDownloadNotifier::label($existing);
 
-            return null;
+            return;
         }
 
         $row = QuickDownload::create($attrs + [
@@ -197,15 +199,13 @@ trait QueuesQuickDownloads
         // The build runs on the box; when it lands we drop an in-app notification
         // (plus email for large artifacts) carrying the download link.
         $this->toastSuccess(__('Preparing your :label — we’ll notify you in-app when it’s ready to download.', ['label' => $this->qdLabel]));
-
-        return null;
     }
 
     /**
      * @param  array<string, mixed>  $attrs
-     * @return \Illuminate\Database\Eloquent\Builder<QuickDownload>
+     * @return Builder<QuickDownload>
      */
-    private function activeQuickDownloadQuery(array $attrs): \Illuminate\Database\Eloquent\Builder
+    private function activeQuickDownloadQuery(array $attrs): Builder
     {
         $query = QuickDownload::query()
             ->where('server_id', $attrs['server_id'])
@@ -224,8 +224,8 @@ trait QueuesQuickDownloads
             QuickDownload::KIND_DATABASE => $query
                 ->where('server_database_id', $attrs['server_database_id']),
             QuickDownload::KIND_ADHOC_DATABASE => $query
-                ->where('meta->engine', $attrs['meta']['engine'])
-                ->where('meta->name', $attrs['meta']['name']),
+                ->where('meta->engine', is_array($attrs['meta'] ?? null) ? $attrs['meta']['engine'] : '')
+                ->where('meta->name', is_array($attrs['meta'] ?? null) ? $attrs['meta']['name'] : ''),
             default => $query,
         };
     }

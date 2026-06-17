@@ -136,7 +136,7 @@ trait ManagesWorkerPoolStats
             'name' => (string) ($j['name'] ?? 'job'),
             'queue' => (string) ($j['queue'] ?? '?'),
             'status' => $forceStatus ?? (string) ($j['status'] ?? 'processing'),
-            'received_at' => isset($j['age']) && $j['age'] !== null
+            'received_at' => isset($j['age'])
                 ? (float) $collectedAt - (float) $j['age']
                 : (float) $collectedAt,
         ])->all();

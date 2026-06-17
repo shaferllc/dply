@@ -8,12 +8,30 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
  * @property string $id
+ * @property string $admin_notes
+ * @property ?string $assigned_to_user_id
+ * @property array<string, mixed> $attachments
+ * @property ?Carbon $attachments_pruned_at
+ * @property array<string, mixed> $context
+ * @property ?string $description
+ * @property string $ip_address
+ * @property ?string $organization_id
+ * @property string $reference
+ * @property ?Carbon $resolved_at
+ * @property ?string $screenshot_path
+ * @property ?string $severity
+ * @property string $status
+ * @property string $title
+ * @property string $type
+ * @property ?string $user_id
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class FeedbackReport extends Model
 {
     use HasUlids;
@@ -108,6 +126,7 @@ class FeedbackReport extends Model
     /**
      * @return BelongsTo<User, $this>
      */
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -116,6 +135,7 @@ class FeedbackReport extends Model
     /**
      * @return BelongsTo<Organization, $this>
      */
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
@@ -124,11 +144,16 @@ class FeedbackReport extends Model
     /**
      * @return BelongsTo<User, $this>
      */
+    /** @return BelongsTo<User, $this> */
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeStatus(Builder $query, ?string $status): Builder
     {
         if ($status === null || $status === '' || $status === 'all') {
@@ -138,6 +163,10 @@ class FeedbackReport extends Model
         return $query->where('status', $status);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeType(Builder $query, ?string $type): Builder
     {
         if ($type === null || $type === '' || $type === 'all') {
@@ -147,6 +176,10 @@ class FeedbackReport extends Model
         return $query->where('type', $type);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeSeverity(Builder $query, ?string $severity): Builder
     {
         if ($severity === null || $severity === '' || $severity === 'all') {
@@ -156,6 +189,10 @@ class FeedbackReport extends Model
         return $query->where('severity', $severity);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeSearch(Builder $query, ?string $search): Builder
     {
         if ($search === null || trim($search) === '') {
@@ -193,7 +230,7 @@ class FeedbackReport extends Model
 
     public function severityLabel(): ?string
     {
-        if ($this->severity === null) {
+        if ($this->severity === null || $this->severity === '') {
             return null;
         }
 

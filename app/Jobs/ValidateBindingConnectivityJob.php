@@ -186,7 +186,7 @@ class ValidateBindingConnectivityJob implements ShouldQueue
 
     private function finish(ConsoleEmitter $emit, SiteBinding $binding, bool $ok, ?string $error, bool $failed = false): void
     {
-        $config = is_array($binding->config) ? $binding->config : [];
+        $config = $binding->config;
         $config['connectivity'] = [
             'ok' => $ok,
             'checked_at' => now()->toIso8601String(),

@@ -21,16 +21,16 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
 
     /**
      * @param  array{
-     *     server_id: int,
+     *     server_id: string,
      *     webserver?: string,
      *     nginx_basename: string,
      *     repository_base: string,
      *     deploy_strategy?: string,
      *     primary_hostname?: string|null,
      *     ssl_was_active?: bool,
-     *     supervisor_program_ids?: array<int, int>,
+     *     supervisor_program_ids?: array<int, string>,
      *     php_fpm_pool_name?: string|null,
-     *     site_id?: int,
+     *     site_id?: string,
      *     systemd_unit_names?: list<string>
      * }  $payload
      */

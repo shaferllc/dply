@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Jobs\SendNotificationChannelTestEmailJob;
 use App\Mail\NotificationChannelMail;
 use Database\Factories\NotificationChannelFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -20,9 +22,11 @@ use Illuminate\Support\Facades\Mail;
  * @property string $owner_id
  * @property string $type
  * @property string $label
- * @property array $config
+ * @property array<string, mixed> $config
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  * @property-read Model $owner
- * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationSubscription> $subscriptions
+ * @property-read Collection<int, NotificationSubscription> $subscriptions
  */
 class NotificationChannel extends Model
 {
@@ -130,13 +134,15 @@ class NotificationChannel extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function owner(): MorphTo
     {
         return $this->morphTo();
     }
 
     /** @return HasMany<NotificationSubscription, $this> */
-    public function subscriptions(): HasMany {
+    public function subscriptions(): HasMany
+    {
         return $this->hasMany(NotificationSubscription::class);
     }
 
@@ -145,7 +151,7 @@ class NotificationChannel extends Model
      */
     public function sendTest(?User $actor = null): array
     {
-        $actorLabel = $actor?->name ?? config('app.name');
+        $actorLabel = $actor !== null ? $actor->name : config('app.name');
 
         return match ($this->type) {
             self::TYPE_SLACK => $this->sendSlackTest($actorLabel),

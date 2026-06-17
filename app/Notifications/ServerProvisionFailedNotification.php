@@ -32,7 +32,7 @@ class ServerProvisionFailedNotification extends Notification implements ShouldQu
         public ?string $errorExcerpt = null,
     ) {}
 
-    /** @return array<int, string> */
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
         return ['mail'];
@@ -42,7 +42,7 @@ class ServerProvisionFailedNotification extends Notification implements ShouldQu
     {
         $name = $this->server->name ?: 'Server';
         $ip = $this->server->ip_address ?: '—';
-        $provider = $this->server->provider?->label() ?? '—';
+        $provider = $this->server->provider->label();
         $journeyUrl = URL::route('servers.journey', $this->server);
 
         $message = (new MailMessage)

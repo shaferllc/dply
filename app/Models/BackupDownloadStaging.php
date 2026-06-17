@@ -7,13 +7,26 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * An ephemeral copy of a backup staged for one-time download. Hetzner-mode rows
- * hold a temporary object in the global staging bucket (deleted by the sweeper
- * after {@see expires_at}); direct-mode rows just point the browser at an
- * already-presignable durable S3 object (nothing to copy or delete).
+ *                      An ephemeral copy of a backup staged for one-time download. Hetzner-mode rows
+ *                      hold a temporary object in the global staging bucket (deleted by the sweeper
+ *                      after {@see expires_at}); direct-mode rows just point the browser at an
+ *                      already-presignable durable S3 object (nothing to copy or delete).
+ * @property ?string $backupable_id
+ * @property string $backupable_type
+ * @property string $bucket
+ * @property ?string $error_message
+ * @property ?Carbon $expires_at
+ * @property string $mode
+ * @property string $object_key
+ * @property ?string $requested_by_user_id
+ * @property string $status
+ * @property-read ?User $requestedBy
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class BackupDownloadStaging extends Model
 {
@@ -53,13 +66,15 @@ class BackupDownloadStaging extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function backupable(): MorphTo
     {
         return $this->morphTo();
     }
 
     /** @return BelongsTo<User, $this> */
-    public function requestedBy(): BelongsTo {
+    public function requestedBy(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 
@@ -70,6 +85,10 @@ class BackupDownloadStaging extends Model
             && $this->expires_at->isFuture();
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeExpired(Builder $query): Builder
     {
         return $query->whereNotNull('expires_at')->where('expires_at', '<', now());

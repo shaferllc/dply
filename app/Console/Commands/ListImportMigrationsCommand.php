@@ -84,7 +84,7 @@ class ListImportMigrationsCommand extends Command
             $migration->organization->name ?? mb_substr((string) $migration->organization_id, -6),
             $migration->targetServer->name ?? '-',
             sprintf('%d/%d/%d', $ok, $failed, $pending),
-            $migration->created_at?->diffForHumans() ?? '-',
+            $migration->created_at->diffForHumans(),
             $lastFinished instanceof Carbon ? $lastFinished->diffForHumans() : '-',
         ];
     }

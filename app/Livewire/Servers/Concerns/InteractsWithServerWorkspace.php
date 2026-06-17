@@ -10,8 +10,14 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
+use Livewire\Component;
 use Throwable;
 
+/**
+ * @phpstan-require-extends Component
+ *
+ * @property Server|null $server
+ */
 trait InteractsWithServerWorkspace
 {
     use DispatchesToastNotifications;
@@ -63,7 +69,8 @@ trait InteractsWithServerWorkspace
             return;
         }
 
-        $lastPolledAt = $server->meta['kubernetes']['last_polled_at'] ?? null;
+        $kubernetes = is_array($server->meta['kubernetes'] ?? null) ? $server->meta['kubernetes'] : [];
+        $lastPolledAt = $kubernetes['last_polled_at'] ?? null;
         if (is_string($lastPolledAt) && $lastPolledAt !== '') {
             try {
                 if (Carbon::parse($lastPolledAt)->isAfter(now()->subSeconds($staleAfterSeconds))) {
@@ -74,7 +81,7 @@ trait InteractsWithServerWorkspace
             }
         }
 
-        $provider = (string) ($server->meta['kubernetes']['provider'] ?? 'digitalocean');
+        $provider = (string) ($kubernetes['provider'] ?? 'digitalocean');
         try {
             if ($provider === 'aws') {
                 PollEksClusterStatusJob::dispatchSync($server);
@@ -103,6 +110,9 @@ trait InteractsWithServerWorkspace
     protected function serverOpsReady(?Server $server = null): bool
     {
         $s = $server ?? $this->server;
+        if ($s === null) {
+            return false;
+        }
 
         return $s->isReady()
             && $s->isVmHost()

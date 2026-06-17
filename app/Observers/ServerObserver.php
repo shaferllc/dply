@@ -199,15 +199,13 @@ class ServerObserver
      */
     private function serverPayload(Server $server): array
     {
-        $provider = $server->provider;
-
         return [
             'id' => $server->id,
             'name' => $server->name,
             'status' => $server->status,
             'setup_status' => $server->setup_status,
             'ip_address' => $server->ip_address,
-            'provider' => $provider instanceof \BackedEnum ? $provider->value : $provider,
+            'provider' => $server->provider->value,
             'team_id' => $server->team_id,
             'health_status' => $server->health_status,
             'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),

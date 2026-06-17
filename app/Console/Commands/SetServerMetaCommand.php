@@ -66,7 +66,7 @@ class SetServerMetaCommand extends Command
         }
 
         $unset = (bool) $this->option('unset');
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $previous = data_get($meta, $key);
 
         if ($unset) {

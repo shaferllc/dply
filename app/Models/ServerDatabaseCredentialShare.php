@@ -5,11 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property ?Carbon $expires_at
+ * @property string $max_views
+ * @property ?string $server_database_id
+ * @property string $token
+ * @property ?string $user_id
+ * @property string $views_remaining
+ * @property-read ?ServerDatabase $serverDatabase
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ServerDatabaseCredentialShare extends Model
 {
     use HasUlids;
@@ -34,12 +44,14 @@ class ServerDatabaseCredentialShare extends Model
     }
 
     /** @return BelongsTo<ServerDatabase, $this> */
-    public function serverDatabase(): BelongsTo {
+    public function serverDatabase(): BelongsTo
+    {
         return $this->belongsTo(ServerDatabase::class, 'server_database_id');
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

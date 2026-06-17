@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,7 +27,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $health_checked_at
  * @property string|null $claimed_org_id
  * @property Carbon|null $claimed_at
- * @property array|null $meta
+ * @property array<string, mixed>|null $meta
+ * @property-read ?Server $server
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerPoolMember extends Model
 {
@@ -57,22 +62,31 @@ class ServerPoolMember extends Model
     ];
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class, 'claimed_org_id');
     }
 
-    /** Members that count toward a bucket's "available" capacity. */
-    public function scopeAvailable($query)
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeAvailable(Builder $query): Builder
     {
         return $query->whereIn('status', [self::STATUS_WARMING, self::STATUS_READY]);
     }
 
-    public function scopeForBucket($query, string $provider, string $region, string $size, string $tier)
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeForBucket(Builder $query, string $provider, string $region, string $size, string $tier): Builder
     {
         return $query->where('provider', $provider)
             ->where('region', $region)

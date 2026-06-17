@@ -44,7 +44,7 @@ class ApplyWorkerPoolExposureJob implements ShouldQueue
             $result = ['applied' => [], 'warnings' => [$e->getMessage()]];
         }
 
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $meta['exposure'] = [
             'applied_at' => now()->toIso8601String(),
             'applied' => $result['applied'],

@@ -87,7 +87,7 @@ class HetznerEnsureFirewallCommand extends Command
 
                 $hetzner->applyFirewallToServer($firewallId, (int) $server->provider_id);
 
-                $meta = is_array($server->meta) ? $server->meta : [];
+                $meta = $server->meta;
                 $meta['hetzner_firewall_id'] = $firewallId;
                 $server->update(['meta' => $meta]);
 

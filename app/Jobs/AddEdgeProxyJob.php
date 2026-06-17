@@ -137,7 +137,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             $emitter->info(sprintf('[cutover]    stop %s, bind %s to :80', $previousWebserver, $this->target));
             $this->executeStageCutover($server, $sites, $previousWebserver);
 
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             $meta['edge_proxy'] = $this->target;
             if ($previousEdgeProxy === null) {
                 $meta['edge_proxy_previous_webserver'] = $previousWebserver;
@@ -622,7 +622,7 @@ BASH;
      */
     private function backendPort(Site $site): int
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $existing = $meta['traefik_backend_port'] ?? null;
         if (is_numeric($existing) && (int) $existing >= 20000) {
             return (int) $existing;

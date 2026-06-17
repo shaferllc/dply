@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Gate;
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
  * wire:* bindings keep resolving against the composed class.
+ *
+ * @method \App\Models\ConsoleAction seedQueuedConsoleAction(string $kind, ?string $label = null)
+ * @method void watchConsoleAction(\App\Models\ConsoleAction $run, string $successToast, ?string $failureToast = null)
  */
 trait VerifiesSiteBindings
 {
@@ -37,9 +40,6 @@ trait VerifiesSiteBindings
         // database/redis probe their own endpoint; cache/queue/session probe the
         // underlying engine they ride on (resolved in ValidateBindingConnectivityJob).
         if (! in_array($binding->type, ['database', 'redis', 'cache', 'queue', 'session'], true)) {
-            return;
-        }
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
             return;
         }
 
@@ -67,10 +67,6 @@ trait VerifiesSiteBindings
     public function validateReachability(): void
     {
         Gate::authorize('update', $this->site);
-
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
-            return;
-        }
 
         $run = $this->seedQueuedConsoleAction('bindings_reachable', __('Validating reachability'));
 
@@ -100,9 +96,6 @@ trait VerifiesSiteBindings
     private function ensurePhpRedisExtension(SiteBinding $binding): void
     {
         if ($binding->type !== 'redis') {
-            return;
-        }
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
             return;
         }
         if ($this->site->server?->hostCapabilities()->supportsSsh() !== true) {
@@ -285,12 +278,6 @@ trait VerifiesSiteBindings
         // the server like the other networked bindings.
         if ($binding->target_type !== 'realtime_app') {
             $this->validateBindingConnectivity($binding);
-
-            return;
-        }
-
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
-            $this->toastError(__('Testing broadcasting is available from the deploy hub.'));
 
             return;
         }

@@ -27,6 +27,7 @@ use Livewire\Component;
 trait PicksRepositoryRef
 {
     use DispatchesToastNotifications;
+
     public string $repo_ref_selected_sha = '';
 
     public ?string $repo_ref_selected_label = null;
@@ -141,9 +142,7 @@ trait PicksRepositoryRef
     {
         $sha = strtolower(trim($sha));
         if (preg_match('/^[a-f0-9]{7,40}$/', $sha) !== 1) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Enter a valid commit SHA (7–40 hex characters).'));
-            }
+            $this->toastError(__('Enter a valid commit SHA (7–40 hex characters).'));
 
             return;
         }

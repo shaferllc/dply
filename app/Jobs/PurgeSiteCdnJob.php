@@ -32,7 +32,7 @@ class PurgeSiteCdnJob implements ShouldQueue
             return;
         }
 
-        $cfg = is_array($site->meta) ? ($site->meta['cdn'] ?? []) : [];
+        $cfg = $site->meta['cdn'] ?? [];
         if (! is_array($cfg) || empty($cfg['enabled']) || ($cfg['provider'] ?? null) !== 'cloudflare') {
             return;
         }

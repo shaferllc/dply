@@ -12,18 +12,31 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A full-disk image (snapshot) of a server captured through its cloud provider's
- * API. Lifecycle:
- *
- *   pending → creating   when {@see CreateServerImageJob} fires the
- *                        provider create-image action and starts polling
- *   creating → completed when the action finishes and provider_image_id is known
- *   * → failed           when the provider errored / timed out (error_message set)
- *
- * Distinct from {@see RedisSnapshot} (cache RDB) and {@see Snapshot} (site DB
- * dump) — this is the whole-machine image, the "images" surface of the unified
- * Snapshots workspace. Only providers whose service wraps the image API qualify
- * (see {@see ServerProvider::supportsImageSnapshots()}).
+ *                      A full-disk image (snapshot) of a server captured through its cloud provider's
+ *                      API. Lifecycle:
+ *                      pending → creating   when {@see CreateServerImageJob} fires the
+ *                      provider create-image action and starts polling
+ *                      creating → completed when the action finishes and provider_image_id is known
+ *                      * → failed           when the provider errored / timed out (error_message set)
+ *                      Distinct from {@see RedisSnapshot} (cache RDB) and {@see Snapshot} (site DB
+ *                      dump) — this is the whole-machine image, the "images" surface of the unified
+ *                      Snapshots workspace. Only providers whose service wraps the image API qualify
+ *                      (see {@see ServerProvider::supportsImageSnapshots()}).
+ * @property int $bytes
+ * @property ?string $error_message
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $provider
+ * @property ?string $provider_action_id
+ * @property ?string $provider_image_id
+ * @property string $region
+ * @property ?string $server_id
+ * @property string $status
+ * @property ?string $user_id
+ * @property-read ?Server $server
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerImage extends Model
 {
@@ -62,12 +75,14 @@ class ServerImage extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

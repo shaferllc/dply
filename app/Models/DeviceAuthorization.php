@@ -12,17 +12,33 @@ use Illuminate\Support\Str;
 
 /**
  * @property string $id
- * OAuth device-flow authorization record. The dply CLI calls
- * /api/v1/auth/device/start which mints one of these (status=pending),
- * shows the user the short `user_code` to type into the web approval
- * page, then polls /api/v1/auth/device/poll with the long device_code
- * until status flips to authorized (token returned exactly once) or
- * expired/denied.
- *
- * Plaintext device_code lives only client-side; we store sha256 of it
- * and look up via {@see resolveDeviceCode()}. Plaintext API token is
- * cached encrypted-at-rest and zeroed on first /poll delivery so the
- * same device_code can never fetch the token twice.
+ *                      OAuth device-flow authorization record. The dply CLI calls
+ *                      /api/v1/auth/device/start which mints one of these (status=pending),
+ *                      shows the user the short `user_code` to type into the web approval
+ *                      page, then polls /api/v1/auth/device/poll with the long device_code
+ *                      until status flips to authorized (token returned exactly once) or
+ *                      expired/denied.
+ *                      Plaintext device_code lives only client-side; we store sha256 of it
+ *                      and look up via {@see resolveDeviceCode()}. Plaintext API token is
+ *                      cached encrypted-at-rest and zeroed on first /poll delivery so the
+ *                      same device_code can never fetch the token twice.
+ * @property ?string $api_token_id
+ * @property ?Carbon $authorized_at
+ * @property ?Carbon $delivered_at
+ * @property string $device_code_hash
+ * @property ?Carbon $expires_at
+ * @property string $ip_address
+ * @property ?string $organization_id
+ * @property string $status
+ * @property string $token_plaintext
+ * @property string $user_agent
+ * @property string $user_code
+ * @property ?string $user_id
+ * @property-read ?User $user
+ * @property-read ?Organization $organization
+ * @property-read ?ApiToken $apiToken
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class DeviceAuthorization extends Model
 {
@@ -67,17 +83,20 @@ class DeviceAuthorization extends Model
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<ApiToken, $this> */
-    public function apiToken(): BelongsTo {
+    public function apiToken(): BelongsTo
+    {
         return $this->belongsTo(ApiToken::class);
     }
 

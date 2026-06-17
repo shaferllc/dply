@@ -5,12 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
  * @property string $id
+ * @property string $email
+ * @property ?Carbon $expires_at
+ * @property string $invited_by
+ * @property ?string $organization_id
+ * @property string $role
+ * @property string $token
+ * @property-read ?Organization $organization
+ * @property-read ?User $inviter
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class OrganizationInvitation extends Model
 {
     use HasUlids;
@@ -33,12 +43,14 @@ class OrganizationInvitation extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function inviter(): BelongsTo {
+    public function inviter(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'invited_by');
     }
 

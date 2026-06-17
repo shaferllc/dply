@@ -280,7 +280,7 @@ class OptimizeSitePipelineJob implements ShouldQueue
      */
     private function storePreview(Site $site, array $proposed): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
 
         if ($proposed === []) {
             unset($meta['pipeline_optimize_preview']);

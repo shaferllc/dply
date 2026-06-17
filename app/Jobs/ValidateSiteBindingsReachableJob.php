@@ -128,7 +128,7 @@ class ValidateSiteBindingsReachableJob implements ShouldQueue
 
     private function record(SiteBinding $binding, bool $ok, ?string $error, string $host, int $port): void
     {
-        $config = is_array($binding->config) ? $binding->config : [];
+        $config = $binding->config;
         $config['connectivity'] = [
             'ok' => $ok,
             'checked_at' => now()->toIso8601String(),

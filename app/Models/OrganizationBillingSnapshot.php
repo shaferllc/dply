@@ -7,11 +7,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property array<string, mixed> $category_breakdown
+ * @property int $edge_usage_cents
+ * @property array<string, mixed> $fleet_counts
+ * @property int $monthly_total_cents
+ * @property ?string $organization_id
+ * @property Carbon $snapshot_date
+ * @property string $subscription_interval
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class OrganizationBillingSnapshot extends Model
 {
     use HasUlids;
@@ -39,7 +49,8 @@ class OrganizationBillingSnapshot extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 }

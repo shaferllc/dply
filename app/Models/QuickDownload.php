@@ -8,15 +8,38 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * A queued quick-download request. The build job stages a freshly-built artifact
- * into the operator-managed download bucket (see config/backup_staging.php), the
- * user is notified in-app + by email, and the signed proxy route streams it on
- * demand — re-downloadable, never deleted on download. The artifact is retained
- * until {@see expires_at} (config/quick_download.php retention_minutes), when the
- * sweeper prunes it. This is a short-lived download tier, not a durable backup.
+ *                      A queued quick-download request. The build job stages a freshly-built artifact
+ *                      into the operator-managed download bucket (see config/backup_staging.php), the
+ *                      user is notified in-app + by email, and the signed proxy route streams it on
+ *                      demand — re-downloadable, never deleted on download. The artifact is retained
+ *                      until {@see expires_at} (config/quick_download.php retention_minutes), when the
+ *                      sweeper prunes it. This is a short-lived download tier, not a durable backup.
+ * @property string $artifact
+ * @property string $bucket
+ * @property int $bytes
+ * @property ?Carbon $consumed_at
+ * @property ?Carbon $expires_at
+ * @property string $filename
+ * @property string $kind
+ * @property array<string, mixed> $meta
+ * @property string $mime
+ * @property string $object_key
+ * @property ?string $organization_id
+ * @property ?string $requested_by_user_id
+ * @property ?string $server_database_id
+ * @property ?string $server_id
+ * @property ?string $site_id
+ * @property string $status
+ * @property-read ?Server $server
+ * @property-read ?Site $site
+ * @property-read ?ServerDatabase $serverDatabase
+ * @property-read ?User $requestedBy
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class QuickDownload extends Model
 {
@@ -77,22 +100,26 @@ class QuickDownload extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<ServerDatabase, $this> */
-    public function serverDatabase(): BelongsTo {
+    public function serverDatabase(): BelongsTo
+    {
         return $this->belongsTo(ServerDatabase::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function requestedBy(): BelongsTo {
+    public function requestedBy(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 
@@ -134,6 +161,10 @@ class QuickDownload extends Model
     /**
      * Sweepable rows: ready-but-expired, or terminal rows (consumed/failed/expired)
      * older than the TTL window — so staged objects and stale rows don't accumulate.
+     */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeSweepable(Builder $query): Builder
     {

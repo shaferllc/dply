@@ -87,7 +87,7 @@ class SiteDoctorCommand extends Command
         $latest = $site->latestDeployment();
         $latestSummary = null;
         if ($latest !== null) {
-            $phases = is_array($latest->phase_results ?? null) ? $latest->phase_results : [];
+            $phases = $latest->phase_results ?? [];
             $latestSummary = [
                 'id' => $latest->id,
                 'status' => $latest->status,

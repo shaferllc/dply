@@ -25,9 +25,13 @@ use Livewire\Component;
  * @phpstan-require-extends Component
  *
  * @property Site $site
+ * @property EdgeDeployment|null $deployment Present on deployment detail surfaces only.
+ *
+ * @method void openConfirmActionModal(string $method, mixed $arguments = [], string $title = 'Confirm action', string $message = 'Are you sure?', string $confirmLabel = 'Confirm', bool $destructive = false, ?list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}> $details = null)
  */
 trait ManagesEdgeDeploymentLifecycle
 {
+    use DispatchesToastNotifications;
     use ManagesDeployContract;
 
     /**
@@ -46,20 +50,12 @@ trait ManagesEdgeDeploymentLifecycle
             ->find($deploymentId);
 
         if ($deployment === null) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Deployment not found.'));
-            }
+            $this->toastError(__('Deployment not found.'));
 
             return;
         }
 
         $message = __('Production will serve this deployment\'s published artifacts. The current live deployment will be marked superseded.');
-
-        if (! method_exists($this, 'openConfirmActionModal')) {
-            $this->rollbackEdgeDeployment($deploymentId);
-
-            return;
-        }
 
         $this->openConfirmActionModal(
             'rollbackEdgeDeployment',
@@ -82,22 +78,18 @@ trait ManagesEdgeDeploymentLifecycle
         try {
             (new RollbackEdgeDeployment)->handle($this->site, $deploymentId);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
 
         $this->site->refresh();
 
-        if (property_exists($this, 'deployment') && $this->deployment instanceof EdgeDeployment) {
+        if ($this->deployment instanceof EdgeDeployment) {
             $this->deployment->refresh();
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Rolled back — the selected deployment is now live.'));
-        }
+        $this->toastSuccess(__('Rolled back — the selected deployment is now live.'));
     }
 
     /**
@@ -115,9 +107,7 @@ trait ManagesEdgeDeploymentLifecycle
         if ($preview === null
             || $preview->organization_id !== $this->site->organization_id
             || ($preview->edgeMeta()['preview_parent_site_id'] ?? null) !== $this->site->id) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Preview not found or not a child of this site.'));
-            }
+            $this->toastError(__('Preview not found or not a child of this site.'));
 
             return;
         }
@@ -129,9 +119,7 @@ trait ManagesEdgeDeploymentLifecycle
             ->first();
 
         if ($previewDeployment === null) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Preview has no live deployment to promote.'));
-            }
+            $this->toastError(__('Preview has no live deployment to promote.'));
 
             return;
         }
@@ -139,9 +127,7 @@ trait ManagesEdgeDeploymentLifecycle
         $reviewState = app(EdgePreviewReviewState::class);
         $review = $reviewState->forPreview($preview);
         if ($blocked = $reviewState->promoteBlockedMessage($review)) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($blocked);
-            }
+            $this->toastError($blocked);
 
             return;
         }
@@ -149,20 +135,12 @@ trait ManagesEdgeDeploymentLifecycle
         $contractState = app(DeployContractState::class);
         $contract = $contractState->forPreview($this->site, $preview);
         if ($blocked = $contractState->promoteBlockedMessage($contract)) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($blocked);
-            }
+            $this->toastError($blocked);
 
             return;
         }
 
         $message = __('Copy this preview\'s artifacts into a fresh production prefix and flip the host map. The preview keeps running.');
-
-        if (! method_exists($this, 'openConfirmActionModal')) {
-            $this->promoteEdgePreview($previewSiteId);
-
-            return;
-        }
 
         $this->openConfirmActionModal(
             'promoteEdgePreview',
@@ -189,9 +167,7 @@ trait ManagesEdgeDeploymentLifecycle
         try {
             $deployment = app(PromoteEdgePreview::class)->handle($this->site, $previewSiteId);
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -208,9 +184,7 @@ trait ManagesEdgeDeploymentLifecycle
 
         $this->site->refresh();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Preview promoted — production is now serving the preview build.'));
-        }
+        $this->toastSuccess(__('Preview promoted — production is now serving the preview build.'));
     }
 
     /**
@@ -237,20 +211,16 @@ trait ManagesEdgeDeploymentLifecycle
                 );
             }
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
 
         $this->site->refresh();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess($percentage > 0
-                ? __('Split traffic: routing :pct% of production traffic to the preview.', ['pct' => $percentage])
-                : __('Split traffic cleared — production is back to 100%.'));
-        }
+        $this->toastSuccess($percentage > 0
+            ? __('Split traffic: routing :pct% of production traffic to the preview.', ['pct' => $percentage])
+            : __('Split traffic cleared — production is back to 100%.'));
     }
 
     /**
@@ -259,9 +229,7 @@ trait ManagesEdgeDeploymentLifecycle
     public function queueEdgeDeployReplay(string $previewSiteId): void
     {
         if (! Feature::active('global.edge_deploy_replay')) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Deploy replay is not enabled for this organization.'));
-            }
+            $this->toastError(__('Deploy replay is not enabled for this organization.'));
 
             return;
         }
@@ -279,15 +247,11 @@ trait ManagesEdgeDeploymentLifecycle
                 $previewSiteId,
             );
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Shadow replay queued — sampling production traffic against the preview.'));
-        }
+        $this->toastSuccess(__('Shadow replay queued — sampling production traffic against the preview.'));
     }
 }

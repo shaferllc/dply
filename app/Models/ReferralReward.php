@@ -8,8 +8,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
+ * @property string $bonus_credit_cents
+ * @property ?string $referred_user_id
+ * @property ?string $referrer_organization_id
+ * @property ?string $referrer_user_id
+ * @property ?string $stripe_balance_transaction_id
+ * @property-read ?User $referrer
+ * @property-read ?User $referred
+ * @property-read ?Organization $referrerOrganization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class ReferralReward extends Model
 {
     use HasUlids;
@@ -23,17 +32,20 @@ class ReferralReward extends Model
     ];
 
     /** @return BelongsTo<User, $this> */
-    public function referrer(): BelongsTo {
+    public function referrer(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'referrer_user_id');
     }
 
     /** @return BelongsTo<User, $this> */
-    public function referred(): BelongsTo {
+    public function referred(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'referred_user_id');
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function referrerOrganization(): BelongsTo {
+    public function referrerOrganization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class, 'referrer_organization_id');
     }
 }

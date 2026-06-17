@@ -46,7 +46,7 @@ class RedeployEdgeSite
         // It's noisy to keep showing a red "Last error" banner on the hero
         // once the operator has kicked off a fresh build — if THIS build
         // fails, markFailed() will repopulate the field.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $edgeMeta = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
         unset($edgeMeta['last_error'], $edgeMeta['last_error_at']);
         $meta['edge'] = $edgeMeta;

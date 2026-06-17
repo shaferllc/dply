@@ -118,7 +118,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         // the SwitchServerWebserverJob persists meta only after cutover succeeds).
         // Defensive though: if meta points at the half-installed target, snap it
         // back to `from` so the rest of the UI doesn't lie.
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         if (strtolower((string) ($meta['webserver'] ?? '')) === strtolower($this->target)) {
             $meta['webserver'] = $this->from;
             $server->update(['meta' => $meta]);

@@ -22,12 +22,8 @@ trait ManagesGitProviderTokens
             return;
         }
 
-        if (method_exists($this, 'cancelEdit')) {
-            $this->cancelEdit();
-        }
-        if (method_exists($this, 'cancelEditPat')) {
-            $this->cancelEditPat();
-        }
+        $this->cancelEdit();
+        $this->cancelEditPat();
 
         $this->addingPatProvider = $provider;
         $this->patLabel = '';
@@ -126,6 +122,16 @@ trait ManagesGitProviderTokens
     }
 
     protected function afterGitProviderTokenSaved(string $provider): void
+    {
+        //
+    }
+
+    protected function cancelEdit(): void
+    {
+        //
+    }
+
+    protected function cancelEditPat(): void
     {
         //
     }

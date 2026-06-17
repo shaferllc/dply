@@ -26,6 +26,15 @@ parameters:
         - app/Mail
         - app/Mcp
         - app/Models
+        - app/Notifications
+        - app/Observers
+        - app/Policies
+        - app/Providers
+        - app/Services
+        - app/Support
+        - app/TaskRunner
+        - app/View
+        - app/helpers.php
         - config
         - database
         - routes

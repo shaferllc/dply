@@ -16,6 +16,7 @@ class OrganizationInvitationNotification extends Notification implements ShouldQ
         public NotificationEvent $event
     ) {}
 
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
         return ['mail'];

@@ -5,23 +5,14 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\Server;
 use App\Services\SshConnectionFactory;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 /**
  * Shared SSH "type a command, see output" engine.
  *
- * Owned state: the prompt buffer ({@see $command}), a rolling per-session
- * history of (cmd, output, exit) entries, and the last connection error.
+ * @phpstan-require-extends Component
  *
- * Caps:
- *   - History size  : self::CONSOLE_HISTORY_LIMIT entries
- *   - Output / entry: 16 KB, longer is truncated with an inline marker
- *   - Exec timeout  : self::CONSOLE_EXEC_TIMEOUT seconds
- *
- * Consumers (WorkspaceConsole, ConsoleDrawer) must expose `$server` and an
- * `authorize('view', $server)`-capable Livewire component.
- *
- * Deployer-role guard mirrors the policy on the Run page — deployers can
- * trigger named recipes but not arbitrary shell.
+ * @property Server|null $server
  */
 trait RunsServerConsoleCommands
 {
@@ -55,7 +46,7 @@ trait RunsServerConsoleCommands
     {
         // Drawer consumers can have a nullable server; bail cleanly so a
         // submit without an active server doesn't leak a 403/null-deref.
-        if (! property_exists($this, 'server') || $this->server === null) {
+        if ($this->server === null) {
             $this->error = __('Pick a server first.');
 
             return;

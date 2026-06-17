@@ -10,13 +10,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A reusable error-tracking credential set scoped to an organization, so the
- * team can attach the same Sentry/Bugsnag/Flare project to multiple sites
- * without re-entering the DSN/key each time.
- *
- * The provider-specific secret (a DSN for Sentry, an API key for Bugsnag/Flare)
- * lives in the encrypted {@see $credentials} JSON column so one model handles
- * every provider shape. Mirrors {@see LogDrainCredential}.
+ *                      A reusable error-tracking credential set scoped to an organization, so the
+ *                      team can attach the same Sentry/Bugsnag/Flare project to multiple sites
+ *                      without re-entering the DSN/key each time.
+ *                      The provider-specific secret (a DSN for Sentry, an API key for Bugsnag/Flare)
+ *                      lives in the encrypted {@see $credentials} JSON column so one model handles
+ *                      every provider shape. Mirrors {@see LogDrainCredential}.
+ * @property ?string $created_by_user_id
+ * @property array<string, mixed> $credentials
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $provider
+ * @property-read ?Organization $organization
+ * @property-read ?User $createdByUser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ErrorTrackingCredential extends Model
 {
@@ -41,12 +49,14 @@ class ErrorTrackingCredential extends Model
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function createdByUser(): BelongsTo {
+    public function createdByUser(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

@@ -47,13 +47,11 @@ class FleetAgeCommand extends Command
 
         $rows = [];
         foreach ($servers as $server) {
-            $ageDays = $server->created_at !== null
-                ? (int) round($server->created_at->diffInDays(now()))
-                : null;
-            if ($minAge !== null && ($ageDays === null || $ageDays < $minAge)) {
+            $ageDays = (int) round($server->created_at->diffInDays(now()));
+            if ($minAge !== null && $ageDays < $minAge) {
                 continue;
             }
-            if ($maxAge !== null && ($ageDays === null || $ageDays > $maxAge)) {
+            if ($maxAge !== null && $ageDays > $maxAge) {
                 continue;
             }
             $rows[] = [
@@ -61,7 +59,7 @@ class FleetAgeCommand extends Command
                 'server_name' => $server->name,
                 'ip_address' => $server->ip_address,
                 'status' => $server->status,
-                'created_at' => $server->created_at?->toIso8601String(),
+                'created_at' => $server->created_at->toIso8601String(),
                 'age_days' => $ageDays,
             ];
         }
@@ -91,8 +89,8 @@ class FleetAgeCommand extends Command
                 $r['server_name'],
                 $r['ip_address'],
                 $r['status'],
-                substr((string) ($r['created_at'] ?? '—'), 0, 10),
-                $r['age_days'] !== null ? $r['age_days'].'d' : '—',
+                substr($r['created_at'], 0, 10),
+                $r['age_days'].'d',
             ], $rows),
         );
 

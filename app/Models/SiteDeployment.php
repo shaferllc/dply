@@ -13,6 +13,24 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $status
  * @property ?Carbon $started_at
  * @property ?Carbon $finished_at
+ * @property string $exit_code
+ * @property string $git_sha
+ * @property string $idempotency_key
+ * @property string $log_output
+ * @property array<string, mixed> $phase_results
+ * @property ?string $project_id
+ * @property string $release_folder
+ * @property ?string $resume_of_deployment_id
+ * @property ?string $site_id
+ * @property string $skip_reason
+ * @property string $skip_rule_summary
+ * @property string $trigger
+ * @property-read ?self $resumeOf
+ * @property-read ?Site $site
+ * @property-read ?Project $project
+ * @property-read ?SiteDeploymentEphemeralCredential $ephemeralCredential
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteDeployment extends Model
 {
@@ -118,7 +136,7 @@ class SiteDeployment extends Model
      */
     public function recordPhaseResults(string $phase, array $results): void
     {
-        $existing = is_array($this->phase_results) ? $this->phase_results : [];
+        $existing = $this->phase_results;
         $existing[$phase] = $results;
         $this->phase_results = $existing;
         $this->save();
@@ -130,7 +148,7 @@ class SiteDeployment extends Model
      */
     public function phasesAllOk(): bool
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results;
         if ($results === []) {
             return false;
         }
@@ -154,7 +172,7 @@ class SiteDeployment extends Model
     public function phaseTotalDurationMs(): int
     {
         $total = 0;
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results;
         foreach ($results as $steps) {
             if (! is_array($steps)) {
                 continue;
@@ -176,7 +194,7 @@ class SiteDeployment extends Model
      */
     public function phaseSteps(string $phase): array
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results;
         $steps = $results[$phase] ?? null;
 
         return is_array($steps) ? array_values($steps) : [];
@@ -202,7 +220,7 @@ class SiteDeployment extends Model
 
     public function hasPhase(string $phase): bool
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results;
 
         return is_array($results[$phase] ?? null);
     }
@@ -216,7 +234,7 @@ class SiteDeployment extends Model
      */
     public function failedPhase(): ?string
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results;
         foreach (\App\Services\Deploy\DeployResumePlan::PHASE_ORDER as $phase) {
             $steps = $results[$phase] ?? null;
             if (! is_array($steps)) {
@@ -279,7 +297,8 @@ class SiteDeployment extends Model
     }
 
     /** @return BelongsTo<self, $this> */
-    public function resumeOf(): BelongsTo {
+    public function resumeOf(): BelongsTo
+    {
         return $this->belongsTo(self::class, 'resume_of_deployment_id');
     }
 
@@ -329,17 +348,20 @@ class SiteDeployment extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<Project, $this> */
-    public function project(): BelongsTo {
+    public function project(): BelongsTo
+    {
         return $this->belongsTo(Project::class);
     }
 
     /** @return HasOne<SiteDeploymentEphemeralCredential, $this> */
-    public function ephemeralCredential(): HasOne {
+    public function ephemeralCredential(): HasOne
+    {
         return $this->hasOne(SiteDeploymentEphemeralCredential::class);
     }
 }

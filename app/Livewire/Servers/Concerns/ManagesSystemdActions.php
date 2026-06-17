@@ -143,7 +143,7 @@ trait ManagesSystemdActions
                     'result' => 'success',
                 ]);
             }
-            if ($syncInventoryAfter && (bool) config('server_services.systemd_inventory_job_enabled', true)) {
+            if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } catch (\Throwable $e) {

@@ -91,7 +91,7 @@ class MeasureSiteDiskUsageJob implements ShouldQueue
 
             $files = $this->intOrNull($parsed['FILES'] ?? null);
 
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['disk_usage'] = array_filter([
                 'bytes' => $bytes,
                 'files' => $files,

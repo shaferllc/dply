@@ -7,17 +7,28 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
  * @property string $id
- * A short-lived, reveal-once link that lets the recipient view a server's
- * credentials (currently the dedicated cache/redis AUTH block) without the
- * secret ever being placed in an email body.
- *
- * Mirrors {@see ServerDatabaseCredentialShare}: token + expiry + a decrementing
- * view counter. The secret itself is NOT stored here — it is decrypted from the
- * server meta at view time (see ServerCredentialShareController).
+ *                      A short-lived, reveal-once link that lets the recipient view a server's
+ *                      credentials (currently the dedicated cache/redis AUTH block) without the
+ *                      secret ever being placed in an email body.
+ *                      Mirrors {@see ServerDatabaseCredentialShare}: token + expiry + a decrementing
+ *                      view counter. The secret itself is NOT stored here — it is decrypted from the
+ *                      server meta at view time (see ServerCredentialShareController).
+ * @property ?Carbon $expires_at
+ * @property string $kind
+ * @property string $max_views
+ * @property ?string $server_id
+ * @property string $token
+ * @property ?string $user_id
+ * @property string $views_remaining
+ * @property-read ?Server $server
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerCredentialShare extends Model
 {
@@ -46,12 +57,14 @@ class ServerCredentialShare extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 

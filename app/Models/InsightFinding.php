@@ -4,7 +4,34 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property ?Carbon $acknowledged_at
+ * @property ?string $acknowledged_by_user_id
+ * @property string $body
+ * @property array<string, mixed> $correlation
+ * @property string $dedupe_hash
+ * @property ?Carbon $detected_at
+ * @property ?Carbon $ignored_at
+ * @property ?string $ignored_by_user_id
+ * @property string $insight_key
+ * @property string $kind
+ * @property array<string, mixed> $meta
+ * @property ?Carbon $resolved_at
+ * @property ?string $server_id
+ * @property string $severity
+ * @property ?string $site_id
+ * @property string $status
+ * @property ?string $team_id
+ * @property string $title
+ * @property-read ?Server $server
+ * @property-read ?Site $site
+ * @property-read ?Team $team
+ * @property-read ?User $acknowledgedBy
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class InsightFinding extends Model
 {
     public const STATUS_OPEN = 'open';
@@ -58,22 +85,26 @@ class InsightFinding extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<Team, $this> */
-    public function team(): BelongsTo {
+    public function team(): BelongsTo
+    {
         return $this->belongsTo(Team::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function acknowledgedBy(): BelongsTo {
+    public function acknowledgedBy(): BelongsTo
+    {
         return $this->belongsTo(User::class, 'acknowledged_by_user_id');
     }
 

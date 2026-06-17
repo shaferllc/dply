@@ -12,11 +12,24 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property ?string $area
+ * @property ?string $description
+ * @property bool $is_published
+ * @property ?Carbon $shipped_at
+ * @property ?string $shipped_release_id
+ * @property int $sort_order
+ * @property string $status
+ * @property string $summary
+ * @property ?string $target_quarter
+ * @property ?string $target_release_id
+ * @property string $title
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
-
 class RoadmapItem extends Model
 {
     /** @use HasFactory<RoadmapItemFactory> */
@@ -68,16 +81,28 @@ class RoadmapItem extends Model
         return array_keys(config('roadmap.areas', []));
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('is_published', true);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeStatus(Builder $query, string $status): Builder
     {
         return $query->where('status', $status);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeArea(Builder $query, ?string $area): Builder
     {
         if ($area === null || $area === '' || $area === 'all') {
@@ -87,6 +112,10 @@ class RoadmapItem extends Model
         return $query->where('area', $area);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeReleaseFilter(Builder $query, ?string $releaseId): Builder
     {
         if ($releaseId === null || $releaseId === '' || $releaseId === 'all') {
@@ -99,11 +128,19 @@ class RoadmapItem extends Model
         });
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOrdered(Builder $query): Builder
     {
         return $query->orderBy('sort_order')->orderBy('title');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeRecentlyShipped(Builder $query): Builder
     {
         return $query->published()
@@ -115,6 +152,7 @@ class RoadmapItem extends Model
     /**
      * @return HasMany<RoadmapSuggestion, $this>
      */
+    /** @return HasMany<RoadmapSuggestion, $this> */
     public function sourceSuggestions(): HasMany
     {
         return $this->hasMany(RoadmapSuggestion::class, 'promoted_roadmap_item_id');
@@ -123,6 +161,7 @@ class RoadmapItem extends Model
     /**
      * @return BelongsTo<RoadmapRelease, $this>
      */
+    /** @return BelongsTo<RoadmapRelease, $this> */
     public function targetRelease(): BelongsTo
     {
         return $this->belongsTo(RoadmapRelease::class, 'target_release_id');
@@ -131,6 +170,7 @@ class RoadmapItem extends Model
     /**
      * @return BelongsTo<RoadmapRelease, $this>
      */
+    /** @return BelongsTo<RoadmapRelease, $this> */
     public function shippedRelease(): BelongsTo
     {
         return $this->belongsTo(RoadmapRelease::class, 'shipped_release_id');

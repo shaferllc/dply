@@ -9,11 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A worker is a ROLE of its parent app, not an independent site. It inherits the
  * parent's entire environment and overrides only a small role-specific set; it
  * therefore exposes no Environment or Resources UI of its own.
- *
  * The worker's own `env_file_content` holds ONLY its overrides (a handful of
  * keys); the effective env it deploys is the parent's full env with those
  * overrides applied. One env source → app/worker drift is structurally
  * impossible (it replaces the hand-sync that used to be needed).
+ *
+ * @property ?string $parent_site_id
+ * @property string $env_file_content
+ * @property-read ?Site $parentSite
  */
 trait DerivesWorkerEnvironment
 {
@@ -30,7 +33,8 @@ trait DerivesWorkerEnvironment
     ];
 
     /** @return BelongsTo<Site, $this> */
-    public function parentSite(): BelongsTo {
+    public function parentSite(): BelongsTo
+    {
         return $this->belongsTo(Site::class, 'parent_site_id');
     }
 
@@ -47,7 +51,7 @@ trait DerivesWorkerEnvironment
      * connection vars + logging from here, not just from static env — so the
      * worker mirrors the parent end-to-end. A standalone site uses its own.
      */
-    public function resourceSourceSite(): self
+    public function resourceSourceSite(): Site
     {
         if ($this->isDerivedWorker()) {
             $parent = $this->parentSite;

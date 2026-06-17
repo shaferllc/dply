@@ -9,7 +9,8 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
  * @property string $id
- * Pivot model for the cloud_bucket_site table. Mirrors {@see CloudDatabaseSite}.
+ *                      Pivot model for the cloud_bucket_site table. Mirrors {@see CloudDatabaseSite}.
+ * @property string $env_prefix
  */
 class CloudBucketSite extends Pivot
 {

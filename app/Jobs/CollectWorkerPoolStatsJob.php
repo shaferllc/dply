@@ -97,7 +97,7 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
                 $emit($redis === 'PONG' ? sprintf('%s — Redis OK', $member->name) : sprintf('%s — Redis %s', $member->name, $redis ?: 'unknown'),
                     $redis === 'PONG' ? 'success' : 'warn', 'stats');
 
-                $meta = is_array($member->meta) ? $member->meta : [];
+                $meta = $member->meta;
                 $meta['pool'] = array_merge($meta['pool'] ?? [], ['stats' => $stats]);
                 $member->forceFill(['meta' => $meta])->save();
             }

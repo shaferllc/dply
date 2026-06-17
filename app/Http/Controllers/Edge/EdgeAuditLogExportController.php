@@ -56,7 +56,7 @@ class EdgeAuditLogExportController extends Controller
 
         if ($format === 'json') {
             $rows = $query->get()->map(fn (AuditLog $e) => [
-                'occurred_at' => $e->created_at?->toIso8601String(),
+                'occurred_at' => $e->created_at->toIso8601String(),
                 'actor' => $e->user ? ['id' => $e->user->id, 'name' => $e->user->name, 'email' => $e->user->email] : null,
                 'action' => $e->action,
                 'subject_type' => $e->subject_type,
@@ -83,14 +83,14 @@ class EdgeAuditLogExportController extends Controller
             $query->chunkById(500, function ($chunk) use ($handle): void {
                 foreach ($chunk as $e) {
                     fputcsv($handle, [
-                        $e->created_at?->toIso8601String() ?? '',
+                        $e->created_at->toIso8601String(),
                         (string) ($e->user->name ?? ''),
                         (string) ($e->user->email ?? ''),
                         (string) $e->action,
                         (string) ($e->subject_type ?? ''),
                         (string) ($e->subject_id ?? ''),
-                        $e->old_values === null ? '' : json_encode($e->old_values, JSON_UNESCAPED_SLASHES),
-                        $e->new_values === null ? '' : json_encode($e->new_values, JSON_UNESCAPED_SLASHES),
+                        json_encode($e->old_values, JSON_UNESCAPED_SLASHES),
+                        json_encode($e->new_values, JSON_UNESCAPED_SLASHES),
                         (string) ($e->ip_address ?? ''),
                     ]);
                 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -17,7 +18,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $user
  * @property int $numprocs
  * @property bool $is_active
- * @property ?array $env_vars
+ * @property ?array<string, mixed> $env_vars
+ * @property ?string $autorestart
+ * @property ?string $priority
+ * @property bool $redirect_stderr
+ * @property ?string $startsecs
+ * @property ?string $stderr_logfile
+ * @property ?string $stdout_logfile
+ * @property ?string $stopwaitsecs
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  * @property-read Server $server
  * @property-read ?Site $site
  */
@@ -56,12 +66,14 @@ class SupervisorProgram extends Model
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
@@ -85,7 +97,7 @@ class SupervisorProgram extends Model
             $sitePath = $site->isAtomicDeploys()
                 ? $site->effectiveEnvDirectory()
                 : $site->effectiveRepositoryPath();
-            if (is_string($sitePath) && trim($sitePath) !== '') {
+            if (trim($sitePath) !== '') {
                 return $sitePath;
             }
         }

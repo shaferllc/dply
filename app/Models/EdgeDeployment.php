@@ -9,11 +9,30 @@ use App\Services\Edge\EdgeDeliveryContextResolver;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property array<string, mixed> $aliases
+ * @property ?string $build_log_path
+ * @property int $cf_kv_version
+ * @property ?Carbon $failed_at
+ * @property ?string $failure_reason
+ * @property ?string $git_branch
+ * @property ?string $git_commit
+ * @property array<string, mixed> $meta
+ * @property ?string $organization_id
+ * @property ?Carbon $pruned_at
+ * @property ?Carbon $published_at
+ * @property array<string, mixed> $repo_config
+ * @property ?string $site_id
+ * @property string $status
+ * @property ?string $storage_prefix
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property-read ?Site $site
+ * @property-read ?Organization $organization
  */
-
 class EdgeDeployment extends Model
 {
     use HasUlids;
@@ -69,21 +88,21 @@ class EdgeDeployment extends Model
      */
     public function aliasHostnames(): array
     {
-        $aliases = is_array($this->aliases) ? $this->aliases : [];
-
         return array_values(array_filter(array_map(
             static fn ($value): string => is_string($value) ? strtolower(trim($value)) : '',
-            $aliases,
+            $this->aliases,
         ), static fn (string $value): bool => $value !== ''));
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 
     /** @return BelongsTo<Organization, $this> */
-    public function organization(): BelongsTo {
+    public function organization(): BelongsTo
+    {
         return $this->belongsTo(Organization::class);
     }
 
@@ -141,7 +160,7 @@ class EdgeDeployment extends Model
 
     public function readBuildLog(?Site $site = null): ?string
     {
-        if (! is_string($this->build_log_path) || $this->build_log_path === '') {
+        if ($this->build_log_path === '') {
             return null;
         }
 

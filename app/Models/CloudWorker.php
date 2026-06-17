@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\CloudWorkerFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,18 +12,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * A background process attached to a Cloud container Site — a queue
- * worker or the Laravel scheduler.
- *
- * On DigitalOcean App Platform each CloudWorker becomes a `workers`
- * component in the site's app spec, built from the same source/image
- * as the web `service`. The `command` is the component's run_command;
- * the scheduler is a worker whose command runs `php artisan
- * schedule:work` (App Platform has no native cron) and which is always
- * pinned to a single instance.
- *
- * AWS App Runner cannot run background processes — worker creation is
- * rejected for App Runner sites via CloudBackend::supportsWorkers().
+ *                      A background process attached to a Cloud container Site — a queue
+ *                      worker or the Laravel scheduler.
+ *                      On DigitalOcean App Platform each CloudWorker becomes a `workers`
+ *                      component in the site's app spec, built from the same source/image
+ *                      as the web `service`. The `command` is the component's run_command;
+ *                      the scheduler is a worker whose command runs `php artisan
+ *                      schedule:work` (App Platform has no native cron) and which is always
+ *                      pinned to a single instance.
+ *                      AWS App Runner cannot run background processes — worker creation is
+ *                      rejected for App Runner sites via CloudBackend::supportsWorkers().
+ * @property string $command
+ * @property int $instance_count
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $site_id
+ * @property string $size
+ * @property string $status
+ * @property string $type
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class CloudWorker extends Model
 {
@@ -95,7 +105,8 @@ class CloudWorker extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 

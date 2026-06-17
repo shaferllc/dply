@@ -18,6 +18,16 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property string $status
+ * @property ?Carbon $last_deploy_at
+ * @property ?Carbon $suspended_at
+ * @property string $git_repository_url
+ * @property SiteType $type
+ * @property string $env_file_content
+ * @property string $deploy_strategy
+ * @property-read ?Server $server
  */
 trait TracksProvisioningStatus
 {
@@ -84,7 +94,7 @@ trait TracksProvisioningStatus
      */
     public function isWorkerSite(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         // Explicit per-site override wins when set (the user toggle). Absent an
         // override, worker mode defaults ON for sites on a worker host and OFF
@@ -102,14 +112,15 @@ trait TracksProvisioningStatus
      */
     public function workerModeIsExplicit(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return array_key_exists('worker_mode', $meta) && $meta['worker_mode'] !== null;
     }
 
+    /** @return array<string, mixed> */
     public function provisioningMeta(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $provisioning = $meta['provisioning'] ?? [];
 
         return is_array($provisioning) ? $provisioning : [];
@@ -500,7 +511,7 @@ trait TracksProvisioningStatus
         $current = [];
         if (filled($this->env_file_content)) {
             $parsed = app(DotEnvFileParser::class)->parse((string) $this->env_file_content);
-            $current = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+            $current = $parsed['variables'];
         }
 
         $missing = [];
@@ -572,15 +583,14 @@ trait TracksProvisioningStatus
         if (data_get($this->meta, 'choose_app.chosen_kind') !== null) {
             return false;
         }
-        if (is_string($this->git_repository_url) && trim($this->git_repository_url) !== '') {
+        if (trim((string) $this->git_repository_url) !== '') {
             // The choose-app picker writes the URL mid-flow (via syncRepoUrlToSite)
             // so the ref picker can resolve branches before the form is submitted.
             // Don't count that as "installed" — require a completed choice or a
             // deploy. Legacy sites with no choose_app meta are pre-flow and their
             // URL is real evidence of an installed app.
             $midFlow = $this->isAwaitingApp()
-                || (data_get($this->meta, 'choose_app') !== null
-                    && data_get($this->meta, 'choose_app.chosen_kind') === null);
+                || data_get($this->meta, 'choose_app') !== null;
             if (! $midFlow) {
                 return false;
             }

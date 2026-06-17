@@ -794,12 +794,10 @@ trait ManagesProviderCredentials
             return false;
         }
 
-        if ($org) {
-            audit_log($org, auth()->user(), 'credential.created', $credential, null, [
-                'provider' => $provider,
-                'name' => $credential->name,
-            ]);
-        }
+        audit_log($org, auth()->user(), 'credential.created', $credential, null, [
+            'provider' => $provider,
+            'name' => $credential->name,
+        ]);
 
         $this->toastSuccess('Provider connected.');
         $this->notifyProviderCredentialStored($provider);
@@ -809,9 +807,12 @@ trait ManagesProviderCredentials
 
     protected function notifyProviderCredentialStored(string $provider): void
     {
-        if (method_exists($this, 'afterProviderCredentialStored')) {
-            $this->afterProviderCredentialStored($provider);
-        }
+        $this->afterProviderCredentialStored($provider);
+    }
+
+    protected function afterProviderCredentialStored(string $provider): void
+    {
+        //
     }
 
     public function canVerifyCredentialProvider(string $provider): bool

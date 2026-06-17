@@ -80,7 +80,7 @@ class WorkerPoolPrimaryHealthCommand extends Command
                 recipientUsers: $recipients,
             );
 
-            $meta = is_array($pool->meta) ? $pool->meta : [];
+            $meta = $pool->meta;
             $meta['primary_alert'] = ['last_at' => now()->toIso8601String()];
             $pool->forceFill(['meta' => $meta])->save();
             $alerted++;

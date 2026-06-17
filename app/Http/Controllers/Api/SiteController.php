@@ -32,7 +32,7 @@ class SiteController extends Controller
                 'deploy_strategy' => $s->deploy_strategy,
                 'status' => $s->status,
                 'document_root' => $s->document_root,
-                'created_at' => $s->created_at?->toIso8601String(),
+                'created_at' => $s->created_at->toIso8601String(),
             ]),
         ]);
     }
@@ -154,7 +154,7 @@ class SiteController extends Controller
             'log_output' => $d->log_output,
             'started_at' => $d->started_at?->toIso8601String(),
             'finished_at' => $d->finished_at?->toIso8601String(),
-            'created_at' => $d->created_at?->toIso8601String(),
+            'created_at' => $d->created_at->toIso8601String(),
         ];
     }
 }

@@ -107,7 +107,7 @@ trait ManagesServerWebhook
             return;
         }
 
-        if ($delivery->url === null || $delivery->url === '') {
+        if ($delivery->url === '') {
             $this->toastError(__('Cannot resend: this delivery has no URL (would-send placeholder).'));
 
             return;

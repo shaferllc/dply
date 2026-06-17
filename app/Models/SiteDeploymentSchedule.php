@@ -15,10 +15,22 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * A recurring, cron-scheduled deploy for a site. Evaluated on the control-plane
- * Laravel scheduler (see {@see RunDueDeploymentSchedulesCommand}),
- * which dispatches {@see RunSiteDeploymentJob} when a schedule is due —
- * deploys are control-plane orchestrated (SSH out), so this is NOT a remote crontab.
+ *                      A recurring, cron-scheduled deploy for a site. Evaluated on the control-plane
+ *                      Laravel scheduler (see {@see RunDueDeploymentSchedulesCommand}),
+ *                      which dispatches {@see RunSiteDeploymentJob} when a schedule is due —
+ *                      deploys are control-plane orchestrated (SSH out), so this is NOT a remote crontab.
+ * @property string $consecutive_failures
+ * @property string $cron_expression
+ * @property string $git_branch
+ * @property string $is_active
+ * @property ?Carbon $last_run_at
+ * @property string $notify_on_failure
+ * @property ?string $server_id
+ * @property ?string $site_id
+ * @property string $timezone
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteDeploymentSchedule extends Model
 {
@@ -49,7 +61,8 @@ class SiteDeploymentSchedule extends Model
     ];
 
     /** @return BelongsTo<Site, $this> */
-    public function site(): BelongsTo {
+    public function site(): BelongsTo
+    {
         return $this->belongsTo(Site::class);
     }
 

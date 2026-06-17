@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -17,9 +18,10 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property string $kind
  * @property ?string $user_id
  * @property ?string $summary
- * @property array $snapshot
+ * @property array<string, mixed> $snapshot
  * @property ?string $checksum
- * @property \Illuminate\Support\Carbon $created_at
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  * @property-read Model $subject
  * @property-read ?Server $server
  * @property-read ?User $user
@@ -48,21 +50,28 @@ class ConfigRevision extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function subject(): MorphTo
     {
         return $this->morphTo();
     }
 
     /** @return BelongsTo<Server, $this> */
-    public function server(): BelongsTo {
+    public function server(): BelongsTo
+    {
         return $this->belongsTo(Server::class);
     }
 
     /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo {
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeForStream(Builder $query, string $streamKey): Builder
     {
         return $query->where('stream_key', $streamKey)->orderByDesc('created_at')->orderByDesc('id');
