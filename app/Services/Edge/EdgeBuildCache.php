@@ -76,6 +76,7 @@ class EdgeBuildCache
     /**
      * @return array{ok: bool, restored_bytes: int, message: string}
      */
+    /** @return array<string, mixed> */
     public function restore(string $checkout, ?string $repoRoot, string $cacheKey, Site $site, ?string $diskName = null): array
     {
         if (FakeEdgeProvision::enabled()) {
@@ -109,6 +110,7 @@ class EdgeBuildCache
     /**
      * @return array{ok: bool, snapshot_bytes: int, message: string}
      */
+    /** @return array<string, mixed> */
     public function snapshot(string $checkout, ?string $repoRoot, string $cacheKey, Site $site, ?string $diskName = null): array
     {
         if (FakeEdgeProvision::enabled()) {

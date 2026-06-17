@@ -26,6 +26,7 @@ final class ServerCertificateInventory
      *     critical_days: int,
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get(['id', 'name', 'server_id']);
@@ -174,7 +175,7 @@ final class ServerCertificateInventory
     }
 
     /**
-     * @return array{overall: string, alert_count: int, alerts: array, summary: array, breakdown: array, items: array, warning_days: int, critical_days: int}
+     * @return array<string, mixed>
      */
     private function emptyReport(): array
     {
@@ -256,6 +257,7 @@ final class ServerCertificateInventory
      * @param  list<array<string, mixed>>  $liveCerts  `certs` from {@see WebserverCertsAggregator::cached()}
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function withLiveExpiry(array $items, array $liveCerts): array
     {
         if ($items === [] || $liveCerts === []) {
@@ -334,7 +336,9 @@ final class ServerCertificateInventory
      * Let's Encrypt live-directory name embedded in the path. Used to match a
      * scan row back to an inventory item by domain.
      *
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
+     * @param  array<string, mixed> $items
+     * @param  array<string, mixed> $liveCerts
      * @return list<string>
      */
     private function liveCertDomains(array $row): array
@@ -354,7 +358,7 @@ final class ServerCertificateInventory
         }
 
         return collect($domains)
-            ->filter(fn (mixed $d): bool => is_string($d) && trim($d) !== '' && ! str_starts_with(trim($d), '*'))
+            ->filter(fn (mixed $d): bool => ($d) && trim($d) !== '' && ! str_starts_with(trim($d), '*'))
             ->map(fn (string $d): string => strtolower(trim($d)))
             ->unique()
             ->values()
@@ -415,6 +419,7 @@ final class ServerCertificateInventory
      *
      * @return array{queued: int, skipped: int}
      */
+    /** @return array<string, mixed> */
     public function queueRenewals(Server $server, ?int $withinDays = null): array
     {
         $report = $this->forServer($server);

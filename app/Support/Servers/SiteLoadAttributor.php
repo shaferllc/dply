@@ -131,7 +131,7 @@ final class SiteLoadAttributor
         $rows = [];
 
         foreach ($rollup['rows'] as $row) {
-            $slug = (string) ($row['slug'] ?? '');
+            $slug = (string) $row['slug'];
             if ($slug === '') {
                 continue;
             }
@@ -141,10 +141,10 @@ final class SiteLoadAttributor
                 'slug' => $slug,
                 'name' => $site !== null ? (string) $site->name : $slug,
                 'href' => $site !== null ? route('sites.show', ['server' => $server, 'site' => $site]) : route('servers.sites', $server),
-                'cpu_pct' => (float) ($row['peak_cpu_pct'] ?? 0),
-                'mem_mb' => (float) ($row['peak_mem_mb'] ?? 0),
-                'avg_cpu_pct' => (float) ($row['avg_cpu_pct'] ?? 0),
-                'avg_mem_mb' => (float) ($row['avg_mem_mb'] ?? 0),
+                'cpu_pct' => (float) ($row['peak_cpu_pct']),
+                'mem_mb' => (float) ($row['peak_mem_mb']),
+                'avg_cpu_pct' => (float) ($row['avg_cpu_pct']),
+                'avg_mem_mb' => (float) ($row['avg_mem_mb']),
                 'cpu_share_pct' => $row['peak_cpu_share_pct'] ?? null,
                 'mem_share_pct' => $row['peak_mem_share_pct'] ?? null,
             ];
@@ -152,12 +152,12 @@ final class SiteLoadAttributor
 
         return [
             'range' => $range,
-            'has_snapshot' => ($rollup['scan_count'] ?? 0) > 0,
+            'has_snapshot' => ($rollup['scan_count']) > 0,
             'checked_at' => null,
             'stale' => false,
             'solo_tenant' => $soloTenant,
             'site_count' => $siteCount,
-            'scan_count' => (int) ($rollup['scan_count'] ?? 0),
+            'scan_count' => (int) ($rollup['scan_count']),
             'rows' => $rows,
             'total' => null,
             'unattributed' => null,

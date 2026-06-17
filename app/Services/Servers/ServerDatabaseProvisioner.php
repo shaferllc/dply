@@ -17,6 +17,10 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function listMysqlDatabaseNames(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -53,6 +57,10 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function listPostgresDatabaseNames(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -77,6 +85,10 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
+    /**
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -105,6 +117,10 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
+    /**
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -595,7 +611,7 @@ class ServerDatabaseProvisioner
     {
         $primaryRoot = '/'.trim((string) config('server_database.sqlite_root', '/var/lib/dply/sqlite'), '/');
 
-        /** @var list<string> $extra */
+        /** @var array $extra */
         $extra = (array) config('server_database.sqlite_extra_safe_roots', []);
         $allowedRoots = array_values(array_unique(array_merge(
             [$primaryRoot],

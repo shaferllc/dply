@@ -31,6 +31,7 @@ final class BackupStagingS3ClientFactory
     /**
      * @return array{client: S3Client, bucket: string, key_prefix: string}
      */
+    /** @return array<string, mixed> */
     public function make(): array
     {
         if (! $this->enabled()) {
@@ -67,7 +68,7 @@ final class BackupStagingS3ClientFactory
      * Explicit endpoint override, else the configured provider's template with
      * {region} substituted (config/object_storage.php → providers.<provider>.endpoint_template).
      *
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      */
     private function resolveEndpoint(array $config, string $region): string
     {

@@ -220,13 +220,13 @@ class SiteEnvPusher
      * reach this. Enabling on-box is a deliberate step that must be validated on
      * a real server (the shim needs jq + curl / the AWS CLI present).
      *
-     * @param  array<string, string>  $mergedVars
+     * @param  array<string, mixed> $mergedVars
      */
     private function resolveOnBoxSecrets(SshConnection $ssh, Site $site, string $envPath, array $mergedVars): void
     {
         $hasDirective = false;
         foreach ($mergedVars as $value) {
-            if (is_string($value) && str_contains($value, OnBoxSecretManifestBuilder::DIRECTIVE_PREFIX)) {
+            if (($value) && str_contains($value, OnBoxSecretManifestBuilder::DIRECTIVE_PREFIX)) {
                 $hasDirective = true;
                 break;
             }

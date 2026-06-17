@@ -29,8 +29,8 @@ use App\Enums\ServerTier;
 class DesiredBillingState
 {
     /**
-     * @param  array<string, int>  $tierQuantities  Display-only size breakdown (xs/s/m/l/xl).
-     * @param  array<string, mixed>  $edgeUsageEstimate
+     * @param  array<string, mixed> $tierQuantities  Display-only size breakdown (xs/s/m/l/xl).
+     * @param  array<string, mixed> $edgeUsageEstimate
      */
     private function __construct(
         public readonly string $planKey,
@@ -67,8 +67,9 @@ class DesiredBillingState
      * Build a state from a resolved plan plus managed-product usage.
      *
      * @param  array{key: string, label: string, price_cents: int, max_servers: ?int}  $plan
-     * @param  array<string, int>  $tierQuantities  Display-only size breakdown.
-     * @param  array<string, mixed>  $edgeUsageEstimate
+     * @param  array<string, mixed> $tierQuantities  Display-only size breakdown.
+     * @param  array<string, mixed> $edgeUsageEstimate
+     * @param  array<string, mixed> $realtimeTierQuantities
      */
     public static function fromPlanAndUsage(
         array $plan,
@@ -96,7 +97,7 @@ class DesiredBillingState
             $normalized[$tier->value] = max(0, (int) ($tierQuantities[$tier->value] ?? 0));
         }
 
-        $planPriceCents = max(0, (int) ($plan['price_cents'] ?? 0));
+        $planPriceCents = max(0, (int) ($plan['price_cents']));
 
         $serverlessCount = max(0, $serverlessCount);
         $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);
@@ -149,8 +150,8 @@ class DesiredBillingState
             + $realtimeSubtotal;
 
         return new self(
-            planKey: (string) ($plan['key'] ?? 'free'),
-            planLabel: (string) ($plan['label'] ?? 'Free'),
+            planKey: $plan['key'],
+            planLabel: $plan['label'],
             planPriceCents: $planPriceCents,
             tierQuantities: $normalized,
             serverlessCount: $serverlessCount,
@@ -215,6 +216,7 @@ class DesiredBillingState
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

@@ -91,15 +91,16 @@ class SubscriptionPlanResolver
      */
     public function all(): array
     {
-        return array_values(array_map(
-            fn (string $key, array $plan) => $this->normalize($key, $plan),
-            array_keys($this->plans()),
-            array_values($this->plans()),
-        ));
+        $normalized = [];
+        foreach ($this->plans() as $key => $plan) {
+            $normalized[] = $this->normalize($key, $plan);
+        }
+
+        return $normalized;
     }
 
     /**
-     * @return array<string, array{label?: string, price_cents?: int, max_servers?: ?int, max_sites?: ?int}>
+     * @return array<string, array{label?: string, price_cents?: int, max_servers?: int|null, max_sites?: int|null}>
      */
     private function plans(): array
     {

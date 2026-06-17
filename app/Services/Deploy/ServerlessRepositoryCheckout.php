@@ -157,7 +157,7 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  list<string>  $command
+     * @param  array<string, mixed> $command
      */
     private function run(array $command, string $workingDirectory): string
     {
@@ -173,7 +173,7 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  list<string>  $log
+     * @param  array<string, mixed> $log
      */
     private function fetchBranch(
         string $repositoryPath,

@@ -165,7 +165,7 @@ class Connection
             throw new InvalidArgumentException('Connection name cannot be empty.');
         }
 
-        /** @var array<string> $config The config array containing the connection details. */
+        /** @var array<string, mixed> $config The config array containing the connection details. */
         $config = config('task-runner.connections.'.$connection);
 
         if (! $config) {
@@ -176,10 +176,7 @@ class Connection
     }
 
     /**
-     * Creates a new connection from the given array.
-     *
-     * @param  array<string>  $config  The config array containing the connection details.
-     * @return Connection The created connection.
+     * @param array<string, mixed> $config
      */
     public static function fromArray(array $config): Connection
     {

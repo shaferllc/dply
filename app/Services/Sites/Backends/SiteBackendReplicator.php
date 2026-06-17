@@ -142,7 +142,7 @@ class SiteBackendReplicator
      */
     private function childSiteMeta(Site $source, string $pinnedSha): array
     {
-        $meta = is_array($source->meta) ? $source->meta : [];
+        $meta = ($source->meta );
 
         // Drop per-site provisioning/runtime state so the child starts clean,
         // but keep operator intent (repository config, git ref kind, …).

@@ -37,10 +37,6 @@ final class DedicatedDatabaseServerProvisionConfig
         }
 
         $meta = $server->meta ?? [];
-        if (! is_array($meta)) {
-            return self::localhostDefaults($wizardDatabase);
-        }
-
         $databaseServer = $meta['database_server'] ?? null;
         if (! is_array($databaseServer)) {
             return self::localhostDefaults($wizardDatabase);

@@ -13,36 +13,23 @@ class TaskChainProgress
 
     /**
      * The tasks in the chain.
+     *
+     * @var list<Task>
      */
     public array $tasks;
 
-    /**
-     * The chain ID.
-     */
     public string $chainId;
 
-    /**
-     * The current task number.
-     */
     public int $currentTask;
 
-    /**
-     * The total number of tasks.
-     */
     public int $totalTasks;
 
-    /**
-     * The progress message.
-     */
     public string $message;
 
-    /**
-     * The start timestamp.
-     */
     public string $startedAt;
 
     /**
-     * Create a new event instance.
+     * @param  list<Task>  $tasks
      */
     public function __construct(array $tasks, string $chainId, int $currentTask, int $totalTasks, string $message, string $startedAt)
     {
@@ -143,7 +130,9 @@ class TaskChainProgress
 
     /**
      * Get progress details.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getProgressDetails(): array
     {
         return [

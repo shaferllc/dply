@@ -59,7 +59,7 @@ class TlsExpiringRule implements IntelligenceRule
                 ? DeployIntelligenceAlert::SEVERITY_DANGER
                 : DeployIntelligenceAlert::SEVERITY_WARNING;
 
-            $siteName = $cert->site?->name ?? '—';
+            $siteName = $cert->site->name ?? '—';
             $findings[] = new AlertFinding(
                 ruleKey: $this->key(),
                 severity: $severity,

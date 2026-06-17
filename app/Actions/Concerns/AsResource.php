@@ -390,6 +390,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 trait AsResource
 {
+    // Method introspection (hasMethod, callMethod) resolves against the action
+    // this trait is mixed into.
+    use DecorateActions;
+
     /**
      * @return array<string, mixed>
      */
@@ -442,7 +446,9 @@ trait AsResource
     {
         $items = [];
         foreach (is_iterable($resource) ? $resource : [$resource] as $item) {
-            $items[] = new static($item);
+            // Resource hosts accept the underlying model in their constructor
+            // (JsonResource pattern); the trait cannot declare that signature.
+            $items[] = new static($item); // @phpstan-ignore new.noConstructor
         }
 
         return new AnonymousResourceCollection($items, static::class);

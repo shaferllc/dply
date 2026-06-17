@@ -19,6 +19,8 @@ final class CloudflareWorkersProvisioner implements ServerlessFunctionProvisione
         private readonly int $scriptMaxBytes,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         $this->assertPathUnderPrefix($artifactPath);
@@ -56,7 +58,7 @@ final class CloudflareWorkersProvisioner implements ServerlessFunctionProvisione
         }
 
         $etag = $response->header('ETag');
-        $revision = is_string($etag) && $etag !== ''
+        $revision = ($etag) && $etag !== ''
             ? trim($etag, '"')
             : (string) (is_array($json['result'] ?? null) ? ($json['result']['id'] ?? 'unknown') : 'unknown');
 
@@ -71,7 +73,7 @@ final class CloudflareWorkersProvisioner implements ServerlessFunctionProvisione
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return array{account_id: string, api_token: string, compatibility_date: string}
      */
     private function resolveCloudflareContext(array $config): array

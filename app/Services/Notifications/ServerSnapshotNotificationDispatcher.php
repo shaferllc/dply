@@ -23,8 +23,8 @@ final class ServerSnapshotNotificationDispatcher
     ) {}
 
     /**
-     * @param  list<string>  $resourceLabels  affected snapshot labels (e.g. "Image: web-1-…")
-     * @param  array<string, mixed>  $extraMetadata  should include `snapshot_type`
+     * @param  array<string, mixed> $resourceLabels  affected snapshot labels (e.g. "Image: web-1-…")
+     * @param  array<string, mixed> $extraMetadata  should include `snapshot_type`
      */
     public function notify(
         Server $server,

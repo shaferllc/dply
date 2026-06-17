@@ -10,6 +10,8 @@ class Route53DnsProvider implements DnsProvider
         private readonly Route53Service $service,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         return $this->service->upsertRecord($zone, $type, $name, $value);

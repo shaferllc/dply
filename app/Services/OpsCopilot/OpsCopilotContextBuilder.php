@@ -27,7 +27,7 @@ final class OpsCopilotContextBuilder
     /**
      * Sites with a recent failed BYO deploy or failed Edge build.
      *
-     * @return Collection<int, array{id: string, name: string, product: string, failed_at: string|null}>
+     * @return Illuminate\Support\Collection<int, array{id: string, name: string, product: string, failed_at: mixed}>
      */
     public function candidateSites(Organization $organization): Collection
     {
@@ -101,7 +101,7 @@ final class OpsCopilotContextBuilder
                 ->all();
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $repoConfig = $failure['repo_config'] ?? null;
         if ($repoConfig === null && is_array($meta['repo_config'] ?? null)) {
             $repoConfig = $meta['repo_config'];
@@ -162,7 +162,7 @@ final class OpsCopilotContextBuilder
             ->first(['id', 'status', 'failure_reason', 'build_log_path', 'repo_config', 'failed_at', 'created_at']);
 
         $byoAt = $byo?->finished_at;
-        $edgeAt = $edge?->failed_at ?? $edge?->created_at;
+        $edgeAt = $edge->failed_at ?? $edge->created_at;
 
         if ($byo === null && $edge === null) {
             return null;
@@ -170,7 +170,7 @@ final class OpsCopilotContextBuilder
 
         $useEdge = $edge !== null && ($byoAt === null || ($edgeAt !== null && $edgeAt->gt($byoAt)));
 
-        if ($useEdge && $edge !== null) {
+        if ($useEdge) {
             $log = $edge->readBuildLog($site);
             $excerpt = $this->tailExcerpt((string) ($log ?? ''));
 
@@ -181,7 +181,7 @@ final class OpsCopilotContextBuilder
                 'log_excerpt' => $excerpt,
                 'exit_code' => null,
                 'failed_at' => $edgeAt?->toIso8601String(),
-                'repo_config' => is_array($edge->repo_config) ? $edge->repo_config : null,
+                'repo_config' => ($edge->repo_config ),
             ];
         }
 
@@ -190,7 +190,7 @@ final class OpsCopilotContextBuilder
         }
 
         $log = (string) ($byo->log_output ?? '');
-        $phaseSnippet = $this->failedPhaseSnippet(is_array($byo->phase_results) ? $byo->phase_results : []);
+        $phaseSnippet = $this->failedPhaseSnippet(($byo->phase_results ));
 
         return [
             'source' => 'byo_deploy',
@@ -204,7 +204,7 @@ final class OpsCopilotContextBuilder
     }
 
     /**
-     * @param  array<string, mixed>  $phaseResults
+     * @param  array<string, mixed> $phaseResults
      */
     private function failedPhaseSnippet(array $phaseResults): string
     {

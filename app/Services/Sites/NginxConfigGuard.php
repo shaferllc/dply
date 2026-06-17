@@ -51,6 +51,10 @@ final class NginxConfigGuard
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function foreignDirectives(?string $current, string $incoming): array
     {
         $current = trim((string) $current);
@@ -100,7 +104,7 @@ final class NginxConfigGuard
     /**
      * Human-readable summary line for the deploy console / exception message.
      *
-     * @param  list<string>  $foreign
+     * @param  array<string, mixed> $foreign
      */
     public function summarize(array $foreign): string
     {

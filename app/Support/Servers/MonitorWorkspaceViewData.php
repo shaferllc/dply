@@ -17,6 +17,7 @@ final class MonitorWorkspaceViewData
 {
     /**
      * @return array<string, mixed>
+     * @param  array<string, mixed> $guestPushVerification
      */
     public static function for(
         Server $server,
@@ -41,7 +42,7 @@ final class MonitorWorkspaceViewData
         $lastGuestSampleAt = $monitorLastGuestSampleAt
             ? Carbon::parse($monitorLastGuestSampleAt)->timezone(config('app.timezone'))
             : null;
-        $p = $latest?->payload ?? [];
+        $p = $latest->payload ?? [];
 
         $fmtBytes = function (?int $b): string {
             if ($b === null || $b <= 0) {
@@ -163,7 +164,7 @@ final class MonitorWorkspaceViewData
             ],
         ];
 
-        $bannerStatus = $component->diagnosticsBannerStatus;
+        $bannerStatus = $component->getDiagnosticsBannerStatusProperty();
         $bannerKind = $component->remote_output_kind;
         $bannerBusy = in_array($bannerStatus, ['queued', 'running'], true);
         $bannerShow = $bannerStatus !== '' && $bannerKind !== null;

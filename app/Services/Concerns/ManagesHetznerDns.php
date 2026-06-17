@@ -31,6 +31,7 @@ trait ManagesHetznerDns
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createZone(string $zoneName): array
     {
         $zoneName = strtolower(trim($zoneName));

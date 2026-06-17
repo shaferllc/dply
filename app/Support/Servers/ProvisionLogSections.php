@@ -24,7 +24,7 @@ class ProvisionLogSections
 
             $parts = array_map('trim', explode('::', $payload, 3));
             $results[] = [
-                'key' => (string) ($parts[0] ?? 'unknown'),
+                'key' => $parts[0],
                 'status' => (string) ($parts[1] ?? 'info'),
                 'detail' => ($parts[2] ?? null) !== null ? (string) $parts[2] : null,
             ];

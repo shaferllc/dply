@@ -19,6 +19,8 @@ trait ProvisionsDoAppPlatform
 {
 
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new DigitalOceanAppPlatformService($credential);
@@ -50,6 +52,8 @@ trait ProvisionsDoAppPlatform
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provisionFromSource(Site $site, ProviderCredential $credential): array
     {
         $service = new DigitalOceanAppPlatformService($credential);
@@ -94,7 +98,7 @@ trait ProvisionsDoAppPlatform
      */
     private function applyAlertDestinations(DigitalOceanAppPlatformService $service, array $result, Site $site): void
     {
-        $alerts = is_array($result['alerts'] ?? null) ? $result['alerts'] : [];
+        $alerts = ($result['alerts'] );
         if ($alerts === []) {
             return;
         }
@@ -130,7 +134,7 @@ trait ProvisionsDoAppPlatform
      */
     private function sourceSpec(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $source = $meta['container']['source'] ?? [];
         if (! is_array($source) || ! is_string($source['repo'] ?? null) || $source['repo'] === '') {
             throw new \RuntimeException('Site has no container source spec recorded — cannot provision from source.');
@@ -144,6 +148,8 @@ trait ProvisionsDoAppPlatform
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function redeploy(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {

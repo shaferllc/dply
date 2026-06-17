@@ -90,6 +90,7 @@ final class DeployPipelineScriptExporter
 
     /**
      * @param  list<string>  $lines
+     * @param-out list<string>  $lines
      * @param  list<string>  $scriptLines
      */
     private function appendSection(array &$lines, string $title, array $scriptLines): void
@@ -105,6 +106,7 @@ final class DeployPipelineScriptExporter
     /**
      * @param  Collection<int, SiteDeployStep>  $steps
      * @param  list<string>  $lines
+     * @param-out list<string>  $lines
      */
     private function appendStepsSection(
         array &$lines,
@@ -169,6 +171,7 @@ final class DeployPipelineScriptExporter
 
     /**
      * @param  list<string>  $lines
+     * @param-out list<string>  $lines
      */
     private function appendNonShellHookComments(array &$lines, SiteDeployPipeline $pipeline): void
     {

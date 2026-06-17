@@ -44,6 +44,7 @@ final class SiteErrorReferenceResolver
     /**
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
+    /** @return array<string, mixed> */
     public function resolve(Site $site, string $reference): array
     {
         $reference = trim($reference);
@@ -97,8 +98,8 @@ final class SiteErrorReferenceResolver
     }
 
     /**
-     * @param  callable(?string): array<string, mixed>  $miss
-     * @param  array<string, 'laravel'|'fpm'|'web'>  $sourceMap
+     * @param  array<string, mixed> $miss
+     * @param  array<string, mixed> $sourceMap
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
     private function parse(string $raw, string $reference, callable $miss, array $sourceMap = []): array
@@ -154,8 +155,8 @@ final class SiteErrorReferenceResolver
      * FPM logs, nginx/apache for the webserver error log). Lines that don't parse
      * are simply dropped from `entries` — they remain verbatim in `trace`.
      *
-     * @param  list<string>  $trace
-     * @param  array<string, 'laravel'|'fpm'|'web'>  $sourceMap
+     * @param  array<string, mixed> $trace
+     * @param  array<string, mixed> $sourceMap
      * @return list<array<string, mixed>>
      */
     private function structureTrace(array $trace, array $sourceMap): array
@@ -203,7 +204,7 @@ final class SiteErrorReferenceResolver
     /**
      * Flatten a parser record (Laravel or webserver) into a uniform entry shape.
      *
-     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed> $record
      * @return array<string, mixed>
      */
     private function normalizeEntry(array $record, string $source, ?string $file): array

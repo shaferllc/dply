@@ -24,8 +24,8 @@ final class ServerFirewallNotificationDispatcher
     ) {}
 
     /**
-     * @param  list<string>  $ruleLabels  affected rule labels (or "N rule(s)" for bulk/apply)
-     * @param  array<string, mixed>  $extraMetadata
+     * @param  array<string, mixed> $ruleLabels  affected rule labels (or "N rule(s)" for bulk/apply)
+     * @param  array<string, mixed> $extraMetadata
      */
     public function notify(
         Server $server,

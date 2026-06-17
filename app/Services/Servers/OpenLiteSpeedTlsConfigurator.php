@@ -74,6 +74,9 @@ class OpenLiteSpeedTlsConfigurator
         $ssh->exec($this->privilegedCommand($server, 'systemctl reload lshttpd 2>&1 || systemctl restart lshttpd 2>&1'), 60);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function resolveListenerTlsMaterial(Server $server, Collection $sites): ?array
     {
         return $this->resolveListenerTlsMaterialFromSsh(new SshConnection($server), $sites);

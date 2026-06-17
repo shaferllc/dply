@@ -32,6 +32,11 @@ class RemoteWebserverConfigService
     /**
      * Engines this service knows about. Used to gate which validate/reload
      * commands and globs to apply.
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<(int|string)>
      */
     public function supportedEngines(): array
     {
@@ -43,7 +48,11 @@ class RemoteWebserverConfigService
      * paths that already exist on the server. The main config is always first
      * (if it exists); the rest come from the engine's globs.
      *
-     * @return array<int, array{path: string, label: string, size: int, mtime: int|null}>
+     * @return list<(int|string)>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, int|string|null>>
      */
     public function listFiles(Server $server, string $engine): array
     {
@@ -100,8 +109,9 @@ class RemoteWebserverConfigService
      * preview size; callers should surface a clear notice when they hit the
      * cap so the operator doesn't silently lose trailing content.
      *
-     * @return array{contents: string, truncated: bool, size: int}
+     * @return list<array<string, int|string|null>>
      */
+    /** @return array<string, mixed> */
     public function read(Server $server, string $engine, string $path, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -145,6 +155,7 @@ class RemoteWebserverConfigService
      *
      * @return array{backup: ?string, validate_output: string, validate_ok: bool}
      */
+    /** @return array<string, mixed> */
     public function write(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -245,6 +256,7 @@ BASH;
      *
      * @return array{output: string, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function validateContent(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -364,7 +376,9 @@ BASH;
      * Run the engine's config-test command without writing anything. Used by
      * the editor's "Validate" button when the operator wants to dry-run the
      * current on-disk config (e.g. after fmt-overwrite or an external edit).
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function validate(Server $server, string $engine): array
     {
         $this->assertEngineSupported($engine);
@@ -387,6 +401,10 @@ BASH;
      * List timestamped backups for a single live path.
      *
      * @return array<int, array{path: string, mtime: int, size: int}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, int|string>>
      */
     public function listBackups(Server $server, string $engine, string $path): array
     {
@@ -422,8 +440,9 @@ BASH;
      * `write()`, this also snapshots the current live file before clobbering
      * it, so a bad restore can be undone by restoring the very last backup.
      *
-     * @return array{validate_output: string, validate_ok: bool}
+     * @return list<array<string, int|string>>
      */
+    /** @return array<string, mixed> */
     public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);

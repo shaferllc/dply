@@ -24,8 +24,8 @@ final readonly class DeployStatus
     /**
      * @param  array{started_at?: string, deployment_id?: ?string}|null  $lock  optimistic deploy-active marker
      * @param  array{ids: list<string>, started_at?: string}|null  $syncBatch  the active sync batch, if any
-     * @param  list<string>  $selectedPeerIds  persisted Sync peer selection (mirrored across surfaces)
-     * @param  list<string>  $completedFixerKeys  fixer keys already run since the last deploy finished
+     * @param  array<string, mixed> $selectedPeerIds  persisted Sync peer selection (mirrored across surfaces)
+     * @param  array<string, mixed> $completedFixerKeys  fixer keys already run since the last deploy finished
      */
     public function __construct(
         public ?SiteDeployment $latest,

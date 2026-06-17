@@ -90,6 +90,7 @@ final class WebserverSwitchPreflight
      *   drift_sites: list<array{id: string, name: string, reason: string}>,
      * }
      */
+    /** @return array<string, mixed> */
     public function plan(Server $server, string $target): array
     {
         $cacheKey = $server->id.'|'.strtolower(trim($target));

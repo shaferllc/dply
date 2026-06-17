@@ -25,6 +25,7 @@ class RemoteServerConfigService
     /**
      * @return array{contents: string, truncated: bool, size: int}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server, string $path, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertPathAllowed($path);
@@ -57,6 +58,7 @@ class RemoteServerConfigService
     /**
      * @return array{backup: ?string, validate_output: string, validate_ok: bool, reverted?: bool}
      */
+    /** @return array<string, mixed> */
     public function write(Server $server, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertPathAllowed($path);
@@ -144,6 +146,7 @@ BASH;
     /**
      * @return array{output: string, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function validateContent(Server $server, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertPathAllowed($path);
@@ -236,6 +239,10 @@ BASH;
     /**
      * @return array<int, array{path: string, mtime: int, size: int}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, int|string>>
+     */
     public function listBackups(Server $server, string $path): array
     {
         $this->assertPathAllowed($path);
@@ -267,8 +274,9 @@ BASH;
     }
 
     /**
-     * @return array{validate_output: string, validate_ok: bool}
+     * @return list<array<string, int|string>>
      */
+    /** @return array<string, mixed> */
     public function restoreBackup(Server $server, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertPathAllowed($targetPath);
@@ -356,7 +364,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $hook
+     * @param  array<string, mixed> $hook
      */
     private function validateOutputLooksOk(string $output, array $hook): bool
     {

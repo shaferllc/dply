@@ -43,6 +43,7 @@ final class ServerlessRoutingResolver
      *     custom_domains: list<array{hostname: string, mode: string, dns_status: string, cname_target: string, verified_at: ?string, error: ?string}>,
      * }
      */
+    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
         return Cache::remember(

@@ -42,8 +42,13 @@ final class SiteEnvWriteGuard
     /**
      * The danger-level findings (only) for a composed env map.
      *
-     * @param  array<string, string>  $vars
+     * @param  array<string, mixed> $vars
      * @return list<array{level: string, key: ?string, message: string}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
+     * @param  array<string, mixed> $vars
      */
     public function dangers(array $vars): array
     {
@@ -58,7 +63,7 @@ final class SiteEnvWriteGuard
      * The message lists every offending key so the operator can fix it in the
      * editor and retry.
      *
-     * @param  array<string, string>  $vars
+     * @param  array<string, mixed> $vars
      */
     public function assertSafeToWrite(array $vars): void
     {

@@ -13,9 +13,9 @@ namespace App\Support\Serverless;
 final readonly class ServerlessGlueRecipe
 {
     /**
-     * @param  list<StepArray>  $steps
-     * @param  list<ResourceArray>  $resources
-     * @param  list<string>  $gaps
+     * @param  array<string, mixed> $steps
+     * @param  array<string, mixed> $resources
+     * @param  array<string, mixed> $gaps
      */
     public function __construct(
         public string $key,

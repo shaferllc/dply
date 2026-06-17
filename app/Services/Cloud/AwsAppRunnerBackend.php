@@ -140,7 +140,7 @@ class AwsAppRunnerBackend implements CloudBackend
 
         // Record the outcome note on the site's meta so the dashboard
         // / CLI can surface what actually happened on App Runner.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $as = is_array($container['autoscaling'] ?? null) ? $container['autoscaling'] : [];
         if ($note === null) {
@@ -164,6 +164,8 @@ class AwsAppRunnerBackend implements CloudBackend
         return substr('dply-'.$base, 0, 32);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
@@ -183,6 +185,8 @@ class AwsAppRunnerBackend implements CloudBackend
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provisionFromSource(Site $site, ProviderCredential $credential): array
     {
         $source = $this->sourceSpec($site);
@@ -215,7 +219,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function sourceSpec(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $source = $meta['container']['source'] ?? [];
         if (! is_array($source) || ! is_string($source['repo'] ?? null) || $source['repo'] === '') {
             throw new \RuntimeException('Site has no container source spec recorded — cannot provision from source.');
@@ -242,6 +246,8 @@ class AwsAppRunnerBackend implements CloudBackend
         return $arn;
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function redeploy(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -297,7 +303,7 @@ class AwsAppRunnerBackend implements CloudBackend
 
         // Image mode — updateImage already re-pushes env vars alongside
         // the (unchanged) image.
-        if (is_string($site->container_image) && $site->container_image !== '') {
+        if (($site->container_image) && $site->container_image !== '') {
             $service->updateImage(
                 $site->container_backend_id,
                 $site->container_image,
@@ -321,6 +327,8 @@ class AwsAppRunnerBackend implements CloudBackend
         }
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function inspect(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -338,11 +346,20 @@ class AwsAppRunnerBackend implements CloudBackend
         ];
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function regions(): array
     {
         return AwsAppRunnerService::getRegions();
     }
 
+    /** @return list<array<string, string>>
+    /** @return list<array<string, string>>
+    /**
+     * @return array<int, array<string, string|null>>
+     */
     public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
     {
         // App Runner exposes ListOperations on a service for full
@@ -351,7 +368,7 @@ class AwsAppRunnerBackend implements CloudBackend
         // first-class). For AWS, return a single synthetic "latest"
         // entry derived from local meta so the CLI / dashboard show
         // something instead of an empty list.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $startedAt = is_string($container['last_deploy_started_at'] ?? null) ? (string) $container['last_deploy_started_at'] : null;
         $deploymentId = is_string($container['last_deployment_id'] ?? null) ? (string) $container['last_deployment_id'] : null;
@@ -369,6 +386,11 @@ class AwsAppRunnerBackend implements CloudBackend
         ]];
     }
 
+    /** @return array<int, array<string, string|null>>
+    /** @return array<int, array<string, string|null>>
+    /**
+     * @return array<int, array<string, string|null>>
+     */
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
         // App Runner streams logs to CloudWatch under
@@ -396,6 +418,7 @@ class AwsAppRunnerBackend implements CloudBackend
      * structured unavailable state with a CloudWatch console deep
      * link the operator can open instead.
      */
+    /** @return array<string, mixed> */
     public function metrics(Site $site, ProviderCredential $credential, string $window): array
     {
         $window = $this->normalizeWindow($window);
@@ -416,6 +439,7 @@ class AwsAppRunnerBackend implements CloudBackend
      * v1 does not tail them through the CloudWatch Logs SDK — the
      * operator opens the CloudWatch console via the returned link.
      */
+    /** @return array<string, mixed> */
     public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
         $serviceName = $this->backendServiceName($site);
@@ -466,6 +490,8 @@ class AwsAppRunnerBackend implements CloudBackend
         );
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -508,7 +534,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function siteBuildEnvVars(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $content = $meta['container']['build_env_file_content'] ?? '';
 
         return $this->parseEnvLines(is_string($content) ? $content : '');
@@ -523,7 +549,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function siteInstanceCount(Site $site): int
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $raw = $meta['container']['instance_count'] ?? null;
 
         return is_int($raw) && $raw > 0 ? $raw : 1;
@@ -538,7 +564,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function cpuMemoryForSite(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
 
         // AWS App Runner has one compute axis (CPU + RAM combo) and no

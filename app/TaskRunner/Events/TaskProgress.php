@@ -51,10 +51,11 @@ class TaskProgress
     /**
      * Additional context data.
      */
+    /** @var array<string, mixed> */
     public array $context;
 
     /**
-     * Create a new event instance.
+     * @param array<string, mixed> $context
      */
     public function __construct(
         Task $task,
@@ -202,7 +203,7 @@ class TaskProgress
      */
     public function getConnection(): ?string
     {
-        return $this->pendingTask->getConnection();
+        return $this->pendingTask->getConnectionName();
     }
 
     /**
@@ -215,15 +216,15 @@ class TaskProgress
 
     /**
      * Get the task data.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getTaskData(): array
     {
         return $this->task->getData();
     }
 
-    /**
-     * Get progress details.
-     */
+    /** @return array<string, mixed> */
     public function getProgressDetails(): array
     {
         return [

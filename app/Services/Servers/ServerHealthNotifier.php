@@ -86,7 +86,7 @@ final class ServerHealthNotifier
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array

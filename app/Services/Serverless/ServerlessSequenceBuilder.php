@@ -26,7 +26,7 @@ class ServerlessSequenceBuilder
     /**
      * Create or update a sequence action on a Site.
      *
-     * @param  list<string>  $componentActionIds  ordered FunctionAction ids
+     * @param  array<string, mixed> $componentActionIds  ordered FunctionAction ids
      */
     public function define(Site $site, string $name, array $componentActionIds): FunctionAction
     {
@@ -55,7 +55,7 @@ class ServerlessSequenceBuilder
     /**
      * Resolve and validate the ordered component actions.
      *
-     * @param  list<string>  $componentActionIds
+     * @param  array<string, mixed> $componentActionIds
      * @return list<array{id: string, name: string}>
      */
     private function resolveComponents(Site $site, array $componentActionIds): array

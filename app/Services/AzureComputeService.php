@@ -63,6 +63,10 @@ class AzureComputeService
     /**
      * @return list<array{id:string,name:string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function listLocations(): array
     {
         $response = $this->request('GET', '/locations', query: [
@@ -94,7 +98,11 @@ class AzureComputeService
     }
 
     /**
-     * @return list<array{id:string,name:string,memory_mb?:int|null,vcpus?:int|null}>
+     * @return list<array<string, string>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, int|string|null>>
      */
     public function listVmSizes(string $location): array
     {
@@ -144,7 +152,7 @@ class AzureComputeService
     }
 
     /**
-     * @return array{vm_id:string,nic_id:string,pip_id:string}
+     * @return list<array<string, int|string|null>>
      */
     public function createLinuxVm(
         string $resourceGroup,
@@ -294,8 +302,8 @@ class AzureComputeService
     }
 
     /**
-     * @param  array<string, mixed>  $body
-     * @param  array<string, mixed>  $query
+     * @param  array<string, mixed> $body
+     * @param  array<string, mixed> $query
      */
     private function request(string $method, string $path, array $body = [], array $query = []): Response
     {

@@ -145,6 +145,7 @@ class ApacheGlobalOptionsConfig
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string, mpm: string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -192,7 +193,7 @@ class ApacheGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -259,7 +260,7 @@ class ApacheGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function upsertMpmDirectives(string $contents, string $blockName, array $values): string
     {

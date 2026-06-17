@@ -210,7 +210,7 @@ class SiteBasicAuthDiscovery
      * files, otherwise '/'. Operators can edit the URL path later if a
      * non-Dply file is meant for a more specific prefix.
      *
-     * @param  array<string, string>  $hashToPath
+     * @param  array<string, mixed> $hashToPath
      */
     private function resolveUrlPath(string $absolutePath, bool $isManaged, array $hashToPath): string
     {

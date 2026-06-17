@@ -68,7 +68,7 @@ class FileBrowserPathPolicy
     }
 
     /**
-     * @param  list<string>  $patterns
+     * @param  array<string, mixed> $patterns
      */
     public static function matchesSensitiveGlob(string $path, array $patterns): bool
     {

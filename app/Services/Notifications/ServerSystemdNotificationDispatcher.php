@@ -43,7 +43,7 @@ final class ServerSystemdNotificationDispatcher
             return;
         }
 
-        $label = (string) ($event['label'] ?? $unit);
+        $label = (string) ($event['label']);
         $detail = isset($event['detail']) && is_string($event['detail']) ? $event['detail'] : null;
         $subject = '['.config('app.name').'] '.$server->name.' — '.$label.' — '.$kind;
         $lines = [
@@ -76,7 +76,7 @@ final class ServerSystemdNotificationDispatcher
         $digest = $org !== null
             && ($org->mergedServicesPreferences()['systemd_notifications_digest'] ?? 'immediate') === 'hourly';
 
-        if ($digest && $org !== null) {
+        if ($digest) {
             $bucket = now('UTC')->format('Y-m-d-H');
             $digestLine = '• '.$label.' ('.$unit.'): '.$kind.($detail !== null && $detail !== '' ? ' — '.$detail : '');
 

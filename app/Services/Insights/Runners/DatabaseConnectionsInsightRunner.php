@@ -31,6 +31,9 @@ class DatabaseConnectionsInsightRunner implements InsightRunnerInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {
@@ -76,10 +79,10 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $maxConn = (int) ($values['max_connections'] ?? 0);
-        $maxUsed = (int) ($values['max_used_connections'] ?? 0);
-        $threadsConn = (int) ($values['threads_connected'] ?? 0);
-        $aborted = (int) ($values['aborted_connects'] ?? 0);
+        $maxConn = (int) ($values['max_connections']);
+        $maxUsed = (int) ($values['max_used_connections']);
+        $threadsConn = (int) ($values['threads_connected']);
+        $aborted = (int) ($values['aborted_connects']);
         $errorsMax = (int) ($values['connection_errors_max_connections'] ?? 0);
 
         if ($maxConn <= 0) {
@@ -138,7 +141,7 @@ BASH;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, App\Services\Insights\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

@@ -43,7 +43,7 @@ final class BindingReachability
         }
 
         $env = $binding->connectionEnv();
-        $cfg = is_array($binding->config) ? $binding->config : [];
+        $cfg = ($binding->config );
         $provider = strtolower(trim((string) ($cfg['provider'] ?? '')));
 
         return match ($binding->type) {
@@ -66,7 +66,10 @@ final class BindingReachability
         };
     }
 
-    /** @param array<string, string> $env */
+    /**
+     * @param  array<string, mixed> $env
+     * @return array{host: string, port: int}|null
+     */
     private static function storage(array $env): ?array
     {
         $endpoint = trim((string) ($env['AWS_ENDPOINT'] ?? $env['AWS_URL'] ?? ''));
@@ -84,7 +87,10 @@ final class BindingReachability
         return $region !== '' ? self::clean('s3.'.$region.'.amazonaws.com', 443, 443) : null;
     }
 
-    /** @param array<string, string> $env */
+    /**
+     * @param  array<string, mixed> $env
+     * @return array{host: string, port: int}|null
+     */
     private static function mail(array $env, string $provider): ?array
     {
         // SMTP transports carry an explicit host:port.
@@ -107,8 +113,9 @@ final class BindingReachability
     }
 
     /**
-     * @param  array<string, string>  $env
-     * @param  array<string, mixed>  $cfg
+     * @param  array<string, mixed> $env
+     * @param  array<string, mixed> $cfg
+     * @return array{host: string, port: int}|null
      */
     private static function logging(array $env, array $cfg): ?array
     {
@@ -125,7 +132,8 @@ final class BindingReachability
     /**
      * Find the first `<PREFIX>_HOST` env key with a matching `<PREFIX>_PORT`.
      *
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
+     * @return array{host: string, port: int}|null
      */
     private static function scan(array $env): ?array
     {

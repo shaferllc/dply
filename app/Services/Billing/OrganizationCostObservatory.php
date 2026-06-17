@@ -25,6 +25,7 @@ final class OrganizationCostObservatory
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function forOrganization(Organization $organization, DesiredBillingState $state): array
     {
         $servers = $this->infrastructureServers($organization);
@@ -87,6 +88,7 @@ final class OrganizationCostObservatory
      *   detail: ?string,
      * }
      */
+    /** @return array<string, mixed> */
     public function providerEstimateForServer(Server $server): array
     {
         $server->loadMissing('providerCredential');
@@ -115,7 +117,7 @@ final class OrganizationCostObservatory
             return [
                 'id' => (string) $server->id,
                 'name' => (string) $server->name,
-                'provider' => $server->provider?->label(),
+                'provider' => $server->provider->label(),
                 'plan' => (string) ($server->size ?: ''),
                 'monthly_usd_cents' => $this->noteParser->toUsdCents($parsed['amount'], $parsed['currency']),
                 'source' => 'note',
@@ -131,7 +133,7 @@ final class OrganizationCostObservatory
                 return [
                     'id' => (string) $server->id,
                     'name' => (string) $server->name,
-                    'provider' => (string) ($estimate['provider_label'] ?? $server->provider?->label()),
+                    'provider' => (string) ($estimate['provider_label'] ?? $server->provider->label()),
                     'plan' => (string) ($estimate['plan'] ?? $server->size),
                     'monthly_usd_cents' => $this->noteParser->toUsdCents((float) $estimate['monthly'], $currency),
                     'source' => 'catalog',
@@ -163,7 +165,7 @@ final class OrganizationCostObservatory
         return [
             'id' => (string) $server->id,
             'name' => (string) $server->name,
-            'provider' => $server->provider?->label(),
+            'provider' => $server->provider->label(),
             'plan' => (string) ($server->size ?: ''),
             'monthly_usd_cents' => 0,
             'source' => 'unknown',

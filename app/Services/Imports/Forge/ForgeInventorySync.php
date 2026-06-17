@@ -169,7 +169,7 @@ class ForgeInventorySync
     }
 
     /**
-     * @param  list<int>  $seen
+     * @param  array<string, mixed> $seen
      */
     protected function markMissingServersRemoved(ProviderCredential $credential, array $seen): void
     {
@@ -191,7 +191,7 @@ class ForgeInventorySync
     }
 
     /**
-     * @param  list<int>  $seen
+     * @param  array<string, mixed> $seen
      */
     protected function markMissingSitesRemoved(ForgeServer $server, array $seen): void
     {

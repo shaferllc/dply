@@ -83,6 +83,8 @@ class FakeCloudBackend implements CloudBackend
         // model's meta in fake mode; there's no real spec to push.
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provision(Site $site, ProviderCredential $credential): array
     {
         return [
@@ -91,6 +93,8 @@ class FakeCloudBackend implements CloudBackend
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provisionFromSource(Site $site, ProviderCredential $credential): array
     {
         return [
@@ -99,6 +103,8 @@ class FakeCloudBackend implements CloudBackend
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function redeploy(Site $site, ProviderCredential $credential): array
     {
         return ['deployment_id' => 'fake-deploy-'.Str::random(8)];
@@ -120,6 +126,8 @@ class FakeCloudBackend implements CloudBackend
         // No-op — idempotent.
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function inspect(Site $site, ProviderCredential $credential): array
     {
         return [
@@ -133,6 +141,10 @@ class FakeCloudBackend implements CloudBackend
      * Mirror the union of DO + App Runner regions so the create form's
      * region picker shows a familiar list in fake mode.
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, string>>
+     */
     public function regions(): array
     {
         return [
@@ -143,6 +155,11 @@ class FakeCloudBackend implements CloudBackend
         ];
     }
 
+    /** @return array<int, array<string, string>>
+    /** @return array<int, array<string, string>>
+    /**
+     * @return array<int, array<string, string>>
+     */
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         return [[
@@ -158,6 +175,11 @@ class FakeCloudBackend implements CloudBackend
         // No-op.
     }
 
+    /** @return array<int, array<string, string>>
+    /** @return array<int, array<string, string>>
+    /**
+     * @return array<int, array<string, string>>
+     */
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
         return [
@@ -167,6 +189,11 @@ class FakeCloudBackend implements CloudBackend
         ];
     }
 
+    /** @return array<int, array<string, string>>
+    /** @return array<int, array<string, string>>
+    /**
+     * @return list<array<string, string>>
+     */
     public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
     {
         $now = now();
@@ -190,6 +217,7 @@ class FakeCloudBackend implements CloudBackend
      * renders the same shape (stable test oracle); restarts are a
      * mostly-flat low integer series. ~60 points regardless of window.
      */
+    /** @return array<string, mixed> */
     public function metrics(Site $site, ProviderCredential $credential, string $window): array
     {
         $window = $this->normalizeWindow($window);
@@ -228,6 +256,7 @@ class FakeCloudBackend implements CloudBackend
      * set of Laravel-shaped request lines so dev installs and tests
      * see a populated RUN log viewer.
      */
+    /** @return array<string, mixed> */
     public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
         $lines = max(1, min(2000, $lines));

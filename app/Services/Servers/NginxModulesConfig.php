@@ -58,6 +58,7 @@ class NginxModulesConfig
      *     unreadable: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -200,13 +201,13 @@ class NginxModulesConfig
         foreach ($availableRows as $stem => $meta) {
             $modules[] = [
                 'name' => $stem,
-                'conf_file' => (string) ($meta['conf_file'] ?? $stem),
+                'conf_file' => (string) ($meta['conf_file']),
                 'enabled' => isset($enabled[$stem]),
                 'protected' => in_array($stem, self::PROTECTED_MODULES, true),
                 'type' => $this->classify($stem),
                 'source' => 'dynamic',
                 'package' => $meta['package'],
-                'installed' => (bool) ($meta['installed'] ?? false),
+                'installed' => (bool) ($meta['installed']),
                 'so_path' => $meta['so_path'],
             ];
         }

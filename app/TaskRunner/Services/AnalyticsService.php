@@ -6,6 +6,7 @@ namespace App\Modules\TaskRunner\Services;
 
 use App\Modules\TaskRunner\Contracts\HasAnalytics;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +18,37 @@ use Illuminate\Support\Facades\Log;
 class AnalyticsService
 {
     /**
+     * Get analytics for a persisted task.
+     *
+     * @return array<string, mixed>
+     */
+    public function getTaskAnalytics(string $taskId): array
+    {
+        $task = Task::find($taskId);
+
+        if (! $task) {
+            return [
+                'found' => false,
+                'task_id' => $taskId,
+            ];
+        }
+
+        $metrics = $task->getPerformanceMetrics();
+
+        return [
+            'found' => true,
+            'task_id' => $taskId,
+            'summary' => $metrics,
+            'historical_metrics' => $this->getHistoricalMetrics($taskId),
+            'success_rate' => $task->isSuccessful() ? 100.0 : 0.0,
+            'duration' => $task->getDuration(),
+        ];
+    }
+
+    /**
      * Record a performance metric.
+     *
+     * @param  array<string, mixed>  $context
      */
     public function recordMetric(string $taskId, string $metric, mixed $value, array $context = []): void
     {
@@ -41,6 +72,8 @@ class AnalyticsService
 
     /**
      * Calculate performance trends for a task.
+     *
+     * @return array<string, mixed>
      */
     public function calculateTrends(HasAnalytics $task): array
     {
@@ -69,6 +102,8 @@ class AnalyticsService
 
     /**
      * Generate optimization insights.
+     *
+     * @return list<array<string, mixed>>
      */
     public function generateOptimizationInsights(HasAnalytics $task): array
     {
@@ -113,8 +148,9 @@ class AnalyticsService
         }
 
         // Execution time insights
-        $baselineTime = $task->getBaselineExecutionTime() ?? 60;
-        if ($metrics['execution_time'] > $baselineTime * 1.5) {
+        $baselineTime = (float) config('task-runner.analytics.baseline_execution_time', 60);
+        $executionTime = (float) ($metrics['execution_time'] ?? $metrics['duration'] ?? 0);
+        if ($executionTime > $baselineTime * 1.5) {
             $insights[] = [
                 'type' => 'execution_time_optimization',
                 'priority' => 'high',
@@ -154,6 +190,8 @@ class AnalyticsService
 
     /**
      * Generate performance report.
+     *
+     * @return array<string, mixed>
      */
     public function generatePerformanceReport(HasAnalytics $task): array
     {
@@ -200,6 +238,9 @@ class AnalyticsService
 
     /**
      * Compare performance across multiple tasks.
+     *
+     * @param  list<string>  $taskIds
+     * @return array<string, mixed>
      */
     public function compareTasks(array $taskIds): array
     {
@@ -208,12 +249,13 @@ class AnalyticsService
         foreach ($taskIds as $taskId) {
             $task = Task::find($taskId);
             if ($task) {
+                $metrics = $task->getPerformanceMetrics();
                 $comparison[$taskId] = [
                     'task_name' => $task->name,
-                    'execution_time' => $task->getExecutionTime(),
-                    'memory_usage' => $task->getMemoryUsage(),
-                    'success_rate' => $task->getSuccessRate(),
-                    'efficiency_score' => $task->getEfficiencyScore(),
+                    'execution_time' => (float) ($metrics['duration'] ?? $task->getDuration()),
+                    'memory_usage' => (int) ($metrics['output_size'] ?? 0),
+                    'success_rate' => $task->isSuccessful() ? 1.0 : 0.0,
+                    'efficiency_score' => $task->isSuccessful() ? 1.0 : 0.0,
                 ];
             }
         }
@@ -233,6 +275,8 @@ class AnalyticsService
 
     /**
      * Generate performance dashboard data.
+     *
+     * @return array<string, mixed>
      */
     public function generateDashboardData(): array
     {
@@ -257,6 +301,8 @@ class AnalyticsService
 
     /**
      * Store metric in database.
+     *
+     * @param  array<string, mixed>  $data
      */
     protected function storeMetricInDatabase(array $data): void
     {
@@ -272,6 +318,8 @@ class AnalyticsService
 
     /**
      * Get historical metrics for a task.
+     *
+     * @return list<array<string, mixed>>
      */
     protected function getHistoricalMetrics(string $taskId): array
     {
@@ -294,6 +342,9 @@ class AnalyticsService
 
     /**
      * Calculate trend for a series of values.
+     *
+     * @param  list<float|int>  $values
+     * @return array<string, mixed>
      */
     protected function calculateTrend(array $values): array
     {
@@ -364,6 +415,9 @@ class AnalyticsService
 
     /**
      * Calculate averages for task comparison.
+     *
+     * @param  array<string, array<string, mixed>>  $comparison
+     * @return array<string, float>
      */
     protected function calculateAverages(array $comparison): array
     {
@@ -380,6 +434,9 @@ class AnalyticsService
 
     /**
      * Calculate rankings for task comparison.
+     *
+     * @param  array<string, array<string, mixed>>  $comparison
+     * @return array<string, array<string, int>>
      */
     protected function calculateRankings(array $comparison): array
     {
@@ -399,6 +456,8 @@ class AnalyticsService
 
     /**
      * Get rank of a value in an array.
+     *
+     * @param  list<float>  $values
      */
     protected function getRank(float $value, array $values): int
     {
@@ -410,6 +469,8 @@ class AnalyticsService
 
     /**
      * Find best performing task.
+     *
+     * @param  array<string, array<string, mixed>>  $comparison
      */
     protected function findBestPerformer(array $comparison): ?string
     {
@@ -428,6 +489,8 @@ class AnalyticsService
 
     /**
      * Find worst performing task.
+     *
+     * @param  array<string, array<string, mixed>>  $comparison
      */
     protected function findWorstPerformer(array $comparison): ?string
     {
@@ -446,8 +509,11 @@ class AnalyticsService
 
     /**
      * Get performance trends for recent tasks.
+     *
+     * @param  Collection<int, Task>  $tasks
+     * @return array<string, mixed>
      */
-    protected function getPerformanceTrends($tasks): array
+    protected function getPerformanceTrends(Collection $tasks): array
     {
         // Group tasks by day and calculate daily averages
         $dailyData = $tasks->groupBy(function ($task) {
@@ -465,8 +531,11 @@ class AnalyticsService
 
     /**
      * Get resource usage summary.
+     *
+     * @param  Collection<int, Task>  $tasks
+     * @return array<string, mixed>
      */
-    protected function getResourceUsageSummary($tasks): array
+    protected function getResourceUsageSummary(Collection $tasks): array
     {
         return [
             'average_memory_usage' => $tasks->avg('memory_usage'),
@@ -478,25 +547,33 @@ class AnalyticsService
 
     /**
      * Get top optimization opportunities.
+     *
+     * @param  Collection<int, Task>  $tasks
+     * @return list<array<string, mixed>>
      */
-    protected function getTopOptimizationOpportunities($tasks): array
+    protected function getTopOptimizationOpportunities(Collection $tasks): array
     {
-        return $tasks->where('efficiency_score', '<', 0.6)
-            ->sortBy('efficiency_score')
+        return $tasks
+            ->filter(fn (Task $task) => ! $task->isSuccessful())
             ->take(5)
-            ->map(function ($task) {
+            ->map(function (Task $task) {
+                $metrics = $task->getPerformanceMetrics();
+
                 return [
                     'task_id' => $task->id,
                     'task_name' => $task->name,
-                    'efficiency_score' => $task->efficiency_score,
-                    'execution_time' => $task->execution_time,
+                    'efficiency_score' => ($metrics['successful'] ?? false) ? 1.0 : 0.0,
+                    'execution_time' => $metrics['duration'] ?? $task->getDuration(),
                 ];
             })
+            ->values()
             ->toArray();
     }
 
     /**
      * Get recent performance alerts.
+     *
+     * @return list<array<string, mixed>>
      */
     protected function getRecentPerformanceAlerts(): array
     {

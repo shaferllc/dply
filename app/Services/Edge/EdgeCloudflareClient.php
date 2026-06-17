@@ -35,6 +35,7 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function verifyToken(): array
     {
         return $this->decode(
@@ -45,18 +46,20 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function listAccounts(): array
     {
         $payload = $this->decode(
             Http::withToken($this->apiToken)->get(self::BASE.'/accounts'),
         );
 
-        return is_array($payload) ? $payload : [];
+        return ($payload );
     }
 
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function listR2Buckets(): array
     {
         $payload = $this->decode(
@@ -70,6 +73,7 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createR2Bucket(string $name, ?string $locationHint = null, ?string $jurisdiction = null): array
     {
         // Cloudflare R2 jurisdictions: "default", "eu", "fedramp".
@@ -107,6 +111,7 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function listKvNamespaces(): array
     {
         $payload = $this->decode(
@@ -120,6 +125,7 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createKvNamespace(string $title): array
     {
         return $this->decode(
@@ -165,6 +171,10 @@ class EdgeCloudflareClient
      *
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed, mixed>>
+     */
     public function listDispatchNamespaces(): array
     {
         $payload = $this->decode(
@@ -172,12 +182,13 @@ class EdgeCloudflareClient
                 ->get(self::BASE.'/accounts/'.$this->accountId.'/workers/dispatch/namespaces'),
         );
 
-        return is_array($payload) ? array_values(array_filter($payload, 'is_array')) : [];
+        return (array_values(array_filter($payload, 'is_array')) );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return list<array<mixed, mixed>>
      */
+    /** @return array<string, mixed> */
     public function createDispatchNamespace(string $name): array
     {
         return $this->decode(
@@ -231,7 +242,7 @@ class EdgeCloudflareClient
      *
      * @param  string  $namespace  Namespace NAME (not id) — CF API uses name here.
      * @param  string  $entryModulePath  File name the metadata.main_module points at (e.g. "worker.js").
-     * @param  array<string, string>  $modules  Map of module file name → module source. Must include $entryModulePath.
+     * @param  array<string, mixed> $modules  Map of module file name → module source. Must include $entryModulePath.
      * @param  list<array<string, mixed>>  $bindings  Cloudflare binding descriptors (kv_namespace, r2_bucket, plain_text, secret_text, etc.).
      * @param  array{compatibility_date?: string, compatibility_flags?: list<string>, tags?: list<string>}  $metaExtras
      * @return array<string, mixed>
@@ -254,7 +265,7 @@ class EdgeCloudflareClient
         $metadata = array_merge(
             [
                 'main_module' => $entryModulePath,
-                'bindings' => array_values($bindings),
+                'bindings' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($bindings)))))))))))))))))))))))))))))))),
             ],
             array_intersect_key($metaExtras, array_flip(['compatibility_date', 'compatibility_flags', 'tags'])),
         );
@@ -314,7 +325,7 @@ class EdgeCloudflareClient
      * dispatch script (P10b / Phase 4c). Pass an empty array to
      * clear all schedules.
      *
-     * @param  list<string>  $schedules  Cron expressions ("0 * * * *")
+     * @param  array<string, mixed> $schedules  Cron expressions ("0 * * * *")
      */
     public function setDispatchScriptSchedules(string $namespace, string $scriptName, array $schedules): void
     {
@@ -324,7 +335,7 @@ class EdgeCloudflareClient
 
         $body = array_values(array_map(
             static fn (string $cron): array => ['cron' => trim($cron)],
-            array_filter($schedules, static fn ($s) => is_string($s) && trim($s) !== ''),
+            array_filter($schedules, static fn ($s) => ($s) && trim($s) !== ''),
         ));
 
         $this->decode(
@@ -342,6 +353,7 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function listD1Databases(): array
     {
         $payload = $this->decode(
@@ -353,12 +365,13 @@ class EdgeCloudflareClient
             return $payload['value'];
         }
 
-        return is_array($payload) && array_is_list($payload) ? $payload : [];
+        return ($payload) && array_is_list($payload) ? $payload : [];
     }
 
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createD1Database(string $name, string $primaryLocationHint = 'wnam'): array
     {
         $body = ['name' => $name];
@@ -376,6 +389,7 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function listQueues(): array
     {
         $payload = $this->decode(
@@ -387,12 +401,13 @@ class EdgeCloudflareClient
             return $payload['value'];
         }
 
-        return is_array($payload) && array_is_list($payload) ? $payload : [];
+        return ($payload) && array_is_list($payload) ? $payload : [];
     }
 
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createQueue(string $name): array
     {
         return $this->decode(
@@ -425,6 +440,7 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function patchZoneSetting(string $zoneId, string $settingId, string $value): array
     {
         return $this->decode(
@@ -440,6 +456,7 @@ class EdgeCloudflareClient
      *
      * @return array{ok: bool, zone: string, value: ?string, detail: string}
      */
+    /** @return array<string, mixed> */
     public function ensureImageResizingEnabled(string $zoneName): array
     {
         $zoneName = strtolower(trim($zoneName));
@@ -507,7 +524,7 @@ class EdgeCloudflareClient
      * Uses Cloudflare GraphQL httpRequestsAdaptiveGroups. Requires Analytics
      * read on the API token and a resolvable zone for worker_zone_name.
      *
-     * @param  list<string>  $hostnames
+     * @param  array<string, mixed> $hostnames
      * @return Collection<string, EdgeUsageTotals>
      */
     public function fetchHttpUsageByHostnames(
@@ -617,6 +634,10 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function queryAnalyticsEngineSql(string $sql): array
     {
         if (! $this->canQueryAnalyticsEngine()) {
@@ -677,8 +698,9 @@ class EdgeCloudflareClient
     }
 
     /**
-     * @return array{id: string, enabled: bool}
+     * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function ensureLogpushJob(string $zoneId, string $destinationConf, string $dataset = 'http_requests'): array
     {
         foreach ($this->listLogpushJobs($zoneId) as $job) {
@@ -708,6 +730,7 @@ class EdgeCloudflareClient
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function listLogpushJobs(string $zoneId): array
     {
         $response = Http::withToken($this->apiToken)->get(self::BASE.'/zones/'.$zoneId.'/logpush/jobs');
@@ -854,9 +877,10 @@ class EdgeCloudflareClient
     /**
      * MVP stub for Cloudflare Custom Hostnames (SSL for SaaS) — full provisioning deferred to Phase 3b.
      *
-     * @param  array<string, mixed>  $options
+     * @param  array<string, mixed> $options
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createCustomHostname(string $zoneId, string $hostname, array $options = []): array
     {
         $response = Http::withToken($this->apiToken)
@@ -872,6 +896,7 @@ class EdgeCloudflareClient
     }
 
     /**
+     * @param  array<string, mixed> $options
      * @return array<string, mixed>
      */
     private function decode(Response $response): array

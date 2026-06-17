@@ -115,6 +115,8 @@ enum TaskStatus: string
 
     /**
      * Get all statuses that indicate completion.
+     *
+     * @return list<TaskStatus>
      */
     public static function getCompletedStatuses(): array
     {
@@ -130,6 +132,8 @@ enum TaskStatus: string
 
     /**
      * Get all statuses that indicate failure.
+     *
+     * @return list<TaskStatus>
      */
     public static function getFailedStatuses(): array
     {

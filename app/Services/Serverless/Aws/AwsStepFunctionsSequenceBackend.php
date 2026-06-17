@@ -49,6 +49,8 @@ class AwsStepFunctionsSequenceBackend implements ServerlessSequenceBackend
         );
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deploy(FunctionAction $sequence): array
     {
         if (! $sequence->isSequence()) {
@@ -93,7 +95,7 @@ class AwsStepFunctionsSequenceBackend implements ServerlessSequenceBackend
      */
     private function componentNames(FunctionAction $sequence): array
     {
-        $components = is_array($sequence->components) ? $sequence->components : [];
+        $components = ($sequence->components );
 
         return array_values(array_filter(array_map(
             static fn (mixed $component): string => is_array($component) ? trim((string) ($component['name'] ?? '')) : '',

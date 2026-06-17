@@ -258,6 +258,7 @@ BASH;
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -294,7 +295,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -479,7 +480,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      */
     public function resolveWebListenPortFromParsed(array $parsed): int
     {
@@ -501,9 +502,10 @@ YAML;
     /**
      * Keep dply-managed localhost API/metrics entry points when operators save static config.
      *
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function ensureDplyTraefikStaticDefaults(Server $server, array $parsed): array
     {
         if ($server->edgeProxy() !== 'traefik') {
@@ -553,7 +555,8 @@ YAML;
     /**
      * Walk a dot-path inside the parsed array.
      *
-     * @param  array<string, mixed>  $tree
+     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed> $tree
      */
     private function getByPath(array $tree, string $path): mixed
     {
@@ -571,7 +574,7 @@ YAML;
     /**
      * Set a dot-path inside the array, creating intermediate maps as needed.
      *
-     * @param  array<string, mixed>  $tree
+     * @param  array<string, mixed> $tree
      * @return array<string, mixed>
      */
     private function setByPath(array $tree, string $path, mixed $value): array
@@ -599,7 +602,7 @@ YAML;
      * Remove a dot-path inside the tree. Empties out intermediate maps that
      * are left with no children so we don't accumulate `api: {}` shells.
      *
-     * @param  array<string, mixed>  $tree
+     * @param  array<string, mixed> $tree
      * @return array<string, mixed>
      */
     private function unsetByPath(array $tree, string $path): array
@@ -611,8 +614,8 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed>  $tree
-     * @param  list<string>  $segments
+     * @param  array<string, mixed> $tree
+     * @param  array<string, mixed> $segments
      */
     private function recursiveUnset(array &$tree, array $segments): void
     {

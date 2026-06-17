@@ -464,6 +464,9 @@ use App\Actions\Decorators\CompensationDecorator;
  */
 trait AsCompensatable
 {
+    // Provides static::make() used by compensate() to resolve an instance.
+    use AsObject;
+
     /**
      * Reference to the compensation decorator (injected by decorator).
      */

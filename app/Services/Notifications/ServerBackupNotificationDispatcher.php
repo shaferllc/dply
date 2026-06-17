@@ -27,8 +27,8 @@ final class ServerBackupNotificationDispatcher
     ) {}
 
     /**
-     * @param  list<string>  $resourceLabels  affected backup/schedule labels
-     * @param  array<string, mixed>  $extraMetadata  should include `backup_type`
+     * @param  array<string, mixed> $resourceLabels  affected backup/schedule labels
+     * @param  array<string, mixed> $extraMetadata  should include `backup_type`
      */
     public function notify(
         Server $server,

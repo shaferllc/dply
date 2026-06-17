@@ -14,6 +14,7 @@ use App\Jobs\ApplyRemediationJob;
 class RemediationCatalog
 {
     /** @return array<string, array<string, mixed>> */
+    /** @return array<string, mixed> */
     public function all(): array
     {
         return (array) config('remediations', []);
@@ -59,6 +60,10 @@ class RemediationCatalog
      *
      * @return list<class-string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function handlerClasses(): array
     {
         $classes = [];
@@ -77,7 +82,7 @@ class RemediationCatalog
     /**
      * Resolve a single action within a remediation.
      *
-     * @return array<string, mixed>|null
+     * @return list<string>
      */
     public function action(string $code, string $actionKey): ?array
     {

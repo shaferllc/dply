@@ -20,7 +20,7 @@ class GenerateEd25519KeyPair extends Task
     /**
      * Initializes a new instance of the class.
      */
-    public function __construct(public string $privatePath) {}
+    public function __construct(public string $privatePath = '') {}
 
     /**
      * Get the comment for the key pair.
@@ -34,7 +34,7 @@ class GenerateEd25519KeyPair extends Task
     {
         $errors = [];
 
-        if (empty($this->privatePath) || ! is_string($this->privatePath)) {
+        if ($this->privatePath === '') {
             $errors['privatePath'] = 'privatePath must be a non-empty string.';
         }
 

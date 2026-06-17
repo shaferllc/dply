@@ -25,6 +25,7 @@ class WranglerBindingsExtractor
     /**
      * @return array<string, array<string, string>>
      */
+    /** @return array<string, mixed> */
     public function extract(string $checkoutDir): array
     {
         foreach (['wrangler.jsonc', 'wrangler.json', 'wrangler.toml'] as $file) {
@@ -137,7 +138,7 @@ class WranglerBindingsExtractor
         return $raw;
     }
 
-    /** @param array<string, mixed> $out */
+    /** @param  array<string, mixed> $out */
     private function pushTomlEntry(array &$out, string $section, array $entry): void
     {
         match ($section) {
@@ -149,7 +150,7 @@ class WranglerBindingsExtractor
         };
     }
 
-    /** @param array<string, mixed> $out */
+    /** @param  array<string, mixed> $out */
     private function updateTomlEntry(array &$out, string $section, array $entry): void
     {
         $list = match ($section) {
@@ -177,7 +178,8 @@ class WranglerBindingsExtractor
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
+     * @param  array<string, mixed> $entry
      * @return array<string, array<string, string>>
      */
     private function normalize(array $parsed): array

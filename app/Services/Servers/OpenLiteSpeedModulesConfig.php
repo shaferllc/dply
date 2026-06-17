@@ -66,6 +66,7 @@ BLOCK,
     /**
      * @return array{modules: list<array{name: string, enabled: bool, protected: bool, on_disk: bool, type: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -160,6 +161,10 @@ BASH;
         $emit->success(sprintf('OpenLiteSpeed reloaded — module `%s` is now %s.', $name, $enable ? 'enabled' : 'disabled'));
     }
 
+    /**
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */

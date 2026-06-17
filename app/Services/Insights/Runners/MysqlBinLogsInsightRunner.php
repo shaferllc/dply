@@ -27,6 +27,9 @@ class MysqlBinLogsInsightRunner implements InsightRunnerInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {
@@ -150,7 +153,7 @@ BASH;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, App\Services\Insights\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

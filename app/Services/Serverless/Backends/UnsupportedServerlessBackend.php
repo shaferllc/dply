@@ -18,16 +18,22 @@ class UnsupportedServerlessBackend implements ServerlessSequenceBackend, Serverl
 {
     public function __construct(private readonly string $reason = 'This serverless host does not support triggers or sequences yet.') {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provision(FunctionAction $action): array
     {
         return ['ok' => false, 'error' => $this->reason, 'trigger' => null];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function remove(FunctionAction $action): array
     {
         return ['ok' => false, 'error' => $this->reason];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deploy(FunctionAction $sequence): array
     {
         return ['ok' => false, 'error' => $this->reason];

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\TaskRunner\Concerns;
 
 use App\Modules\TaskRunner\AnonymousTask;
-use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\ParallelTaskExecutor;
 use App\Modules\TaskRunner\Task;
 use App\Modules\TaskRunner\TaskChain;
@@ -18,10 +17,11 @@ use Throwable;
  */
 trait RunsTaskRunnerParallelChains
 {
-
-
     /**
      * Run multiple tasks in parallel with model support.
+     *
+     * @param  array<string, mixed>  $tasks
+     * @return array<string, mixed>
      */
     public function runParallelWithModels(array $tasks): array
     {
@@ -36,8 +36,6 @@ trait RunsTaskRunnerParallelChains
             }
         }
 
-        // For now, run sequentially but track as parallel
-        // In a real implementation, you'd use async/await or parallel processing
         foreach ($promises as $index => $promise) {
             try {
                 $results[$index] = $promise();
@@ -51,6 +49,10 @@ trait RunsTaskRunnerParallelChains
 
     /**
      * Run tasks in a chain with model support.
+     *
+     * @param  array<string, mixed>  $tasks
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function runChainWithModels(array $tasks, array $options = []): array
     {
@@ -71,6 +73,10 @@ trait RunsTaskRunnerParallelChains
 
     /**
      * Run multiple tasks in parallel.
+     *
+     * @param  array<string, mixed>  $tasks
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function runParallel(array $tasks, array $options = []): array
     {
@@ -87,6 +93,8 @@ trait RunsTaskRunnerParallelChains
 
     /**
      * Run a task chain in parallel.
+     *
+     * @return array<string, mixed>
      */
     public function runChainParallel(TaskChain $chain): array
     {
@@ -95,13 +103,16 @@ trait RunsTaskRunnerParallelChains
 
     /**
      * Run multiple task chains in parallel.
+     *
+     * @param  array<string, mixed>  $chains
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function runChainsParallel(array $chains, array $options = []): array
     {
         $parallelExecutor = ParallelTaskExecutor::make($this);
 
         foreach ($chains as $chain) {
-            // Convert each chain to a single task that runs the chain
             $chainTask = AnonymousTask::callback(
                 "Chain: {$chain->getChainId()}",
                 function () use ($chain) {
@@ -126,6 +137,8 @@ trait RunsTaskRunnerParallelChains
 
     /**
      * Run a task chain.
+     *
+     * @return array<string, mixed>
      */
     public function runChain(TaskChain $chain): array
     {
@@ -134,6 +147,10 @@ trait RunsTaskRunnerParallelChains
 
     /**
      * Create and run a task chain with the given tasks.
+     *
+     * @param  array<string, mixed>  $tasks
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function runTaskChain(array $tasks, array $options = []): array
     {

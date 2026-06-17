@@ -59,6 +59,9 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, 'validate connection');
     }
 
+    /**
+     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
+     */
     public function listServers(): array
     {
         $response = $this->client->get('/servers');
@@ -72,6 +75,9 @@ class ForgeImportDriver implements ImportDriver
         ));
     }
 
+    /**
+     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
+     */
     public function fetchServerDetail(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}");
@@ -81,6 +87,9 @@ class ForgeImportDriver implements ImportDriver
         return $this->normaliseServer($row);
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listSites(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}/sites");
@@ -93,6 +102,9 @@ class ForgeImportDriver implements ImportDriver
         ));
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}");
@@ -135,6 +147,9 @@ class ForgeImportDriver implements ImportDriver
         return (string) $response->body();
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listSiteCrons(int $sourceServerId, int $sourceSiteId): array
     {
         // Forge: crons are server-level "scheduled jobs". For per-site
@@ -170,6 +185,9 @@ class ForgeImportDriver implements ImportDriver
         return $hits;
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listDaemons(int $sourceServerId, int $sourceSiteId): array
     {
         $site = $this->fetchSiteDetail($sourceServerId, $sourceSiteId);
@@ -207,6 +225,9 @@ class ForgeImportDriver implements ImportDriver
         return $hits;
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array
     {
         // Forge databases are server-level. For per-site listing we match by user
@@ -297,6 +318,9 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "disable maintenance for site {$sourceServerId}/{$sourceSiteId}");
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string>>
+     */
     public function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}/git/webhooks");
@@ -323,8 +347,8 @@ class ForgeImportDriver implements ImportDriver
     }
 
     /**
-     * @param  array<string, mixed>  $row
-     * @return array{
+     * @param  array<string, mixed> $row
+     * @return list<array<string, array<string, mixed>|int|string>>
      *     id: int,
      *     name: string,
      *     ip_address: ?string,
@@ -375,7 +399,7 @@ class ForgeImportDriver implements ImportDriver
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{
      *     id: int,
      *     domain: string,
@@ -427,6 +451,7 @@ class ForgeImportDriver implements ImportDriver
 
     /**
      * Forge encodes versions as "php82" / "php83"; normalise to "8.2" / "8.3"
+     * @param  array<string, mixed> $row
      * to match Ploi's shape.
      */
     protected function humanisePhpVersion(mixed $value): ?string

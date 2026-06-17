@@ -30,7 +30,7 @@ class ScheduleHeartbeatIngest
     private const SUPPORTED_VERSIONS = [1, 2];
 
     /**
-     * @param  array<int, mixed>  $heartbeats  Raw `scheduler_heartbeats` array from the push payload.
+     * @param  array<string, mixed> $heartbeats  Raw `scheduler_heartbeats` array from the push payload.
      */
     public function ingest(Server $server, array $heartbeats): void
     {
@@ -169,7 +169,7 @@ class ScheduleHeartbeatIngest
      * wrapper captured it (per-scheduler opt-in). Excerpt fields absent + a
      * zero exit code = nothing worth a row.
      *
-     * @param  array<string, mixed>  $raw
+     * @param  array<string, mixed> $raw
      */
     private function recordTickOutputIfAny(
         ServerSchedulerHeartbeat $heartbeat,

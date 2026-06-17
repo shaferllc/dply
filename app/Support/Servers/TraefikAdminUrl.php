@@ -48,7 +48,7 @@ final class TraefikAdminUrl
     }
 
     /**
-     * @param  array<string, mixed>  $parsed  Decoded traefik.yml
+     * @param  array<string, mixed> $parsed  Decoded traefik.yml
      */
     public static function fromStaticConfig(array $parsed): ?string
     {
@@ -68,7 +68,7 @@ final class TraefikAdminUrl
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      */
     public static function apiDashboardEnabled(array $parsed): bool
     {
@@ -85,7 +85,7 @@ final class TraefikAdminUrl
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      */
     public static function apiInsecureEnabled(array $parsed): bool
     {
@@ -102,7 +102,7 @@ final class TraefikAdminUrl
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      */
     public static function hasTraefikEntryPoint(array $parsed): bool
     {

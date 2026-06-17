@@ -25,6 +25,7 @@ final class AccessLogVisitorClassifier
 
     /**
      * @return array{human: int, crawler: int, bot: int, ai: int, unknown: int}
+     * @param  array<string, mixed> $lines
      */
     public static function breakdown(array $lines): array
     {
@@ -103,6 +104,9 @@ final class AccessLogVisitorClassifier
         return in_array($filter, self::FILTERS, true) ? $filter : 'all';
     }
 
+    /**
+     * @param  array<string, mixed> $def
+     */
     public static function isAccessLogSource(string $logKey, array $def): bool
     {
         if (($def['type'] ?? '') !== 'file') {

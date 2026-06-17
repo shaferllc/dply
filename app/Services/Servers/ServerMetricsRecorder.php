@@ -13,6 +13,9 @@ use DateTimeInterface;
  */
 class ServerMetricsRecorder
 {
+    /**
+     * @param  array<string, mixed> $normalizedPayload
+     */
     public function storeSnapshot(Server $server, array $normalizedPayload, DateTimeInterface $capturedAt): ServerMetricSnapshot
     {
         $snapshot = ServerMetricSnapshot::query()->create([

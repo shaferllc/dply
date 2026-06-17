@@ -23,6 +23,9 @@ class PackageSecurityUpdatesInsightRunner implements InsightRunnerInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {
@@ -62,8 +65,8 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $security = (int) ($values['security'] ?? 0);
-        $total = (int) ($values['total'] ?? 0);
+        $security = (int) ($values['security']);
+        $total = (int) ($values['total']);
 
         $threshold = max(0, (int) ($parameters['min_security_updates'] ?? 1));
         if ($security < $threshold || $security <= 0) {
@@ -99,7 +102,7 @@ BASH;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, App\Services\Insights\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

@@ -79,6 +79,8 @@ trait BuildsTaskUrlsAndOutput
 
     /**
      * Get the task output as lines.
+     *
+     * @return list<string>
      */
     public function outputLines(): array
     {
@@ -89,9 +91,6 @@ trait BuildsTaskUrlsAndOutput
         return explode(PHP_EOL, $this->output);
     }
 
-    /**
-     * Get the last N lines of output.
-     */
     public function tailOutput(int $lines = 10): string
     {
         $outputLines = $this->outputLines();

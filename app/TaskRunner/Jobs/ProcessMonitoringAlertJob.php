@@ -28,17 +28,16 @@ class ProcessMonitoringAlertJob implements ShouldQueue
 
     /**
      * Create a new job instance.
+     * @param  array<string, mixed> $alert
      */
     public function __construct(
+        /** @var array<string, mixed> */
         public array $alert,
         public ?string $taskId = null
     ) {
         $this->onQueue('monitoring');
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(MonitoringService $monitoringService): void
     {
         Log::info('Starting monitoring alert processing', [
@@ -107,6 +106,8 @@ class ProcessMonitoringAlertJob implements ShouldQueue
 
     /**
      * Get the tags for the job.
+     *
+     * @return list<string>
      */
     public function tags(): array
     {

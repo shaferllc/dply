@@ -362,6 +362,7 @@ class SiteProvisioner
     /**
      * @return array{ok: bool, hostname: ?string, url: ?string, error: ?string, checked_at: string}
      */
+    /** @return array<string, mixed> */
     public function checkReadiness(Site $site): array
     {
         $site->loadMissing(['server', 'domains']);
@@ -576,9 +577,12 @@ class SiteProvisioner
         ]);
     }
 
+    /**
+     * @param  array<string, mixed> $payload
+     */
     private function updateProvisioning(Site $site, array $payload): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $existing = $site->provisioningMeta();
         $meta['provisioning'] = array_merge($existing, $payload);
 
@@ -597,11 +601,11 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      */
     public function appendLog(Site $site, string $level, string $step, string $message, array $context = []): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $existing = $site->provisioningMeta();
         $log = $existing['log'] ?? [];
         $log = is_array($log) ? $log : [];
@@ -622,7 +626,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      * @return array<string, mixed>
      */
     private function filterLogContext(array $context): array
@@ -662,7 +666,7 @@ class SiteProvisioner
         }
 
         foreach ($reachability['checks'] ?? [] as $check) {
-            if (($check['hostname'] ?? null) === $previewHostname && ($check['ok'] ?? false)) {
+            if (($check['hostname']) === $previewHostname && ($check['ok'])) {
                 return true;
             }
         }
@@ -671,7 +675,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      */
     private function queueAutomaticPreviewSsl(Site $site, string $step, string $message, array $context = []): void
     {

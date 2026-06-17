@@ -112,7 +112,7 @@ class SiteBackendManager
      */
     private function ensureGroupEnabled(Site $site, ?string $substrate): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $group = is_array($meta['backend_group'] ?? null) ? $meta['backend_group'] : [];
 
         $group['enabled'] = true;

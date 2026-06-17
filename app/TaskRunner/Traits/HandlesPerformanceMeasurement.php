@@ -13,17 +13,18 @@ trait HandlesPerformanceMeasurement
     /**
      * Performance measurement properties.
      */
+    /** @var array<string, mixed> */
     protected array $measurements = [];
 
+    /** @var array<string, mixed> */
     protected array $timers = [];
 
+    /** @var array<string, mixed> */
     protected array $profiles = [];
 
+    /** @var array<string, mixed> */
     protected array $benchmarks = [];
 
-    /**
-     * Start performance measurement.
-     */
     public function startMeasurement(string $measurement): void
     {
         $this->measurements[$measurement] = [
@@ -33,9 +34,6 @@ trait HandlesPerformanceMeasurement
         ];
     }
 
-    /**
-     * End performance measurement.
-     */
     public function endMeasurement(string $measurement): float
     {
         if (! isset($this->measurements[$measurement])) {
@@ -117,6 +115,7 @@ trait HandlesPerformanceMeasurement
     /**
      * End profiling and get results.
      */
+    /** @return array<string, mixed> */
     public function endProfile(string $profileName): array
     {
         if (! isset($this->profiles[$profileName])) {
@@ -149,6 +148,7 @@ trait HandlesPerformanceMeasurement
     /**
      * Run a benchmark with multiple iterations.
      */
+    /** @return array<string, mixed> */
     public function runBenchmark(string $benchmarkName, callable $callback, int $iterations = 1000): array
     {
         $this->startMeasurement($benchmarkName);
@@ -205,46 +205,37 @@ trait HandlesPerformanceMeasurement
     /**
      * Get all measurements.
      */
+    /** @return array<string, mixed> */
     public function getMeasurements(): array
     {
         return $this->measurements;
     }
 
-    /**
-     * Get all timers.
-     */
+    /** @return array<string, mixed> */
     public function getTimers(): array
     {
         return $this->timers;
     }
 
-    /**
-     * Get all profiles.
-     */
+    /** @return array<string, mixed> */
     public function getProfiles(): array
     {
         return $this->profiles;
     }
 
-    /**
-     * Get all benchmarks.
-     */
+    /** @return array<string, mixed> */
     public function getBenchmarks(): array
     {
         return $this->benchmarks;
     }
 
-    /**
-     * Get measurement by name.
-     */
+    /** @return array<string, mixed>|null */
     public function getMeasurement(string $measurementName): ?array
     {
         return $this->measurements[$measurementName] ?? null;
     }
 
-    /**
-     * Get timer by name.
-     */
+    /** @return array<string, mixed>|null */
     public function getTimer(string $timerName): ?array
     {
         return $this->timers[$timerName] ?? null;
@@ -252,6 +243,8 @@ trait HandlesPerformanceMeasurement
 
     /**
      * Get profile by name.
+     *
+     * @return array<string, mixed>|null
      */
     public function getProfile(string $profileName): ?array
     {
@@ -260,6 +253,8 @@ trait HandlesPerformanceMeasurement
 
     /**
      * Get benchmark by name.
+     *
+     * @return array<string, mixed>|null
      */
     public function getBenchmark(string $benchmarkName): ?array
     {
@@ -301,6 +296,7 @@ trait HandlesPerformanceMeasurement
     /**
      * Get performance summary.
      */
+    /** @return array<string, mixed> */
     public function getPerformanceSummary(): array
     {
         return [
@@ -315,9 +311,6 @@ trait HandlesPerformanceMeasurement
         ];
     }
 
-    /**
-     * Export performance data.
-     */
     public function exportPerformanceData(string $format = 'json'): string
     {
         $data = $this->getPerformanceSummary();
@@ -333,6 +326,7 @@ trait HandlesPerformanceMeasurement
     /**
      * Get execution time breakdown.
      */
+    /** @return array<string, mixed> */
     public function getExecutionTimeBreakdown(): array
     {
         $totalTime = $this->getExecutionTime();
@@ -358,12 +352,12 @@ trait HandlesPerformanceMeasurement
 
     protected function getExecutionTime(): float
     {
-        if (! $this->task) {
+        if (! $this->taskModel) {
             return 0.0;
         }
 
-        $startedAt = $this->task->created_at;
-        $completedAt = $this->task->updated_at;
+        $startedAt = $this->taskModel->created_at;
+        $completedAt = $this->taskModel->updated_at;
 
         if (! $startedAt || ! $completedAt) {
             return 0.0;
@@ -406,12 +400,18 @@ trait HandlesPerformanceMeasurement
         return $total > 0 ? ($part / $total) * 100 : 0;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     protected function convertToCsv(array $data): string
     {
         // Convert data to CSV format
         return ''; // Placeholder
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     protected function convertToXml(array $data): string
     {
         // Convert data to XML format

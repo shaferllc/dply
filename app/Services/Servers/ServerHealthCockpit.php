@@ -34,6 +34,7 @@ final class ServerHealthCockpit
      *     monitoring: array<string, mixed>,
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get(['id', 'name', 'server_id', 'deploy_strategy', 'releases_to_keep']);
@@ -95,7 +96,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      * @return array<string, mixed>
      */
     private function capacity(array $payload, ?Carbon $capturedAt): array
@@ -141,7 +142,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      * @return list<array<string, mixed>>
      */
     private function disks(array $payload): array
@@ -382,7 +383,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      * @return array<string, mixed>
      */
     private function monitoring(Server $server, ?Carbon $capturedAt, array $payload): array
@@ -401,7 +402,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $capacity
+     * @param  array<string, mixed> $capacity
      * @param  list<array<string, mixed>>  $disks
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
@@ -472,7 +473,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $releases
+     * @param  array<string, mixed> $releases
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function releaseAlerts(array $releases, Server $server): array
@@ -495,7 +496,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $deployments
+     * @param  array<string, mixed> $deployments
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function deploymentAlerts(array $deployments, Server $server): array
@@ -519,7 +520,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $certificates
+     * @param  array<string, mixed> $certificates
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function certificateAlerts(array $certificates): array
@@ -558,7 +559,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $daemons
+     * @param  array<string, mixed> $daemons
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function daemonAlerts(array $daemons, Server $server): array
@@ -581,7 +582,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $monitoring
+     * @param  array<string, mixed> $monitoring
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function monitoringAlerts(array $monitoring, Server $server): array
@@ -612,7 +613,7 @@ final class ServerHealthCockpit
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     private function metricFloat(array $payload, string $key): ?float
     {

@@ -58,13 +58,14 @@ final class ServerAccessMap
      *     edges: list<array<string, mixed>>,
      * }
      */
+    /** @return array<string, mixed> */
     public function build(Server $server, array $reportRows): array
     {
         $siteCounts = $this->deletionPolicy->siteCountsByUsername($server);
         $workerCounts = $this->deletionPolicy->workerCountsByUsername($server);
         $cronCounts = $this->deletionPolicy->cronCountsByUsername($server);
 
-        /** @var array<string, ServerSystemUser> $passwd */
+        /** @var array $passwd */
         $passwd = $server->systemUsers()->get()
             ->keyBy(fn (ServerSystemUser $u): string => strtolower(trim((string) $u->username)))
             ->all();
@@ -228,6 +229,7 @@ final class ServerAccessMap
     }
 
     /**
+     * @param  array<string, mixed> $reportRows
      * @return array{has_data: bool, height: int, columns: array{sources: string, accounts: string, workloads: string}, sources: list<array<string, mixed>>, accounts: list<array<string, mixed>>, workloads: list<array<string, mixed>>, edges: list<array<string, mixed>>}
      */
     private function empty(): array

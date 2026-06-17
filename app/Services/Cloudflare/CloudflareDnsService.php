@@ -69,6 +69,7 @@ class CloudflareDnsService
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function upsertARecord(string $zoneName, string $relativeRecordName, string $ipv4): array
     {
         $zoneId = $this->findZoneId($zoneName);
@@ -132,6 +133,7 @@ class CloudflareDnsService
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function upsertCnameRecord(string $zoneName, string $relativeRecordName, string $targetHost): array
     {
         $zoneId = $this->findZoneId($zoneName);
@@ -243,6 +245,9 @@ class CloudflareDnsService
         return $lower.'.'.$zone;
     }
 
+    /**
+     * @param  array<string, mixed> $queryOrBody
+     */
     private function request(string $method, string $path, array $queryOrBody = []): Response
     {
         $url = self::BASE.$path;

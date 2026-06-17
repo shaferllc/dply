@@ -93,6 +93,8 @@ use Illuminate\Support\Str;
  * @property string $dns_zone
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
+ * @property-read ?string $php_version
+ * @property-read int $code_action_count
  */
 class Site extends Model
 {

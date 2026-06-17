@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 final class EdgeAccessGate
 {
     /**
-     * @param  list<string>  $allowedEmails
+     * @param  array<string, mixed> $allowedEmails
      */
     public function sync(
         Site $site,
@@ -219,13 +219,13 @@ final class EdgeAccessGate
     }
 
     /**
-     * @param  list<string>  $allowedEmails
+     * @param  array<string, mixed> $allowedEmails
      * @return list<string>
      */
     private function normalizeEmails(array $allowedEmails): array
     {
         return array_values(array_unique(array_filter(array_map(
-            static fn ($email): string => is_string($email) ? strtolower(trim($email)) : '',
+            static fn ($email): string => (strtolower(trim($email)) ),
             $allowedEmails,
         ))));
     }

@@ -25,6 +25,8 @@ class Artisan extends RemoteCli
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     protected function instantCommands(): array
     {
         return [
@@ -128,6 +130,7 @@ class Artisan extends RemoteCli
     /**
      * `cd <site-root> && php artisan <command> <args>` so artisan
      * picks up the site's own .env / vendor / config.
+     * @param  array<string, mixed> $args
      */
     protected function buildShellCommand(Site $site, string $command, array $args): string
     {

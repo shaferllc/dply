@@ -33,6 +33,10 @@ final class RoadmapGitHistory
      *
      * @return list<array{sha: string, subject: string, body: string, date: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function commitsSince(?string $fromCommit, ?string $toCommit = null): array
     {
         $gitArgs = $this->gitLocatorArgs();
@@ -103,7 +107,7 @@ final class RoadmapGitHistory
      * The `git` locator flags (`-C <dir>` or `--git-dir <dir>`) for the repo we
      * should read, or null when none is reachable.
      *
-     * @return list<string>|null
+     * @return list<array<string, string>>
      */
     private function gitLocatorArgs(): ?array
     {

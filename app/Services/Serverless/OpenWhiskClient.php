@@ -53,18 +53,21 @@ class OpenWhiskClient
     // ── Actions ──────────────────────────────────────────────────────────
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function actions(): array
     {
         return $this->request('GET', 'actions', ['limit' => 200]);
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function action(string $name): array
     {
         return $this->request('GET', 'actions/'.rawurlencode($name));
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function deleteAction(string $name): array
     {
         return $this->request('DELETE', 'actions/'.rawurlencode($name));
@@ -73,12 +76,14 @@ class OpenWhiskClient
     // ── Packages ─────────────────────────────────────────────────────────
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function packages(): array
     {
         return $this->request('GET', 'packages', ['limit' => 200]);
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function package(string $name): array
     {
         return $this->request('GET', 'packages/'.rawurlencode($name));
@@ -87,6 +92,7 @@ class OpenWhiskClient
     // ── Triggers ─────────────────────────────────────────────────────────
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function triggers(): array
     {
         // docs=true so the list carries each trigger's parameters.
@@ -94,6 +100,7 @@ class OpenWhiskClient
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function trigger(string $name): array
     {
         return $this->request('GET', 'triggers/'.rawurlencode($name));
@@ -103,9 +110,10 @@ class OpenWhiskClient
      * Create or update a trigger. `$params` is a flat key→value map; it is
      * converted to OpenWhisk's `{key, value}` parameter list.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array{ok: bool, error: ?string, data: mixed}
      */
+    /** @return array<string, mixed> */
     public function putTrigger(string $name, array $params = []): array
     {
         $body = $params === [] ? [] : ['parameters' => $this->keyValuePairs($params)];
@@ -114,6 +122,7 @@ class OpenWhiskClient
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function deleteTrigger(string $name): array
     {
         return $this->request('DELETE', 'triggers/'.rawurlencode($name));
@@ -122,9 +131,11 @@ class OpenWhiskClient
     /**
      * Fire a trigger once with an optional JSON payload.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed> $params
      * @return array{ok: bool, error: ?string, data: mixed}
      */
+    /** @return array<string, mixed> */
     public function fireTrigger(string $name, array $payload = []): array
     {
         return $this->request('POST', 'triggers/'.rawurlencode($name), [], $payload);
@@ -133,6 +144,7 @@ class OpenWhiskClient
     // ── Rules ────────────────────────────────────────────────────────────
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         // docs=true so the list carries each rule's status + trigger/action.
@@ -140,6 +152,7 @@ class OpenWhiskClient
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function rule(string $name): array
     {
         return $this->request('GET', 'rules/'.rawurlencode($name));
@@ -148,8 +161,10 @@ class OpenWhiskClient
     /**
      * Create or update a rule binding a trigger to an action.
      *
+     * @param  array<string, mixed> $payload
      * @return array{ok: bool, error: ?string, data: mixed}
      */
+    /** @return array<string, mixed> */
     public function putRule(string $name, string $trigger, string $action): array
     {
         return $this->request('PUT', 'rules/'.rawurlencode($name), ['overwrite' => 'true'], [
@@ -159,6 +174,7 @@ class OpenWhiskClient
     }
 
     /** @return array{ok: bool, error: ?string, data: mixed} */
+    /** @return array<string, mixed> */
     public function deleteRule(string $name): array
     {
         return $this->request('DELETE', 'rules/'.rawurlencode($name));
@@ -169,6 +185,7 @@ class OpenWhiskClient
      *
      * @return array{ok: bool, error: ?string, data: mixed}
      */
+    /** @return array<string, mixed> */
     public function setRuleState(string $name, string $state): array
     {
         return $this->request('POST', 'rules/'.rawurlencode($name), [], [
@@ -181,8 +198,8 @@ class OpenWhiskClient
     /**
      * Issue one OpenWhisk REST call and normalize the outcome. Never throws.
      *
-     * @param  array<string, scalar>  $query
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $query
+     * @param  array<string, mixed> $body
      * @return array{ok: bool, error: ?string, data: mixed}
      */
     private function request(string $method, string $path, array $query = [], array $body = []): array
@@ -225,7 +242,7 @@ class OpenWhiskClient
     /**
      * Convert a flat map to OpenWhisk's `[{key, value}, …]` parameter shape.
      *
-     * @param  array<string, mixed>  $assoc
+     * @param  array<string, mixed> $assoc
      * @return list<array{key: string, value: mixed}>
      */
     private function keyValuePairs(array $assoc): array

@@ -127,6 +127,9 @@ class CreateTargetSiteHandler implements StepHandler
         $step->save();
     }
 
+    /**
+     * @param  array<string, mixed> $snapshot
+     */
     protected function resolveRepositoryUrl(array $snapshot): ?string
     {
         if (! empty($snapshot['repository_url']) && is_string($snapshot['repository_url'])) {

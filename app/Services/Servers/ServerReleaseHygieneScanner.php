@@ -104,7 +104,7 @@ final class ServerReleaseHygieneScanner
         }
 
         throw new RuntimeException(
-            $lastError?->getMessage() ?: __('SSH connection failed for hygiene scan.'),
+            $lastError->getMessage() ?: __('SSH connection failed for hygiene scan.'),
             0,
             $lastError,
         );
@@ -161,7 +161,7 @@ final class ServerReleaseHygieneScanner
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array

@@ -174,6 +174,10 @@ class SshConnection implements RemoteShell
      * @param  callable(string):void  $chunkCallback
      * @return array{0: string, 1: ?int}
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, int|string|null>
+     */
     public function execWithCallbackAndExit(string $command, callable $chunkCallback, int $timeoutSeconds = 120): array
     {
         $out = $this->execWithCallback($command, $chunkCallback, $timeoutSeconds);
@@ -238,6 +242,13 @@ class SshConnection implements RemoteShell
 
     /**
      * Run multiple commands (each in its own channel; combine with && if you need state).
+     * @param  array<string, mixed> $commands
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     * @param  array<string, mixed> $commands
      */
     public function execMany(array $commands): array
     {
@@ -250,6 +261,7 @@ class SshConnection implements RemoteShell
     }
 
     /**
+     * @param  array<string, mixed> $commands
      * Disconnect.
      */
     public function disconnect(): void

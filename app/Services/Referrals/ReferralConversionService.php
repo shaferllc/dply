@@ -15,6 +15,7 @@ class ReferralConversionService
 
     /**
      * Handle Stripe invoice.payment_succeeded webhooks for referral rewards.
+     * @param  array<string, mixed> $payload
      */
     public function handleInvoicePaymentSucceeded(array $payload): void
     {
@@ -55,6 +56,9 @@ class ReferralConversionService
         }
     }
 
+    /**
+     * @param  array<string, mixed> $invoice
+     */
     protected function invoiceContainsProPrice(array $invoice): bool
     {
         $proPriceIds = array_values(array_filter(array_merge(

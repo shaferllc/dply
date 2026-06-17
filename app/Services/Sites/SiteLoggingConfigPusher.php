@@ -37,6 +37,7 @@ class SiteLoggingConfigPusher
     /**
      * @return array{managed: bool, log: string}
      */
+    /** @return array<string, mixed> */
     public function apply(Site $site, SshConnection $ssh, string $buildDir): array
     {
         $binding = $this->managedBinding($site);
@@ -44,7 +45,7 @@ class SiteLoggingConfigPusher
             return ['managed' => false, 'log' => "[dply] LOGGING → no managed logging binding; leaving repo's config/logging.php\n"];
         }
 
-        $spec = is_array($binding->config) ? $binding->config : [];
+        $spec = ($binding->config );
         $content = $this->generator->generate($spec);
 
         // Gate 1 — syntax, in dply (no round-trip to the box needed).
@@ -114,7 +115,7 @@ class SiteLoggingConfigPusher
             return null;
         }
 
-        return LoggingSpec::isV2(is_array($binding->config) ? $binding->config : null) ? $binding : null;
+        return LoggingSpec::isV2(($binding->config )) ? $binding : null;
     }
 
     private function lintLocally(string $content): void

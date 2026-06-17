@@ -29,6 +29,10 @@ class EnvDriftRule implements IntelligenceRule
         return DeployIntelligenceAlert::RULE_ENV_DRIFT;
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<App\Services\DeployIntelligence\AlertFinding>
+     */
     public function evaluate(Organization $organization): array
     {
         $serverIds = Server::query()

@@ -183,7 +183,7 @@ class EdgeFrameworkPresetRegistry
      * array. Returns the `static` fallback when nothing matches so
      * callers can always rely on a non-null preset.
      *
-     * @param  array<string, mixed>  $plan
+     * @param  array<string, mixed> $plan
      */
     public static function byDetectionPlan(array $plan): EdgeFrameworkPreset
     {

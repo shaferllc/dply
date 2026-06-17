@@ -15,6 +15,7 @@ class CaddyModuleRegistry
     /**
      * @return array<string, list<array{name: string, docs: string, package: string, repo: string}>>
      */
+    /** @return array<string, mixed> */
     public function moduleIndex(): array
     {
         $ttl = (int) config('caddy_modules.registry_cache_seconds', 86_400);
@@ -48,6 +49,10 @@ class CaddyModuleRegistry
      *     description: string,
      *     module_ids: list<string>,
      * }>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, list<string>|string>>
      */
     public function communityPackages(): array
     {
@@ -96,7 +101,7 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @return array{
+     * @return list<array<string, list<string>|string>>
      *     path: string,
      *     repo: string,
      *     label: string,
@@ -162,8 +167,13 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @param  list<string>  $moduleIds
+     * @param  array<string, mixed> $moduleIds
      * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     * @param  array<string, mixed> $moduleIds
      */
     public function packagesFromModuleIds(array $moduleIds): array
     {
@@ -206,7 +216,8 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @return array{label?: string, description?: string}
+     * @param  array<string, mixed> $moduleIds
+     * @return list<string>
      */
     private function catalogEntry(string $path): array
     {

@@ -169,7 +169,7 @@ class CloudflareCdnService
      * are preserved verbatim; ours are stripped and re-appended from
      * `$rules` so each save is a full overwrite of dply's slice.
      *
-     * @param  list<array{path: string, action: string, ttl?: int}>  $rules
+     * @param  array<string, mixed> $rules
      */
     public function syncCacheRules(string $zoneId, string $hostname, array $rules, string $managedPrefix): void
     {
@@ -283,6 +283,7 @@ class CloudflareCdnService
      *
      * @return array{requests_all: int, requests_cached: int, bandwidth_all: int, bandwidth_cached: int, since_minutes: int}
      */
+    /** @return array<string, mixed> */
     public function fetchDashboardAnalytics(string $zoneId, int $sinceMinutes = 1440): array
     {
         // Cloudflare's GraphQL Analytics expects ISO-8601 timestamps; align
@@ -389,6 +390,9 @@ class CloudflareCdnService
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $queryOrBody
+     */
     private function request(string $method, string $path, array $queryOrBody = []): Response
     {
         $url = self::BASE.$path;

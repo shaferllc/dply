@@ -40,6 +40,7 @@ class ExecuteTaskJob implements ShouldQueue
 
     /**
      * Create a new job instance.
+     * @param  array<string, mixed> $taskData
      */
     public function __construct(
         public Task $taskModel,

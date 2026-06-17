@@ -21,6 +21,7 @@ class TraefikCustomRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, hosts: list<string>, rule: string, upstream: string, middlewares: list<string>}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

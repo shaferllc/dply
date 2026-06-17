@@ -25,6 +25,10 @@ class SiteEnvResourceImporter
      *
      * @return list<array{id: string, type: string, label: string, server: string, same_server: bool}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, bool|string>>
+     */
     public function candidates(Site $site): array
     {
         $serverIds = $this->accessibleServerIds($site);
@@ -44,7 +48,7 @@ class SiteEnvResourceImporter
                     'id' => 'db:'.$db->id,
                     'type' => 'database',
                     'label' => trim((string) $db->name).' ('.$db->engine.')',
-                    'server' => (string) ($db->server?->name ?? '—'),
+                    'server' => (string) ($db->server->name ?? '—'),
                     'same_server' => (string) $db->server_id === (string) $site->server_id,
                 ];
             });
@@ -58,7 +62,7 @@ class SiteEnvResourceImporter
                     'id' => 'cache:'.$cache->id,
                     'type' => 'cache',
                     'label' => $cache->engine.' ('.($cache->name ?: 'default').')',
-                    'server' => (string) ($cache->server?->name ?? '—'),
+                    'server' => (string) ($cache->server->name ?? '—'),
                     'same_server' => (string) $cache->server_id === (string) $site->server_id,
                 ];
             });
@@ -70,8 +74,9 @@ class SiteEnvResourceImporter
      * The candidate env key => value map for a chosen resource, or [] when the
      * id is unknown or out of the operator's reach.
      *
-     * @return array<string, string>
+     * @return list<array<string, bool|string>>
      */
+    /** @return array<string, mixed> */
     public function envFor(Site $site, string $resourceId): array
     {
         $serverIds = $this->accessibleServerIds($site);

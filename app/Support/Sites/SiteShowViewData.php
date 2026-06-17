@@ -9,6 +9,7 @@ use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Models\SiteDeployment;
 use App\Support\Deployment\DeploymentContract;
 use Illuminate\Support\Collection;
 
@@ -19,7 +20,7 @@ use Illuminate\Support\Collection;
 final class SiteShowViewData
 {
     /**
-     * @param  array<string, mixed>  $deploymentPreflight
+     * @param  array<string, mixed> $deploymentPreflight
      * @return array<string, mixed>
      */
     public static function for(
@@ -69,8 +70,11 @@ final class SiteShowViewData
         })->implode("\n\n");
         $targetUrl = $testingHostname ? 'http://'.$testingHostname : ($site->visitUrl() ?? null);
         $readyForWorkspace = $site->isReadyForWorkspace();
-        $hostChecks = collect($provisioningMeta['host_checks'] ?? [])
-            ->filter(fn ($check) => is_array($check) && is_string($check['hostname'] ?? null))
+        /** @var list<mixed> $hostChecksRaw */
+        $hostChecksRaw = is_array($provisioningMeta['host_checks'] ?? null) ? $provisioningMeta['host_checks'] : [];
+        /** @var Collection<int, array<string, mixed>> $hostChecks */
+        $hostChecks = (new Collection($hostChecksRaw))
+            ->filter(fn ($check): bool => is_array($check) && is_string($check['hostname'] ?? null))
             ->values();
         $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
         $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
@@ -78,14 +82,45 @@ final class SiteShowViewData
         $runtimeTarget = $site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
         $dockerRuntimeDetails = $site->usesDockerRuntime() && is_array($dockerRuntime['runtime_details'] ?? null) ? $dockerRuntime['runtime_details'] : [];
-        $dockerContainers = collect($dockerRuntimeDetails['containers'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
-        $runtimeLogs = collect($runtimeTarget['logs'] ?? [])->filter(fn ($entry) => is_array($entry))->reverse()->values();
+        /** @var list<mixed> $dockerContainersRaw */
+        $dockerContainersRaw = is_array($dockerRuntimeDetails['containers'] ?? null) ? $dockerRuntimeDetails['containers'] : [];
+        /** @var Collection<int, array<string, mixed>> $dockerContainers */
+        $dockerContainers = (new Collection($dockerContainersRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
+        /** @var list<mixed> $runtimeLogsRaw */
+        $runtimeLogsRaw = is_array($runtimeTarget['logs'] ?? null) ? $runtimeTarget['logs'] : [];
+        /** @var Collection<int, array<string, mixed>> $runtimeLogs */
+        $runtimeLogs = (new Collection($runtimeLogsRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->reverse()
+            ->values();
 
-        $foundationStatus = is_array($deploymentContract?->status ?? null) ? $deploymentContract->status : [];
-        $resourceBindings = collect($deploymentContract?->resourceBindingArrays() ?? [])->filter(fn ($entry) => is_array($entry))->values();
-        $preflightChecks = collect($deploymentPreflight['checks'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
-        $preflightErrors = collect($deploymentPreflight['errors'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
-        $preflightWarnings = collect($deploymentPreflight['warnings'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
+        $foundationStatus = is_array($deploymentContract->status ?? null) ? $deploymentContract->status : [];
+        /** @var list<mixed> $resourceBindingsRaw */
+        $resourceBindingsRaw = $deploymentContract?->resourceBindingArrays() ?? [];
+        /** @var Collection<int, array<string, mixed>> $resourceBindings */
+        $resourceBindings = (new Collection($resourceBindingsRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
+        /** @var list<mixed> $preflightChecksRaw */
+        $preflightChecksRaw = is_array($deploymentPreflight['checks'] ?? null) ? $deploymentPreflight['checks'] : [];
+        /** @var Collection<int, array{key?: string, level?: string, message?: string}> $preflightChecks */
+        $preflightChecks = (new Collection($preflightChecksRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
+        /** @var list<mixed> $preflightErrorsRaw */
+        $preflightErrorsRaw = is_array($deploymentPreflight['errors'] ?? null) ? $deploymentPreflight['errors'] : [];
+        /** @var Collection<int, string> $preflightErrors */
+        $preflightErrors = (new Collection($preflightErrorsRaw))
+            ->filter(fn ($entry): bool => is_string($entry))
+            ->values();
+        /** @var list<mixed> $preflightWarningsRaw */
+        $preflightWarningsRaw = is_array($deploymentPreflight['warnings'] ?? null) ? $deploymentPreflight['warnings'] : [];
+        /** @var Collection<int, string> $preflightWarnings */
+        $preflightWarnings = (new Collection($preflightWarningsRaw))
+            ->filter(fn ($entry): bool => is_string($entry))
+            ->values();
 
         // Preflight only makes sense once the operator has actually tried to ship.
         // A brand-new, never-deployed site hasn't asked for a deploy, so surfacing
@@ -98,12 +133,15 @@ final class SiteShowViewData
         $preflightActive = $readyForWorkspace && $hasDeployAttempt;
 
         if (! $preflightActive) {
-            $preflightChecks = collect();
-            $preflightErrors = collect();
-            $preflightWarnings = collect();
+            /** @var Collection<int, array{key?: string, level?: string, message?: string}> $preflightChecks */
+            $preflightChecks = new Collection;
+            /** @var Collection<int, string> $preflightErrors */
+            $preflightErrors = new Collection;
+            /** @var Collection<int, string> $preflightWarnings */
+            $preflightWarnings = new Collection;
         }
 
-        $preflightActionableChecks = PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks);
+        $preflightActionableChecks = collect(PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks));
 
         $runtimeOperationConsoles = self::runtimeOperationConsoles($runtimeLogs);
         $runtimeErrorConsole = $runtimeOperationConsoles->first(fn (array $console): bool => in_array($console['action'], ['errors'], true) || $console['status'] === 'failed');
@@ -140,6 +178,7 @@ final class SiteShowViewData
         }
         $statusSteps['ready'] = __('Site available');
         $statusSteps['failed'] = __('Needs attention');
+        /** @var list<string> $stepKeys */
         $stepKeys = array_keys($statusSteps);
         $currentStepIndex = array_search($provisioningState, $stepKeys, true);
         $currentStepIndex = $currentStepIndex === false ? 0 : $currentStepIndex;
@@ -396,7 +435,7 @@ final class SiteShowViewData
         $progressPercent = $totalSteps > 0
             ? (int) round(($completedSteps / $totalSteps) * 100)
             : 0;
-        $currentLabel = $statusSteps[$state] ?? str_replace('_', ' ', $state);
+        $currentLabel = $statusSteps[$state];
 
         return [
             'state' => $state,
@@ -455,8 +494,8 @@ final class SiteShowViewData
     }
 
     /**
-     * @param  array<string, string>  $statusSteps
-     * @param  list<string>  $stepKeys
+     * @param  array<string, string> $statusSteps
+     * @param  list<string> $stepKeys
      * @return array<string, mixed>
      */
     private static function provisioningJourney(
@@ -500,7 +539,10 @@ final class SiteShowViewData
     }
 
     /**
-     * @param  array<string, mixed>  $foundationStatus
+     * @param  array<string, mixed> $foundationStatus
+     * @param  Collection<int, string> $preflightErrors
+     * @param  Collection<int, string> $preflightWarnings
+     * @param  Collection<int, array<string, mixed>> $hostChecks
      * @return array<string, mixed>
      */
     private static function dashboard(
@@ -587,11 +629,15 @@ final class SiteShowViewData
     }
 
     /**
-     * @return Collection<int, array{title: string, meta: string|null, transcript: string, action: string, status: string}>
+     * @param  Collection<int, array<string, mixed>>  $runtimeLogs
+     * @return Collection<int, array{title: string, meta: string, transcript: string, action: string, status: string}>
      */
     public static function runtimeOperationConsoles(Collection $runtimeLogs): Collection
     {
-        return $runtimeLogs->map(function (array $runtimeLog): array {
+        /** @var Collection<int, array{title: string, meta: string, transcript: string, action: string, status: string}> $rows */
+        $rows = new Collection;
+
+        foreach ($runtimeLogs as $runtimeLog) {
             $timestamp = (string) ($runtimeLog['ran_at'] ?? '');
             $status = strtoupper((string) ($runtimeLog['status'] ?? 'unknown'));
             $action = ucfirst((string) ($runtimeLog['action'] ?? 'runtime'));
@@ -603,48 +649,63 @@ final class SiteShowViewData
                 $transcript .= "\n\n".$output;
             }
 
-            return [
-                'title' => __('Runtime activity'),
+            $rows->push([
+                'title' => (string) __('Runtime activity'),
                 'meta' => $action,
                 'transcript' => $transcript,
                 'action' => strtolower((string) ($runtimeLog['action'] ?? '')),
                 'status' => strtolower((string) ($runtimeLog['status'] ?? '')),
-            ];
-        });
+            ]);
+        }
+
+        /** @var Collection<int, array{title: string, meta: string, transcript: string, action: string, status: string}> $consoles */
+        $consoles = $rows->values();
+
+        return $consoles;
     }
 
     /**
-     * @return Collection<int, array{title: string, meta: string|null, transcript: string}>
-     */
-    /**
-     * @return Collection<int, array{title: string, meta: string|null, transcript: string}>
+     * @param  Collection<int, SiteDeployment>  $deployments
+     * @return Collection<int, array{title: string, meta: string, transcript: string}>
      */
     public static function deploymentConsolesFor(Collection $deployments): Collection
     {
-        return self::deploymentConsoles($deployments);
+        /** @var Collection<int, array{title: string, meta: string, transcript: string}> $consoles */
+        $consoles = self::deploymentConsoles($deployments);
+
+        return $consoles;
     }
 
     /**
-     * @return Collection<int, array{title: string, meta: string|null, transcript: string}>
+     * @param  Collection<int, SiteDeployment>  $deployments
+     * @return Collection<int, array{title: string, meta: string, transcript: string}>
      */
     private static function deploymentConsoles(Collection $deployments): Collection
     {
-        return $deployments->map(function ($deployment): array {
+        /** @var Collection<int, array{title: string, meta: string, transcript: string}> $rows */
+        $rows = new Collection;
+
+        foreach ($deployments as $deployment) {
             $status = strtoupper((string) $deployment->status);
             $trigger = strtoupper((string) $deployment->trigger);
-            $createdAt = $deployment->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') ?? '';
-            $prefix = array_filter([$createdAt, $status, $trigger]);
+            $createdAt = $deployment->created_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s T');
+            $prefix = array_values(array_filter([$createdAt, $status, $trigger]));
             $transcript = trim(implode("\n", array_filter([
-                $prefix !== [] ? '['.implode('] [', $prefix).'] Deployment record' : 'Deployment record',
+                '['.implode('] [', $prefix).'] Deployment record',
                 $deployment->git_sha ? 'SHA: '.$deployment->git_sha : null,
                 trim((string) $deployment->log_output) !== '' ? trim((string) $deployment->log_output) : null,
             ])));
 
-            return [
-                'title' => __('Deployment log'),
-                'meta' => $deployment->created_at?->diffForHumans(),
+            $rows->push([
+                'title' => (string) __('Deployment log'),
+                'meta' => (string) $deployment->created_at->diffForHumans(),
                 'transcript' => $transcript,
-            ];
-        });
+            ]);
+        }
+
+        /** @var Collection<int, array{title: string, meta: string, transcript: string}> $consoles */
+        $consoles = $rows->values();
+
+        return $consoles;
     }
 }

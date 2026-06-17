@@ -31,6 +31,9 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
         protected ServerPhpConfigEditor $editor,
     ) {}
 
+    /**
+     * @param  array<string, mixed> $params
+     */
     public function preflight(Server $server, ?Site $site, InsightFinding $finding, array $params): ?string
     {
         if (! $server->isReady()) {
@@ -66,6 +69,9 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $params
+     */
     public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $phpVersion = (string) $finding->meta['signal']['php_version'];
@@ -114,7 +120,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function computeProposedMaxChildren(int $current, int $totalRamMb, array $params): int
     {
@@ -141,7 +147,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
             ->whereNotNull('captured_at')
             ->orderByDesc('captured_at')
             ->first();
-        $kb = is_array($latest?->payload ?? null) ? ($latest->payload['mem_total_kb'] ?? null) : null;
+        $kb = is_array($latest->payload ?? null) ? ($latest->payload['mem_total_kb'] ?? null) : null;
         if (is_numeric($kb) && (int) $kb > 0) {
             return (int) round(((int) $kb) / 1024);
         }
@@ -164,6 +170,9 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
         return preg_replace($pattern, '$1pm.max_children = '.$newValue, $content) ?? $content;
     }
 
+    /**
+     * @param  array<string, mixed> $params
+     */
     public function revert(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $backupPath = $finding->meta['backup_path'] ?? null;
@@ -203,7 +212,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
             return FixResult::failure(__('Validation or write failed during revert: :err', ['err' => $e->getMessage()]));
         }
 
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = ($finding->meta );
         unset($meta['backup_path']);
         $meta['revert_applied_at'] = now()->toIso8601String();
         $meta['revert_pool_path'] = $poolPath;
@@ -214,7 +223,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
 
     private function stampBackupPath(InsightFinding $finding, string $backupPath, int $newValue, int $previousValue): void
     {
-        $meta = is_array($finding->meta) ? $finding->meta : [];
+        $meta = ($finding->meta );
         $meta['backup_path'] = $backupPath;
         $meta['fix_change'] = [
             'pm_max_children_before' => $previousValue,

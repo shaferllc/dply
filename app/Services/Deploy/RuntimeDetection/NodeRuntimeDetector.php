@@ -70,9 +70,9 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $packageJson
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $packageJson
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      */
     private function detectVersion(
         string $workingDirectory,
@@ -116,8 +116,8 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $deps
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $deps
+     * @param  array<string, mixed> $reasons
      */
     private function detectFramework(array $deps, array &$reasons): ?string
     {
@@ -143,8 +143,8 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $scripts
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $scripts
+     * @param  array<string, mixed> $reasons
      */
     private function detectBuildCommand(array $scripts, array &$reasons): ?string
     {
@@ -158,9 +158,9 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $scripts
-     * @param  array<string, mixed>  $packageJson
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $scripts
+     * @param  array<string, mixed> $packageJson
+     * @param  array<string, mixed> $reasons
      */
     private function detectStartCommand(
         array $scripts,
@@ -198,8 +198,8 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $scripts
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $scripts
+     * @param  array<string, mixed> $reasons
      */
     private function detectAppPort(array $scripts, ?string $framework, array &$reasons): int
     {
@@ -225,9 +225,9 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $scripts
-     * @param  list<string>  $deps
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $scripts
+     * @param  array<string, mixed> $deps
+     * @param  array<string, mixed> $reasons
      * @return list<DetectedProcess>
      */
     private function detectProcesses(array $scripts, array $deps, array &$reasons): array
@@ -259,6 +259,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
 
     /**
      * @return list<string>
+     * @param  array<string, mixed> $packageJson
      */
     private function collectDependencyKeys(array $packageJson): array
     {
@@ -279,7 +280,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $reasons
      */
     private function detectOutputDirectory(?string $framework, array &$reasons): ?string
     {

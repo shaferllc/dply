@@ -49,15 +49,13 @@ class PendingTask
      */
     protected function validateTask(): void
     {
-        if (! $this->task instanceof Task) {
-            throw new InvalidArgumentException('Task must be an instance of '.Task::class);
-        }
+        // Task is enforced by the readonly constructor property type.
     }
 
     /**
      * Wraps the given task in a PendingTask instance.
      */
-    public static function make(string|Task|PendingTask $task): static
+    public static function make(string|Task|PendingTask $task): self
     {
         if (is_string($task)) {
             if (! class_exists($task)) {
@@ -71,7 +69,11 @@ class PendingTask
             $task = app($task);
         }
 
-        return $task instanceof PendingTask ? $task : new PendingTask($task);
+        if ($task instanceof PendingTask) {
+            return $task;
+        }
+
+        return new self($task);
     }
 
     /**
@@ -79,10 +81,6 @@ class PendingTask
      */
     public function onOutput(callable $callback): self
     {
-        if (! is_callable($callback)) {
-            throw new InvalidArgumentException('Callback must be callable.');
-        }
-
         $this->onOutput = $callback;
 
         return $this;
@@ -99,6 +97,7 @@ class PendingTask
     /**
      * Exclude the onOutput closure from serialization.
      */
+    /** @return array<string, mixed> */
     public function __serialize(): array
     {
         $data = get_object_vars($this);
@@ -107,6 +106,9 @@ class PendingTask
         return $data;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __unserialize(array $data): void
     {
         foreach ($data as $key => $value) {

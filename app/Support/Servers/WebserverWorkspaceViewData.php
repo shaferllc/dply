@@ -313,7 +313,7 @@ final class WebserverWorkspaceViewData
     }
 
     /**
-     * @param  array<string, mixed>  $certbot
+     * @param  array<string, mixed> $certbot
      * @return list<array{name: string, domains: ?string, expiry: ?string, valid: int|null}>
      */
     private static function parseCertbotCerts(array $certbot): array

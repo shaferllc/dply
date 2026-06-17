@@ -67,7 +67,7 @@ trait ManagesBroadcastingBindings
      * Both inject BROADCAST_CONNECTION + the driver's connection vars, plus the
      * VITE_ mirror so Laravel Echo works without hand-adding client vars.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachBroadcasting(Site $site, array $params): SiteBinding
     {
@@ -81,7 +81,7 @@ trait ManagesBroadcastingBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachManagedBroadcasting(Site $site, array $params): SiteBinding
     {
@@ -123,7 +123,7 @@ trait ManagesBroadcastingBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function provisionManagedBroadcasting(Site $site, array $params): SiteBinding
     {
@@ -167,7 +167,7 @@ trait ManagesBroadcastingBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachByoBroadcasting(Site $site, array $params): SiteBinding
     {
@@ -218,7 +218,7 @@ trait ManagesBroadcastingBindings
      * Build the BYO env for a driver. pusher/reverb carry full connection vars;
      * ably a single key; log/null just flip BROADCAST_CONNECTION.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function byoBroadcastingEnv(string $driver, array $params): array
@@ -302,7 +302,7 @@ trait ManagesBroadcastingBindings
      * without the operator hand-adding them. The signing secret is excluded —
      * it must never reach client-side bundles.
      *
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      * @return array<string, string>
      */
     private function broadcastingViteMirror(array $env): array

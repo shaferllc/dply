@@ -42,16 +42,28 @@ final class SourceControlRepositoryReader
         $this->resolver ??= app(GitIdentityResolver::class);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function branches(Site $site, User $user): array
     {
         return $this->remember($site, 'branches', '', fn () => $this->branchesUncached($site, $user));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function tags(Site $site, User $user): array
     {
         return $this->remember($site, 'tags', '', fn () => $this->tagsUncached($site, $user));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function tree(Site $site, User $user, string $branch, string $path = ''): array
     {
         $branch = $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -60,6 +72,10 @@ final class SourceControlRepositoryReader
         return $this->remember($site, 'tree:'.$branch, $path, fn () => $this->treeUncached($site, $user, $branch, $path));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function file(Site $site, User $user, string $branch, string $path): array
     {
         $branch = $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -68,6 +84,10 @@ final class SourceControlRepositoryReader
         return $this->remember($site, 'file:'.$branch, $path, fn () => $this->fileUncached($site, $user, $branch, $path));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function readme(Site $site, User $user, ?string $branch = null): array
     {
         $branch = $branch !== null && $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -95,6 +115,9 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── branches ────────────────────── */
 
+    /**
+     * @return array<string, mixed>
+     */
     private function branchesUncached(Site $site, User $user): array
     {
         $remote = $this->remoteForSite($site);
@@ -110,6 +133,10 @@ final class SourceControlRepositoryReader
         };
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function githubBranches(array $remote, Site $site, User $user): array
     {
         $identity = $this->resolver->forSite($site, $user, 'github');
@@ -151,6 +178,10 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'github'];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function gitlabBranches(array $remote, Site $site, User $user): array
     {
         $identity = $this->resolver->forSite($site, $user, 'gitlab');
@@ -191,6 +222,10 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'gitlab'];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function bitbucketBranches(array $remote, Site $site, User $user): array
     {
         $identity = $this->resolver->forSite($site, $user, 'bitbucket');
@@ -229,6 +264,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'bitbucket'];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function tagsUncached(Site $site, User $user): array
     {
         $remote = $this->remoteForSite($site);
@@ -244,6 +282,10 @@ final class SourceControlRepositoryReader
         };
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function githubTags(array $remote, Site $site, User $user): array
     {
         $identity = $this->resolver->forSite($site, $user, 'github');
@@ -279,6 +321,10 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'github'];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function gitlabTags(array $remote, Site $site, User $user): array
     {
         $identity = $this->resolver->forSite($site, $user, 'gitlab');
@@ -313,6 +359,10 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'gitlab'];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function bitbucketTags(array $remote, Site $site, User $user): array
     {
         $identity = $this->resolver->forSite($site, $user, 'bitbucket');
@@ -349,6 +399,9 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── tree ────────────────────── */
 
+    /**
+     * @return array<string, mixed>
+     */
     private function treeUncached(Site $site, User $user, string $branch, string $path): array
     {
         $remote = $this->remoteForSite($site);
@@ -366,6 +419,10 @@ final class SourceControlRepositoryReader
         return $result + ['path' => $path, 'branch' => $branch];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function githubTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
         $identity = $this->resolver->forSite($site, $user, 'github');
@@ -401,6 +458,10 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'entries' => $this->sortEntries($entries), 'error' => null, 'provider' => 'github'];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function gitlabTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
         $identity = $this->resolver->forSite($site, $user, 'gitlab');
@@ -438,6 +499,10 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'entries' => $this->sortEntries($entries), 'error' => null, 'provider' => 'gitlab'];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function bitbucketTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
         $identity = $this->resolver->forSite($site, $user, 'bitbucket');
@@ -479,6 +544,9 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── file ────────────────────── */
 
+    /**
+     * @return array<string, mixed>
+     */
     private function fileUncached(Site $site, User $user, string $branch, string $path): array
     {
         $remote = $this->remoteForSite($site);
@@ -499,6 +567,10 @@ final class SourceControlRepositoryReader
         return $result + ['path' => $path, 'branch' => $branch];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function githubFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
         $identity = $this->resolver->forSite($site, $user, 'github');
@@ -529,6 +601,10 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'github');
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function gitlabFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
         $identity = $this->resolver->forSite($site, $user, 'gitlab');
@@ -561,6 +637,10 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'gitlab');
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function bitbucketFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
         $identity = $this->resolver->forSite($site, $user, 'bitbucket');
@@ -583,6 +663,9 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'bitbucket');
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function buildFileResult(string $raw, int $size, string $htmlUrl, string $provider): array
     {
         $binary = $this->looksBinary($raw);
@@ -604,6 +687,9 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── readme ────────────────────── */
 
+    /**
+     * @return array<string, mixed>
+     */
     private function readmeUncached(Site $site, User $user, string $branch): array
     {
         $remote = $this->remoteForSite($site);
@@ -621,6 +707,10 @@ final class SourceControlRepositoryReader
         return $result + ['branch' => $branch];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function githubReadme(array $remote, Site $site, User $user, string $branch): array
     {
         $identity = $this->resolver->forSite($site, $user, 'github');
@@ -652,6 +742,10 @@ final class SourceControlRepositoryReader
         ];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function probeReadmeViaFile(array $remote, Site $site, User $user, string $branch, string $provider): array
     {
         foreach (['README.md', 'readme.md', 'Readme.md', 'README', 'README.rst', 'README.txt'] as $candidate) {
@@ -700,6 +794,10 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── helpers ────────────────────── */
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function githubRepoMeta(array $remote, GitIdentity $identity): array
     {
         try {
@@ -716,6 +814,10 @@ final class SourceControlRepositoryReader
         return [];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function gitlabProjectMeta(array $remote, GitIdentity $identity): array
     {
         try {
@@ -734,6 +836,9 @@ final class SourceControlRepositoryReader
         return [];
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     */
     private function bitbucketDefaultBranch(array $remote, GitIdentity $identity): ?string
     {
         try {
@@ -766,6 +871,7 @@ final class SourceControlRepositoryReader
      * gitlab.com repo with no PAT yet, or a self-hosted PAT pointed at a
      * different host). Prefer the identity's configured base; fall back
      * to the host parsed from the repo URL.
+     * @param  array<string, mixed> $remote
      */
     private function gitlabApiBase(GitIdentity $identity, array $remote): string
     {
@@ -779,11 +885,17 @@ final class SourceControlRepositoryReader
         return $fromRemote !== '' ? rtrim($fromRemote, '/') : rtrim($base, '/');
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function remoteForSite(Site $site): ?array
     {
         return $this->parseRemoteUrl($site->sourceControlRepositoryUrl());
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function parseRemoteUrl(?string $url): ?array
     {
         if ($url === null || trim($url) === '') {
@@ -811,6 +923,9 @@ final class SourceControlRepositoryReader
         return $this->remoteFromHostAndPath($host, $path);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function remoteFromHostAndPath(string $host, string $path): ?array
     {
         if ($path === '') {
@@ -844,6 +959,10 @@ final class SourceControlRepositoryReader
         return implode('/', array_map('rawurlencode', explode('/', $path)));
     }
 
+    /**
+     * @param  array<string, mixed> $entries
+     * @return list<mixed>
+     */
     private function sortEntries(array $entries): array
     {
         usort($entries, function (array $a, array $b): int {
@@ -854,7 +973,7 @@ final class SourceControlRepositoryReader
             return strcasecmp($a['name'], $b['name']);
         });
 
-        return array_values($entries);
+        return array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($entries))))))))))))))))))))))))))))))));
     }
 
     private function looksBinary(string $raw): bool

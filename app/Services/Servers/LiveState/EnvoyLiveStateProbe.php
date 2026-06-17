@@ -267,13 +267,13 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
             $row = $metrics[$clusterName] ?? ['requests' => 0, 'errors_5xx' => 0, 'connections_active' => 0];
             $rows[] = [
                 'name' => $clusterName,
-                'requests' => (int) ($row['requests'] ?? 0),
-                'errors_5xx' => (int) ($row['errors_5xx'] ?? 0),
-                'connections_active' => (int) ($row['connections_active'] ?? 0),
+                'requests' => (int) ($row['requests']),
+                'errors_5xx' => (int) ($row['errors_5xx']),
+                'connections_active' => (int) ($row['connections_active']),
             ];
         }
 
-        usort($rows, fn (array $a, array $b): int => ($b['requests'] ?? 0) <=> ($a['requests'] ?? 0));
+        usort($rows, fn (array $a, array $b): int => ($b['requests']) <=> ($a['requests']));
 
         return $rows;
     }

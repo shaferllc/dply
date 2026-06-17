@@ -93,7 +93,7 @@ class ServerlessEnvironmentPreparer
      * — existing keys are replaced in place, new ones appended. Used to wire
      * a provisioned database's connection into the function.
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     public function mergeKeys(Site $site, array $values): void
     {
@@ -125,7 +125,7 @@ class ServerlessEnvironmentPreparer
      */
     private function logIngestSecret(Site $site): string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $secret = trim((string) ($serverless['log_ingest_secret'] ?? ''));
 

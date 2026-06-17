@@ -10,6 +10,8 @@ class DigitalOceanDnsProvider implements DnsProvider
         private readonly DigitalOceanService $service,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         $record = $this->service->findDomainRecord($zone, $type, $name, $value)

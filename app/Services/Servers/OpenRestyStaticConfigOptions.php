@@ -244,6 +244,7 @@ BASH;
     /**
      * @return array{values: array<string, string>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         return [
@@ -253,7 +254,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     public function save(Server $server, array $values, ?ConsoleEmitter $emitter = null): void
     {

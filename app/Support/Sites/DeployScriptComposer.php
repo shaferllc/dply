@@ -121,7 +121,7 @@ class DeployScriptComposer
 
         $grouped = array_fill_keys(self::PHASES, []);
         foreach ($defaults as $def) {
-            $phase = $def['phase'] ?? SiteDeployStep::PHASE_BUILD;
+            $phase = $def['phase'];
             if (! in_array($phase, self::PHASES, true)) {
                 continue;
             }
@@ -148,7 +148,7 @@ class DeployScriptComposer
      * migration. The blob sorts after every surviving step. An empty block
      * clears only the phase's trailing custom step.
      *
-     * @param  array<string, string>  $scripts  phase => script text
+     * @param  array<string, mixed> $scripts  phase => script text
      */
     public function apply(Site $site, array $scripts): void
     {

@@ -10,6 +10,7 @@ interface InsightRunnerInterface
 {
     /**
      * @return list<InsightCandidate>
+     * @param  array<string, mixed> $parameters
      */
     public function run(Server $server, ?Site $site, array $parameters): array;
 }

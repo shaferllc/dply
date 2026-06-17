@@ -47,6 +47,7 @@ use Laravel\Cashier\Billable;
  * @property ?string $billing_currency
  * @property ?array<string, mixed> $billing_details
  * @property ?string $pm_last_four
+ * @property ?string $stripe_id
  * @property ?Carbon $trial_ends_at
  * @property ?Carbon $beta_joined_at
  * @property bool $is_internal

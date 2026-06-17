@@ -17,6 +17,8 @@ trait ManagesDoAppDomainsEnv
 {
 
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -60,7 +62,7 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteBuildEnvVars(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $content = $meta['container']['build_env_file_content'] ?? '';
 
         return $this->parseEnvLines(is_string($content) ? $content : '');
@@ -72,7 +74,7 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteInstanceCount(Site $site): int
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $raw = $meta['container']['instance_count'] ?? null;
 
         return is_int($raw) && $raw > 0 ? $raw : 1;
@@ -91,7 +93,7 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteSizeSlugForDo(Site $site): string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
 
         return match ($tier) {

@@ -101,6 +101,7 @@ final class ServerMetricsRangeQuery
      *     metrics: array<string, list<array{at: int, min: float, avg: float, max: float}>>
      * }
      */
+    /** @return array<string, mixed> */
     public function fetch(Server $server, string $range): array
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();
@@ -184,6 +185,7 @@ final class ServerMetricsRangeQuery
      *     metrics: array<string, list<array{at: int, min: float, avg: float, max: float}>>
      * }
      */
+    /** @return array<string, mixed> */
     public function fetchEngineHealth(Server $server, string $engine, string $range): array
     {
         $range = self::isValidRange($range) ? $range : self::defaultRange();
@@ -203,7 +205,7 @@ final class ServerMetricsRangeQuery
             'from' => $from,
             'to' => $to,
             'sample_count' => $snapshots->count(),
-            'latest_block' => $this->engineBlockFromPayload($latest?->payload ?? [], $engine),
+            'latest_block' => $this->engineBlockFromPayload($latest->payload ?? [], $engine),
             'latest_at' => $latest?->captured_at,
             'metrics' => [
                 'active_connections' => $activeSeries,
@@ -339,7 +341,7 @@ final class ServerMetricsRangeQuery
     {
         $buckets = [];
         foreach ($snapshots as $snap) {
-            $payload = is_array($snap->payload) ? $snap->payload : [];
+            $payload = ($snap->payload );
             if (! array_key_exists($metric, $payload)) {
                 continue;
             }

@@ -23,6 +23,7 @@ final class DigitalOceanFunctionsActionDeployer
     /**
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
+    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $site->loadMissing('server', 'domains');
@@ -66,6 +67,7 @@ final class DigitalOceanFunctionsActionDeployer
      *
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
+    /** @return array<string, mixed> */
     public function redeployArtifact(Site $site, string $artifactPath): array
     {
         $site->loadMissing('server', 'domains');
@@ -92,7 +94,7 @@ final class DigitalOceanFunctionsActionDeployer
         $server = $site->server;
         $serverMeta = is_array($server->meta) ? $server->meta : [];
         $hostConfig = is_array($serverMeta['digitalocean_functions'] ?? null) ? $serverMeta['digitalocean_functions'] : [];
-        $siteMeta = is_array($site->meta) ? $site->meta : [];
+        $siteMeta = ($site->meta );
 
         $apiHost = rtrim((string) ($hostConfig['api_host'] ?? ''), '/');
         $namespace = trim((string) ($hostConfig['namespace'] ?? ''));

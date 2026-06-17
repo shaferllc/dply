@@ -18,11 +18,15 @@ class DplyEdgeBackend implements EdgeBackend
         return 'dply_edge';
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array
     {
         return $this->delivery->publishDeployment($deployment, $site, $localArtifactDir);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function republishDeployment(EdgeDeployment $deployment, Site $site): array
     {
         return $this->delivery->republishDeployment($deployment, $site);
@@ -33,6 +37,8 @@ class DplyEdgeBackend implements EdgeBackend
         $this->delivery->unpublish($site);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function attachDomain(Site $site, string $hostname): array
     {
         return $this->delivery->attachDomain($site, $hostname);
@@ -43,6 +49,8 @@ class DplyEdgeBackend implements EdgeBackend
         $this->delivery->detachDomain($site, $hostname);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function inspect(Site $site): array
     {
         return $this->delivery->inspect($site);

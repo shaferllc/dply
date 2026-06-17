@@ -80,6 +80,7 @@ class HaproxyBackendsConfig
     /**
      * @return array{backends: list<array{name: string, servers: list<string>, values: array<string, string>, raw: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -200,8 +201,8 @@ class HaproxyBackendsConfig
     }
 
     /**
-     * @param  list<string>  $servers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $servers
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -278,8 +279,8 @@ class HaproxyBackendsConfig
     }
 
     /**
-     * @param  list<string>  $servers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $servers
+     * @param  array<string, mixed> $values
      */
     private function renderBackend(string $name, array $servers, array $values): string
     {

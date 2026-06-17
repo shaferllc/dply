@@ -88,7 +88,7 @@ class ScaffoldRepoSeeder
         // Point the site at its new origin: future deploys clone/pull from the
         // bare repo, and the Repository page now resolves. The local path is the
         // origin until a provider remote replaces it (off-box copy).
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         data_set($meta, 'scaffold.repo_seeded', true);
         data_set($meta, 'scaffold.repo_origin', $bare);
         $site->forceFill([

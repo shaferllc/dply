@@ -81,7 +81,10 @@ trait MakesTestAssertions
         return ! $typeName || $typeName === PendingTask::class;
     }
 
-    protected function makeAssertCallback(string|callable $taskClass, ?callable $additionalCallback = null)
+    /**
+     * @return callable(PendingTask): bool
+     */
+    protected function makeAssertCallback(string|callable $taskClass, ?callable $additionalCallback = null): callable
     {
         if (! $additionalCallback) {
             $additionalCallback = fn () => true;
@@ -97,7 +100,11 @@ trait MakesTestAssertions
         return function (PendingTask $pendingTask) use ($taskClass, $additionalCallback) {
             $class = $this->typeNameOfFirstParameter($taskClass);
 
-            return ($class === PendingTask::class || $pendingTask->task instanceof $class)
+            $matchesClass = $class === null
+                || $class === PendingTask::class
+                || is_a($pendingTask->task, $class);
+
+            return $matchesClass
                 && $taskClass($this->callbackExpectsPendingTask($taskClass) ? $pendingTask : $pendingTask->task)
                 && $additionalCallback($this->callbackExpectsPendingTask($additionalCallback) ? $pendingTask : $pendingTask->task);
         };

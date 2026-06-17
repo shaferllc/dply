@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 class OrganizationInsightsMetricsService
 {
     /**
-     * @return array{
+     * @return array{open_by_severity: array{critical: int, warning: int, info: int}, total_open: int, avg_health_score: float|null, worst_servers: array<string, mixed>}
      *   open_by_severity: array{critical: int, warning: int, info: int},
      *   total_open: int,
      *   avg_health_score: float|null,
@@ -116,6 +116,10 @@ class OrganizationInsightsMetricsService
      * @param  Collection<string, array{open: int, worst: string|null}>  $perServer
      * @param  Collection<int, string>  $serverIds
      * @return list<array{id: string, name: string, open: int, worst: string|null}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
      */
     protected function topWorstServers(Collection $perServer, Collection $serverIds, int $limit): array
     {

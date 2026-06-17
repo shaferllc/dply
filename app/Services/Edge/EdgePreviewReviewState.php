@@ -32,6 +32,7 @@ final class EdgePreviewReviewState
      *   approvals: list<array{id: string, user_name: string, note: ?string, created_at: string}>,
      * }
      */
+    /** @return array<string, mixed> */
     public function forPreview(Site $preview): array
     {
         $edge = $preview->edgeMeta();
@@ -88,14 +89,19 @@ final class EdgePreviewReviewState
                 'id' => (string) $row->id,
                 'user_name' => (string) ($row->user?->name ?: $row->user?->email ?: __('Reviewer')),
                 'note' => is_string($row->note) && $row->note !== '' ? $row->note : null,
-                'created_at' => $row->created_at?->toDateTimeString() ?? '',
+                'created_at' => $row->created_at->toDateTimeString() ?? '',
             ])->values()->all(),
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $review
+     * @param  array<string, mixed> $review
      * @return list<array{label: string, value: string, mono?: bool}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, string>>
+     * @param  array<string, mixed> $review
      */
     public function confirmModalRows(array $review): array
     {
@@ -130,6 +136,9 @@ final class EdgePreviewReviewState
         return $rows;
     }
 
+    /**
+     * @param  array<string, mixed> $review
+     */
     public function promoteBlockedMessage(array $review): ?string
     {
         if (! empty($review['ready_to_promote'])) {

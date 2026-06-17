@@ -17,6 +17,8 @@ use ReflectionProperty;
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
  * wire:* bindings keep resolving against the composed class.
+ *
+ * @phpstan-require-extends \App\Modules\TaskRunner\Task
  */
 trait ConvertsTaskModel
 {
@@ -54,7 +56,16 @@ trait ConvertsTaskModel
      */
     public static function fromModel(TaskModel $model): static
     {
-        $task = new static;
+        $restored = $model->instance !== null && $model->instance !== ''
+            ? TaskModel::restoreStoredInstance($model->instance)
+            : null;
+
+        if ($restored instanceof static) {
+            $task = $restored;
+        } else {
+            $task = app(static::class);
+        }
+
         $task->taskModel = $model;
         $task->status = $model->status;
         $task->output = $model->output ?? '';
@@ -92,6 +103,7 @@ trait ConvertsTaskModel
     /**
      * Get the task summary.
      */
+    /** @return array<string, mixed> */
     public function getSummary(): array
     {
         return [
@@ -170,7 +182,10 @@ trait ConvertsTaskModel
                 return [$method->getName() => $method->getClosure($this)];
             });
 
-        return $macros->merge($methodCollection);
+        return new Collection([
+            ...$macros->all(),
+            ...$methodCollection->all(),
+        ]);
     }
 
     /**
@@ -186,19 +201,12 @@ trait ConvertsTaskModel
             ->all();
     }
 
-    /**
-     * Returns the data that should be passed to the view.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function getViewData(): array
     {
         return [];
     }
 
-    /**
-     * Convert this task to an AnonymousTask for enhanced TaskRunner features.
-     */
     public function toAnonymousTask(): AnonymousTask
     {
         return AnonymousTask::script(
@@ -208,17 +216,15 @@ trait ConvertsTaskModel
         );
     }
 
-    /**
-     * Check if this task is compatible with enhanced TaskRunner features.
-     */
     public function isEnhancedCompatible(): bool
     {
-        return method_exists($this, 'render') || method_exists($this, 'getScript');
+        return method_exists($this, 'render');
     }
 
     /**
      * Get task information for monitoring and management.
      */
+    /** @return array<string, mixed> */
     public function getTaskInfo(): array
     {
         return [

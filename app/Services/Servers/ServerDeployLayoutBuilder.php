@@ -23,6 +23,7 @@ class ServerDeployLayoutBuilder
     /**
      * @return array{web_root:string,logs:string,bin:string}
      */
+    /** @return array<string, mixed> */
     public function build(Server $server): array
     {
         return [

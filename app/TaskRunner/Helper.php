@@ -125,7 +125,7 @@ class Helper
      *
      * @throws InvalidArgumentException
      */
-    private static function validatePath(string $path): void
+    protected static function validatePath(string $path): void
     {
         // Check for path traversal attempts
         if (str_contains($path, '..') || str_contains($path, '//')) {
@@ -146,7 +146,7 @@ class Helper
     /**
      * Safely cleans up a temporary directory.
      */
-    private static function cleanupTemporaryDirectory(TemporaryDirectory $directory): void
+    protected static function cleanupTemporaryDirectory(TemporaryDirectory $directory): void
     {
         try {
             if ($directory->exists()) {

@@ -13,6 +13,7 @@ class FirewallRuleDiffService
     /**
      * @return array{current_hash: string, last_apply_hash: ?string, matches_last_apply: bool, rule_count: int}
      */
+    /** @return array<string, mixed> */
     public function compareToLastApply(Server $server): array
     {
         $h = $this->hasher->hashServerRules($server);

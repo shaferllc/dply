@@ -81,6 +81,7 @@ class AzureDnsService
     /**
      * @return array<string,mixed>
      */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zoneName, string $type, string $recordName, string $value, int $ttl = 60): array
     {
         $zone = $this->findZone($zoneName);
@@ -170,7 +171,8 @@ class AzureDnsService
     }
 
     /**
-     * @param  array<string,mixed>  $query
+     * @param  array<string, mixed> $query
+     * @param  array<string, mixed> $body
      */
     private function request(string $method, string $path, array $query = [], array $body = []): Response
     {
@@ -180,8 +182,8 @@ class AzureDnsService
     }
 
     /**
-     * @param  array<string,mixed>  $query
-     * @param  array<string,mixed>  $body
+     * @param  array<string, mixed> $query
+     * @param  array<string, mixed> $body
      */
     private function requestAbsolute(string $method, string $url, array $query = [], array $body = []): Response
     {

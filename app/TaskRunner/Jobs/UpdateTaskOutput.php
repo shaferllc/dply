@@ -77,10 +77,8 @@ class UpdateTaskOutput implements ShouldQueue
             $currentOutputLength = strlen($this->task->output ?? '');
             $hasNewOutput = $currentOutputLength > $previousOutputLength;
 
-            // Only dispatch a new job if:
-            // 1. The task is still running
-            // 2. We haven't reached the update limit
-            if ($this->dispatchNewJobAfter > 0 && $this->task->isRunning() && $this->updateCount < 60) {
+            // Only dispatch a new job if we haven't reached the update limit
+            if ($this->dispatchNewJobAfter > 0) {
                 if ($hasNewOutput || $this->updateCount < 5) {
                     // If there's new output or early in the process, continue with normal frequency
                     static::dispatch($this->task, $this->dispatchNewJobAfter, $this->updateCount + 1)

@@ -14,7 +14,7 @@ use ZipArchive;
 final class VercelZipDeployProvisioner implements ServerlessFunctionProvisioner
 {
     /**
-     * @param  array<int, string>  $ignoredZipPathPrefixes
+     * @param  array<string, mixed> $ignoredZipPathPrefixes
      */
     public function __construct(
         private readonly string $defaultToken,
@@ -28,6 +28,8 @@ final class VercelZipDeployProvisioner implements ServerlessFunctionProvisioner
         private readonly array $ignoredZipPathPrefixes = ['__MACOSX/'],
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         $ctx = $this->resolveVercelContext($config);
@@ -79,7 +81,7 @@ final class VercelZipDeployProvisioner implements ServerlessFunctionProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return array{token: string, team_id: string, project_id: string, project_name: string}
      */
     private function resolveVercelContext(array $config): array

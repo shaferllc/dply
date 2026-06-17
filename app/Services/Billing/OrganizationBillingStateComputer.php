@@ -184,7 +184,7 @@ class OrganizationBillingStateComputer
             'bytes_egress' => $usageTotals->bytesEgress,
             'r2_storage_bytes' => $usageTotals->r2StorageBytes,
         ]);
-        $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents'] ?? 0);
+        $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents']);
 
         // Managed-serverless usage (metered invocations above the included
         // allowance) + managed DB/cache resources, both cost-plus. BYO
@@ -193,7 +193,7 @@ class OrganizationBillingStateComputer
         [$slPeriodStart, $slPeriodEnd] = $this->serverlessUsageReader->currentMonthWindow();
         $serverlessUsageTotals = $this->serverlessUsageReader->totalsForOrganization($organization, $slPeriodStart, $slPeriodEnd);
         $serverlessUsageEstimate = $this->serverlessUsageCostCalculator->estimate($serverlessUsageTotals, $managedServerlessCount);
-        $serverlessUsageSubtotalCents = (int) ($serverlessUsageEstimate['subtotal_cents'] ?? 0)
+        $serverlessUsageSubtotalCents = (int) ($serverlessUsageEstimate['subtotal_cents'])
             + $this->serverlessResourceCalculator->subtotalCents($managedServerlessSites);
 
         // The flat plan is chosen by billable BYO server count; size only

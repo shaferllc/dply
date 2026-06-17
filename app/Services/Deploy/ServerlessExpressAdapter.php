@@ -39,6 +39,7 @@ class ServerlessExpressAdapter
      *
      * @return array{express: bool, handler: string, function: string, entry: string}
      */
+    /** @return array<string, mixed> */
     public function plan(string $workingDirectory): array
     {
         $packageJson = $this->readPackageJson($workingDirectory);
@@ -57,6 +58,7 @@ class ServerlessExpressAdapter
      *
      * @return array{express: bool, handler: string, function: string, entry: string, ran: bool, output: string}
      */
+    /** @return array<string, mixed> */
     public function inject(string $workingDirectory): array
     {
         $plan = $this->plan($workingDirectory);

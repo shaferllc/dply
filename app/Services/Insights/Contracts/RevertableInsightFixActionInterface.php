@@ -18,7 +18,7 @@ interface RevertableInsightFixActionInterface
      * Restore the prior on-disk state captured during apply. Should never throw —
      * all failures (missing backup file, reload failure, etc.) go in the FixResult.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @param  (callable(string $type, string $chunk): void)|null  $onOutput
      *                                                                        Optional streaming hook for live banner output. See {@see InsightFixActionInterface::apply}.
      */

@@ -10,6 +10,8 @@ final class DigitalOceanFunctionsDeployEngine implements DeployEngine
         private readonly DigitalOceanFunctionsActionDeployer $actionDeployer,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function run(DeployContext $context): array
     {
         $result = $this->actionDeployer->deploy($context->site());

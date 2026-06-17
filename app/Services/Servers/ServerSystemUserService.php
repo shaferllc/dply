@@ -24,6 +24,10 @@ class ServerSystemUserService
      *
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
+     */
     public function listPasswdUsersWithSiteCounts(Server $server, ServerPasswdUserLister $lister): array
     {
         $details = $lister->listPasswdDetails($server);
@@ -36,7 +40,11 @@ class ServerSystemUserService
      * DB-backed read of the last persisted snapshot. Used by the workspace
      * page on mount so the table is populated without a fresh SSH probe.
      *
-     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
      */
     public function storedSystemUsersWithMetadata(Server $server): array
     {
@@ -46,7 +54,7 @@ class ServerSystemUserService
                 'uid' => $u->uid,
                 'home' => (string) $u->home,
                 'shell' => (string) $u->shell,
-                'groups' => is_array($u->groups) ? array_values($u->groups) : [],
+                'groups' => (array_values($u->groups) ),
             ])
             ->all();
 
@@ -54,7 +62,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  list<array{username: string, uid?: int|null, home?: string, shell?: string, groups?: list<string>}>  $details
+     * @param  array<string, mixed> $details
      */
     private function persistSystemUsers(Server $server, array $details): void
     {
@@ -90,7 +98,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  list<array{username: string, uid?: int|null, home?: string, shell?: string, groups?: list<string>}>  $details
+     * @param  array<string, mixed> $details
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     private function buildEnrichedRows(Server $server, array $details): array
@@ -155,7 +163,7 @@ class ServerSystemUserService
      * /system-users page; the site-level "Create user" path is gone — sites
      * pick from the existing-users dropdown via {@see assignExistingUserToSite()}.
      *
-     * @param  list<string>  $extraGroups  supplementary groups (e.g. www-data)
+     * @param  array<string, mixed> $extraGroups  supplementary groups (e.g. www-data)
      *
      * @throws \RuntimeException
      */
@@ -282,7 +290,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  list<string>  $extraGroups
+     * @param  array<string, mixed> $extraGroups
      */
     private function createUserIfMissing(Server $server, string $username, bool $grantSudo, string $shell, array $extraGroups): void
     {
@@ -489,7 +497,7 @@ BASH;
 
     private function writeOperationMeta(Site $site, string $status, string $message): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['system_user_operation'] = [
             'status' => $status,
             'message' => $message,

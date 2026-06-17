@@ -16,10 +16,11 @@ class TaskChainException extends Exception
     /**
      * The task chain results.
      */
+    /** @var array<string, mixed> */
     protected array $chainResults = [];
 
     /**
-     * Create a new TaskChainException instance.
+     * @param array<string, mixed> $chainResults
      */
     public function __construct(
         string $message = '',
@@ -44,14 +45,16 @@ class TaskChainException extends Exception
 
     /**
      * Get the chain results.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getChainResults(): array
     {
         return $this->chainResults;
     }
 
     /**
-     * Set the chain results.
+     * @param array<string, mixed> $results
      */
     public function setChainResults(array $results): self
     {
@@ -60,9 +63,6 @@ class TaskChainException extends Exception
         return $this;
     }
 
-    /**
-     * Check if any tasks were successful before failure.
-     */
     public function hasSuccessfulTasks(): bool
     {
         return ! empty($this->chainResults['successful_tasks'] ?? 0);

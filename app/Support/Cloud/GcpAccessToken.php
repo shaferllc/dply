@@ -15,7 +15,7 @@ final class GcpAccessToken
     private static array $tokenCache = [];
 
     /**
-     * @param  array<string, mixed>  $serviceAccount
+     * @param  array<string, mixed> $serviceAccount
      */
     public function __construct(
         private readonly ProviderCredential $credential,
@@ -73,7 +73,7 @@ final class GcpAccessToken
     }
 
     /**
-     * @param  list<string>  $scopes
+     * @param  array<string, mixed> $scopes
      */
     public function token(array $scopes): string
     {
@@ -84,7 +84,7 @@ final class GcpAccessToken
 
         $cacheKey = sha1($this->projectId.'|'.implode(' ', $scopes).'|'.$this->credential->id);
         $cached = self::$tokenCache[$cacheKey] ?? null;
-        if (is_array($cached) && ($cached['expires_at'] ?? 0) > (time() + 30)) {
+        if (is_array($cached) && ($cached['expires_at']) > (time() + 30)) {
             return (string) $cached['token'];
         }
 
@@ -155,7 +155,7 @@ final class GcpAccessToken
     }
 
     /**
-     * @param  array<string, mixed>  $serviceAccount
+     * @param  array<string, mixed> $serviceAccount
      */
     private static function assertRequiredFields(array $serviceAccount): void
     {

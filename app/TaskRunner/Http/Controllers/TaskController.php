@@ -119,15 +119,17 @@ class TaskController extends Controller
                 $task = AnonymousTask::command($name, $command);
             }
 
+            $pendingTask = $task->pending();
+
             if ($timeout) {
-                $task->timeout($timeout);
+                $pendingTask->timeout((int) $timeout);
             }
 
             if ($connection) {
-                $task->onConnection($connection);
+                $pendingTask->onConnection($connection);
             }
 
-            $result = TaskRunner::run($task);
+            $result = TaskRunner::run($pendingTask);
 
             return response()->json([
                 'data' => [

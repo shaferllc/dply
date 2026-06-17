@@ -38,7 +38,7 @@ final class SiteFileBackupExporter
 
         $backup->loadMissing('site.server');
         $site = $backup->site;
-        $server = $site?->server;
+        $server = $site->server;
 
         if ($site === null || $server === null) {
             throw new \RuntimeException(__('Site or server is missing for this backup.'));
@@ -100,7 +100,7 @@ final class SiteFileBackupExporter
     {
         if ($backup->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER && filled($backup->remote_path)) {
             $backup->loadMissing('site.server');
-            $server = $backup->site?->server;
+            $server = $backup->site->server;
             if ($server !== null) {
                 $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg((string) $backup->remote_path), 60);
             }

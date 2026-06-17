@@ -20,6 +20,7 @@ trait ManagesDoDroplets
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getDroplets(?string $tag = null): array
     {
         $query = $tag !== null ? ['tag_name' => $tag] : [];
@@ -41,6 +42,7 @@ trait ManagesDoDroplets
      *
      * @return array{state: 'present'|'gone'|'unknown', detail?: string}
      */
+    /** @return array<string, mixed> */
     public function inspectDropletPresence(int $id): array
     {
         $response = $this->request('get', '/droplets/'.$id);
@@ -65,6 +67,8 @@ trait ManagesDoDroplets
         return ['state' => 'unknown', 'detail' => $detail];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function getDroplet(int $id): array
     {
         $response = $this->request('get', '/droplets/'.$id);
@@ -81,7 +85,7 @@ trait ManagesDoDroplets
     /**
      * Create a new droplet. Returns droplet array (IP may not be available immediately).
      *
-     * @param  array<int|string>  $sshKeyIds  Optional DO SSH key IDs or fingerprints
+     * @param  array<string, mixed> $sshKeyIds  Optional DO SSH key IDs or fingerprints
      * @param  array{
      *     ipv6?: bool,
      *     backups?: bool,
@@ -106,7 +110,7 @@ trait ManagesDoDroplets
         $rawVpc = $options['vpc_uuid'] ?? null;
         $vpcUuid = is_string($rawVpc) ? trim($rawVpc) : '';
         $tags = $options['tags'] ?? [];
-        $tags = is_array($tags) ? array_values(array_filter($tags, static fn ($t) => is_string($t) && $t !== '')) : [];
+        $tags = (array_values(array_filter($tags, static fn ($t) => ($t) && $t !== '')) );
 
         $body = [
             'name' => $name,
@@ -167,7 +171,7 @@ trait ManagesDoDroplets
                 }
             }
         }
-        // Legacy shape: array of network objects
+        // Legacy shape: array<string, mixed> of network objects
         if (isset($networks[0]) && is_array($networks)) {
             foreach ($networks as $n) {
                 if (($n['type'] ?? '') === 'public' && ($n['version'] ?? '') === '4') {
@@ -230,6 +234,7 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed> action payload
      */
+    /** @return array<string, mixed> */
     public function powerOffDroplet(int $id): array
     {
         $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_off']);
@@ -243,6 +248,7 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed> action payload
      */
+    /** @return array<string, mixed> */
     public function snapshotDroplet(int $id, string $name): array
     {
         $name = trim($name);
@@ -264,6 +270,7 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getDropletAction(int $dropletId, int $actionId): array
     {
         $response = $this->request('get', '/droplets/'.$dropletId.'/actions/'.$actionId);
@@ -316,6 +323,7 @@ trait ManagesDoDroplets
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getSnapshots(?string $resourceType = 'droplet'): array
     {
         $query = $resourceType !== null && $resourceType !== '' ? ['resource_type' => $resourceType] : [];

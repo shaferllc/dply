@@ -118,6 +118,8 @@ class ExecuteRollbackJob implements ShouldQueue
 
     /**
      * Get the tags for the job.
+     *
+     * @return list<string>
      */
     public function tags(): array
     {

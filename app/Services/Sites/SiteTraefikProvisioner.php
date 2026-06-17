@@ -80,7 +80,7 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
 
         $emit->success('reload OK', 'traefik');
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['traefik_backend_port'] = $backendPort;
         $meta['traefik_last_output'] = $out;
         $site->update(['meta' => $meta]);
@@ -129,7 +129,7 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
 
     private function backendPort(Site $site): int
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $existing = $meta['traefik_backend_port'] ?? null;
         if (is_numeric($existing) && (int) $existing >= 20000) {
             return (int) $existing;

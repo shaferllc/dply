@@ -89,6 +89,10 @@ class WebserverCertsAggregator
      *
      * @return list<array{t: int, line: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed, mixed>>
+     */
     public function progress(Server $server): array
     {
         $raw = Cache::get(self::progressKey((string) $server->id));
@@ -131,7 +135,7 @@ class WebserverCertsAggregator
      * This is the read side the Livewire surfaces poll; the SSH work happens in
      * {@see ScanServerLiveCertsJob} via {@see scanAndCache()}.
      *
-     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}|null
+     * @return list<array<mixed, mixed>>
      */
     public function cached(Server $server): ?array
     {
@@ -170,6 +174,7 @@ class WebserverCertsAggregator
      *
      * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function scanAndCache(Server $server): array
     {
         $payload = $this->runScan($server);
@@ -202,6 +207,7 @@ class WebserverCertsAggregator
      *
      * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function aggregate(Server $server, bool $forceFresh = false): array
     {
         if (! $forceFresh) {
@@ -296,7 +302,7 @@ class WebserverCertsAggregator
      * A "[read/total] name · Nd" progress frame naming the cert just read, with
      * its days-until-expiry when we got one — so each frame is informative.
      *
-     * @param  list<string>  $chunk
+     * @param  array<string, mixed> $chunk
      * @param  list<array<string, mixed>>  $rows
      */
     private function frameLine(int $read, int $total, array $chunk, array $rows): string
@@ -347,7 +353,7 @@ BASH;
      * `path|subject|issuer|notAfter` line each (the format {@see parseScanOutput}
      * consumes). Unreadable/non-cert files are skipped silently.
      *
-     * @param  list<string>  $files
+     * @param  array<string, mixed> $files
      */
     private function buildReadScript(array $files): string
     {
@@ -473,7 +479,7 @@ BASH;
      * cache backends that might JSON-encode, we re-create the carbon
      * objects from `not_after` on the way back out.
      *
-     * @param  array<string, mixed>  $cached
+     * @param  array<string, mixed> $cached
      * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     private function rehydrate(array $cached): array

@@ -15,7 +15,7 @@ final class AzureAccessToken
      */
     public static function credentials(ProviderCredential $credential): array
     {
-        $creds = is_array($credential->credentials) ? $credential->credentials : [];
+        $creds = ($credential->credentials );
 
         $tenantId = trim((string) ($creds['tenant_id'] ?? ''));
         $clientId = trim((string) ($creds['client_id'] ?? ''));

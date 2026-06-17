@@ -10,6 +10,9 @@ use App\Services\Insights\InsightCandidate;
 
 class DiskCapacityInsightRunner implements InsightRunnerInterface
 {
+    /**
+     * @return list<InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {

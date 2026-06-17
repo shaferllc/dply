@@ -127,6 +127,9 @@ final class WebserverEngineInfo
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function for(string $engine): array
     {
         return self::all()[$engine] ?? [

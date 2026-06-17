@@ -104,7 +104,7 @@ final class ServerlessFunctionDnsProvisioner
                 ]);
                 $do = new DigitalOceanService($token);
                 foreach ($blocking as $r) {
-                    $recordId = (int) ($r['id'] ?? 0);
+                    $recordId = (int) ($r['id']);
                     if ($recordId > 0) {
                         $do->deleteDomainRecord($zone, $recordId);
                     }
@@ -347,11 +347,11 @@ final class ServerlessFunctionDnsProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     private function store(Site $site, array $payload): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $serverless['dns'] = $payload;
         $meta['serverless'] = $serverless;

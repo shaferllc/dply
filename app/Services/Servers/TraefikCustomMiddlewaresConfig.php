@@ -23,6 +23,7 @@ class TraefikCustomMiddlewaresConfig
     /**
      * @return array{middlewares: list<array{slug: string, path: string, type: string, config_summary: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

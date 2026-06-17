@@ -27,7 +27,7 @@ final class PipelineAnchorScriptRunner
         bool $atomic,
         bool $hasExistingGit,
     ): string {
-        $script = trim((string) ($this->activePipeline($site)?->clone_script ?? ''));
+        $script = trim((string) ($this->activePipeline($site)->clone_script ?? ''));
         if ($script !== '') {
             $log = "\n--- clone (custom) ---\n";
             $log .= $this->execScript($ssh, $site, $script, $releaseDir, $gitSshPrefix, $repoUrl, $branch, 600);
@@ -147,7 +147,7 @@ final class PipelineAnchorScriptRunner
         string $repoUrl,
         string $branch,
     ): string {
-        $script = trim((string) ($this->activePipeline($site)?->activate_script ?? ''));
+        $script = trim((string) ($this->activePipeline($site)->activate_script ?? ''));
         if ($script !== '') {
             $log = "\n--- activate (custom) ---\n";
 

@@ -30,6 +30,7 @@ final class ServerWebserverConfigEditor
     /**
      * @return array{path: string, engine: string, content: string}
      */
+    /** @return array<string, mixed> */
     public function snapshotFor(string $engine, string $path, string $content): array
     {
         return [

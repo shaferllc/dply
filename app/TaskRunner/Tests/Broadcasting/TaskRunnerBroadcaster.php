@@ -67,6 +67,12 @@ class TaskRunnerBroadcaster implements StreamingLoggerInterface
         }
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function getStreamHandlers(): array
     {
         return $this->streamHandlers;

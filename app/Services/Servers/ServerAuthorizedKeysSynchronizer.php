@@ -134,9 +134,10 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  list<string>  $targets
+     * @param  array<string, mixed> $targets
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function buildSyncPayload(Server $server, array $targets): array
     {
         $fingerprints = [];
@@ -162,7 +163,12 @@ class ServerAuthorizedKeysSynchronizer
      * file), plus the SSH login user (so an empty panel clears the deploy account).
      *
      * @param  Collection<string, Collection<int, ServerAuthorizedKey>>  $groups
+     * @param  array<string, mixed> $targets
      * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
      */
     protected function resolveSyncTargets(Server $server, Collection $groups): array
     {
@@ -185,7 +191,7 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  list<string>  $targets
+     * @param  array<string, mixed> $targets
      */
     protected function persistSyncedTargets(Server $server, array $targets): void
     {
@@ -259,6 +265,10 @@ class ServerAuthorizedKeysSynchronizer
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     protected function desiredAuthorizedKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
     {
         $lines = [];
@@ -298,6 +308,10 @@ class ServerAuthorizedKeysSynchronizer
      * Records the desired fingerprints for this target so the next run knows what it may remove.
      *
      * @param  Collection<int, ServerAuthorizedKey>  $rows
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
      * @return list<string>
      */
     protected function reconciledKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
@@ -364,6 +378,7 @@ class ServerAuthorizedKeysSynchronizer
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
     protected function hiddenManagedTargets(Server $server): array
     {
         return trim((string) $server->openSshPublicKeyFromRecoveryPrivate()) !== ''

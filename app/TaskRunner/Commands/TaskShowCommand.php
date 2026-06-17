@@ -65,16 +65,16 @@ class TaskShowCommand extends Command
             ['Created', $task->created_at->format('Y-m-d H:i:s')],
             ['Started', $task->started_at?->format('Y-m-d H:i:s') ?? 'Not started'],
             ['Completed', $task->completed_at?->format('Y-m-d H:i:s') ?? 'Not completed'],
-            ['Duration', $task->duration ? number_format($task->duration, 2).'s' : 'N/A'],
+            ['Duration', $task->getDuration() > 0 ? number_format((float) $task->getDuration(), 2).'s' : 'N/A'],
             ['Exit Code', $task->exit_code ?? 'N/A'],
-            ['Progress', $task->progress ? $task->progress.'%' : 'N/A'],
+            ['Progress', $task->getProgressAttribute() !== null ? $task->getProgressAttribute().'%' : 'N/A'],
         ]);
 
-        if ($showError && $task->error) {
+        if ($showError && $task->getErrorAttribute()) {
             $this->newLine();
             $this->error('Error Output');
             $this->line('============');
-            $this->line($task->error);
+            $this->line($task->getErrorAttribute());
         }
 
         if ($showOutput && $task->output) {
@@ -84,7 +84,7 @@ class TaskShowCommand extends Command
             $this->line($task->output);
         }
 
-        if (! $showOutput && ! $showError && ($task->output || $task->error)) {
+        if (! $showOutput && ! $showError && ($task->output || $task->getErrorAttribute())) {
             $this->newLine();
             $this->comment('Use --output to show task output');
             $this->comment('Use --error to show task error');
@@ -100,13 +100,13 @@ class TaskShowCommand extends Command
             'created_at' => $task->created_at->toISOString(),
             'started_at' => $task->started_at?->toISOString(),
             'completed_at' => $task->completed_at?->toISOString(),
-            'duration' => $task->duration,
+            'duration' => $task->getDuration(),
             'exit_code' => $task->exit_code,
-            'progress' => $task->progress,
+            'progress' => $task->getProgressAttribute(),
         ];
 
         if ($showError) {
-            $data['error'] = $task->error;
+            $data['error'] = $task->getErrorAttribute();
         }
 
         if ($showOutput) {
@@ -136,15 +136,17 @@ class TaskShowCommand extends Command
             }
 
             // Show new error
-            if ($task->error && strlen($task->error) > $lastErrorLength) {
-                $newError = substr($task->error, $lastErrorLength);
+            $errorOutput = $task->getErrorAttribute() ?? '';
+            if ($errorOutput !== '' && strlen($errorOutput) > $lastErrorLength) {
+                $newError = substr($errorOutput, $lastErrorLength);
                 $this->error($newError);
-                $lastErrorLength = strlen($task->error);
+                $lastErrorLength = strlen($errorOutput);
             }
 
             // Show progress
-            if ($task->progress) {
-                $this->overwrite("Progress: {$task->progress}%");
+            $progress = $task->getProgressAttribute();
+            if ($progress !== null) {
+                $this->output->write("\r\x1B[2KProgress: {$progress}%");
             }
 
             sleep(1);
@@ -160,7 +162,7 @@ class TaskShowCommand extends Command
         return 0;
     }
 
-    protected function formatStatus($status): string
+    protected function formatStatus(TaskStatus $status): string
     {
         return match ($status) {
             TaskStatus::Pending => '<fg=yellow>Pending</>',
@@ -171,7 +173,6 @@ class TaskShowCommand extends Command
             TaskStatus::Cancelled => '<fg=yellow>Cancelled</>',
             TaskStatus::UploadFailed => '<fg=red>Upload Failed</>',
             TaskStatus::ConnectionFailed => '<fg=red>Connection Failed</>',
-            default => $status->value,
         };
     }
 }

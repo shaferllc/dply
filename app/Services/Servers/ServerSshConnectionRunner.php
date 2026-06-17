@@ -24,7 +24,7 @@ class ServerSshConnectionRunner
     /**
      * @template T
      *
-     * @param  callable(SshConnection, string):T  $callback
+     * @param  callable(SshConnection, string): T  $callback
      * @return T
      */
     public function run(Server $server, callable $callback, bool $useRoot = true, bool $fallbackToDeploy = true): mixed

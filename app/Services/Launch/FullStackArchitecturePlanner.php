@@ -152,7 +152,7 @@ final class FullStackArchitecturePlanner
         return new FullStackLaunchPlan(
             repo: $repo,
             branch: $branch,
-            isMonorepo: (bool) ($monorepo['is_monorepo'] ?? false),
+            isMonorepo: (bool) ($monorepo['is_monorepo']),
             layers: $layers,
             wiringHints: $this->wiringHints($layers),
             reasons: $reasons,
@@ -166,7 +166,7 @@ final class FullStackArchitecturePlanner
      */
     private function analysisTargets(string $checkoutPath, array $monorepo): array
     {
-        if (! ($monorepo['is_monorepo'] ?? false) || ($monorepo['packages'] ?? []) === []) {
+        if (! ($monorepo['is_monorepo']) || ($monorepo['packages'] ?? []) === []) {
             return [[
                 'path' => $checkoutPath,
                 'repo_root' => '',
@@ -187,7 +187,7 @@ final class FullStackArchitecturePlanner
             $targets[] = [
                 'path' => $absolute,
                 'repo_root' => $relative,
-                'label' => (string) ($package['label'] ?? $relative),
+                'label' => (string) ($package['label']),
             ];
         }
 
@@ -203,7 +203,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  list<array{path: string, repo_root: string, label: string}>  $targets
+     * @param  array<string, mixed> $targets
      * @return list<array{path: string, repo_root: string, label: string}>
      */
     private function mergeComposerTargets(string $checkoutPath, array $targets): array
@@ -241,7 +241,7 @@ final class FullStackArchitecturePlanner
 
     /**
      * @param  array{plan: RepositoryRuntimePlan, plan_array: array<string, mixed>, repo_root: string, label: string}  $target
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $reasons
      * @return list<FullStackLayer>
      */
     private function layersForNodeTarget(string $repo, string $branch, array $target, array &$reasons): array
@@ -261,7 +261,7 @@ final class FullStackArchitecturePlanner
             'name' => $this->suggestedName($repo, 'edge'),
             'runtime_mode' => $runtimeMode,
             'build_command' => $planArray['build_command'] ?? null,
-            'output_dir' => $preset?->outputDir,
+            'output_dir' => $preset->outputDir,
             'repo_root' => $repoRoot !== '' ? $repoRoot : null,
         ], fn ($value): bool => $value !== null && $value !== '');
 
@@ -310,7 +310,7 @@ final class FullStackArchitecturePlanner
 
     /**
      * @param  array{plan: RepositoryRuntimePlan, plan_array: array<string, mixed>, repo_root: string, label: string}  $target
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $reasons
      */
     private function layerForPhpTarget(string $repo, string $branch, array $target, array &$reasons): FullStackLayer
     {
@@ -350,7 +350,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  list<FullStackLayer>  $layers
+     * @param  array<string, mixed> $layers
      */
     private function shouldRecommendDatabase(array $layers): bool
     {
@@ -364,7 +364,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  list<FullStackLayer>  $layers
+     * @param  array<string, mixed> $layers
      * @return list<FullStackLayer>
      */
     private function dedupeLayers(array $layers): array
@@ -384,7 +384,7 @@ final class FullStackArchitecturePlanner
     }
 
     /**
-     * @param  list<FullStackLayer>  $layers
+     * @param  array<string, mixed> $layers
      * @return list<string>
      */
     private function wiringHints(array $layers): array

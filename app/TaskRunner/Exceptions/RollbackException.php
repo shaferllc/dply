@@ -25,10 +25,11 @@ class RollbackException extends Exception
     /**
      * Additional rollback context.
      */
+    /** @var array<string, mixed> */
     protected array $context = [];
 
     /**
-     * Create a new RollbackException instance.
+     * @param array<string, mixed> $context
      */
     public function __construct(
         string $message = '',
@@ -63,14 +64,16 @@ class RollbackException extends Exception
 
     /**
      * Get the rollback context.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getContext(): array
     {
         return $this->context;
     }
 
     /**
-     * Create a RollbackException for validation failure.
+     * @param array<string, mixed> $validationErrors
      */
     public static function validationFailed(string $taskId, array $validationErrors): self
     {
@@ -101,6 +104,7 @@ class RollbackException extends Exception
 
     /**
      * Create a RollbackException for dependency failure.
+     * @param  array<string, mixed> $dependencies
      */
     public static function dependencyFailed(string $taskId, array $dependencies): self
     {

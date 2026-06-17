@@ -20,6 +20,7 @@ trait ManagesDoCatalog
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getRegions(): array
     {
         return $this->cachedCatalogList('do_regions', '/regions', 'regions');
@@ -30,6 +31,7 @@ trait ManagesDoCatalog
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getSizes(): array
     {
         return $this->cachedCatalogList('do_sizes', '/sizes', 'sizes');
@@ -67,6 +69,7 @@ trait ManagesDoCatalog
      *
      * @return array<int, array{id: string, name: string, region: string, ip_range: string}>
      */
+    /** @return array<string, mixed> */
     public function listVpcs(?string $region = null): array
     {
         $response = $this->request('get', '/vpcs');
@@ -107,6 +110,7 @@ trait ManagesDoCatalog
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getImages(): array
     {
         $response = $this->request('get', '/images');

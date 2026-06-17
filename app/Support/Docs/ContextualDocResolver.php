@@ -152,7 +152,7 @@ final class ContextualDocResolver
             'label' => (string) ($group['label'] ?? $groupKey),
             'slugs' => array_values(array_filter(
                 $group['slugs'] ?? [],
-                static fn ($value): bool => is_string($value) && $value !== '',
+                static fn (mixed $value): bool => is_string($value) && $value !== '',
             )),
         ];
     }
@@ -173,9 +173,9 @@ final class ContextualDocResolver
         ];
 
         $group = $this->guideGroup($slug);
-        if ($group !== null && ($group['label'] ?? '') !== '') {
+        if ($group !== null && $group['label'] !== '') {
             $items[] = [
-                'label' => (string) $group['label'],
+                'label' => $group['label'],
                 'slug' => null,
             ];
         }
@@ -396,7 +396,7 @@ final class ContextualDocResolver
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function matchesParams(array $params): bool
     {

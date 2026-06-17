@@ -84,7 +84,7 @@ class ErrorEventRecorder
             : null;
 
         return $this->upsert($deployment, [
-            'organization_id' => $site?->organization_id ?? $server?->organization_id,
+            'organization_id' => $site->organization_id ?? $server->organization_id,
             'server_id' => $server?->id,
             'site_id' => $site?->id,
             'category' => 'deploy',
@@ -192,7 +192,7 @@ class ErrorEventRecorder
     }
 
     /**
-     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed> $attributes
      */
     private function upsert(Model $source, array $attributes): ErrorEvent
     {
@@ -232,10 +232,10 @@ class ErrorEventRecorder
     /** Newest error-level line from a ConsoleAction's output, if any. */
     private function lastErrorLine(ConsoleAction $action): string
     {
-        $lines = method_exists($action, 'lines') ? $action->lines() : [];
-        foreach (array_reverse(is_array($lines) ? $lines : []) as $line) {
-            if (($line['level'] ?? null) === ConsoleAction::LEVEL_ERROR && trim((string) ($line['line'] ?? '')) !== '') {
-                return trim((string) $line['line']);
+        $lines = $action->lines();
+        foreach (array_reverse($lines) as $line) {
+            if (($line['level']) === ConsoleAction::LEVEL_ERROR && trim($line['line']) !== '') {
+                return trim($line['line']);
             }
         }
 
@@ -262,7 +262,7 @@ class ErrorEventRecorder
         $tail = trim((string) ($deployment->log_output ?? ''));
         $tail = $tail === '' ? '' : trim((string) mb_substr($tail, -1000));
 
-        $prefix = $exit !== null ? sprintf('Exited %d. ', (int) $exit) : '';
+        $prefix = sprintf('Exited %d. ', (int) $exit);
 
         return trim($prefix.$tail);
     }

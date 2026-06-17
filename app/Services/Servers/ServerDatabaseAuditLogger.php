@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Request;
 
 class ServerDatabaseAuditLogger
 {
+    /**
+     * @param  array<string, mixed> $meta
+     */
     public function record(
         Server $server,
         string $event,

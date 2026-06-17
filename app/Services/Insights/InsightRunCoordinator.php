@@ -159,8 +159,8 @@ class InsightRunCoordinator
      * service isn't installed. Fail open when the stack summary is unavailable
      * (`unknown` tag) so freshly-imported servers still surface everything.
      *
-     * @param  array<string, mixed>  $def
-     * @param  array<string, true>  $installedTags
+     * @param  array<string, mixed> $def
+     * @param  array<string, mixed> $installedTags
      */
     private function stackRequirementsMet(array $def, array $installedTags): bool
     {

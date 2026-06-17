@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\TaskRunner\Livewire;
 
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
@@ -22,21 +23,22 @@ class TaskMonitor extends Component
 
     public int $refreshInterval = 2000; // 2 seconds
 
+    /** @var list<array<string, mixed>> */
     public array $tasks = [];
 
+    /** @var array<string, mixed> */
     public array $taskResults = [];
 
+    /** @var array<string, mixed> */
     public array $taskProgress = [];
 
+    /** @var array<string, mixed> */
     public array $taskOutputs = [];
 
+    /** @var array<string, mixed> */
     public array $taskErrors = [];
 
-    /**
-     * Get the Echo channel listeners for task events.
-     *
-     * @return array<string, string>
-     */
+    /** @return array<string, mixed> */
     public function getListeners(): array
     {
         return [
@@ -55,7 +57,7 @@ class TaskMonitor extends Component
         ];
     }
 
-    public function mount(?string $taskName = null, ?string $taskId = null, bool $showAllTasks = false)
+    public function mount(?string $taskName = null, ?string $taskId = null, bool $showAllTasks = false): void
     {
         $this->taskName = $taskName;
         $this->taskId = $taskId;
@@ -64,21 +66,23 @@ class TaskMonitor extends Component
         $this->loadTasks();
     }
 
-    public function loadTasks()
+    public function loadTasks(): void
     {
         if ($this->showAllTasks) {
             $this->tasks = Task::latest()
                 ->take(50)
                 ->get()
                 ->map(fn ($task) => $this->formatTaskForDisplay($task))
-                ->toArray();
+                ->values()
+                ->all();
         } elseif ($this->taskName) {
             $this->tasks = Task::where('name', $this->taskName)
                 ->latest()
                 ->take(10)
                 ->get()
                 ->map(fn ($task) => $this->formatTaskForDisplay($task))
-                ->toArray();
+                ->values()
+                ->all();
         } elseif ($this->taskId) {
             $task = Task::find($this->taskId);
             if ($task) {
@@ -86,12 +90,16 @@ class TaskMonitor extends Component
             }
         }
 
-        // Load existing results and outputs
         foreach ($this->tasks as $task) {
-            $this->loadTaskData($task['id']);
+            if (isset($task['id']) && is_string($task['id'])) {
+                $this->loadTaskData($task['id']);
+            }
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function formatTaskForDisplay(Task $task): array
     {
         return [
@@ -101,17 +109,17 @@ class TaskMonitor extends Component
             'created_at' => $task->created_at->toISOString(),
             'started_at' => $task->started_at?->toISOString(),
             'completed_at' => $task->completed_at?->toISOString(),
-            'duration' => $task->duration,
+            'duration' => $task->getDuration(),
             'exit_code' => $task->exit_code,
             'output' => $task->output,
-            'error' => $task->error,
-            'progress' => $task->progress,
+            'error' => $task->getErrorAttribute(),
+            'progress' => $task->getProgressAttribute(),
             'is_running' => $task->status->value === 'running',
-            'is_completed' => in_array($task->status->value, ['completed', 'failed']),
+            'is_completed' => in_array($task->status->value, ['completed', 'failed'], true),
         ];
     }
 
-    protected function loadTaskData(string $taskId)
+    protected function loadTaskData(string $taskId): void
     {
         $task = Task::find($taskId);
         if (! $task) {
@@ -121,41 +129,43 @@ class TaskMonitor extends Component
         $this->taskResults[$taskId] = [
             'status' => $task->status->value,
             'exit_code' => $task->exit_code,
-            'duration' => $task->duration,
+            'duration' => $task->getDuration(),
             'completed_at' => $task->completed_at?->toISOString(),
         ];
 
         $this->taskOutputs[$taskId] = $task->output ?? '';
-        $this->taskErrors[$taskId] = $task->error ?? '';
-        $this->taskProgress[$taskId] = $task->progress ?? 0;
+        $this->taskErrors[$taskId] = $task->getErrorAttribute() ?? '';
+        $this->taskProgress[$taskId] = $task->getProgressAttribute() ?? 0;
     }
 
-    public function refreshTasks()
+    public function refreshTasks(): void
     {
         $this->loadTasks();
     }
 
-    public function toggleAutoRefresh()
+    public function toggleAutoRefresh(): void
     {
         $this->autoRefresh = ! $this->autoRefresh;
     }
 
-    public function clearOutput(string $taskId)
+    public function clearOutput(string $taskId): void
     {
         unset($this->taskOutputs[$taskId]);
         unset($this->taskErrors[$taskId]);
         unset($this->taskProgress[$taskId]);
     }
 
-    public function clearAllOutputs()
+    public function clearAllOutputs(): void
     {
         $this->taskOutputs = [];
         $this->taskErrors = [];
         $this->taskProgress = [];
     }
 
-    // Event handlers for real-time updates
-    public function handleTaskStarted($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskStarted(array $event): void
     {
         $taskId = $event['task_id'] ?? null;
         if ($taskId && $this->shouldTrackTask($taskId)) {
@@ -169,7 +179,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskCompleted($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskCompleted(array $event): void
     {
         $taskId = $event['task_id'] ?? null;
         if ($taskId && $this->shouldTrackTask($taskId)) {
@@ -183,7 +196,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskFailed($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskFailed(array $event): void
     {
         $taskId = $event['task_id'] ?? null;
         if ($taskId && $this->shouldTrackTask($taskId)) {
@@ -197,7 +213,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskProgress($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskProgress(array $event): void
     {
         $taskId = $event['task_id'] ?? null;
         if ($taskId && $this->shouldTrackTask($taskId)) {
@@ -205,7 +224,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskOutput($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskOutput(array $event): void
     {
         $taskId = $event['task_id'] ?? null;
         if ($taskId && $this->shouldTrackTask($taskId)) {
@@ -214,7 +236,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskChainStarted($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskChainStarted(array $event): void
     {
         $chainId = $event['chain_id'] ?? null;
         if ($chainId) {
@@ -222,7 +247,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskChainCompleted($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskChainCompleted(array $event): void
     {
         $chainId = $event['chain_id'] ?? null;
         if ($chainId) {
@@ -230,7 +258,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskChainFailed($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskChainFailed(array $event): void
     {
         $chainId = $event['chain_id'] ?? null;
         if ($chainId) {
@@ -238,7 +269,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleTaskChainProgress($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleTaskChainProgress(array $event): void
     {
         $chainId = $event['chain_id'] ?? null;
         if ($chainId) {
@@ -246,7 +280,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleParallelTaskStarted($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleParallelTaskStarted(array $event): void
     {
         $executionId = $event['execution_id'] ?? null;
         if ($executionId) {
@@ -254,7 +291,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleParallelTaskCompleted($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleParallelTaskCompleted(array $event): void
     {
         $executionId = $event['execution_id'] ?? null;
         if ($executionId) {
@@ -262,7 +302,10 @@ class TaskMonitor extends Component
         }
     }
 
-    public function handleParallelTaskFailed($event)
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function handleParallelTaskFailed(array $event): void
     {
         $executionId = $event['execution_id'] ?? null;
         if ($executionId) {
@@ -289,7 +332,7 @@ class TaskMonitor extends Component
         return false;
     }
 
-    public function render()
+    public function render(): View
     {
         return view('task-runner::livewire.task-monitor');
     }

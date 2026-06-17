@@ -150,7 +150,7 @@ class WorkerCloneProvisioner
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed><string, mixed>
      */
     private function cloneableMeta(Server $source): array
     {
@@ -174,7 +174,7 @@ class WorkerCloneProvisioner
         // all current member names (so it never collides and continues the
         // primary's numbering, e.g. worker-1 → worker-2).
         $primary = $pool->primaryServer ?? $pool->sourceServer;
-        $primaryName = trim((string) ($primary?->name ?? ''));
+        $primaryName = trim((string) ($primary->name ?? ''));
         $base = $primaryName !== ''
             ? (string) preg_replace('/-\d+$/', '', $primaryName)
             : (Str::of($pool->name)->slug()->value() ?: 'worker');

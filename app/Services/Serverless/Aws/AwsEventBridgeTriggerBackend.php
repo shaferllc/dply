@@ -48,6 +48,8 @@ class AwsEventBridgeTriggerBackend implements ServerlessTriggerBackend
         return new self(new EventBridgeClient($config), new LambdaClient($config));
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function provision(FunctionAction $action): array
     {
         $cron = $this->cronExpression($action);
@@ -98,6 +100,8 @@ class AwsEventBridgeTriggerBackend implements ServerlessTriggerBackend
         return ['ok' => true, 'error' => null, 'trigger' => $ruleName];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function remove(FunctionAction $action): array
     {
         $functionName = $this->functionName($action);
@@ -129,7 +133,7 @@ class AwsEventBridgeTriggerBackend implements ServerlessTriggerBackend
 
     private function cronExpression(FunctionAction $action): ?string
     {
-        $trigger = is_array($action->trigger) ? $action->trigger : [];
+        $trigger = ($action->trigger );
         $cron = trim((string) ($trigger['cron'] ?? ''));
 
         return ($cron !== '' && ($trigger['enabled'] ?? false) === true) ? $cron : null;

@@ -22,6 +22,10 @@ final class ServerSystemdInventoryRecorder
     /**
      * @return list<array{unit: string, label: string, active: string, sub: string, ts: string, version: string, unit_file_state: string, main_pid: string, custom: bool, can_manage: bool}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, bool|string>>
+     */
     public function parseRows(Server $server, string $raw): array
     {
         $allowed = array_flip($this->catalog->allowedUnitsForServer($server));
@@ -80,6 +84,9 @@ final class ServerSystemdInventoryRecorder
         return $rows;
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $newUnits
+     */
     public function persistInventoryFromRawOutput(Server $server, string $raw): void
     {
         $newRows = $this->parseRows($server, $raw);
@@ -114,8 +121,8 @@ final class ServerSystemdInventoryRecorder
                     'label' => $row['label'],
                     'active_state' => $row['active'],
                     'sub_state' => $row['sub'],
-                    'unit_file_state' => $row['unit_file_state'] ?? null,
-                    'main_pid' => $row['main_pid'] ?? null,
+                    'unit_file_state' => $row['unit_file_state'],
+                    'main_pid' => $row['main_pid'],
                     'active_enter_ts' => $row['ts'] !== '' ? $row['ts'] : null,
                     'version' => $row['version'],
                     'is_custom' => $row['custom'],

@@ -18,6 +18,7 @@ class SiteReachabilityChecker
      *   checks: list<array{hostname: string, url: string, ok: bool, error: ?string}>
      * }
      */
+    /** @return array<string, mixed> */
     public function check(Site $site): array
     {
         $previewDomains = $site->previewDomains instanceof Collection
@@ -26,9 +27,9 @@ class SiteReachabilityChecker
         $domains = $site->domains instanceof Collection
             ? $site->domains
             : $site->domains()->get();
-        $primaryHostname = $domains->firstWhere('is_primary', true)?->hostname
+        $primaryHostname = $domains->firstWhere('is_primary', true)->hostname
             ?? $domains->first()?->hostname;
-        $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)?->hostname
+        $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)->hostname
             ?? $previewDomains->first()?->hostname;
 
         $hostnames = collect([
@@ -143,10 +144,11 @@ class SiteReachabilityChecker
      *   checked_at: string
      * }
      */
+    /** @return array<string, mixed> */
     public function checkHostname(Site $site, string $hostname): array
     {
         $hostname = strtolower(trim($hostname));
-        $serverIp = trim((string) ($site->server?->ip_address ?? ''));
+        $serverIp = trim((string) ($site->server->ip_address ?? ''));
         $resolved = @gethostbynamel($hostname) ?: [];
         $resolves = $resolved !== [];
         $pointsHere = $serverIp !== '' && in_array($serverIp, $resolved, true);
@@ -195,7 +197,7 @@ class SiteReachabilityChecker
             'resolves' => $resolves,
             'points_here' => $pointsHere,
             'http_ok' => $httpOk,
-            'resolved_ips' => array_values($resolved),
+            'resolved_ips' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($resolved)))))))))))))))))))))))))))))))),
             'server_ip' => $serverIp,
             'error' => $error,
             'checked_at' => now()->toIso8601String(),

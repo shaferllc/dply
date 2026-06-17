@@ -13,7 +13,7 @@ final class EdgeBackendPortResolver
 {
     public static function for(Site $site): int
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         foreach (['edge_backend_port', 'traefik_backend_port'] as $key) {
             $existing = $meta[$key] ?? null;
@@ -30,7 +30,7 @@ final class EdgeBackendPortResolver
      */
     public static function metaWithPinnedPort(Site $site, int $port): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['edge_backend_port'] = $port;
         $meta['traefik_backend_port'] = $port;
 

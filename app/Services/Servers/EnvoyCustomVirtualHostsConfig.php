@@ -17,6 +17,10 @@ class EnvoyCustomVirtualHostsConfig
     /**
      * @return list<array{name: string, domains: list<string>, cluster: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, list<string>|string>>
+     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -54,7 +58,7 @@ class EnvoyCustomVirtualHostsConfig
     }
 
     /**
-     * @param  list<string>  $domains
+     * @param  array<string, mixed> $domains
      */
     public function add(
         Server $server,
@@ -97,7 +101,7 @@ class EnvoyCustomVirtualHostsConfig
     }
 
     /**
-     * @return list<array{name: string, domains: list<string>, cluster: string}>
+     * @return array<string, mixed>
      */
     public static function virtualHostsFromServer(Server $server): array
     {
@@ -118,7 +122,7 @@ class EnvoyCustomVirtualHostsConfig
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{name: string, domains: list<string>, cluster: string}|null
      */
     private function normalizeRow(array $row): ?array
@@ -160,7 +164,7 @@ class EnvoyCustomVirtualHostsConfig
     }
 
     /**
-     * @param  list<string>|string  $domains
+     * @param  list<string>|string $domains
      * @return list<string>
      */
     private function normalizeDomains(array|string $domains): array

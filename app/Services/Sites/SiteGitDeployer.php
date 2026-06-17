@@ -24,6 +24,10 @@ class SiteGitDeployer
         protected SshConnectionFactory $sshFactory
     ) {}
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function run(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         // Cutover wrapper: maintenance/recreate methods bracket the whole deploy
@@ -103,6 +107,9 @@ class SiteGitDeployer
             .$ssh->exec(sprintf('sudo -n systemctl start %1$s 2>&1 || systemctl start %1$s 2>&1 || echo "[dply]   (no managed unit — skipped)"', $unit), 60);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function runInner(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         if (($site->deploy_strategy ?? 'simple') === 'atomic') {

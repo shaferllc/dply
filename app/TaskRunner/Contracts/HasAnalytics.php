@@ -19,36 +19,43 @@ interface HasAnalytics
 
     /**
      * Get performance metrics for this task.
+     * @return array<string, mixed>
      */
     public function getPerformanceMetrics(): array;
 
     /**
      * Get resource usage metrics.
+     * @return array<string, mixed>
      */
     public function getResourceMetrics(): array;
 
     /**
      * Get execution time breakdown.
+     * @return array<string, mixed>
      */
     public function getExecutionTimeBreakdown(): array;
 
     /**
      * Get optimization recommendations.
+     * @return array<string, mixed>
      */
     public function getOptimizationRecommendations(): array;
 
     /**
      * Get performance trends.
+     * @return array<string, mixed>
      */
     public function getPerformanceTrends(): array;
 
     /**
      * Get bottleneck analysis.
+     * @return array<string, mixed>
      */
     public function getBottleneckAnalysis(): array;
 
     /**
      * Get cost analysis.
+     * @return array<string, mixed>
      */
     public function getCostAnalysis(): array;
 
@@ -59,11 +66,13 @@ interface HasAnalytics
 
     /**
      * Get performance alerts.
+     * @return array<string, mixed>
      */
     public function getPerformanceAlerts(): array;
 
     /**
      * Record performance metric.
+     * @param  array<string, mixed> $context
      */
     public function recordMetric(string $metric, mixed $value, array $context = []): void;
 
@@ -79,6 +88,7 @@ interface HasAnalytics
 
     /**
      * Get performance summary.
+     * @return array<string, mixed>
      */
     public function getPerformanceSummary(): array;
 
@@ -89,6 +99,7 @@ interface HasAnalytics
 
     /**
      * Compare performance with baseline.
+     * @return array<string, mixed>
      */
     public function compareWithBaseline(): array;
 }

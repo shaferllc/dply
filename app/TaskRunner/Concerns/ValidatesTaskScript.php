@@ -134,7 +134,7 @@ trait ValidatesTaskScript
      * Render the task's script as a string using the associated Blade view.
      * Useful for validation, preview, or testing.
      *
-     * @param  array  $viewData  Optional overrides for view data.
+     * @param  array<string, mixed> $viewData  Optional overrides for view data.
      */
     protected function renderScript(array $viewData = []): string
     {

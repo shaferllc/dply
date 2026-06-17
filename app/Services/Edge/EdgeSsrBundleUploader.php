@@ -57,7 +57,7 @@ class EdgeSsrBundleUploader
             throw new RuntimeException('SSR bundle sidecar is malformed.');
         }
         $entry = is_string($payload['entry_module'] ?? null) ? $payload['entry_module'] : 'worker.js';
-        /** @var array<string, string> $modules */
+        /** @var array $modules */
         $modules = array_filter($payload['modules'], static fn ($value): bool => is_string($value));
         if ($modules === []) {
             throw new RuntimeException('SSR bundle sidecar has no module sources.');
@@ -215,7 +215,7 @@ class EdgeSsrBundleUploader
 
     public function scriptNameOnDeployment(EdgeDeployment $deployment): string
     {
-        $meta = is_array($deployment->meta) ? $deployment->meta : [];
+        $meta = ($deployment->meta );
         $ssr = is_array($meta['ssr'] ?? null) ? $meta['ssr'] : [];
 
         return is_string($ssr['script_name'] ?? null) ? trim($ssr['script_name']) : '';
@@ -223,7 +223,7 @@ class EdgeSsrBundleUploader
 
     private function persistScriptName(EdgeDeployment $deployment, string $scriptName): void
     {
-        $meta = is_array($deployment->meta) ? $deployment->meta : [];
+        $meta = ($deployment->meta );
         $ssr = is_array($meta['ssr'] ?? null) ? $meta['ssr'] : [];
         $ssr['script_name'] = $scriptName;
         $ssr['uploaded_at'] = now()->toIso8601String();
@@ -237,7 +237,7 @@ class EdgeSsrBundleUploader
      */
     private function clearScriptName(EdgeDeployment $deployment): void
     {
-        $meta = is_array($deployment->meta) ? $deployment->meta : [];
+        $meta = ($deployment->meta );
         $ssr = is_array($meta['ssr'] ?? null) ? $meta['ssr'] : [];
         unset($ssr['script_name']);
         $ssr['deleted_at'] = now()->toIso8601String();

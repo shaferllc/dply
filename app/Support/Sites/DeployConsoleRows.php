@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Cache;
 class DeployConsoleRows
 {
     /**
-     * @param  list<string>  $siteIds  watched sites, order preserved
+     * @param  array<string, mixed> $siteIds  watched sites, order preserved
      * @param  string|null  $selfId  site id to flag as `is_self` (the page's own site, if any)
      * @return list<array<string, mixed>>
      */
@@ -85,10 +85,10 @@ class DeployConsoleRows
                     $startingFresh => 'starting',
                     // All phases done — show the recorded terminal status, or
                     // 'success' if the row hasn't been finalised yet.
-                    $phasesComplete => ($latest && $latest->status !== SiteDeployment::STATUS_RUNNING)
+                    $phasesComplete => $latest->status !== SiteDeployment::STATUS_RUNNING
                         ? $latest->status
                         : 'success',
-                    default => $latest?->status ?? 'queued',
+                    default => $latest->status ?? 'queued',
                 },
                 'phases' => $phases,
                 'phase_done' => $done,

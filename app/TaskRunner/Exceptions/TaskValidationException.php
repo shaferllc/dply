@@ -11,10 +11,11 @@ class TaskValidationException extends Exception
     /**
      * The validation errors.
      */
+    /** @var array<string, mixed> */
     protected array $errors;
 
     /**
-     * Create a new TaskValidationException instance.
+     * @param array<string, mixed> $errors
      */
     public function __construct(
         string $message = 'Task validation failed.',
@@ -26,16 +27,14 @@ class TaskValidationException extends Exception
         $this->errors = $errors;
     }
 
-    /**
-     * Get the validation errors.
-     */
+    /** @return array<string, mixed> */
     public function getErrors(): array
     {
         return $this->errors;
     }
 
     /**
-     * Create a new instance with validation errors.
+     * @param array<string, mixed> $errors
      */
     public static function withErrors(array $errors, string $message = 'Task validation failed.'): self
     {

@@ -8,12 +8,12 @@ use Illuminate\Filesystem\Filesystem;
 
 trait PersistentFakeTasks
 {
-    public function setUpPersistentFakeTasks()
+    public function setUpPersistentFakeTasks(): void
     {
         //
     }
 
-    public function tearDownPersistentFakeTasks()
+    public function tearDownPersistentFakeTasks(): void
     {
         $directory = rtrim(config('task-runner.persistent_fake.storage_root'), '/');
 

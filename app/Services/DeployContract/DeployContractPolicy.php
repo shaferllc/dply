@@ -15,7 +15,7 @@ namespace App\Services\DeployContract;
  */
 final class DeployContractPolicy
 {
-    /** @param list<string> $requires */
+    /** @param  array<string, mixed> $requires */
     public function __construct(
         public readonly array $requires = [],
         public readonly ?float $minReplayPassRate = null,
@@ -39,13 +39,13 @@ final class DeployContractPolicy
         $requires = [];
         if (isset($contract['requires']) && is_array($contract['requires'])) {
             foreach ($contract['requires'] as $key) {
-                if (is_string($key) && $key !== '') {
+                if (($key) && $key !== '') {
                     $requires[] = $key;
                 }
             }
         }
 
-        $promote = is_array($contract['promote'] ?? null) ? $contract['promote'] : [];
+        $promote = is_array($contract['promote']) ? $contract['promote'] : [];
         if ($requires === [] && isset($promote['requires']) && is_array($promote['requires'])) {
             foreach ($promote['requires'] as $key) {
                 if (is_string($key) && $key !== '') {
@@ -54,8 +54,8 @@ final class DeployContractPolicy
             }
         }
 
-        $minRate = $contract['min_replay_pass_rate'] ?? $promote['min_replay_pass_rate'] ?? null;
-        $requireReplay = $contract['require_replay'] ?? $promote['require_replay'] ?? null;
+        $minRate = $contract['min_replay_pass_rate']['min_replay_pass_rate'];
+        $requireReplay = $contract['require_replay']['require_replay'];
 
         return new self(
             requires: array_values(array_unique($requires)),
@@ -94,6 +94,7 @@ final class DeployContractPolicy
     /**
      * @return array{requires: list<string>, min_replay_pass_rate: ?float, require_replay: ?bool}
      */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

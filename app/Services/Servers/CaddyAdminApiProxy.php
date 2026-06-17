@@ -30,6 +30,7 @@ class CaddyAdminApiProxy
     /**
      * @return array{status: int, body: string, content_type: string, admin_url: string}
      */
+    /** @return array<string, mixed> */
     public function fetch(Server $server, string $path): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key) || blank($server->ip_address)) {

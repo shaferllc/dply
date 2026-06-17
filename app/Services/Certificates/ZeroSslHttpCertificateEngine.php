@@ -109,9 +109,11 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  list<string>  $domains
+     * @param  array<string, mixed> $domains
      * @return array{0: string, 1: string}
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     protected function ensureSigningMaterial(SiteCertificate $certificate, array $domains): array
     {
         $privateKeyPem = trim((string) $certificate->private_key_pem);
@@ -157,9 +159,10 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  list<string>  $domains
-     * @return array<string, mixed>
+     * @param  array<string, mixed> $domains
+     * @return array<int, string>
      */
+    /** @return array<string, mixed> */
     protected function createRemoteCertificate(string $accessKey, array $domains, string $csrPem): array
     {
         return $this->postForm('https://api.zerossl.com/certificates', $accessKey, [
@@ -177,8 +180,10 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
+     * @param  array<string, mixed> $domains
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function waitForIssuedCertificate(string $accessKey, string $certificateId): array
     {
         $attempts = max(1, (int) config('services.zerossl.poll_attempts', 10));
@@ -207,15 +212,22 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function downloadRemoteCertificate(string $accessKey, string $certificateId): array
     {
         return $this->getJson(sprintf('https://api.zerossl.com/certificates/%s/download/json', $certificateId), $accessKey);
     }
 
     /**
-     * @param  array<string, mixed>  $remoteCertificate
-     * @param  list<string>  $domains
+     * @param  array<string, mixed> $remoteCertificate
+     * @param  array<string, mixed> $domains
      * @return array<int, array{domain: string, filename: string, content: string}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     * @param  array<string, mixed> $domains
+     * @param  array<string, mixed> $remoteCertificate
      */
     protected function extractValidationFiles(array $remoteCertificate, array $domains): array
     {
@@ -246,7 +258,9 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<int, array{domain: string, filename: string, content: string}>  $files
+     * @param  array<string, mixed> $domains
+     * @param  array<string, mixed> $remoteCertificate
+     * @param  array<string, mixed> $files
      */
     protected function publishValidationFiles(Server $server, Site $site, array $files): void
     {
@@ -267,9 +281,10 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, string>  $data
+     * @param  array<string, mixed> $data
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function postForm(string $url, string $accessKey, array $data): array
     {
         $response = Http::asForm()
@@ -281,8 +296,10 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
+     * @param  array<string, mixed> $data
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function getJson(string $url, string $accessKey): array
     {
         $response = Http::acceptJson()
@@ -295,6 +312,7 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function decodeResponse(int $status, mixed $decoded, string $rawBody): array
     {
         if ($status < 200 || $status >= 300 || ! is_array($decoded)) {
@@ -313,7 +331,7 @@ class ZeroSslHttpCertificateEngine implements CertificateEngine
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     protected function apiErrorMessage(array $payload, string $rawBody): string
     {

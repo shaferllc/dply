@@ -5,7 +5,7 @@ namespace App\Support\Servers;
 class ClassifyProvisionFailure
 {
     /**
-     * @param  list<array{key:string,label:string,status:string,detail:?string}>  $verificationChecks
+     * @param  array<string, mixed> $verificationChecks
      * @return array{code:string,label:string,detail:string}
      */
     public static function classify(

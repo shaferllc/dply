@@ -18,13 +18,14 @@ trait HandlesComprehensiveMonitoring
     /**
      * Get comprehensive monitoring dashboard.
      */
+    /** @return array<string, mixed> */
     public function getComprehensiveDashboard(): array
     {
         return [
             'task_info' => [
-                'id' => $this->task?->id,
-                'name' => $this->task?->name,
-                'status' => $this->task?->status?->value,
+                'id' => $this->taskModel?->id,
+                'name' => $this->taskModel?->name,
+                'status' => $this->taskModel?->status?->value,
             ],
             'monitoring' => [
                 'health_status' => $this->getHealthStatus(),
@@ -87,14 +88,12 @@ trait HandlesComprehensiveMonitoring
         ];
 
         $totalScore = 0;
-        $totalWeight = 0;
 
         foreach ($scores as $aspect => $score) {
             $totalScore += $score * $weights[$aspect];
-            $totalWeight += $weights[$aspect];
         }
 
-        return $totalWeight > 0 ? $totalScore / $totalWeight : 0;
+        return $totalScore;
     }
 
     /**
@@ -118,14 +117,12 @@ trait HandlesComprehensiveMonitoring
         ];
 
         $totalScore = 0;
-        $totalWeight = 0;
 
         foreach ($scores as $aspect => $score) {
             $totalScore += $score * $weights[$aspect];
-            $totalWeight += $weights[$aspect];
         }
 
-        return $totalWeight > 0 ? $totalScore / $totalWeight : 0;
+        return $totalScore;
     }
 
     /**
@@ -162,6 +159,7 @@ trait HandlesComprehensiveMonitoring
     /**
      * Get all alerts from all monitoring systems.
      */
+    /** @return array<string, mixed> */
     public function getAllAlerts(): array
     {
         return [
@@ -173,15 +171,12 @@ trait HandlesComprehensiveMonitoring
         ];
     }
 
-    /**
-     * Export comprehensive monitoring data.
-     */
     public function exportComprehensiveData(string $format = 'json'): string
     {
         $data = [
             'task_info' => [
-                'id' => $this->task?->id,
-                'name' => $this->task?->name,
+                'id' => $this->taskModel?->id,
+                'name' => $this->taskModel?->name,
             ],
             'comprehensive_dashboard' => $this->getComprehensiveDashboard(),
             'all_alerts' => $this->getAllAlerts(),
@@ -223,6 +218,7 @@ trait HandlesComprehensiveMonitoring
     /**
      * Get comprehensive monitoring status.
      */
+    /** @return array<string, mixed> */
     public function getComprehensiveStatus(): array
     {
         return [
@@ -237,9 +233,6 @@ trait HandlesComprehensiveMonitoring
         ];
     }
 
-    /**
-     * Get comprehensive status string.
-     */
     protected function getComprehensiveStatusString(): string
     {
         $healthScore = $this->getOverallHealthScore();
@@ -259,6 +252,7 @@ trait HandlesComprehensiveMonitoring
     /**
      * Run comprehensive health check.
      */
+    /** @return array<string, mixed> */
     public function runComprehensiveHealthCheck(): array
     {
         $results = [
@@ -286,6 +280,8 @@ trait HandlesComprehensiveMonitoring
 
     /**
      * Get comprehensive recommendations.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getComprehensiveRecommendations(): array
     {

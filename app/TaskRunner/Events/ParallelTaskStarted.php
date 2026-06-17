@@ -17,6 +17,8 @@ class ParallelTaskStarted
 
     /**
      * Create a new event instance.
+     * @param  array<string, mixed> $options
+     * @param  array<string, mixed> $tasks
      */
     public function __construct(
         public readonly array $tasks,

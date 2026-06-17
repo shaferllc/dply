@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 final class ProvisionPipelineLog
 {
     /**
-     * @param  array<string, mixed>  $extra
+     * @param  array<string, mixed> $extra
      * @return array<string, mixed>
      */
     public static function context(Server $server, array $extra = []): array
@@ -25,7 +25,7 @@ final class ProvisionPipelineLog
             'organization_id' => $server->organization_id,
             'server_status' => $server->status,
             'setup_status' => $server->setup_status,
-            'provider' => $server->provider?->value,
+            'provider' => $server->provider->value,
             'ip' => $server->ip_address,
             'ssh_port' => $server->ssh_port,
             'provision_task_id' => $meta['provision_task_id'] ?? null,
@@ -34,7 +34,7 @@ final class ProvisionPipelineLog
     }
 
     /**
-     * @param  array<string, mixed>  $extra
+     * @param  array<string, mixed> $extra
      */
     public static function info(string $message, Server $server, array $extra = []): void
     {
@@ -42,7 +42,7 @@ final class ProvisionPipelineLog
     }
 
     /**
-     * @param  array<string, mixed>  $extra
+     * @param  array<string, mixed> $extra
      */
     public static function debug(string $message, Server $server, array $extra = []): void
     {
@@ -50,7 +50,7 @@ final class ProvisionPipelineLog
     }
 
     /**
-     * @param  array<string, mixed>  $extra
+     * @param  array<string, mixed> $extra
      */
     public static function warning(string $message, Server $server, array $extra = []): void
     {

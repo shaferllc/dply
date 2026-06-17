@@ -51,7 +51,7 @@ class LinodeService
     /**
      * Create a new Linode instance and return its ID.
      *
-     * @param  array<string>  $authorizedKeys  SSH public key strings
+     * @param  array<string, mixed> $authorizedKeys  SSH public key strings
      */
     public function createInstance(
         string $label,
@@ -86,7 +86,9 @@ class LinodeService
 
     /**
      * Get instance by ID. Returns decoded JSON.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getInstance(int $id): array
     {
         $response = $this->request('get', "/linode/instances/{$id}");
@@ -103,6 +105,7 @@ class LinodeService
 
     /**
      * Get public IPv4 from instance. Linode may return ipv4 as array of strings or nested.
+     * @param  array<string, mixed> $instance
      */
     public static function getPublicIp(array $instance): ?string
     {
@@ -136,6 +139,7 @@ class LinodeService
      * (Linode allocates private IPs from 192.168.128.0/17). Returns null when the
      * Linode has no private networking — same null-safe contract as the other
      * providers' private-IP readers.
+     * @param  array<string, mixed> $instance
      */
     public static function getPrivateIp(array $instance): ?string
     {
@@ -155,6 +159,7 @@ class LinodeService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getInstanceDisks(int $id): array
     {
         $response = $this->request('get', "/linode/instances/{$id}/disks");
@@ -193,6 +198,7 @@ class LinodeService
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function createImageFromDisk(int $diskId, string $label, string $description = ''): array
     {
         $body = ['disk_id' => $diskId, 'label' => $label];
@@ -218,6 +224,7 @@ class LinodeService
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getImage(string $imageId): array
     {
         // The id contains a slash ("private/12345") that is part of the path —
@@ -242,6 +249,7 @@ class LinodeService
      * @param  callable(array<string, mixed>):void|null  $onTick
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function waitForImage(string $imageId, ?callable $onTick = null, int $maxAttempts = 360, int $sleepSeconds = 10): array
     {
         $image = [];
@@ -281,6 +289,7 @@ class LinodeService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getRegions(): array
     {
         $response = $this->request('get', '/regions');
@@ -295,6 +304,7 @@ class LinodeService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getTypes(): array
     {
         $response = $this->request('get', '/linode/types');
@@ -348,6 +358,10 @@ class LinodeService
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed, mixed>>
+     */
     public function getDomains(): array
     {
         $all = [];
@@ -373,7 +387,7 @@ class LinodeService
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return list<array<mixed, mixed>>
      */
     public function findDomainRecord(int $domainId, string $type, string $name, string $zoneName, ?string $target = null): ?array
     {
@@ -406,6 +420,10 @@ class LinodeService
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed, mixed>>
+     */
     public function getDomainRecords(int $domainId): array
     {
         $all = [];
@@ -436,7 +454,7 @@ class LinodeService
     /**
      * Create or update a domain record and return the Linode record payload.
      *
-     * @return array<string, mixed>
+     * @return list<array<mixed, mixed>>
      */
     public function upsertDomainRecord(
         string $domainName,
@@ -460,7 +478,7 @@ class LinodeService
         $existing = $this->findDomainRecord($domainId, $type, $name, $domainName);
 
         if ($existing !== null) {
-            $recordId = (int) ($existing['id'] ?? 0);
+            $recordId = (int) ($existing['id']);
             if ($recordId <= 0) {
                 throw new \RuntimeException('Linode record payload did not include an id.');
             }
@@ -540,6 +558,9 @@ class LinodeService
         return $recordName;
     }
 
+    /**
+     * @param  array<string, mixed> $body
+     */
     protected function request(string $method, string $path, array $body = []): Response
     {
         $url = $this->baseUrl.$path;

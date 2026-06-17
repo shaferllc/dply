@@ -9,6 +9,7 @@ class NotificationEventRegistry
     /**
      * @return array{key: string, label: string, category: string|null, severity: string, supports_in_app: bool, supports_email: bool, supports_webhook: bool}
      */
+    /** @return array<string, mixed> */
     public function definition(string $eventKey): array
     {
         $configured = config('notification_events.categories', []);

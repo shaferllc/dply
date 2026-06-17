@@ -15,6 +15,8 @@ final class RoadmapStubProvisioner implements ServerlessFunctionProvisioner
         private readonly string $revisionId,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         return [

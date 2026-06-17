@@ -29,19 +29,18 @@ class RetryCallbackJob implements ShouldQueue
 
     /**
      * Create a new job instance.
+     * @param  array<string, mixed> $additionalData
      */
     public function __construct(
         public HasCallbacks $task,
         public CallbackType $type,
+        /** @var array<string, mixed> */
         public array $additionalData = [],
         public int $attempt = 1
     ) {
         $this->onQueue('callbacks');
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(CallbackService $callbackService): void
     {
         Log::info('Retrying callback', [

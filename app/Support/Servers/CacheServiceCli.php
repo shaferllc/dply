@@ -102,6 +102,6 @@ BASH;
             return [];
         }
 
-        return array_values(preg_split('/\s+/', $trimmed) ?: []);
+        return preg_split('/\s+/', $trimmed) ?: [];
     }
 }

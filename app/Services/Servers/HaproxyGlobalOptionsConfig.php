@@ -149,6 +149,7 @@ class HaproxyGlobalOptionsConfig
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -187,7 +188,7 @@ class HaproxyGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -217,8 +218,8 @@ class HaproxyGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, array{type: string, default: string, label: string, help: string}>  $params
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $values
      */
     private function upsertSection(string $contents, string $sectionName, array $params, array $values, string $keyPrefix): string
     {

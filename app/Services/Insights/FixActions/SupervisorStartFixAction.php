@@ -15,6 +15,9 @@ class SupervisorStartFixAction implements InsightFixActionInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @param  array<string, mixed> $params
+     */
     public function preflight(Server $server, ?Site $site, InsightFinding $finding, array $params): ?string
     {
         if (! $server->isReady()) {
@@ -27,6 +30,9 @@ class SupervisorStartFixAction implements InsightFixActionInterface
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $params
+     */
     public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         $inline = <<<'BASH'

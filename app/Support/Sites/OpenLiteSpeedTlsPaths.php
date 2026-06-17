@@ -78,7 +78,7 @@ final class OpenLiteSpeedTlsPaths
     }
 
     /**
-     * @return array{keyFile: string, certFile: string}
+     * @param  array{keyFile: string, certFile: string}  $paths
      */
     public static function vhsslBlock(array $paths): string
     {
@@ -126,13 +126,13 @@ CONF;
 
         $site->loadMissing(['previewDomains', 'domains']);
 
-        $preview = $site->previewDomains->firstWhere('is_primary', true)?->hostname
+        $preview = $site->previewDomains->firstWhere('is_primary', true)->hostname
             ?? $site->previewDomains->first()?->hostname;
         if (is_string($preview) && trim($preview) !== '') {
             return strtolower(trim($preview));
         }
 
-        $primary = $site->domains->firstWhere('is_primary', true)?->hostname
+        $primary = $site->domains->firstWhere('is_primary', true)->hostname
             ?? $site->domains->first()?->hostname;
         if (is_string($primary) && trim($primary) !== '') {
             return strtolower(trim($primary));

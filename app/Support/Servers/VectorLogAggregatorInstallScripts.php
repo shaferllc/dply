@@ -179,8 +179,8 @@ class VectorLogAggregatorInstallScripts
     protected function serverSan(ServerLogAggregator $aggregator): string
     {
         $parts = ['IP:127.0.0.1', 'DNS:localhost'];
-        $public = trim((string) ($aggregator->server?->ip_address ?? ''));
-        $private = trim((string) ($aggregator->server?->private_ip_address ?? ''));
+        $public = trim((string) ($aggregator->server->ip_address ?? ''));
+        $private = trim((string) ($aggregator->server->private_ip_address ?? ''));
         if ($public !== '') {
             $parts[] = 'IP:'.$public;
         }

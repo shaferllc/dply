@@ -19,6 +19,7 @@ trait ResolvesPhpInventory
     /**
      * @return list<array{id: string, label: string}>
      */
+    /** @return array<string, mixed> */
     public function supportedVersions(Server $server): array
     {
         $role = $this->serverRole($server);
@@ -52,6 +53,7 @@ trait ResolvesPhpInventory
      *     detected_default_version: ?string
      * }
      */
+    /** @return array<string, mixed> */
     public function cachedInventory(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -105,6 +107,7 @@ trait ResolvesPhpInventory
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
     public function installedVersionIds(Server $server): array
     {
         return array_column($this->cachedInventory($server)['installed_versions'], 'id');
@@ -127,6 +130,7 @@ trait ResolvesPhpInventory
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
     public function probeInstalledVersionIds(Server $server): array
     {
         try {
@@ -171,6 +175,7 @@ trait ResolvesPhpInventory
     /**
      * @return array{cli_default: ?string, new_site_default: ?string}
      */
+    /** @return array<string, mixed> */
     public function currentDefaults(Server $server, ?array $inventory = null): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -196,6 +201,7 @@ trait ResolvesPhpInventory
      * @param  array{installed_versions?: mixed, detected_default_version?: mixed, supported?: mixed}  $freshInventory
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function reconcileFreshInventory(Server $server, array $freshInventory): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -230,6 +236,7 @@ trait ResolvesPhpInventory
     /**
      * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
+    /** @return array<string, mixed> */
     public function refreshInventory(Server $server): array
     {
         $server->refresh();
@@ -369,6 +376,7 @@ trait ResolvesPhpInventory
     /**
      * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}
      */
+    /** @return array<string, mixed> */
     protected function fetchRemoteInventory(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key) || blank($server->ip_address)) {
@@ -403,7 +411,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed> $meta
      */
     protected function persistRefreshedInventoryMeta(Server $server, array $meta): void
     {
@@ -413,7 +421,7 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array<string, mixed>  $refreshMeta
+     * @param  array<string, mixed> $refreshMeta
      */
     protected function persistRefreshMeta(Server $server, array $refreshMeta): void
     {
@@ -427,9 +435,10 @@ trait ResolvesPhpInventory
     }
 
     /**
-     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed> $meta
      * @return list<string>
      */
+    /** @return array<string, mixed> */
     protected function inferInstalledVersionIds(Server $server, array $meta): array
     {
         $inferred = [];
@@ -458,6 +467,7 @@ trait ResolvesPhpInventory
     /**
      * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}
      */
+    /** @return array<string, mixed> */
     protected function parseRemoteInventoryOutput(string $output): array
     {
         $values = [];

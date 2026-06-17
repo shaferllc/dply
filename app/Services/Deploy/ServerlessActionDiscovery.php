@@ -28,7 +28,7 @@ final class ServerlessActionDiscovery
     public function __construct(private readonly ServerlessRuntimeDetector $detector) {}
 
     /**
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return list<array{
      *     name: string,
      *     package: string,
@@ -42,6 +42,11 @@ final class ServerlessActionDiscovery
      *     confidence: string,
      *     source: string
      * }>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
+     * @param  array<string, mixed> $capabilities
      */
     public function discover(string $workingDirectory, array $capabilities): array
     {
@@ -63,7 +68,8 @@ final class ServerlessActionDiscovery
      * empty list when there is no manifest, it cannot be parsed, or it
      * declares no actions — so discovery falls through to the next rule.
      *
-     * @return list<array<string, mixed>>
+     * @param  array<string, mixed> $capabilities
+     * @return array<int, array<string, mixed>>
      */
     private function fromProjectManifest(string $workingDirectory): array
     {
@@ -119,7 +125,7 @@ final class ServerlessActionDiscovery
      * Treat each immediate sub-directory of `functions/` as one action,
      * detecting its runtime from the files it contains.
      *
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return list<array<string, mixed>>
      */
     private function fromFunctionsDirectory(string $workingDirectory, array $capabilities): array
@@ -145,7 +151,7 @@ final class ServerlessActionDiscovery
     }
 
     /**
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>
      */
     private function singleAction(string $workingDirectory, array $capabilities): array
@@ -157,7 +163,7 @@ final class ServerlessActionDiscovery
     }
 
     /**
-     * @param  array<string, mixed>  $detected
+     * @param  array<string, mixed> $detected
      * @return array<string, mixed>
      */
     private function descriptorFromDetection(array $detected, string $name, string $sourceSubdir, string $source): array

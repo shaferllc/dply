@@ -15,7 +15,7 @@ interface InsightFixActionInterface
      * or a short human-readable reason string when refusing. The reason is surfaced
      * in the apply-fix flow so the user understands why nothing happened.
      *
-     * @param  array<string, mixed>  $params  Per-fix parameters from config.
+     * @param  array<string, mixed> $params  Per-fix parameters from config.
      */
     public function preflight(Server $server, ?Site $site, InsightFinding $finding, array $params): ?string;
 
@@ -24,7 +24,7 @@ interface InsightFixActionInterface
      * (size-bounded by the implementation) and never throw — all failure modes go in
      * the FixResult.
      *
-     * @param  array<string, mixed>  $params  Per-fix parameters from config.
+     * @param  array<string, mixed> $params  Per-fix parameters from config.
      * @param  (callable(string $type, string $chunk): void)|null  $onOutput
      *                                                                        Optional streaming hook. When supplied, long-running handlers should plumb it
      *                                                                        through to the SSH layer (e.g. {@see ExecuteRemoteTaskOnServer::runInlineBashWithOutputCallback})

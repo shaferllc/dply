@@ -58,10 +58,11 @@ class TaskFailed
     /**
      * Additional context data.
      */
+    /** @var array<string, mixed> */
     public array $context;
 
     /**
-     * Create a new event instance.
+     * @param array<string, mixed> $context
      */
     public function __construct(
         Task $task,
@@ -86,6 +87,7 @@ class TaskFailed
     /**
      * Exclude unserializable properties from serialization.
      */
+    /** @return array<string, mixed> */
     public function __serialize(): array
     {
         $data = get_object_vars($this);
@@ -94,6 +96,9 @@ class TaskFailed
         return $data;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __unserialize(array $data): void
     {
         foreach ($data as $key => $value) {
@@ -167,23 +172,19 @@ class TaskFailed
 
     /**
      * Get the exception trace.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getExceptionTrace(): array
     {
         return $this->exception?->getTrace() ?? [];
     }
 
-    /**
-     * Get the failure reason.
-     */
     public function getReason(): string
     {
         return $this->reason;
     }
 
-    /**
-     * Get the task duration in seconds.
-     */
     public function getDuration(): float
     {
         return $this->duration;
@@ -234,23 +235,19 @@ class TaskFailed
 
     /**
      * Get the task data.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getTaskData(): array
     {
         return $this->task->getData();
     }
 
-    /**
-     * Get the task script.
-     */
     public function getTaskScript(): string
     {
         return $this->task->getScript();
     }
 
-    /**
-     * Get the task view.
-     */
     public function getTaskView(): string
     {
         return $this->task->getView();
@@ -258,7 +255,9 @@ class TaskFailed
 
     /**
      * Get failure details.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getFailureDetails(): array
     {
         return [

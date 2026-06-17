@@ -29,6 +29,8 @@ class MultiServerDispatcher
 
     /**
      * The server connections.
+     *
+     * @var list<Connection>
      */
     protected array $connections;
 
@@ -40,20 +42,26 @@ class MultiServerDispatcher
     /**
      * The execution options.
      */
+    /** @var array<string, mixed> */
     protected array $options;
 
     /**
      * The results from each server.
      */
+    /** @var array<string, mixed> */
     protected array $results = [];
 
     /**
      * The failed servers.
+     *
+     * @var list<string>
      */
     protected array $failedServers = [];
 
     /**
      * The successful servers.
+     *
+     * @var list<string>
      */
     protected array $successfulServers = [];
 
@@ -74,6 +82,10 @@ class MultiServerDispatcher
 
     /**
      * Dispatch a task to multiple servers.
+     *
+     * @param  list<Connection|array<string, mixed>|string>  $connections
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function dispatch(Task $task, array $connections, array $options = []): array
     {
@@ -118,6 +130,8 @@ class MultiServerDispatcher
 
     /**
      * Dispatch tasks to all servers in parallel.
+     *
+     * @return array<string, mixed>
      */
     protected function dispatchParallel(): array
     {
@@ -167,6 +181,8 @@ class MultiServerDispatcher
 
     /**
      * Dispatch tasks to servers sequentially.
+     *
+     * @return array<string, mixed>
      */
     protected function dispatchSequential(): array
     {
@@ -209,6 +225,9 @@ class MultiServerDispatcher
 
     /**
      * Normalize connections to Connection objects.
+     *
+     * @param  list<Connection|array<string, mixed>|string>  $connections
+     * @return list<Connection>
      */
     protected function normalizeConnections(array $connections): array
     {
@@ -233,6 +252,8 @@ class MultiServerDispatcher
 
     /**
      * Execute the task on a specific server.
+     *
+     * @return array<string, mixed>
      */
     protected function executeTaskOnServer(Connection $connection): array
     {
@@ -267,6 +288,8 @@ class MultiServerDispatcher
 
     /**
      * Process the results from all servers.
+     *
+     * @return array<string, mixed>
      */
     protected function processResults(): array
     {
@@ -391,6 +414,8 @@ class MultiServerDispatcher
 
     /**
      * Get the results from all servers.
+     *
+     * @return array<string, mixed>
      */
     public function getResults(): array
     {
@@ -399,6 +424,8 @@ class MultiServerDispatcher
 
     /**
      * Get the successful servers.
+     *
+     * @return list<string>
      */
     public function getSuccessfulServers(): array
     {
@@ -407,6 +434,8 @@ class MultiServerDispatcher
 
     /**
      * Get the failed servers.
+     *
+     * @return list<string>
      */
     public function getFailedServers(): array
     {
@@ -423,6 +452,8 @@ class MultiServerDispatcher
 
     /**
      * Get the result for a specific server.
+     *
+     * @return array<string, mixed>|null
      */
     public function getServerResult(string $connection): ?array
     {

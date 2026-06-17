@@ -24,6 +24,7 @@ final class DocsSearchIndex
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function cached(): array
     {
         if (app()->environment('local')) {
@@ -40,6 +41,10 @@ final class DocsSearchIndex
 
     /**
      * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
      */
     public function build(): array
     {
@@ -73,7 +78,7 @@ final class DocsSearchIndex
     }
 
     /**
-     * @param  array<string, mixed>  $doc
+     * @param  array<string, mixed> $doc
      */
     private function urlFor(array $doc): string
     {

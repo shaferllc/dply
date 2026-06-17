@@ -17,6 +17,7 @@ final class DatabaseBackupS3ClientFactory
     /**
      * @return array{client: S3Client, bucket: string, key_prefix: string}
      */
+    /** @return array<string, mixed> */
     public function forConfiguration(BackupConfiguration $configuration): array
     {
         $config = $configuration->config ?? [];
@@ -38,7 +39,7 @@ final class DatabaseBackupS3ClientFactory
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return array{client: S3Client, bucket: string, key_prefix: string}
      */
     private function buildS3Compatible(array $config, bool $isSpaces): array

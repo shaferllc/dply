@@ -34,20 +34,15 @@ class AnonymousTask extends Task
     /**
      * The task data.
      */
+    /** @var array<string, mixed> */
     protected array $data = [];
 
-    /**
-     * The task script (if not using a view).
-     */
     protected ?string $script = null;
 
-    /**
-     * The task render callback.
-     */
     protected ?Closure $renderCallback = null;
 
     /**
-     * Create a new AnonymousTask instance.
+     * @param array<string, mixed> $attributes
      */
     public function __construct(array $attributes = [])
     {
@@ -76,7 +71,7 @@ class AnonymousTask extends Task
      */
     public function callbackUrl(): ?string
     {
-        if ($this->taskModel === null || $this->taskModel->id === null) {
+        if ($this->taskModel === null) {
             return null;
         }
 
@@ -122,22 +117,18 @@ class AnonymousTask extends Task
     /**
      * Get the task data.
      */
+    /** @return array<string, mixed> */
     public function getData(): array
     {
         return array_merge(parent::getData(), $this->data);
     }
 
-    /**
-     * Get the task view data.
-     */
+    /** @return array<string, mixed> */
     public function getViewData(): array
     {
         return $this->data;
     }
 
-    /**
-     * Get the task script.
-     */
     public function getScript(): string
     {
         // If a script is provided directly, use it
@@ -216,6 +207,7 @@ class AnonymousTask extends Task
 
     /**
      * Add data to the task.
+     * @param  array<string, mixed> $data
      */
     public function addData(array $data): self
     {
@@ -236,6 +228,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with a script.
+     * @param  array<string, mixed> $options
      */
     public static function script(string $name, string $script, array $options = []): self
     {
@@ -248,6 +241,8 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with a view.
+     * @param  array<string, mixed> $data
+     * @param  array<string, mixed> $options
      */
     public static function view(string $name, string $view, array $data = [], array $options = []): self
     {
@@ -261,6 +256,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with a render callback.
+     * @param  array<string, mixed> $options
      */
     public static function callback(string $name, Closure $callback, array $options = []): self
     {
@@ -273,6 +269,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with inline script.
+     * @param  array<string, mixed> $options
      */
     public static function inline(string $name, string $script, array $options = []): self
     {
@@ -281,6 +278,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task for a simple command.
+     * @param  array<string, mixed> $options
      */
     public static function command(string $name, string $command, array $options = []): self
     {
@@ -296,6 +294,8 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task for multiple commands.
+     * @param  array<string, mixed> $commands
+     * @param  array<string, mixed> $options
      */
     public static function commands(string $name, array $commands, array $options = []): self
     {
@@ -317,6 +317,8 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with environment variables.
+     * @param  array<string, mixed> $env
+     * @param  array<string, mixed> $options
      */
     public static function withEnv(string $name, array $env, string $command, array $options = []): self
     {
@@ -338,6 +340,8 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with conditional logic.
+     * @param  array<string, mixed> $conditions
+     * @param  array<string, mixed> $options
      */
     public static function conditional(string $name, array $conditions, array $options = []): self
     {
@@ -365,6 +369,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with error handling.
+     * @param  array<string, mixed> $options
      */
     public static function withErrorHandling(string $name, string $command, ?string $errorCommand = null, array $options = []): self
     {
@@ -390,6 +395,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with retry logic.
+     * @param  array<string, mixed> $options
      */
     public static function withRetry(string $name, string $command, int $maxRetries = 3, int $delay = 5, array $options = []): self
     {
@@ -422,6 +428,8 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with progress tracking.
+     * @param  array<string, mixed> $options
+     * @param  array<string, mixed> $steps
      */
     public static function withProgress(string $name, array $steps, array $options = []): self
     {
@@ -449,6 +457,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with cleanup.
+     * @param  array<string, mixed> $options
      */
     public static function withCleanup(string $name, string $command, string $cleanupCommand, array $options = []): self
     {
@@ -466,6 +475,7 @@ class AnonymousTask extends Task
 
     /**
      * Create an anonymous task with logging.
+     * @param  array<string, mixed> $options
      */
     public static function withLogging(string $name, string $command, ?string $logFile = null, array $options = []): self
     {

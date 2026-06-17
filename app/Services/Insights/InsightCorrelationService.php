@@ -132,7 +132,7 @@ class InsightCorrelationService
         }
 
         $meta = $row->meta;
-        if (is_array($meta) && (! empty($meta['error']) || ! empty($meta['skipped']))) {
+        if (($meta) && (! empty($meta['error']) || ! empty($meta['skipped']))) {
             return null;
         }
 

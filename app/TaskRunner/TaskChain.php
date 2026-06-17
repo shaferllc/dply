@@ -16,6 +16,8 @@ class TaskChain
 {
     /**
      * The tasks in the chain.
+     *
+     * @var Collection<int, Task>
      */
     protected Collection $tasks;
 
@@ -32,31 +34,18 @@ class TaskChain
     /**
      * The execution options.
      */
+    /** @var array<string, mixed> */
     protected array $options;
 
-    /**
-     * The streaming logger.
-     */
     protected ?Contracts\StreamingLoggerInterface $streamingLogger;
 
-    /**
-     * The chain results.
-     */
+    /** @var array<int, array<string, mixed>> */
     protected array $results = [];
 
-    /**
-     * The current task index.
-     */
     protected int $currentTaskIndex = 0;
 
-    /**
-     * The start timestamp.
-     */
     protected string $startedAt;
 
-    /**
-     * Create a new TaskChain instance.
-     */
     public function __construct(TaskDispatcher $dispatcher, ?Contracts\StreamingLoggerInterface $streamingLogger = null)
     {
         $this->dispatcher = $dispatcher;
@@ -96,6 +85,7 @@ class TaskChain
 
     /**
      * Add multiple tasks to the chain.
+     * @param  array<string, mixed> $tasks
      */
     public function addMany(array $tasks): self
     {
@@ -116,6 +106,7 @@ class TaskChain
 
     /**
      * Add a command task to the chain.
+     * @param  array<string, mixed> $options
      */
     public function addCommand(string $name, string $command, array $options = []): self
     {
@@ -126,6 +117,8 @@ class TaskChain
 
     /**
      * Add multiple commands to the chain.
+     * @param  array<string, mixed> $commands
+     * @param  array<string, mixed> $options
      */
     public function addCommands(string $name, array $commands, array $options = []): self
     {
@@ -136,6 +129,8 @@ class TaskChain
 
     /**
      * Add a view task to the chain.
+     * @param  array<string, mixed> $data
+     * @param  array<string, mixed> $options
      */
     public function addView(string $name, string $view, array $data = [], array $options = []): self
     {
@@ -146,6 +141,7 @@ class TaskChain
 
     /**
      * Add a callback task to the chain.
+     * @param  array<string, mixed> $options
      */
     public function addCallback(string $name, \Closure $callback, array $options = []): self
     {
@@ -156,6 +152,7 @@ class TaskChain
 
     /**
      * Set execution options.
+     * @param  array<string, mixed> $options
      */
     public function withOptions(array $options): self
     {
@@ -192,6 +189,11 @@ class TaskChain
         $this->options['stop_on_failure'] = $stop;
 
         return $this;
+    }
+
+    public function dontStopOnFailure(): self
+    {
+        return $this->stopOnFailure(false);
     }
 
     /**
@@ -238,7 +240,9 @@ class TaskChain
 
     /**
      * Run the task chain.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function run(): array
     {
         $this->startedAt = now()->toISOString();
@@ -279,7 +283,9 @@ class TaskChain
 
     /**
      * Run tasks sequentially.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function runSequential(): array
     {
         $totalTasks = $this->tasks->count();
@@ -378,7 +384,9 @@ class TaskChain
 
     /**
      * Run tasks in parallel.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function runParallel(): array
     {
         $parallelExecutor = ParallelTaskExecutor::make($this->dispatcher, $this->streamingLogger);
@@ -408,7 +416,9 @@ class TaskChain
 
     /**
      * Process the chain results.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function processChainResults(): array
     {
         $totalTasks = $this->tasks->count();
@@ -536,6 +546,7 @@ class TaskChain
 
     /**
      * Stream chain events.
+     * @param  array<string, mixed> $data
      */
     protected function streamChainEvent(string $event, array $data = []): void
     {
@@ -574,6 +585,8 @@ class TaskChain
 
     /**
      * Get the tasks in the chain.
+     *
+     * @return Collection<int, Task>
      */
     public function getTasks(): Collection
     {
@@ -590,31 +603,25 @@ class TaskChain
 
     /**
      * Get the results.
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function getResults(): array
     {
         return $this->results;
     }
 
-    /**
-     * Get the options.
-     */
+    /** @return array<string, mixed> */
     public function getOptions(): array
     {
         return $this->options;
     }
 
-    /**
-     * Check if the chain is empty.
-     */
     public function isEmpty(): bool
     {
         return $this->tasks->isEmpty();
     }
 
-    /**
-     * Get the number of tasks in the chain.
-     */
     public function count(): int
     {
         return $this->tasks->count();

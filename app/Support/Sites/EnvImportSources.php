@@ -82,7 +82,7 @@ final class EnvImportSources
      * Sanitize a copied env variable map: blank known secrets / host-bound values
      * (keeping the key), regenerate APP_KEY, and leave plain config intact.
      *
-     * @param  array<string, string>  $variables
+     * @param  array<string, mixed> $variables
      * @return array<string, string>
      */
     public static function sanitize(array $variables): array

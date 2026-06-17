@@ -170,7 +170,7 @@ class CacheServiceCommandPolicy
 
         $parts = preg_split('/\s+/', $trimmed) ?: [];
 
-        return array_values(array_map(static fn (string $t): string => strtoupper($t), $parts));
+        return array_map(static fn (string $t): string => strtoupper($t), $parts);
     }
 
     private function isPrefixOnly(string $firstToken): bool

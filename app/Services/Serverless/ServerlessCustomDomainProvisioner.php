@@ -177,7 +177,7 @@ final class ServerlessCustomDomainProvisioner
     public function remove(Site $site, string $hostname): void
     {
         $hostname = strtolower(trim($hostname));
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $routing = is_array($serverless['routing'] ?? null) ? $serverless['routing'] : [];
         $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
@@ -193,7 +193,7 @@ final class ServerlessCustomDomainProvisioner
             $remaining[] = $entry;
         }
 
-        $routing['custom_domains'] = array_values($remaining);
+        $routing['custom_domains'] = array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($remaining))))))))))))))))))))))))))))))));
         $serverless['routing'] = $routing;
         $meta['serverless'] = $serverless;
         $site->forceFill(['meta' => $meta])->save();
@@ -227,12 +227,12 @@ final class ServerlessCustomDomainProvisioner
      * entry when absent (so first-time provision works). Always wipes the
      * resolver cache so the proxy sees fresh state.
      *
-     * @param  array<string, mixed>  $patch
+     * @param  array<string, mixed> $patch
      * @return array<string, mixed>
      */
     private function updateEntry(Site $site, string $hostname, array $patch): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $routing = is_array($serverless['routing'] ?? null) ? $serverless['routing'] : [];
         $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];

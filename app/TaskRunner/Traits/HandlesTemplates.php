@@ -20,27 +20,27 @@ trait HandlesTemplates
      */
     protected bool $templatesEnabled = true;
 
+    /** @var array<string, mixed> */
     protected array $templates = [];
 
+    /** @var array<string, mixed> */
     protected array $templateCategories = [];
 
+    /** @var array<string, mixed> */
     protected array $templateMetadata = [];
 
+    /** @var array<string, mixed> */
     protected array $templateParameters = [];
 
+    /** @var array<string, mixed> */
     protected array $templateDependencies = [];
 
-    /**
-     * Check if templates are enabled for this task.
-     */
     public function isTemplatesEnabled(): bool
     {
         return $this->templatesEnabled;
     }
 
-    /**
-     * Get available templates for this task type.
-     */
+    /** @return array<string, mixed> */
     public function getAvailableTemplates(): array
     {
         $cacheKey = "task_templates_{$this->getTaskType()}";
@@ -57,6 +57,7 @@ trait HandlesTemplates
 
     /**
      * Get template by name.
+      * @return array<string, mixed>
      */
     public function getTemplate(string $templateName): ?array
     {
@@ -67,6 +68,7 @@ trait HandlesTemplates
 
     /**
      * Create task from template.
+      * @param array<string, mixed> $parameters
      */
     public function createFromTemplate(string $templateName, array $parameters = []): static
     {
@@ -93,6 +95,7 @@ trait HandlesTemplates
 
     /**
      * Save current task as template.
+      * @param array<string, mixed> $metadata
      */
     public function saveAsTemplate(string $templateName, array $metadata = []): bool
     {
@@ -135,6 +138,7 @@ trait HandlesTemplates
 
     /**
      * Update existing template.
+      * @param array<string, mixed> $data
      */
     public function updateTemplate(string $templateName, array $data): bool
     {
@@ -186,6 +190,8 @@ trait HandlesTemplates
 
     /**
      * Get template metadata.
+     *
+     * @return array<string, mixed>
      */
     public function getTemplateMetadata(string $templateName): array
     {
@@ -196,6 +202,9 @@ trait HandlesTemplates
 
     /**
      * Validate template parameters.
+     *
+     * @param  array<string, mixed>  $parameters
+     * @return array<string, mixed>
      */
     public function validateTemplateParameters(string $templateName, array $parameters): array
     {
@@ -253,6 +262,8 @@ trait HandlesTemplates
 
     /**
      * Get template parameters schema.
+     *
+     * @return array<string, mixed>
      */
     public function getTemplateParametersSchema(string $templateName): array
     {
@@ -263,6 +274,8 @@ trait HandlesTemplates
 
     /**
      * List all templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function listTemplates(): array
     {
@@ -273,6 +286,8 @@ trait HandlesTemplates
 
     /**
      * Search templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function searchTemplates(string $query): array
     {
@@ -283,6 +298,8 @@ trait HandlesTemplates
 
     /**
      * Get template categories.
+     *
+     * @return array<string, mixed>
      */
     public function getTemplateCategories(): array
     {
@@ -300,6 +317,8 @@ trait HandlesTemplates
 
     /**
      * Get templates by category.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplatesByCategory(string $category): array
     {
@@ -365,6 +384,8 @@ trait HandlesTemplates
 
     /**
      * Get template usage statistics.
+     *
+     * @return array<string, mixed>
      */
     public function getTemplateUsageStats(string $templateName): array
     {
@@ -375,6 +396,8 @@ trait HandlesTemplates
 
     /**
      * Get popular templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getPopularTemplates(int $limit = 10): array
     {
@@ -385,6 +408,8 @@ trait HandlesTemplates
 
     /**
      * Get recent templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getRecentTemplates(int $limit = 10): array
     {
@@ -395,6 +420,8 @@ trait HandlesTemplates
 
     /**
      * Get template recommendations.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplateRecommendations(): array
     {
@@ -443,6 +470,8 @@ trait HandlesTemplates
 
     /**
      * Get template version history.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplateVersionHistory(string $templateName): array
     {
@@ -479,6 +508,8 @@ trait HandlesTemplates
 
     /**
      * Get template dependencies.
+     *
+     * @return array<string, mixed>
      */
     public function getTemplateDependencies(string $templateName): array
     {
@@ -489,6 +520,8 @@ trait HandlesTemplates
 
     /**
      * Check template compatibility.
+     *
+     * @return array<string, mixed>
      */
     public function checkTemplateCompatibility(string $templateName): array
     {
@@ -515,6 +548,7 @@ trait HandlesTemplates
 
     /**
      * Set templates configuration.
+      * @param array<string, mixed> $config
      */
     public function setTemplatesConfig(array $config): self
     {
@@ -564,6 +598,8 @@ trait HandlesTemplates
 
     /**
      * Get task configuration for template saving.
+     *
+     * @return array<string, mixed>
      */
     protected function getTaskConfiguration(): array
     {
@@ -576,6 +612,8 @@ trait HandlesTemplates
 
     /**
      * Get task properties for template saving.
+     *
+     * @return array<string, mixed>
      */
     protected function getTaskProperties(): array
     {
@@ -594,6 +632,8 @@ trait HandlesTemplates
 
     /**
      * Get task methods for template saving.
+     *
+     * @return list<string>
      */
     protected function getTaskMethods(): array
     {
@@ -611,6 +651,8 @@ trait HandlesTemplates
 
     /**
      * Apply template configuration to task.
+      * @param array<string, mixed> $parameters
+      * @param array<string, mixed> $template
      */
     protected function applyTemplateConfiguration(array $template, array $parameters): void
     {
@@ -633,8 +675,9 @@ trait HandlesTemplates
 
     /**
      * Interpolate parameters in template values.
+      * @param array<string, mixed> $parameters
      */
-    protected function interpolateParameters($value, array $parameters): mixed
+    protected function interpolateParameters(mixed $value, array $parameters): mixed
     {
         if (is_string($value)) {
             foreach ($parameters as $key => $paramValue) {
@@ -647,32 +690,37 @@ trait HandlesTemplates
 
     /**
      * Apply configuration to task.
+     *
+     * @param  array<string, mixed>  $configuration
+     * @param  array<string, mixed>  $parameters
      */
     protected function applyConfiguration(array $configuration, array $parameters): void
     {
         // Apply monitoring configuration
         if (isset($configuration['monitoring'])) {
-            $this->setMonitoringConfiguration($configuration['monitoring']);
+            $this->setMonitoringConfig($configuration['monitoring']);
         }
 
         // Apply analytics configuration
         if (isset($configuration['analytics'])) {
-            $this->setAnalyticsConfiguration($configuration['analytics']);
+            $this->setAnalyticsConfig($configuration['analytics']);
         }
 
         // Apply rollback configuration
         if (isset($configuration['rollback'])) {
-            $this->setRollbackConfiguration($configuration['rollback']);
+            $this->setRollbackConfig($configuration['rollback']);
         }
 
         // Apply callback configuration
         if (isset($configuration['callbacks'])) {
-            $this->setCallbackConfiguration($configuration['callbacks']);
+            $this->setCallbackConfig($configuration['callbacks']);
         }
     }
 
     /**
      * Generate parameters schema from task properties.
+     *
+     * @return array<string, mixed>
      */
     protected function generateParametersSchema(): array
     {
@@ -727,6 +775,8 @@ trait HandlesTemplates
 
     /**
      * Get task dependencies.
+     *
+     * @return array<string, mixed>
      */
     protected function getTaskDependencies(): array
     {
@@ -739,6 +789,7 @@ trait HandlesTemplates
 
     /**
      * Record template usage.
+      * @param array<string, mixed> $parameters
      */
     protected function recordTemplateUsage(string $templateName, array $parameters): void
     {
@@ -758,7 +809,7 @@ trait HandlesTemplates
     /**
      * Validate parameter type.
      */
-    protected function validateParameterType($value, string $type): bool
+    protected function validateParameterType(mixed $value, string $type): bool
     {
         return match ($type) {
             'string' => is_string($value),
@@ -782,6 +833,7 @@ trait HandlesTemplates
 
     /**
      * Convert template to YAML.
+      * @param array<string, mixed> $template
      */
     protected function convertToYaml(array $template): string
     {

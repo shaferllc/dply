@@ -8,8 +8,8 @@ use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\Task;
-use Throwable;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\Log;
  */
 trait CreatesTaskRunnerBuilders
 {
-
-
     /**
      * Create a task from a model.
      */
@@ -55,6 +53,8 @@ trait CreatesTaskRunnerBuilders
 
     /**
      * Create an anonymous task with a script.
+     *
+     * @param  array<string, mixed>  $options
      */
     public function anonymous(string $name, string $script, array $options = []): AnonymousTask
     {
@@ -63,6 +63,8 @@ trait CreatesTaskRunnerBuilders
 
     /**
      * Create an anonymous task for a simple command.
+     *
+     * @param  array<string, mixed>  $options
      */
     public function command(string $name, string $command, array $options = []): AnonymousTask
     {
@@ -71,6 +73,9 @@ trait CreatesTaskRunnerBuilders
 
     /**
      * Create an anonymous task for multiple commands.
+     *
+     * @param  array<string, mixed>  $commands
+     * @param  array<string, mixed>  $options
      */
     public function commands(string $name, array $commands, array $options = []): AnonymousTask
     {
@@ -79,6 +84,9 @@ trait CreatesTaskRunnerBuilders
 
     /**
      * Create an anonymous task with a view.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $options
      */
     public function view(string $name, string $view, array $data = [], array $options = []): AnonymousTask
     {
@@ -87,6 +95,8 @@ trait CreatesTaskRunnerBuilders
 
     /**
      * Create an anonymous task with a render callback.
+     *
+     * @param  array<string, mixed>  $options
      */
     public function callback(string $name, \Closure $callback, array $options = []): AnonymousTask
     {

@@ -22,7 +22,7 @@ use InvalidArgumentException;
 trait ManagesStorageBindings
 {
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachStorage(Site $site, array $params): SiteBinding
     {
@@ -86,7 +86,7 @@ trait ManagesStorageBindings
      * on the binding (status=error, last_error) so it surfaces inline and can
      * be retried, then re-thrown for the toast.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function provisionBucket(Site $site, array $params): SiteBinding
     {
@@ -169,7 +169,7 @@ trait ManagesStorageBindings
      * Mint S3 keys for an api_managed provider (DigitalOcean Spaces) via the
      * org's cloud API token, so the operator never pastes keys.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array{key: string, secret: string}
      */
     private function mintApiManagedKeys(Site $site, string $provider, string $bucket, array $params): array
@@ -219,7 +219,7 @@ trait ManagesStorageBindings
      * Form region/endpoint always win over the saved credential's stored
      * defaults so the operator's picks aren't silently overridden.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array{key: string, secret: string, region: string, endpoint: string}
      */
     private function resolveStorageCredentials(Site $site, string $provider, array $params): array
@@ -260,7 +260,7 @@ trait ManagesStorageBindings
      * the operator ticked "save for reuse". No-op when reusing an existing
      * saved credential or when saving wasn't requested.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function maybeSaveStorageCredential(Site $site, string $provider, array $params, string $key, string $secret, string $region, string $endpoint): void
     {
@@ -357,7 +357,7 @@ trait ManagesStorageBindings
      * editing an existing binding ($params['binding_id']), a same-slug match on
      * that row is allowed (it's an update); any other collision is rejected.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function resolveStorageDisk(Site $site, array $params): string
     {

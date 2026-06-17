@@ -60,6 +60,8 @@ class MiseInstallScriptBuilder
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function installLines(bool $forceReinstall = false): array
     {
         // Gate every apt-get behind dply_wait_for_apt_locks (defined in the
@@ -103,8 +105,10 @@ class MiseInstallScriptBuilder
      * Adds the activation snippet to ~/.bashrc if not already present,
      * idempotent. Does not source the file; the next login picks it up.
      *
-     * @return list<string>
+     * @return array<int, string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function activateForUserLines(string $deployUser): array
     {
         $userArg = escapeshellarg($deployUser);
@@ -131,8 +135,10 @@ class MiseInstallScriptBuilder
      * Returns an empty array for unsupported runtimes (silent skip
      * matches the rest of the provision builder's defensive style).
      *
-     * @return list<string>
+     * @return array<int, string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function installRuntimeForUserLines(string $deployUser, string $runtime, string $version): array
     {
         if (! in_array($runtime, self::supportedRuntimes(), true)) {
@@ -183,8 +189,9 @@ class MiseInstallScriptBuilder
      * it as the global default. Alias of {@see installRuntimeForUserLines} —
      * kept so call sites that name "install version" still get install + activate.
      *
-     * @return list<string>
+     * @return array<int, string>
      */
+    /** @return array<string, mixed> */
     public function installRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
         return $this->installRuntimeForUserLines($deployUser, $runtime, $version);
@@ -197,6 +204,8 @@ class MiseInstallScriptBuilder
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function uninstallRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
         if (! in_array($runtime, self::supportedRuntimes(), true)) {
@@ -224,8 +233,9 @@ class MiseInstallScriptBuilder
      * click. Same shape as installRuntimeForUserLines() (which is the provision-
      * time entry point), kept separate so the call site is self-documenting.
      *
-     * @return list<string>
+     * @return array<int, string>
      */
+    /** @return array<string, mixed> */
     public function setRuntimeDefaultForUserLines(string $deployUser, string $runtime, string $version): array
     {
         return $this->installRuntimeForUserLines($deployUser, $runtime, $version);

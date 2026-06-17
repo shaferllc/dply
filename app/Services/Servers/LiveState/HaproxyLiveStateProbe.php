@@ -308,7 +308,8 @@ BASH;
      * Single-row table (or fewer fields when info is empty). Surfaces
      * what operators usually care about from `show info`.
      *
-     * @param  array<string, string>  $info
+     * @param  array<string, mixed> $info
+     * @return array<int, array<string, mixed>>
      */
     private function buildRuntimeUnits(array $info, string $pools): array
     {

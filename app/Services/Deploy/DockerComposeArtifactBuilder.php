@@ -24,7 +24,7 @@ final class DockerComposeArtifactBuilder
         $contract = $this->contractBuilder->build($site);
         $service = Str::slug($site->slug ?: $site->name ?: 'site', '-');
         $publishedPort = (int) data_get($site->meta, 'runtime_target.publication.port', 80);
-        $port = $site->type?->value === 'node'
+        $port = $site->type->value === 'node'
             ? (int) ($site->app_port ?: 3000)
             : 80;
         $environment = $contract->environmentMap();

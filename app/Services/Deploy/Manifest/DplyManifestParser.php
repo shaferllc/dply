@@ -127,7 +127,7 @@ class DplyManifestParser
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed> $data
      */
     public function parseArray(array $data): DplyManifest
     {
@@ -338,7 +338,7 @@ class DplyManifestParser
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed> $data
      * @return list<string>
      */
     private function collectWarnings(array $data): array

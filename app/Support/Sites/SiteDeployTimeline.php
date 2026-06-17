@@ -198,8 +198,9 @@ final class SiteDeployTimeline
      */
     private static function hooksByPhase(Site $site): Collection
     {
-        $map = collect(array_fill_keys(array_keys(self::PHASES), null))
-            ->map(static fn () => collect());
+        /** @var Collection<string, Collection<int, SiteDeployHook>> $map */
+        $map = (new Collection(array_keys(self::PHASES)))
+            ->mapWithKeys(static fn (string $phase): array => [$phase => new Collection]);
 
         $site->loadMissing('deployHooks.anchorStep');
         foreach ($site->deployHooks as $hook) {
@@ -210,9 +211,12 @@ final class SiteDeployTimeline
                 default => 'build',
             };
             if (! $map->has($phase)) {
-                $map->put($phase, collect());
+                $map->put($phase, new Collection);
             }
-            $map->get($phase)->push($hook);
+
+            /** @var Collection<int, SiteDeployHook> $phaseHooks */
+            $phaseHooks = $map->get($phase);
+            $phaseHooks->push($hook);
         }
 
         return $map;
@@ -308,7 +312,7 @@ final class SiteDeployTimeline
     }
 
     /**
-     * @param  array<string, mixed>  $step
+     * @param  array<string, mixed> $step
      * @return array<string, mixed>
      */
     private static function stepView(?SiteDeployment $latest, array $step): array
@@ -333,7 +337,7 @@ final class SiteDeployTimeline
     }
 
     /**
-     * @param  array<string, mixed>  $step
+     * @param  array<string, mixed> $step
      */
     private static function stepLabel(array $step): string
     {

@@ -19,7 +19,7 @@ use App\Models\User;
 class SiteAuditWriter
 {
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     public function record(
         Site $site,

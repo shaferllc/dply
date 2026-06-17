@@ -9,6 +9,8 @@ use App\Services\Deploy\Support\ProvisionerConfigReport;
 
 final class LocalStubProvisioner implements ServerlessFunctionProvisioner
 {
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         return [

@@ -35,7 +35,7 @@ class TestingHostnameProvisioner
             return null;
         }
 
-        $serverIp = trim((string) ($site->server?->ip_address ?? ''));
+        $serverIp = trim((string) ($site->server->ip_address ?? ''));
         if ($serverIp === '') {
             $this->storeResult($site, [
                 'status' => 'skipped',
@@ -144,7 +144,7 @@ class TestingHostnameProvisioner
             return false;
         }
 
-        $serverIp = trim((string) ($site->server?->ip_address ?? ''));
+        $serverIp = trim((string) ($site->server->ip_address ?? ''));
         if ($serverIp === '') {
             $this->storeTenantResult($tenant, ['status' => 'skipped', 'reason' => 'missing_server_ip']);
 
@@ -220,7 +220,7 @@ class TestingHostnameProvisioner
             }
         }
 
-        $tenantMeta = is_array($tenant->meta) ? $tenant->meta : [];
+        $tenantMeta = ($tenant->meta );
         unset($tenantMeta['testing']);
         $tenant->forceFill(['meta' => $tenantMeta])->save();
     }
@@ -241,9 +241,12 @@ class TestingHostnameProvisioner
         return $label.'.'.$zone;
     }
 
+    /**
+     * @param  array<string, mixed> $payload
+     */
     private function storeTenantResult(SiteTenantDomain $tenant, array $payload): void
     {
-        $meta = is_array($tenant->meta) ? $tenant->meta : [];
+        $meta = ($tenant->meta );
         $meta['testing'] = $payload;
         $tenant->forceFill(['meta' => $meta])->save();
         $tenant->setAttribute('meta', $meta);
@@ -381,12 +384,12 @@ class TestingHostnameProvisioner
         $recordName = is_string($testingMeta['record_name'] ?? null) && $testingMeta['record_name'] !== ''
             ? (string) $testingMeta['record_name']
             : $this->relativeRecordName($hostname, $zone);
-        $serverIp = trim((string) ($testingMeta['record_data'] ?? $site->server?->ip_address ?? ''));
+        $serverIp = trim((string) ($testingMeta['record_data'] ?? $site->server->ip_address ?? ''));
 
         $previewRow = $site->previewDomains()->where('hostname', $hostname)->first();
         $providerType = is_string($previewRow?->provider_type) && $previewRow->provider_type !== ''
             ? $previewRow->provider_type
-            : ($site->dnsAutomationCredential()?->provider ?? 'digitalocean');
+            : ($site->dnsAutomationCredential()->provider ?? 'digitalocean');
 
         if ($providerType === 'cloudflare') {
             $site->loadMissing('dnsProviderCredential');
@@ -407,7 +410,7 @@ class TestingHostnameProvisioner
             // non-"0" value and otherwise fall back to the row.
             $recordId = (string) ($testingMeta['record_id'] ?? '');
             if ($recordId === '' || $recordId === '0') {
-                $recordId = (string) ($previewRow?->provider_record_id ?? '');
+                $recordId = (string) ($previewRow->provider_record_id ?? '');
             }
             if ($recordId === '') {
                 return;
@@ -424,7 +427,7 @@ class TestingHostnameProvisioner
             // non-"0" value and otherwise fall back to the row.
             $recordId = (string) ($testingMeta['record_id'] ?? '');
             if ($recordId === '' || $recordId === '0') {
-                $recordId = (string) ($previewRow?->provider_record_id ?? '');
+                $recordId = (string) ($previewRow->provider_record_id ?? '');
             }
             if ($recordId === '') {
                 return;
@@ -452,6 +455,8 @@ class TestingHostnameProvisioner
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function configuredDomains(): array
     {
         $domains = config('services.digitalocean.testing_domains', []);
@@ -484,8 +489,9 @@ class TestingHostnameProvisioner
      * in the app-level DigitalOcean token fallback so callers always get a
      * usable token when one is available.
      *
-     * @return array{provider: string, credential: ?ProviderCredential, token: string}
+     * @return array<int, string>
      */
+    /** @return array<string, mixed> */
     public function testingDnsRoutingForSite(Site $site): array
     {
         $site->loadMissing(['server', 'organization', 'dnsProviderCredential']);
@@ -503,7 +509,7 @@ class TestingHostnameProvisioner
         return [
             'provider' => $routing['provider'],
             'credential' => $credential,
-            'token' => is_string($token) ? trim($token) : '',
+            'token' => (trim($token) ),
         ];
     }
 
@@ -518,7 +524,7 @@ class TestingHostnameProvisioner
      *
      * Throws when DO fallback is also unavailable.
      *
-     * @return array{provider: string, dns_provider: DnsProvider, pool: list<string>, credential: ?ProviderCredential}
+     * @return array{provider: 'digitalocean', dns_provider: App\Services\Sites\Dns\DnsProvider, pool: non-empty-array<string, mixed>, credential: null}
      */
     private function resolveTestingProviderForSite(Site $site): array
     {
@@ -593,6 +599,10 @@ class TestingHostnameProvisioner
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function configuredDomainsForProvider(string $provider): array
     {
         $provider = strtolower(trim($provider));
@@ -613,7 +623,7 @@ class TestingHostnameProvisioner
      * Same selection strategy as {@see chooseZone()} but against an arbitrary
      * zone list — used after the per-provider pool is resolved.
      *
-     * @param  list<string>  $pool
+     * @param  array<string, mixed> $pool
      */
     private function chooseZoneFromPool(Site $site, array $pool): string
     {
@@ -673,9 +683,12 @@ class TestingHostnameProvisioner
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $payload
+     */
     private function storeResult(Site $site, array $payload): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['testing_hostname'] = $payload;
 
         $site->forceFill(['meta' => $meta])->save();

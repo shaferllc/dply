@@ -16,12 +16,12 @@ class NotificationRoutingResolver
     ) {}
 
     /**
-     * @param  list<string>  $recipientUserIds
-     * @param  list<string>  $excludeChannelIds  NotificationChannel ULIDs that have already received
+     * @param  array<string, mixed> $recipientUserIds
+     * @param  array<string, mixed> $excludeChannelIds  NotificationChannel ULIDs that have already received
      *                                           this event from a direct fan-out path and should be
      *                                           skipped here to avoid double-dispatch. Empty list
      *                                           preserves the original behaviour.
-     * @param  list<string>  $excludeRecipientUserIds  User ULIDs that have already received this event
+     * @param  array<string, mixed> $excludeRecipientUserIds  User ULIDs that have already received this event
      *                                                 in-app from a sibling publish and should be skipped
      *                                                 here so the inbox isn't double-filled. Empty list
      *                                                 preserves the original behaviour.

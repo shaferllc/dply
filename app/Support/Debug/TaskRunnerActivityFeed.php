@@ -7,6 +7,7 @@ namespace App\Support\Debug;
 use App\Models\RemoteCliRun;
 use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -33,25 +34,23 @@ final class TaskRunnerActivityFeed
      */
     public function recent(int $limit = 50, ?string $organizationId = null, ?string $actorUserId = null): Collection
     {
+        $query = $this->queryTaskRunnerTasks($organizationId, $actorUserId)
+            ->orderByDesc('started_at')
+            ->orderByDesc('created_at')
+            ->limit($limit);
+        $manageQuery = $this->queryManageActions($organizationId, $actorUserId)
+            ->orderByDesc('started_at')
+            ->orderByDesc('created_at')
+            ->limit($limit);
+        $cliQuery = $this->queryRemoteCliRuns($organizationId, $actorUserId)
+            ->orderByDesc('started_at')
+            ->orderByDesc('created_at')
+            ->limit($limit);
+
         return $this->merge(
-            $this->queryTaskRunnerTasks($organizationId, $actorUserId)
-                ->orderByDesc('started_at')
-                ->orderByDesc('created_at')
-                ->limit($limit)
-                ->get()
-                ->map(fn (TaskRunnerTask $r) => $this->fromTaskRunnerTask($r)),
-            $this->queryManageActions($organizationId, $actorUserId)
-                ->orderByDesc('started_at')
-                ->orderByDesc('created_at')
-                ->limit($limit)
-                ->get()
-                ->map(fn (ServerManageAction $r) => $this->fromManageAction($r)),
-            $this->queryRemoteCliRuns($organizationId, $actorUserId)
-                ->orderByDesc('started_at')
-                ->orderByDesc('created_at')
-                ->limit($limit)
-                ->get()
-                ->map(fn (RemoteCliRun $r) => $this->fromRemoteCliRun($r)),
+            $this->mapTaskRunnerTasks($query),
+            $this->mapManageActions($manageQuery),
+            $this->mapRemoteCliRuns($cliQuery),
         )
             ->sortByDesc(fn (ActivityRow $row): int => optional($row->startedAt)->getTimestamp() ?? optional($row->createdAt)->getTimestamp() ?? 0)
             ->take($limit)
@@ -64,18 +63,18 @@ final class TaskRunnerActivityFeed
     public function running(?string $organizationId = null, ?string $actorUserId = null): Collection
     {
         return $this->merge(
-            $this->queryTaskRunnerTasks($organizationId, $actorUserId)
-                ->whereIn('status', self::RUNNING_STATUSES_TASK_RUNNER)
-                ->get()
-                ->map(fn (TaskRunnerTask $r) => $this->fromTaskRunnerTask($r)),
-            $this->queryManageActions($organizationId, $actorUserId)
-                ->whereIn('status', self::RUNNING_STATUSES_MANAGE)
-                ->get()
-                ->map(fn (ServerManageAction $r) => $this->fromManageAction($r)),
-            $this->queryRemoteCliRuns($organizationId, $actorUserId)
-                ->whereIn('status', self::RUNNING_STATUSES_REMOTE_CLI)
-                ->get()
-                ->map(fn (RemoteCliRun $r) => $this->fromRemoteCliRun($r)),
+            $this->mapTaskRunnerTasks(
+                $this->queryTaskRunnerTasks($organizationId, $actorUserId)
+                    ->whereIn('status', self::RUNNING_STATUSES_TASK_RUNNER),
+            ),
+            $this->mapManageActions(
+                $this->queryManageActions($organizationId, $actorUserId)
+                    ->whereIn('status', self::RUNNING_STATUSES_MANAGE),
+            ),
+            $this->mapRemoteCliRuns(
+                $this->queryRemoteCliRuns($organizationId, $actorUserId)
+                    ->whereIn('status', self::RUNNING_STATUSES_REMOTE_CLI),
+            ),
         )->values();
     }
 
@@ -128,7 +127,46 @@ final class TaskRunnerActivityFeed
         return implode("\n\n", $parts);
     }
 
-    private function queryTaskRunnerTasks(?string $organizationId, ?string $actorUserId = null)
+    /**
+     * @param  Builder<TaskRunnerTask>  $query
+     * @return Collection<int, ActivityRow>
+     */
+    private function mapTaskRunnerTasks(Builder $query): Collection
+    {
+        /** @var \Illuminate\Database\Eloquent\Collection<int, TaskRunnerTask> $rows */
+        $rows = $query->get();
+
+        return $rows->map(fn (TaskRunnerTask $r): ActivityRow => $this->fromTaskRunnerTask($r));
+    }
+
+    /**
+     * @param  Builder<ServerManageAction>  $query
+     * @return Collection<int, ActivityRow>
+     */
+    private function mapManageActions(Builder $query): Collection
+    {
+        /** @var \Illuminate\Database\Eloquent\Collection<int, ServerManageAction> $rows */
+        $rows = $query->get();
+
+        return $rows->map(fn (ServerManageAction $r): ActivityRow => $this->fromManageAction($r));
+    }
+
+    /**
+     * @param  Builder<RemoteCliRun>  $query
+     * @return Collection<int, ActivityRow>
+     */
+    private function mapRemoteCliRuns(Builder $query): Collection
+    {
+        /** @var \Illuminate\Database\Eloquent\Collection<int, RemoteCliRun> $rows */
+        $rows = $query->get();
+
+        return $rows->map(fn (RemoteCliRun $r): ActivityRow => $this->fromRemoteCliRun($r));
+    }
+
+    /**
+     * @return Builder<TaskRunnerTask>
+     */
+    private function queryTaskRunnerTasks(?string $organizationId, ?string $actorUserId = null): Builder
     {
         $q = TaskRunnerTask::query()->select([
             'id', 'name', 'action', 'status', 'exit_code', 'server_id',
@@ -166,7 +204,10 @@ final class TaskRunnerActivityFeed
         return $q;
     }
 
-    private function queryManageActions(?string $organizationId, ?string $actorUserId = null)
+    /**
+     * @return Builder<ServerManageAction>
+     */
+    private function queryManageActions(?string $organizationId, ?string $actorUserId = null): Builder
     {
         $q = ServerManageAction::query()->select([
             'id', 'server_id', 'user_id', 'task_name', 'label', 'status',
@@ -189,7 +230,10 @@ final class TaskRunnerActivityFeed
         return $q;
     }
 
-    private function queryRemoteCliRuns(?string $organizationId, ?string $actorUserId = null)
+    /**
+     * @return Builder<RemoteCliRun>
+     */
+    private function queryRemoteCliRuns(?string $organizationId, ?string $actorUserId = null): Builder
     {
         $q = RemoteCliRun::query()->select([
             'id', 'site_id', 'kind', 'command', 'risk', 'mode', 'status',
@@ -214,10 +258,8 @@ final class TaskRunnerActivityFeed
     }
 
     /**
-     * @template T
-     *
-     * @param  Collection<int, T>  ...$collections
-     * @return Collection<int, T>
+     * @param  Collection<int, ActivityRow>  ...$collections
+     * @return Collection<int, ActivityRow>
      */
     private function merge(Collection ...$collections): Collection
     {
@@ -226,7 +268,7 @@ final class TaskRunnerActivityFeed
 
     private function fromTaskRunnerTask(TaskRunnerTask $r): ActivityRow
     {
-        $status = $r->status?->value ?? 'unknown';
+        $status = $r->status->value;
         $duration = $this->durationSeconds($r->started_at, $r->completed_at);
         $label = trim((string) ($r->name ?? '')) !== '' ? (string) $r->name : ((string) ($r->action ?? '—'));
 
@@ -274,7 +316,7 @@ final class TaskRunnerActivityFeed
     private function fromRemoteCliRun(RemoteCliRun $r): ActivityRow
     {
         $duration = $this->durationSeconds($r->started_at, $r->finished_at);
-        $label = strtoupper((string) $r->kind).' · '.((string) $r->command);
+        $label = $r->kind->value.' · '.((string) $r->command);
 
         return new ActivityRow(
             source: 'remote_cli_runs',

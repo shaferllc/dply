@@ -28,36 +28,36 @@ final class SharedHostBudgetMonitor
             return;
         }
 
-        if (! ($this->budgets->forServer($server)['alerts_enabled'] ?? true)) {
+        if (! ($this->budgets->forServer($server)['alerts_enabled'])) {
             return;
         }
 
         $rollup = $this->history->rollup($server, '24h');
-        $rows = $rollup['rows'] ?? [];
+        $rows = $rollup['rows'];
         if ($rows === []) {
             $current = $this->attributor->forServer($server, 'current');
-            $rows = is_array($current['rows'] ?? null) ? $current['rows'] : [];
+            $rows = $current['rows'];
         }
 
         foreach ($this->evaluator->breaches($server, $rows, usePeakShares: true) as $breach) {
-            if ($this->shouldNotify($server, (string) $breach['id'], (string) ($breach['observed_pct'] ?? ''))) {
+            if ($this->shouldNotify($server, (string) $breach['id'], (string) $breach['observed_pct'])) {
                 $this->notifications->notifyBudgetBreach($server, $breach);
-                $this->markNotified($server, (string) $breach['id'], (string) ($breach['observed_pct'] ?? ''));
+                $this->markNotified($server, (string) $breach['id'], (string) $breach['observed_pct']);
             }
         }
 
         $attribution = $this->attributor->forServer($server, 'current');
         foreach ($this->contention->events($server, $attribution) as $event) {
-            if (($event['severity'] ?? '') !== 'critical') {
+            if ($event['severity'] !== 'critical') {
                 continue;
             }
-            $eventId = (string) ($event['id'] ?? '');
+            $eventId = (string) $event['id'];
             if ($eventId === '') {
                 continue;
             }
-            if ($this->shouldNotify($server, 'contention-'.$eventId, (string) ($event['severity'] ?? ''))) {
+            if ($this->shouldNotify($server, 'contention-'.$eventId, (string) $event['severity'])) {
                 $this->notifications->notifyContentionEvent($server, $event);
-                $this->markNotified($server, 'contention-'.$eventId, (string) ($event['severity'] ?? ''));
+                $this->markNotified($server, 'contention-'.$eventId, (string) $event['severity']);
             }
         }
     }

@@ -15,7 +15,93 @@ use Illuminate\Support\Facades\Log;
 class TemplateService
 {
     /**
+     * Render a template with variable substitution.
+     *
+     * @param  array<string, mixed>  $variables
+     */
+    public function render(string $templateName, array $variables): ?string
+    {
+        try {
+            $template = DB::table('task_templates')
+                ->where('name', $templateName)
+                ->where('active', true)
+                ->first();
+
+            if (! $template) {
+                return null;
+            }
+
+            $record = (array) $template;
+            $script = $record['script'] ?? $record['script_content'] ?? null;
+
+            if (! is_string($script) || $script === '') {
+                return null;
+            }
+
+            foreach ($variables as $key => $value) {
+                $replacement = is_scalar($value) || $value === null
+                    ? (string) $value
+                    : json_encode($value);
+                $script = str_replace(
+                    ['{{'.$key.'}}', '{{ '.$key.' }}'],
+                    $replacement,
+                    $script
+                );
+            }
+
+            return $script;
+        } catch (\Exception $e) {
+            Log::error('Failed to render template', [
+                'template_name' => $templateName,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * List templates with optional filters.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, mixed>>
+     */
+    public function list(array $filters = []): array
+    {
+        if ($filters === []) {
+            return $this->listAllTemplates();
+        }
+
+        try {
+            $query = DB::table('task_templates')->where('active', true);
+
+            if (isset($filters['task_type']) && is_string($filters['task_type'])) {
+                $query->where('task_type', $filters['task_type']);
+            }
+
+            if (isset($filters['category']) && is_string($filters['category'])) {
+                $query->where('metadata->category', $filters['category']);
+            }
+
+            if (isset($filters['query']) && is_string($filters['query'])) {
+                return $this->searchTemplates($filters['query']);
+            }
+
+            return $this->formatTemplates($query->orderBy('created_at', 'desc')->get()->toArray());
+        } catch (\Exception $e) {
+            Log::error('Failed to list templates', [
+                'filters' => $filters,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
      * Get templates for a specific task type.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplatesForTaskType(string $taskType): array
     {
@@ -41,6 +127,8 @@ class TemplateService
 
     /**
      * Save a new template.
+     *
+     * @param  array<string, mixed>  $templateData
      */
     public function saveTemplate(array $templateData): bool
     {
@@ -70,6 +158,8 @@ class TemplateService
 
     /**
      * Update an existing template.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function updateTemplate(string $templateName, array $data): bool
     {
@@ -124,6 +214,8 @@ class TemplateService
 
     /**
      * List all templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function listAllTemplates(): array
     {
@@ -145,6 +237,8 @@ class TemplateService
 
     /**
      * Search templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function searchTemplates(string $query): array
     {
@@ -174,6 +268,8 @@ class TemplateService
 
     /**
      * Get templates by category.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplatesByCategory(string $category): array
     {
@@ -199,6 +295,8 @@ class TemplateService
 
     /**
      * Import template from data.
+     *
+     * @param  array<string, mixed>  $templateData
      */
     public function importTemplate(array $templateData): bool
     {
@@ -234,6 +332,8 @@ class TemplateService
 
     /**
      * Record template usage.
+     *
+     * @param  array<string, mixed>  $parameters
      */
     public function recordUsage(string $templateName, array $parameters = []): void
     {
@@ -262,6 +362,8 @@ class TemplateService
 
     /**
      * Get template usage statistics.
+     *
+     * @return array<string, mixed>
      */
     public function getTemplateUsageStats(string $templateName): array
     {
@@ -293,6 +395,8 @@ class TemplateService
 
     /**
      * Get popular templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getPopularTemplates(int $limit = 10): array
     {
@@ -315,6 +419,8 @@ class TemplateService
 
     /**
      * Get recent templates.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getRecentTemplates(int $limit = 10): array
     {
@@ -337,6 +443,8 @@ class TemplateService
 
     /**
      * Get template recommendations.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplateRecommendations(?string $taskType = null): array
     {
@@ -364,6 +472,8 @@ class TemplateService
 
     /**
      * Get template version history.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getTemplateVersionHistory(string $templateName): array
     {
@@ -460,6 +570,8 @@ class TemplateService
 
     /**
      * Generate built-in templates.
+     *
+     * @return array<string, mixed>
      */
     public function generateBuiltInTemplates(): array
     {
@@ -589,6 +701,9 @@ class TemplateService
 
     /**
      * Format templates for consistent output.
+     *
+     * @param  array<int, array<string, mixed>|object>  $templates
+     * @return list<array<string, mixed>>
      */
     protected function formatTemplates(array $templates): array
     {
@@ -620,6 +735,8 @@ class TemplateService
 
     /**
      * Get popular parameters for a template.
+     *
+     * @return array<string, mixed>
      */
     protected function getPopularParameters(string $templateName): array
     {
@@ -627,10 +744,9 @@ class TemplateService
             $parameters = DB::table('template_usage')
                 ->where('template_name', $templateName)
                 ->whereNotNull('parameters')
-                ->get()
                 ->pluck('parameters')
                 ->map(function ($params) {
-                    return json_decode($params, true) ?? [];
+                    return json_decode((string) $params, true) ?? [];
                 })
                 ->filter()
                 ->toArray();

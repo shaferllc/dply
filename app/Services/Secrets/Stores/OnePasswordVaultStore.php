@@ -18,7 +18,7 @@ use RuntimeException;
 final class OnePasswordVaultStore implements VaultStore
 {
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      */
     public function __construct(private readonly array $config) {}
 
@@ -33,6 +33,9 @@ final class OnePasswordVaultStore implements VaultStore
             && trim((string) ($this->config['vault'] ?? '')) !== '';
     }
 
+    /**
+     * @param  array<string, mixed> $meta
+     */
     public function put(string $key, string $ciphertext, array $meta): void
     {
         $this->createDocument($key, $ciphertext);
@@ -49,6 +52,10 @@ final class OnePasswordVaultStore implements VaultStore
         return $result->output();
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, array<mixed>|string>>
+     */
     public function list(string $prefix): array
     {
         $result = $this->op(['document', 'list', '--vault', $this->vault(), '--format', 'json']);
@@ -99,7 +106,7 @@ final class OnePasswordVaultStore implements VaultStore
     }
 
     /**
-     * @param  list<string>  $args
+     * @param  array<string, mixed> $args
      */
     private function op(array $args): ProcessResult
     {

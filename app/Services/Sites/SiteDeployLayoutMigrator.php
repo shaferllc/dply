@@ -28,7 +28,7 @@ class SiteDeployLayoutMigrator
 
     public function migrateIfArmed(Site $site, SshConnection $ssh, string $timestamp): string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $armed = $meta['deploy_layout_migration'] ?? null;
         if (! is_array($armed) || empty($armed['to'])) {
             return '';

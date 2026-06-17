@@ -101,6 +101,7 @@ class ConsoleEmitter
      * one writer per row at a time. The lock just guards against the rare
      * race where the worker writes a line while the user's poll request is
      * also reading the row.
+     * @param  array<string, mixed> $entry
      */
     private function appendEntry(array $entry): void
     {

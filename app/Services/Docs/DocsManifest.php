@@ -92,6 +92,8 @@ final class DocsManifest
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function publishedSlugs(): array
     {
         return $this->published()->keys()->all();
@@ -100,7 +102,7 @@ final class DocsManifest
     /**
      * Published docs grouped by category, both categories and docs in display order.
      *
-     * @return Collection<string, Collection<int, array<string, mixed>>>
+     * @return array<int, string>
      */
     public function byCategory(): Collection
     {
@@ -119,6 +121,10 @@ final class DocsManifest
      *
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function orderedList(): array
     {
         return $this->published()
@@ -135,8 +141,9 @@ final class DocsManifest
     /**
      * Previous/next docs around the given slug, in global reading order.
      *
-     * @return array{prev: ?array<string, mixed>, next: ?array<string, mixed>}
+     * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function prevNext(string $slug): array
     {
         $list = $this->orderedList();
@@ -172,6 +179,7 @@ final class DocsManifest
      *
      * @return array<string, array{key: string, label: string, slugs: list<string>}>
      */
+    /** @return array<string, mixed> */
     public function groups(): array
     {
         $labels = [

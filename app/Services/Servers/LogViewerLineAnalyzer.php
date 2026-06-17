@@ -9,6 +9,9 @@ namespace App\Services\Servers;
  */
 class LogViewerLineAnalyzer
 {
+    /**
+     * @return array<string, mixed>
+     */
     public static function analyze(string $text): array
     {
         $lines = preg_split('/\r\n|\r|\n/', $text) ?: [];

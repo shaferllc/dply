@@ -30,6 +30,7 @@ final class ServerSshAccessTimeline
      *     you_active_now: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server, ?User $viewer, string $range = '30d', ?ServerSshAccessContext $context = null): array
     {
         $context ??= ServerSshAccessContext::load($server);
@@ -42,7 +43,7 @@ final class ServerSshAccessTimeline
         $lanes = $this->buildLanes($intervals, $from, $to);
 
         $youActiveNow = collect($intervals)->contains(function (array $interval) use ($to): bool {
-            if (! ($interval['is_you'] ?? false)) {
+            if (! ($interval['is_you'])) {
                 return false;
             }
 
@@ -131,8 +132,8 @@ final class ServerSshAccessTimeline
                 'label' => $nameByKeyId[$keyId] ?? __('Removed key'),
                 'source' => 'historical',
                 'is_you' => false,
-                'start' => $startedAt instanceof Carbon ? $startedAt : Carbon::parse($startedAt),
-                'end' => $endedAt instanceof Carbon ? $endedAt : Carbon::parse($endedAt),
+                'start' => true ? $startedAt : Carbon::parse($startedAt),
+                'end' => true ? $endedAt : Carbon::parse($endedAt),
             ];
         }
 
@@ -207,7 +208,7 @@ final class ServerSshAccessTimeline
     }
 
     /**
-     * @param  list<array{key: string, label: string, source: string, is_you: bool, start: Carbon, end: Carbon}>  $intervals
+     * @param  array<string, mixed> $intervals
      * @return list<array{at: int, total: float, you: float}>
      */
     private function buildSeries(array $intervals, Carbon $from, Carbon $to): array
@@ -247,7 +248,7 @@ final class ServerSshAccessTimeline
     }
 
     /**
-     * @param  list<array{key: string, label: string, source: string, is_you: bool, start: Carbon, end: Carbon}>  $intervals
+     * @param  array<string, mixed> $intervals
      * @return list<array{key: string, label: string, source: string, is_you: bool, start: Carbon, end: Carbon, left_pct: float, width_pct: float}>
      */
     private function buildLanes(array $intervals, Carbon $from, Carbon $to): array
@@ -308,7 +309,7 @@ final class ServerSshAccessTimeline
                 };
 
                 $name = (string) data_get($event->meta, 'name', '');
-                $actor = (string) ($event->user?->name ?? $event->user?->email ?? __('System'));
+                $actor = (string) ($event->user->name ?? $event->user->email ?? __('System'));
                 $detail = $name !== '' ? $name.' · '.$actor : $actor;
 
                 $events[] = [
@@ -330,7 +331,7 @@ final class ServerSshAccessTimeline
                 $events[] = [
                     'at' => $session->provisioned_at,
                     'label' => __('Session granted'),
-                    'detail' => $session->name.' · '.($session->createdBy?->name ?? __('Unknown')),
+                    'detail' => $session->name.' · '.($session->createdBy->name ?? __('Unknown')),
                     'is_you' => $viewer !== null && (string) $session->created_by_user_id === (string) $viewer->id,
                     'type' => 'session',
                     'id' => (string) $session->id,
@@ -354,7 +355,7 @@ final class ServerSshAccessTimeline
             ->filter(fn (ServerRemoteAccessEvent $access): bool => $access->started_at->gte($from))
             ->take(20)
             ->each(function (ServerRemoteAccessEvent $access) use (&$events): void {
-                $actor = (string) ($access->user?->name ?? $access->user?->email ?? __('Dply'));
+                $actor = (string) ($access->user->name ?? $access->user->email ?? __('Dply'));
                 $detail = $access->label;
                 if ($access->command_count > 0) {
                     $detail .= ' · '.trans_choice(':count command|:count commands', $access->command_count, ['count' => $access->command_count]);

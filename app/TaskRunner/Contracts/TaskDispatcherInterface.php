@@ -12,7 +12,7 @@ interface TaskDispatcherInterface
      * Dispatch a task for execution.
      *
      * @param  string  $command  The command to execute.
-     * @param  array  $arguments  Optional arguments for the command.
+     * @param  array<string, mixed> $arguments  Optional arguments for the command.
      */
     public function dispatch(string $command, array $arguments = []): ProcessOutput;
 }

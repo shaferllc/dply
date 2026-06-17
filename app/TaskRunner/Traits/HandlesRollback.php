@@ -24,27 +24,25 @@ trait HandlesRollback
 
     protected int $rollbackTimeout = 300;
 
+    /** @var array<string, mixed> */
     protected array $rollbackDependencies = [];
 
+    /** @var array<string, mixed> */
     protected array $rollbackSafetyChecks = [];
 
+    /** @var array<string, mixed> */
     protected array $rollbackData = [];
 
     protected ?string $rollbackScript = null;
 
+    /** @var array<string, mixed> */
     protected array $rollbackHistory = [];
 
-    /**
-     * Check if rollback is supported for this task.
-     */
     public function supportsRollback(): bool
     {
         return $this->rollbackEnabled && ! empty($this->getRollbackScript());
     }
 
-    /**
-     * Check if rollback is required based on current state.
-     */
     public function isRollbackRequired(): bool
     {
         if (! $this->supportsRollback()) {
@@ -83,14 +81,13 @@ trait HandlesRollback
     /**
      * Get the rollback dependencies (tasks that must be rolled back first).
      */
+    /** @return array<string, mixed> */
     public function getRollbackDependencies(): array
     {
         return $this->rollbackDependencies;
     }
 
-    /**
-     * Get the rollback safety checks that must pass before rollback.
-     */
+    /** @return array<string, mixed> */
     public function getRollbackSafetyChecks(): array
     {
         return array_merge([
@@ -100,9 +97,7 @@ trait HandlesRollback
         ], $this->rollbackSafetyChecks);
     }
 
-    /**
-     * Get the rollback data (state to restore).
-     */
+    /** @return array<string, mixed> */
     public function getRollbackData(): array
     {
         return array_merge([
@@ -113,9 +108,6 @@ trait HandlesRollback
         ], $this->rollbackData);
     }
 
-    /**
-     * Validate that rollback can be performed safely.
-     */
     public function validateRollback(): bool
     {
         if (! $this->supportsRollback()) {
@@ -236,22 +228,18 @@ trait HandlesRollback
     /**
      * Get rollback history for this task.
      */
+    /** @return array<string, mixed> */
     public function getRollbackHistory(): array
     {
         return $this->rollbackHistory;
     }
 
-    /**
-     * Check if recovery is possible for this task.
-     */
     public function isRecoveryPossible(): bool
     {
         return ! empty($this->getRecoveryOptions()) && $this->hasValidCheckpoint();
     }
 
-    /**
-     * Get recovery options for this task.
-     */
+    /** @return array<string, mixed> */
     public function getRecoveryOptions(): array
     {
         return [
@@ -262,9 +250,6 @@ trait HandlesRollback
         ];
     }
 
-    /**
-     * Execute recovery procedure.
-     */
     public function executeRecovery(string $recoveryType): bool
     {
         if (! $this->isRecoveryPossible()) {
@@ -301,6 +286,7 @@ trait HandlesRollback
 
     /**
      * Set rollback configuration.
+      * @param array<string, mixed> $config
      */
     public function setRollbackConfig(array $config): self
     {
@@ -385,7 +371,7 @@ trait HandlesRollback
         }
 
         // Check exit code
-        if ($this->taskModel->exit_code && $this->taskModel->exit_code !== 0) {
+        if ($this->taskModel->exit_code !== null && $this->taskModel->exit_code !== 0) {
             return true;
         }
 
@@ -469,6 +455,7 @@ trait HandlesRollback
     /**
      * Capture current state for checkpoint.
      */
+    /** @return array<string, mixed> */
     protected function captureCurrentState(): array
     {
         return [
@@ -479,9 +466,7 @@ trait HandlesRollback
         ];
     }
 
-    /**
-     * Create backup data.
-     */
+    /** @return array<string, mixed> */
     protected function createBackup(): array
     {
         // Create backup of current state
@@ -489,7 +474,7 @@ trait HandlesRollback
     }
 
     /**
-     * Save checkpoint data.
+     * @param array<string, mixed> $checkpoint
      */
     protected function saveCheckpoint(array $checkpoint): void
     {
@@ -497,9 +482,6 @@ trait HandlesRollback
         Storage::disk('local')->put("task-runner/checkpoints/{$filename}", json_encode($checkpoint));
     }
 
-    /**
-     * Check if task has valid checkpoint.
-     */
     protected function hasValidCheckpoint(): bool
     {
         // Check if valid checkpoint exists

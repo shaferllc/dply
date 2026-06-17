@@ -205,6 +205,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     protected function shadowedServerNames(string $out, string $config, Server $server, SshConnection $ssh, string $ourBasename): array
     {
         if (! preg_match_all('/conflicting server name "([^"]+)"/i', $out, $m)) {
@@ -268,8 +272,13 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * proceed; a non-empty return means a real conflict with a live site
      * remains and the caller should fail loudly.
      *
-     * @param  list<string>  $shadowedNames
+     * @param  array<string, mixed> $shadowedNames
      * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     * @param  array<string, mixed> $shadowedNames
      */
     protected function healShadowingOrphans(Server $server, SshConnection $ssh, array $shadowedNames, string $ourBasename, ConsoleEmitter $emit): array
     {
@@ -318,6 +327,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * treated as "nothing to protect" — `nginx -t` below remains the real syntax
      * gate, and this never blocks a deploy in the default warn mode.
      *
+     * @param  array<string, mixed> $shadowedNames
      * @param  Server  $server
      */
     protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit, ?string $current = null): void
@@ -479,9 +489,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * Stat a set of paths on the box in one round trip.
      *
-     * @param  list<string>  $paths
+     * @param  array<string, mixed> $paths
      * @return array<string, bool>
      */
+    /** @return array<string, mixed> */
     protected function filesPresentOnBox(Server $server, SshConnection $ssh, array $paths): array
     {
         $paths = array_values(array_unique(array_filter($paths)));
@@ -519,6 +530,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * Mirrors {@see OpenLiteSpeedTlsPaths::letsEncryptDirectoryName}'s wildcard
      * branch: certbot stores the shared cert under /etc/letsencrypt/live/<zone>/.
      *
+     * @param  array<string, mixed> $paths
      * @return array{cert: string, key: string}|null
      */
     protected function coveringWildcardCertPair(Site $site): ?array
@@ -567,6 +579,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return array{main: ?string, before: ?string, after: ?string}
      */
+    /** @return array<string, mixed> */
     public function readEditorStateFromServer(Site $site): array
     {
         $server = $this->ensureServerReady($site);
@@ -690,6 +703,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         return implode("\n", $out);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingMainConfig, SiteWebserverConfigProfile $profile): array
     {
         $server = $this->ensureServerReady($site);
@@ -872,7 +889,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             throw new \RuntimeException('Nginx config cleanup failed. Output: '.Str::limit($out, 2000));
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['nginx_cleanup_output'] = $out;
 
         $site->update(['meta' => $meta]);

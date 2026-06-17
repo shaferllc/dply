@@ -24,6 +24,9 @@ use Carbon\CarbonInterface;
  */
 class StaleBackupsInsightRunner implements InsightRunnerInterface
 {
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {

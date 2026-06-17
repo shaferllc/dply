@@ -49,6 +49,7 @@ class FunctionScheduleService
     /**
      * @return array{ok: bool, error: ?string, triggers: list<array<string, mixed>>}
      */
+    /** @return array<string, mixed> */
     public function list(Site $site): array
     {
         return $this->run(
@@ -61,6 +62,7 @@ class FunctionScheduleService
     /**
      * @return array{ok: bool, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function add(Site $site, string $name, string $cron): array
     {
         $function = $this->actionName($site);
@@ -78,6 +80,7 @@ class FunctionScheduleService
     /**
      * @return array{ok: bool, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function remove(Site $site, string $name): array
     {
         return $this->run($site, function (DigitalOceanService $do, string $ns) use ($name): array {
@@ -91,8 +94,8 @@ class FunctionScheduleService
      * Resolve the host's DO credential + Functions namespace, run the
      * callback, and normalize the outcome. Never throws.
      *
-     * @param  Closure(DigitalOceanService, string): array<string, mixed>  $callback
-     * @param  array<string, mixed>  $emptyExtra  shape returned alongside an error
+     * @param  array<string, mixed> $callback
+     * @param  array<string, mixed> $emptyExtra  shape returned alongside an error
      * @return array<string, mixed>
      */
     private function run(Site $site, Closure $callback, array $emptyExtra = []): array

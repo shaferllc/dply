@@ -71,6 +71,12 @@ class DeploymentTask extends Task
         return 'tasks.deployment';
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function getViewData(): array
     {
         return [

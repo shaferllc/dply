@@ -22,7 +22,7 @@ namespace App\Services\OpsCopilot;
 final class OpsCopilotSuggestion
 {
     /**
-     * @param  list<SuggestionAction>  $actions
+     * @param  array<string, mixed> $actions
      */
     public function __construct(
         public readonly string $id,
@@ -38,6 +38,7 @@ final class OpsCopilotSuggestion
     /**
      * @return SuggestionArray
      */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

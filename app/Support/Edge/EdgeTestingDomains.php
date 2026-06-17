@@ -144,13 +144,13 @@ final class EdgeTestingDomains
     {
         $pool = array_values(array_filter(array_map(
             static fn (string $value): string => strtolower(trim($value)),
-            explode(',', (string) env('DPLY_TESTING_DOMAINS', '')),
+            (array) config('services.digitalocean.testing_domains', []),
         )));
 
         if ($pool === []) {
             $pool = array_values(array_filter(array_map(
                 static fn (string $value): string => strtolower(trim($value)),
-                (array) config('services.digitalocean.testing_domains', []),
+                (array) config('services.dply.testing_domains.digitalocean', []),
             )));
         }
 

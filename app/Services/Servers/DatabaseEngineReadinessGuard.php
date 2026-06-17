@@ -31,6 +31,7 @@ final class DatabaseEngineReadinessGuard
     /**
      * @return array{ok: bool, reason: ?string}
      */
+    /** @return array<string, mixed> */
     public function check(Server $server, string $engine): array
     {
         // sqlite is a file on disk — no engine daemon, no TCP surface.

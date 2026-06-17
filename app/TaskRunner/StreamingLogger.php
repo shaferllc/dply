@@ -38,6 +38,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Log a message with streaming support.
+     * @param  array<string, mixed> $context
      */
     public function log(string $level, string $message, array $context = [], bool $stream = false): void
     {
@@ -52,6 +53,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Stream a message immediately to all registered stream handlers.
+     * @param  array<string, mixed> $context
      */
     public function stream(string $level, string $message, array $context = []): void
     {
@@ -90,10 +92,6 @@ class StreamingLogger implements StreamingLoggerInterface
      */
     public function addStreamHandler(callable $handler, ?string $channel = null): void
     {
-        if (! is_callable($handler)) {
-            throw new InvalidArgumentException('Handler must be callable');
-        }
-
         $this->streamHandlers[] = [
             'handler' => $handler,
             'channel' => $channel,
@@ -113,23 +111,19 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Get all registered stream handlers.
+     *
+     * @return array<int, callable>
      */
     public function getStreamHandlers(): array
     {
         return array_column($this->streamHandlers, 'handler');
     }
 
-    /**
-     * Clear all stream handlers.
-     */
     public function clearStreamHandlers(): void
     {
         $this->streamHandlers = [];
     }
 
-    /**
-     * Stream process output in real-time.
-     */
     public function streamProcessOutput(string $type, string $output, array $context = []): void
     {
         $level = $type === 'err' ? 'warning' : 'info';
@@ -145,6 +139,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Stream task lifecycle events.
+     * @param  array<string, mixed> $context
      */
     public function streamTaskEvent(string $event, array $context = []): void
     {
@@ -156,6 +151,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Stream error events.
+     * @param  array<string, mixed> $context
      */
     public function streamError(string $message, array $context = []): void
     {
@@ -166,6 +162,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Stream progress updates.
+     * @param  array<string, mixed> $context
      */
     public function streamProgress(int $current, int $total, string $message = '', array $context = []): void
     {
@@ -181,6 +178,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Stream task chain events.
+     * @param  array<string, mixed> $context
      */
     public function streamChainEvent(string $event, array $context = []): void
     {
@@ -202,6 +200,7 @@ class StreamingLogger implements StreamingLoggerInterface
 
     /**
      * Check if a channel matches the handler's channel filter.
+     * @param  array<string, mixed> $context
      */
     protected function isChannelMatch(?string $handlerChannel, array $context): bool
     {

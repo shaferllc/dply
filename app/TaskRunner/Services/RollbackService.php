@@ -6,6 +6,7 @@ namespace App\Modules\TaskRunner\Services;
 
 use App\Modules\TaskRunner\Contracts\HasRollback;
 use App\Modules\TaskRunner\Exceptions\RollbackException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -15,6 +16,66 @@ use Illuminate\Support\Facades\Storage;
  */
 class RollbackService
 {
+    /**
+     * Register a rollback script for a task ID.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function registerRollback(string $taskId, string $rollbackScript, array $options = []): void
+    {
+        Cache::put($this->rollbackCacheKey($taskId), [
+            'task_id' => $taskId,
+            'script' => $rollbackScript,
+            'options' => $options,
+            'registered_at' => now()->toISOString(),
+        ], now()->addDays(30));
+
+        Log::info('Rollback registered for task', [
+            'task_id' => $taskId,
+        ]);
+    }
+
+    /**
+     * Execute rollback for a registered task ID.
+     */
+    public function executeByTaskId(string $taskId): bool
+    {
+        $registration = Cache::get($this->rollbackCacheKey($taskId));
+
+        if (! is_array($registration) || ! isset($registration['script']) || ! is_string($registration['script'])) {
+            Log::warning('No rollback registration found for task', [
+                'task_id' => $taskId,
+            ]);
+
+            return false;
+        }
+
+        $timeout = 300;
+        if (isset($registration['options']) && is_array($registration['options'])) {
+            $timeout = (int) ($registration['options']['timeout'] ?? $timeout);
+        }
+
+        $result = $this->runScript($registration['script'], $timeout);
+
+        if ($result['success']) {
+            Log::info('Rollback executed for task', [
+                'task_id' => $taskId,
+            ]);
+        } else {
+            Log::error('Rollback execution failed for task', [
+                'task_id' => $taskId,
+                'output' => $result['output'] ?? null,
+            ]);
+        }
+
+        return (bool) $result['success'];
+    }
+
+    protected function rollbackCacheKey(string $taskId): string
+    {
+        return "task_runner_rollback_{$taskId}";
+    }
+
     /**
      * Execute rollback for a task.
      */
@@ -30,7 +91,7 @@ class RollbackService
             if (! $task->validateRollback()) {
                 throw RollbackException::validationFailed(
                     $task->getRollbackData()['task_id'] ?? 'unknown',
-                    ['validation_failed']
+                    ['validation_failed' => true]
                 );
             }
 
@@ -262,7 +323,9 @@ class RollbackService
 
     /**
      * Run a script with timeout.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function runScript(string $script, int $timeout): array
     {
         // This would execute the script and return results
@@ -274,9 +337,7 @@ class RollbackService
         ];
     }
 
-    /**
-     * Get the latest checkpoint for a task.
-     */
+    /** @return array<string, mixed> */
     protected function getLatestCheckpoint(HasRollback $task): ?array
     {
         $taskId = $task->getRollbackData()['task_id'] ?? null;
@@ -306,6 +367,7 @@ class RollbackService
 
     /**
      * Restore state from checkpoint.
+     * @param  array<string, mixed> $checkpoint
      */
     protected function restoreState(HasRollback $task, array $checkpoint): bool
     {
@@ -335,7 +397,9 @@ class RollbackService
 
     /**
      * Generate recovery instructions.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function generateRecoveryInstructions(HasRollback $task): array
     {
         $taskId = $task->getRollbackData()['task_id'] ?? 'unknown';
@@ -374,6 +438,7 @@ class RollbackService
 
     /**
      * Store recovery instructions.
+     * @param  array<string, mixed> $instructions
      */
     protected function storeRecoveryInstructions(HasRollback $task, array $instructions): void
     {

@@ -63,18 +63,14 @@ class RemoteProcessRunner
     /**
      * Returns a set of common SSH options.
      *
-     * @return array<int, string> A set of SSH options.
+     * @return list<string>
      */
     public function sshOptions(): array
     {
         return array_merge($this->baseSshOptions(), $this->multiplexingClientOptions());
     }
 
-    /**
-     * The always-on SSH options shared by every ssh/scp invocation.
-     *
-     * @return array<int, string>
-     */
+    /** @return list<string> */
     private function baseSshOptions(): array
     {
         $options = [

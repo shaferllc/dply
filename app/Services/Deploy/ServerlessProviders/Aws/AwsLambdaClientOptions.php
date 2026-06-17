@@ -7,7 +7,7 @@ namespace App\Services\Deploy\ServerlessProviders\Aws;
 final class AwsLambdaClientOptions
 {
     /**
-     * @param  array<string, mixed>  $providerConfig
+     * @param  array<string, mixed> $providerConfig
      * @return array{client_config: array<string, mixed>, equals_default: bool}
      */
     public static function resolve(string $defaultRegion, array $providerConfig): array

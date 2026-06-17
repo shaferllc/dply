@@ -31,7 +31,7 @@ class ForgeClient
     }
 
     /**
-     * @param  array<string, mixed>  $query
+     * @param  array<string, mixed> $query
      */
     public function get(string $path, array $query = []): Response
     {
@@ -39,7 +39,7 @@ class ForgeClient
     }
 
     /**
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $body
      */
     public function post(string $path, array $body = []): Response
     {
@@ -47,7 +47,7 @@ class ForgeClient
     }
 
     /**
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $body
      */
     public function put(string $path, array $body = []): Response
     {
@@ -75,8 +75,8 @@ class ForgeClient
     }
 
     /**
-     * @param  array<string, mixed>  $body
-     * @param  array<string, mixed>  $query
+     * @param  array<string, mixed> $body
+     * @param  array<string, mixed> $query
      */
     protected function request(string $method, string $path, array $body = [], array $query = []): Response
     {
@@ -88,7 +88,7 @@ class ForgeClient
             ->retry(3, function (int $attempt, \Throwable $exception): int {
                 $delay = (int) (1000 * (2 ** ($attempt - 1)));
                 if ($exception instanceof RequestException) {
-                    $retryAfter = $exception->response?->header('Retry-After');
+                    $retryAfter = $exception->response->header('Retry-After');
                     if (is_string($retryAfter) && ctype_digit($retryAfter)) {
                         $delay = max($delay, (int) $retryAfter * 1000);
                     }
@@ -99,7 +99,7 @@ class ForgeClient
                 if (! $exception instanceof RequestException) {
                     return false;
                 }
-                $status = $exception->response?->status();
+                $status = $exception->response->status();
 
                 return in_array($status, [429, 502, 503, 504], true);
             }, throw: false);

@@ -14,9 +14,13 @@ final class SitePromotePlanner
     /**
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     */
     public function previewSteps(Site $source): array
     {
-        $productionHostname = (string) ($source->primaryDomain()?->hostname ?? '');
+        $productionHostname = (string) ($source->primaryDomain()->hostname ?? '');
 
         $steps = [
             ['text' => __('Provision completes on the standby server with a preview hostname.'), 'href' => null, 'link_label' => null],
@@ -40,7 +44,11 @@ final class SitePromotePlanner
     }
 
     /**
-     * @return list<array{text: string, href: string|null, link_label: string|null}>
+     * @return array<int, array<string, array|string|null>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
      */
     public function cutoverSteps(Site $destination, ?Site $source = null): array
     {
@@ -119,8 +127,9 @@ final class SitePromotePlanner
     }
 
     /**
-     * @return array{source_site_name: string|null, source_server_name: string|null, production_hostname: string|null, preview_hostname: string|null, destination_server_name: string|null}
+     * @return array<int, array<string, array|string|null>>
      */
+    /** @return array<string, mixed> */
     public function summary(Site $destination, ?Site $source = null): array
     {
         $promote = is_array($destination->meta['promote'] ?? null) ? $destination->meta['promote'] : [];
@@ -129,7 +138,7 @@ final class SitePromotePlanner
             $source = Site::query()->with('server:id,name')->find($promote['source_site_id']);
         }
 
-        $preview = $destination->primaryDomain()?->hostname
+        $preview = $destination->primaryDomain()->hostname
             ?? $destination->testingHostname();
 
         return [
@@ -138,7 +147,7 @@ final class SitePromotePlanner
             'production_hostname' => is_string($promote['source_production_hostname'] ?? null)
                 ? (string) $promote['source_production_hostname']
                 : null,
-            'preview_hostname' => is_string($preview) && $preview !== '' ? $preview : null,
+            'preview_hostname' => ($preview) && $preview !== '' ? $preview : null,
             'destination_server_name' => $destination->server !== null ? (string) $destination->server->name : null,
         ];
     }

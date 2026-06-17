@@ -56,6 +56,7 @@ class NginxEngineCacheConfig
      *     conf_path: string,
      * }
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $feature = ServerWebserverCacheFeature::findOrCreateFor(
@@ -98,7 +99,7 @@ class NginxEngineCacheConfig
     }
 
     /**
-     * @param  array<string, string|int>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */

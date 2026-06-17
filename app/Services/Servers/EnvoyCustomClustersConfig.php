@@ -42,6 +42,10 @@ class EnvoyCustomClustersConfig
     /**
      * @return list<array{name: string, connect_timeout: string, lb_policy: string, endpoints: list<string>}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, list<string>|string>>
+     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -84,7 +88,8 @@ class EnvoyCustomClustersConfig
     }
 
     /**
-     * @param  list<string>  $endpoints
+     * @param  array<string, mixed> $endpoints
+     * @param  array<string, mixed> $values
      */
     public function addCluster(
         Server $server,
@@ -138,7 +143,7 @@ class EnvoyCustomClustersConfig
     }
 
     /**
-     * @return list<array{name: string, connect_timeout: string, lb_policy: string, endpoints: list<string>}>
+     * @return array<string, mixed>
      */
     public static function clustersFromServer(Server $server): array
     {
@@ -146,7 +151,7 @@ class EnvoyCustomClustersConfig
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{name: string, connect_timeout: string, lb_policy: string, endpoints: list<string>}|null
      */
     private function normalizeClusterRow(array $row): ?array

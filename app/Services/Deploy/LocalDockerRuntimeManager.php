@@ -18,6 +18,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{output: string, sha: ?string, status: string, logs: array<int, string>, compose_yaml: string, dockerfile: string, workspace_path: string, repository_checkout_path: string, working_directory: string, generated_compose_path: string, generated_dockerfile_path: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $workspace = $this->workspace->ensure($site);
@@ -72,6 +73,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function start(Site $site): array
     {
         return $this->simpleAction($site, ['up', '-d'], 'running', 'Local containers started.', refreshRuntimeDetails: true);
@@ -80,6 +82,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function stop(Site $site): array
     {
         return $this->simpleAction($site, ['stop'], 'stopped', 'Local containers stopped.', refreshRuntimeDetails: true);
@@ -88,6 +91,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function restart(Site $site): array
     {
         return $this->simpleAction($site, ['restart'], 'running', 'Local containers restarted.', refreshRuntimeDetails: true);
@@ -96,6 +100,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
+    /** @return array<string, mixed> */
     public function destroy(Site $site): array
     {
         return $this->simpleAction($site, ['down', '--remove-orphans', '--volumes'], 'destroyed', 'Local containers destroyed.');
@@ -104,6 +109,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function status(Site $site): array
     {
         return $this->simpleAction($site, ['ps', '--all'], 'unknown', 'Local runtime status refreshed.', allowFailure: true, refreshRuntimeDetails: true);
@@ -112,6 +118,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function inspect(Site $site): array
     {
         return $this->simpleAction($site, ['ps', '--all'], 'unknown', 'Docker details refreshed.', allowFailure: true, refreshRuntimeDetails: true);
@@ -120,6 +127,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string}
      */
+    /** @return array<string, mixed> */
     public function logs(Site $site): array
     {
         return $this->simpleAction($site, ['logs', '--tail', '200', '--no-color'], 'unknown', 'Local runtime logs refreshed.', allowFailure: true);
@@ -128,6 +136,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function errors(Site $site): array
     {
         $runtime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
@@ -165,7 +174,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  list<string>  $subCommand
+     * @param  array<string, mixed> $subCommand
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
     private function simpleAction(
@@ -204,6 +213,9 @@ class LocalDockerRuntimeManager
         return $result;
     }
 
+    /**
+     * @param  array<string, mixed> $command
+     */
     private function run(array $command, string $workingDirectory, bool $allowFailure = false): string
     {
         $process = new Process($command, $workingDirectory);
@@ -255,7 +267,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  list<string>  $subCommand
+     * @param  array<string, mixed> $subCommand
      */
     private function missingRuntimeMessage(Site $site, array $subCommand, string $repositoryPath, string $workingDirectory, string $composePath): string
     {
@@ -267,7 +279,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  list<string>  $command
+     * @param  array<string, mixed> $command
      */
     private function commandFailureMessage(array $command, string $workingDirectory, string $output, ?int $exitCode): string
     {
@@ -282,6 +294,9 @@ class LocalDockerRuntimeManager
         ])));
     }
 
+    /**
+     * @param  array<string, mixed> $command
+     */
     private function composePathFromCommand(array $command): string
     {
         $index = array_search('-f', $command, true);
@@ -316,6 +331,7 @@ class LocalDockerRuntimeManager
     /**
      * @return array{compose_ps_json: ?string, containers: list<array<string, mixed>>, collected_at: string}
      */
+    /** @return array<string, mixed> */
     public function collectRuntimeDetailsForSite(Site $site): array
     {
         $runtime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
@@ -410,8 +426,8 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed>  $summary
-     * @param  array<string, mixed>  $inspect
+     * @param  array<string, mixed> $summary
+     * @param  array<string, mixed> $inspect
      * @return array<string, mixed>
      */
     private function normalizeContainerDetails(array $summary, array $inspect): array
@@ -461,7 +477,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed>  $runtimeDetails
+     * @param  array<string, mixed> $runtimeDetails
      * @return array<string, mixed>
      */
     private function publicationFromRuntimeDetails(array $runtimeDetails): array
@@ -484,7 +500,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  array<string, mixed>  $runtimeDetails
+     * @param  array<string, mixed> $runtimeDetails
      */
     private function applicationErrorLogs(Site $site, string $workingDirectory, array $runtimeDetails): string
     {
@@ -563,7 +579,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  list<string>  $command
+     * @param  array<string, mixed> $command
      */
     private function timedOutMessage(Process $process, array $command): string
     {
@@ -578,7 +594,7 @@ class LocalDockerRuntimeManager
     }
 
     /**
-     * @param  list<string>  $command
+     * @param  array<string, mixed> $command
      */
     private function inspectCompose(array $command, string $workingDirectory, string $label): string
     {

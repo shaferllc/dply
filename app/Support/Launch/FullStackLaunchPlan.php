@@ -10,10 +10,10 @@ namespace App\Support\Launch;
 final readonly class FullStackLaunchPlan
 {
     /**
-     * @param  list<FullStackLayer>  $layers
-     * @param  list<string>  $wiringHints
-     * @param  list<string>  $reasons
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $layers
+     * @param  array<string, mixed> $wiringHints
+     * @param  array<string, mixed> $reasons
+     * @param  array<string, mixed> $warnings
      */
     public function __construct(
         public string $repo,

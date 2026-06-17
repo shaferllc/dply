@@ -34,16 +34,19 @@ interface HasRollback
 
     /**
      * Get the rollback dependencies (tasks that must be rolled back first).
+     * @return array<string, mixed>
      */
     public function getRollbackDependencies(): array;
 
     /**
      * Get the rollback safety checks that must pass before rollback.
+     * @return array<string, mixed>
      */
     public function getRollbackSafetyChecks(): array;
 
     /**
      * Get the rollback data (state to restore).
+     * @return array<string, mixed>
      */
     public function getRollbackData(): array;
 
@@ -64,6 +67,7 @@ interface HasRollback
 
     /**
      * Get rollback history for this task.
+     * @return array<string, mixed>
      */
     public function getRollbackHistory(): array;
 
@@ -74,6 +78,7 @@ interface HasRollback
 
     /**
      * Get recovery options for this task.
+     * @return array<string, mixed>
      */
     public function getRecoveryOptions(): array;
 

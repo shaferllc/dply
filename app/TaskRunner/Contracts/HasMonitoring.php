@@ -19,6 +19,7 @@ interface HasMonitoring
 
     /**
      * Get health status of this task.
+     * @return array<string, mixed>
      */
     public function getHealthStatus(): array;
 
@@ -29,46 +30,55 @@ interface HasMonitoring
 
     /**
      * Get monitoring metrics.
+     * @return array<string, mixed>
      */
     public function getMonitoringMetrics(): array;
 
     /**
      * Get alert rules for this task.
+     * @return array<string, mixed>
      */
     public function getAlertRules(): array;
 
     /**
      * Check if any alerts should be triggered.
+     * @return array<string, mixed>
      */
     public function checkAlerts(): array;
 
     /**
      * Get monitoring configuration.
+     * @return array<string, mixed>
      */
     public function getMonitoringConfig(): array;
 
     /**
      * Get performance thresholds.
+     * @return array<string, mixed>
      */
     public function getPerformanceThresholds(): array;
 
     /**
      * Get resource limits.
+     * @return array<string, mixed>
      */
     public function getResourceLimits(): array;
 
     /**
      * Get monitoring history.
+     * @return array<string, mixed>
      */
     public function getMonitoringHistory(): array;
 
     /**
      * Record monitoring event.
+     * @param  array<string, mixed> $data
      */
     public function recordMonitoringEvent(string $event, array $data = []): void;
 
     /**
      * Set monitoring configuration.
+     * @param  array<string, mixed> $config
      */
     public function setMonitoringConfig(array $config): void;
 
@@ -84,6 +94,7 @@ interface HasMonitoring
 
     /**
      * Get monitoring dashboard data.
+     * @return array<string, mixed>
      */
     public function getMonitoringDashboard(): array;
 
@@ -94,6 +105,7 @@ interface HasMonitoring
 
     /**
      * Get monitoring alerts.
+     * @return array<string, mixed>
      */
     public function getMonitoringAlerts(): array;
 

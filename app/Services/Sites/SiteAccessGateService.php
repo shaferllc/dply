@@ -45,7 +45,7 @@ final class SiteAccessGateService
         $this->markAllBasicAuthUsersForRemoval($site);
 
         $gate = SiteAccessGate::query()->firstOrNew(['site_id' => $site->id]);
-        if (! $gate->exists || $gate->cookie_secret === null || $gate->cookie_secret === '') {
+        if (! $gate->exists || $gate->cookie_secret === '') {
             $gate->cookie_secret = Str::random(48);
         }
 
@@ -186,7 +186,7 @@ final class SiteAccessGateService
         }
 
         $hostnames = collect($site->webserverHostnames())
-            ->filter(fn ($h): bool => is_string($h) && $h !== '')
+            ->filter(fn ($h): bool => ($h) && $h !== '')
             ->map(fn (string $h): string => strtolower($h))
             ->unique()
             ->values()

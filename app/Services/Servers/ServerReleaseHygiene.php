@@ -29,6 +29,7 @@ final class ServerReleaseHygiene
      *     prune_command: array{name: string, description: string, installed: bool},
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get([
@@ -120,6 +121,7 @@ final class ServerReleaseHygiene
     /**
      * @param  Collection<int, Site>  $sites
      * @return array<string, mixed>
+     * @param  array<string, mixed> $snapshot
      */
     private function releases(Collection $sites, array $snapshot): array
     {
@@ -185,6 +187,7 @@ final class ServerReleaseHygiene
     /**
      * @param  Collection<int, Site>  $sites
      * @return array<string, mixed>
+     * @param  array<string, mixed> $snapshot
      */
     private function logs(Collection $sites, array $snapshot): array
     {
@@ -243,6 +246,7 @@ final class ServerReleaseHygiene
     /**
      * @param  Collection<int, Site>  $sites
      * @return array<string, mixed>
+     * @param  array<string, mixed> $snapshot
      */
     private function failedJobs(Collection $sites, array $snapshot): array
     {
@@ -294,7 +298,7 @@ final class ServerReleaseHygiene
             return ['pct' => null, 'captured_at' => null];
         }
 
-        $payload = is_array($snapshot->payload) ? $snapshot->payload : [];
+        $payload = ($snapshot->payload );
         $pct = isset($payload['disk_pct']) ? (float) $payload['disk_pct'] : null;
 
         return [
@@ -369,7 +373,7 @@ final class ServerReleaseHygiene
     }
 
     /**
-     * @param  array<string, mixed>  $releases
+     * @param  array<string, mixed> $releases
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function releaseAlerts(array $releases, Server $server): array
@@ -402,7 +406,7 @@ final class ServerReleaseHygiene
     }
 
     /**
-     * @param  array<string, mixed>  $logs
+     * @param  array<string, mixed> $logs
      * @param  list<array<string, mixed>>  $releaseRows
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
@@ -459,7 +463,7 @@ final class ServerReleaseHygiene
     }
 
     /**
-     * @param  array<string, mixed>  $failedJobs
+     * @param  array<string, mixed> $failedJobs
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function failedJobAlerts(array $failedJobs, Server $server): array

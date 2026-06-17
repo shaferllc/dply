@@ -27,6 +27,9 @@ class UnattendedUpgradesInsightRunner implements InsightRunnerInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {
@@ -144,11 +147,11 @@ BASH;
                 body: implode("\n", $reasons),
                 meta: [
                     'signal' => [
-                        'installed' => $values['installed'] ?? null,
-                        'auto_upgrades_file' => $values['auto_upgrades_file'] ?? null,
-                        'unattended_enabled' => $values['unattended_enabled'] ?? null,
-                        'timer_present' => $values['timer_present'] ?? null,
-                        'timer_state' => $values['timer_state'] ?? null,
+                        'installed' => $values['installed'],
+                        'auto_upgrades_file' => $values['auto_upgrades_file'],
+                        'unattended_enabled' => $values['unattended_enabled'],
+                        'timer_present' => $values['timer_present'],
+                        'timer_state' => $values['timer_state'],
                     ],
                 ],
                 kind: $kind,
@@ -157,7 +160,7 @@ BASH;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, App\Services\Insights\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

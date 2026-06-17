@@ -88,7 +88,7 @@ final class RoadmapAiUpdater
             );
         }
 
-        $plan = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $plan = ($response['data'] );
 
         try {
             $counts = DB::transaction(fn (): array => $this->applyPlan($plan));
@@ -110,13 +110,13 @@ final class RoadmapAiUpdater
             to: $to,
             commits: count($commits),
             counts: $counts,
-            tokens: [$response['prompt_tokens'] ?? null, $response['completion_tokens'] ?? null, $response['latency_ms'] ?? null],
+            tokens: [$response['prompt_tokens'] ?? null, $response['completion_tokens'] ?? null, $response['latency_ms']],
             plan: $plan,
         );
     }
 
     /**
-     * @param  list<array{sha: string, subject: string, body: string, date: string}>  $commits
+     * @param  array<string, mixed> $commits
      * @param  Collection<int, RoadmapSuggestion>  $suggestions
      * @return array<string, mixed>
      */
@@ -180,7 +180,7 @@ final class RoadmapAiUpdater
     /**
      * Apply the model's plan. Returns per-action counts.
      *
-     * @param  array<string, mixed>  $plan
+     * @param  array<string, mixed> $plan
      * @return array{shipped: int, created: int, triaged: int, summaries: int}
      */
     private function applyPlan(array $plan): array

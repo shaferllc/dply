@@ -124,6 +124,7 @@ trait ManagesTaskState
 
     /**
      * Set the task options.
+      * @param array<string, mixed> $options
      */
     public function options(array $options): self
     {
@@ -135,14 +136,12 @@ trait ManagesTaskState
     /**
      * Get the task options.
      */
+    /** @return array<string, mixed> */
     public function getOptions(): array
     {
         return $this->options;
     }
 
-    /**
-     * Set a specific option.
-     */
     public function setOption(string $key, mixed $value): self
     {
         $this->options[$key] = $value;
@@ -150,9 +149,6 @@ trait ManagesTaskState
         return $this;
     }
 
-    /**
-     * Get a specific option.
-     */
     public function getOption(string $key, mixed $default = null): mixed
     {
         return $this->options[$key] ?? $default;

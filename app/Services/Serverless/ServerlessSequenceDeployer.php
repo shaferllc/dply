@@ -25,6 +25,7 @@ class ServerlessSequenceDeployer implements ServerlessSequenceBackend
      *
      * @return array{ok: bool, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function deploy(FunctionAction $sequence): array
     {
         if (! $sequence->isSequence()) {
@@ -72,7 +73,7 @@ class ServerlessSequenceDeployer implements ServerlessSequenceBackend
      */
     private function componentNames(FunctionAction $sequence): array
     {
-        $components = is_array($sequence->components) ? $sequence->components : [];
+        $components = ($sequence->components );
 
         return array_values(array_filter(array_map(
             static function (mixed $component): ?string {

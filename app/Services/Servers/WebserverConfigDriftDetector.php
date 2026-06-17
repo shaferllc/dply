@@ -61,6 +61,7 @@ class WebserverConfigDriftDetector
      *     unsupported: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function detect(Server $server, bool $forceFresh = false): array
     {
         $cacheKey = 'dply.webserver-drift:'.$server->id;
@@ -231,7 +232,7 @@ class WebserverConfigDriftDetector
      * Pull on-disk content for every supplied path in one SSH call. Uses
      * a marker scheme so we can split per-file from the combined output.
      *
-     * @param  list<string>  $paths
+     * @param  array<string, mixed> $paths
      * @return array<string, string> path → contents
      */
     private function fetchOnDiskContents(Server $server, array $paths): array
@@ -399,6 +400,9 @@ BASH;
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function emptyResult(?string $engine, bool $unsupported): array
     {
         return [
@@ -413,7 +417,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $cached
+     * @param  array<string, mixed> $cached
+     * @return array<string, mixed>
      */
     private function rehydrate(array $cached): array
     {

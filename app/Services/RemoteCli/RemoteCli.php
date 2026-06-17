@@ -67,7 +67,7 @@ abstract class RemoteCli
      * server inside the site's working directory. Subclasses build
      * the right binary + path prefix.
      *
-     * @param  list<string>  $args
+     * @param  array<string, mixed> $args
      */
     abstract protected function buildShellCommand(Site $site, string $command, array $args): string;
 
@@ -75,7 +75,7 @@ abstract class RemoteCli
      * Public entry-point for the async worker, which doesn't have
      * direct access to the protected builder.
      *
-     * @param  list<string>  $args
+     * @param  array<string, mixed> $args
      */
     public function buildShellForRun(Site $site, string $command, array $args): string
     {
@@ -85,7 +85,7 @@ abstract class RemoteCli
     /**
      * Run a command against the given site.
      *
-     * @param  list<string>  $args
+     * @param  array<string, mixed> $args
      *
      * @throws RemoteCliPermissionDeniedException When $queuedBy lacks
      *                                            the role for the command's risk level.
@@ -141,6 +141,7 @@ abstract class RemoteCli
      * On exit code != 0 OR timeout the run is marked 'failed'. PR 3+
      * may add an "auto-fallback to async on timeout" path per Q15;
      * v2 of the gate. v1 just records the failure.
+     * @param  array<string, mixed> $args
      */
     protected function executeSync(Site $site, RemoteCliRun $run, array $args, ?User $queuedBy): RemoteCliResult
     {

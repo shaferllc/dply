@@ -19,6 +19,52 @@ use Illuminate\Support\Facades\Log;
  */
 trait HandlesCallbacks
 {
+    protected ?string $callbackUrl = null;
+
+    protected ?int $callbackTimeout = null;
+
+    protected ?int $callbackMaxAttempts = null;
+
+    protected ?int $callbackDelay = null;
+
+    protected ?int $callbackBackoffMultiplier = null;
+
+    protected ?bool $callbacksEnabled = null;
+
+    /**
+     * Configure callback settings.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function setCallbackConfig(array $config): self
+    {
+        if (array_key_exists('url', $config)) {
+            $this->callbackUrl = is_string($config['url']) ? $config['url'] : null;
+        }
+
+        if (array_key_exists('timeout', $config)) {
+            $this->callbackTimeout = is_int($config['timeout']) ? $config['timeout'] : null;
+        }
+
+        if (array_key_exists('max_attempts', $config)) {
+            $this->callbackMaxAttempts = is_int($config['max_attempts']) ? $config['max_attempts'] : null;
+        }
+
+        if (array_key_exists('delay', $config)) {
+            $this->callbackDelay = is_int($config['delay']) ? $config['delay'] : null;
+        }
+
+        if (array_key_exists('backoff_multiplier', $config)) {
+            $this->callbackBackoffMultiplier = is_int($config['backoff_multiplier']) ? $config['backoff_multiplier'] : null;
+        }
+
+        if (array_key_exists('enabled', $config)) {
+            $this->callbacksEnabled = is_bool($config['enabled']) ? $config['enabled'] : null;
+        }
+
+        return $this;
+    }
+
     /**
      * Handle a callback for the given task.
      */
@@ -29,6 +75,11 @@ trait HandlesCallbacks
             CallbackType::Failed => $this->onFailed($task, $request),
             CallbackType::Finished => $this->onFinished($task, $request),
             CallbackType::Custom => $this->onCustomCallback($task, $request),
+            CallbackType::Started => $this->onStarted($task, $request),
+            CallbackType::Progress => $this->onProgress($task, $request),
+            CallbackType::Cancelled => $this->onCancelled($task, $request),
+            CallbackType::Paused => $this->onPaused($task, $request),
+            CallbackType::Resumed => $this->onResumed($task, $request),
         };
 
         $this->afterCallback($task, $request, $callbackType);
@@ -45,36 +96,32 @@ trait HandlesCallbacks
     /**
      * Get the callback data to send with the request.
      */
+    /** @return array<string, mixed> */
     public function getCallbackData(): array
     {
         return [
-            'task_id' => $this->task?->id,
-            'task_name' => $this->task?->name,
-            'status' => $this->task?->status?->value,
-            'exit_code' => $this->task?->exit_code,
-            'duration' => $this->task?->getDuration(),
-            'output' => $this->task?->getOutput(),
+            'task_id' => $this->taskModel?->id,
+            'task_name' => $this->taskModel?->name,
+            'status' => $this->taskModel?->status?->value,
+            'exit_code' => $this->taskModel?->exit_code,
+            'duration' => $this->taskModel?->getDuration(),
+            'output' => $this->taskModel?->getOutput(),
             'timestamp' => now()->toISOString(),
             'callback_type' => 'task_update',
         ];
     }
 
-    /**
-     * Get the callback headers to send with the request.
-     */
+    /** @return array<string, mixed> */
     public function getCallbackHeaders(): array
     {
         return [
             'Content-Type' => 'application/json',
             'User-Agent' => 'TaskRunner/1.0',
-            'X-Task-ID' => $this->task?->id,
+            'X-Task-ID' => $this->taskModel?->id,
             'X-Callback-Type' => 'task_update',
         ];
     }
 
-    /**
-     * Get the callback timeout in seconds.
-     */
     public function getCallbackTimeout(): int
     {
         return $this->callbackTimeout ?? 30;
@@ -91,6 +138,7 @@ trait HandlesCallbacks
     /**
      * Get the callback retry configuration.
      */
+    /** @return array<string, mixed> */
     public function getCallbackRetryConfig(): array
     {
         return [
@@ -101,7 +149,7 @@ trait HandlesCallbacks
     }
 
     /**
-     * Validate callback data before sending.
+     * @param array<string, mixed> $data
      */
     public function validateCallbackData(array $data): bool
     {
@@ -109,7 +157,7 @@ trait HandlesCallbacks
     }
 
     /**
-     * Send a callback to the home server.
+     * @param array<string, mixed> $additionalData
      */
     public function sendCallback(CallbackType $type, array $additionalData = []): bool
     {
@@ -166,12 +214,13 @@ trait HandlesCallbacks
         return $this->sendCallback(CallbackType::Timeout, [
             'event' => 'task_timeout',
             'timed_out_at' => now()->toISOString(),
-            'timeout_duration' => $this->task?->timeout,
+            'timeout_duration' => $this->taskModel?->timeout,
         ]);
     }
 
     /**
      * Send a progress callback with custom data.
+      * @param array<string, mixed> $progressData
      */
     public function sendProgressCallback(array $progressData): bool
     {
@@ -228,6 +277,34 @@ trait HandlesCallbacks
     {
         $data = $request->all();
         $this->sendCallback(CallbackType::Custom, $data);
+    }
+
+    protected function onStarted(Task $task, Request $request): void
+    {
+        // Lifecycle callbacks are handled via sendStartedCallback(); no model mutation required here.
+    }
+
+    protected function onProgress(Task $task, Request $request): void
+    {
+        // Progress payloads are forwarded by sendProgressCallback(); no model mutation required here.
+    }
+
+    protected function onCancelled(Task $task, Request $request): void
+    {
+        $task->update([
+            'status' => TaskStatus::Cancelled,
+            'completed_at' => now(),
+        ]);
+    }
+
+    protected function onPaused(Task $task, Request $request): void
+    {
+        // Pause/resume state is tracked by the remote runner; no model mutation required here.
+    }
+
+    protected function onResumed(Task $task, Request $request): void
+    {
+        // Pause/resume state is tracked by the remote runner; no model mutation required here.
     }
 
     /**

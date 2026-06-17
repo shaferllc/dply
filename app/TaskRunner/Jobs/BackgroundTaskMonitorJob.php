@@ -6,7 +6,7 @@ namespace App\Modules\TaskRunner\Jobs;
 
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\BackgroundTaskTracker;
-use App\Modules\TaskRunner\TestTask;
+use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

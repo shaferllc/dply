@@ -3,8 +3,8 @@
 namespace App\Services\Billing;
 
 use App\Models\Organization;
+use App\Models\Subscription;
 use Illuminate\Support\Facades\Log;
-use Laravel\Cashier\Subscription;
 use Throwable;
 
 /**
@@ -31,8 +31,7 @@ class StripeSubscriptionSyncer
     ) {}
 
     /**
-     * @return array<int, array{tier: string, action: string, from: ?int, to: int}>
-     *                                                                              Audit log of changes applied; empty when nothing changed.
+     * @return list<array<string, mixed>>
      */
     public function reconcile(Organization $organization, DesiredBillingState $desired): array
     {
@@ -74,7 +73,7 @@ class StripeSubscriptionSyncer
     }
 
     /**
-     * @return array{action: string, from: ?int, to: int}|null
+     * @return array{action: string, from: int|null, to: int}|null
      */
     private function applyDelta(Subscription $subscription, string $priceId, ?int $currentQty, int $desiredQty): ?array
     {
@@ -122,7 +121,7 @@ class StripeSubscriptionSyncer
 
         $item = $subscription->items->firstWhere('stripe_price', $priceId);
 
-        return $item ? (int) $item->quantity : null;
+        return $item instanceof \App\Models\SubscriptionItem ? (int) $item->quantity : null;
     }
 
     /**
@@ -142,7 +141,7 @@ class StripeSubscriptionSyncer
      * or a downgrade to Free settles to exactly the right plan line. Adding
      * before removing keeps the subscription non-empty mid-swap.
      *
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcilePlanLine(Subscription $subscription, DesiredBillingState $desired, array &$changes): void
     {
@@ -195,7 +194,7 @@ class StripeSubscriptionSyncer
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcileManagedProductLine(
         Subscription $subscription,
@@ -223,7 +222,7 @@ class StripeSubscriptionSyncer
      * Also strips the retired flat realtime line off any subscription migrated
      * from the v1 flat-per-app model.
      *
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcileRealtimeTierLines(
         Subscription $subscription,
@@ -281,7 +280,7 @@ class StripeSubscriptionSyncer
      * Edge delivery-usage line. Monthly only — a yearly subscription can't carry
      * a monthly-metered price.
      *
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcileCloudResourceLine(
         Subscription $subscription,
@@ -309,7 +308,7 @@ class StripeSubscriptionSyncer
      * Metered managed-serverless usage + resources line (per-cent quantity),
      * monthly only — mirrors the Cloud-resource and Edge-usage lines.
      *
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcileServerlessUsageLine(
         Subscription $subscription,
@@ -337,7 +336,7 @@ class StripeSubscriptionSyncer
      * Metered dply-managed server line — all-in cost-plus billed as a per-cent
      * quantity, monthly only. Mirrors the Cloud-resource and serverless-usage lines.
      *
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcileManagedServerLine(
         Subscription $subscription,
@@ -362,7 +361,7 @@ class StripeSubscriptionSyncer
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $changes
+     * @param  list<array<string, mixed>>  $changes
      */
     private function reconcileEdgeUsageLine(
         Subscription $subscription,

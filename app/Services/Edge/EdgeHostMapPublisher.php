@@ -102,7 +102,7 @@ class EdgeHostMapPublisher
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     private function writeKv(string $key, array $payload, EdgeDeliveryContext $context): void
     {

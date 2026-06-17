@@ -38,9 +38,6 @@ final class DedicatedCacheServerProvisionConfig
         }
 
         $meta = $server->meta ?? [];
-        if (! is_array($meta)) {
-            return self::localhostOnly($engine);
-        }
 
         $cacheServer = $meta['cache_server'] ?? null;
         if (! is_array($cacheServer)) {

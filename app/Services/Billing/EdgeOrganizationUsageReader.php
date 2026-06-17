@@ -6,7 +6,7 @@ namespace App\Services\Billing;
 
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
-use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,8 +17,8 @@ class EdgeOrganizationUsageReader
 {
     public function totalsForOrganization(
         Organization $organization,
-        CarbonInterface $periodStart,
-        CarbonInterface $periodEnd,
+        \Carbon\CarbonInterface $periodStart,
+        \Carbon\CarbonInterface $periodEnd,
     ): EdgeUsageTotals {
         $row = EdgeUsageSnapshot::query()
             ->where('organization_id', $organization->id)
@@ -46,6 +46,9 @@ class EdgeOrganizationUsageReader
         );
     }
 
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
     public function currentMonthWindow(): array
     {
         $start = now()->startOfMonth();

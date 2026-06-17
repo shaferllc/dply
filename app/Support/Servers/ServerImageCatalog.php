@@ -69,10 +69,10 @@ final class ServerImageCatalog
             if (! is_string($slug) || $slug === '') {
                 continue;
             }
-            $family = (string) ($image['family'] ?? '');
+            $family = $image['family'];
             $options[] = [
                 'id' => $key,
-                'label' => (string) ($image['label'] ?? $key),
+                'label' => $image['label'],
                 'summary' => $family === 'debian' ? __('Debian') : __('Ubuntu'),
                 'family' => $family,
             ];

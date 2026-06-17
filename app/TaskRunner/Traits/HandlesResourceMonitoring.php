@@ -13,17 +13,19 @@ trait HandlesResourceMonitoring
     /**
      * Resource monitoring properties.
      */
+    /** @var array<string, mixed> */
     protected array $resourceMetrics = [];
 
+    /** @var array<string, mixed> */
     protected array $resourceHistory = [];
 
+    /** @var array<string, mixed> */
     protected array $resourceLimits = [];
 
+    /** @var array<string, mixed> */
     protected array $resourceAlerts = [];
 
-    /**
-     * Get resource usage metrics.
-     */
+    /** @return array<string, mixed> */
     public function getResourceMetrics(): array
     {
         return [
@@ -80,14 +82,13 @@ trait HandlesResourceMonitoring
     /**
      * Get resource usage history.
      */
+    /** @return array<string, mixed> */
     public function getResourceHistory(): array
     {
         return $this->resourceHistory;
     }
 
-    /**
-     * Get resource usage trends.
-     */
+    /** @return array<string, mixed> */
     public function getResourceTrends(): array
     {
         if (empty($this->resourceHistory)) {
@@ -134,6 +135,7 @@ trait HandlesResourceMonitoring
     /**
      * Get resource limits.
      */
+    /** @return array<string, mixed> */
     public function getResourceLimits(): array
     {
         return array_merge([
@@ -144,9 +146,7 @@ trait HandlesResourceMonitoring
         ], $this->resourceLimits);
     }
 
-    /**
-     * Check resource limits.
-     */
+    /** @return array<string, mixed> */
     public function checkResourceLimits(): array
     {
         $violations = [];
@@ -192,6 +192,7 @@ trait HandlesResourceMonitoring
     /**
      * Get resource alerts.
      */
+    /** @return array<string, mixed> */
     public function getResourceAlerts(): array
     {
         $alerts = [];
@@ -238,6 +239,7 @@ trait HandlesResourceMonitoring
 
     /**
      * Add resource alert.
+      * @param array<string, mixed> $alert
      */
     public function addResourceAlert(array $alert): self
     {
@@ -275,14 +277,12 @@ trait HandlesResourceMonitoring
         ];
 
         $totalScore = 0;
-        $totalWeight = 0;
 
         foreach ($scores as $resource => $score) {
             $totalScore += $score * $weights[$resource];
-            $totalWeight += $weights[$resource];
         }
 
-        return $totalWeight > 0 ? $totalScore / $totalWeight : 0;
+        return $totalScore;
     }
 
     /**
@@ -467,6 +467,7 @@ trait HandlesResourceMonitoring
         return 1.0; // Placeholder
     }
 
+    /** @return array<string, mixed> */
     protected function getBandwidthUsage(): array
     {
         return [

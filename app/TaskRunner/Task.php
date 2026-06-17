@@ -9,14 +9,16 @@ use App\Modules\TaskRunner\Concerns\ConvertsTaskModel;
 use App\Modules\TaskRunner\Concerns\ManagesTaskFactory;
 use App\Modules\TaskRunner\Concerns\ManagesTaskState;
 use App\Modules\TaskRunner\Concerns\ValidatesTaskScript;
+use App\Modules\TaskRunner\Contracts\HasAnalytics;
 use App\Modules\TaskRunner\Contracts\HasCallbacks;
+use App\Modules\TaskRunner\Contracts\HasRollback;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Exceptions\TaskValidationException;
 use App\Modules\TaskRunner\Jobs\UpdateTaskOutput;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\Traits\HandlesAnalytics;
 use App\Modules\TaskRunner\Traits\HandlesCallbacks;
-use App\Modules\TaskRunner\Traits\HandlesMonitoring;
+use App\Modules\TaskRunner\Traits\HandlesComprehensiveMonitoring;
 use App\Modules\TaskRunner\Traits\HandlesRollback;
 use App\Modules\TaskRunner\Traits\HandlesTemplates;
 use App\Modules\TaskRunner\View\TaskViewRenderer;
@@ -36,9 +38,60 @@ use ReflectionProperty;
  * Base Task class that provides the foundation for all task implementations in TaskRunner.
  * Combines functionality from both the original Task and EnhancedTask classes.
  */
-abstract class Task
+abstract class Task implements HasAnalytics, HasCallbacks, HasRollback
 {
-    use HandlesAnalytics, HandlesCallbacks, HandlesMonitoring, HandlesRollback, HandlesTemplates;
+    use HandlesAnalytics, HandlesCallbacks, HandlesComprehensiveMonitoring, HandlesRollback, HandlesTemplates {
+        HandlesComprehensiveMonitoring::calculatePercentage insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::clearBenchmarks insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::clearMeasurements insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::clearProfiles insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::clearTimers insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::convertToCsv insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::convertToXml insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::endMeasurement insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::endProfile insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::endTimer insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::exportPerformanceData insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getAverageCpuUsage insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getAverageMemoryUsage insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getBenchmark insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getBenchmarks insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getCleanupTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getCpuEfficiency insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getCpuTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getDiskEfficiency insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getDiskReadBytes insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getDiskReadOperations insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getDiskWriteBytes insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getDiskWriteOperations insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getExecutionTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getExecutionTimeBreakdown insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getInitializationTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getMeasurement insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getMeasurements insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getMemoryEfficiency insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getMemoryLimit insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getNetworkBytesReceived insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getNetworkBytesSent insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getNetworkConnections insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getNetworkEfficiency insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getOverheadTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getPeakCpuUsage insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getPeakMemoryUsage insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getPerformanceSummary insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getProcessingTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getProfile insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getProfiles insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getResourceMetrics insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getTimer insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getTimerDuration insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getTimers insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::getWaitTime insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::runBenchmark insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::startMeasurement insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::startProfile insteadof HandlesAnalytics;
+        HandlesComprehensiveMonitoring::startTimer insteadof HandlesAnalytics;
+    }
     use Macroable, SerializesModels;
     use BuildsTaskUrlsAndOutput;
     use ConvertsTaskModel;
@@ -59,37 +112,32 @@ abstract class Task
     /**
      * The task options.
      */
+    /** @var array<string, mixed> */
     protected array $options = [];
 
-    /**
-     * The task status.
-     */
     protected TaskStatus $status = TaskStatus::Pending;
 
-    /**
-     * The task output.
-     */
     protected string $output = '';
 
-    /**
-     * The task exit code.
-     */
     protected ?int $exitCode = null;
 
-    /**
-     * The task timeout.
-     */
     protected ?int $timeout = 300;
 
-    /**
-     * The task user.
-     */
     protected string $user = 'root';
 
-    /**
-     * The task instance data.
-     */
     protected ?string $instance = null;
+
+    protected ?string $callbackUrl = null;
+
+    protected ?int $callbackTimeout = null;
+
+    protected ?int $callbackMaxAttempts = null;
+
+    protected ?int $callbackDelay = null;
+
+    protected ?int $callbackBackoffMultiplier = null;
+
+    protected ?bool $callbacksEnabled = null;
 
 
     /**
@@ -164,6 +212,10 @@ abstract class Task
 
 
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         if (! $this->taskModel) {
@@ -189,7 +241,10 @@ abstract class Task
         ];
     }
 
-    public static function __callStatic($name, $arguments)
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    public static function __callStatic(string $name, array $arguments): mixed
     {
         return static::createInstance()->pending()->{$name}(...$arguments);
     }

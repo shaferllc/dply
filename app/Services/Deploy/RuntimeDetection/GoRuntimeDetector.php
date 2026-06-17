@@ -63,8 +63,8 @@ final class GoRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      */
     private function detectVersion(
         string $root,
@@ -125,8 +125,8 @@ final class GoRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $imports
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $imports
+     * @param  array<string, mixed> $reasons
      */
     private function detectFramework(array $imports, array &$reasons): ?string
     {
@@ -155,8 +155,8 @@ final class GoRuntimeDetector implements RuntimeDetector
      * layout), falls back to `main.go` at the repo root, then to a generic
      * `./...` build of all packages.
      *
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      * @return array{0: string, 1: string} [entrypointName, packagePath]
      */
     private function detectEntrypoint(string $root, array &$detectedFiles, array &$reasons): array

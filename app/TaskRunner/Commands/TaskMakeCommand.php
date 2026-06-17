@@ -112,7 +112,7 @@ class TaskMakeCommand extends GeneratorCommand
     /**
      * Get the console command options.
      *
-     * @return array<int, array<int, string|int>>
+     * @return array<int, array<int, string|int|null>>
      */
     protected function getOptions(): array
     {

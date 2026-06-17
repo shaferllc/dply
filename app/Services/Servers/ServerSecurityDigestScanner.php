@@ -102,7 +102,7 @@ final class ServerSecurityDigestScanner
         }
 
         throw new RuntimeException(
-            $lastError?->getMessage() ?: __('SSH connection failed for security digest.'),
+            $lastError->getMessage() ?: __('SSH connection failed for security digest.'),
             0,
             $lastError,
         );
@@ -139,7 +139,7 @@ final class ServerSecurityDigestScanner
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array

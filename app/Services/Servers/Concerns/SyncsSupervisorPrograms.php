@@ -200,6 +200,7 @@ trait SyncsSupervisorPrograms
      *
      * @return array{log: string, state: string, status_line: string, message: string, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function syncProgramResult(Server $server, string $programId): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -267,6 +268,7 @@ trait SyncsSupervisorPrograms
      *
      * @return array{log: string, state: string, status_line: string, message: string, ok: bool}
      */
+    /** @return array<string, mixed> */
     protected function classifySyncProgramResult(string $group, string $log, string $startOut, string $statusOut): array
     {
         $state = $this->classifySupervisorStatusLine($statusOut);

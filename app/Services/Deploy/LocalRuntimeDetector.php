@@ -39,6 +39,7 @@ final class LocalRuntimeDetector
      *     }
      * }
      */
+    /** @return array<string, mixed> */
     public function detect(string $workingDirectory, string $slug): array
     {
         $appDetection = $this->serverlessRuntimeDetector->detect($workingDirectory, [
@@ -77,10 +78,10 @@ final class LocalRuntimeDetector
             'site_type' => $siteType,
             'framework' => (string) ($appDetection['framework'] ?? 'unknown'),
             'language' => (string) ($appDetection['language'] ?? 'unknown'),
-            'laravel_octane' => (bool) ($appDetection['laravel_octane'] ?? false),
-            'laravel_horizon' => (bool) ($appDetection['laravel_horizon'] ?? false),
-            'laravel_pulse' => (bool) ($appDetection['laravel_pulse'] ?? false),
-            'laravel_reverb' => (bool) ($appDetection['laravel_reverb'] ?? false),
+            'laravel_octane' => (bool) ($appDetection['laravel_octane']),
+            'laravel_horizon' => (bool) ($appDetection['laravel_horizon']),
+            'laravel_pulse' => (bool) ($appDetection['laravel_pulse']),
+            'laravel_reverb' => (bool) ($appDetection['laravel_reverb']),
             'confidence' => $this->mergeConfidence(
                 (string) ($containerSignals['confidence'] ?? 'medium'),
                 (string) ($appDetection['confidence'] ?? 'low'),
@@ -164,6 +165,9 @@ final class LocalRuntimeDetector
         ];
     }
 
+    /**
+     * @param  array<string, mixed> $appDetection
+     */
     private function inferSiteType(array $appDetection): SiteType
     {
         return match ($appDetection['framework'] ?? null) {
@@ -276,12 +280,18 @@ final class LocalRuntimeDetector
         };
     }
 
+    /**
+     * @param  array<string, mixed> $detectedFiles
+     */
     private function hasDockerSignal(array $detectedFiles): bool
     {
         return collect($detectedFiles)->contains(static fn (string $file): bool => str_contains($file, 'Dockerfile')
             || str_contains($file, 'compose'));
     }
 
+    /**
+     * @param  array<string, mixed> $detectedFiles
+     */
     private function hasKubernetesSignal(array $detectedFiles, ?string $manifestPath): bool
     {
         if ($manifestPath !== null) {

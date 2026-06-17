@@ -215,6 +215,7 @@ class TaskServiceProvider extends ServiceProvider
 
     /**
      * Handle console streaming output.
+     * @param  array<string, mixed> $logData
      */
     protected function handleConsoleStream(array $logData): void
     {
@@ -236,6 +237,7 @@ class TaskServiceProvider extends ServiceProvider
 
     /**
      * Handle file streaming output.
+     * @param  array<string, mixed> $logData
      */
     protected function handleFileStream(array $logData): void
     {
@@ -247,6 +249,7 @@ class TaskServiceProvider extends ServiceProvider
 
     /**
      * Handle WebSocket streaming output.
+     * @param  array<string, mixed> $logData
      */
     protected function handleWebSocketStream(array $logData): void
     {

@@ -13,8 +13,8 @@ class UserAgentParser
             return __('Unknown device');
         }
 
-        $browser = static::detectBrowser($userAgent);
-        $platform = static::detectPlatform($userAgent);
+        $browser = self::detectBrowser($userAgent);
+        $platform = self::detectPlatform($userAgent);
 
         if ($browser && $platform) {
             return $browser.' on '.$platform;

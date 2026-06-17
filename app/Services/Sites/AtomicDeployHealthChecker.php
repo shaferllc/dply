@@ -17,7 +17,7 @@ final class AtomicDeployHealthChecker
      */
     public function verify(Site $site, SshConnection $ssh): string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         // Validate-by-default: every atomic deploy is HTTP-smoke-tested after
         // cutover unless explicitly opted out (meta.deploy_health_enabled=false

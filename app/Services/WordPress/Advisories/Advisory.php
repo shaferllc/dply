@@ -25,7 +25,7 @@ final class Advisory
     /**
      * Build from a Wordfence Intelligence API record (the v1 source).
      *
-     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed> $record
      */
     public static function fromWordfence(array $record): self
     {

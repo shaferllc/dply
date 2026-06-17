@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Livewire;
 
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class TaskMetricsDashboard extends Component
 {
+    /** @var array<string, mixed> */
     public array $metrics = [
         'active_tasks' => 0,
         'total_tasks_today' => 0,
@@ -20,24 +23,29 @@ class TaskMetricsDashboard extends Component
         'queue_size' => 0,
     ];
 
+    /** @var list<array<string, Carbon|int|string|null>> */
     public array $recentTasks = [];
 
+    /** @var array<string, list<array<string, int|string>>> */
     public array $taskHistory = [];
 
     public string $timeRange = '1h';
 
     public bool $autoRefresh = true;
 
-    public function mount()
+    public function mount(): void
     {
         $this->loadMetrics();
         $this->loadRecentTasks();
         $this->loadTaskHistory();
     }
 
-    public function render()
+    public function render(): View
     {
-        return view('task-runner::livewire.task-metrics-dashboard', [
+        /** @var view-string $viewName */
+        $viewName = 'task-runner::livewire.task-metrics-dashboard';
+
+        return view($viewName, [
             'metrics' => $this->metrics,
             'recentTasks' => $this->recentTasks,
             'taskHistory' => $this->taskHistory,
@@ -104,6 +112,8 @@ class TaskMetricsDashboard extends Component
 
     /**
      * Handle task events from WebSocket.
+     *
+     * @param  array<string, mixed>  $eventData
      */
     #[On('echo:task-runner,TaskEvent')]
     public function handleTaskEvent(array $eventData): void
@@ -114,6 +124,8 @@ class TaskMetricsDashboard extends Component
 
     /**
      * Handle metrics updates from WebSocket.
+     *
+     * @param  array<string, mixed>  $metricsData
      */
     #[On('echo:task-runner,Metrics')]
     public function handleMetricsUpdate(array $metricsData): void
@@ -222,6 +234,8 @@ class TaskMetricsDashboard extends Component
 
     /**
      * Generate hourly data for charts.
+     *
+     * @return list<array<string, int|string>>
      */
     protected function generateHourlyData(): array
     {
@@ -241,6 +255,8 @@ class TaskMetricsDashboard extends Component
 
     /**
      * Generate daily data for charts.
+     *
+     * @return list<array<string, int|string>>
      */
     protected function generateDailyData(): array
     {

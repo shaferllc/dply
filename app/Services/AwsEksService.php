@@ -81,6 +81,10 @@ class AwsEksService
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function listClusterNames(): array
     {
         $names = [];
@@ -139,6 +143,10 @@ class AwsEksService
      *
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function listAndDescribeNodegroups(string $clusterName): array
     {
         $names = [];
@@ -184,7 +192,7 @@ class AwsEksService
      * the AWS CLI installed with credentials configured wherever they run
      * kubectl; everyone running EKS already has that.
      *
-     * @param  array<string, mixed>  $cluster  the DescribeCluster output
+     * @param  array<string, mixed> $cluster  the DescribeCluster output
      */
     public function generateKubeconfig(array $cluster): string
     {
@@ -233,7 +241,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed>  $nodegroup
+     * @param  array<string, mixed> $nodegroup
      * @return array<string, mixed>
      */
     private function normalizeNodegroup(array $nodegroup): array

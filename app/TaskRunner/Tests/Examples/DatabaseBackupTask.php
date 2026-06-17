@@ -67,6 +67,12 @@ class DatabaseBackupTask extends Task
         return 'tasks.database-backup';
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function getViewData(): array
     {
         return [

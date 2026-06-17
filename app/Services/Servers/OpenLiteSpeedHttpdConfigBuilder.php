@@ -31,6 +31,7 @@ class OpenLiteSpeedHttpdConfigBuilder
      * Build the full httpd_config.conf for the given sites bound to $listenPort.
      *
      * @param  Collection<int, Site>  $sites
+     * @param  array<string, mixed> $listenerTls
      */
     public function build(Collection $sites, int $listenPort, string $vhostsPath = '/usr/local/lsws/conf/vhosts', ?array $listenerTls = null): string
     {

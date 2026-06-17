@@ -46,7 +46,7 @@ final class DatabaseConnectionEnv
         };
     }
 
-    /** @param array<string,mixed> $context */
+    /** @param  array<string, mixed> $context */
     private static function sqlite(array $context): string
     {
         $path = (string) ($context['sqlite_path'] ?? 'database/database.sqlite');
@@ -59,7 +59,7 @@ final class DatabaseConnectionEnv
         return "DB_CONNECTION=sqlite\nDB_DATABASE={$path}\n";
     }
 
-    /** @param array<string,mixed> $context */
+    /** @param  array<string, mixed> $context */
     private static function mysql(array $context): string
     {
         $host = (string) ($context['host'] ?? '127.0.0.1');
@@ -71,7 +71,7 @@ final class DatabaseConnectionEnv
         return "DB_CONNECTION=mysql\nDB_HOST={$host}\nDB_PORT={$port}\nDB_DATABASE={$name}\nDB_USERNAME={$user}\nDB_PASSWORD={$pass}\n";
     }
 
-    /** @param array<string,mixed> $context */
+    /** @param  array<string, mixed> $context */
     private static function mariadb(array $context): string
     {
         $host = (string) ($context['host'] ?? '127.0.0.1');
@@ -88,7 +88,7 @@ final class DatabaseConnectionEnv
         return "DB_CONNECTION=mariadb\nDB_HOST={$host}\nDB_PORT={$port}\nDB_DATABASE={$name}\nDB_USERNAME={$user}\nDB_PASSWORD={$pass}\n";
     }
 
-    /** @param array<string,mixed> $context */
+    /** @param  array<string, mixed> $context */
     private static function postgres(array $context): string
     {
         $host = (string) ($context['host'] ?? '127.0.0.1');

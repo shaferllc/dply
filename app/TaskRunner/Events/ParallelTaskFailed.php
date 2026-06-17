@@ -16,6 +16,8 @@ class ParallelTaskFailed
 
     /**
      * Create a new event instance.
+     * @param  array<string, mixed> $summary
+     * @param  array<string, mixed> $tasks
      */
     public function __construct(
         public readonly array $tasks,

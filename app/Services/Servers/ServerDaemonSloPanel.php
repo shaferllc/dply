@@ -28,6 +28,7 @@ final class ServerDaemonSloPanel
      *     programs: array{total: int, active: int, inactive: int, running: int, unhealthy: int, rows: list<array<string, mixed>>},
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $health = $this->healthSnapshot($server);
@@ -98,7 +99,7 @@ final class ServerDaemonSloPanel
     }
 
     /**
-     * @param  array<string, mixed>  $health
+     * @param  array<string, mixed> $health
      * @return array<string, mixed>
      */
     private function programs(Server $server, array $health): array
@@ -179,7 +180,7 @@ final class ServerDaemonSloPanel
     }
 
     /**
-     * @param  array<string, mixed>  $health
+     * @param  array<string, mixed> $health
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function healthAlerts(array $health, Server $server): array
@@ -228,7 +229,7 @@ final class ServerDaemonSloPanel
     }
 
     /**
-     * @param  array<string, mixed>  $programs
+     * @param  array<string, mixed> $programs
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
     private function programAlerts(array $programs, Server $server): array

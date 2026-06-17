@@ -10,6 +10,7 @@ use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Jobs\BackgroundTaskMonitorJob;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
@@ -23,12 +24,51 @@ class BackgroundTaskTracker
      * Create a new BackgroundTaskTracker instance.
      */
     public function __construct(
-        protected readonly CallbackService $callbackService,
-        protected readonly ?StreamingLoggerInterface $streamingLogger = null
+        protected CallbackService $callbackService,
+        protected ?StreamingLoggerInterface $streamingLogger = null
     ) {
-        // Resolve streaming logger if not provided
         if ($this->streamingLogger === null && app()->bound(StreamingLoggerInterface::class)) {
             $this->streamingLogger = app(StreamingLoggerInterface::class);
+        }
+    }
+
+    /**
+     * Mark a task running and schedule background monitoring.
+     */
+    public function track(Task $task): void
+    {
+        $task->update([
+            'status' => TaskStatus::Running,
+            'started_at' => now(),
+        ]);
+
+        $taskClass = $this->resolveTaskClass($task);
+
+        $monitoringInterval = config('task-runner.background.monitoring_interval', 5);
+
+        Queue::later(
+            now()->addSeconds($monitoringInterval),
+            new BackgroundTaskMonitorJob($task->id, $taskClass)
+        );
+
+        Log::info('Background task tracking started', [
+            'task_id' => $task->id,
+            'task_name' => $task->name,
+        ]);
+    }
+
+    protected function resolveTaskClass(Task $task): string
+    {
+        if (! $task->instance) {
+            return '';
+        }
+
+        try {
+            $instance = Task::restoreStoredInstance($task->instance);
+
+            return is_object($instance) ? $instance::class : '';
+        } catch (\Throwable) {
+            return '';
         }
     }
 
@@ -195,7 +235,7 @@ class BackgroundTaskTracker
     protected function sendStartedCallback(HasCallbacks $taskInstance, Task $task): void
     {
         if ($taskInstance->isCallbacksEnabled()) {
-            $taskInstance->sendCallback(CallbackType::Started, [
+            $this->callbackService->send($taskInstance, CallbackType::Started, [
                 'event' => 'task_started',
                 'started_at' => now()->toISOString(),
             ]);
@@ -208,7 +248,7 @@ class BackgroundTaskTracker
     protected function sendCompletionCallback(HasCallbacks $taskInstance, Task $task): void
     {
         if ($taskInstance->isCallbacksEnabled()) {
-            $taskInstance->sendCallback(CallbackType::Finished, [
+            $this->callbackService->send($taskInstance, CallbackType::Finished, [
                 'event' => 'task_finished',
                 'completed_at' => now()->toISOString(),
                 'success' => true,
@@ -222,7 +262,7 @@ class BackgroundTaskTracker
     protected function sendTimeoutCallback(HasCallbacks $taskInstance, Task $task): void
     {
         if ($taskInstance->isCallbacksEnabled()) {
-            $taskInstance->sendCallback(CallbackType::Timeout, [
+            $this->callbackService->send($taskInstance, CallbackType::Timeout, [
                 'event' => 'task_timeout',
                 'timed_out_at' => now()->toISOString(),
                 'timeout_duration' => $task->timeout,
@@ -236,7 +276,7 @@ class BackgroundTaskTracker
     protected function sendFailureCallback(HasCallbacks $taskInstance, Task $task, ?string $error = null): void
     {
         if ($taskInstance->isCallbacksEnabled()) {
-            $taskInstance->sendCallback(CallbackType::Failed, [
+            $this->callbackService->send($taskInstance, CallbackType::Failed, [
                 'event' => 'task_failed',
                 'failed_at' => now()->toISOString(),
                 'success' => false,
@@ -253,7 +293,7 @@ class BackgroundTaskTracker
         if ($taskInstance->isCallbacksEnabled()) {
             $progress = $this->calculateProgress($task);
 
-            $taskInstance->sendCallback(CallbackType::Progress, [
+            $this->callbackService->send($taskInstance, CallbackType::Progress, [
                 'event' => 'task_progress',
                 'progress_at' => now()->toISOString(),
                 'percentage' => $progress,
@@ -310,17 +350,20 @@ class BackgroundTaskTracker
 
     /**
      * Stream a task event.
+     * @param  array<string, mixed> $context
      */
     protected function streamTaskEvent(string $event, array $context = []): void
     {
-        if ($this->streamingLogger && method_exists($this->streamingLogger, 'streamTaskEvent')) {
+        if ($this->streamingLogger !== null) {
             $this->streamingLogger->streamTaskEvent($event, $context);
         }
     }
 
     /**
      * Get task status summary.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getTaskStatus(Task $task): array
     {
         return [
@@ -351,7 +394,7 @@ class BackgroundTaskTracker
 
         // Send cancellation callback
         if ($taskInstance->isCallbacksEnabled()) {
-            $taskInstance->sendCallback(CallbackType::Custom, [
+            $this->callbackService->send($taskInstance, CallbackType::Custom, [
                 'event' => 'task_cancelled',
                 'cancelled_at' => now()->toISOString(),
             ]);
@@ -371,6 +414,8 @@ class BackgroundTaskTracker
 
     /**
      * Get all running background tasks.
+     *
+     * @return list<array<string, mixed>>
      */
     public function getRunningTasks(): array
     {
@@ -381,9 +426,6 @@ class BackgroundTaskTracker
             ->toArray();
     }
 
-    /**
-     * Clean up old completed tasks.
-     */
     public function cleanupOldTasks(int $daysToKeep = 30): int
     {
         $cutoffDate = now()->subDays($daysToKeep);

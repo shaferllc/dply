@@ -33,6 +33,7 @@ final class SiteHttp5xxLogScanner
     /**
      * @return array{ok: bool, hits: list<array{reference: string, status: int, method: string, uri: string, occurred_at: CarbonImmutable}>, truncated: bool, note: ?string}
      */
+    /** @return array<string, mixed> */
     public function scan(Site $site, int $lookbackMinutes, int $max): array
     {
         $miss = fn (?string $note = null): array => [

@@ -42,6 +42,9 @@ class DigitalOceanService
     }
 
 
+    /**
+     * @param  array<string, mixed> $bodyOrQuery
+     */
     protected function request(string $method, string $path, array $bodyOrQuery = []): Response
     {
         $url = $this->baseUrl.$path;

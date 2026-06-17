@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Concerns;
 
-use App\Modules\TaskRunner\Contracts\HasCallbacks;
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Events\TaskCompleted;
@@ -48,10 +47,7 @@ trait RunsTaskRunnerTasks
             if ($fakeTask = $this->taskShouldBeFaked($pendingTask)) {
                 $result = $this->handleFakeTask($pendingTask, $fakeTask);
 
-                // Dispatch task completed event for fake tasks
-                if ($result) {
-                    event(new TaskCompleted($pendingTask->task, $pendingTask, $result, $startedAt, $context));
-                }
+                event(new TaskCompleted($pendingTask->task, $pendingTask, $result, $startedAt, $context));
 
                 return $result;
             }
@@ -66,9 +62,7 @@ trait RunsTaskRunnerTasks
             }
 
             // Dispatch task completed event
-            if ($result) {
-                event(new TaskCompleted($pendingTask->task, $pendingTask, $result, $startedAt, $context));
-            }
+            event(new TaskCompleted($pendingTask->task, $pendingTask, $result, $startedAt, $context));
 
             return $result;
         } catch (\Exception $e) {
@@ -165,16 +159,14 @@ trait RunsTaskRunnerTasks
                 'user' => $taskModel->user,
             ]));
 
-            // Handle callbacks if task implements HasCallbacks
-            if ($task instanceof HasCallbacks) {
-                $callbackType = $output->isSuccessful()
-                    ? CallbackType::Finished
-                    : CallbackType::Failed;
+            // Handle callbacks
+            $callbackType = $output->isSuccessful()
+                ? CallbackType::Finished
+                : CallbackType::Failed;
 
-                // Create a mock request for the callback
-                $request = request();
-                $task->handleCallback($taskModel, $request, $callbackType);
-            }
+            // Create a mock request for the callback
+            $request = request();
+            $task->handleCallback($taskModel, $request, $callbackType);
 
             return $output;
 
@@ -198,11 +190,9 @@ trait RunsTaskRunnerTasks
                 'user' => $taskModel->user,
             ]));
 
-            // Handle failure callback if task implements HasCallbacks
-            if ($task instanceof HasCallbacks) {
-                $request = request();
-                $task->handleCallback($taskModel, $request, CallbackType::Failed);
-            }
+            // Handle failure callback
+            $request = request();
+            $task->handleCallback($taskModel, $request, CallbackType::Failed);
 
             throw new TaskExecutionException(
                 'Task execution failed: '.$e->getMessage(),
@@ -322,6 +312,7 @@ trait RunsTaskRunnerTasks
 
     /**
      * Extract task data for serialization.
+      * @return array<string, mixed>
      */
     private function extractTaskData(Task $task): array
     {
@@ -398,6 +389,7 @@ trait RunsTaskRunnerTasks
     /**
      * Get task statistics.
      */
+    /** @return array<string, mixed> */
     public function getTaskStatistics(): array
     {
         $totalTasks = TaskModel::count();
@@ -433,9 +425,7 @@ trait RunsTaskRunnerTasks
         $this->dispatchedTasks[] = $pendingTask;
         $this->storePersistentFake();
 
-        return $fakeTask instanceof FakeTask
-            ? $fakeTask->processOutput
-            : new ProcessOutput;
+        return $fakeTask->processOutput;
     }
 
     protected function runLocally(PendingTask $pendingTask): ProcessOutput
@@ -490,7 +480,7 @@ trait RunsTaskRunnerTasks
 
             // Use the template's output path
             $outputPath = $pendingTask->getOutputPath();
-            $timeout = $task->getTimeout() ?? $this->defaultTimeout ?? self::DEFAULT_TIMEOUT;
+            $timeout = $task->getTimeout();
 
             $command = Helper::scriptInBackground(
                 scriptPath: $scriptPath,

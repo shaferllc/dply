@@ -18,10 +18,10 @@ trait ManagesHetznerNetworks
     /**
      * Create a new Hetzner private network and return its ID.
      *
-     * @param  array<int>  $serverIds  Provider server IDs to attach immediately
+     * @param  array<string, mixed> $serverIds  Provider server IDs to attach immediately
      */
     /**
-     * @param  list<string>  $zones  Network zones to add subnets for (e.g. ['eu-central', 'us-east']).
+     * @param  array<string, mixed> $zones  Network zones to add subnets for (e.g. ['eu-central', 'us-east']).
      *                               At least one is required — Hetzner will not assign private IPs without a subnet.
      */
     public function createNetwork(string $name, string $ipRange = '10.0.0.0/8', array $zones = ['eu-central']): int
@@ -94,6 +94,7 @@ trait ManagesHetznerNetworks
      *
      * @return array{id:int,name:string,ip_range:string,routes:list<array{destination:string,gateway:string}>}
      */
+    /** @return array<string, mixed> */
     public function getNetwork(int $id): array
     {
         $response = $this->request('get', "/networks/{$id}");
@@ -146,6 +147,7 @@ trait ManagesHetznerNetworks
      *
      * @return array<int, array{id: int, name: string, ip_range: string}>
      */
+    /** @return array<string, mixed> */
     public function listNetworks(): array
     {
         $response = $this->request('get', '/networks');

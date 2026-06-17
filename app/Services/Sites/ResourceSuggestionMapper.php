@@ -49,6 +49,10 @@ class ResourceSuggestionMapper
      *     note: ?string,
      * }>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     */
     public function map(): array
     {
         return [
@@ -127,7 +131,7 @@ class ResourceSuggestionMapper
      * Each suggestion carries the keys it matched (for dual-path satisfaction)
      * and the default attach/provision mode the wizard should open the modal in.
      *
-     * @return list<array{
+     * @return array<int, array<string, array|string|null>>
      *     type: string,
      *     label: string,
      *     icon: string,
@@ -139,11 +143,12 @@ class ResourceSuggestionMapper
      *     matched_keys: list<string>,
      * }>
      */
+    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
         $keys = [];
         foreach (($site->envRequirements()['keys'] ?? []) as $entry) {
-            if (is_array($entry) && ($k = (string) ($entry['key'] ?? '')) !== '') {
+            if (($entry) && ($k = (string) ($entry['key'] ?? '')) !== '') {
                 $keys[] = $k;
             }
         }
@@ -155,8 +160,13 @@ class ResourceSuggestionMapper
      * Pure mapping from a flat list of env keys to suggestions. Exposed
      * separately so callers with keys in hand (or tests) skip the model.
      *
-     * @param  list<string>  $keys
+     * @param  array<string, mixed> $keys
      * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     * @param  array<string, mixed> $keys
      */
     public function forKeys(array $keys): array
     {
@@ -201,7 +211,8 @@ class ResourceSuggestionMapper
      * True when $key equals an exact pattern or starts with a prefix pattern.
      * Patterns ending in `_` are treated as prefixes; everything else is exact.
      *
-     * @param  list<string>  $patterns
+     * @param  array<string, mixed> $keys
+     * @param  array<string, mixed> $patterns
      */
     private function keyMatches(string $key, array $patterns): bool
     {

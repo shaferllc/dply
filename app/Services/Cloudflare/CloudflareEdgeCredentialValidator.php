@@ -51,7 +51,7 @@ class CloudflareEdgeCredentialValidator
 
         $client = new EdgeCloudflareClient('', trim($token));
         foreach ($client->listAccounts() as $account) {
-            $id = is_array($account) ? ($account['id'] ?? null) : null;
+            $id = (($account['id'] ?? null) );
             if (is_string($id) && $id !== '') {
                 return $id;
             }
@@ -62,7 +62,7 @@ class CloudflareEdgeCredentialValidator
 
     private function resolveAccountId(ProviderCredential $credential): string
     {
-        $creds = is_array($credential->credentials) ? $credential->credentials : [];
+        $creds = ($credential->credentials );
         $edge = is_array($creds['edge'] ?? null) ? $creds['edge'] : [];
 
         return trim((string) ($edge['account_id'] ?? ''));

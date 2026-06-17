@@ -60,7 +60,7 @@ final class LoggingSpec
      *  - syslog       → default=syslog
      *  - dply_realtime→ default=dply_realtime (endpoint from config, env keys legacy)
      *
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, mixed>
      */
     public static function fromLegacyProvider(string $provider, array $creds): array
@@ -98,7 +98,7 @@ final class LoggingSpec
     /**
      * One normalised channel entry with its secret-field env map resolved.
      *
-     * @param  array<string, mixed>  $extra
+     * @param  array<string, mixed> $extra
      * @return array<string, mixed>
      */
     public static function channel(string $name, string $type, array $extra = []): array

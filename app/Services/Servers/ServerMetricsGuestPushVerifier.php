@@ -24,6 +24,7 @@ class ServerMetricsGuestPushVerifier
      *   last_guest_sample_at: ?string
      * }
      */
+    /** @return array<string, mixed> */
     public function summary(Server $server): array
     {
         $meta = $server->meta ?? [];
@@ -72,6 +73,10 @@ class ServerMetricsGuestPushVerifier
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function refreshRemoteState(Server $server): array
     {
         $out = app(ExecuteRemoteTaskOnServer::class)->runInlineBash(
@@ -129,6 +134,7 @@ BASH;
     /**
      * @return array{remote_sha: ?string, env_present: bool, cron_present: bool}
      */
+    /** @return array<string, mixed> */
     protected function parseVerificationBuffer(string $buffer): array
     {
         $state = [

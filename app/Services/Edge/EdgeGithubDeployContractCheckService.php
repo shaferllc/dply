@@ -67,7 +67,7 @@ class EdgeGithubDeployContractCheckService
     }
 
     /**
-     * @param  list<array{key: string, label: string, status: string, message: string}>  $checks
+     * @param  array<string, mixed> $checks
      */
     public function complete(
         Site $preview,

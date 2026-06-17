@@ -62,8 +62,8 @@ class TaskRunnerService
      *
      * @param  string  $name  Task name
      * @param  string  $script  Script to execute
-     * @param  array  $options  Execution options
-     * @return array Execution result
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function createAndExecute(string $name, string $script, array $options = []): array
     {
@@ -93,7 +93,7 @@ class TaskRunnerService
 
         // Send callbacks if configured
         if (isset($options['callback_url'])) {
-            $this->callback->send($taskModel, CallbackType::OnComplete, $result);
+            $this->callback->sendForTaskModel($taskModel, CallbackType::Finished, $result);
         }
 
         return $result;
@@ -103,19 +103,15 @@ class TaskRunnerService
      * Execute task synchronously
      *
      * @param  TaskModel  $taskModel  Task to execute
-     * @return array Execution result
+     * @return array<string, mixed>
      */
     protected function executeSynchronous(TaskModel $taskModel): array
     {
         $startTime = microtime(true);
 
-        // Create anonymous task
-        $task = new class($taskModel->script) extends Task
+        $task = new class($taskModel->script ?? '') extends Task
         {
-            public function __construct(protected string $scriptContent)
-            {
-                parent::__construct();
-            }
+            public function __construct(protected string $scriptContent = '') {}
 
             public function getScript(): string
             {
@@ -141,7 +137,7 @@ class TaskRunnerService
      * Execute task in background
      *
      * @param  TaskModel  $taskModel  Task to execute
-     * @return array Execution result
+     * @return array<string, mixed>
      */
     protected function executeInBackground(TaskModel $taskModel): array
     {
@@ -160,7 +156,7 @@ class TaskRunnerService
      * Get task execution status with full details
      *
      * @param  string  $taskId  Task ID
-     * @return array Task status and details
+     * @return array<string, mixed>
      */
     public function getTaskStatus(string $taskId): array
     {
@@ -203,13 +199,13 @@ class TaskRunnerService
     /**
      * Create task chain with monitoring
      *
-     * @param  array  $tasks  Array of tasks
-     * @param  array  $options  Chain options
-     * @return array Chain creation result
+     * @param  list<array<string, mixed>>  $tasks
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function createTaskChain(array $tasks, array $options = []): array
     {
-        $chain = new TaskChain;
+        $chain = new TaskChain($this->dispatcher);
 
         foreach ($tasks as $taskData) {
             $task = $this->createTaskFromData($taskData);
@@ -233,17 +229,15 @@ class TaskRunnerService
     /**
      * Create task from data array
      *
-     * @param  array  $data  Task data
-     * @return Task Task instance
+     * @param  array<string, mixed>  $data
      */
     protected function createTaskFromData(array $data): Task
     {
-        return new class($data['script']) extends Task
+        $script = is_string($data['script'] ?? null) ? $data['script'] : '';
+
+        return new class($script) extends Task
         {
-            public function __construct(protected string $scriptContent)
-            {
-                parent::__construct();
-            }
+            public function __construct(protected string $scriptContent = '') {}
 
             public function getScript(): string
             {
@@ -255,9 +249,9 @@ class TaskRunnerService
     /**
      * Execute parallel tasks
      *
-     * @param  array  $tasks  Tasks to execute in parallel
-     * @param  array  $options  Execution options
-     * @return array Execution results
+     * @param  list<array<string, mixed>>  $tasks
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function executeParallel(array $tasks, array $options = []): array
     {
@@ -301,8 +295,8 @@ class TaskRunnerService
     /**
      * Get analytics summary for all tasks
      *
-     * @param  array  $filters  Query filters
-     * @return array Analytics summary
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
      */
     public function getAnalyticsSummary(array $filters = []): array
     {
@@ -329,29 +323,28 @@ class TaskRunnerService
     /**
      * Group tasks by status
      *
-     * @param  Collection  $tasks  Tasks to group
-     * @return array Status groups
+     * @param  Collection<int, TaskModel>  $tasks
+     * @return array<string, int>
      */
     protected function groupTasksByStatus(Collection $tasks): array
     {
-        return $tasks->groupBy(fn ($t) => $t->status->value)->map->count()->toArray();
+        return $tasks->groupBy(fn (TaskModel $t) => $t->status->value)->map->count()->toArray();
     }
 
     /**
      * Calculate average task duration
      *
-     * @param  Collection  $tasks  Tasks to analyze
-     * @return float Average duration in seconds
+     * @param  Collection<int, TaskModel>  $tasks
      */
     protected function calculateAverageDuration(Collection $tasks): float
     {
-        $completed = $tasks->filter(fn ($t) => $t->completed_at && $t->started_at);
+        $completed = $tasks->filter(fn (TaskModel $t) => $t->completed_at && $t->started_at);
 
         if ($completed->isEmpty()) {
             return 0.0;
         }
 
-        $totalDuration = $completed->sum(fn ($t) => $t->started_at->diffInSeconds($t->completed_at));
+        $totalDuration = $completed->sum(fn (TaskModel $t) => $t->started_at->diffInSeconds($t->completed_at));
 
         return round($totalDuration / $completed->count(), 2);
     }
@@ -359,8 +352,7 @@ class TaskRunnerService
     /**
      * Calculate success rate
      *
-     * @param  Collection  $tasks  Tasks to analyze
-     * @return float Success rate percentage
+     * @param  Collection<int, TaskModel>  $tasks
      */
     protected function calculateSuccessRate(Collection $tasks): float
     {
@@ -377,8 +369,8 @@ class TaskRunnerService
      * Retry failed task
      *
      * @param  string  $taskId  Task ID to retry
-     * @param  array  $options  Retry options
-     * @return array Retry result
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function retryTask(string $taskId, array $options = []): array
     {
@@ -410,7 +402,7 @@ class TaskRunnerService
      * Cancel running task
      *
      * @param  string  $taskId  Task ID to cancel
-     * @return array Cancellation result
+     * @return array<string, mixed>
      */
     public function cancelTask(string $taskId): array
     {
@@ -547,8 +539,8 @@ BASH, [
     /**
      * Get task history with filters
      *
-     * @param  array  $filters  Query filters
-     * @return Collection Task history
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, TaskModel>
      */
     public function getTaskHistory(array $filters = []): Collection
     {
@@ -578,8 +570,8 @@ BASH, [
     /**
      * Get monitoring dashboard data
      *
-     * @param  array  $filters  Query filters
-     * @return array Dashboard data
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
      */
     public function getMonitoringDashboard(array $filters = []): array
     {
@@ -598,7 +590,7 @@ BASH, [
      * Cleanup old completed tasks
      *
      * @param  int  $olderThanDays  Days threshold
-     * @return array Cleanup result
+     * @return array<string, mixed>
      */
     public function cleanupOldTasks(int $olderThanDays = 30): array
     {
@@ -619,9 +611,9 @@ BASH, [
      * Execute task with template
      *
      * @param  string  $templateName  Template name
-     * @param  array  $variables  Template variables
-     * @param  array  $options  Execution options
-     * @return array Execution result
+     * @param  array<string, mixed>  $variables
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function executeWithTemplate(string $templateName, array $variables, array $options = []): array
     {
@@ -649,8 +641,8 @@ BASH, [
      * @param  string  $name  Task name
      * @param  string  $script  Forward script
      * @param  string  $rollbackScript  Rollback script
-     * @param  array  $options  Execution options
-     * @return array Execution result with rollback capability
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function executeWithRollback(string $name, string $script, string $rollbackScript, array $options = []): array
     {
@@ -672,16 +664,16 @@ BASH, [
      * Perform rollback for task
      *
      * @param  string  $taskId  Task ID to rollback
-     * @return array Rollback result
+     * @return array<string, mixed>
      */
     public function performRollback(string $taskId): array
     {
         try {
-            $result = $this->rollback->execute($taskId);
+            $success = $this->rollback->executeByTaskId($taskId);
 
             return [
-                'success' => true,
-                'rollback_result' => $result,
+                'success' => $success,
+                'rollback_result' => $success,
             ];
         } catch (\Throwable $e) {
             return [
@@ -694,8 +686,8 @@ BASH, [
     /**
      * Get task templates list
      *
-     * @param  array  $filters  Template filters
-     * @return array Templates list
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, mixed>>
      */
     public function getTemplates(array $filters = []): array
     {
@@ -706,8 +698,8 @@ BASH, [
      * Create task from template
      *
      * @param  string  $templateName  Template name
-     * @param  array  $variables  Variables to substitute
-     * @return array Task creation result
+     * @param  array<string, mixed>  $variables
+     * @return array<string, mixed>
      */
     public function createFromTemplate(string $templateName, array $variables): array
     {
@@ -737,8 +729,8 @@ BASH, [
     /**
      * Get performance insights
      *
-     * @param  array  $filters  Query filters
-     * @return array Performance insights
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
      */
     public function getPerformanceInsights(array $filters = []): array
     {
@@ -773,9 +765,8 @@ BASH, [
     /**
      * Export task execution report
      *
-     * @param  array  $filters  Report filters
-     * @param  string  $format  Export format (array, json, csv)
-     * @return array|string Export data
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>|string
      */
     public function exportReport(array $filters = [], string $format = 'array'): array|string
     {
@@ -810,8 +801,7 @@ BASH, [
     /**
      * Convert report to CSV
      *
-     * @param  array  $data  Report data
-     * @return string CSV content
+     * @param  array<string, mixed>  $data
      */
     protected function convertToCsv(array $data): string
     {
@@ -834,7 +824,7 @@ BASH, [
      * Get task scheduling calendar
      *
      * @param  string  $month  Month to display (Y-m format)
-     * @return array Calendar data
+     * @return array<string, mixed>
      */
     public function getSchedulingCalendar(string $month): array
     {
@@ -844,9 +834,8 @@ BASH, [
     /**
      * Bulk task operations
      *
-     * @param  array  $taskIds  Task IDs to operate on
-     * @param  string  $operation  Operation (cancel, retry, delete)
-     * @return array Operation results
+     * @param  list<string>  $taskIds
+     * @return array<string, mixed>
      */
     public function bulkOperation(array $taskIds, string $operation): array
     {
@@ -893,7 +882,7 @@ BASH, [
      * Delete task
      *
      * @param  string  $taskId  Task ID to delete
-     * @return array Deletion result
+     * @return array<string, mixed>
      */
     protected function deleteTask(string $taskId): array
     {
@@ -917,7 +906,7 @@ BASH, [
     /**
      * Get quick stats summary
      *
-     * @return array Quick statistics
+     * @return array<string, int>
      */
     public function getQuickStats(): array
     {

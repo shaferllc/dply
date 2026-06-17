@@ -88,7 +88,7 @@ class DatabaseConnectionDiagnostic
         try {
             $parsed = $this->parser->parse($site->effectiveEnvFileContent());
 
-            return is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+            return ($parsed['variables'] );
         } catch (\Throwable) {
             return [];
         }

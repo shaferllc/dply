@@ -32,10 +32,11 @@ class TaskStarted
     /**
      * Additional context data.
      */
+    /** @var array<string, mixed> */
     public array $context;
 
     /**
-     * Create a new event instance.
+     * @param array<string, mixed> $context
      */
     public function __construct(Task $task, PendingTask $pendingTask, array $context = [])
     {
@@ -45,9 +46,6 @@ class TaskStarted
         $this->context = $context;
     }
 
-    /**
-     * Get the task name.
-     */
     public function getTaskName(): string
     {
         return $this->task->getName();
@@ -111,23 +109,19 @@ class TaskStarted
 
     /**
      * Get the task data.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getTaskData(): array
     {
         return $this->task->getData();
     }
 
-    /**
-     * Get the task script.
-     */
     public function getTaskScript(): string
     {
         return $this->task->getScript();
     }
 
-    /**
-     * Get the task view.
-     */
     public function getTaskView(): string
     {
         return $this->task->getView();

@@ -59,7 +59,7 @@ final class DeployResourceVerifier
         // Escape hatch: the gate is on by default, but an operator can disable it
         // per-site (meta.deploy_resource_verify = false) if a probe ever
         // misjudges a resource that the app can in fact reach.
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         if (($meta['deploy_resource_verify'] ?? true) === false) {
             return "\n[dply] RESOURCES → verification disabled for this site (deploy_resource_verify=false); skipping\n";
         }
@@ -79,7 +79,7 @@ final class DeployResourceVerifier
 
         $log = "\n--- verify resources (pre-cutover) ---\n";
         $log .= sprintf("Probing %d resource binding(s) for reachability from %s before cutover\n",
-            count($targets), (string) ($site->server?->name ?? 'the server'));
+            count($targets), (string) ($site->server->name ?? 'the server'));
 
         $steps = [];
         $criticalFailures = [];
@@ -102,7 +102,7 @@ final class DeployResourceVerifier
 
             $detail = $reachable
                 ? null
-                : sprintf('%s could not open a TCP socket to %s:%d.', (string) ($site->server?->name ?? 'The server'), $host, $port);
+                : sprintf('%s could not open a TCP socket to %s:%d.', (string) ($site->server->name ?? 'The server'), $host, $port);
             $this->recordBinding($binding, $reachable, $detail, $host, $port);
 
             if ($reachable) {
@@ -180,7 +180,7 @@ final class DeployResourceVerifier
      */
     private function recordBinding(SiteBinding $binding, bool $ok, ?string $error, string $host, int $port): void
     {
-        $config = is_array($binding->config) ? $binding->config : [];
+        $config = ($binding->config );
         $config['connectivity'] = [
             'ok' => $ok,
             'checked_at' => now()->toIso8601String(),

@@ -99,9 +99,9 @@ final class SiteWorkspaceBreadcrumbs
     public static function iconKeyFromSection(string $section, Site $site, Server $server): string
     {
         $header = SiteSettingsHeader::for($site, $server, $section);
-        $icon = $header['icon'] ?? null;
+        $icon = $header['icon'];
 
-        if (! is_string($icon) || $icon === '') {
+        if ($icon === '') {
             return 'map-pin';
         }
 

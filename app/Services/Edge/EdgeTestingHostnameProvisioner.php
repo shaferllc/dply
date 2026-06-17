@@ -170,7 +170,7 @@ final class EdgeTestingHostnameProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     private function store(Site $site, array $payload): void
     {
@@ -180,7 +180,7 @@ final class EdgeTestingHostnameProvisioner
         $meta['routing'] = $routing;
 
         $site->update([
-            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+            'meta' => array_merge(($site->meta ), ['edge' => $meta]),
         ]);
     }
 }

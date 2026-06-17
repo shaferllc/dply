@@ -23,8 +23,8 @@ final class ServerLoadBalancerNotificationDispatcher
     ) {}
 
     /**
-     * @param  list<string>  $resourceNames  affected resources (load balancer / target names)
-     * @param  array<string, mixed>  $extraMetadata
+     * @param  array<string, mixed> $resourceNames  affected resources (load balancer / target names)
+     * @param  array<string, mixed> $extraMetadata
      */
     public function notify(
         Server $server,

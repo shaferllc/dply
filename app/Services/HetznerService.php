@@ -55,6 +55,9 @@ class HetznerService
     // ─── Load Balancers ───────────────────────────────────────────────────────
 
 
+    /**
+     * @param  array<string, mixed> $body
+     */
     protected function request(string $method, string $path, array $body = []): Response
     {
         $url = $this->baseUrl.$path;

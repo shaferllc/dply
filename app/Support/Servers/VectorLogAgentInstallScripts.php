@@ -214,7 +214,7 @@ class VectorLogAgentInstallScripts
 
         // --- enrich: always stamp tenant identity (dply renders these server-side,
         //     so they're trusted-ish) + optional edge redaction ------------------
-        $orgId = (string) ($agent->server?->organization_id ?? '');
+        $orgId = (string) ($agent->server->organization_id ?? '');
         $blocks[] = $this->enrichTransform($sourceNames, $serverId, $orgId);
         $blocks[] = '';
         $sinkInput = ['enrich'];

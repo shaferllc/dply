@@ -21,6 +21,7 @@ final class ServerSshAccessWorkspaceData
     /**
      * @return array{report: array<string, mixed>, timeline: array<string, mixed>, access_map: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function for(Server $server, ?User $viewer, string $range = '30d'): array
     {
         $context = ServerSshAccessContext::load($server);

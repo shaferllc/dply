@@ -42,9 +42,10 @@ class EdgeBindingsAutoResolver
      *
      * @return array<string, array<string, string>>
      */
+    /** @return array<string, mixed> */
     public function resolve(Site $site, EdgeDeployment $deployment): array
     {
-        $config = is_array($deployment->repo_config) ? $deployment->repo_config : null;
+        $config = ($deployment->repo_config );
         $declared = is_array($config['bindings'] ?? null) ? $config['bindings'] : [];
         if ($declared === []) {
             return [];
@@ -157,7 +158,7 @@ class EdgeBindingsAutoResolver
         }
         // Use the org's preferred residency on create, mirroring
         // EdgeOrgInfraBootstrapper. Defaults to null (CF picks).
-        $region = (string) ($site->organization?->edge_data_region ?? 'default');
+        $region = (string) ($site->organization->edge_data_region ?? 'default');
         [$jur, $hint] = $this->mapRegion($region);
         $client->createR2Bucket($name, $hint, $jur);
 
@@ -171,7 +172,7 @@ class EdgeBindingsAutoResolver
                 return is_string($db['uuid'] ?? null) ? (string) $db['uuid'] : null;
             }
         }
-        $region = (string) ($site->organization?->edge_data_region ?? 'wnam');
+        $region = (string) ($site->organization->edge_data_region ?? 'wnam');
         [, $hint] = $this->mapRegion($region);
         $created = $client->createD1Database($name, $hint ?: 'wnam');
 

@@ -19,11 +19,9 @@ class ConnectionManager
     /**
      * The connection cache.
      */
+    /** @var array<string, mixed> */
     protected array $connectionCache = [];
 
-    /**
-     * Create a connection from various sources.
-     */
     public function createConnection(mixed $source): Connection
     {
         if ($source instanceof Connection) {
@@ -47,6 +45,8 @@ class ConnectionManager
 
     /**
      * Create multiple connections from various sources.
+     *
+     * @return Collection<int, Connection>
      */
     public function createConnections(mixed $sources): Collection
     {
@@ -88,6 +88,7 @@ class ConnectionManager
 
     /**
      * Create a connection from an array.
+     * @param  array<string, mixed> $source
      */
     protected function createFromArray(array $source): Connection
     {
@@ -140,6 +141,8 @@ class ConnectionManager
 
     /**
      * Create a connection from a connection string.
+     *
+     * @param  array<int, string>  $matches
      */
     protected function createFromConnectionString(array $matches): Connection
     {
@@ -158,6 +161,10 @@ class ConnectionManager
 
     /**
      * Create connections from a database query.
+     *
+     * @param  array<string, mixed>  $orderBy
+     * @param  array<string, mixed>  $where
+     * @return Collection<int, Connection>
      */
     public function createFromQuery(string $table, array $where = [], array $orderBy = []): Collection
     {
@@ -178,6 +185,11 @@ class ConnectionManager
 
     /**
      * Create connections from a model query.
+     *
+     * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $orderBy
+     * @param  array<string, mixed>  $where
+     * @return Collection<int, Connection>
      */
     public function createFromModelQuery(string $modelClass, array $where = [], array $orderBy = []): Collection
     {
@@ -198,6 +210,8 @@ class ConnectionManager
 
     /**
      * Create connections from a server group or tag.
+     *
+     * @return Collection<int, Connection>
      */
     public function createFromGroup(string $groupName, string $table = 'servers'): Collection
     {
@@ -206,6 +220,9 @@ class ConnectionManager
 
     /**
      * Create connections from tags.
+     *
+     * @param  list<string>  $tags
+     * @return Collection<int, Connection>
      */
     public function createFromTags(array $tags, string $table = 'servers'): Collection
     {
@@ -222,6 +239,9 @@ class ConnectionManager
 
     /**
      * Create connections from environment variables.
+     *
+     * @param  list<string>  $prefixes
+     * @return Collection<int, Connection>
      */
     public function createFromEnvironment(array $prefixes = ['SSH_']): Collection
     {
@@ -251,11 +271,15 @@ class ConnectionManager
             $groupedConnections[$connectionId][$property] = $value;
         }
 
-        return collect($groupedConnections)->map(fn ($connection) => $this->createFromArray($connection));
+        return collect($groupedConnections)
+            ->map(fn ($connection) => $this->createFromArray($connection))
+            ->values();
     }
 
     /**
      * Create connections from a JSON file.
+     *
+     * @return Collection<int, Connection>
      */
     public function createFromJsonFile(string $filePath): Collection
     {
@@ -282,6 +306,9 @@ class ConnectionManager
 
     /**
      * Create connections from a CSV file.
+     *
+     * @param  array<string, string>  $columnMapping
+     * @return Collection<int, Connection>
      */
     public function createFromCsvFile(string $filePath, array $columnMapping = []): Collection
     {
@@ -341,7 +368,9 @@ class ConnectionManager
 
     /**
      * Get cache statistics.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getCacheStats(): array
     {
         return [
@@ -350,9 +379,7 @@ class ConnectionManager
         ];
     }
 
-    /**
-     * Validate connection sources before creating them.
-     */
+    /** @return array<string, mixed> */
     public function validateSources(mixed $sources): array
     {
         $errors = [];

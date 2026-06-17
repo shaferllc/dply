@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Events;
 
+use App\Modules\TaskRunner\Connection;
 use App\Modules\TaskRunner\Task;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -19,26 +20,21 @@ class MultiServerTaskCompleted
 
     /**
      * The server connections.
+     *
+     * @var list<Connection>
      */
     public array $connections;
 
-    /**
-     * The multi-server task ID.
-     */
     public string $multiServerTaskId;
 
-    /**
-     * The task summary.
-     */
+    /** @var array<string, mixed> */
     public array $summary;
 
-    /**
-     * The task start timestamp.
-     */
     public string $startedAt;
 
     /**
-     * Create a new event instance.
+     * @param  list<Connection>  $connections
+     * @param  array<string, mixed>  $summary
      */
     public function __construct(
         Task $task,
@@ -133,39 +129,31 @@ class MultiServerTaskCompleted
 
     /**
      * Get the successful connections.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getSuccessfulConnections(): array
     {
         return $this->summary['successful_connections'] ?? [];
     }
 
-    /**
-     * Get the failed connections.
-     */
+    /** @return array<string, mixed> */
     public function getFailedConnections(): array
     {
         return $this->summary['failed_connections'] ?? [];
     }
 
-    /**
-     * Get the results from all servers.
-     */
+    /** @return array<string, mixed> */
     public function getResults(): array
     {
         return $this->summary['results'] ?? [];
     }
 
-    /**
-     * Check if the overall task was successful.
-     */
     public function wasSuccessful(): bool
     {
         return $this->summary['overall_success'] ?? false;
     }
 
-    /**
-     * Get the completion timestamp.
-     */
     public function getCompletedAt(): string
     {
         return $this->summary['completed_at'] ?? '';
@@ -173,7 +161,9 @@ class MultiServerTaskCompleted
 
     /**
      * Get performance metrics.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         return [

@@ -34,7 +34,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      */
     protected function rowMatchesRole(array $row, string $role): bool
     {
@@ -96,7 +96,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  list<string>  $installedIds
+     * @param  array<string, mixed> $installedIds
      */
     protected function guardMigrateSitesAction(Server $server, string $version, array $installedIds): void
     {
@@ -115,7 +115,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  list<string>  $supportedIds
+     * @param  array<string, mixed> $supportedIds
      */
     protected function guardInstallAction(string $version, array $supportedIds): void
     {
@@ -125,7 +125,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  list<string>  $installedIds
+     * @param  array<string, mixed> $installedIds
      */
     protected function guardSetCliDefaultAction(string $version, array $installedIds): void
     {
@@ -135,7 +135,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  list<string>  $installedIds
+     * @param  array<string, mixed> $installedIds
      */
     protected function guardSetNewSiteDefaultAction(string $version, array $installedIds): void
     {
@@ -145,7 +145,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  list<string>  $installedIds
+     * @param  array<string, mixed> $installedIds
      */
     protected function guardPatchAction(string $version, array $installedIds): void
     {
@@ -155,7 +155,7 @@ trait GuardsPhpPackageActions
     }
 
     /**
-     * @param  list<string>  $installedIds
+     * @param  array<string, mixed> $installedIds
      * @param  array{cli_default: ?string, new_site_default: ?string}  $defaults
      */
     protected function guardUninstallAction(string $version, array $installedIds, int $siteCount, array $defaults): void

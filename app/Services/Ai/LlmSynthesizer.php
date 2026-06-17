@@ -36,7 +36,7 @@ final class LlmSynthesizer
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      */
     public function synthesizeOpsCopilot(array $context): LlmSynthesisResult
     {
@@ -44,7 +44,7 @@ final class LlmSynthesizer
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      */
     public function synthesizeSharedHost(array $report): LlmSynthesisResult
     {
@@ -79,6 +79,7 @@ final class LlmSynthesizer
      *
      * @return array{data: array<string, mixed>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int, raw: string}
      */
+    /** @return array<string, mixed> */
     public function completeJson(string $userPrompt, ?string $systemOverride = null): array
     {
         $result = $this->complete(
@@ -250,7 +251,7 @@ final class LlmSynthesizer
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      * @return list<array{title: string, summary: string, confidence: string, doc_slug: string|null, actions: list<array{label: string, url: string}>}>
      */
     private function normalizeSuggestions(array $parsed): array

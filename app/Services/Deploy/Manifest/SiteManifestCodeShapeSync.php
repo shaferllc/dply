@@ -120,6 +120,7 @@ final class SiteManifestCodeShapeSync
     /**
      * @return array{build: int, release: int, processes: int, runtime_change: ?array{field: string, from: ?string, to: ?string}}
      */
+    /** @return array<string, mixed> */
     public function reconcile(Site $site, DplyManifest $manifest): array
     {
         $pipeline = $this->pipelines->ensureDefaultPipeline($site);
@@ -133,7 +134,7 @@ final class SiteManifestCodeShapeSync
     }
 
     /**
-     * @param  list<string>  $commands
+     * @param  array<string, mixed> $commands
      */
     private function reconcilePhase(Site $site, string $pipelineId, string $phase, array $commands): int
     {
@@ -170,7 +171,7 @@ final class SiteManifestCodeShapeSync
     }
 
     /**
-     * @param  array<string, DplyManifestProcess>  $processes
+     * @param  array<string, mixed> $processes
      */
     private function reconcileProcesses(Site $site, array $processes): int
     {
@@ -236,7 +237,7 @@ final class SiteManifestCodeShapeSync
     /** True when the manifest was removed from the repo but managed rows remain. */
     public function removalPendingConfirm(Site $site): bool
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         return (bool) ($meta['manifest']['removed_pending_confirm'] ?? false);
     }
@@ -247,6 +248,7 @@ final class SiteManifestCodeShapeSync
      *
      * @return array{steps: int, processes: int}
      */
+    /** @return array<string, mixed> */
     public function revertToDashboard(Site $site): array
     {
         $steps = SiteDeployStep::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->delete();
@@ -262,7 +264,7 @@ final class SiteManifestCodeShapeSync
             return '';
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['manifest']['removed_pending_confirm'] = true;
         $site->forceFill(['meta' => $meta])->save();
 
@@ -272,7 +274,7 @@ final class SiteManifestCodeShapeSync
 
     private function clearRemovalFlag(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         if (! isset($meta['manifest']['removed_pending_confirm'])) {
             return;
         }
@@ -327,14 +329,14 @@ final class SiteManifestCodeShapeSync
      */
     private function storePendingRuntimeChange(Site $site, array $change): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['manifest']['pending_runtime_change'] = $change;
         $site->forceFill(['meta' => $meta])->save();
     }
 
     private function clearPendingRuntimeChange(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         if (! isset($meta['manifest']['pending_runtime_change'])) {
             return;
         }

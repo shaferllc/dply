@@ -22,8 +22,8 @@ final class ServerPatchNotificationDispatcher
     ) {}
 
     /**
-     * @param  list<string>  $detailLines
-     * @param  array<string, mixed>  $extraMetadata
+     * @param  array<string, mixed> $detailLines
+     * @param  array<string, mixed> $extraMetadata
      */
     public function notify(
         Server $server,

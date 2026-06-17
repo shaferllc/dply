@@ -131,7 +131,7 @@ class ServerInstalledServices
     }
 
     /**
-     * @param  list<string>  $tags
+     * @param  array<string, mixed> $tags
      */
     public static function hasAny(Server $server, array $tags): bool
     {
@@ -166,7 +166,7 @@ class ServerInstalledServices
         }
 
         $meta = $artifact->metadata;
-        if (is_array($meta) && $meta !== []) {
+        if ($meta !== []) {
             return self::$stackSummaryCache[$key] = $meta;
         }
 

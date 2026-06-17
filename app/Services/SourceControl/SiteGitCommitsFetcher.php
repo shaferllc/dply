@@ -55,6 +55,7 @@ final class SiteGitCommitsFetcher
      *     remote_label: string|null,
      * }
      */
+    /** @return array<string, mixed> */
     public function fetch(Site $site, User $user, int $limit = 30, ?string $branchOverride = null, int $page = 1): array
     {
         $branch = $branchOverride !== null && $branchOverride !== ''
@@ -121,6 +122,7 @@ final class SiteGitCommitsFetcher
      * transient ?repo_ref preview), only while the stored branch is exactly the
      * missing one, and only for a never-deployed site — so we never override a
      * ref the operator deliberately set or one a live deployment depends on.
+     * @param  array<string, mixed> $result
      */
     private function persistResolvedBranchIfStale(Site $site, ?string $branchOverride, array $result): void
     {
@@ -141,6 +143,9 @@ final class SiteGitCommitsFetcher
         $site->forceFill(['git_branch' => $resolved])->save();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function parseRemoteUrl(?string $url): ?array
     {
         if ($url === null || trim($url) === '') {
@@ -172,6 +177,9 @@ final class SiteGitCommitsFetcher
         return $this->remoteFromHostAndPath($host, $path);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function remoteFromHostAndPath(string $host, string $path): ?array
     {
         if ($path === '') {
@@ -220,6 +228,10 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function fetchGithub(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user, 'github');
@@ -336,6 +348,7 @@ final class SiteGitCommitsFetcher
      * The repo's default branch (e.g. "master") via GET /repos/{owner}/{repo}.
      * Used to recover from a list-commits 404 when the configured branch is
      * stale/missing. Returns null when the repo can't be read.
+     * @param  array<string, mixed> $remote
      */
     private function githubDefaultBranch(GitIdentity $identity, array $remote): ?string
     {
@@ -369,6 +382,10 @@ final class SiteGitCommitsFetcher
         ]);
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user, 'gitlab');
@@ -500,6 +517,10 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     * @return array<string, mixed>
+     */
     private function fetchBitbucket(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user, 'bitbucket');
@@ -623,6 +644,9 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
+    /**
+     * @param  array<string, mixed> $remote
+     */
     private function gitlabApiBase(GitIdentity $identity, array $remote): string
     {
         $base = $identity->apiBaseUrl();

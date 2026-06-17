@@ -174,7 +174,7 @@ class PloiInventorySync
     }
 
     /**
-     * @param  list<int>  $seenSourceIds
+     * @param  array<string, mixed> $seenSourceIds
      */
     protected function markMissingServersRemoved(ProviderCredential $credential, array $seenSourceIds): void
     {
@@ -201,7 +201,7 @@ class PloiInventorySync
     }
 
     /**
-     * @param  list<int>  $seenSourceIds
+     * @param  array<string, mixed> $seenSourceIds
      */
     protected function markMissingSitesRemoved(PloiServer $server, array $seenSourceIds): void
     {

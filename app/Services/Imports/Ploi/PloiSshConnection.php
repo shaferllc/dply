@@ -58,6 +58,7 @@ class PloiSshConnection implements RemoteShell
         return (string) $this->ssh->exec($command);
     }
 
+    /** @return array<string, mixed> */
     public function execWithExit(string $command, int $timeoutSeconds = 120): array
     {
         $output = $this->exec($command, $timeoutSeconds);

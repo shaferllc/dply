@@ -15,25 +15,19 @@ class TaskChainStarted
     /**
      * The tasks in the chain.
      */
+    /** @var array<string, mixed> */
     public array $tasks;
 
-    /**
-     * The chain ID.
-     */
     public string $chainId;
 
-    /**
-     * The start timestamp.
-     */
     public string $startedAt;
 
-    /**
-     * The execution options.
-     */
+    /** @var array<string, mixed> */
     public array $options;
 
     /**
-     * Create a new event instance.
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $tasks
      */
     public function __construct(array $tasks, string $chainId, string $startedAt, array $options = [])
     {
@@ -43,9 +37,6 @@ class TaskChainStarted
         $this->options = $options;
     }
 
-    /**
-     * Get the number of tasks in the chain.
-     */
     public function getTaskCount(): int
     {
         return count($this->tasks);
@@ -53,31 +44,25 @@ class TaskChainStarted
 
     /**
      * Get the task names.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getTaskNames(): array
     {
         return array_map(fn ($task) => $task->getName(), $this->tasks);
     }
 
-    /**
-     * Get the task classes.
-     */
+    /** @return array<string, mixed> */
     public function getTaskClasses(): array
     {
         return array_map(fn ($task) => get_class($task), $this->tasks);
     }
 
-    /**
-     * Check if streaming is enabled.
-     */
     public function isStreamingEnabled(): bool
     {
         return $this->options['streaming'] ?? true;
     }
 
-    /**
-     * Check if progress tracking is enabled.
-     */
     public function isProgressTrackingEnabled(): bool
     {
         return $this->options['progress_tracking'] ?? true;

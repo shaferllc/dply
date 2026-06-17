@@ -12,7 +12,7 @@ use RuntimeException;
 final class AwsLambdaSdkProvisioner implements ServerlessFunctionProvisioner
 {
     /**
-     * @param  array<int, string>  $s3AllowBuckets
+     * @param  array<string, mixed> $s3AllowBuckets
      */
     public function __construct(
         private readonly AwsLambdaGateway $gateway,
@@ -23,6 +23,8 @@ final class AwsLambdaSdkProvisioner implements ServerlessFunctionProvisioner
         private readonly array $s3AllowBuckets = [],
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         $gateway = $this->gatewayForProviderConfig($config);
@@ -46,7 +48,7 @@ final class AwsLambdaSdkProvisioner implements ServerlessFunctionProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      */
     private function gatewayForProviderConfig(array $config): AwsLambdaGateway
     {
@@ -59,8 +61,8 @@ final class AwsLambdaSdkProvisioner implements ServerlessFunctionProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $config
-     * @return list<string>
+     * @param  array<string, mixed> $config
+     * @return non-empty-array<string, mixed>
      */
     private function s3AllowBucketsForConfig(array $config): array
     {
@@ -115,7 +117,7 @@ final class AwsLambdaSdkProvisioner implements ServerlessFunctionProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return array{function_arn: string, revision_id: string}|null
      */
     private function tryDeployFromS3(AwsLambdaGateway $gateway, string $functionName, string $artifactPath, array $config): ?array

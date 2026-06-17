@@ -15,7 +15,7 @@ final class DeployPipelineIssueFixResolver
 {
     /**
      * @param  Collection<int, array{key?: string, level?: string, message?: string, meta?: array<string, mixed>}>  $checks
-     * @return Collection<int, array{key: string, level: string, message: string, fix: ?array{label: string, url?: string, action?: string}}>
+     * @return Collection<int, array{key: string, level: string, message: string, fix: array{label: string, url?: string, action?: string}}>
      */
     public static function actionableChecks(Site $site, Server $server, Collection $checks): Collection
     {
@@ -36,10 +36,10 @@ final class DeployPipelineIssueFixResolver
     }
 
     /**
-     * @param  array<string, mixed>  $meta
-     * @return array{label: string, url?: string, action?: string}|null
+     * @param  array<string, mixed> $meta
+     * @return array{label: string, url?: string, action?: string}
      */
-    public static function fixFor(Site $site, Server $server, string $key, array $meta = []): ?array
+    public static function fixFor(Site $site, Server $server, string $key, array $meta = []): array
     {
         if (str_starts_with($key, 'duplicate_step_')) {
             $stepType = (string) ($meta['step_type'] ?? '');
@@ -180,7 +180,7 @@ final class DeployPipelineIssueFixResolver
      * In-place "move this step to the other phase" fix, falling back to the
      * steps tab when the originating check didn't carry phase metadata.
      *
-     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed> $meta
      * @return array{label: string, url?: string, action?: string}
      */
     private static function phaseMoveFix(Site $site, Server $server, string $label, array $meta): array

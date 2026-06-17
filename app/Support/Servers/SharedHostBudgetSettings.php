@@ -61,9 +61,6 @@ final class SharedHostBudgetSettings
 
         $sites = [];
         foreach ($input['site_rows'] ?? [] as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
             $slug = trim((string) ($row['slug'] ?? ''));
             if ($slug === '') {
                 continue;

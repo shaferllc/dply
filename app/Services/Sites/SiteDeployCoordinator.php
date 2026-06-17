@@ -216,7 +216,7 @@ class SiteDeployCoordinator
                 SiteDeployment::STATUS_SUCCESS,
                 SiteDeployment::STATUS_SKIPPED,
             ], true)
-            && $latest->created_at?->greaterThanOrEqualTo($startedAt->subSeconds(2));
+            && $latest->created_at->greaterThanOrEqualTo($startedAt->subSeconds(2));
 
         return ! $terminalSinceLock && $startedAt->greaterThan(now()->subSeconds(90));
     }
@@ -304,7 +304,7 @@ class SiteDeployCoordinator
     public function completedFixerKeys(Site $site, ?SiteDeployment $latest = null): array
     {
         $latest ??= $this->latestDeployment($site);
-        $since = $latest?->finished_at ?? $latest?->created_at;
+        $since = $latest->finished_at ?? $latest->created_at;
 
         $query = ConsoleAction::query()
             ->where('subject_type', $site->getMorphClass())

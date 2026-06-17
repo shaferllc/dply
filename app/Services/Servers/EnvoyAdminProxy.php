@@ -21,6 +21,7 @@ class EnvoyAdminProxy
     /**
      * @return array{status: int, body: string, content_type: string, target_url: string, admin_url: string}
      */
+    /** @return array<string, mixed> */
     public function fetch(Server $server, string $path, string $proxyPrefix): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key) || blank($server->ip_address)) {

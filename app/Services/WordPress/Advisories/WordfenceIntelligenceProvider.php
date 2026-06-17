@@ -33,23 +33,37 @@ class WordfenceIntelligenceProvider implements AdvisoryProvider
         return 'Wordfence Intelligence';
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<App\Services\WordPress\Advisories\Advisory>
+     */
     public function forPlugin(string $slug, string $installedVersion): array
     {
         return $this->lookup('plugin', $slug, $installedVersion);
     }
 
+    /** @return list<App\Services\WordPress\Advisories\Advisory>
+    /** @return list<App\Services\WordPress\Advisories\Advisory>
+    /**
+     * @return list<App\Services\WordPress\Advisories\Advisory>
+     */
     public function forTheme(string $slug, string $installedVersion): array
     {
         return $this->lookup('theme', $slug, $installedVersion);
     }
 
+    /** @return list<App\Services\WordPress\Advisories\Advisory>
+    /** @return list<App\Services\WordPress\Advisories\Advisory>
+    /**
+     * @return list<App\Services\WordPress\Advisories\Advisory>
+     */
     public function forCore(string $installedVersion): array
     {
         return $this->lookup('core', 'wordpress', $installedVersion);
     }
 
     /**
-     * @return list<Advisory>
+     * @return list<App\Services\WordPress\Advisories\Advisory>
      */
     private function lookup(string $kind, string $slug, string $version): array
     {

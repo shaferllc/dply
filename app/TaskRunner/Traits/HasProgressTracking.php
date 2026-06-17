@@ -22,16 +22,15 @@ trait HasProgressTracking
 
     /**
      * The step descriptions.
+     *
+     * @var list<string>
      */
     protected array $stepDescriptions = [];
 
-    /**
-     * The streaming logger instance.
-     */
     protected ?StreamingLoggerInterface $progressLogger = null;
 
     /**
-     * Initialize progress tracking.
+     * @param  list<string>  $stepDescriptions
      */
     protected function initializeProgress(int $totalSteps, array $stepDescriptions = []): void
     {
@@ -43,9 +42,6 @@ trait HasProgressTracking
         $this->streamProgress(0, $totalSteps, 'Task initialized');
     }
 
-    /**
-     * Move to the next step.
-     */
     protected function nextStep(?string $description = null): void
     {
         $this->currentStep++;

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Request;
 class DatabaseEngineAuditLogger
 {
     /**
-     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed> $meta
      */
     public function record(
         Server $server,

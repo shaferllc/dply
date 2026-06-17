@@ -16,7 +16,7 @@ use RuntimeException;
 final class EdgeDeployReplayRunner
 {
     /**
-     * @param  list<array{method: string, path: string, prod_status: ?int, prod_duration_ms: int}>  $samples
+     * @param  array<string, mixed> $samples
      * @return array{results: list<array<string, mixed>>, summary: array<string, mixed>}
      */
     public function run(Site $previewSite, array $samples): array
@@ -118,7 +118,7 @@ final class EdgeDeployReplayRunner
         ]);
 
         $preview = Site::query()->findOrFail($replay->preview_site_id);
-        $samples = is_array($replay->samples) ? $replay->samples : [];
+        $samples = ($replay->samples );
 
         if ($samples === []) {
             $replay->update([

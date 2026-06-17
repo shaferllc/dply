@@ -130,6 +130,7 @@ class ServerSystemLogReader
      *
      * @return array{output: string, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function tailAllowlistedFile(Server $server, string $path, ?int $tailLineCount = null): array
     {
         $normalized = str_starts_with($path, '/') ? $path : '/'.$path;
@@ -199,7 +200,7 @@ class ServerSystemLogReader
                 '%s  %s  %s  %s',
                 $log->created_at->timezone($tz)->format('Y-m-d H:i:s'),
                 $log->action,
-                $log->user?->name ?? '—',
+                $log->user->name ?? '—',
                 Str::limit((string) ($log->subject_summary ?? ''), 120)
             );
         }
@@ -243,7 +244,7 @@ class ServerSystemLogReader
                     '%s  audit  %s  %s  %s',
                     $at->timezone($tz)->format('Y-m-d H:i:s'),
                     $log->action,
-                    $log->user?->name ?? '—',
+                    $log->user->name ?? '—',
                     Str::limit((string) ($log->subject_summary ?? ''), 120)
                 ),
             ];
@@ -456,6 +457,9 @@ class ServerSystemLogReader
         ];
     }
 
+    /**
+     * @param  array<string, mixed> $def
+     */
     private function resolveJournalUnit(Server $server, array $def): ?string
     {
         $unit = '';

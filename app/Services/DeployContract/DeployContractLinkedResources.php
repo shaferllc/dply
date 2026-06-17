@@ -15,6 +15,7 @@ final class DeployContractLinkedResources
     /**
      * @return array{cloud: ?Site, byo: list<Site>}
      */
+    /** @return array<string, mixed> */
     public function forParent(Site $parent): array
     {
         $cloud = $this->linkedCloudSite($parent);

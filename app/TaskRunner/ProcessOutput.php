@@ -86,24 +86,18 @@ class ProcessOutput
     /**
      * Returns the buffer as an array of strings.
      *
-     * @return array<string>
+     * @return list<string>
      */
     public function getLines(): array
     {
         return explode(PHP_EOL, $this->getBuffer());
     }
 
-    /**
-     * Returns the exit code.
-     */
     public function getExitCode(): ?int
     {
         return $this->exitCode;
     }
 
-    /**
-     * Checks if the process was successful.
-     */
     public function isSuccessful(): bool
     {
         return $this->getExitCode() === 0;

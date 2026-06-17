@@ -90,8 +90,8 @@ class TraefikLiveStateProbe extends AbstractEngineLiveStateProbe
                 'providers' => $this->buildProviderUnits($routers, $services, $tcpRouters, $tcpServices),
             ],
             engineSpecific: array_filter([
-                'overview' => is_array($overview) ? $overview : null,
-                'version' => is_array($version) ? $version : null,
+                'overview' => ($overview ),
+                'version' => ($version ),
                 'errors' => $errors !== [] ? $errors : null,
             ], static fn ($v) => $v !== null),
         );
@@ -454,7 +454,7 @@ BASH;
     /**
      * /api/tls/stores — default certificate stores and stored certs.
      *
-     * @param  array<int, array<string, mixed>>|array<string, mixed>  $stores
+     * @param  array<string, mixed> $stores
      * @return list<array<string, mixed>>
      */
     private function buildTlsUnits(array $stores): array

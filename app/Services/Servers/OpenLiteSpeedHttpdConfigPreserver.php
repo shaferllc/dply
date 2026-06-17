@@ -14,6 +14,7 @@ class OpenLiteSpeedHttpdConfigPreserver
     /**
      * @return array<string, string> module name => full block text
      */
+    /** @return array<string, mixed> */
     public function extractModuleBlocks(string $config): array
     {
         if ($config === '') {

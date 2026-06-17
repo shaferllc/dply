@@ -24,7 +24,7 @@ class EnsureEdgeRepoDomains
             return;
         }
 
-        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : [];
+        $repoConfig = ($deployment->repo_config );
         $declared = is_array($repoConfig['domains'] ?? null) ? $repoConfig['domains'] : [];
         if ($declared === []) {
             return;

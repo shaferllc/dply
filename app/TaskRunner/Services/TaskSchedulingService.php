@@ -36,7 +36,7 @@ class TaskSchedulingService
      * Get calendar view for a specific month
      *
      * @param  string  $month  Month in Y-m format (e.g., '2025-10')
-     * @return array Calendar data with tasks
+     * @return array<string, mixed> Calendar data with tasks
      */
     public function getCalendarView(string $month): array
     {
@@ -94,8 +94,8 @@ class TaskSchedulingService
      * @param  string  $name  Task name
      * @param  string  $script  Script to execute
      * @param  string  $schedule  Cron expression
-     * @param  array  $options  Task options
-     * @return array Scheduling result
+     * @param  array<string, mixed>  $options  Task options
+     * @return array<string, mixed> Scheduling result
      */
     public function scheduleRecurring(string $name, string $script, string $schedule, array $options = []): array
     {
@@ -153,7 +153,7 @@ class TaskSchedulingService
      * Get upcoming scheduled tasks
      *
      * @param  int  $days  Days ahead to look
-     * @return array Upcoming tasks
+     * @return list<array<string, int|string>> Upcoming tasks
      */
     public function getUpcomingTasks(int $days = 7): array
     {
@@ -176,7 +176,7 @@ class TaskSchedulingService
      * Get task schedule conflicts
      *
      * @param  string  $month  Month to check
-     * @return array Scheduling conflicts
+     * @return array<string, mixed> Scheduling conflicts
      */
     public function getScheduleConflicts(string $month): array
     {

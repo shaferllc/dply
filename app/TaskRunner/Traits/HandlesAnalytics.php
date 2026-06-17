@@ -13,39 +13,39 @@ use Illuminate\Support\Facades\Cache;
  */
 trait HandlesAnalytics
 {
+    use HandlesPerformanceMeasurement;
+
     /**
      * Analytics configuration properties.
      */
     protected bool $analyticsEnabled = true;
 
+    /** @var array<string, mixed> */
     protected array $performanceMetrics = [];
 
+    /** @var array<string, mixed> */
     protected array $resourceMetrics = [];
 
+    /** @var array<string, mixed> */
     protected array $executionTimes = [];
 
-    protected array $measurements = [];
-
+    /** @var array<string, mixed> */
     protected array $baselineMetrics = [];
 
+    /** @var array<string, mixed> */
     protected array $performanceAlerts = [];
 
-    /**
-     * Check if analytics are enabled for this task.
-     */
     public function isAnalyticsEnabled(): bool
     {
         return $this->analyticsEnabled;
     }
 
-    /**
-     * Get performance metrics for this task.
-     */
+    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         $metrics = [
-            'task_id' => $this->task?->id,
-            'task_name' => $this->task?->name,
+            'task_id' => $this->taskModel?->id,
+            'task_name' => $this->taskModel?->name,
             'execution_time' => $this->getExecutionTime(),
             'memory_usage' => $this->getMemoryUsage(),
             'cpu_usage' => $this->getCpuUsage(),
@@ -65,6 +65,7 @@ trait HandlesAnalytics
     /**
      * Get resource usage metrics.
      */
+    /** @return array<string, mixed> */
     public function getResourceMetrics(): array
     {
         return [
@@ -99,6 +100,7 @@ trait HandlesAnalytics
     /**
      * Get optimization recommendations.
      */
+    /** @return array<string, mixed> */
     public function getOptimizationRecommendations(): array
     {
         $recommendations = [];
@@ -154,9 +156,10 @@ trait HandlesAnalytics
     /**
      * Get performance trends.
      */
+    /** @return array<string, mixed> */
     public function getPerformanceTrends(): array
     {
-        $taskId = $this->task?->id;
+        $taskId = $this->taskModel?->id;
         if (! $taskId) {
             return [];
         }
@@ -176,6 +179,7 @@ trait HandlesAnalytics
     /**
      * Get bottleneck analysis.
      */
+    /** @return array<string, mixed> */
     public function getBottleneckAnalysis(): array
     {
         $bottlenecks = [];
@@ -221,6 +225,7 @@ trait HandlesAnalytics
     /**
      * Get cost analysis.
      */
+    /** @return array<string, mixed> */
     public function getCostAnalysis(): array
     {
         $executionTime = $this->getExecutionTime();
@@ -265,20 +270,19 @@ trait HandlesAnalytics
             'network_io' => 0.1,
         ];
 
-        $totalScore = 0;
-        $totalWeight = 0;
+        $totalScore = 0.0;
 
         foreach ($scores as $metric => $score) {
             $totalScore += $score * $weights[$metric];
-            $totalWeight += $weights[$metric];
         }
 
-        return $totalWeight > 0 ? $totalScore / $totalWeight : 0;
+        return $totalScore;
     }
 
     /**
      * Get performance alerts.
      */
+    /** @return array<string, mixed> */
     public function getPerformanceAlerts(): array
     {
         $alerts = [];
@@ -325,6 +329,7 @@ trait HandlesAnalytics
 
     /**
      * Record performance metric.
+      * @param array<string, mixed> $context
      */
     public function recordMetric(string $metric, mixed $value, array $context = []): void
     {
@@ -336,12 +341,13 @@ trait HandlesAnalytics
 
         // Store in analytics service
         $analyticsService = app(AnalyticsService::class);
-        $analyticsService->recordMetric($this->task?->id, $metric, $value, $context);
+        $analyticsService->recordMetric($this->taskModel?->id, $metric, $value, $context);
     }
 
     /**
      * Compare performance with baseline.
      */
+    /** @return array<string, mixed> */
     public function compareWithBaseline(): array
     {
         $currentMetrics = $this->getPerformanceMetrics();
@@ -369,6 +375,7 @@ trait HandlesAnalytics
 
     /**
      * Set analytics configuration.
+      * @param array<string, mixed> $config
      */
     public function setAnalyticsConfig(array $config): self
     {
@@ -400,6 +407,7 @@ trait HandlesAnalytics
 
     /**
      * Add performance alert.
+      * @param array<string, mixed> $alert
      */
     public function addPerformanceAlert(array $alert): self
     {
@@ -409,22 +417,6 @@ trait HandlesAnalytics
     }
 
     // Helper methods for metrics calculation
-
-    protected function getExecutionTime(): float
-    {
-        if (! $this->task) {
-            return 0.0;
-        }
-
-        $startedAt = $this->task->created_at;
-        $completedAt = $this->task->updated_at;
-
-        if (! $startedAt || ! $completedAt) {
-            return 0.0;
-        }
-
-        return $startedAt->diffInSeconds($completedAt);
-    }
 
     protected function getMemoryUsage(): int
     {
@@ -437,6 +429,7 @@ trait HandlesAnalytics
         return 0.0;
     }
 
+    /** @return array<string, mixed> */
     protected function getDiskIO(): array
     {
         return [
@@ -445,6 +438,7 @@ trait HandlesAnalytics
         ];
     }
 
+    /** @return array<string, mixed> */
     protected function getNetworkIO(): array
     {
         return [
@@ -566,48 +560,17 @@ trait HandlesAnalytics
         return 1.0; // Placeholder
     }
 
-    protected function getInitializationTime(): float
-    {
-        return $this->measurements['initialization']['duration'] ?? 0.0;
-    }
-
-    protected function getProcessingTime(): float
-    {
-        return $this->measurements['processing']['duration'] ?? 0.0;
-    }
-
-    protected function getCleanupTime(): float
-    {
-        return $this->measurements['cleanup']['duration'] ?? 0.0;
-    }
-
-    protected function getWaitTime(): float
-    {
-        return $this->measurements['wait']['duration'] ?? 0.0;
-    }
-
-    protected function getOverheadTime(): float
-    {
-        $total = $this->getExecutionTime();
-        $measured = $this->getInitializationTime() + $this->getProcessingTime() +
-                   $this->getCleanupTime() + $this->getWaitTime();
-
-        return max(0, $total - $measured);
-    }
-
     protected function getBaselineExecutionTime(): float
     {
         return $this->baselineMetrics['execution_time'] ?? 60.0;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getBaselineMetrics(): array
     {
         return $this->baselineMetrics;
-    }
-
-    protected function calculatePercentage(float $part, float $total): float
-    {
-        return $total > 0 ? ($part / $total) * 100 : 0;
     }
 
     protected function calculateExecutionTimeScore(): float
@@ -644,6 +607,7 @@ trait HandlesAnalytics
         return 1.0; // Placeholder
     }
 
+    /** @return array<string, mixed> */
     protected function getCostTrend(): array
     {
         return [
@@ -667,17 +631,5 @@ trait HandlesAnalytics
         } else {
             return 'stable';
         }
-    }
-
-    protected function convertToCsv(array $data): string
-    {
-        // Convert data to CSV format
-        return ''; // Placeholder
-    }
-
-    protected function convertToXml(array $data): string
-    {
-        // Convert data to XML format
-        return ''; // Placeholder
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Events;
 
+use App\Modules\TaskRunner\Connection;
 use App\Modules\TaskRunner\Task;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -19,26 +20,21 @@ class MultiServerTaskStarted
 
     /**
      * The server connections.
+     *
+     * @var list<Connection>
      */
     public array $connections;
 
-    /**
-     * The multi-server task ID.
-     */
     public string $multiServerTaskId;
 
-    /**
-     * The task start timestamp.
-     */
     public string $startedAt;
 
-    /**
-     * The execution options.
-     */
+    /** @var array<string, mixed> */
     public array $options;
 
     /**
-     * Create a new event instance.
+     * @param  list<Connection>  $connections
+     * @param  array<string, mixed>  $options
      */
     public function __construct(
         Task $task,

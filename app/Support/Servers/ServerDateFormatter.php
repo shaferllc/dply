@@ -60,7 +60,7 @@ class ServerDateFormatter
      */
     public static function resolveKey(?Server $server): string
     {
-        $meta = is_array($server?->meta ?? null) ? $server->meta : [];
+        $meta = is_array($server->meta ?? null) ? $server->meta : [];
         $key = is_string($meta['date_format'] ?? null) ? (string) $meta['date_format'] : '';
         $allowed = array_keys((array) config('server_settings.date_formats', []));
 
@@ -74,7 +74,7 @@ class ServerDateFormatter
      */
     public static function resolveTimezone(?Server $server): string
     {
-        $meta = is_array($server?->meta ?? null) ? $server->meta : [];
+        $meta = is_array($server->meta ?? null) ? $server->meta : [];
         $tz = is_string($meta['timezone'] ?? null) ? (string) $meta['timezone'] : '';
 
         return $tz !== '' ? $tz : (string) config('app.timezone', 'UTC');

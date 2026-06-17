@@ -82,6 +82,10 @@ class SiteBindingManager
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function reachableServerIdsForSite(Site $site): array
     {
         $server = $site->server;
@@ -89,6 +93,13 @@ class SiteBindingManager
         return $server === null ? [] : $this->reachableServerIds($server);
     }
 
+    /**
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function attachableTargets(Site $site, string $type): array
     {
         return match ($type) {
@@ -102,7 +113,7 @@ class SiteBindingManager
     /**
      * Attach an existing resource to the site.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     public function attachExisting(Site $site, string $type, array $params): SiteBinding
     {
@@ -137,7 +148,7 @@ class SiteBindingManager
     /**
      * Provision a brand-new resource, then attach it.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     public function provisionNew(Site $site, string $type, array $params): SiteBinding
     {
@@ -232,6 +243,10 @@ class SiteBindingManager
      *
      * @return list<string> every key removed across all bindings
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function reAdoptAll(Site $site): array
     {
         $removed = [];
@@ -311,7 +326,7 @@ class SiteBindingManager
             return;
         }
 
-        $cfg = is_array($binding->config) ? $binding->config : [];
+        $cfg = ($binding->config );
         if (($cfg['provisioned_during_setup'] ?? false) === true) {
             return;
         }
@@ -364,8 +379,8 @@ class SiteBindingManager
      * each its own filesystem disk; every other caller keeps the narrow key and
      * is therefore unaffected.
      *
-     * @param  array<string, mixed>  $attributes
-     * @param  list<string>  $matchOn  Attribute keys (from $attributes, plus the
+     * @param  array<string, mixed> $attributes
+     * @param  array<string, mixed> $matchOn  Attribute keys (from $attributes, plus the
      *                                 implicit site_id/type) to match the existing row on.
      */
     private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding

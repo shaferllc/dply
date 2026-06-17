@@ -163,7 +163,7 @@ class SiteBackendBalancerProvisioner
 
     private function linkToGroup(Site $site, LoadBalancer $lb): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $group = is_array($meta['backend_group'] ?? null) ? $meta['backend_group'] : [];
         $group['load_balancer_id'] = (string) $lb->id;
         $meta['backend_group'] = $group;

@@ -20,6 +20,7 @@ trait ManagesDoKubernetes
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getKubernetesClusters(): array
     {
         return $this->cachedCatalogList('do_kubernetes_clusters', '/kubernetes/clusters', 'kubernetes_clusters');
@@ -87,6 +88,7 @@ trait ManagesDoKubernetes
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getKubernetesOptions(): array
     {
         $cacheKey = 'do_kubernetes_options:'.sha1($this->token);

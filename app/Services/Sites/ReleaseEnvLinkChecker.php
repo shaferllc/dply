@@ -33,6 +33,7 @@ final class ReleaseEnvLinkChecker
     /**
      * @return array{applicable: bool, canonical: string, checked: int, drifted: list<array{release: string, kind: string, target: ?string}>}
      */
+    /** @return array<string, mixed> */
     public function check(Site $site): array
     {
         $notApplicable = ['applicable' => false, 'canonical' => '', 'checked' => 0, 'drifted' => []];
@@ -98,6 +99,7 @@ final class ReleaseEnvLinkChecker
     /**
      * @return array{applicable: bool, canonical: string, checked: int, drifted: list<array{release: string, kind: string, target: ?string}>}
      */
+    /** @return array<string, mixed> */
     public function parse(string $raw): array
     {
         $canonical = '';

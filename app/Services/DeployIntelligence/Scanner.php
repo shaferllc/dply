@@ -43,6 +43,7 @@ class Scanner
     /**
      * @return array{opened:int, refreshed:int, resolved:int}
      */
+    /** @return array<string, mixed> */
     public function scan(Organization $organization): array
     {
         $opened = 0;

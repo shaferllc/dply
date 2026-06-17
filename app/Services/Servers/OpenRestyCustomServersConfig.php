@@ -17,6 +17,10 @@ class OpenRestyCustomServersConfig
     /**
      * @return list<array{name: string, server_names: list<string>, upstream: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, list<string>|string>>
+     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -54,7 +58,7 @@ class OpenRestyCustomServersConfig
     }
 
     /**
-     * @param  list<string>  $serverNames
+     * @param  array<string, mixed> $serverNames
      */
     public function add(
         Server $server,
@@ -97,7 +101,7 @@ class OpenRestyCustomServersConfig
     }
 
     /**
-     * @return list<array{name: string, server_names: list<string>, upstream: string}>
+     * @return array<string, mixed>
      */
     public static function serversFromServer(Server $server): array
     {
@@ -105,7 +109,7 @@ class OpenRestyCustomServersConfig
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{name: string, server_names: list<string>, upstream: string}|null
      */
     private function normalizeRow(array $row): ?array
@@ -147,7 +151,7 @@ class OpenRestyCustomServersConfig
     }
 
     /**
-     * @param  list<string>|string  $serverNames
+     * @param  list<string>|string $serverNames
      * @return list<string>
      */
     private function normalizeServerNames(array|string $serverNames): array

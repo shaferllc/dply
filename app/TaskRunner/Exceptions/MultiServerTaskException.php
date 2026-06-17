@@ -16,15 +16,19 @@ class MultiServerTaskException extends Exception
     /**
      * The server connections.
      */
+    /** @var array<string, mixed> */
     protected array $connections;
 
-    /**
-     * The failed connections.
-     */
+    /** @var array<string, mixed> */
     protected array $failedConnections;
 
+    /** @var array<string, mixed> */
+    protected array $summary = [];
+
     /**
-     * Create a new exception instance.
+     * @param array<string, mixed> $connections
+     * @param array<string, mixed> $failedConnections
+     * @param array<string, mixed> $summary
      */
     public function __construct(
         string $message = '',
@@ -39,6 +43,7 @@ class MultiServerTaskException extends Exception
         $this->multiServerTaskId = $multiServerTaskId;
         $this->connections = $connections;
         $this->failedConnections = $failedConnections;
+        $this->summary = $summary;
     }
 
     /**
@@ -49,41 +54,38 @@ class MultiServerTaskException extends Exception
         return $this->multiServerTaskId;
     }
 
+    /** @return array<string, mixed> */
+    public function getSummary(): array
+    {
+        return $this->summary;
+    }
+
     /**
      * Get the server connections.
+     * @return array<string, mixed>
      */
     public function getConnections(): array
     {
         return $this->connections;
     }
 
-    /**
-     * Get the failed connections.
-     */
+    /** @return array<string, mixed> */
     public function getFailedConnections(): array
     {
         return $this->failedConnections;
     }
 
-    /**
-     * Get the successful connections.
-     */
+    /** @return array<string, mixed> */
     public function getSuccessfulConnections(): array
     {
         return array_diff($this->connections, $this->failedConnections);
     }
 
-    /**
-     * Get the number of total servers.
-     */
     public function getTotalServers(): int
     {
         return count($this->connections);
     }
 
-    /**
-     * Get the number of failed servers.
-     */
     public function getFailedServers(): int
     {
         return count($this->failedConnections);

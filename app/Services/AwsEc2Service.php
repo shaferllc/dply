@@ -61,6 +61,7 @@ class AwsEc2Service
      *
      * @return array{key_name: string, key_material: string}
      */
+    /** @return array<string, mixed> */
     public function createKeyPair(string $keyName): array
     {
         $result = $this->client->createKeyPair([
@@ -211,6 +212,7 @@ class AwsEc2Service
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function describeInstances(string $instanceId): array
     {
         $result = $this->client->describeInstances([
@@ -225,6 +227,7 @@ class AwsEc2Service
 
     /**
      * Get public IPv4 from an instance array (first instance).
+     * @param  array<string, mixed> $instances
      */
     public static function getPublicIp(array $instances): ?string
     {
@@ -239,6 +242,7 @@ class AwsEc2Service
 
     /**
      * Get instance state (e.g. 'running', 'pending').
+     * @param  array<string, mixed> $instances
      */
     public static function getState(array $instances): ?string
     {
@@ -276,6 +280,10 @@ class AwsEc2Service
      *
      * @return array<int, array{id: string, name: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function getRegions(): array
     {
         $result = $this->client->describeRegions([
@@ -303,7 +311,7 @@ class AwsEc2Service
     /**
      * Default region list when API is unavailable (e.g. permission or network).
      *
-     * @return array<int, array{id: string, name: string}>
+     * @return list<array<string, string>>
      */
     public static function getDefaultRegions(): array
     {

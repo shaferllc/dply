@@ -58,13 +58,10 @@ final class ProvisioningDigest
             && $server->setup_status === Server::SETUP_STATUS_RUNNING;
         $setupFailed = $server->setup_status === Server::SETUP_STATUS_FAILED;
 
-        $elapsedSeconds = null;
-        if ($server->created_at) {
-            try {
-                $elapsedSeconds = max(0, (int) $server->created_at->diffInSeconds(now()));
-            } catch (Throwable) {
-                $elapsedSeconds = null;
-            }
+        try {
+            $elapsedSeconds = max(0, (int) $server->created_at->diffInSeconds(now()));
+        } catch (Throwable) {
+            $elapsedSeconds = null;
         }
 
         // Setup phase — derive the current scripted step from the most-recently
@@ -83,9 +80,9 @@ final class ProvisioningDigest
                 ->values();
             $total = $entries->count();
             $emitted = $entries->filter(static fn (array $snap): bool => isset($snap['updated_at']))->values();
-            $latest = $emitted->sortByDesc(static fn (array $snap): string => (string) ($snap['updated_at'] ?? ''))->first();
+            $latest = $emitted->sortByDesc(static fn (array $snap): string => (string) $snap['updated_at'])->first();
 
-            if (is_array($latest) && isset($latest['label'])) {
+            if (is_array($latest)) {
                 $stepLabel = (string) $latest['label'];
                 $index = (int) $emitted->count();
 

@@ -24,6 +24,7 @@ class TraefikHttpServicesConfig
     /**
      * @return array{services: list<array{slug: string, path: string, servers: list<string>}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

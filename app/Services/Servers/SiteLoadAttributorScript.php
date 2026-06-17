@@ -12,7 +12,7 @@ use App\Support\Servers\SiteLoadAttributionHistory;
 final class SiteLoadAttributorScript
 {
     /**
-     * @param  list<array{slug: string, path: string}>  $sites
+     * @param  array<string, mixed> $sites
      */
     public function build(array $sites): string
     {
@@ -116,7 +116,7 @@ SH;
         $total['mem_mb'] = round($total['mem_kb'] / 1024, 1);
 
         $attributedMem = array_sum(array_column($sites, 'mem_kb'));
-        $attributedCpu = array_sum(array_map(static fn (array $row): float => (float) ($row['cpu_pct'] ?? 0), $sites));
+        $attributedCpu = array_sum(array_map(static fn (array $row): float => (float) ($row['cpu_pct']), $sites));
 
         $unattributedMem = max(0, $total['mem_kb'] - $attributedMem);
         $unattributedCpu = max(0.0, $total['cpu_pct'] - $attributedCpu);
@@ -134,8 +134,9 @@ SH;
     }
 
     /**
-     * @param  array<string, mixed>  $existingMeta
+     * @param  array<string, mixed> $existingMeta
      * @return array<string, mixed>
+     * @param  array<string, mixed> $snapshot
      */
     public function mergeIntoMeta(array $snapshot, array $existingMeta = []): array
     {

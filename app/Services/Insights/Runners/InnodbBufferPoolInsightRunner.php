@@ -28,6 +28,9 @@ class InnodbBufferPoolInsightRunner implements InsightRunnerInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {
@@ -80,10 +83,10 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $poolBytes = (int) ($values['buffer_pool_bytes'] ?? 0);
-        $pagesTotal = (int) ($values['pages_total'] ?? 0);
-        $pagesData = (int) ($values['pages_data'] ?? 0);
-        $memTotalKb = (int) ($values['mem_total_kb'] ?? 0);
+        $poolBytes = (int) ($values['buffer_pool_bytes']);
+        $pagesTotal = (int) ($values['pages_total']);
+        $pagesData = (int) ($values['pages_data']);
+        $memTotalKb = (int) ($values['mem_total_kb']);
 
         // If we couldn't read anything authentic, skip — better than firing on
         // an auth failure where mysql returned an error onto stdout.
@@ -143,7 +146,7 @@ BASH;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, App\Services\Insights\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

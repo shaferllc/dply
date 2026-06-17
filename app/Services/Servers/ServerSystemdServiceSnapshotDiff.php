@@ -119,6 +119,8 @@ final class ServerSystemdServiceSnapshotDiff
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, mixed> $newUnits
+     * @param  array<string, mixed> $oldUnits
      * @return array<string, array<string, mixed>>
      */
     protected function mapByUnit(array $rows): array
@@ -136,7 +138,8 @@ final class ServerSystemdServiceSnapshotDiff
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
+     * @param  array<string, mixed> $rows
      * @return array{at: string, kind: string, unit: string, label: string, detail: ?string}
      */
     protected function makeEvent(string $at, string $kind, array $row, ?string $detail = null): array

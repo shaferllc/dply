@@ -62,7 +62,7 @@ trait ManagesRedisBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachRedis(Site $site, array $params): SiteBinding
     {

@@ -76,9 +76,9 @@ final class PhpRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $composerJson
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $composerJson
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      */
     private function detectVersion(
         string $root,
@@ -118,9 +118,9 @@ final class PhpRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $packages
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $packages
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      */
     private function detectFramework(array $packages, string $root, array &$detectedFiles, array &$reasons): ?string
     {
@@ -153,9 +153,9 @@ final class PhpRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $packages
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $packages
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      * @return list<DetectedProcess>
      */
     private function detectProcesses(

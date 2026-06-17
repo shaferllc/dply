@@ -26,6 +26,7 @@ final class LoggingDivergenceDetector
      *   message: string,
      * }
      */
+    /** @return array<string, mixed> */
     public function inspect(string $fileContents, int $laravelMajor): array
     {
         $stock = CanonicalLoggingStock::channels($laravelMajor);
@@ -122,8 +123,8 @@ final class LoggingDivergenceDetector
     }
 
     /**
-     * @param  list<string>  $nonStock
-     * @param  list<string>  $retyped
+     * @param  array<string, mixed> $nonStock
+     * @param  array<string, mixed> $retyped
      * @return array{customized: bool, verified: bool, non_stock_channels: list<string>, retyped_channels: list<string>, default_changed: bool, message: string}
      */
     private function result(bool $customized, bool $verified, array $nonStock, array $retyped, bool $defaultChanged, string $message): array

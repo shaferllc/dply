@@ -26,7 +26,7 @@ class SitePlaceholderPageBuilder
         $runtimeVersion = (string) ($site->runtimeVersion() ?? '');
         $runtimeLabel = $this->escape(strtoupper($runtimeKey).($runtimeVersion !== '' ? ' '.$runtimeVersion : ''));
         $deployPath = $this->escape($site->effectiveRepositoryPath());
-        $serverName = $this->escape($site->server?->name ?? '—');
+        $serverName = $this->escape($site->server->name ?? '—');
 
         return <<<HTML
 <!doctype html>

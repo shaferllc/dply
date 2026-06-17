@@ -344,6 +344,12 @@ class TaskRunCommand extends Command
         $this->output->write(json_encode($data, JSON_PRETTY_PRINT));
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     protected function parseDataOption(): array
     {
         $data = [];

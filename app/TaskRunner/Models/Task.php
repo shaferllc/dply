@@ -33,6 +33,9 @@ use Throwable;
  * @property string $id
  * @property string $name
  * @property string $action
+ * @property ?string $script
+ * @property ?string $script_content
+ * @property ?string $instance
  * @property ?string $output
  * @property ?int $exit_code
  * @property ?int $timeout
@@ -40,15 +43,25 @@ use Throwable;
  * @property \App\Modules\TaskRunner\Enums\TaskStatus $status
  * @property ?string $server_id
  * @property ?string $created_by
- * @property ?array $options
+ * @property ?array<string, mixed> $options
  * @property ?\Illuminate\Support\Carbon $started_at
  * @property ?\Illuminate\Support\Carbon $completed_at
  * @property ?\Illuminate\Support\Carbon $created_at
+ * @property ?\Illuminate\Support\Carbon $updated_at
+ * @property ?\Illuminate\Support\Carbon $failed_at
+ * @property ?\Illuminate\Support\Carbon $timed_out_at
+ * @property ?\Illuminate\Support\Carbon $cancelled_at
+ * @property ?string $error_message
+ * @property-read float|int $duration
+ * @property-read ?string $error
+ * @property-read ?int $progress
+ * @property-read ?int $process_id
  * @property-read ?Server $server
  * @property-read ?User $creator
  */
 class Task extends Model
 {
+    /** @use HasFactory<TaskFactory> */
     use HasFactory, HasUlids;
 
     protected $table = 'task_runner_tasks';
@@ -95,6 +108,8 @@ class Task extends Model
 
     /**
      * Get the server that this task belongs to.
+     *
+     * @return BelongsTo<Server, $this>
      */
     public function server(): BelongsTo
     {
@@ -113,6 +128,8 @@ class Task extends Model
 
     /**
      * Get the user that created this task.
+     *
+     * @return BelongsTo<User, $this>
      */
     public function creator(): BelongsTo
     {
@@ -380,6 +397,8 @@ class Task extends Model
 
     /**
      * Get the output as a collection of lines.
+     *
+     * @return Collection<int, string>
      */
     public function outputLines(): Collection
     {
@@ -562,6 +581,52 @@ class Task extends Model
         return unserialize($storedInstance);
     }
 
+    public function getDurationAttribute(): float|int
+    {
+        return $this->getDuration();
+    }
+
+    public function getErrorAttribute(): ?string
+    {
+        if (is_string($this->error_message)) {
+            return $this->error_message;
+        }
+
+        $optionsError = $this->options['error'] ?? null;
+
+        return is_string($optionsError) ? $optionsError : null;
+    }
+
+    public function getProgressAttribute(): ?int
+    {
+        if (isset($this->options['progress'])) {
+            return (int) $this->options['progress'];
+        }
+
+        return match ($this->status) {
+            TaskStatus::Pending => 0,
+            TaskStatus::Running => 50,
+            TaskStatus::Finished, TaskStatus::Failed => 100,
+            default => null,
+        };
+    }
+
+    public function getProcessIdAttribute(): ?int
+    {
+        $processId = $this->options['process_id'] ?? null;
+
+        return $processId !== null ? (int) $processId : null;
+    }
+
+    public function getTaskInstance(): mixed
+    {
+        if (! $this->instance) {
+            return null;
+        }
+
+        return static::restoreStoredInstance($this->instance);
+    }
+
     /**
      * Get the task duration in seconds.
      */
@@ -599,7 +664,9 @@ class Task extends Model
 
     /**
      * Get the task performance metrics.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         return [
@@ -619,7 +686,9 @@ class Task extends Model
 
     /**
      * Get the task summary.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getSummary(): array
     {
         return [

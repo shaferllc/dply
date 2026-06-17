@@ -54,6 +54,10 @@ final class ServerProvisionCommandBuilder
     private ?Server $server = null;
 
     /** @return list<string> */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function build(Server $server): array
     {
         $this->server = $server;
@@ -64,7 +68,9 @@ final class ServerProvisionCommandBuilder
         }
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     */
     private function buildInner(Server $server): array
     {
         $meta = $server->meta ?? [];
@@ -311,7 +317,7 @@ final class ServerProvisionCommandBuilder
      * demand. Force-reinstall mode wipes the directory at bootstrap
      * (see bootstrap()).
      *
-     * @param  list<string>  $commands
+     * @param  array<string, mixed> $commands
      * @return list<string>
      */
     private function withStep(string $label, array $commands): array
@@ -356,7 +362,7 @@ final class ServerProvisionCommandBuilder
     }
 
     /**
-     * @param  list<string>  $packages
+     * @param  array<string, mixed> $packages
      * @return list<string>
      */
     private function ensurePackagesInstalled(array $packages, string $alreadyInstalledMessage): array
@@ -420,8 +426,8 @@ final class ServerProvisionCommandBuilder
      * Required-missing still trips exit 100; optional-missing are pre-filtered
      * out so they can't.
      *
-     * @param  list<string>  $required
-     * @param  list<string>  $optional
+     * @param  array<string, mixed> $required
+     * @param  array<string, mixed> $optional
      * @return list<string>
      */
     private function ensureMixedPackagesInstalled(array $required, array $optional, string $alreadyInstalledMessage): array

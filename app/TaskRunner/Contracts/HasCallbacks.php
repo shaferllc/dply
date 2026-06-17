@@ -27,11 +27,13 @@ interface HasCallbacks
 
     /**
      * Get the callback data to send with the request.
+     * @return array<string, mixed>
      */
     public function getCallbackData(): array;
 
     /**
      * Get the callback headers to send with the request.
+     * @return array<string, mixed>
      */
     public function getCallbackHeaders(): array;
 
@@ -47,11 +49,13 @@ interface HasCallbacks
 
     /**
      * Get the callback retry configuration.
+     * @return array<string, mixed>
      */
     public function getCallbackRetryConfig(): array;
 
     /**
      * Validate callback data before sending.
+     * @param  array<string, mixed> $data
      */
     public function validateCallbackData(array $data): bool;
 }

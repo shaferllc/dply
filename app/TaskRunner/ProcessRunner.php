@@ -6,9 +6,9 @@ namespace App\Modules\TaskRunner;
 
 use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Process\PendingProcess;
-use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -28,9 +28,8 @@ class ProcessRunner
      * Create a new ProcessRunner instance.
      */
     public function __construct(
-        protected readonly ?StreamingLoggerInterface $streamingLogger = null
+        protected ?StreamingLoggerInterface $streamingLogger = null
     ) {
-        // Only resolve from container if not provided and container is available
         if ($this->streamingLogger === null && app()->bound(StreamingLoggerInterface::class)) {
             $this->streamingLogger = app(StreamingLoggerInterface::class);
         }
@@ -276,44 +275,30 @@ class ProcessRunner
     }
 
     /**
-     * Checks if a process should be retried based on exit code.
-     */
-    private function shouldRetry(int $exitCode): bool
-    {
-        // Retry on non-zero exit codes, but not on specific error codes
-        // that indicate permanent failures
-        $permanentFailureCodes = [127, 126]; // Command not found, Permission denied
-
-        return $exitCode !== 0 && ! in_array($exitCode, $permanentFailureCodes);
-    }
-
-    /**
-     * Stream a task event.
+     * @param  array<string, mixed>  $context
      */
     private function streamTaskEvent(string $event, array $context = []): void
     {
-        if ($this->streamingLogger && method_exists($this->streamingLogger, 'streamTaskEvent')) {
-            $this->streamingLogger->streamTaskEvent($event, $context);
-        }
+        $this->streamingLogger?->streamTaskEvent($event, $context);
     }
 
     /**
      * Stream process output.
+     *
+     * @param  array<string, mixed>  $context
      */
     private function streamProcessOutput(string $type, string $output, array $context = []): void
     {
-        if ($this->streamingLogger && method_exists($this->streamingLogger, 'streamProcessOutput')) {
-            $this->streamingLogger->streamProcessOutput($type, $output, $context);
-        }
+        $this->streamingLogger?->streamProcessOutput($type, $output, $context);
     }
 
     /**
      * Stream an error message.
+     *
+     * @param  array<string, mixed>  $context
      */
     private function streamError(string $message, array $context = []): void
     {
-        if ($this->streamingLogger && method_exists($this->streamingLogger, 'streamError')) {
-            $this->streamingLogger->streamError($message, $context);
-        }
+        $this->streamingLogger?->streamError($message, $context);
     }
 }

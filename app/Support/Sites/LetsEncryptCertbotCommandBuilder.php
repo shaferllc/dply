@@ -159,7 +159,7 @@ BASH;
      */
     private static function acmePreflightScript(array $domains, string $webrootEscaped): string
     {
-        $hostname = $domains[0] ?? '';
+        $hostname = $domains[0];
         if ($hostname === '') {
             return '';
         }

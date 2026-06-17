@@ -142,6 +142,7 @@ class OpenLiteSpeedVhostsConfig
     /**
      * @return array{vhosts: list<array{name: string, conf_path: string, vh_root: ?string, domains: list<string>, values: array<string, string>, raw: string, unreadable: bool}>, unreadable_httpd: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -196,6 +197,10 @@ class OpenLiteSpeedVhostsConfig
      * `virtualhost` stanzas and legacy `vhTemplate` blocks.
      *
      * @return list<array{name: string, conf_path: string, vh_root: ?string, domains: list<string>}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, list<string>|string|null>>
      */
     public function parseHttpdIndex(string $httpd): array
     {
@@ -358,7 +363,7 @@ class OpenLiteSpeedVhostsConfig
      * indentation) or appends to the matching block (or creates the block
      * if missing).
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function mergeIntoVhconf(string $contents, array $values): string
     {

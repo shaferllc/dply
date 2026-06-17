@@ -28,7 +28,7 @@ use Illuminate\Support\Collection;
 final class SiteSettingsViewData
 {
     /**
-     * @param  array<string, mixed>  $deploymentPreflight
+     * @param  array<string, mixed> $deploymentPreflight
      * @return array<string, mixed>
      */
     public static function for(
@@ -113,8 +113,13 @@ final class SiteSettingsViewData
         $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
         $runtimeTarget = $site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
-        $foundationStatus = is_array($deploymentContract?->status ?? null) ? $deploymentContract->status : [];
-        $foundationSecrets = collect($deploymentContract?->secretArrays() ?? [])->filter(fn ($entry) => is_array($entry))->values();
+        $foundationStatus = is_array($deploymentContract->status ?? null) ? $deploymentContract->status : [];
+        /** @var list<mixed> $foundationSecretsRaw */
+        $foundationSecretsRaw = $deploymentContract?->secretArrays() ?? [];
+        /** @var Collection<int, array<string, mixed>> $foundationSecrets */
+        $foundationSecrets = (new Collection($foundationSecretsRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
         $secretConfigEntries = $foundationSecrets
             ->reject(fn (array $entry): bool => str_starts_with((string) ($entry['key'] ?? ''), 'DPLY_'))
             ->sortBy('key')
@@ -127,22 +132,51 @@ final class SiteSettingsViewData
             'serverless' => __('Injected into the provider runtime environment payload during publish.'),
             default => __('Injected into the site environment Dply manages on the host for deploys and runtime use.'),
         };
-        $resourceBindings = collect($deploymentContract?->resourceBindingArrays() ?? [])->filter(fn ($entry) => is_array($entry))->values();
-        $preflightChecks = collect($deploymentPreflight['checks'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
-        $preflightErrors = collect($deploymentPreflight['errors'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
-        $preflightWarnings = collect($deploymentPreflight['warnings'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
-        $preflightActionableChecks = PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks);
+        /** @var list<mixed> $resourceBindingsRaw */
+        $resourceBindingsRaw = $deploymentContract?->resourceBindingArrays() ?? [];
+        /** @var Collection<int, array<string, mixed>> $resourceBindings */
+        $resourceBindings = (new Collection($resourceBindingsRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
+        /** @var list<mixed> $preflightChecksRaw */
+        $preflightChecksRaw = is_array($deploymentPreflight['checks'] ?? null) ? $deploymentPreflight['checks'] : [];
+        /** @var Collection<int, array{key?: string, level?: string, message?: string}> $preflightChecks */
+        $preflightChecks = (new Collection($preflightChecksRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
+        /** @var list<mixed> $preflightErrorsRaw */
+        $preflightErrorsRaw = is_array($deploymentPreflight['errors'] ?? null) ? $deploymentPreflight['errors'] : [];
+        /** @var Collection<int, string> $preflightErrors */
+        $preflightErrors = (new Collection($preflightErrorsRaw))
+            ->filter(fn ($entry): bool => is_string($entry))
+            ->values();
+        /** @var list<mixed> $preflightWarningsRaw */
+        $preflightWarningsRaw = is_array($deploymentPreflight['warnings'] ?? null) ? $deploymentPreflight['warnings'] : [];
+        /** @var Collection<int, string> $preflightWarnings */
+        $preflightWarnings = (new Collection($preflightWarningsRaw))
+            ->filter(fn ($entry): bool => is_string($entry))
+            ->values();
+        $preflightActionableChecks = collect(PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks));
         $dockerRuntimeDetails = $site->usesDockerRuntime() && is_array($dockerRuntime['runtime_details'] ?? null) ? $dockerRuntime['runtime_details'] : [];
-        $dockerContainers = collect($dockerRuntimeDetails['containers'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
-        $runtimeLogs = collect($runtimeTarget['logs'] ?? [])->filter(fn ($entry) => is_array($entry))->reverse()->values();
+        /** @var list<mixed> $dockerContainersRaw */
+        $dockerContainersRaw = is_array($dockerRuntimeDetails['containers'] ?? null) ? $dockerRuntimeDetails['containers'] : [];
+        /** @var Collection<int, array<string, mixed>> $dockerContainers */
+        $dockerContainers = (new Collection($dockerContainersRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->values();
+        /** @var list<mixed> $runtimeLogsRaw */
+        $runtimeLogsRaw = is_array($runtimeTarget['logs'] ?? null) ? $runtimeTarget['logs'] : [];
+        /** @var Collection<int, array<string, mixed>> $runtimeLogs */
+        $runtimeLogs = (new Collection($runtimeLogsRaw))
+            ->filter(fn ($entry): bool => is_array($entry))
+            ->reverse()
+            ->values();
         $runtimeOperationConsoles = SiteShowViewData::runtimeOperationConsoles($runtimeLogs);
         $runtimeErrorConsole = $runtimeOperationConsoles->first(fn (array $console): bool => in_array($console['action'], ['errors'], true) || $console['status'] === 'failed');
         $resourceNoun = $runtimeMode === 'vm' ? __('Site') : __('App');
         $resourceNounLower = strtolower($resourceNoun);
         $resourcePlural = $runtimeMode === 'vm' ? __('sites') : __('apps');
-        $isEdgeWorkspace = $site->usesEdgeRuntime();
         $workspacePrefix = match (true) {
-            $isEdgeWorkspace => __('Edge'),
             str_contains($runtimeFamily, 'cloud') || str_contains($runtimePlatform, 'cloud') => __('Cloud'),
             in_array($runtimePlatform, ['aws', 'digitalocean'], true) => __('Cloud'),
             $runtimeMode === 'docker' => __('Container'),
@@ -151,9 +185,6 @@ final class SiteSettingsViewData
             default => null,
         };
         $workspaceTitle = $workspacePrefix ? $workspacePrefix.' '.$resourceNounLower.' '.__('workspace') : $resourceNoun.' '.__('workspace');
-        if ($isEdgeWorkspace) {
-            $workspaceTitle = __('Edge site workspace');
-        }
         $sectionHeader = SiteSettingsHeader::for($site, $server, $section);
         $headerUser = $user;
         $headerOrg = $headerUser?->currentOrganization();
@@ -206,7 +237,6 @@ final class SiteSettingsViewData
             ];
         $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
         $edgeAnalytics = self::edgeAnalyticsForSection($site, $section);
-        $edgeContext = $isEdgeWorkspace ? EdgeSiteViewData::context($site, $section) : [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
         $generalRecentDeployments = $section === 'general'
@@ -290,11 +320,12 @@ final class SiteSettingsViewData
                 'sectionConsoleActionKinds',
                 'sectionConsoleActionRun',
                 'generalRecentDeployments',
-                'isEdgeWorkspace',
                 'contextualDocSlug',
             ),
+            [
+                'isEdgeWorkspace' => false,
+            ],
             $edgeAnalytics,
-            $edgeContext,
         );
     }
 
@@ -342,7 +373,7 @@ final class SiteSettingsViewData
             $header,
             [
                 'isEdgeWorkspace' => true,
-                'generalRecentDeployments' => collect(),
+                'generalRecentDeployments' => new Collection,
             ],
             $edgeAnalytics,
             $edgeContext,
@@ -570,7 +601,7 @@ final class SiteSettingsViewData
     }
 
     /**
-     * @param  list<string>  $kinds
+     * @param  array<string, mixed> $kinds
      */
     private static function consoleActionRun(Site $site, array $kinds): ?ConsoleAction
     {
@@ -597,7 +628,7 @@ final class SiteSettingsViewData
         }
 
         return $site->deployments
-            ->filter(fn (SiteDeployment $deployment): bool => is_array($deployment->phase_results) && $deployment->phase_results !== [])
+            ->filter(fn (SiteDeployment $deployment): bool => $deployment->phase_results !== [])
             ->take(10)
             ->values();
     }

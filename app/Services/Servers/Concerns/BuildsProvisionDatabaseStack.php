@@ -27,6 +27,7 @@ trait BuildsProvisionDatabaseStack
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
     public function installEngineLines(string $engineId): array
     {
         return $this->installDatabaseIfNeeded($engineId);

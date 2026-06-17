@@ -71,6 +71,10 @@ class OracleComputeService
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed>>
+     */
     public function listAvailabilityDomains(): array
     {
         $payload = $this->request(
@@ -97,6 +101,10 @@ class OracleComputeService
     }
 
     /**
+     * @return list<array<mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
      * @return list<array<string, mixed>>
      */
     public function listShapes(?string $availabilityDomain = null): array
@@ -117,7 +125,7 @@ class OracleComputeService
             );
 
             $shapes = [];
-            if (is_array($payload)) {
+            if (true) {
                 foreach ($payload as $shape) {
                     if (is_array($shape)) {
                         $shapes[] = $shape;
@@ -183,8 +191,9 @@ class OracleComputeService
     }
 
     /**
-     * @return array<string, mixed>
+     * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getInstance(string $instanceId): array
     {
         $payload = $this->request(
@@ -259,7 +268,7 @@ class OracleComputeService
     }
 
     /**
-     * @param  array<string, mixed>  $query
+     * @param  array<string, mixed> $query
      * @param  array<string, mixed>|null  $body
      * @return array<string, mixed>|list<array<string, mixed>>
      */

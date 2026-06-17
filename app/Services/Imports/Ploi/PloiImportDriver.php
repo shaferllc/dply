@@ -43,6 +43,9 @@ class PloiImportDriver implements ImportDriver
         $this->client->assertSuccess($response, 'validate connection');
     }
 
+    /**
+     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
+     */
     public function listServers(): array
     {
         return array_map(
@@ -51,6 +54,9 @@ class PloiImportDriver implements ImportDriver
         );
     }
 
+    /**
+     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
+     */
     public function fetchServerDetail(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}");
@@ -60,6 +66,9 @@ class PloiImportDriver implements ImportDriver
         return $this->normaliseServer($data);
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listSites(int $sourceServerId): array
     {
         return array_map(
@@ -68,6 +77,9 @@ class PloiImportDriver implements ImportDriver
         );
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}");
@@ -120,6 +132,9 @@ class PloiImportDriver implements ImportDriver
         return '';
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listSiteCrons(int $sourceServerId, int $sourceSiteId): array
     {
         $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/crons");
@@ -136,6 +151,9 @@ class PloiImportDriver implements ImportDriver
         ));
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listDaemons(int $sourceServerId, int $sourceSiteId): array
     {
         // Ploi exposes daemons at server level with a site filter, or at site level
@@ -156,6 +174,9 @@ class PloiImportDriver implements ImportDriver
         ));
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string|null>>
+     */
     public function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array
     {
         $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/databases");
@@ -226,6 +247,9 @@ class PloiImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "disable maintenance for site {$sourceServerId}/{$sourceSiteId}");
     }
 
+    /**
+     * @return list<array<string, array<string, mixed>|int|string>>
+     */
     public function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array
     {
         $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/deploy-keys");
@@ -253,7 +277,7 @@ class PloiImportDriver implements ImportDriver
      * Walk Ploi's paginated index endpoints and return the concatenated `data` rows.
      * Defensive against either Laravel-shape (`meta.last_page`) or no-pagination shape.
      *
-     * @return list<array<string, mixed>>
+     * @return list<array<string, array<string, mixed>|int|string>>
      */
     protected function paginated(string $path): array
     {
@@ -289,7 +313,7 @@ class PloiImportDriver implements ImportDriver
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{
      *     id: int,
      *     name: string,
@@ -330,7 +354,7 @@ class PloiImportDriver implements ImportDriver
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{
      *     id: int,
      *     domain: string,
@@ -372,6 +396,7 @@ class PloiImportDriver implements ImportDriver
 
     /**
      * @param  mixed  $payload
+     * @param  array<string, mixed> $row
      * @return array<string, mixed>
      */
     protected function extractObject($payload, string $envelopeKey): array

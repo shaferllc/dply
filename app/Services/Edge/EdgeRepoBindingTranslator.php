@@ -43,9 +43,13 @@ class EdgeRepoBindingTranslator
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, (int|string)>>
+     */
     public function bindingsFor(EdgeDeployment $deployment): array
     {
-        $config = is_array($deployment->repo_config) ? $deployment->repo_config : [];
+        $config = ($deployment->repo_config );
         $site = $deployment->site;
 
         // Resolve wrangler-declared bindings (titles → CF IDs, with
@@ -100,7 +104,7 @@ class EdgeRepoBindingTranslator
 
     /**
      * @param  array<string, array<string, string>>  $declared
-     * @return list<string>
+     * @return list<array<string, (int|string)>>
      */
     private function collectDeclaredNames(array $declared): array
     {

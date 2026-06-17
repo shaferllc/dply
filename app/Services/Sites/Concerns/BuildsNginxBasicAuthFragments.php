@@ -20,6 +20,7 @@ trait BuildsNginxBasicAuthFragments
     /**
      * @return array{preamble: string, prefix_locations: string, location_slash_auth: string}
      */
+    /** @return array<string, mixed> */
     protected function nginxBasicAuthPhpFragments(Site $site, string $root, string $phpSock, string $fcgiEngine): array
     {
         if (! $this->nginxBasicAuthEnabled($site)) {
@@ -41,6 +42,7 @@ trait BuildsNginxBasicAuthFragments
     /**
      * @return array{preamble: string, prefix_locations: string, location_slash_auth: string}
      */
+    /** @return array<string, mixed> */
     protected function nginxBasicAuthStaticFragments(Site $site, string $root): array
     {
         if (! $this->nginxBasicAuthEnabled($site)) {
@@ -62,6 +64,7 @@ trait BuildsNginxBasicAuthFragments
     /**
      * @return array{preamble: string, prefix_locations: string, location_slash_auth: string}
      */
+    /** @return array<string, mixed> */
     protected function nginxBasicAuthNodeFragments(Site $site, string $webRoot): array
     {
         if (! $this->nginxBasicAuthEnabled($site)) {
@@ -80,6 +83,7 @@ trait BuildsNginxBasicAuthFragments
     /**
      * @return array{preamble: string, location_slash_auth: string, named_location_auth: string}
      */
+    /** @return array<string, mixed> */
     protected function nginxBasicAuthOctaneFragments(Site $site, string $root): array
     {
         if (! $this->nginxBasicAuthEnabled($site)) {

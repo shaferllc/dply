@@ -7,7 +7,7 @@ use App\Models\InsightFinding;
 final class InsightCandidate
 {
     /**
-     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed> $meta
      * @param  string  $kind  'problem' (default) or 'suggestion'. Suggestions skip notifications
      *                        and render in a separate UI section. See {@see InsightFinding}.
      */

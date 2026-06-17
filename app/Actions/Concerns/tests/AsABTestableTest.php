@@ -21,6 +21,7 @@ describe('AsABTestable', function () {
             use AsABTestable;
         };
 
+        /** @var ABTestableDecorator&\Mockery\MockInterface $decorator */
         $decorator = Mockery::mock(ABTestableDecorator::class);
 
         $instance->setABTestableDecorator($decorator);
@@ -68,6 +69,7 @@ describe('AsABTestable', function () {
         };
 
         $user = new stdClass;
+        /** @var ABTestableDecorator&\Mockery\MockInterface $decorator */
         $decorator = Mockery::mock(ABTestableDecorator::class);
         $decorator->shouldReceive('selectVariant')->with($user)->once()->andReturn('B');
 
@@ -83,6 +85,7 @@ describe('AsABTestable', function () {
         };
 
         $user = new stdClass;
+        /** @var ABTestableDecorator&\Mockery\MockInterface $decorator */
         $decorator = Mockery::mock(ABTestableDecorator::class);
         $decorator->shouldReceive('getUserVariant')->with($user)->once()->andReturn('B');
 
@@ -98,6 +101,7 @@ describe('AsABTestable', function () {
         };
 
         $user = new stdClass;
+        /** @var ABTestableDecorator&\Mockery\MockInterface $decorator */
         $decorator = Mockery::mock(ABTestableDecorator::class);
         $decorator->shouldReceive('trackVariant')->with($user, 'B')->once();
 

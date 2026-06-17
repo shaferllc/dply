@@ -80,6 +80,7 @@ class ManagedProductCostEstimator
      *
      * @return array<string, float|int>
      */
+    /** @return array<string, mixed> */
     public function edgeUsageRates(): array
     {
         return [

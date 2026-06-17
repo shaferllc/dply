@@ -13,8 +13,8 @@ use Illuminate\Support\Carbon;
 final class SiteLoadAttributionHistory
 {
     /**
-     * @param  array<string, mixed>  $snapshot
-     * @param  array<string, mixed>  $existingMeta
+     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed> $existingMeta
      * @return array<string, mixed>
      */
     public function appendSnapshot(array $snapshot, array $existingMeta = []): array
@@ -133,7 +133,7 @@ final class SiteLoadAttributionHistory
 
         $rows = [];
         foreach ($aggregates as $slug => $row) {
-            $samples = max(1, (int) ($row['samples'] ?? 1));
+            $samples = max(1, (int) $row['samples']);
             $rows[] = [
                 'slug' => $slug,
                 'peak_cpu_pct' => (float) $row['peak_cpu_pct'],
@@ -158,7 +158,7 @@ final class SiteLoadAttributionHistory
     private function rangeHours(string $range): int
     {
         $ranges = (array) config('server_shared_host.attribution.ranges', []);
-        $hours = is_array($ranges) ? ($ranges[$range] ?? null) : null;
+        $hours = (($ranges[$range] ?? null) );
 
         return max(1, (int) ($hours ?? match ($range) {
             '7d' => 168,

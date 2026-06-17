@@ -21,6 +21,10 @@ class EnvoyCustomListenersConfig
     /**
      * @return list<array{name: string, address: string, port: int, mode: string, default_cluster: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, int|string>>
+     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -36,7 +40,7 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @param  list<array{name: string, address?: string, port?: int|string, mode?: string, default_cluster?: string}>  $listeners
+     * @param  array<string, mixed> $listeners
      */
     public function save(Server $server, array $listeners, ?ConsoleEmitter $emitter = null): void
     {
@@ -57,6 +61,9 @@ class EnvoyCustomListenersConfig
         app(SiteEdgeBackendProvisioner::class)->syncAllForServer($server, $emitter);
     }
 
+    /**
+     * @param  array<string, mixed> $fields
+     */
     public function add(Server $server, array $fields, ?ConsoleEmitter $emitter = null): void
     {
         $row = $this->normalizeRow($fields);
@@ -69,7 +76,7 @@ class EnvoyCustomListenersConfig
             if (($existing['name'] ?? '') === $row['name']) {
                 throw new \RuntimeException("A listener named `{$row['name']}` already exists.");
             }
-            if ((int) ($existing['port'] ?? 0) === $row['port']) {
+            if ((int) ($existing['port']) === $row['port']) {
                 throw new \RuntimeException("Port {$row['port']} is already used by listener `{$existing['name']}`.");
             }
         }
@@ -94,7 +101,7 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @return list<array{name: string, address: string, port: int, mode: string, default_cluster: string}>
+     * @return array<string, mixed>
      */
     public static function listenersFromServer(Server $server): array
     {
@@ -102,7 +109,7 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      * @return array{name: string, address: string, port: int, mode: string, default_cluster: string}|null
      */
     private function normalizeRow(array $row): ?array
@@ -151,13 +158,13 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @param  list<array{name: string, address: string, port: int, mode: string, default_cluster: string}>  $listeners
+     * @param  array<string, mixed> $listeners
      */
     private function assertValid(array $listeners): void
     {
         $ports = [];
         foreach ($listeners as $row) {
-            $port = (int) ($row['port'] ?? 0);
+            $port = (int) ($row['port']);
             if (isset($ports[$port])) {
                 throw new \RuntimeException("Port {$port} is used by more than one custom listener.");
             }

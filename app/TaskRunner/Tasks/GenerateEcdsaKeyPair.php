@@ -17,7 +17,7 @@ class GenerateEcdsaKeyPair extends Task
     public ?int $timeout = 600; // 10 minutes timeout for SSH key generation
 
     public function __construct(
-        public string $privatePath,
+        public string $privatePath = '',
         public int $bits = 256
     ) {}
 
@@ -30,7 +30,7 @@ class GenerateEcdsaKeyPair extends Task
     {
         $errors = [];
 
-        if (empty($this->privatePath) || ! is_string($this->privatePath)) {
+        if ($this->privatePath === '') {
             $errors['privatePath'] = 'privatePath must be a non-empty string.';
         }
 

@@ -40,9 +40,10 @@ class FunctionInvoker
      * The caller owns it so ticks can inject the `x-dply-run` command header
      * and the test button can replay an operator-chosen method/path.
      *
-     * @param  array<string, mixed>  $owArgs
+     * @param  array<string, mixed> $owArgs
      * @return array{ok: bool, error: ?string, invocation: ?FunctionInvocation}
      */
+    /** @return array<string, mixed> */
     public function invoke(Site $site, string $source, ?string $task, array $owArgs): array
     {
         $site->loadMissing('server');
@@ -107,7 +108,7 @@ class FunctionInvoker
      * Record a row for an invocation that never reached the function — a
      * timeout, DNS failure, or a gateway error with no activation body.
      *
-     * @param  array<string, mixed>  $owArgs
+     * @param  array<string, mixed> $owArgs
      */
     private function recordFailure(Site $site, string $source, ?string $task, array $owArgs, string $error, ?int $status): FunctionInvocation
     {
@@ -131,8 +132,8 @@ class FunctionInvoker
     /**
      * Persist one activation as a FunctionInvocation row.
      *
-     * @param  array<string, mixed>  $owArgs
-     * @param  array<string, mixed>  $activation
+     * @param  array<string, mixed> $owArgs
+     * @param  array<string, mixed> $activation
      */
     private function record(Site $site, string $source, ?string $task, array $owArgs, array $activation): FunctionInvocation
     {

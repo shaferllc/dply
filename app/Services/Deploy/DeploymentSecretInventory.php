@@ -17,6 +17,10 @@ final class DeploymentSecretInventory
     /**
      * @return list<DeploymentSecret>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<App\Support\Deployment\DeploymentSecret>
+     */
     public function forSite(Site $site): array
     {
         $site->loadMissing(['workspace.variables']);
@@ -106,8 +110,9 @@ final class DeploymentSecretInventory
     }
 
     /**
-     * @return array<string, string>
+     * @return list<App\Support\Deployment\DeploymentSecret>
      */
+    /** @return array<string, mixed> */
     public function environmentMapForSite(Site $site): array
     {
         $environment = [];
@@ -129,6 +134,7 @@ final class DeploymentSecretInventory
      *
      * @return array<string, string>
      */
+    /** @return array<string, mixed> */
     public function effectiveEnvironmentMapForSite(Site $site): array
     {
         $site->loadMissing(['workspace.variables']);

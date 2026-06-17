@@ -20,7 +20,7 @@ class SiteDeploySyncCoordinator
 
     public function shouldIncludePeersOnManual(Site $site): bool
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $repo = is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
 
         return (bool) ($repo['deploy_sync_include_peers_on_manual'] ?? true);

@@ -70,6 +70,9 @@ final class DeployPipelineStarterCatalog
         return $meta;
     }
 
+    /**
+     * @param  array<string, mixed> $meta
+     */
     public function visibleForSite(Site $site, ?array $meta = null, ?string $key = null): bool
     {
         if ($meta === null && $key !== null) {
@@ -104,20 +107,23 @@ final class DeployPipelineStarterCatalog
         $strategy = (string) ($meta['strategy'] ?? 'simple');
 
         if (isset($meta['steps']) && is_array($meta['steps'])) {
-            return $this->normalizeSteps($meta['steps']);
+            /** @var list<array<string, mixed>> $configuredSteps */
+            $configuredSteps = array_values($meta['steps']);
+
+            return $this->normalizeSteps($configuredSteps);
         }
 
         if (($meta['steps_from'] ?? '') === 'runtime') {
-            $steps = $this->runtimeDefaults->defaultsFor(
+            $runtimeSteps = $this->runtimeDefaults->defaultsFor(
                 $site->runtimeKey(),
                 $this->runtimeFrameworkForStarterSteps($site),
             );
 
             if ($strategy === 'simple') {
-                return $this->moveReleaseStepsToBuild($steps);
+                return $this->moveReleaseStepsToBuild($runtimeSteps);
             }
 
-            return $this->normalizeSteps($steps);
+            return $this->normalizeSteps($runtimeSteps);
         }
 
         return [];
@@ -210,7 +216,7 @@ final class DeployPipelineStarterCatalog
     {
         $normalized = [];
         foreach ($steps as $step) {
-            if (! is_array($step) || ! isset($step['step_type'])) {
+            if (! isset($step['step_type'])) {
                 continue;
             }
             $row = [

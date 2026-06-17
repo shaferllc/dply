@@ -15,25 +15,19 @@ class TaskChainFailed
     /**
      * The tasks in the chain.
      */
+    /** @var array<string, mixed> */
     public array $tasks;
 
-    /**
-     * The chain ID.
-     */
     public string $chainId;
 
-    /**
-     * The chain summary.
-     */
+    /** @var array<string, mixed> */
     public array $summary;
 
-    /**
-     * The start timestamp.
-     */
     public string $startedAt;
 
     /**
-     * Create a new event instance.
+     * @param array<string, mixed> $summary
+     * @param array<string, mixed> $tasks
      */
     public function __construct(array $tasks, string $chainId, array $summary, string $startedAt)
     {
@@ -43,9 +37,6 @@ class TaskChainFailed
         $this->startedAt = $startedAt;
     }
 
-    /**
-     * Get the total number of tasks.
-     */
     public function getTotalTasks(): int
     {
         return $this->summary['total_tasks'] ?? 0;
@@ -138,23 +129,20 @@ class TaskChainFailed
 
     /**
      * Get the task results.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getResults(): array
     {
         return $this->summary['results'] ?? [];
     }
 
-    /**
-     * Check if the overall chain was successful.
-     */
     public function wasSuccessful(): bool
     {
         return $this->summary['overall_success'] ?? false;
     }
 
-    /**
-     * Get failure details.
-     */
+    /** @return array<string, mixed> */
     public function getFailureDetails(): array
     {
         return [

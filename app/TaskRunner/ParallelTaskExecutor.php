@@ -35,32 +35,24 @@ class ParallelTaskExecutor
 
     /**
      * The tasks to execute.
+     *
+     * @var Collection<int, Task>
      */
     protected Collection $tasks;
 
     /**
      * The execution options.
      */
+    /** @var array<string, mixed> */
     protected array $options;
 
-    /**
-     * The execution results.
-     */
+    /** @var array<int, array<string, mixed>> */
     protected array $results = [];
 
-    /**
-     * The start timestamp.
-     */
     protected string $startedAt;
 
-    /**
-     * The maximum concurrent tasks.
-     */
     protected int $maxConcurrency;
 
-    /**
-     * Create a new ParallelTaskExecutor instance.
-     */
     public function __construct(TaskDispatcher $dispatcher, ?StreamingLoggerInterface $streamingLogger = null)
     {
         $this->dispatcher = $dispatcher;
@@ -102,6 +94,7 @@ class ParallelTaskExecutor
 
     /**
      * Add multiple tasks to execute.
+     * @param  array<string, mixed> $tasks
      */
     public function addMany(array $tasks): self
     {
@@ -122,6 +115,7 @@ class ParallelTaskExecutor
 
     /**
      * Add a command task to execute.
+     * @param  array<string, mixed> $options
      */
     public function addCommand(string $name, string $command, array $options = []): self
     {
@@ -132,6 +126,8 @@ class ParallelTaskExecutor
 
     /**
      * Add multiple commands to execute.
+     * @param  array<string, mixed> $commands
+     * @param  array<string, mixed> $options
      */
     public function addCommands(string $name, array $commands, array $options = []): self
     {
@@ -142,6 +138,8 @@ class ParallelTaskExecutor
 
     /**
      * Add a view task to execute.
+     * @param  array<string, mixed> $data
+     * @param  array<string, mixed> $options
      */
     public function addView(string $name, string $view, array $data = [], array $options = []): self
     {
@@ -152,6 +150,7 @@ class ParallelTaskExecutor
 
     /**
      * Add a callback task to execute.
+     * @param  array<string, mixed> $options
      */
     public function addCallback(string $name, \Closure $callback, array $options = []): self
     {
@@ -162,6 +161,7 @@ class ParallelTaskExecutor
 
     /**
      * Set execution options.
+     * @param  array<string, mixed> $options
      */
     public function withOptions(array $options): self
     {
@@ -252,7 +252,9 @@ class ParallelTaskExecutor
 
     /**
      * Execute all tasks in parallel.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function run(): array
     {
         $this->startedAt = now()->toISOString();
@@ -294,7 +296,9 @@ class ParallelTaskExecutor
 
     /**
      * Run tasks sequentially (when max_concurrency = 1).
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function runSequentially(): array
     {
         $totalTasks = $this->tasks->count();
@@ -313,7 +317,9 @@ class ParallelTaskExecutor
 
     /**
      * Run tasks in parallel with concurrency control.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function runInParallel(): array
     {
         $totalTasks = $this->tasks->count();
@@ -415,7 +421,9 @@ class ParallelTaskExecutor
 
     /**
      * Execute a single task.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function executeTask(Task $task, int $index, int $totalTasks): array
     {
         $taskName = $task->getName();
@@ -496,7 +504,9 @@ class ParallelTaskExecutor
 
     /**
      * Process the execution results.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function processExecutionResults(): array
     {
         $totalTasks = $this->tasks->count();
@@ -639,6 +649,7 @@ class ParallelTaskExecutor
 
     /**
      * Stream execution event.
+     * @param  array<string, mixed> $data
      */
     protected function streamExecutionEvent(string $event, array $data = []): void
     {
@@ -674,6 +685,9 @@ class ParallelTaskExecutor
     /**
      * Get the tasks.
      */
+    /**
+     * @return Collection<int, Task>
+     */
     public function getTasks(): Collection
     {
         return $this->tasks;
@@ -681,31 +695,28 @@ class ParallelTaskExecutor
 
     /**
      * Get the results.
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
      */
     public function getResults(): array
     {
         return $this->results;
     }
 
-    /**
-     * Get the options.
-     */
+    /** @return array<string, mixed> */
     public function getOptions(): array
     {
         return $this->options;
     }
 
-    /**
-     * Check if execution is empty.
-     */
     public function isEmpty(): bool
     {
         return $this->tasks->isEmpty();
     }
 
-    /**
-     * Get the number of tasks.
-     */
     public function count(): int
     {
         return $this->tasks->count();

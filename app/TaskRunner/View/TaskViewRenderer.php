@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\TaskRunner\View;
 
 use App\Modules\TaskRunner\Task;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\View\View as BladeView;
 
 class TaskViewRenderer
@@ -72,12 +73,12 @@ class TaskViewRenderer
         $data = $this->prepareViewData();
 
         // Check if view exists
-        if (! View::exists($viewName)) {
+        if (! ViewFacade::exists($viewName)) {
             throw new \InvalidArgumentException("View '{$viewName}' does not exist.");
         }
 
         // Create the view
-        $view = View::make($viewName, $data);
+        $view = ViewFacade::make($viewName, $data);
 
         // Apply view composers if any
         $this->applyViewComposers($view);
@@ -90,6 +91,7 @@ class TaskViewRenderer
      * Prepare data for the view.
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function prepareViewData(): array
     {
         $data = array_filter(
@@ -122,7 +124,7 @@ class TaskViewRenderer
     /**
      * Apply view composers to the view.
      */
-    protected function applyViewComposers(BladeView $view): void
+    protected function applyViewComposers(View $view): void
     {
         $viewName = $this->task->getView();
 
@@ -149,6 +151,7 @@ class TaskViewRenderer
      * Get helper functions for the view.
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function getHelperFunctions(): array
     {
         return [
@@ -236,6 +239,7 @@ class TaskViewRenderer
      * Get view compilation statistics.
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getStats(): array
     {
         return [
@@ -248,14 +252,11 @@ class TaskViewRenderer
         ];
     }
 
-    /**
-     * Validate the view before rendering.
-     */
     public function validateView(): void
     {
         $viewName = $this->task->getView();
 
-        if (! View::exists($viewName)) {
+        if (! ViewFacade::exists($viewName)) {
             throw new \InvalidArgumentException("View '{$viewName}' does not exist.");
         }
 
@@ -269,7 +270,7 @@ class TaskViewRenderer
     protected function checkViewForIssues(string $viewName): void
     {
         // Get the view file path
-        $viewPath = View::getFinder()->find($viewName);
+        $viewPath = ViewFacade::getFinder()->find($viewName);
 
         if (! $viewPath) {
             return;
@@ -304,7 +305,8 @@ class TaskViewRenderer
 
     /**
      * Get available views for tasks.
-     * @return array<string, mixed>
+     *
+     * @return list<string>
      */
     public static function getAvailableViews(): array
     {

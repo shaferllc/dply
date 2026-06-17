@@ -11,7 +11,7 @@ interface StreamingLoggerInterface
      *
      * @param  string  $level  The log level (debug, info, warning, error)
      * @param  string  $message  The message to log
-     * @param  array  $context  Additional context data
+     * @param  array<string, mixed> $context  Additional context data
      * @param  bool  $stream  Whether to stream this message immediately
      */
     public function log(string $level, string $message, array $context = [], bool $stream = false): void;
@@ -21,7 +21,7 @@ interface StreamingLoggerInterface
      *
      * @param  string  $level  The log level
      * @param  string  $message  The message to stream
-     * @param  array  $context  Additional context data
+     * @param  array<string, mixed> $context  Additional context data
      */
     public function stream(string $level, string $message, array $context = []): void;
 
@@ -54,26 +54,31 @@ interface StreamingLoggerInterface
 
     /**
      * Stream process output in real-time.
+     * @param  array<string, mixed> $context
      */
     public function streamProcessOutput(string $type, string $output, array $context = []): void;
 
     /**
      * Stream task lifecycle events.
+     * @param  array<string, mixed> $context
      */
     public function streamTaskEvent(string $event, array $context = []): void;
 
     /**
      * Stream error events.
+     * @param  array<string, mixed> $context
      */
     public function streamError(string $message, array $context = []): void;
 
     /**
      * Stream progress updates.
+     * @param  array<string, mixed> $context
      */
     public function streamProgress(int $current, int $total, string $message = '', array $context = []): void;
 
     /**
      * Stream task chain events.
+     * @param  array<string, mixed> $context
      */
     public function streamChainEvent(string $event, array $context = []): void;
 }

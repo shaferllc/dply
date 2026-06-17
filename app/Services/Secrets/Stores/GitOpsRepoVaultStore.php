@@ -17,7 +17,7 @@ use RuntimeException;
 final class GitOpsRepoVaultStore implements VaultStore
 {
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      */
     public function __construct(private readonly array $config) {}
 
@@ -32,6 +32,9 @@ final class GitOpsRepoVaultStore implements VaultStore
             && trim((string) ($this->config['repo'] ?? '')) !== '';
     }
 
+    /**
+     * @param  array<string, mixed> $meta
+     */
     public function put(string $key, string $ciphertext, array $meta): void
     {
         $dir = $this->ensureClone();
@@ -54,6 +57,10 @@ final class GitOpsRepoVaultStore implements VaultStore
         return (string) file_get_contents($path);
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, array<mixed>|string>>
+     */
     public function list(string $prefix): array
     {
         $dir = $this->ensureClone();
@@ -119,7 +126,7 @@ final class GitOpsRepoVaultStore implements VaultStore
     }
 
     /**
-     * @param  list<string>  $args
+     * @param  array<string, mixed> $args
      */
     private function git(string $dir, array $args, bool $allowFailure = false): void
     {

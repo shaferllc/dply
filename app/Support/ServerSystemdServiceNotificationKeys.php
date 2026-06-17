@@ -21,7 +21,7 @@ final class ServerSystemdServiceNotificationKeys
     public static function slugFromUnit(string $normalizedUnit): string
     {
         $base = preg_replace('/\.service$/i', '', $normalizedUnit) ?? '';
-        $base = is_string($base) ? strtolower($base) : '';
+        $base = (strtolower($base) );
         $slug = preg_replace('/[^a-z0-9]+/', '_', $base) ?? '';
         $slug = trim((string) $slug, '_');
         if ($slug === '') {

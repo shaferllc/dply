@@ -29,6 +29,10 @@ final class SiteResourceBindingResolver
     /**
      * @return list<SiteResourceBinding>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, App\Support\Deployment\SiteResourceBinding>
+     */
     public function forSite(Site $site): array
     {
         $key = (string) $site->id;
@@ -81,7 +85,7 @@ final class SiteResourceBindingResolver
             mode: $mode === 'vm' ? 'provision_new' : 'attach_existing',
             required: ! $isWorkerHost
                 && in_array($mode, ['vm', 'docker', 'kubernetes'], true)
-                && $site->type?->value !== 'static',
+                && $site->type->value !== 'static',
             status: $databaseCount > 0 ? 'configured' : 'pending',
             source: $databaseCount > 0 ? 'server_database' : 'inferred_requirement',
             name: $databaseCount > 0 ? 'server-database' : null,
@@ -164,7 +168,7 @@ final class SiteResourceBindingResolver
                 status: (string) ($row->status ?: $derived->status),
                 source: 'binding',
                 name: $row->name ?: $derived->name,
-                config: array_merge($derived->config, is_array($row->config) ? $row->config : [], [
+                config: array_merge($derived->config, ($row->config ), [
                     'last_error' => $row->last_error,
                 ]),
                 bindingId: (string) $row->id,
@@ -180,7 +184,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function redisBinding(array $env): SiteResourceBinding
     {
@@ -220,7 +224,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function queueBinding(array $env): SiteResourceBinding
     {
@@ -250,7 +254,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function cacheBinding(array $env): SiteResourceBinding
     {
@@ -283,7 +287,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function objectStorageBinding(array $env): SiteResourceBinding
     {
@@ -337,7 +341,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function broadcastingBinding(array $env): SiteResourceBinding
     {
@@ -356,7 +360,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function errorTrackingBinding(array $env): SiteResourceBinding
     {
@@ -391,7 +395,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function aiBinding(array $env): SiteResourceBinding
     {
@@ -408,7 +412,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function captchaBinding(array $env): SiteResourceBinding
     {
@@ -423,7 +427,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function smsBinding(array $env): SiteResourceBinding
     {
@@ -438,7 +442,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function searchBinding(array $env): SiteResourceBinding
     {
@@ -454,7 +458,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function paymentsBinding(array $env): SiteResourceBinding
     {
@@ -468,7 +472,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function oauthBinding(array $env): SiteResourceBinding
     {
@@ -514,17 +518,17 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function envFilled(array $env, string $key): bool
     {
         $value = $env[$key] ?? '';
 
-        return is_string($value) && trim($value) !== '';
+        return ($value) && trim($value) !== '';
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function envHasRedisConnection(array $env): bool
     {
@@ -533,7 +537,7 @@ final class SiteResourceBindingResolver
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      */
     private function envReferencesRedisWithoutHost(array $env): bool
     {

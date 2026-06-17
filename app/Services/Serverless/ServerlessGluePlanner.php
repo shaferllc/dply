@@ -20,6 +20,10 @@ final class ServerlessGluePlanner
     /**
      * @return list<array{key: string, title: string, summary: string, available: bool, unavailable_reason: string|null}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, bool|string|null>>
+     */
     public function catalog(Organization $organization): array
     {
         $snapshot = $this->inventory->forOrganization($organization);
@@ -68,8 +72,8 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
-     * @return array{0: bool, 1: string|null}
+     * @param  array<string, mixed> $snapshot
+     * @return list<array<string, bool|string|null>>
      */
     private function availability(string $key, array $snapshot): array
     {
@@ -129,7 +133,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed> $snapshot
      * @return list<string>
      */
     private function gaps(string $key, array $snapshot): array
@@ -154,8 +158,8 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed>  $definition
-     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed> $definition
+     * @param  array<string, mixed> $snapshot
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
     private function buildSteps(string $key, array $definition, array $snapshot): array
@@ -181,7 +185,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed> $snapshot
      * @return list<array{kind: string, label: string, href: string|null, meta: string|null}>
      */
     private function resources(string $key, array $snapshot): array
@@ -246,7 +250,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed> $snapshot
      * @return array{0: string|null, 1: string|null}
      */
     private function stepLink(string $key, int $index, array $snapshot): array
@@ -295,7 +299,7 @@ final class ServerlessGluePlanner
     }
 
     /**
-     * @param  array<bool, string>  $reasons
+     * @param  array<string, mixed> $reasons
      */
     private function missingReason(array $reasons): string
     {

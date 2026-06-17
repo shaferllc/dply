@@ -25,6 +25,10 @@ final class DeployPipelineTemplateCatalog
      *     steps: list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>,
      * }>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     */
     public function templatesForSite(Site $site): array
     {
         $templates = [];
@@ -65,7 +69,11 @@ final class DeployPipelineTemplateCatalog
     }
 
     /**
-     * @return list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>
+     * @return list<array<string, array|string|null>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, int|string>>
      */
     public function stepsForTemplateKey(string $key): array
     {
@@ -86,8 +94,8 @@ final class DeployPipelineTemplateCatalog
     }
 
     /**
-     * @param  array<string, mixed>  $meta
-     * @return list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>
+     * @param  array<string, mixed> $meta
+     * @return list<array<string, int|string>>
      */
     private function stepsFromTemplateMeta(array $meta): array
     {
@@ -119,9 +127,9 @@ final class DeployPipelineTemplateCatalog
     }
 
     /**
-     * @param  array<string, mixed>  $meta
-     * @param  list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>  $steps
-     * @return array{key: string, label: string, description: string, runtime: ?string, framework: ?string, steps: list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>}
+     * @param  array<string, mixed> $meta
+     * @param  array<string, mixed> $steps
+     * @return array{key: string, label: string, description: string, runtime: string|null, framework: string|null, steps: array<string, mixed>}
      */
     private function formatTemplate(string $key, array $meta, array $steps): array
     {
@@ -136,7 +144,7 @@ final class DeployPipelineTemplateCatalog
     }
 
     /**
-     * @param  list<array<string, mixed>>  $steps
+     * @param  array<string, mixed> $steps
      * @return list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>
      */
     private function stripSortOrder(array $steps): array

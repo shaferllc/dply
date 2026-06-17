@@ -28,7 +28,7 @@ trait BuildsDoAppSpec
      */
     public static function imageRegistryCredentialsFor(Site $site): ?string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $credId = $meta['container']['image_credential_id'] ?? null;
         if (! is_string($credId) || $credId === '') {
             return null;
@@ -39,7 +39,7 @@ trait BuildsDoAppSpec
             return null;
         }
 
-        $body = is_array($cred->credentials) ? $cred->credentials : [];
+        $body = ($cred->credentials );
         $username = (string) ($body['username'] ?? '');
         $token = (string) ($body['token'] ?? $body['api_token'] ?? '');
         if ($username === '' || $token === '') {
@@ -59,7 +59,7 @@ trait BuildsDoAppSpec
      * The form calls this with its own state to get a cost estimate
      * and to catch spec validation errors before the user submits.
      *
-     * @param  array{name: string, region: string, size_tier_slug: string, instances: int, port: int, mode: string, image?: string, repo?: string, branch?: string, dockerfile_path?: ?string, autoscaling?: ?array, health_check?: ?array}  $payload
+     * @param  array{name: string, region: string, size_tier_slug: string, instances: int, port: int, mode: string, image?: string, repo?: string, branch?: string, dockerfile_path?: ?string, autoscaling?: ?array<string, mixed>, health_check?: ?array<string, mixed>}  $payload
      * @return array<string, mixed>
      */
     public static function buildProposeSpecFromPayload(array $payload): array

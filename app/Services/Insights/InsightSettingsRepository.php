@@ -14,6 +14,7 @@ class InsightSettingsRepository
      *
      * @return array<string, bool>
      */
+    /** @return array<string, mixed> */
     public function defaultEnabledMap(Organization $organization): array
     {
         $map = [];
@@ -35,6 +36,7 @@ class InsightSettingsRepository
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function defaultParameters(): array
     {
         $out = [];

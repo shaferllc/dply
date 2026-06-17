@@ -12,7 +12,7 @@ use App\Support\Servers\InstalledStack;
 final class ServerBlueprintSummary
 {
     /**
-     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed> $snapshot
      */
     public function tagline(array $snapshot): string
     {
@@ -33,7 +33,7 @@ final class ServerBlueprintSummary
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed> $snapshot
      * @return array{firewall_rules: int, supervisor_programs: int, runtimes: list<string>}
      */
     public function extras(array $snapshot): array

@@ -26,6 +26,10 @@ class WebserverConfigDiffRenderer implements ConfigRevisionDiffRenderer
         'full_override_body' => 'full override',
     ];
 
+    /**
+     * @param  array<string, mixed> $left
+     * @param  array<string, mixed> $right
+     */
     public function render(array $left, array $right): string
     {
         $blocks = [];

@@ -16,23 +16,29 @@ use Illuminate\Support\Str;
  */
 trait HandlesMonitoring
 {
+    use HandlesResourceMonitoring;
+
     /**
      * Monitoring configuration properties.
      */
     protected bool $monitoringEnabled = true;
 
+    /** @var array<string, mixed> */
     protected array $monitoringConfig = [];
 
+    /** @var array<string, mixed> */
     protected array $alertRules = [];
 
+    /** @var array<string, mixed> */
     protected array $performanceThresholds = [];
 
-    protected array $resourceLimits = [];
-
+    /** @var array<string, mixed> */
     protected array $monitoringHistory = [];
 
+    /** @var array<string, mixed> */
     protected array $monitoringAlerts = [];
 
+    /** @var array<string, mixed> */
     protected array $healthChecks = [];
 
     /**
@@ -45,6 +51,8 @@ trait HandlesMonitoring
 
     /**
      * Get health status of this task.
+     *
+     * @return array<string, mixed>
      */
     public function getHealthStatus(): array
     {
@@ -68,7 +76,7 @@ trait HandlesMonitoring
         }
 
         // Check task-specific health
-        if ($this->task) {
+        if ($this->taskModel) {
             $taskHealth = $this->checkTaskHealth();
             if (! $taskHealth['healthy']) {
                 $status = 'unhealthy';
@@ -87,13 +95,15 @@ trait HandlesMonitoring
 
     /**
      * Get monitoring metrics.
+     *
+     * @return array<string, mixed>
      */
     public function getMonitoringMetrics(): array
     {
         $metrics = [
-            'task_id' => $this->task?->id,
-            'task_name' => $this->task?->name,
-            'status' => $this->task?->status?->value,
+            'task_id' => $this->taskModel?->id,
+            'task_name' => $this->taskModel?->name,
+            'status' => $this->taskModel?->status?->value,
             'uptime' => $this->calculateUptime(),
             'availability' => $this->calculateAvailability(),
             'response_time' => $this->getResponseTime(),
@@ -112,6 +122,8 @@ trait HandlesMonitoring
 
     /**
      * Get alert rules for this task.
+     *
+     * @return array<string, mixed>
      */
     public function getAlertRules(): array
     {
@@ -156,6 +168,8 @@ trait HandlesMonitoring
 
     /**
      * Check if any alerts should be triggered.
+     *
+     * @return list<array<string, mixed>>
      */
     public function checkAlerts(): array
     {
@@ -184,6 +198,8 @@ trait HandlesMonitoring
 
     /**
      * Get monitoring configuration.
+     *
+     * @return array<string, mixed>
      */
     public function getMonitoringConfig(): array
     {
@@ -202,6 +218,8 @@ trait HandlesMonitoring
 
     /**
      * Get performance thresholds.
+     *
+     * @return array<string, mixed>
      */
     public function getPerformanceThresholds(): array
     {
@@ -216,20 +234,9 @@ trait HandlesMonitoring
     }
 
     /**
-     * Get resource limits.
-     */
-    public function getResourceLimits(): array
-    {
-        return array_merge([
-            'memory_limit' => 512 * 1024 * 1024, // 512MB
-            'cpu_limit' => 1.0, // 1 CPU core
-            'disk_limit' => 1024 * 1024 * 1024, // 1GB
-            'network_limit' => 100 * 1024 * 1024, // 100MB
-        ], $this->resourceLimits);
-    }
-
-    /**
      * Get monitoring history.
+     *
+     * @return array<string, mixed>
      */
     public function getMonitoringHistory(): array
     {
@@ -238,12 +245,14 @@ trait HandlesMonitoring
 
     /**
      * Record monitoring event.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function recordMonitoringEvent(string $event, array $data = []): void
     {
         $eventData = [
             'event' => $event,
-            'task_id' => $this->task?->id,
+            'task_id' => $this->taskModel?->id,
             'timestamp' => now()->toISOString(),
             'data' => $data,
         ];
@@ -252,13 +261,15 @@ trait HandlesMonitoring
 
         // Store in monitoring service
         $monitoringService = app(MonitoringService::class);
-        $monitoringService->recordEvent($this->task?->id, $event, $data);
+        $monitoringService->recordEvent($this->taskModel?->id, $event, $data);
 
         Log::info('Monitoring event recorded', $eventData);
     }
 
     /**
      * Set monitoring configuration.
+     *
+     * @param  array<string, mixed>  $config
      */
     public function setMonitoringConfig(array $config): void
     {
@@ -285,14 +296,16 @@ trait HandlesMonitoring
 
     /**
      * Get monitoring dashboard data.
+     *
+     * @return array<string, mixed>
      */
     public function getMonitoringDashboard(): array
     {
         return [
             'task_info' => [
-                'id' => $this->task?->id,
-                'name' => $this->task?->name,
-                'status' => $this->task?->status?->value,
+                'id' => $this->taskModel?->id,
+                'name' => $this->taskModel?->name,
+                'status' => $this->taskModel?->status?->value,
             ],
             'health_status' => $this->getHealthStatus(),
             'monitoring_metrics' => $this->getMonitoringMetrics(),
@@ -312,8 +325,8 @@ trait HandlesMonitoring
     {
         $data = [
             'task_info' => [
-                'id' => $this->task?->id,
-                'name' => $this->task?->name,
+                'id' => $this->taskModel?->id,
+                'name' => $this->taskModel?->name,
             ],
             'monitoring_config' => $this->getMonitoringConfig(),
             'health_status' => $this->getHealthStatus(),
@@ -333,6 +346,8 @@ trait HandlesMonitoring
 
     /**
      * Get monitoring alerts.
+     *
+     * @return array<string, mixed>
      */
     public function getMonitoringAlerts(): array
     {
@@ -378,6 +393,8 @@ trait HandlesMonitoring
 
     /**
      * Add alert rule.
+     *
+     * @param  array<string, mixed>  $rule
      */
     public function addAlertRule(string $name, array $rule): self
     {
@@ -397,17 +414,9 @@ trait HandlesMonitoring
     }
 
     /**
-     * Set resource limit.
-     */
-    public function setResourceLimit(string $resource, float $limit): self
-    {
-        $this->resourceLimits[$resource] = $limit;
-
-        return $this;
-    }
-
-    /**
      * Add health check.
+     *
+     * @param  array<string, mixed>  $config
      */
     public function addHealthCheck(string $name, array $config): self
     {
@@ -418,6 +427,8 @@ trait HandlesMonitoring
 
     /**
      * Get health checks.
+     *
+     * @return array<string, mixed>
      */
     protected function getHealthChecks(): array
     {
@@ -444,12 +455,25 @@ trait HandlesMonitoring
     /**
      * Perform health check for this task.
      */
-    public function performHealthCheck(): bool
+    public function performHealthCheck(?string $checkName = null): bool
     {
-        return $this->checkTaskStatus() &&
-               $this->checkResourceUsage() &&
-               $this->checkPerformanceMetrics() &&
-               $this->checkConnectivity();
+        if ($checkName !== null) {
+            return match ($checkName) {
+                'task_status' => $this->checkTaskStatus(),
+                'resource_usage' => $this->checkResourceUsage(),
+                'performance_metrics' => $this->checkPerformanceMetrics(),
+                'connectivity' => $this->checkConnectivity(),
+                default => $this->performCustomHealthCheck($checkName),
+            };
+        }
+
+        foreach ($this->getHealthChecks() as $name => $checkConfig) {
+            if (($checkConfig['enabled'] ?? true) && ! $this->performHealthCheck($name)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -457,13 +481,13 @@ trait HandlesMonitoring
      */
     protected function checkTaskStatus(): bool
     {
-        if (! $this->task) {
+        if (! $this->taskModel) {
             return false;
         }
 
         $validStatuses = [TaskStatus::Pending, TaskStatus::Running, TaskStatus::Finished];
 
-        return in_array($this->task->status, $validStatuses);
+        return in_array($this->taskModel->status, $validStatuses);
     }
 
     /**
@@ -521,19 +545,21 @@ trait HandlesMonitoring
 
     /**
      * Check task health.
+     *
+     * @return array<string, mixed>
      */
     protected function checkTaskHealth(): array
     {
         $issues = [];
         $healthy = true;
 
-        if (! $this->task) {
+        if (! $this->taskModel) {
             $issues[] = 'Task not found';
             $healthy = false;
-        } elseif ($this->task->status === TaskStatus::Failed) {
+        } elseif ($this->taskModel->status === TaskStatus::Failed) {
             $issues[] = 'Task has failed';
             $healthy = false;
-        } elseif ($this->task->status === TaskStatus::Timeout) {
+        } elseif ($this->taskModel->status === TaskStatus::Timeout) {
             $issues[] = 'Task has timed out';
             $healthy = false;
         }
@@ -546,6 +572,8 @@ trait HandlesMonitoring
 
     /**
      * Calculate health score.
+     *
+     * @param  array<string, mixed>  $checks
      */
     protected function calculateHealthScore(array $checks): float
     {
@@ -566,11 +594,11 @@ trait HandlesMonitoring
      */
     protected function calculateUptime(): float
     {
-        if (! $this->task) {
+        if (! $this->taskModel) {
             return 0.0;
         }
 
-        $startedAt = $this->task->created_at;
+        $startedAt = $this->taskModel->created_at;
         $now = now();
 
         if (! $startedAt) {
@@ -599,6 +627,8 @@ trait HandlesMonitoring
 
     /**
      * Get resource usage.
+     *
+     * @return array<string, mixed>
      */
     protected function getResourceUsage(): array
     {
@@ -621,6 +651,8 @@ trait HandlesMonitoring
 
     /**
      * Get custom metrics.
+     *
+     * @return array<string, mixed>
      */
     protected function getCustomMetrics(): array
     {
@@ -629,6 +661,9 @@ trait HandlesMonitoring
 
     /**
      * Evaluate alert rule.
+     *
+     * @param  array<string, mixed>  $rule
+     * @param  array<string, mixed>  $metrics
      */
     protected function evaluateAlertRule(string $ruleName, array $rule, array $metrics): bool
     {
@@ -640,6 +675,10 @@ trait HandlesMonitoring
 
     /**
      * Create alert.
+     *
+     * @param  array<string, mixed>  $rule
+     * @param  array<string, mixed>  $metrics
+     * @return array<string, mixed>
      */
     protected function createAlert(string $ruleName, array $rule, array $metrics): array
     {
@@ -662,11 +701,13 @@ trait HandlesMonitoring
 
     /**
      * Process alert.
+     *
+     * @param  array<string, mixed>  $alert
      */
     protected function processAlert(array $alert): void
     {
         // Dispatch alert processing job
-        ProcessMonitoringAlertJob::dispatch($alert, $this->task?->id);
+        ProcessMonitoringAlertJob::dispatch($alert, $this->taskModel?->id);
 
         $this->recordMonitoringEvent('alert_triggered', [
             'alert_id' => $alert['id'],
@@ -677,21 +718,25 @@ trait HandlesMonitoring
 
     /**
      * Get recent alerts.
+     *
+     * @return list<array<string, mixed>>
      */
     protected function getRecentAlerts(): array
     {
-        return array_slice($this->monitoringAlerts, -5);
+        return array_values(array_slice($this->monitoringAlerts, -5));
     }
 
     /**
      * Get uptime stats.
+     *
+     * @return array<string, mixed>
      */
     protected function getUptimeStats(): array
     {
         return [
             'current_uptime' => $this->calculateUptime(),
             'availability' => $this->calculateAvailability(),
-            'last_restart' => $this->task?->created_at?->toISOString(),
+            'last_restart' => $this->taskModel?->created_at?->toISOString(),
         ];
     }
 

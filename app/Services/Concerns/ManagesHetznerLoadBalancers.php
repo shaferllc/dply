@@ -18,8 +18,8 @@ trait ManagesHetznerLoadBalancers
     /**
      * Create a load balancer and return its ID.
      *
-     * @param  array<int>  $targetServerProviderIds  Hetzner server IDs to add as targets immediately
-     * @param  list<array{protocol:string,listen_port:int,destination_port:int}>  $services
+     * @param  array<string, mixed> $targetServerProviderIds  Hetzner server IDs to add as targets immediately
+     * @param  array<string, mixed> $services
      */
     public function createLoadBalancer(
         string $name,
@@ -81,6 +81,8 @@ trait ManagesHetznerLoadBalancers
         return $lb;
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function getLoadBalancer(int $id): array
     {
         $response = $this->request('get', "/load_balancers/{$id}");
@@ -90,6 +92,7 @@ trait ManagesHetznerLoadBalancers
     }
 
     /** @return list<array<string, mixed>> */
+    /** @return array<string, mixed> */
     public function listLoadBalancers(): array
     {
         $response = $this->request('get', '/load_balancers');

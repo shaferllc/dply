@@ -15,20 +15,20 @@ class NotificationPublisher
     ) {}
 
     /**
-     * @param  array<string, mixed>  $metadata
-     * @param  array<string, mixed>  $contextOverrides
+     * @param  array<string, mixed> $metadata
+     * @param  array<string, mixed> $contextOverrides
      * @param  list<User|string>|null  $recipientUsers
-     * @param  list<string>  $excludeChannelIds  NotificationChannel ULIDs to skip during routing.
+     * @param  array<string, mixed> $excludeChannelIds  NotificationChannel ULIDs to skip during routing.
      *                                           Use when the caller has already delivered the event
      *                                           through those channels directly (e.g. always-send
      *                                           fan-out for provision failure) and the subscription
      *                                           pipe would otherwise produce a duplicate message.
-     * @param  list<string>  $excludeRecipientUserIds  User ULIDs to skip when fanning out the
+     * @param  array<string, mixed> $excludeRecipientUserIds  User ULIDs to skip when fanning out the
      *                                                 in-app inbox. Use when the caller has already
      *                                                 delivered this event to those users via a sibling
      *                                                 publish (e.g. a site error's site-scoped dispatch
      *                                                 covers stakeholders the server roll-up would repeat).
-     * @param  list<User|string>  $additionalRecipientUsers  Users always added to the in-app
+     * @param  array<string, mixed> $additionalRecipientUsers  Users always added to the in-app
      *                                                       recipient set (unioned on top of the resolved
      *                                                       stakeholders), e.g. the operator who triggered the
      *                                                       action — so they get the bell entry regardless of
@@ -91,7 +91,7 @@ class NotificationPublisher
     }
 
     /**
-     * @param  list<User|string>  $recipientUsers
+     * @param  array<string, mixed> $recipientUsers
      * @return list<string>
      */
     private function normalizeRecipientIds(array $recipientUsers): array

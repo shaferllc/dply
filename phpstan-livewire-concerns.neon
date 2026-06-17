@@ -1,0 +1,11 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+    parseModelCastsMethod: true
+    databaseMigrationsPath:
+        - database/migrations
+    parallel:
+        maximumNumberOfProcesses: 1
+        processTimeout: 1800.0

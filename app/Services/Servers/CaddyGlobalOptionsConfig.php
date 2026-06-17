@@ -139,6 +139,7 @@ class CaddyGlobalOptionsConfig
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -189,7 +190,7 @@ class CaddyGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -226,7 +227,7 @@ class CaddyGlobalOptionsConfig
      * Render the global `{ ... }` block from form values. Public so tests
      * can assert the formatter output without going through SSH.
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     public function renderBlock(array $values): string
     {

@@ -51,6 +51,7 @@ class WorkerDaemonBackend
      *
      * @return array{backend: string, detail: string}
      */
+    /** @return array<string, mixed> */
     public function ensure(Site $site): array
     {
         if ($this->backendFor($site) === WorkerPool::PM_SUPERVISOR) {

@@ -23,6 +23,7 @@ class NginxCustomHostsConfig
     /**
      * @return array{hosts: list<array{slug: string, path: string, server_names: list<string>, listen: list<string>, root: string, upstream: string, ssl: bool}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $available = rtrim((string) config('sites.nginx_sites_available'), '/');
@@ -200,7 +201,7 @@ class NginxCustomHostsConfig
         $emit->step('nginx-custom-hosts', 'Writing '.$path.' ('.$reason.')');
         $result = app(RemoteWebserverConfigService::class)->write($server, 'nginx', $path, $contents, $emit);
 
-        if (! ($result['validate_ok'] ?? false)) {
+        if (! ($result['validate_ok'])) {
             throw new \RuntimeException(trim((string) ($result['validate_output'] ?? 'nginx -t rejected the new file.')));
         }
 
@@ -239,6 +240,7 @@ class NginxCustomHostsConfig
 
     /**
      * @return list<string>
+     * @param  array<string, mixed> $value
      */
     private function normalizeList(array|string $value): array
     {

@@ -15,6 +15,7 @@ class ScriptRemoteRunner
      *
      * @return array{ok: bool, output: string, error: string|null}
      */
+    /** @return array<string, mixed> */
     public function run(Script $script, Server $server, int $timeoutSeconds = 600): array
     {
         $tmp = '/tmp/dply-script-'.Str::lower(Str::random(20)).'.sh';

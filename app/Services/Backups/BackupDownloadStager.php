@@ -68,7 +68,7 @@ final class BackupDownloadStager
             }
 
             $target = $this->dbExporter->downloadTarget($backup);
-            if (($target['mode'] ?? null) !== 'redirect' || ! isset($target['url'])) {
+            if (($target['mode']) !== 'redirect' || ! isset($target['url'])) {
                 throw new \RuntimeException(__('Backup is not available for direct download.'));
             }
 
@@ -149,7 +149,7 @@ final class BackupDownloadStager
         if ($backup->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER) {
             $this->uploadFromServer(
                 $row,
-                $this->requireServer($backup->site?->server, __('The site server is unavailable.')),
+                $this->requireServer($backup->site->server, __('The site server is unavailable.')),
                 (string) $backup->remote_path,
                 'site-files',
                 'tar.gz',

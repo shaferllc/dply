@@ -18,6 +18,7 @@ final class DocChunkExtractor
     /**
      * @return array{title: string, excerpt: string, headings: list<string>}
      */
+    /** @return array<string, mixed> */
     public function excerptForSlug(string $slug, int $maxChars = 6000): array
     {
         $path = $this->resolvePath($slug);

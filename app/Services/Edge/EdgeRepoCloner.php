@@ -40,6 +40,10 @@ final class EdgeRepoCloner
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function clone(string $repoUrl, string $branch, string $checkout, ?string $commitOverride = null): array
     {
         $log = [];
@@ -59,7 +63,7 @@ final class EdgeRepoCloner
     }
 
     /**
-     * @param  list<string>  $log
+     * @param  array<string, mixed> $log
      * @return list<string>
      */
     private function cloneViaMirror(string $repoUrl, string $branch, string $checkout, ?string $commitOverride, array $log): array
@@ -116,7 +120,7 @@ final class EdgeRepoCloner
     }
 
     /**
-     * @param  list<string>  $log
+     * @param  array<string, mixed> $log
      * @return list<string>
      */
     private function cloneDirect(string $repoUrl, string $branch, string $checkout, ?string $commitOverride, array $log): array
@@ -142,8 +146,8 @@ final class EdgeRepoCloner
      * operators can see WHY a retry kicked in (network blip vs. real auth
      * failure, etc.). Throws after the final attempt fails.
      *
-     * @param  list<string>  $command
-     * @param  list<string>  $log
+     * @param  array<string, mixed> $command
+     * @param  array<string, mixed> $log
      */
     private function runWithRetry(array $command, array &$log): void
     {

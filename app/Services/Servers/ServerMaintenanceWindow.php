@@ -24,7 +24,7 @@ final class ServerMaintenanceWindow
     public function isActive(Server $server): bool
     {
         $state = $this->state($server);
-        if ($state === null || ! ($state['active'] ?? false)) {
+        if ($state === null || ! ($state['active'])) {
             return false;
         }
 
@@ -70,6 +70,7 @@ final class ServerMaintenanceWindow
     /**
      * @return array{suspend_count: int, already_suspended: int, skipped: int}
      */
+    /** @return array<string, mixed> */
     public function preview(Server $server): array
     {
         $eligible = $this->eligibleSites($server);
@@ -111,6 +112,7 @@ final class ServerMaintenanceWindow
      *     }>,
      * }
      */
+    /** @return array<string, mixed> */
     public function report(Server $server): array
     {
         $server->loadMissing(['sites.server']);
@@ -120,7 +122,7 @@ final class ServerMaintenanceWindow
         $eligible = $this->eligibleSites($server);
         $eligibleIds = $eligible->pluck('id')->map(fn ($id): string => (string) $id)->all();
 
-        /** @var list<string> $windowSuspendedIds */
+        /** @var array $windowSuspendedIds */
         $windowSuspendedIds = is_array($state['suspended_site_ids'] ?? null)
             ? array_map('strval', $state['suspended_site_ids'])
             : [];
@@ -237,7 +239,7 @@ final class ServerMaintenanceWindow
                 continue;
             }
 
-            $siteMeta = is_array($site->meta) ? $site->meta : [];
+            $siteMeta = ($site->meta );
             if ($publicMessage !== '') {
                 $siteMeta['suspended_message'] = $publicMessage;
             } else {
@@ -310,15 +312,16 @@ final class ServerMaintenanceWindow
     /**
      * @return array{resumed: int, left_suspended: int}
      */
+    /** @return array<string, mixed> */
     public function disable(Server $server, ?User $user = null, bool $autoExpired = false): array
     {
         $state = $this->state($server);
-        if ($state === null || ! ($state['active'] ?? false)) {
+        if ($state === null || ! ($state['active'])) {
             throw new \RuntimeException(__('No active maintenance window on this server.'));
         }
 
-        /** @var list<string> $siteIds */
-        $siteIds = is_array($state['suspended_site_ids'] ?? null) ? $state['suspended_site_ids'] : [];
+        /** @var array $siteIds */
+        $siteIds = ($state['suspended_site_ids'] );
         $resumed = 0;
         $leftSuspended = 0;
 
@@ -335,7 +338,7 @@ final class ServerMaintenanceWindow
                     continue;
                 }
 
-                $siteMeta = is_array($site->meta) ? $site->meta : [];
+                $siteMeta = ($site->meta );
                 unset($siteMeta['suspended_message']);
 
                 $site->update([
@@ -399,7 +402,7 @@ final class ServerMaintenanceWindow
     public function refreshExpired(Server $server, ?User $user = null): bool
     {
         $state = $this->state($server);
-        if ($state === null || ! ($state['active'] ?? false)) {
+        if ($state === null || ! ($state['active'])) {
             return false;
         }
 

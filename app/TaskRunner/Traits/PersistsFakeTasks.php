@@ -8,7 +8,9 @@ use Illuminate\Filesystem\Filesystem;
 
 trait PersistsFakeTasks
 {
-    public function storePersistentFake()
+    use PersistentFakeTasks;
+
+    public function storePersistentFake(): void
     {
         if (! config('task-runner.persistent_fake.enabled')) {
             return;
@@ -27,7 +29,7 @@ trait PersistsFakeTasks
         ]));
     }
 
-    public function loadPersistentFake()
+    public function loadPersistentFake(): void
     {
         if (! config('task-runner.persistent_fake.enabled')) {
             return;

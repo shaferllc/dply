@@ -71,7 +71,7 @@ class VultrService
     /**
      * Create a new instance and return its ID.
      *
-     * @param  array<string>  $sshKeyIds  SSH key IDs from createSshKey()
+     * @param  array<string, mixed> $sshKeyIds  SSH key IDs from createSshKey()
      */
     public function createInstance(
         string $region,
@@ -105,7 +105,9 @@ class VultrService
 
     /**
      * Get instance by ID. Returns decoded JSON.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getInstance(string $id): array
     {
         $response = $this->request('get', '/instances/'.$id);
@@ -122,6 +124,7 @@ class VultrService
 
     /**
      * Get public IPv4 from instance.
+     * @param  array<string, mixed> $instance
      */
     public static function getPublicIp(array $instance): ?string
     {
@@ -136,6 +139,7 @@ class VultrService
      * isn't on a private network); VPC attachments live under `vpcs[].subnet`.
      * Returns null when the instance has no private networking — same null-safe
      * contract as {@see DigitalOceanService::getDropletPrivateIp()}.
+     * @param  array<string, mixed> $instance
      */
     public static function getPrivateIp(array $instance): ?string
     {
@@ -158,6 +162,7 @@ class VultrService
      * The id of the VPC the instance is attached to (Vultr instances are NOT on a
      * private network by default — this is null unless one was attached). The id
      * is the identity used to record the instance's private network.
+     * @param  array<string, mixed> $instance
      */
     public static function getInstanceVpcId(array $instance): ?string
     {
@@ -174,6 +179,7 @@ class VultrService
     /**
      * Best-effort CIDR for the attached VPC (subnet + mask). Null when the mask
      * isn't present — recording by VPC id alone still enables peering.
+     * @param  array<string, mixed> $instance
      */
     public static function getInstanceVpcRange(array $instance): ?string
     {
@@ -229,6 +235,7 @@ class VultrService
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getSnapshot(string $id): array
     {
         $response = $this->request('get', '/snapshots/'.$id);
@@ -253,6 +260,7 @@ class VultrService
      * @param  callable(array<string, mixed>):void|null  $onTick  receives each poll's snapshot
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function waitForSnapshot(string $id, ?callable $onTick = null, int $maxAttempts = 360, int $sleepSeconds = 10): array
     {
         $snapshot = [];
@@ -292,6 +300,10 @@ class VultrService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed>>
+     */
     public function getRegions(): array
     {
         $response = $this->request('get', '/regions');
@@ -315,7 +327,11 @@ class VultrService
     /**
      * List plans. Normalizes to list (API may return object keyed by id).
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<array<mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed>>
      */
     public function getPlans(): array
     {
@@ -340,8 +356,9 @@ class VultrService
     /**
      * List OS images (optional; can use default_os_id from config).
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<array<mixed>>
      */
+    /** @return array<string, mixed> */
     public function getOsList(): array
     {
         $response = $this->request('get', '/os');
@@ -393,6 +410,10 @@ class VultrService
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<mixed, mixed>>
+     */
     public function getDomainRecords(string $domainName): array
     {
         $all = [];
@@ -423,7 +444,7 @@ class VultrService
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return list<array<mixed, mixed>>
      */
     public function findDomainRecord(string $domainName, string $type, string $name, ?string $data = null): ?array
     {
@@ -543,6 +564,9 @@ class VultrService
         return $recordName;
     }
 
+    /**
+     * @param  array<string, mixed> $body
+     */
     protected function request(string $method, string $path, array $body = []): Response
     {
         $url = $this->baseUrl.$path;

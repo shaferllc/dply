@@ -75,6 +75,9 @@ class TaskListCommand extends Command
         return 0;
     }
 
+    /**
+     * @param  Collection<int, Task>  $tasks
+     */
     protected function outputTable(Collection $tasks, bool $verbose): void
     {
         $headers = ['ID', 'Name', 'Status', 'Created', 'Duration', 'Exit Code'];
@@ -108,6 +111,9 @@ class TaskListCommand extends Command
         $this->table($headers, $rows);
     }
 
+    /**
+     * @param  Collection<int, Task>  $tasks
+     */
     protected function outputJson(Collection $tasks, bool $verbose): void
     {
         $data = $tasks->map(function (Task $task) use ($verbose) {
@@ -136,6 +142,9 @@ class TaskListCommand extends Command
         $this->line(json_encode($data, JSON_PRETTY_PRINT));
     }
 
+    /**
+     * @param  Collection<int, Task>  $tasks
+     */
     protected function outputCsv(Collection $tasks, bool $verbose): void
     {
         $headers = ['ID', 'Name', 'Status', 'Created', 'Duration', 'Exit Code'];
@@ -180,7 +189,6 @@ class TaskListCommand extends Command
             TaskStatus::Cancelled => '<fg=yellow>Cancelled</>',
             TaskStatus::UploadFailed => '<fg=red>Upload Failed</>',
             TaskStatus::ConnectionFailed => '<fg=red>Connection Failed</>',
-            default => $status->value,
         };
     }
 }

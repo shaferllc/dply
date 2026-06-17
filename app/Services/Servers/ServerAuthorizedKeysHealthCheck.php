@@ -13,6 +13,7 @@ class ServerAuthorizedKeysHealthCheck
     /**
      * @return array{ok: bool, sshd_config: string, auth_keys_stat: string}
      */
+    /** @return array<string, mixed> */
     public function run(Server $server): array
     {
         $script = "#!/bin/bash\nset -u\n";

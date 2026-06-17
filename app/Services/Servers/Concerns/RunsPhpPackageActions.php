@@ -296,6 +296,7 @@ trait RunsPhpPackageActions
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
     public function normalizeVersionList(mixed $value): array
     {
         if (! is_array($value)) {

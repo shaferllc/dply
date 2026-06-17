@@ -10,6 +10,8 @@ class GcpDnsProvider implements DnsProvider
         private readonly GcpDnsService $service,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         $record = $this->service->upsertRecord($zone, $type, $name, $value);

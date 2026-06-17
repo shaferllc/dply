@@ -121,7 +121,7 @@ final class HostContentionDetector
     }
 
     /**
-     * @param  array<string, mixed>  $attribution
+     * @param  array<string, mixed> $attribution
      * @return list<array<string, mixed>>
      */
     private function dominantSiteEvents(Server $server, array $attribution): array
@@ -187,7 +187,7 @@ final class HostContentionDetector
     }
 
     /**
-     * @param  array<string, mixed>  $attribution
+     * @param  array<string, mixed> $attribution
      * @param  array<string, mixed>|null  $budgetSettings
      * @return list<array<string, mixed>>
      */
@@ -204,14 +204,14 @@ final class HostContentionDetector
 
         foreach ($breaches as $breach) {
             $events[] = [
-                'id' => (string) ($breach['id'] ?? uniqid('budget-', true)),
+                'id' => (string) $breach['id'],
                 'kind' => 'budget',
-                'severity' => (string) ($breach['severity'] ?? 'warning'),
-                'title' => (string) ($breach['title'] ?? __('Soft budget exceeded')),
-                'message' => (string) ($breach['message'] ?? ''),
+                'severity' => (string) $breach['severity'],
+                'title' => (string) $breach['title'],
+                'message' => (string) $breach['message'],
                 'occurred_at' => now(),
-                'site_slug' => (string) ($breach['slug'] ?? ''),
-                'site_name' => (string) ($breach['name'] ?? ''),
+                'site_slug' => (string) $breach['slug'],
+                'site_name' => (string) $breach['name'],
                 'site_href' => route('servers.shared-host', $server).'#budgets',
                 'action_label' => __('Adjust budgets'),
                 'action_route' => 'servers.shared-host',

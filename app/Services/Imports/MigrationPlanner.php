@@ -55,7 +55,7 @@ class MigrationPlanner
 
     /**
      * @param  PloiServer|ForgeServer  $source  the inventory-side row for the source server
-     * @param  list<string>  $selectedSiteIds  ulid PKs from the source-side sites table for the user-checked sites
+     * @param  array<string, mixed> $selectedSiteIds  ulid PKs from the source-side sites table for the user-checked sites
      * @param  string  $targetServerId  ulid PK of the dply Server provisioned for this migration
      * @param  ProviderCredential  $credential  the credential used for API calls
      */

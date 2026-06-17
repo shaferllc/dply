@@ -82,6 +82,7 @@ class ConditionalStreamingService
 
     /**
      * Handle critical task streaming.
+     * @param  array<string, mixed> $logData
      */
     protected function handleCriticalTask(array $logData): void
     {
@@ -102,6 +103,7 @@ class ConditionalStreamingService
 
     /**
      * Handle high priority task streaming.
+     * @param  array<string, mixed> $logData
      */
     protected function handleHighPriorityTask(array $logData): void
     {
@@ -122,6 +124,7 @@ class ConditionalStreamingService
 
     /**
      * Handle backup task streaming.
+     * @param  array<string, mixed> $logData
      */
     protected function handleBackupTask(array $logData): void
     {
@@ -136,7 +139,7 @@ class ConditionalStreamingService
             $this->updateBackupDashboard($logData);
 
             // Send backup completion notification
-            if ($logData['context']['event'] ?? '' === 'completed') {
+            if (($logData['context']['event'] ?? '') === 'completed') {
                 $this->sendBackupCompletionNotification($logData);
             }
         }
@@ -144,6 +147,7 @@ class ConditionalStreamingService
 
     /**
      * Handle deployment task streaming.
+     * @param  array<string, mixed> $logData
      */
     protected function handleDeploymentTask(array $logData): void
     {
@@ -164,6 +168,7 @@ class ConditionalStreamingService
 
     /**
      * Handle error events.
+     * @param  array<string, mixed> $logData
      */
     protected function handleError(array $logData): void
     {
@@ -181,6 +186,7 @@ class ConditionalStreamingService
 
     /**
      * Configure streaming for a specific task.
+     * @param  array<string, mixed> $options
      */
     public function configureTaskStreaming(Task $task, array $options = []): void
     {
@@ -198,6 +204,7 @@ class ConditionalStreamingService
 
     /**
      * Handle task-specific streaming.
+     * @param  array<string, mixed> $logData
      */
     protected function handleTaskSpecificStreaming(array $logData, string $taskId, string $priority, string $category, bool $notifyOnCompletion, bool $notifyOnError): void
     {
@@ -232,6 +239,7 @@ class ConditionalStreamingService
 
     /**
      * Send critical alert.
+     * @param  array<string, mixed> $logData
      */
     protected function sendCriticalAlert(array $logData): void
     {
@@ -241,6 +249,7 @@ class ConditionalStreamingService
 
     /**
      * Send Slack notification.
+     * @param  array<string, mixed> $logData
      */
     protected function sendSlackNotification(array $logData): void
     {
@@ -250,6 +259,7 @@ class ConditionalStreamingService
 
     /**
      * Broadcast to admins.
+     * @param  array<string, mixed> $logData
      */
     protected function broadcastToAdmins(array $logData): void
     {
@@ -259,6 +269,7 @@ class ConditionalStreamingService
 
     /**
      * Track backup progress.
+     * @param  array<string, mixed> $logData
      */
     protected function trackBackupProgress(array $logData): void
     {
@@ -268,6 +279,7 @@ class ConditionalStreamingService
 
     /**
      * Update backup dashboard.
+     * @param  array<string, mixed> $logData
      */
     protected function updateBackupDashboard(array $logData): void
     {
@@ -277,6 +289,7 @@ class ConditionalStreamingService
 
     /**
      * Send backup completion notification.
+     * @param  array<string, mixed> $logData
      */
     protected function sendBackupCompletionNotification(array $logData): void
     {
@@ -286,6 +299,7 @@ class ConditionalStreamingService
 
     /**
      * Track deployment stage.
+     * @param  array<string, mixed> $logData
      */
     protected function trackDeploymentStage(array $logData): void
     {
@@ -295,6 +309,7 @@ class ConditionalStreamingService
 
     /**
      * Update deployment status.
+     * @param  array<string, mixed> $logData
      */
     protected function updateDeploymentStatus(array $logData): void
     {
@@ -304,6 +319,7 @@ class ConditionalStreamingService
 
     /**
      * Send deployment notification.
+     * @param  array<string, mixed> $logData
      */
     protected function sendDeploymentNotification(array $logData): void
     {
@@ -313,6 +329,7 @@ class ConditionalStreamingService
 
     /**
      * Send error alert.
+     * @param  array<string, mixed> $logData
      */
     protected function sendErrorAlert(array $logData): void
     {
@@ -322,6 +339,7 @@ class ConditionalStreamingService
 
     /**
      * Log to error tracking service.
+     * @param  array<string, mixed> $logData
      */
     protected function logToErrorTracking(array $logData): void
     {
@@ -331,6 +349,7 @@ class ConditionalStreamingService
 
     /**
      * Update error dashboard.
+     * @param  array<string, mixed> $logData
      */
     protected function updateErrorDashboard(array $logData): void
     {
@@ -340,6 +359,7 @@ class ConditionalStreamingService
 
     /**
      * Send completion notification.
+     * @param  array<string, mixed> $logData
      */
     protected function sendCompletionNotification(array $logData): void
     {
@@ -349,6 +369,7 @@ class ConditionalStreamingService
 
     /**
      * Update high priority dashboard.
+     * @param  array<string, mixed> $logData
      */
     protected function updateHighPriorityDashboard(array $logData): void
     {
@@ -376,6 +397,7 @@ class ConditionalStreamingService
 
     /**
      * Check if task should be streamed based on conditions.
+     * @param  array<string, mixed> $conditions
      */
     public function shouldStreamTask(Task $task, array $conditions = []): bool
     {

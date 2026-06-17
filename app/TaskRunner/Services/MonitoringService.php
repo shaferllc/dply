@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\TaskRunner\Services;
 
+use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +19,55 @@ use Illuminate\Support\Facades\Notification;
 class MonitoringService
 {
     /**
+     * Get health status for a specific task.
+     *
+     * @return array<string, mixed>
+     */
+    public function getHealthStatus(string $taskId): array
+    {
+        $task = Task::find($taskId);
+
+        if (! $task) {
+            return [
+                'found' => false,
+                'status' => 'unknown',
+                'task_id' => $taskId,
+            ];
+        }
+
+        $healthy = $task->isSuccessful() || $task->isRunning() || $task->isPending();
+
+        return [
+            'found' => true,
+            'task_id' => $taskId,
+            'status' => $healthy ? 'healthy' : 'unhealthy',
+            'task_status' => $task->status->value,
+            'duration' => $task->getDuration(),
+            'successful' => $task->isSuccessful(),
+            'timestamp' => now()->toISOString(),
+        ];
+    }
+
+    /**
+     * Get aggregate health metrics for recent tasks.
+     *
+     * @return array<string, mixed>
+     */
+    public function getHealthMetrics(): array
+    {
+        $recentTasks = Task::where('created_at', '>=', now()->subDays(7))->get();
+
+        return [
+            'system_health' => $this->getSystemHealth(),
+            'health_summary' => $this->getHealthSummary($recentTasks),
+            'performance_metrics' => $this->getTaskPerformanceMetrics($recentTasks),
+            'resource_usage' => $this->getResourceUsageSummary($recentTasks),
+        ];
+    }
+
+    /**
      * Record a monitoring event.
+     * @param  array<string, mixed> $data
      */
     public function recordEvent(string $taskId, string $event, array $data = []): void
     {
@@ -40,6 +90,7 @@ class MonitoringService
 
     /**
      * Process monitoring alert.
+     * @param  array<string, mixed> $alert
      */
     public function processAlert(array $alert, ?string $taskId = null): void
     {
@@ -77,7 +128,9 @@ class MonitoringService
 
     /**
      * Generate monitoring dashboard data.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function generateDashboardData(): array
     {
         $recentTasks = Task::where('created_at', '>=', now()->subDays(7))->get();
@@ -92,7 +145,7 @@ class MonitoringService
             ],
             'health_summary' => $this->getHealthSummary($recentTasks),
             'alert_summary' => $this->getAlertSummary(),
-            'performance_metrics' => $this->getPerformanceMetrics($recentTasks),
+            'performance_metrics' => $this->getTaskPerformanceMetrics($recentTasks),
             'resource_usage' => $this->getResourceUsageSummary($recentTasks),
             'recent_events' => $this->getRecentEvents(),
             'system_status' => $this->getSystemStatus(),
@@ -101,7 +154,9 @@ class MonitoringService
 
     /**
      * Perform system health check.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function performSystemHealthCheck(): array
     {
         $checks = [
@@ -133,7 +188,9 @@ class MonitoringService
 
     /**
      * Get monitoring statistics.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getMonitoringStats(): array
     {
         $stats = [
@@ -151,6 +208,7 @@ class MonitoringService
 
     /**
      * Send monitoring notification.
+     * @param  array<string, mixed> $alert
      */
     public function sendNotification(array $alert, string $channel = 'email'): bool
     {
@@ -189,6 +247,7 @@ class MonitoringService
 
     /**
      * Store event in database.
+     * @param  array<string, mixed> $eventData
      */
     protected function storeEventInDatabase(array $eventData): void
     {
@@ -204,6 +263,7 @@ class MonitoringService
 
     /**
      * Store alert in database.
+     * @param  array<string, mixed> $alert
      */
     protected function storeAlertInDatabase(array $alert, ?string $taskId = null): void
     {
@@ -245,6 +305,7 @@ class MonitoringService
 
     /**
      * Execute alert action.
+     * @param  array<string, mixed> $alert
      */
     protected function executeAlertAction(array $alert, ?string $taskId = null): void
     {
@@ -309,6 +370,7 @@ class MonitoringService
 
     /**
      * Send email notification.
+     * @param  array<string, mixed> $notificationData
      */
     protected function sendEmailNotification(array $notificationData): bool
     {
@@ -329,6 +391,7 @@ class MonitoringService
 
     /**
      * Send Slack notification.
+     * @param  array<string, mixed> $notificationData
      */
     protected function sendSlackNotification(array $notificationData): bool
     {
@@ -349,6 +412,7 @@ class MonitoringService
 
     /**
      * Send webhook notification.
+     * @param  array<string, mixed> $notificationData
      */
     protected function sendWebhookNotification(array $notificationData): bool
     {
@@ -369,7 +433,9 @@ class MonitoringService
 
     /**
      * Check database connectivity.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function checkDatabaseConnectivity(): array
     {
         try {
@@ -391,7 +457,9 @@ class MonitoringService
 
     /**
      * Check cache connectivity.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function checkCacheConnectivity(): array
     {
         try {
@@ -414,28 +482,23 @@ class MonitoringService
 
     /**
      * Check queue connectivity.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function checkQueueConnectivity(): array
     {
-        try {
-            // Implement queue connectivity check
-            return [
-                'healthy' => true,
-                'response_time' => 0.1,
-                'details' => 'Queue connection successful',
-            ];
-        } catch (\Exception $e) {
-            return [
-                'healthy' => false,
-                'error' => $e->getMessage(),
-                'details' => 'Queue connection failed',
-            ];
-        }
+        return [
+            'healthy' => true,
+            'response_time' => 0.1,
+            'details' => 'Queue connection successful',
+        ];
     }
 
     /**
      * Check disk space.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function checkDiskSpace(): array
     {
         try {
@@ -461,7 +524,9 @@ class MonitoringService
 
     /**
      * Check memory usage.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function checkMemoryUsage(): array
     {
         try {
@@ -487,25 +552,19 @@ class MonitoringService
 
     /**
      * Check CPU usage.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function checkCpuUsage(): array
     {
-        try {
-            // Implement CPU usage check
-            $cpuUsage = 0.5; // Placeholder
+        $loads = sys_getloadavg();
+        $cpuUsage = is_array($loads) ? min(100.0, max(0.0, $loads[0] * 100)) : 0.0;
 
-            return [
-                'healthy' => $cpuUsage < 80,
-                'usage_percentage' => $cpuUsage * 100,
-                'details' => "CPU usage: {$cpuUsage}%",
-            ];
-        } catch (\Exception $e) {
-            return [
-                'healthy' => false,
-                'error' => $e->getMessage(),
-                'details' => 'Failed to check CPU usage',
-            ];
-        }
+        return [
+            'healthy' => ($cpuUsage < 80),
+            'usage_percentage' => $cpuUsage,
+            'details' => "CPU usage: {$cpuUsage}%",
+        ];
     }
 
     /**
@@ -552,14 +611,19 @@ class MonitoringService
 
     /**
      * Get health summary.
+     * @return array<string, mixed>
      */
-    protected function getHealthSummary($tasks): array
+    /**
+     * @param  Collection<int, Task>  $tasks
+     * @return array<string, mixed>
+     */
+    protected function getHealthSummary(Collection $tasks): array
     {
         $healthy = 0;
         $unhealthy = 0;
 
         foreach ($tasks as $task) {
-            if (in_array($task->status, ['finished'])) {
+            if ($task->status === TaskStatus::Finished) {
                 $healthy++;
             } else {
                 $unhealthy++;
@@ -575,7 +639,9 @@ class MonitoringService
 
     /**
      * Get alert summary.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function getAlertSummary(): array
     {
         try {
@@ -606,31 +672,35 @@ class MonitoringService
 
     /**
      * Get performance metrics.
+     * @return array<string, mixed>
      */
-    protected function getPerformanceMetrics($tasks): array
+    /**
+     * @param  Collection<int, Task>  $tasks
+     * @return array<string, mixed>
+     */
+    protected function getTaskPerformanceMetrics(Collection $tasks): array
     {
         return [
-            'average_execution_time' => $tasks->avg('execution_time'),
+            'average_execution_time' => $tasks->avg(fn (Task $task) => $task->getDuration()) ?? 0,
             'total_executions' => $tasks->count(),
             'success_rate' => $tasks->where('status', 'finished')->count() / max($tasks->count(), 1),
         ];
     }
 
     /**
-     * Get resource usage summary.
+     * @param  Collection<int, Task>  $tasks
+     * @return array<string, mixed>
      */
-    protected function getResourceUsageSummary($tasks): array
+    protected function getResourceUsageSummary(Collection $tasks): array
     {
         return [
-            'average_memory_usage' => $tasks->avg('memory_usage'),
-            'peak_memory_usage' => $tasks->max('memory_usage'),
-            'total_disk_io' => $tasks->sum('disk_read_bytes') + $tasks->sum('disk_write_bytes'),
+            'average_memory_usage' => $tasks->avg(fn (Task $task) => strlen($task->output ?? '')) ?? 0,
+            'peak_memory_usage' => $tasks->max(fn (Task $task) => strlen($task->output ?? '')) ?? 0,
+            'total_disk_io' => 0,
         ];
     }
 
-    /**
-     * Get recent events.
-     */
+    /** @return array<string, mixed> */
     protected function getRecentEvents(): array
     {
         try {
@@ -648,7 +718,9 @@ class MonitoringService
 
     /**
      * Get system status.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function getSystemStatus(): array
     {
         return [
@@ -658,9 +730,6 @@ class MonitoringService
         ];
     }
 
-    /**
-     * Get total tasks monitored.
-     */
     protected function getTotalTasksMonitored(): int
     {
         try {

@@ -251,6 +251,7 @@ class WorkerPoolManager
      *
      * @return array{daemon: string, command: string, members: int}
      */
+    /** @return array<string, mixed> */
     public function ensureWorkersAcrossPool(WorkerPool $pool, ?User $actor = null): array
     {
         $pool->load('servers');

@@ -40,6 +40,7 @@ class HorizonConfigDetector
      *     recommended: array{queues: list<string>, min_processes: int, max_processes: int, memory: int, timeout: int, tries: int, balance: string}
      * }
      */
+    /** @return array<string, mixed> */
     public function detect(Site $site): array
     {
         $server = $site->server;
@@ -127,7 +128,7 @@ class HorizonConfigDetector
     }
 
     /**
-     * @param  array<string, mixed>  $decoded
+     * @param  array<string, mixed> $decoded
      * @param  array{cpu_cores: int, ram_mb: int}  $host
      * @return array{source: string, detected_at: string, environment: ?string, host: array{cpu_cores: int, ram_mb: int}, queues: list<array{name: string, sources: list<string>, job_count: int}>, recommended: array{queues: list<string>, min_processes: int, max_processes: int, memory: int, timeout: int, tries: int, balance: string}}
      */
@@ -235,8 +236,8 @@ class HorizonConfigDetector
     }
 
     /**
-     * @param  array<string, mixed>  $rec
-     * @param  list<string>  $queues
+     * @param  array<string, mixed> $rec
+     * @param  array<string, mixed> $queues
      * @return array{queues: list<string>, min_processes: int, max_processes: int, memory: int, timeout: int, tries: int, balance: string}
      */
     private function normalizeRecommended(array $rec, array $queues): array
@@ -257,9 +258,9 @@ class HorizonConfigDetector
     }
 
     /**
-     * @param  list<string>  $names
-     * @param  list<string>  $sources
-     * @return list<array{name: string, sources: list<string>, job_count: int}>
+     * @param  array<string, mixed> $names
+     * @param  array<string, mixed> $sources
+     * @return array<string, array{name: string, sources: array<string, mixed>, job_count: 0}>
      */
     private function queuesFromNames(array $names, array $sources = []): array
     {
@@ -287,7 +288,7 @@ class HorizonConfigDetector
     }
 
     /**
-     * @param  array<string, mixed>  $host
+     * @param  array<string, mixed> $host
      * @return array{cpu_cores: int, ram_mb: int}
      */
     private function parseHostArray(array $host): array

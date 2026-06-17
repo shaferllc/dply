@@ -30,6 +30,9 @@ class NginxWorkerConnectionsInsightRunner implements InsightRunnerInterface
         protected ExecuteRemoteTaskOnServer $remote,
     ) {}
 
+    /**
+     * @return array<int, App\Services\Insights\InsightCandidate>
+     */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
         if ($site !== null) {
@@ -89,9 +92,9 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $wp = (int) ($values['worker_processes'] ?? 0);
-        $wc = (int) ($values['worker_connections'] ?? 0);
-        $rl = (int) ($values['worker_rlimit_nofile'] ?? 0);
+        $wp = (int) ($values['worker_processes']);
+        $wc = (int) ($values['worker_connections']);
+        $rl = (int) ($values['worker_rlimit_nofile']);
         $conns = (int) ($values['established_connections'] ?? 0);
 
         if ($wp <= 0 || $wc <= 0) {
@@ -158,7 +161,7 @@ BASH;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<int, App\Services\Insights\InsightCandidate>
      */
     private function parseKeyValues(string $buffer): array
     {

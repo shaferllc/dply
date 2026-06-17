@@ -9,7 +9,7 @@ use RuntimeException;
 final class ArtifactZipPathPrefix
 {
     /**
-     * @param  array<string, mixed>  $providerConfig
+     * @param  array<string, mixed> $providerConfig
      */
     public static function resolve(string $globalPrefix, array $providerConfig, string $settingsKey): string
     {

@@ -58,6 +58,7 @@ class ScaffoldLaravelPipeline
     /**
      * @return array{ok: bool, failed_step: ?string, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function run(Site $site): array
     {
         $this->initSteps($site);
@@ -184,7 +185,7 @@ class ScaffoldLaravelPipeline
     {
         $assignment = $this->placeholderDns->assign($site);
 
-        $hostname = $assignment['hostname'] ?? null;
+        $hostname = $assignment['hostname'];
         if (! is_string($hostname) || $hostname === '') {
             throw new \RuntimeException('Placeholder DNS assignment returned no hostname.');
         }
@@ -503,7 +504,7 @@ class ScaffoldLaravelPipeline
     private function setMeta(Site $site, string $dottedPath, mixed $value): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         data_set($meta, $dottedPath, $value);
         $site->meta = $meta;
         $site->save();
@@ -512,7 +513,7 @@ class ScaffoldLaravelPipeline
     private function markStep(Site $site, string $key, string $state, ?string $error = null): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $steps = $meta['scaffold']['steps'] ?? [];
         foreach ($steps as &$step) {
             if (($step['key'] ?? null) === $key) {

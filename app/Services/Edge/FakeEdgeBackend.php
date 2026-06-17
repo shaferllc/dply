@@ -20,6 +20,8 @@ class FakeEdgeBackend implements EdgeBackend
         return 'dply_edge';
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array
     {
         $dest = $this->artifactRoot($deployment->storage_prefix);
@@ -29,6 +31,8 @@ class FakeEdgeBackend implements EdgeBackend
         return $this->writeHostMap($deployment, $site);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function republishDeployment(EdgeDeployment $deployment, Site $site): array
     {
         return $this->writeHostMap($deployment, $site);
@@ -70,6 +74,10 @@ class FakeEdgeBackend implements EdgeBackend
         }
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, string>>
+     */
     public function attachDomain(Site $site, string $hostname): array
     {
         $entry = app(EdgeCustomDomainProvisioner::class)->provision($site, $hostname);
@@ -92,6 +100,11 @@ class FakeEdgeBackend implements EdgeBackend
         app(EdgeCustomDomainProvisioner::class)->remove($site, $hostname);
     }
 
+    /** @return array<int, array<string, string>>
+    /** @return array<int, array<string, string>>
+    /**
+     * @return array<int, array<string, string>>
+     */
     public function inspect(Site $site): array
     {
         $meta = $site->edgeMeta();
@@ -140,7 +153,7 @@ class FakeEdgeBackend implements EdgeBackend
     }
 
     /**
-     * @return array<string, array<string, mixed>>
+     * @return array<int, array<string, string>>
      */
     private function hostMap(): array
     {

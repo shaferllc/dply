@@ -19,6 +19,7 @@ class TraefikDashboardExposure
     /**
      * @return array{enabled: bool, path: string, username: string, has_password: bool, auth_user_line: ?string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $defaults = ['enabled' => false, 'path' => '/traefik-dashboard', 'username' => '', 'has_password' => false, 'auth_user_line' => null];

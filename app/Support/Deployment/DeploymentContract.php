@@ -7,12 +7,12 @@ namespace App\Support\Deployment;
 final readonly class DeploymentContract
 {
     /**
-     * @param  array<string, mixed>  $target
-     * @param  array<string, mixed>  $config
-     * @param  list<DeploymentSecret>  $secrets
-     * @param  array<string, mixed>  $artifacts
-     * @param  array<string, mixed>  $status
-     * @param  list<SiteResourceBinding>  $resourceBindings
+     * @param  array<string, mixed> $target
+     * @param  array<string, mixed> $config
+     * @param  array<string, mixed> $secrets
+     * @param  array<string, mixed> $artifacts
+     * @param  array<string, mixed> $status
+     * @param  array<string, mixed> $resourceBindings
      */
     public function __construct(
         public array $target,
@@ -41,10 +41,10 @@ final readonly class DeploymentContract
      */
     public function secretArrays(): array
     {
-        return array_map(
+        return array_values(array_map(
             static fn (DeploymentSecret $secret): array => $secret->toArray(),
             $this->secrets,
-        );
+        ));
     }
 
     /**
@@ -52,10 +52,10 @@ final readonly class DeploymentContract
      */
     public function resourceBindingArrays(): array
     {
-        return array_map(
+        return array_values(array_map(
             static fn (SiteResourceBinding $binding): array => $binding->toArray(),
             $this->resourceBindings,
-        );
+        ));
     }
 
     /**

@@ -24,6 +24,7 @@ class ServerlessUsageCollector
     /**
      * @return array{sites: int, invocations: int}
      */
+    /** @return array<string, mixed> */
     public function collectForDate(CarbonInterface $date, bool $dryRun = false): array
     {
         $day = $date->copy()->startOfDay();

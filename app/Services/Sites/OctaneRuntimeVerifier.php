@@ -87,7 +87,7 @@ final class OctaneRuntimeVerifier
      */
     public static function persist(Site $site, array $verdict): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta[self::META_KEY] = [
             'ok' => $verdict['ok'],
             'installed' => $verdict['installed'],

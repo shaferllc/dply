@@ -48,6 +48,9 @@ final class PostgresExtensionCatalog
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function for(string $key): array
     {
         return self::all()[$key] ?? throw new \InvalidArgumentException("Unknown PostgreSQL extension: {$key}");

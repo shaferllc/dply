@@ -36,6 +36,7 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string}
      */
+    /** @return array<string, mixed> */
     public function enable(Site $site, GitIdentity $account): array
     {
         if (! $this->canRegisterProviderHook($site)) {
@@ -331,7 +332,7 @@ class RepositoryWebhookProvisioner
             return;
         }
 
-        if ($provider === 'github' && $ref?->owner && $ref?->repo && $hookId !== null) {
+        if ($provider === 'github' && $ref->owner && $ref->repo && $hookId !== null) {
             Http::withToken($token)
                 ->patch($account->apiBaseUrl().'/repos/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$hookId, [
                     'config' => [

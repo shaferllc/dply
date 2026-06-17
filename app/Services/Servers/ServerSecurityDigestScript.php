@@ -56,7 +56,9 @@ SH;
 
     /**
      * @return array<string, mixed>
+     * @param  array<string, mixed> $existingMeta
      */
+    /** @return array<string, mixed> */
     public function parse(string $output, array $existingMeta = []): array
     {
         $authFailed = 0;
@@ -145,7 +147,7 @@ SH;
             }
         }
 
-        $meta = is_array($existingMeta) ? $existingMeta : [];
+        $meta = ($existingMeta );
         $meta['security_digest_snapshot'] = [
             'checked_at' => now()->toIso8601String(),
             'auth_failed_lines' => $authFailed,
@@ -172,8 +174,10 @@ SH;
      *   currently_failed: ?int,
      *   total_failed: ?int,
      *   banned_ips: list<string>,
+     * @param  array<string, mixed> $existingMeta
      * }
      */
+    /** @return array<string, mixed> */
     public function parseJailStatus(string $name, string $raw): array
     {
         $currentlyBanned = $this->matchInt($raw, '/Currently banned:\s*(\d+)/');

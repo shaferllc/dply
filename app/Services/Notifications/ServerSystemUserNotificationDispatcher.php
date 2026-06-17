@@ -22,9 +22,9 @@ final class ServerSystemUserNotificationDispatcher
     ) {}
 
     /**
-     * @param  list<string>  $usernames  affected accounts; for create/update this is a single name,
+     * @param  array<string, mixed> $usernames  affected accounts; for create/update this is a single name,
      *                                   for orphan cleanup it can be several. Empty = nothing to report.
-     * @param  array<string, mixed>  $extraMetadata
+     * @param  array<string, mixed> $extraMetadata
      */
     public function notify(
         Server $server,

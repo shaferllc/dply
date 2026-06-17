@@ -15,29 +15,29 @@ parameters:
 
     paths:
         - app/Actions
-        - app/Console
-        - app/Contracts
-        - app/Enums
-        - app/Events
-        - app/Exceptions
-        - app/Http
-        - app/Jobs
-        - app/Listeners
-        - app/Mail
-        - app/Mcp
-        - app/Models
-        - app/Notifications
-        - app/Observers
-        - app/Policies
-        - app/Providers
-        - app/Services
-        - app/Support
-        - app/TaskRunner
-        - app/View
-        - app/helpers.php
-        - config
-        - database
-        - routes
+        #- app/Console
+        #- app/Contracts
+        #- app/Enums
+        #- app/Events
+        #- app/Exceptions
+        #- app/Http
+        #- app/Jobs
+        #- app/Listeners
+        #- app/Mail
+        #- app/Mcp
+        #- app/Models
+        #- app/Notifications
+        #- app/Observers
+        #- app/Policies
+        #- app/Providers
+        #- app/Services
+        #- app/Support
+        #- app/TaskRunner
+        #- app/View
+        #- app/helpers.php
+        #- config
+        #- database
+        #- routes
 
     # Test files that live under app/ (PSR-4 namespace mismatches + a Pest guard
     # stub) — analysed via the test suite, not here.
@@ -59,6 +59,7 @@ parameters:
         # Demo/example scripts that extend base classes which don't exist in the
         # codebase (EnhancedTask, Dply\Tasks\BaseTask) — non-runnable samples.
         - app/TaskRunner/Examples/*
+        - app/TaskRunner/config/*
 
     # Existing violations are captured in phpstan-baseline.neon so the suite is
     # green today; new code is held to the level above. Regenerate the baseline

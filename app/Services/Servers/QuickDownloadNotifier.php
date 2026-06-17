@@ -110,7 +110,7 @@ final class QuickDownloadNotifier
             };
         }
 
-        $name = (string) ($row->serverDatabase?->name ?? $row->meta['name'] ?? '');
+        $name = (string) ($row->serverDatabase->name ?? $row->meta['name'] ?? '');
 
         return $name !== ''
             ? __('Database dump (:name)', ['name' => $name])

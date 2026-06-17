@@ -44,11 +44,13 @@ class TaskRunnerBroadcaster
 
     /**
      * Broadcast a log message to all connected clients.
+     *
+     * @param  array<string, mixed>  $logData
      */
     public function broadcastLog(array $logData): void
     {
         try {
-            Broadcast::to(self::CHANNEL)->emit('log', [
+            $this->emit(self::CHANNEL, 'log', [
                 'timestamp' => $logData['timestamp'],
                 'level' => $logData['level'],
                 'message' => $logData['message'],
@@ -65,6 +67,8 @@ class TaskRunnerBroadcaster
 
     /**
      * Broadcast a task event to all connected clients.
+     *
+     * @param  array<string, mixed>  $logData
      */
     public function broadcastTaskEvent(array $logData): void
     {
@@ -78,12 +82,12 @@ class TaskRunnerBroadcaster
                 'type' => 'task_event',
             ];
 
-            Broadcast::to(self::CHANNEL)->emit('task-event', $eventData);
+            $this->emit(self::CHANNEL, 'task-event', $eventData);
 
             // Also broadcast to task-specific channel if task_id is present
             if (! empty($logData['context']['task_id'])) {
                 $taskChannel = self::CHANNEL.'.'.$logData['context']['task_id'];
-                Broadcast::to($taskChannel)->emit('task-event', $eventData);
+                $this->emit($taskChannel, 'task-event', $eventData);
             }
         } catch (\Throwable $e) {
             Log::error('Failed to broadcast task event', [
@@ -95,6 +99,8 @@ class TaskRunnerBroadcaster
 
     /**
      * Broadcast progress updates to all connected clients.
+     *
+     * @param  array<string, mixed>  $logData
      */
     public function broadcastProgress(array $logData): void
     {
@@ -109,12 +115,12 @@ class TaskRunnerBroadcaster
                 'type' => 'progress',
             ];
 
-            Broadcast::to(self::CHANNEL)->emit('progress', $progressData);
+            $this->emit(self::CHANNEL, 'progress', $progressData);
 
             // Also broadcast to task-specific channel if task_id is present
             if (! empty($logData['context']['task_id'])) {
                 $taskChannel = self::CHANNEL.'.'.$logData['context']['task_id'];
-                Broadcast::to($taskChannel)->emit('progress', $progressData);
+                $this->emit($taskChannel, 'progress', $progressData);
             }
         } catch (\Throwable $e) {
             Log::error('Failed to broadcast progress', [
@@ -126,12 +132,14 @@ class TaskRunnerBroadcaster
 
     /**
      * Broadcast to a specific user's private channel.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function broadcastToUser(int $userId, string $event, array $data): void
     {
         try {
             $channel = self::PRIVATE_CHANNEL_PREFIX.'.'.$userId;
-            Broadcast::to($channel)->emit($event, $data);
+            $this->emit($channel, $event, $data);
         } catch (\Throwable $e) {
             Log::error('Failed to broadcast to user', [
                 'error' => $e->getMessage(),
@@ -144,11 +152,13 @@ class TaskRunnerBroadcaster
 
     /**
      * Broadcast task metrics to all connected clients.
+     *
+     * @param  array<string, mixed>  $metrics
      */
     public function broadcastMetrics(array $metrics): void
     {
         try {
-            Broadcast::to(self::CHANNEL)->emit('metrics', [
+            $this->emit(self::CHANNEL, 'metrics', [
                 'timestamp' => now()->toISOString(),
                 'metrics' => $metrics,
                 'type' => 'metrics',
@@ -163,6 +173,8 @@ class TaskRunnerBroadcaster
 
     /**
      * Broadcast task completion notification.
+     *
+     * @param  array<string, mixed>  $result
      */
     public function broadcastTaskCompleted(string $taskId, array $result): void
     {
@@ -176,11 +188,11 @@ class TaskRunnerBroadcaster
                 'type' => 'task_completed',
             ];
 
-            Broadcast::to(self::CHANNEL)->emit('task-completed', $completionData);
+            $this->emit(self::CHANNEL, 'task-completed', $completionData);
 
             // Also broadcast to task-specific channel
             $taskChannel = self::CHANNEL.'.'.$taskId;
-            Broadcast::to($taskChannel)->emit('task-completed', $completionData);
+            $this->emit($taskChannel, 'task-completed', $completionData);
         } catch (\Throwable $e) {
             Log::error('Failed to broadcast task completion', [
                 'error' => $e->getMessage(),
@@ -188,5 +200,13 @@ class TaskRunnerBroadcaster
                 'result' => $result,
             ]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function emit(string $channel, string $event, array $payload): void
+    {
+        Broadcast::on($channel)->as($event)->with($payload)->sendNow();
     }
 }

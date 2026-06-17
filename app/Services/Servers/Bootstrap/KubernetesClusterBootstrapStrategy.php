@@ -26,7 +26,7 @@ class KubernetesClusterBootstrapStrategy implements ServerBootstrapStrategy
             'key' => 'kubernetes-cluster',
             'label' => 'Kubernetes cluster',
             'content' => json_encode([
-                'provider' => $server->provider?->value,
+                'provider' => $server->provider->value,
                 'cluster_name' => $config['cluster_name'] ?? null,
                 'namespace' => $config['namespace'] ?? 'default',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}',

@@ -14,6 +14,10 @@ use SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder;
  */
 class PhpFileDiffRenderer implements ConfigRevisionDiffRenderer
 {
+    /**
+     * @param  array<string, mixed> $left
+     * @param  array<string, mixed> $right
+     */
     public function render(array $left, array $right): string
     {
         $leftContent = is_string($left['content'] ?? null) ? $left['content'] : '';

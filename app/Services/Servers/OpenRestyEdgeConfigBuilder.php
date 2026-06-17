@@ -148,7 +148,7 @@ NGINX;
     }
 
     /**
-     * @param  list<string>  $servers
+     * @param  array<string, mixed> $servers
      */
     private function renderUpstream(string $name, array $servers): string
     {
@@ -168,7 +168,7 @@ NGINX;
     }
 
     /**
-     * @param  list<string>  $serverNames
+     * @param  array<string, mixed> $serverNames
      */
     private function renderServerBlock(string $blockName, array $serverNames, int $listenPort, string $upstreamName): string
     {
@@ -216,7 +216,7 @@ NGINX;
     }
 
     /**
-     * @param  list<string>  $serverNames
+     * @param  array<string, mixed> $serverNames
      * @return list<string>
      */
     private function serverNamesForPort(array $serverNames, int $listenPort): array

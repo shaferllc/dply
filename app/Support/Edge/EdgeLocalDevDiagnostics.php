@@ -97,7 +97,7 @@ final class EdgeLocalDevDiagnostics
         $records = @dns_get_record($host, DNS_A);
         if (is_array($records) && $records !== []) {
             foreach ($records as $record) {
-                if (is_array($record) && isset($record['ip']) && is_string($record['ip']) && $record['ip'] !== '') {
+                if (($record) && isset($record['ip']) && is_string($record['ip']) && $record['ip'] !== '') {
                     return $record['ip'];
                 }
             }

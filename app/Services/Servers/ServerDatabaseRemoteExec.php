@@ -69,13 +69,13 @@ class ServerDatabaseRemoteExec
         $cred = $this->adminCredential($server);
 
         $mysqlUser = $cred?->mysql_root_username ?: 'root';
-        $mysqlPw = (string) ($cred?->mysql_root_password ?? '');
+        $mysqlPw = (string) ($cred->mysql_root_password ?? '');
         $pgUser = $cred?->postgres_superuser ?: 'postgres';
-        $pgPw = (string) ($cred?->postgres_password ?? '');
+        $pgPw = (string) ($cred->postgres_password ?? '');
         $mongoUser = $cred?->mongodb_admin_username ?: 'admin';
-        $mongoPw = (string) ($cred?->mongodb_admin_password ?? '');
+        $mongoPw = (string) ($cred->mongodb_admin_password ?? '');
         $chUser = $cred?->clickhouse_admin_username ?: 'default';
-        $chPw = (string) ($cred?->clickhouse_admin_password ?? '');
+        $chPw = (string) ($cred->clickhouse_admin_password ?? '');
 
         // Postgres: sudo path when no stored superuser password (or explicitly
         // configured for sudo); direct 127.0.0.1 login otherwise — mirrors probePostgres().
@@ -305,7 +305,7 @@ BASH;
 
         $cred = $this->adminCredential($server);
         $user = $cred?->clickhouse_admin_username ?: 'default';
-        $pass = $cred?->clickhouse_admin_password ?? '';
+        $pass = $cred->clickhouse_admin_password ?? '';
         $auth = $pass !== ''
             ? 'clickhouse-client --user '.escapeshellarg($user).' --password '.escapeshellarg($pass)
             : 'clickhouse-client --user '.escapeshellarg($user);
@@ -340,7 +340,7 @@ BASH;
     {
         $cred = $this->adminCredential($server);
         $user = $cred?->clickhouse_admin_username ?: 'default';
-        $pass = $cred?->clickhouse_admin_password ?? '';
+        $pass = $cred->clickhouse_admin_password ?? '';
         $auth = $pass !== ''
             ? 'clickhouse-client --user '.escapeshellarg($user).' --password '.escapeshellarg($pass)
             : 'clickhouse-client --user '.escapeshellarg($user);
@@ -382,6 +382,7 @@ BASH;
     /**
      * Run a one-off mysql command (used after exec to read exit status from same connection — caller must use one SSH exec chain).
      * Prefer {@see mysqlExecute} which runs a single remote bash -lc.
+     * @return array<string, mixed>
      */
     public function mysqlRunWithExit(Server $server, string $sql, int $timeout = 120): array
     {
@@ -396,6 +397,9 @@ BASH;
         return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function postgresRun(Server $server, string $sql, int $timeout = 120): array
     {
         $cred = $this->adminCredential($server);

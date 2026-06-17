@@ -26,7 +26,7 @@ class SiteWorkerPageBuilder
         }
 
         $siteName = $this->escape($site->name !== '' ? $site->name : 'Worker');
-        $serverName = $this->escape($site->server?->name ?? '—');
+        $serverName = $this->escape($site->server->name ?? '—');
         $runtimeKey = $site->runtimeKey() ?: $site->type->value;
         $runtimeVersion = (string) ($site->runtimeVersion() ?? '');
         $runtimeLabel = $this->escape(strtoupper($runtimeKey).($runtimeVersion !== '' ? ' '.$runtimeVersion : ''));
@@ -270,7 +270,7 @@ HTML;
      */
     private function customHtml(Site $site): ?string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $html = trim((string) ($meta['worker_page_html'] ?? ''));
         if ($html === '') {
             return null;
@@ -281,7 +281,7 @@ HTML;
 
         return strtr($html, [
             '{{site_name}}' => $this->escape($site->name !== '' ? $site->name : 'Worker'),
-            '{{server_name}}' => $this->escape($site->server?->name ?? ''),
+            '{{server_name}}' => $this->escape($site->server->name ?? ''),
             '{{runtime}}' => $this->escape(strtoupper($runtimeKey).($runtimeVersion !== '' ? ' '.$runtimeVersion : '')),
             '{{hostname}}' => $this->escape((string) $site->testingHostname()),
         ]);

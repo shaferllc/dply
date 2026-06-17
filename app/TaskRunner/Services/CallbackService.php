@@ -7,6 +7,8 @@ namespace App\Modules\TaskRunner\Services;
 use App\Modules\TaskRunner\Contracts\HasCallbacks;
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Jobs\RetryCallbackJob;
+use App\Modules\TaskRunner\Models\Task as TaskModel;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -19,10 +21,11 @@ class CallbackService
 {
     /**
      * Send a callback to the home server.
+      * @param array<string, mixed> $additionalData
      */
     public function send(HasCallbacks $task, CallbackType $type, array $additionalData = []): bool
     {
-        $url = $task->getCallbackUrl($type);
+        $url = $task->getCallbackUrl();
 
         if (! $url) {
             Log::warning('No callback URL provided for task', [
@@ -76,6 +79,9 @@ class CallbackService
 
     /**
      * Send a callback with custom configuration.
+      * @param array<string, mixed> $data
+      * @param array<string, mixed> $headers
+      * @param array<string, mixed> $retryConfig
      */
     public function sendWithConfig(
         string $url,
@@ -125,7 +131,88 @@ class CallbackService
     }
 
     /**
+     * Send an HTTP callback for a persisted Task model.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function sendForTaskModel(TaskModel $task, CallbackType $type, array $data = []): bool
+    {
+        $options = is_array($task->options) ? $task->options : [];
+        $url = $options['callback_url'] ?? null;
+
+        if (! is_string($url) || $url === '') {
+            Log::warning('No callback URL provided for task model', [
+                'task_id' => $task->id,
+                'callback_type' => $type->value,
+            ]);
+
+            return false;
+        }
+
+        $payload = array_merge($data, [
+            'task_id' => $task->id,
+            'task_name' => $task->name,
+            'status' => $task->status->value,
+            'callback_type' => $type->value,
+            'timestamp' => now()->toISOString(),
+        ]);
+
+        if (! $this->validateCallbackData($payload)) {
+            Log::error('Invalid callback data for task model', [
+                'task_id' => $task->id,
+                'data' => $payload,
+            ]);
+
+            return false;
+        }
+
+        try {
+            $response = Http::timeout(30)
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                    'User-Agent' => 'TaskRunner/1.0',
+                    'X-Task-ID' => $task->id,
+                    'X-Callback-Type' => $type->value,
+                ])
+                ->post($url, $payload);
+
+            if ($response->successful()) {
+                Log::info('Task model callback sent successfully', [
+                    'task_id' => $task->id,
+                    'callback_type' => $type->value,
+                    'url' => $url,
+                    'status_code' => $response->status(),
+                ]);
+
+                return true;
+            }
+
+            Log::warning('Task model callback failed', [
+                'task_id' => $task->id,
+                'callback_type' => $type->value,
+                'url' => $url,
+                'status_code' => $response->status(),
+                'response_body' => $response->body(),
+            ]);
+
+            return false;
+        } catch (\Exception $e) {
+            Log::error('Task model callback exception', [
+                'task_id' => $task->id,
+                'callback_type' => $type->value,
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Send a batch of callbacks.
+     *
+     * @param  array<int, array<string, mixed>>  $callbacks
+     * @return array<int, bool>
      */
     public function sendBatch(array $callbacks): array
     {
@@ -165,6 +252,7 @@ class CallbackService
 
     /**
      * Validate callback data structure.
+      * @param array<string, mixed> $data
      */
     public function validateCallbackData(array $data): bool
     {
@@ -181,12 +269,13 @@ class CallbackService
 
     /**
      * Log successful callback.
+      * @param array<string, mixed> $data
      */
     protected function logSuccessfulCallback(
         HasCallbacks $task,
         CallbackType $type,
         array $data,
-        $response
+        Response $response
     ): void {
         Log::info('Callback sent successfully', [
             'task_class' => get_class($task),
@@ -199,12 +288,13 @@ class CallbackService
 
     /**
      * Log failed callback.
+      * @param array<string, mixed> $data
      */
     protected function logFailedCallback(
         HasCallbacks $task,
         CallbackType $type,
         array $data,
-        $response
+        Response $response
     ): void {
         Log::warning('Callback failed', [
             'task_class' => get_class($task),
@@ -218,6 +308,7 @@ class CallbackService
 
     /**
      * Log callback exception.
+      * @param array<string, mixed> $data
      */
     protected function logCallbackException(
         HasCallbacks $task,
@@ -236,6 +327,8 @@ class CallbackService
 
     /**
      * Schedule a retry for failed callbacks.
+      * @param array<string, mixed> $additionalData
+      * @param array<string, mixed> $retryConfig
      */
     protected function scheduleRetry(
         HasCallbacks $task,

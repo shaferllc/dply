@@ -29,7 +29,7 @@ trait ManagesTaskFactory
     /**
      * Returns a new PendingTask with this task.
      */
-    public static function make(...$arguments): PendingTask
+    public static function make(mixed ...$arguments): PendingTask
     {
         return static::createInstance(...$arguments)->pending();
     }
@@ -46,7 +46,7 @@ trait ManagesTaskFactory
     /**
      * Create an instance of the current class.
      */
-    protected static function createInstance(...$arguments): static
+    protected static function createInstance(mixed ...$arguments): static
     {
         // If we're in fake mode, create a fake instance
         if (static::isFake()) {
@@ -92,7 +92,7 @@ trait ManagesTaskFactory
      * Create a fake instance for testing that sets up the task model
      * and allows running the actual task code without background monitoring.
      */
-    protected static function createFakeInstance(...$arguments): static
+    protected static function createFakeInstance(mixed ...$arguments): static
     {
         $task = static::createInstance(...$arguments);
 

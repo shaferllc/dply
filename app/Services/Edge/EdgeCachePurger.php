@@ -97,7 +97,7 @@ class EdgeCachePurger
      * KV key — the next request for that path re-fetches from origin
      * and re-warms cache.
      *
-     * @param  list<string>  $paths
+     * @param  array<string, mixed> $paths
      * @return array{ok: bool, purged_keys: list<string>, message: string}
      */
     public function purgeByPaths(Site $site, array $paths): array

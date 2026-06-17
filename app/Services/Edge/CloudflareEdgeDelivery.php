@@ -22,6 +22,7 @@ class CloudflareEdgeDelivery
     /**
      * @return array{live_url: ?string, cf_kv_version: int}
      */
+    /** @return array<string, mixed> */
     public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array
     {
         $context = $this->contextResolver->forSite($site);
@@ -36,7 +37,7 @@ class CloudflareEdgeDelivery
 
         $artifactBytes = $this->artifactPublisher->directoryBytes($localArtifactDir);
         if ($artifactBytes > 0) {
-            $meta = is_array($deployment->meta) ? $deployment->meta : [];
+            $meta = ($deployment->meta );
             $deployment->update([
                 'meta' => array_merge($meta, ['artifact_bytes' => $artifactBytes]),
             ]);
@@ -53,6 +54,7 @@ class CloudflareEdgeDelivery
     /**
      * @return array{live_url: ?string, cf_kv_version: int}
      */
+    /** @return array<string, mixed> */
     public function republishDeployment(EdgeDeployment $deployment, Site $site): array
     {
         $context = $this->contextResolver->forSite($site);
@@ -78,6 +80,10 @@ class CloudflareEdgeDelivery
     /**
      * @return list<array{name: string, type: string, value: string, status: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, string>>
+     */
     public function attachDomain(Site $site, string $hostname): array
     {
         $entry = app(EdgeCustomDomainProvisioner::class)->provision($site, $hostname);
@@ -101,8 +107,9 @@ class CloudflareEdgeDelivery
     }
 
     /**
-     * @return array{phase: string, live_url: ?string, active_deployment_id: ?string}
+     * @return array<int, array<string, string>>
      */
+    /** @return array<string, mixed> */
     public function inspect(Site $site): array
     {
         $meta = $site->edgeMeta();

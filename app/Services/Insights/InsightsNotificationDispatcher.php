@@ -31,7 +31,7 @@ class InsightsNotificationDispatcher
             ->pluck('users.id')
             ->all();
 
-        if (! $isCritical && ($prefs['digest_non_critical'] ?? false)) {
+        if (! $isCritical && ($prefs['digest_non_critical'])) {
             InsightDigestQueue::query()->firstOrCreate(
                 [
                     'insight_finding_id' => $finding->id,
@@ -44,7 +44,7 @@ class InsightsNotificationDispatcher
             return;
         }
 
-        if (! $isCritical && ($prefs['quiet_hours_enabled'] ?? false) && $this->inQuietHours($prefs)) {
+        if (! $isCritical && ($prefs['quiet_hours_enabled']) && $this->inQuietHours($prefs)) {
             return;
         }
 
@@ -54,7 +54,7 @@ class InsightsNotificationDispatcher
         $lines = [
             '['.$severityLabel.'] '.$finding->title,
         ];
-        if (is_string($finding->body) && $finding->body !== '') {
+        if (($finding->body) && $finding->body !== '') {
             $lines[] = $finding->body;
         }
         if ($finding->site_id) {
@@ -102,7 +102,7 @@ class InsightsNotificationDispatcher
     }
 
     /**
-     * @param  array<string, mixed>  $prefs
+     * @param  array<string, mixed> $prefs
      */
     protected function inQuietHours(array $prefs): bool
     {

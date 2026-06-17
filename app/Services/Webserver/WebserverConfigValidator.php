@@ -36,6 +36,7 @@ class WebserverConfigValidator
     /**
      * @return array{ok: bool, message: string, engine: string}
      */
+    /** @return array<string, mixed> */
     public function validate(string $engine, string $config): array
     {
         $engine = $engine !== '' ? strtolower($engine) : 'nginx';
@@ -255,6 +256,7 @@ class WebserverConfigValidator
     /**
      * Walk the candidates and return the first one resolvable on PATH.
      * `command -v` is portable across the shells we care about.
+     * @param  array<string, mixed> $candidates
      */
     private function firstAvailableBinary(array $candidates): ?string
     {

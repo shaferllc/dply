@@ -28,6 +28,7 @@ class ServerHealthProbe
      *     tested_at: string
      * }
      */
+    /** @return array<string, mixed> */
     public function probe(Server $server): array
     {
         $result = [

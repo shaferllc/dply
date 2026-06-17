@@ -33,8 +33,13 @@ class SiteEnvValidator
     ];
 
     /**
-     * @param  array<string, string>  $vars
+     * @param  array<string, mixed> $vars
      * @return list<array{level: string, key: ?string, message: string}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string|null>>
+     * @param  array<string, mixed> $vars
      */
     public function validate(array $vars): array
     {
@@ -57,7 +62,8 @@ class SiteEnvValidator
 
     /**
      * @param  \Closure(string): ?string  $get
-     * @return list<array{level: string, key: ?string, message: string}>
+     * @param  array<string, mixed> $vars
+     * @return list<array<string, string|null>>
      */
     private function checkApp(\Closure $get, bool $isProd): array
     {
@@ -340,7 +346,7 @@ class SiteEnvValidator
     }
 
     /**
-     * @param  array<string, string>  $vars
+     * @param  array<string, mixed> $vars
      * @return list<array{level: string, key: ?string, message: string}>
      */
     private function checkPlaceholders(array $vars): array

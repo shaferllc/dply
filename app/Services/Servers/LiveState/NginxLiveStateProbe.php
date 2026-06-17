@@ -206,7 +206,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, string>  $certExpiries  path → expiry-or-error
+     * @param  array<string, mixed> $certExpiries  path → expiry-or-error
      * @return list<array<string, mixed>>
      */
     private function buildCertUnits(string $configDump, array $certExpiries): array
@@ -380,7 +380,7 @@ BASH;
     }
 
     /**
-     * @param  list<string>  $listens
+     * @param  array<string, mixed> $listens
      */
     private function blockHasSsl(string $block, array $listens): bool
     {

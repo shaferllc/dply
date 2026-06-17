@@ -136,7 +136,7 @@ final class AdminPlatformMetrics
     }
 
     /**
-     * @return Collection<int, object>
+     * @return Collection<int, \stdClass>
      */
     public static function recentFailedJobs(int $limit = 12): Collection
     {

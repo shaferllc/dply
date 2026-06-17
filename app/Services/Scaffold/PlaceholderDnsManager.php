@@ -37,6 +37,7 @@ class PlaceholderDnsManager
      *
      * @return array{hostname: string, zone: ?string, record_id: ?string, source: string}
      */
+    /** @return array<string, mixed> */
     public function assign(Site $site): array
     {
         if ($this->alreadyAssigned($site)) {
@@ -143,6 +144,9 @@ class PlaceholderDnsManager
         return ['zone' => $zone, 'credential' => $credential];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function assignNipIo(Site $site, string $serverIp): array
     {
         // nip.io recommends dashed-IP form because some validators
@@ -162,6 +166,9 @@ class PlaceholderDnsManager
         return $assignment;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function assignToZone(Site $site, string $serverIp, string $zone, ProviderCredential $credential): array
     {
         $name = $this->pickAvailableName($site, $zone, $credential);
@@ -226,7 +233,7 @@ class PlaceholderDnsManager
 
     private function serverIp(Site $site): ?string
     {
-        $ip = $site->server?->public_ip ?? $site->server?->ip_address ?? null;
+        $ip = $site->server->public_ip ?? $site->server->ip_address ?? null;
 
         return is_string($ip) && $ip !== '' ? $ip : null;
     }
@@ -239,12 +246,12 @@ class PlaceholderDnsManager
     }
 
     /**
-     * @param  array<string, mixed>  $assignment
+     * @param  array<string, mixed> $assignment
      */
     private function persistAssignment(Site $site, array $assignment): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         data_set($meta, self::META_PATH, $assignment);
         $site->meta = $meta;
         $site->save();
@@ -253,7 +260,7 @@ class PlaceholderDnsManager
     private function forgetAssignment(Site $site): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         unset($meta['scaffold']['placeholder_dns']);
         $site->meta = $meta;
         $site->save();

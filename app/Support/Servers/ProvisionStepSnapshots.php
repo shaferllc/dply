@@ -38,7 +38,7 @@ class ProvisionStepSnapshots
     }
 
     /**
-     * @param  array<string, mixed>  $existing
+     * @param  array<string, mixed> $existing
      * @return array<string, array{label:string,output?:string,updated_at?:string}>
      */
     public static function merge(array $existing, ?string $scriptContent, ?string $output): array
@@ -83,7 +83,7 @@ class ProvisionStepSnapshots
             }
 
             $label = trim(str_replace(["echo '", 'echo "', "'", '"'], '', strstr($line, self::SCRIPT_STEP_PREFIX) ?: ''));
-            $label = preg_replace('/^\[dply-step\]\s*/', '', $label ?? '');
+            $label = preg_replace('/^\[dply-step\]\s*/', '', $label);
             $label = self::normalizeLabel(trim((string) $label));
 
             if ($label !== '' && ! in_array($label, $labels, true)) {

@@ -39,6 +39,8 @@ trait ReadsDoAppState
         return true;
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function inspect(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -54,11 +56,15 @@ trait ReadsDoAppState
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function regions(): array
     {
         return DigitalOceanAppPlatformService::getRegions();
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -81,6 +87,8 @@ trait ReadsDoAppState
         }, $raw);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
@@ -106,6 +114,7 @@ trait ReadsDoAppState
      * (unprovisioned site, API error, unexpected shape) degrades to
      * available:false rather than throwing.
      */
+    /** @return array<string, mixed> */
     public function metrics(Site $site, ProviderCredential $credential, string $window): array
     {
         $window = $this->normalizeWindow($window);
@@ -158,6 +167,7 @@ trait ReadsDoAppState
      * archive download are cached for 60s. Failures degrade to
      * available:false.
      */
+    /** @return array<string, mixed> */
     public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
         $lines = max(1, min(2000, $lines));

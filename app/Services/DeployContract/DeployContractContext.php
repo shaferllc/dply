@@ -10,7 +10,7 @@ use App\Models\User;
 
 final class DeployContractContext
 {
-    /** @param list<Site> $linkedByoSites */
+    /** @param  array<string, mixed> $linkedByoSites */
     public function __construct(
         public Site $parent,
         public Site $preview,

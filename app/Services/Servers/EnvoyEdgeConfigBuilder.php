@@ -27,7 +27,7 @@ class EnvoyEdgeConfigBuilder
      * @param  callable(Site): int  $backendPortFor  Resolves the per-site Caddy upstream port.
      * @param  list<array{name: string, connect_timeout?: string, lb_policy?: string, endpoints?: list<string>}>  $customClusters
      * @param  list<array{name: string, domains?: list<string>, cluster?: string}>  $customVirtualHosts
-     * @param  list<array{name: string, address?: string, port?: int, mode?: string, default_cluster?: string}>  $customListeners
+     * @param  array<string, mixed> $customListeners
      * @param  array{admin_port?: string|int, stat_prefix?: string}  $operatorSettings
      */
     public function build(
@@ -224,7 +224,7 @@ YAML;
     }
 
     /**
-     * @param  list<string>  $domains
+     * @param  array<string, mixed> $domains
      * @return list<string>
      */
     private function domainsForPort(array $domains, int $listenPort): array
@@ -243,7 +243,7 @@ YAML;
     }
 
     /**
-     * @param  list<string>  $virtualHosts
+     * @param  array<string, mixed> $virtualHosts
      */
     private function renderHttpListener(
         string $name,
@@ -278,7 +278,7 @@ YAML;
     }
 
     /**
-     * @param  list<string>  $blocks
+     * @param  array<string, mixed> $blocks
      */
     private function indentListenerBlocks(array $blocks): string
     {
@@ -286,7 +286,7 @@ YAML;
     }
 
     /**
-     * @param  list<string>  $domains
+     * @param  array<string, mixed> $domains
      */
     private function renderVirtualHost(string $name, array $domains, string $clusterName): string
     {
@@ -329,7 +329,7 @@ YAML;
     }
 
     /**
-     * @param  list<string>  $endpoints
+     * @param  array<string, mixed> $endpoints
      */
     private function renderCustomCluster(string $clusterName, array $endpoints, string $connectTimeout, string $lbPolicy): string
     {

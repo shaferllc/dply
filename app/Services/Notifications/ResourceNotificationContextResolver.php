@@ -23,6 +23,7 @@ class ResourceNotificationContextResolver
      *     stakeholder_user_ids: list<string>
      * }
      */
+    /** @return array<string, mixed> */
     public function resolve(?Model $subject): array
     {
         if ($subject instanceof Server) {
@@ -98,13 +99,13 @@ class ResourceNotificationContextResolver
         }
 
         $organizationId = null;
-        if (isset($subject?->organization_id) && is_string((string) $subject->organization_id) && $subject->organization_id !== '') {
+        if (isset($subject->organization_id) && is_string((string) $subject->organization_id) && $subject->organization_id !== '') {
             $organizationId = (string) $subject->organization_id;
         }
 
         return [
             'organization_id' => $organizationId,
-            'team_id' => isset($subject?->team_id) ? (string) $subject->team_id : null,
+            'team_id' => isset($subject->team_id) ? (string) $subject->team_id : null,
             'resource_type' => $subject ? $subject::class : null,
             'resource_id' => $subject ? (string) $subject->getKey() : null,
             'url' => null,

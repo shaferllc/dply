@@ -42,16 +42,17 @@ class TrackTaskInBackground extends Task implements HasCallbacks
      * Create a new TrackTaskInBackground instance.
      */
     public function __construct(
-        public Task $actualTask,
-        public string $finishedUrl,
-        public string $failedUrl,
-        public string $timeoutUrl,
+        public ?Task $actualTask = null,
+        public string $finishedUrl = '',
+        public string $failedUrl = '',
+        public string $timeoutUrl = '',
     ) {
         $this->eof = 'DPLY-TASK-RUNNER-'.strtoupper(Str::random(32));
 
         // Configure callbacks for background tracking
-        $this->configureCallbacks();
-
+        if ($this->actualTask !== null) {
+            $this->configureCallbacks();
+        }
     }
 
     /**
@@ -249,7 +250,9 @@ class TrackTaskInBackground extends Task implements HasCallbacks
 
     /**
      * Get the callback data to send with the request.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getCallbackData(): array
     {
         $taskModel = $this->actualTask->getTaskModel();
@@ -269,7 +272,9 @@ class TrackTaskInBackground extends Task implements HasCallbacks
 
     /**
      * Get the callback headers to send with the request.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getCallbackHeaders(): array
     {
         return [
@@ -281,9 +286,6 @@ class TrackTaskInBackground extends Task implements HasCallbacks
         ];
     }
 
-    /**
-     * Get the callback timeout in seconds.
-     */
     public function getCallbackTimeout(): int
     {
         return $this->callbackTimeout ?? 30;
@@ -319,7 +321,9 @@ class TrackTaskInBackground extends Task implements HasCallbacks
 
     /**
      * Get the callback retry configuration.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getCallbackRetryConfig(): array
     {
         return [
@@ -329,10 +333,6 @@ class TrackTaskInBackground extends Task implements HasCallbacks
         ];
     }
 
-    /**
-     * The background wrapper script intentionally uses shell variable expansion and command
-     * substitution while still honoring script size and forbidden command checks.
-     */
     protected function validateScript(string $script): void
     {
         $errors = [];
@@ -360,6 +360,7 @@ class TrackTaskInBackground extends Task implements HasCallbacks
 
     /**
      * Validate callback data before sending.
+     * @param  array<string, mixed> $data
      */
     public function validateCallbackData(array $data): bool
     {
@@ -378,6 +379,7 @@ class TrackTaskInBackground extends Task implements HasCallbacks
 
     /**
      * Send a callback to the configured URL.
+     * @param  array<string, mixed> $additionalData
      */
     public function sendCallback(CallbackType $type, array $additionalData = []): bool
     {
@@ -392,7 +394,9 @@ class TrackTaskInBackground extends Task implements HasCallbacks
 
     /**
      * Get task information for monitoring and management.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getTaskInfo(): array
     {
         $taskModel = $this->actualTask->getTaskModel();

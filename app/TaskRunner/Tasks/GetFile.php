@@ -14,7 +14,7 @@ class GetFile extends Task
 {
     protected ?int $timeout = 30;
 
-    public function __construct(public string $path, public ?int $lines = null) {}
+    public function __construct(public string $path = '', public ?int $lines = null) {}
 
     /**
      * The command to run.

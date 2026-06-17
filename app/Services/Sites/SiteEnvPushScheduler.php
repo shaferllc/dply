@@ -40,6 +40,7 @@ class SiteEnvPushScheduler
      * @return array{run: ConsoleAction, coalesced: bool} the console run the
      *                                                    caller should watch, and whether it joined an already-pending push
      */
+    /** @return array<string, mixed> */
     public function schedule(Site $site, ?string $userId): array
     {
         $pending = ConsoleAction::query()

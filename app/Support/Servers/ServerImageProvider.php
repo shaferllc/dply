@@ -31,7 +31,7 @@ class ServerImageProvider
 {
     public static function supports(Server $server): bool
     {
-        return $server->provider?->supportsImageSnapshots() ?? false;
+        return $server->provider->supportsImageSnapshots();
     }
 
     /**
@@ -59,7 +59,7 @@ class ServerImageProvider
             ServerProvider::Hetzner => $this->createHetzner(new HetznerService($credential), (int) $providerId, $name, $onTick),
             ServerProvider::Vultr => $this->createVultr(new VultrService($credential), $providerId, $name, $onTick),
             ServerProvider::Linode => $this->createLinode(new LinodeService($credential), (int) $providerId, $name, $onTick),
-            default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
+            default => throw new \RuntimeException('Image snapshots are not supported on '.$server->provider->label().'.'),
         };
     }
 
@@ -75,7 +75,7 @@ class ServerImageProvider
             ServerProvider::Hetzner => (new HetznerService($credential))->deleteImage((int) $providerImageId),
             ServerProvider::Vultr => (new VultrService($credential))->deleteSnapshot($providerImageId),
             ServerProvider::Linode => (new LinodeService($credential))->deleteImage($providerImageId),
-            default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
+            default => throw new \RuntimeException('Image snapshots are not supported on '.$server->provider->label().'.'),
         };
     }
 
@@ -117,7 +117,7 @@ class ServerImageProvider
     {
         $result = $h->createImageFromServer($serverId, $name);
         $actionId = (int) ($result['action']['id'] ?? 0);
-        $imageId = (int) ($result['image_id'] ?? 0);
+        $imageId = (int) ($result['image_id']);
 
         $h->waitForAction($actionId, onTick: function (array $a) use ($onTick): void {
             if ($onTick !== null) {
@@ -229,7 +229,7 @@ class ServerImageProvider
         $snapshots = $do->getSnapshots('droplet');
 
         foreach ($snapshots as $snapshot) {
-            if (is_array($snapshot) && (string) ($snapshot['name'] ?? '') === $name) {
+            if (($snapshot) && (string) ($snapshot['name'] ?? '') === $name) {
                 return $snapshot;
             }
         }
