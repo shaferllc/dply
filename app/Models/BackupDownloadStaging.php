@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
+ * @property string $id
  * An ephemeral copy of a backup staged for one-time download. Hetzner-mode rows
  * hold a temporary object in the global staging bucket (deleted by the sweeper
  * after {@see expires_at}); direct-mode rows just point the browser at an
@@ -44,6 +45,7 @@ class BackupDownloadStaging extends Model
         'expires_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -56,8 +58,8 @@ class BackupDownloadStaging extends Model
         return $this->morphTo();
     }
 
-    public function requestedBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function requestedBy(): BelongsTo {
         return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 

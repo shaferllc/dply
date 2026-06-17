@@ -5,6 +5,10 @@ includes:
 parameters:
     level: 6
 
+    parseModelCastsMethod: true
+    databaseMigrationsPath:
+        - database/migrations
+
     # The baseline is large; tolerate minor count drift between runs rather than
     # failing CI when an unrelated change shifts an inferred type.
     reportUnmatchedIgnoredErrors: false
@@ -12,6 +16,16 @@ parameters:
     paths:
         - app/Actions
         - app/Console
+        - app/Contracts
+        - app/Enums
+        - app/Events
+        - app/Exceptions
+        - app/Http
+        - app/Jobs
+        - app/Listeners
+        - app/Mail
+        - app/Mcp
+        - app/Models
         - config
         - database
         - routes

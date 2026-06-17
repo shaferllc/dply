@@ -7,8 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerProvisionArtifact extends Model
 {
+    /** @use HasFactory<ServerProvisionArtifactFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -20,6 +25,7 @@ class ServerProvisionArtifact extends Model
         'metadata',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -27,8 +33,8 @@ class ServerProvisionArtifact extends Model
         ];
     }
 
-    public function run(): BelongsTo
-    {
+    /** @return BelongsTo<ServerProvisionRun, $this> */
+    public function run(): BelongsTo {
         return $this->belongsTo(ServerProvisionRun::class, 'server_provision_run_id');
     }
 }

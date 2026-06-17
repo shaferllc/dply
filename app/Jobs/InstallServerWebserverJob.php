@@ -43,7 +43,7 @@ class InstallServerWebserverJob implements ShouldQueue
 
     public function handle(SshConnectionFactory $sshFactory, SiteProvisioner $siteProvisioner): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

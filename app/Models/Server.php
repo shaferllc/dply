@@ -22,8 +22,13 @@ use Illuminate\Support\Facades\Storage;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 
+/**
+ * @property string $id
+ */
+
 class Server extends Model
 {
+    /** @use HasFactory<ServerFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
@@ -117,6 +122,7 @@ class Server extends Model
         'scheduled_deletion_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -151,23 +157,23 @@ class Server extends Model
         return is_string($this->logo_path) && $this->logo_path !== '';
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function workspace(): BelongsTo
-    {
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function team(): BelongsTo
-    {
+    /** @return BelongsTo<Team, $this> */
+    public function team(): BelongsTo {
         return $this->belongsTo(Team::class);
     }
 
@@ -281,10 +287,10 @@ class Server extends Model
 
     /**
      * The worker pool this server belongs to (clones + their source), if any.
-     * See {@see WorkerPool}.
-     */
-    public function workerPool(): BelongsTo
-    {
+     * See {@see WorkerPool}. *
+ * @return BelongsTo<WorkerPool, $this>
+ */
+    public function workerPool(): BelongsTo {
         return $this->belongsTo(WorkerPool::class);
     }
 
@@ -314,33 +320,33 @@ class Server extends Model
         return $meta['pool']['state'] ?? null;
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 
-    public function sites(): HasMany
-    {
+    /** @return HasMany<Site, $this> */
+    public function sites(): HasMany {
         return $this->hasMany(Site::class);
     }
 
     /**
      * Per-zone wildcard TLS certificates (e.g. *.on-dply.com) installed on this
      * server, shared by every testing-hostname site on the matching zone. See
-     * {@see WildcardCertificateIssuer}.
-     */
-    public function wildcardCertificates(): HasMany
-    {
+     * {@see WildcardCertificateIssuer}. *
+ * @return HasMany<ServerWildcardCertificate, $this>
+ */
+    public function wildcardCertificates(): HasMany {
         return $this->hasMany(ServerWildcardCertificate::class);
     }
 
     /**
      * Multi-backend serving points hosted on this server (this server acting as a
      * backend for one or more sites' backend groups). See
-     * docs/MULTI_BACKEND_SITES.md.
-     */
-    public function siteBackends(): HasMany
-    {
+     * docs/MULTI_BACKEND_SITES.md. *
+ * @return HasMany<SiteBackend, $this>
+ */
+    public function siteBackends(): HasMany {
         return $this->hasMany(SiteBackend::class);
     }
 
@@ -374,28 +380,28 @@ class Server extends Model
         $this->cachedSitesCount = null;
     }
 
-    public function serverDatabases(): HasMany
-    {
+    /** @return HasMany<ServerDatabase, $this> */
+    public function serverDatabases(): HasMany {
         return $this->hasMany(ServerDatabase::class);
     }
 
     /**
      * Database engines installed on this server (multi-engine support).
      * Distinct from {@see serverDatabases} which lists user-created
-     * named DBs on top of an engine. See ServerDatabaseEngine docblock.
-     */
-    public function databaseEngines(): HasMany
-    {
+     * named DBs on top of an engine. See ServerDatabaseEngine docblock. *
+ * @return HasMany<ServerDatabaseEngine, $this>
+ */
+    public function databaseEngines(): HasMany {
         return $this->hasMany(ServerDatabaseEngine::class);
     }
 
     /**
      * Cache services (Redis/Valkey/Memcached) installed on this server.
      * Companion to {@see databaseEngines}; together they make up the
-     * engine inventory surfaced in the fleet "Services" disclosure.
-     */
-    public function cacheServices(): HasMany
-    {
+     * engine inventory surfaced in the fleet "Services" disclosure. *
+ * @return HasMany<ServerCacheService, $this>
+ */
+    public function cacheServices(): HasMany {
         return $this->hasMany(ServerCacheService::class);
     }
 
@@ -467,57 +473,57 @@ class Server extends Model
         return in_array($runtime, $this->installedRuntimeKeys(), true);
     }
 
-    public function databaseAdminCredential(): HasOne
-    {
+    /** @return HasOne<ServerDatabaseAdminCredential, $this> */
+    public function databaseAdminCredential(): HasOne {
         return $this->hasOne(ServerDatabaseAdminCredential::class);
     }
 
     /**
      * The dply Logs add-on agent for this server (at most one — the add-on is a
-     * per-server resource). See {@see ServerLogAgent}.
-     */
-    public function logAgent(): HasOne
-    {
+     * per-server resource). See {@see ServerLogAgent}. *
+ * @return HasOne<ServerLogAgent, $this>
+ */
+    public function logAgent(): HasOne {
         return $this->hasOne(ServerLogAgent::class);
     }
 
-    public function databaseAuditEvents(): HasMany
-    {
+    /** @return HasMany<ServerDatabaseAuditEvent, $this> */
+    public function databaseAuditEvents(): HasMany {
         return $this->hasMany(ServerDatabaseAuditEvent::class)->orderByDesc('created_at');
     }
 
-    public function cronJobs(): HasMany
-    {
+    /** @return HasMany<ServerCronJob, $this> */
+    public function cronJobs(): HasMany {
         return $this->hasMany(ServerCronJob::class);
     }
 
-    public function supervisorPrograms(): HasMany
-    {
+    /** @return HasMany<SupervisorProgram, $this> */
+    public function supervisorPrograms(): HasMany {
         return $this->hasMany(SupervisorProgram::class);
     }
 
-    public function firewallRules(): HasMany
-    {
+    /** @return HasMany<ServerFirewallRule, $this> */
+    public function firewallRules(): HasMany {
         return $this->hasMany(ServerFirewallRule::class)->orderBy('sort_order');
     }
 
-    public function firewallSnapshots(): HasMany
-    {
+    /** @return HasMany<ServerFirewallSnapshot, $this> */
+    public function firewallSnapshots(): HasMany {
         return $this->hasMany(ServerFirewallSnapshot::class)->orderByDesc('created_at');
     }
 
-    public function firewallAuditEvents(): HasMany
-    {
+    /** @return HasMany<ServerFirewallAuditEvent, $this> */
+    public function firewallAuditEvents(): HasMany {
         return $this->hasMany(ServerFirewallAuditEvent::class)->orderByDesc('created_at');
     }
 
-    public function firewallApplyLogs(): HasMany
-    {
+    /** @return HasMany<ServerFirewallApplyLog, $this> */
+    public function firewallApplyLogs(): HasMany {
         return $this->hasMany(ServerFirewallApplyLog::class)->orderByDesc('created_at');
     }
 
-    public function metricSnapshots(): HasMany
-    {
+    /** @return HasMany<ServerMetricSnapshot, $this> */
+    public function metricSnapshots(): HasMany {
         return $this->hasMany(ServerMetricSnapshot::class)->orderByDesc('captured_at');
     }
 
@@ -526,10 +532,10 @@ class Server extends Model
      * single-row lookup on the instance. The overview render fans the same
      * server out to the cost card, health cockpit, and billing tier — each
      * of which used to run its own "latest snapshot" query. Routing them all
-     * through this relation collapses those into one query per request.
-     */
-    public function latestMetricSnapshot(): HasOne
-    {
+     * through this relation collapses those into one query per request. *
+ * @return HasOne<ServerMetricSnapshot, $this>
+ */
+    public function latestMetricSnapshot(): HasOne {
         return $this->hasOne(ServerMetricSnapshot::class)->latestOfMany('captured_at');
     }
 
@@ -555,64 +561,64 @@ class Server extends Model
         return app(ServerTierClassifier::class)->classify($cpuCount, $memMb);
     }
 
-    public function systemdServiceStates(): HasMany
-    {
+    /** @return HasMany<ServerSystemdServiceState, $this> */
+    public function systemdServiceStates(): HasMany {
         return $this->hasMany(ServerSystemdServiceState::class)->orderBy('label');
     }
 
-    public function systemdServiceAuditEvents(): HasMany
-    {
+    /** @return HasMany<ServerSystemdServiceAuditEvent, $this> */
+    public function systemdServiceAuditEvents(): HasMany {
         return $this->hasMany(ServerSystemdServiceAuditEvent::class)->orderByDesc('occurred_at');
     }
 
-    public function insightSetting(): MorphOne
-    {
+    /** @return MorphOne<InsightSetting, $this> */
+    public function insightSetting(): MorphOne {
         return $this->morphOne(InsightSetting::class, 'settingsable');
     }
 
-    public function insightFindings(): HasMany
-    {
+    /** @return HasMany<InsightFinding, $this> */
+    public function insightFindings(): HasMany {
         return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
     }
 
-    public function authorizedKeys(): HasMany
-    {
+    /** @return HasMany<ServerAuthorizedKey, $this> */
+    public function authorizedKeys(): HasMany {
         return $this->hasMany(ServerAuthorizedKey::class);
     }
 
-    public function systemUsers(): HasMany
-    {
+    /** @return HasMany<ServerSystemUser, $this> */
+    public function systemUsers(): HasMany {
         return $this->hasMany(ServerSystemUser::class)->orderBy('username');
     }
 
     /**
      * Free-form operator notes (runbooks, customer IDs, context). Pinned first,
-     * then most-recently-touched. Pinned notes surface on the server overview.
-     */
-    public function notes(): HasMany
-    {
+     * then most-recently-touched. Pinned notes surface on the server overview. *
+ * @return HasMany<ServerNote, $this>
+ */
+    public function notes(): HasMany {
         return $this->hasMany(ServerNote::class)
             ->orderByDesc('pinned')
             ->orderByDesc('updated_at');
     }
 
-    public function sshKeyAuditEvents(): HasMany
-    {
+    /** @return HasMany<ServerSshKeyAuditEvent, $this> */
+    public function sshKeyAuditEvents(): HasMany {
         return $this->hasMany(ServerSshKeyAuditEvent::class)->orderByDesc('created_at');
     }
 
-    public function recipes(): HasMany
-    {
+    /** @return HasMany<ServerRecipe, $this> */
+    public function recipes(): HasMany {
         return $this->hasMany(ServerRecipe::class);
     }
 
-    public function provisionRuns(): HasMany
-    {
+    /** @return HasMany<ServerProvisionRun, $this> */
+    public function provisionRuns(): HasMany {
         return $this->hasMany(ServerProvisionRun::class)->orderByDesc('created_at');
     }
 
-    public function notificationSubscriptions(): MorphMany
-    {
+    /** @return MorphMany<NotificationSubscription, $this> */
+    public function notificationSubscriptions(): MorphMany {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
     }
 
@@ -634,8 +640,8 @@ class Server extends Model
             && $this->setup_status === self::SETUP_STATUS_DONE;
     }
 
-    public function privateNetwork(): BelongsTo
-    {
+    /** @return BelongsTo<PrivateNetwork, $this> */
+    public function privateNetwork(): BelongsTo {
         return $this->belongsTo(PrivateNetwork::class, 'private_network_id');
     }
 

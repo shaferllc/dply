@@ -34,7 +34,7 @@ class CreateSiteDatabase extends AbstractDplyTool
     protected string $ability = 'database.write';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {

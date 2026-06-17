@@ -43,7 +43,7 @@ class PreviewDriftJob implements ShouldQueue
 
     public function handle(ServerAuthorizedKeysDiffPreview $diff): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

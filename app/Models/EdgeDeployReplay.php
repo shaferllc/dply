@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class EdgeDeployReplay extends Model
 {
     use HasUlids;
@@ -37,6 +41,7 @@ class EdgeDeployReplay extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -48,18 +53,18 @@ class EdgeDeployReplay extends Model
         ];
     }
 
-    public function parentSite(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function parentSite(): BelongsTo {
         return $this->belongsTo(Site::class, 'parent_site_id');
     }
 
-    public function previewSite(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function previewSite(): BelongsTo {
         return $this->belongsTo(Site::class, 'preview_site_id');
     }
 
-    public function triggeredBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function triggeredBy(): BelongsTo {
         return $this->belongsTo(User::class, 'triggered_by_user_id');
     }
 }

@@ -100,7 +100,7 @@ class BackfillServerWildcardCertificatesCommand extends Command
                 [
                     'provider' => $route['provider'],
                     'provider_credential_id' => $route['credential']?->id,
-                    'status' => $existing?->status ?? ServerWildcardCertificate::STATUS_PENDING,
+                    'status' => $existing !== null ? $existing->status : ServerWildcardCertificate::STATUS_PENDING,
                     'live_directory' => $zone,
                 ],
             );

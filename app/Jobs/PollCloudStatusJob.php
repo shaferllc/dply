@@ -42,7 +42,7 @@ class PollCloudStatusJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null || ! $site->usesContainerRuntime()) {
             return;
         }
@@ -128,7 +128,7 @@ class PollCloudStatusJob implements ShouldQueue
                 'site' => $site->name,
                 'site_id' => (string) $site->id,
                 'backend' => $site->container_backend,
-                'phase' => $result['phase'] ?? null,
+                'phase' => $result['phase'],
                 'live_url' => $meta['container']['live_url'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''));
         }

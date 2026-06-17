@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
+ * @property string $id
  * A managed realtime app — a Pusher/Reverb-compatible channel application that
  * runs on the dply realtime Worker (packages/realtime-worker). One row per app;
  * the row's ULID is the Worker-side `app_id` used for Durable Object routing,
@@ -24,6 +25,7 @@ use Illuminate\Support\Str;
  */
 class RealtimeApp extends Model
 {
+    /** @use HasFactory<RealtimeAppFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PROVISIONING = 'provisioning';
@@ -53,6 +55,7 @@ class RealtimeApp extends Model
     /**
      * @return array<string, string>
      */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -64,8 +67,8 @@ class RealtimeApp extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 

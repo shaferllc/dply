@@ -46,7 +46,7 @@ class SetSchedulerOutputCaptureJob implements ShouldQueue
     {
         $this->store('running', '');
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         $heartbeat = ServerSchedulerHeartbeat::query()
             ->where('server_id', $this->serverId)
             ->whereKey($this->heartbeatId)

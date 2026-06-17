@@ -90,9 +90,7 @@ trait ResolvesDplyContext
      */
     protected function assertVmSite(Site $site, string $operation): void
     {
-        $type = $site->type instanceof SiteType
-            ? $site->type
-            : SiteType::tryFrom((string) $site->type);
+        $type = $site->type;
 
         if (filled($site->edge_backend) || filled($site->serverless_backend) || $type === SiteType::Container) {
             throw new DplyMcpException(

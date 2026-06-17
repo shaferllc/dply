@@ -48,7 +48,7 @@ class CreateProviderNetworkJob implements ShouldQueue
             return;
         }
 
-        $credential = $servers->first()?->providerCredential;
+        $credential = $servers->first()->providerCredential;
         if (! $credential) {
             Log::warning('CreateProviderNetworkJob: no Hetzner credential found', [
                 'server_ids' => $this->serverIds,

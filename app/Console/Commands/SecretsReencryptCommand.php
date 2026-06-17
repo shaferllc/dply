@@ -334,7 +334,7 @@ class SecretsReencryptCommand extends Command
                                 continue;
                             }
                             try {
-                                $row->{$col};
+                                $row->getAttribute($col);
                             } catch (DecryptException) {
                                 $failures++;
                                 $this->error("  not on current key: {$row->getKey()}.{$col}");
@@ -459,7 +459,7 @@ class SecretsReencryptCommand extends Command
     private function saveCheckpoint(array $done): void
     {
         Storage::disk((string) config('secret_vault.reencrypt.checkpoint_disk', 'local'))
-            ->put((string) config('secret_vault.reencrypt.checkpoint_path'), json_encode(array_values($done)));
+            ->put((string) config('secret_vault.reencrypt.checkpoint_path'), json_encode($done));
     }
 
     private function clearCheckpoint(): void

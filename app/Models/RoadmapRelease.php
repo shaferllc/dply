@@ -12,6 +12,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class RoadmapRelease extends Model
 {
     /** @use HasFactory<RoadmapReleaseFactory> */
@@ -26,6 +30,7 @@ class RoadmapRelease extends Model
         'sort_order',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

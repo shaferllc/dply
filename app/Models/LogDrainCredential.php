@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A reusable log drain credential set scoped to an organization, so the team
  * can attach the same Papertrail/Logtail/syslog drain to multiple sites without
  * re-entering secrets each time.
@@ -32,6 +33,7 @@ class LogDrainCredential extends Model
         'credentials',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -39,13 +41,13 @@ class LogDrainCredential extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function createdByUser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function createdByUser(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

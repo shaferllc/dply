@@ -68,6 +68,7 @@ class ServerWebserverAuditEvent extends Model
         'result_status',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -76,13 +77,13 @@ class ServerWebserverAuditEvent extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

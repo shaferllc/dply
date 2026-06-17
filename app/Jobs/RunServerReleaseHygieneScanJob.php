@@ -37,7 +37,7 @@ class RunServerReleaseHygieneScanJob implements ShouldQueue
 
     public function handle(ServerReleaseHygieneScanner $scanner): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null
             || ! $server->isReady()
             || ! $server->isVmHost()

@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property string $id
+ */
+
 class Project extends Model
 {
     use HasUlids;
@@ -22,23 +26,23 @@ class Project extends Model
         'kind',
     ];
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function site(): HasOne
-    {
+    /** @return HasOne<Site, $this> */
+    public function site(): HasOne {
         return $this->hasOne(Site::class);
     }
 
-    public function deployments(): HasMany
-    {
+    /** @return HasMany<SiteDeployment, $this> */
+    public function deployments(): HasMany {
         return $this->hasMany(SiteDeployment::class, 'project_id')->orderByDesc('id');
     }
 }

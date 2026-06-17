@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One application log record received from a site via the dply Realtime drain
  * (Phase 5). Written by the drain receiver ({@see LogDrainListen})
  * and read by the App logs panel. Append-only — a row is written once.
@@ -37,6 +38,7 @@ class AppLogRecord extends Model
         'created_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -46,8 +48,8 @@ class AppLogRecord extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 }

@@ -107,9 +107,9 @@ class FailedDeploysFleetCommand extends Command
             array_map(fn (array $r) => [
                 $r['site_name'],
                 $r['server_name'] ?? '—',
-                $r['runtime'] ?? '—',
+                $r['runtime'],
                 $r['finished_at'] ?? '—',
-                $r['trigger'] ?? '—',
+                $r['trigger'],
                 $r['deployment_id'],
             ], $rows),
         );

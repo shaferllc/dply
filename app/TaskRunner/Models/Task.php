@@ -29,6 +29,23 @@ use Throwable;
 
 /**
  * Task model for storing task execution data.
+ *
+ * @property string $id
+ * @property string $name
+ * @property string $action
+ * @property ?string $output
+ * @property ?int $exit_code
+ * @property ?int $timeout
+ * @property string $user
+ * @property \App\Modules\TaskRunner\Enums\TaskStatus $status
+ * @property ?string $server_id
+ * @property ?string $created_by
+ * @property ?array $options
+ * @property ?\Illuminate\Support\Carbon $started_at
+ * @property ?\Illuminate\Support\Carbon $completed_at
+ * @property ?\Illuminate\Support\Carbon $created_at
+ * @property-read ?Server $server
+ * @property-read ?User $creator
  */
 class Task extends Model
 {

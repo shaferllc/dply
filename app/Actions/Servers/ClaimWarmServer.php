@@ -36,10 +36,10 @@ class ClaimWarmServer
             return false;
         }
 
-        $provider = $server->provider?->value ?? '';
+        $provider = $server->provider->value;
         $region = (string) $server->region;
         $size = (string) $server->size;
-        if ($provider === '' || $region === '' || $size === '') {
+        if ($region === '' || $size === '') {
             return false;
         }
 

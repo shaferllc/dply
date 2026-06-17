@@ -9,8 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ */
+
 class StatusPage extends Model
 {
+    /** @use HasFactory<StatusPageFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -22,6 +27,7 @@ class StatusPage extends Model
         'is_public',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -50,23 +56,23 @@ class StatusPage extends Model
         return 'slug';
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function monitors(): HasMany
-    {
+    /** @return HasMany<StatusPageMonitor, $this> */
+    public function monitors(): HasMany {
         return $this->hasMany(StatusPageMonitor::class)->orderBy('sort_order')->orderBy('id');
     }
 
-    public function incidents(): HasMany
-    {
+    /** @return HasMany<Incident, $this> */
+    public function incidents(): HasMany {
         return $this->hasMany(Incident::class)->orderByDesc('started_at');
     }
 

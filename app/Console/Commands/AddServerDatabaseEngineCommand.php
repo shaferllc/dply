@@ -54,7 +54,7 @@ class AddServerDatabaseEngineCommand extends Command
         try {
             if ($shouldInstall) {
                 $result = $install->execute($server, $engine, $version, $isDefault);
-                if (! ($result['ok'] ?? false)) {
+                if (! $result['ok']) {
                     $this->warn('No install steps known for engine: '.$engine);
                     $this->line('Falling back to data-only registration. Install the package separately.');
                     $row = $attach->execute($server, $engine, $version, $isDefault);

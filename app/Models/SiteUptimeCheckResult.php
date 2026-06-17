@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One recorded uptime check. Append-only history behind a monitor's last_*
  * snapshot; powers uptime %, latency trends and incident stitching. `state`
  * mirrors {@see MonitorOperationalState} values.
@@ -28,6 +29,7 @@ class SiteUptimeCheckResult extends Model
         'probe_worker',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -35,8 +37,8 @@ class SiteUptimeCheckResult extends Model
         ];
     }
 
-    public function monitor(): BelongsTo
-    {
+    /** @return BelongsTo<SiteUptimeMonitor, $this> */
+    public function monitor(): BelongsTo {
         return $this->belongsTo(SiteUptimeMonitor::class, 'site_uptime_monitor_id');
     }
 }

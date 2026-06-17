@@ -41,7 +41,7 @@ class BuildEdgeSiteJob implements ShouldQueue
             return;
         }
 
-        $site = Site::query()->find($deployment->site_id);
+        $site = Site::find($deployment->site_id);
         if ($site === null) {
             return;
         }
@@ -161,7 +161,7 @@ class BuildEdgeSiteJob implements ShouldQueue
                 $middlewareSidecarPath,
             );
         } catch (Throwable $e) {
-            if (is_array($buildResult) && isset($buildResult['build_log']) && is_file($buildResult['build_log'])) {
+            if (is_array($buildResult) && is_file($buildResult['build_log'])) {
                 try {
                     $buildLogPath = $this->persistBuildLog($site, $deployment, $buildResult['build_log']);
                     $deployment->update(['build_log_path' => $buildLogPath]);

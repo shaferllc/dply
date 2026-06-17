@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SiteDeployHook extends Model
 {
     use HasUlids;
@@ -54,23 +58,23 @@ class SiteDeployHook extends Model
         'timeout_seconds',
     ];
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function pipeline(): BelongsTo
-    {
+    /** @return BelongsTo<SiteDeployPipeline, $this> */
+    public function pipeline(): BelongsTo {
         return $this->belongsTo(SiteDeployPipeline::class, 'pipeline_id');
     }
 
-    public function anchorStep(): BelongsTo
-    {
+    /** @return BelongsTo<SiteDeployStep, $this> */
+    public function anchorStep(): BelongsTo {
         return $this->belongsTo(SiteDeployStep::class, 'anchor_step_id');
     }
 
-    public function notificationChannel(): BelongsTo
-    {
+    /** @return BelongsTo<NotificationChannel, $this> */
+    public function notificationChannel(): BelongsTo {
         return $this->belongsTo(NotificationChannel::class);
     }
 

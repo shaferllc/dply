@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
+ * @property string $id
  * Pivot model for the cloud_bucket_site table. Mirrors {@see CloudDatabaseSite}.
  */
 class CloudBucketSite extends Pivot

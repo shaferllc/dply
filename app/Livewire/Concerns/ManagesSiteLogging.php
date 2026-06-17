@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Jobs\SendSiteLogTestJob;
 use App\Models\Site;
 use App\Models\SiteBinding;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSiteLogging
 {
+    use DispatchesToastNotifications;
     /** @var array<string, mixed> The working logging spec. */
     public array $loggingSpec = [];
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property string $id
  * A worker pool groups a source worker server and its clones so background
  * throughput can be scaled declaratively. Exactly one member is the primary
  * (owns the scheduler / cron / migrations); the rest are queue-worker replicas.
@@ -66,6 +67,7 @@ class WorkerPool extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -93,18 +95,18 @@ class WorkerPool extends Model
         return $this->processManager() === self::PM_SUPERVISOR;
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function sourceServer(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function sourceServer(): BelongsTo {
         return $this->belongsTo(Server::class, 'source_server_id');
     }
 
-    public function primaryServer(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function primaryServer(): BelongsTo {
         return $this->belongsTo(Server::class, 'primary_server_id');
     }
 

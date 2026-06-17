@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
+ * @property string $id
  * Object-storage bucket attached to one or more Cloud sites.
  *
  * v1 backend is DigitalOcean Spaces; AWS S3 and Cloudflare R2 are
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 class CloudBucket extends Model
 {
+    /** @use HasFactory<CloudBucketFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
@@ -57,6 +59,7 @@ class CloudBucket extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -65,18 +68,18 @@ class CloudBucket extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class, 'provider_credential_id');
     }
 
-    public function sites(): BelongsToMany
-    {
+    /** @return BelongsToMany<Site, $this> */
+    public function sites(): BelongsToMany {
         return $this->belongsToMany(Site::class, 'cloud_bucket_site')
             ->using(CloudBucketSite::class)
             ->withPivot('env_prefix')

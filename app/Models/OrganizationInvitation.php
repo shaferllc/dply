@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ */
+
 class OrganizationInvitation extends Model
 {
     use HasUlids;
@@ -20,6 +24,7 @@ class OrganizationInvitation extends Model
         'expires_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -27,13 +32,13 @@ class OrganizationInvitation extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function inviter(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function inviter(): BelongsTo {
         return $this->belongsTo(User::class, 'invited_by');
     }
 

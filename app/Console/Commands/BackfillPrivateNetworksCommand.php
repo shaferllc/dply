@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Enums\ServerProvider;
 use App\Models\PrivateNetwork;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\Servers\ServerPrivateNetworkRecorder;
@@ -64,7 +65,7 @@ class BackfillPrivateNetworksCommand extends Command
         $skipped = 0;
 
         foreach ($servers as $server) {
-            $label = sprintf('%s (%s)', $server->name, $server->provider?->value);
+            $label = sprintf('%s (%s)', $server->name, $server->provider->value);
 
             $credential = $server->providerCredential;
             if ($credential === null) {
@@ -120,7 +121,7 @@ class BackfillPrivateNetworksCommand extends Command
     /**
      * @return array{0: string, 1: string, 2: ?string, 3: ?string}|null [provider, vpcId, ipRange, name]
      */
-    private function resolveDigitalOcean($credential, int $dropletId): ?array
+    private function resolveDigitalOcean(ProviderCredential $credential, int $dropletId): ?array
     {
         $do = new DigitalOceanService($credential);
         $droplet = $do->getDroplet($dropletId);
@@ -133,9 +134,9 @@ class BackfillPrivateNetworksCommand extends Command
         $name = null;
         try {
             foreach ($do->listVpcs() as $vpc) {
-                if (($vpc['id'] ?? '') === $vpcUuid) {
-                    $ipRange = ($vpc['ip_range'] ?? '') ?: null;
-                    $name = ($vpc['name'] ?? '') ?: null;
+                if ($vpc['id'] === $vpcUuid) {
+                    $ipRange = $vpc['ip_range'] !== '' ? $vpc['ip_range'] : null;
+                    $name = $vpc['name'] !== '' ? $vpc['name'] : null;
                     break;
                 }
             }
@@ -149,7 +150,7 @@ class BackfillPrivateNetworksCommand extends Command
     /**
      * @return array{0: string, 1: string, 2: ?string, 3: ?string}|null
      */
-    private function resolveVultr($credential, string $instanceId): ?array
+    private function resolveVultr(ProviderCredential $credential, string $instanceId): ?array
     {
         $vultr = new VultrService($credential);
         $instance = $vultr->getInstance($instanceId);

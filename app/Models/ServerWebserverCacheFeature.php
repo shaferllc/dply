@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Per (server, webserver) install state for the webserver's NATIVE cache module.
  *
  * Varnish is a separate HTTP-front daemon and lives on `server_cache_services`
@@ -48,6 +49,7 @@ class ServerWebserverCacheFeature extends Model
         'last_probed_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -62,8 +64,8 @@ class ServerWebserverCacheFeature extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

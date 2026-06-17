@@ -130,7 +130,7 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
             $db->server,
             $this->enable ? 'db_access_enabled' : 'db_access_disabled',
             [(string) $db->name],
-            $this->userId ? User::query()->find($this->userId) : null,
+            $this->userId ? User::find($this->userId) : null,
             ['database_id' => $db->id, 'engine' => $db->engine, 'allowed_from' => $this->enable ? $this->allowedCidr : null],
         );
     }

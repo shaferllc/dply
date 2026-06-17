@@ -58,7 +58,7 @@ class UpgradeGuestMetricsScriptJob implements ShouldBeUnique, ShouldQueue
         ServerMetricsGuestScript $guest,
         ServerMetricsGuestPushService $guestPush,
     ): void {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

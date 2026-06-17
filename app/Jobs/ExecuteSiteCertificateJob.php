@@ -70,9 +70,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             $this->notifyCertOutcome($certificate, 'renewed', null);
         } catch (\Throwable $e) {
             $certificate->refresh();
-            $summary = is_string($certificate->last_output)
-                ? CertbotOutputParser::failureSummary($certificate->last_output)
-                : '';
+            $summary = CertbotOutputParser::failureSummary((string) $certificate->last_output);
             if ($summary !== '' && ! str_contains($e->getMessage(), $summary)) {
                 $emit->error($summary, 'ssl');
             }
@@ -101,17 +99,13 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             return;
         }
 
-        $domains = method_exists($certificate, 'domainHostnames')
-            ? $certificate->domainHostnames()
-            : (is_array($certificate->domains ?? null) ? $certificate->domains : []);
-        $domainLabel = is_array($domains) && $domains !== []
+        $domains = $certificate->domainHostnames();
+        $domainLabel = $domains !== []
             ? implode(', ', array_slice($domains, 0, 3))
-            : ($certificate->site?->name ?? 'certificate');
+            : ($certificate->site->name ?? 'certificate');
 
         $details = [__('Certificate: :domains', ['domains' => $domainLabel])];
-        if ($certificate->site) {
-            $details[] = __('Site: :name', ['name' => $certificate->site->name]);
-        }
+        $details[] = __('Site: :name', ['name' => $certificate->site->name]);
         if ($kind === 'renewal_failed' && $error) {
             $details[] = __('Error: :error', ['error' => Str::limit($error, 300)]);
         }
@@ -120,7 +114,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             $server,
             $kind,
             $details,
-            $this->userId ? User::query()->find($this->userId) : null,
+            $this->userId ? User::find($this->userId) : null,
             [
                 'certificate_id' => (string) $certificate->id,
                 'site_id' => (string) $certificate->site_id,
@@ -137,7 +131,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
         if ($org === null) {
             return;
         }
-        $user = $this->userId ? User::query()->find($this->userId) : null;
+        $user = $this->userId ? User::find($this->userId) : null;
         $certificate->refresh();
 
         audit_log($org, $user, $action, $certificate, null, array_filter([

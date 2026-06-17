@@ -14,6 +14,7 @@ class InsightHealthSnapshot extends Model
         'captured_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -22,8 +23,8 @@ class InsightHealthSnapshot extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 }

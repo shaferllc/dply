@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ */
+
 class AuditLog extends Model
 {
     use HasUlids;
@@ -22,6 +26,7 @@ class AuditLog extends Model
         'ip_address',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -30,13 +35,13 @@ class AuditLog extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

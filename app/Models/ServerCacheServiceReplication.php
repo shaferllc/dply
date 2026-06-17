@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Edge connecting a master {@see ServerCacheService} to a replica
  * {@see ServerCacheService}. Created by the add-replica wizard; kept fresh by
  * {@see App\Console\Commands\PollCacheServiceReplicationCommand}.
@@ -37,6 +38,7 @@ class ServerCacheServiceReplication extends Model
         'error_message',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,13 +47,13 @@ class ServerCacheServiceReplication extends Model
         ];
     }
 
-    public function masterCacheService(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCacheService, $this> */
+    public function masterCacheService(): BelongsTo {
         return $this->belongsTo(ServerCacheService::class, 'master_cache_service_id');
     }
 
-    public function replicaCacheService(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCacheService, $this> */
+    public function replicaCacheService(): BelongsTo {
         return $this->belongsTo(ServerCacheService::class, 'replica_cache_service_id');
     }
 }

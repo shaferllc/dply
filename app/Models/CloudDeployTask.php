@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property string $id
  * A one-shot task tied to a Cloud Site's deploy lifecycle — migrations
  * before traffic flips, cache warmers after rollout, cleanup on
  * failure, or ad-hoc commands an operator triggers from the dashboard.
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CloudDeployTask extends Model
 {
+    /** @use HasFactory<CloudDeployTaskFactory> */
     use HasFactory, HasUlids;
 
     public const TRIGGER_PRE_DEPLOY = 'pre_deploy';
@@ -87,6 +89,7 @@ class CloudDeployTask extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -94,13 +97,13 @@ class CloudDeployTask extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function runs(): HasMany
-    {
+    /** @return HasMany<CloudDeployTaskRun, $this> */
+    public function runs(): HasMany {
         return $this->hasMany(CloudDeployTaskRun::class);
     }
 

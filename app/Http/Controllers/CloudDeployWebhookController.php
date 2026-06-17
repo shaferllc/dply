@@ -38,8 +38,8 @@ class CloudDeployWebhookController extends Controller
         }
 
         $allowedIps = $site->webhook_allowed_ips;
-        if (is_string($allowedIps) && trim($allowedIps) !== '') {
-            $allowed = array_filter(array_map('trim', explode(',', $allowedIps)));
+        if ($allowedIps !== []) {
+            $allowed = array_filter(array_map(static fn (mixed $ip): string => trim((string) $ip), $allowedIps));
             $clientIp = (string) $request->ip();
             if ($allowed !== [] && ! IpUtils::checkIp($clientIp, $allowed)) {
                 return response()->json(['ok' => false, 'reason' => 'ip_not_allowed'], 403);

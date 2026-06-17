@@ -39,11 +39,11 @@ class RemoveServerDatabaseEngineCommand extends Command
         $engine = (string) $this->argument('engine');
         $result = $action->execute($server, $engine);
 
-        if (! ($result['ok'] ?? false)) {
+        if (! $result['ok']) {
             $this->error(sprintf(
                 'Cannot remove %s — these sites still target it: %s',
                 $engine,
-                implode(', ', $result['sites_using_engine'] ?? []),
+                implode(', ', $result['sites_using_engine']),
             ));
             $this->line('Re-pin those sites to a different engine before retrying.');
 

@@ -57,7 +57,10 @@ class ServerController extends Controller
             }
         }
 
-        return view('servers.create', compact('credentials', 'regions', 'sizes'));
+        /** @var view-string $view */
+        $view = 'servers.create';
+
+        return view($view, compact('credentials', 'regions', 'sizes'));
     }
 
     public function store(Request $request): RedirectResponse

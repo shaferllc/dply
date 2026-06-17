@@ -41,8 +41,13 @@ class AuthenticateApiToken
 
         $token->touchLastUsed();
 
-        auth()->setUser($token->user);
-        $request->setUserResolver(fn () => $token->user);
+        $user = $token->user;
+        if ($user === null) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        auth()->setUser($user);
+        $request->setUserResolver(fn () => $user);
         $request->attributes->set('api_token', $token);
         $request->attributes->set('api_organization', $token->organization);
 

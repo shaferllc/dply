@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
+ * @property string $id
  * A closed-beta invitation, bound to a single email address. Admin-issued (one
  * by one, in bulk, or pulled from the coming-soon waitlist); a valid unredeemed
  * token lets that email register while public signups are closed, and flags the
@@ -40,6 +41,7 @@ class BetaInvitation extends Model
         'revoked_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -54,18 +56,18 @@ class BetaInvitation extends Model
         return 'token';
     }
 
-    public function inviter(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function inviter(): BelongsTo {
         return $this->belongsTo(User::class, 'invited_by');
     }
 
-    public function redeemer(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function redeemer(): BelongsTo {
         return $this->belongsTo(User::class, 'redeemed_by_user_id');
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 

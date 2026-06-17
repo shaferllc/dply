@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One env var a site keeps OUT of the loose plaintext-in-DB `.env` blob —
  * the unit of "I don't want this secret sitting decryptable in your database."
  *
@@ -64,8 +65,8 @@ class SiteSecretResidency extends Model
         return '${dply:secret:'.$id.'}';
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 }

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property string $id
  * One row per (server, site, scheduler_kind) — the live state of a framework
  * scheduler's heartbeat as last reported by the metrics agent.
  *
@@ -53,6 +54,7 @@ class ServerSchedulerHeartbeat extends Model
         'output_capture_enabled',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -67,13 +69,13 @@ class ServerSchedulerHeartbeat extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

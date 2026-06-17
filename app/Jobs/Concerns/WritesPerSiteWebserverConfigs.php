@@ -183,8 +183,6 @@ trait WritesPerSiteWebserverConfigs
 
     protected function basenameForSite(Site $site): string
     {
-        return method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        return (string) $site->webserverConfigBasename();
     }
 }

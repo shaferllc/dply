@@ -7,8 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SiteCertificate extends Model
 {
+    /** @use HasFactory<SiteCertificateFactory> */
     use HasFactory, HasUlids;
 
     public const SCOPE_CUSTOMER = 'customer';
@@ -74,6 +79,7 @@ class SiteCertificate extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -93,18 +99,18 @@ class SiteCertificate extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function previewDomain(): BelongsTo
-    {
+    /** @return BelongsTo<SitePreviewDomain, $this> */
+    public function previewDomain(): BelongsTo {
         return $this->belongsTo(SitePreviewDomain::class, 'preview_domain_id');
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 

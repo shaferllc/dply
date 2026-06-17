@@ -46,7 +46,7 @@ class CdnEnableCommand extends Command
 
         $hostname = strtolower(trim((string) ($this->option('hostname') ?: (string) optional($site->primaryDomain())->hostname)));
         $zone = strtolower(trim((string) ($this->option('zone') ?: (Site::apexGuessForHostname($hostname) ?? ''))));
-        $originIp = trim((string) ($this->option('origin-ip') ?: (string) ($site->server?->ip_address ?? '')));
+        $originIp = trim((string) ($this->option('origin-ip') ?: (string) $site->server->ip_address));
         $preset = (string) $this->option('preset');
 
         if ($hostname === '' || $zone === '' || $originIp === '') {

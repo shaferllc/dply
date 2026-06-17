@@ -37,7 +37,7 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -52,7 +52,7 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
 
     public function handle(SiteErrorReferenceResolver $resolver): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

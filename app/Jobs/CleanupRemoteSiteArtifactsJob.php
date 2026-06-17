@@ -29,6 +29,7 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
      *     primary_hostname?: string|null,
      *     ssl_was_active?: bool,
      *     supervisor_program_ids?: array<int, int>,
+     *     php_fpm_pool_name?: string|null,
      *     site_id?: int,
      *     systemd_unit_names?: list<string>
      * }  $payload
@@ -39,15 +40,15 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
 
     public function handle(SshConnectionFactory $sshFactory, ServerCronSynchronizer $cronSync, SupervisorProvisioner $supervisorProvisioner): void
     {
-        $server = Server::query()->find($this->payload['server_id'] ?? 0);
+        $server = Server::find($this->payload['server_id']);
         if (! $server || ! $server->isReady() || empty($server->ssh_private_key)) {
             return;
         }
 
         $ssh = $sshFactory->forServer($server);
-        $basename = (string) ($this->payload['nginx_basename'] ?? '');
+        $basename = $this->payload['nginx_basename'];
         $webserver = (string) ($this->payload['webserver'] ?? 'nginx');
-        $base = (string) ($this->payload['repository_base'] ?? '');
+        $base = $this->payload['repository_base'];
         $strategy = (string) ($this->payload['deploy_strategy'] ?? 'simple');
         /** @var array<int, int> $svIds */
         $svIds = $this->payload['supervisor_program_ids'] ?? [];
@@ -113,7 +114,7 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
         // (a version switch can leave the conf in more than one) and reload each
         // affected master. Runs after the vhost teardown above, so nothing still
         // points at the pool's socket when it goes away.
-        $poolName = trim((string) ($this->payload['php_fpm_pool_name'] ?? ''));
+        $poolName = trim((string) ($this->payload['php_fpm_pool_name'] ?? '')); // optional key
         if ($poolName !== '') {
             $log .= $ssh->exec(sprintf(
                 '(NAME=%1$s; RELOAD=""; for d in /etc/php/*/fpm/pool.d; do [ -d "$d" ] || continue; f="${d}/${NAME}.conf"; if [ -f "$f" ]; then sudo rm -f "$f"; v="$(basename "$(dirname "$(dirname "$d")")")"; RELOAD="${RELOAD} ${v}"; fi; done; for v in $(echo "$RELOAD" | tr " " "\n" | sort -u); do [ -z "$v" ] && continue; sudo systemctl reload "php${v}-fpm" 2>/dev/null || sudo systemctl restart "php${v}-fpm" 2>/dev/null || true; done) 2>&1; printf "\nDPLY_FPM_POOL_CLEAN_EXIT:%%s" "$?"',

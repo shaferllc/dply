@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One row per (server, php_version) — PHP OPcache lives per PHP version, not
  * per site. The row drives `ServerOpcacheConfigEditor`, which renders
  * `opcache.ini` from the structured fields and ships it to the host.
@@ -53,6 +54,7 @@ class ServerPhpOpcacheProfile extends Model
         'last_error',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -67,8 +69,8 @@ class ServerPhpOpcacheProfile extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * @property string $id
+ */
+
 class SiteDeploySyncGroup extends Model
 {
     use HasUlids;
@@ -27,18 +31,18 @@ class SiteDeploySyncGroup extends Model
         return ($this->rollout_mode ?? self::ROLLOUT_PARALLEL) === self::ROLLOUT_SEQUENTIAL;
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function leader(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function leader(): BelongsTo {
         return $this->belongsTo(Site::class, 'leader_site_id');
     }
 
-    public function sites(): BelongsToMany
-    {
+    /** @return BelongsToMany<Site, $this> */
+    public function sites(): BelongsToMany {
         return $this->belongsToMany(Site::class, 'site_deploy_sync_group_sites', 'site_deploy_sync_group_id', 'site_id')
             ->withPivot('sort_order')
             ->withTimestamps()

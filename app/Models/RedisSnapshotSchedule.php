@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Cron-driven schedule that fires `php artisan dply:run-redis-snapshot-schedule {schedule}`
  * on the control plane, which dispatches {@see App\Jobs\ExportRedisSnapshotJob}.
  *
@@ -34,6 +35,7 @@ class RedisSnapshotSchedule extends Model
         'last_run_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -43,23 +45,23 @@ class RedisSnapshotSchedule extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function cacheService(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCacheService, $this> */
+    public function cacheService(): BelongsTo {
         return $this->belongsTo(ServerCacheService::class, 'server_cache_service_id');
     }
 
-    public function backupConfiguration(): BelongsTo
-    {
+    /** @return BelongsTo<BackupConfiguration, $this> */
+    public function backupConfiguration(): BelongsTo {
         return $this->belongsTo(BackupConfiguration::class);
     }
 
-    public function serverCronJob(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCronJob, $this> */
+    public function serverCronJob(): BelongsTo {
         return $this->belongsTo(ServerCronJob::class);
     }
 }

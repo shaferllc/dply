@@ -33,7 +33,7 @@ final class RecordServerRemoteAccessContext
         }
 
         $class = $event->job->resolveName();
-        if (! is_string($class) || $class === '') {
+        if ($class === '') {
             return;
         }
 
@@ -42,7 +42,7 @@ final class RecordServerRemoteAccessContext
         }
 
         $instance = $this->resolveJobInstance($event);
-        $uuid = method_exists($event->job, 'uuid') ? $event->job->uuid() : null;
+        $uuid = $event->job->uuid();
 
         app()->instance(
             ServerRemoteAccessContext::class,

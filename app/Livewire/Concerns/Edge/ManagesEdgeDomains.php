@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Services\Edge\EdgeCustomDomainProvisioner;
 use App\Services\Edge\EdgeRouter;
@@ -16,6 +17,7 @@ use Livewire\Component;
  */
 trait ManagesEdgeDomains
 {
+    use DispatchesToastNotifications;
     public string $edge_domain_input = '';
 
     public function attachEdgeDomain(): void

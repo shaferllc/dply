@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FirewallRuleTemplate;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerFirewallRule;
 use App\Services\Servers\FirewallRuleStateHasher;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
 use App\Services\Servers\ServerFirewallApplyRecorder;
@@ -39,7 +40,7 @@ class ServerFirewallController extends Controller
         return response()->json([
             'data' => [
                 'server_id' => $server->id,
-                'rules' => $server->firewallRules->map(fn ($r) => [
+                'rules' => $server->firewallRules->map(fn (ServerFirewallRule $r): array => [
                     'id' => $r->id,
                     'name' => $r->name,
                     'port' => $r->port,

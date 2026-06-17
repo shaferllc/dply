@@ -32,6 +32,9 @@ final class SiteProvisioningUpdatedBroadcast implements ShouldBroadcastNow
         return 'site.provisioning.updated';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function broadcastWith(): array
     {
         return [

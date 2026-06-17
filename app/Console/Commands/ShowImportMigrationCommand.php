@@ -33,8 +33,8 @@ class ShowImportMigrationCommand extends Command
         $this->line(sprintf('<info>Migration %s</info>', $migration->id));
         $this->line(sprintf('  Source:           %s server %d', $migration->source, $migration->source_server_id));
         $this->line(sprintf('  Status:           %s', $migration->status));
-        $this->line(sprintf('  Org:              %s', $migration->organization?->name ?? $migration->organization_id));
-        $this->line(sprintf('  Target server:    %s', $migration->targetServer?->name ?? '(none)'));
+        $this->line(sprintf('  Org:              %s', $migration->organization->name ?? $migration->organization_id));
+        $this->line(sprintf('  Target server:    %s', $migration->targetServer->name ?? '(none)'));
         $this->line(sprintf('  Started / done:   %s → %s',
             optional($migration->started_at)->toDateTimeString() ?? '-',
             optional($migration->completed_at)->toDateTimeString() ?? '-',

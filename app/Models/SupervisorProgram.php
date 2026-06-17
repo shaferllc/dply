@@ -6,6 +6,21 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $server_id
+ * @property ?string $site_id
+ * @property string $slug
+ * @property string $program_type
+ * @property string $command
+ * @property ?string $directory
+ * @property ?string $user
+ * @property int $numprocs
+ * @property bool $is_active
+ * @property ?array $env_vars
+ * @property-read Server $server
+ * @property-read ?Site $site
+ */
 class SupervisorProgram extends Model
 {
     use HasUlids;
@@ -30,6 +45,7 @@ class SupervisorProgram extends Model
         'stderr_logfile',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -39,13 +55,13 @@ class SupervisorProgram extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

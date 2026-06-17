@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One row per provision step per run. Powers the data-driven ETA
  * surfaced on the provision-journey UI ("Avg 1m 25s from 12 previous
  * runs") in place of the old static "Usually X minutes" copy.
  */
 class ServerProvisionStepRun extends Model
 {
+    /** @use HasFactory<ServerProvisionStepRunFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -30,6 +32,7 @@ class ServerProvisionStepRun extends Model
         'resumed',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -40,23 +43,23 @@ class ServerProvisionStepRun extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function provisionRun(): BelongsTo
-    {
+    /** @return BelongsTo<ServerProvisionRun, $this> */
+    public function provisionRun(): BelongsTo {
         return $this->belongsTo(ServerProvisionRun::class, 'server_provision_run_id');
     }
 
-    public function task(): BelongsTo
-    {
+    /** @return BelongsTo<Task, $this> */
+    public function task(): BelongsTo {
         return $this->belongsTo(Task::class, 'task_id');
     }
 }

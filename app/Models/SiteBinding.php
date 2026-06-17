@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A persisted resource binding for a site: a managed attachment (database,
  * redis, queue, object storage, scheduler, workers, publication) that
  * contributes connection variables to the deploy environment.
@@ -67,6 +68,7 @@ class SiteBinding extends Model
         'last_error',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -75,8 +77,8 @@ class SiteBinding extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

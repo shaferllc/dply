@@ -13,6 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class RoadmapItem extends Model
 {
     /** @use HasFactory<RoadmapItemFactory> */
@@ -38,6 +42,7 @@ class RoadmapItem extends Model
         'shipped_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

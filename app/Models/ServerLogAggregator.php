@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * The dply Logs Vector aggregator — the ingest tier that authenticates edges over
  * mTLS, stamps tenant identity, and bulk-inserts into ClickHouse. At most one per
  * server (the box designated as the aggregator), enforced by the unique index on
@@ -49,6 +50,7 @@ class ServerLogAggregator extends Model
         'last_seen_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -60,8 +62,8 @@ class ServerLogAggregator extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

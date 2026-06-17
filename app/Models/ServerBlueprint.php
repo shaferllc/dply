@@ -33,6 +33,7 @@ class ServerBlueprint extends Model
         'snapshot',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -40,18 +41,18 @@ class ServerBlueprint extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function sourceServer(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function sourceServer(): BelongsTo {
         return $this->belongsTo(Server::class, 'source_server_id');
     }
 
-    public function createdBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function createdBy(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

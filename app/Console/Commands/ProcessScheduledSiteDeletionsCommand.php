@@ -21,7 +21,7 @@ class ProcessScheduledSiteDeletionsCommand extends Command
 
         $count = 0;
         $query->each(function (Site $site) use (&$count): void {
-            $organization = $site->server?->organization ?? $site->organization;
+            $organization = $site->server->organization ?? $site->organization;
             $meta = $site->meta ?? [];
             $reason = is_string($meta['scheduled_deletion_reason'] ?? null) ? $meta['scheduled_deletion_reason'] : null;
 
@@ -29,7 +29,7 @@ class ProcessScheduledSiteDeletionsCommand extends Command
                 'name' => $site->name,
                 'slug' => $site->slug,
                 'server_id' => (string) $site->server_id,
-                'type' => $site->type instanceof \BackedEnum ? $site->type->value : (string) $site->type,
+                'type' => $site->type->value,
                 'runtime' => $site->runtime,
                 'git_repository_url' => $site->git_repository_url,
                 'scheduled_completion' => true,

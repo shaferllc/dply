@@ -34,8 +34,8 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
 
     public function handle(CreateContainerSiteFromInspection $siteCreator): void
     {
-        $server = Server::query()->find($this->serverId);
-        $user = User::query()->find($this->userId);
+        $server = Server::find($this->serverId);
+        $user = User::find($this->userId);
         $organization = Organization::query()->find($this->organizationId);
 
         if (! $server || ! $user || ! $organization) {
@@ -134,7 +134,7 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             return;
         }
@@ -149,7 +149,7 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
         );
 
         try {
-            $user = User::query()->find($this->userId);
+            $user = User::find($this->userId);
             app(NotificationPublisher::class)->publish(
                 eventKey: 'server.container_launch.failed',
                 subject: $server,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Server;
 use App\Models\ServerLogAgent;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\VectorLogAgentInstallScripts;
@@ -57,9 +58,14 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
         // "installing" forever). Reaching this job means enablement was intended.
         /** @var ServerLogAgent|null $agent */
         $agent = ServerLogAgent::query()->with('server')->find($this->serverLogAgentId);
-        if ($agent === null || $agent->server === null || ! $agent->server->isVmHost()) {
+        if ($agent === null) {
+            return;
+        }
+
+        $server = $agent->server;
+        if (! $server->isVmHost()) {
             // Can't proceed — don't leave the UI stuck on "installing".
-            $agent?->update([
+            $agent->update([
                 'status' => ServerLogAgent::STATUS_FAILED,
                 'error_message' => 'Server is not a reachable VM host.',
             ]);

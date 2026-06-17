@@ -52,8 +52,8 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
 
     public function handle(): void
     {
-        $source = Server::query()->find($this->sourceServerId);
-        $clone = Server::query()->find($this->cloneServerId);
+        $source = Server::find($this->sourceServerId);
+        $clone = Server::find($this->cloneServerId);
         if ($source === null || $clone === null) {
             $this->failClone($clone, 'Source or clone server row vanished mid-flight.');
 
@@ -225,9 +225,6 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
     {
         $snapshots = $do->getSnapshots('droplet');
         foreach ($snapshots as $snapshot) {
-            if (! is_array($snapshot)) {
-                continue;
-            }
             if ((string) ($snapshot['name'] ?? '') === $name) {
                 return (string) ($snapshot['id'] ?? '');
             }
@@ -238,9 +235,6 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
         $candidate = null;
         $candidateAt = null;
         foreach ($snapshots as $snapshot) {
-            if (! is_array($snapshot)) {
-                continue;
-            }
             $resourceIds = $snapshot['resource_id'] ?? null;
             if (is_array($resourceIds)) {
                 $matches = in_array($sourceDropletId, array_map('strval', $resourceIds), true);

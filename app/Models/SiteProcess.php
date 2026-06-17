@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SiteProcess extends Model
 {
     /** @use HasFactory<SiteProcessFactory> */
@@ -34,6 +38,7 @@ class SiteProcess extends Model
         'managed_by_manifest',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -44,8 +49,8 @@ class SiteProcess extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 }

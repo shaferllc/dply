@@ -83,7 +83,7 @@ class EdgeInfraBootstrapOrgCommand extends Command
         // to R2 jurisdiction + location hint. CF jurisdictions:
         //   default | eu | fedramp.
         // Location hints: weur | eeur | wnam | enam | apac | oc.
-        $region = (string) ($credential->organization?->edge_data_region ?? 'default');
+        $region = (string) $credential->organization->edge_data_region;
         [$jurisdiction, $locationHint] = $this->mapRegion($region);
 
         try {

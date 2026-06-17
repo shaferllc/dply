@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class SitePreviewDomain extends Model
 {
+    /** @use HasFactory<SitePreviewDomainFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -33,6 +38,7 @@ class SitePreviewDomain extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -46,13 +52,13 @@ class SitePreviewDomain extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function certificates(): HasMany
-    {
+    /** @return HasMany<SiteCertificate, $this> */
+    public function certificates(): HasMany {
         return $this->hasMany(SiteCertificate::class, 'preview_domain_id');
     }
 }

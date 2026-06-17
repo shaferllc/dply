@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
 class OAuthController extends Controller
@@ -47,11 +48,11 @@ class OAuthController extends Controller
 
         $driver = Socialite::driver($provider);
         $scopes = config('services.'.$provider.'.scopes');
-        if (is_array($scopes) && $scopes !== []) {
+        if (is_array($scopes) && $scopes !== [] && $driver instanceof AbstractProvider) {
             $driver = $driver->scopes($scopes);
         }
 
-        return $driver->redirect();
+        return redirect()->away($driver->redirect()->getTargetUrl());
     }
 
     public function callback(string $provider): RedirectResponse
@@ -64,6 +65,10 @@ class OAuthController extends Controller
             $oauthUser = Socialite::driver($provider)->user();
         } catch (\Throwable $e) {
             return $this->oauthFailureRedirect($intent, $e->getMessage());
+        }
+
+        if (! $oauthUser instanceof SocialiteUser) {
+            return $this->oauthFailureRedirect($intent, __('Could not read your account from the provider.'));
         }
 
         if ($intent === 'link') {
@@ -87,6 +92,9 @@ class OAuthController extends Controller
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
+    /**
+     * @return list<array{id: string, name: string}>
+     */
     public static function getEnabledProviders(): array
     {
         $providers = [];
@@ -168,7 +176,7 @@ class OAuthController extends Controller
         $nickname = $oauthUser->getNickname() ?? $oauthUser->getName() ?? $providerId;
         $payload = [
             'access_token' => $oauthUser->token,
-            'refresh_token' => $oauthUser->refreshToken ?? null,
+            'refresh_token' => $oauthUser->refreshToken !== '' ? $oauthUser->refreshToken : null,
             'nickname' => $nickname,
         ];
 
@@ -203,7 +211,7 @@ class OAuthController extends Controller
         if ($account) {
             $account->update([
                 'access_token' => $oauthUser->token,
-                'refresh_token' => $oauthUser->refreshToken ?? null,
+                'refresh_token' => $oauthUser->refreshToken !== '' ? $oauthUser->refreshToken : null,
                 'nickname' => $oauthUser->getNickname() ?? $oauthUser->getName(),
             ]);
 
@@ -229,7 +237,7 @@ class OAuthController extends Controller
                 'label' => null,
                 'nickname' => $nickname,
                 'access_token' => $oauthUser->token,
-                'refresh_token' => $oauthUser->refreshToken ?? null,
+                'refresh_token' => $oauthUser->refreshToken !== '' ? $oauthUser->refreshToken : null,
             ]);
 
             return $user;
@@ -251,7 +259,7 @@ class OAuthController extends Controller
             'label' => null,
             'nickname' => $nickname,
             'access_token' => $oauthUser->token,
-            'refresh_token' => $oauthUser->refreshToken ?? null,
+            'refresh_token' => $oauthUser->refreshToken !== '' ? $oauthUser->refreshToken : null,
         ]);
 
         return $user;

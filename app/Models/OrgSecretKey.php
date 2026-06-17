@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * An organization's `age` keypair for escrowed secrets (see the table migration
  * for the trust model). Encrypt with {@see $public_recipient}; decrypt with the
  * private identity — which dply holds ({@see $dply_identity}, APP_KEY-encrypted)
@@ -53,8 +54,8 @@ class OrgSecretKey extends Model
             && $this->dply_identity !== '';
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 }

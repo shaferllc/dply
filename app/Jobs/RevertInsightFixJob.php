@@ -30,13 +30,13 @@ class RevertInsightFixJob implements ShouldQueue
     public function handle(): void
     {
         $finding = InsightFinding::query()->with(['server', 'site'])->find($this->insightFindingId);
-        $user = User::query()->find($this->userId);
+        $user = User::find($this->userId);
         if ($finding === null || $user === null) {
             return;
         }
 
         $server = $finding->server;
-        if ($server === null || ! $user->can('update', $server)) {
+        if (! $user->can('update', $server)) {
             return;
         }
 

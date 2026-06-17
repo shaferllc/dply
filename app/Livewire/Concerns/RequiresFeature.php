@@ -21,12 +21,14 @@ use Laravel\Pennant\Feature;
  *
  * Livewire auto-runs `bootedRequiresFeature` on every request because the
  * method name matches the trait name — see Livewire's lifecycle docs.
+ *
+ * @property string $requiredFeature
  */
 trait RequiresFeature
 {
     public function bootedRequiresFeature(): void
     {
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }

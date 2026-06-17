@@ -513,6 +513,8 @@ BASH;
      * works) yet not be listening on TCP localhost, in which case the app can't
      * connect at all — the "I made a database but it can't reach itself" trap.
      * sqlite has no TCP surface, so it's always considered reachable.
+     *
+     * @phpstan-impure
      */
     public function engineListeningOnLoopback(Server $server, string $engine, ?int $port = null): bool
     {

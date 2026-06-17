@@ -302,17 +302,21 @@ enum ServerProvider: string
 
     /**
      * Providers that accept credentials only (no create/destroy yet).
+     *
+     * @return list<self>
      */
     public static function credentialOnly(): array
     {
-        return array_filter(
+        return array_values(array_filter(
             self::cases(),
             fn (self $p) => ! $p->hasFullSupport() && $p !== self::Custom
-        );
+        ));
     }
 
     /**
      * All provider values (for validation, etc.).
+     *
+     * @return list<string>
      */
     public static function values(): array
     {
@@ -321,6 +325,8 @@ enum ServerProvider: string
 
     /**
      * Provider values allowed for provider_credentials (excludes Custom).
+     *
+     * @return list<string>
      */
     public static function valuesForCredentials(): array
     {

@@ -39,6 +39,7 @@ use Illuminate\Support\Carbon;
  */
 class RemoteCliRun extends Model
 {
+    /** @use HasFactory<RemoteCliRunFactory> */
     use HasFactory;
 
     protected $table = 'remote_cli_runs';
@@ -74,6 +75,7 @@ class RemoteCliRun extends Model
 
     public const MODE_ASYNC = 'async';
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -86,13 +88,13 @@ class RemoteCliRun extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function queuedByUser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function queuedByUser(): BelongsTo {
         return $this->belongsTo(User::class, 'queued_by_user_id');
     }
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One row per outbound webhook attempt — including the "would have been sent"
  * placeholder rows for events on servers without a webhook URL configured. Lets
  * users audit exactly what Dply emits even before they wire up an endpoint.
@@ -45,6 +46,7 @@ class OutboundWebhookDelivery extends Model
         'completed_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -55,13 +57,13 @@ class OutboundWebhookDelivery extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 }

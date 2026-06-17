@@ -173,7 +173,7 @@ trait SchedulesProvisionRetry
         }
 
         $meta = $server->meta ?? [];
-        $hasStack = is_array($meta) && filled($meta['server_role'] ?? null);
+        $hasStack = filled($meta['server_role'] ?? null);
         $hasOptionalScript = filled($server->setup_script_key) && $server->setup_script_key !== 'none';
 
         return $hasStack || $hasOptionalScript;

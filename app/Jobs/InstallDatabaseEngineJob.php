@@ -6,9 +6,11 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
+use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
 use App\Models\User;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -92,16 +94,20 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
         ServerResourcePreflight $preflight,
         ServerDatabaseNotificationDispatcher $notifications,
     ): void {
-        /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
-        if (! $row) {
+        if ($row === null) {
+            return;
+        }
+
+        $server = $row->server;
+        if (! $server instanceof Server) {
             return;
         }
 
         $emit = $this->beginConsoleAction();
 
         $preflightResult = $preflight->check(
-            $row->server,
+            $server,
             ServerResourcePreflight::requirementsForDatabaseEngine($row->engine),
         );
         if (! $preflightResult['ok']) {
@@ -111,7 +117,7 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
                 'status' => ServerDatabaseEngine::STATUS_FAILED,
                 'error_message' => Str::limit($message, 800),
             ]);
-            $audit->record($row->server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALL_FAILED, [
+            $audit->record($server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALL_FAILED, [
                 'engine' => $row->engine,
                 'phase' => 'preflight',
                 'error' => $message,
@@ -137,7 +143,7 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
                 "\n".DatabaseEngineInstallScripts::versionProbeScript($row->engine);
 
             $output = $executor->runInlineBashWithOutputCallback(
-                $row->server,
+                $server,
                 'database-engine:install:'.$row->engine,
                 $script,
                 function (string $type, string $chunk) use ($emit): void {
@@ -164,7 +170,7 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
             // guarantees the daemon is up — not that it's listening on loopback
             // TCP. Verify, remediate if not, and re-verify so an engine never lands
             // "running" while being unreachable to the very apps it's installed for.
-            $this->ensureLoopbackListening($row, $executor, $emit);
+            $this->ensureLoopbackListening($row, $server, $executor, $emit);
 
             $row->update([
                 'status' => ServerDatabaseEngine::STATUS_RUNNING,
@@ -172,19 +178,19 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
                 'port' => DatabaseEngineInstallScripts::defaultPortFor($row->engine),
             ]);
 
-            $capabilities->forget($row->server);
+            $capabilities->forget($server);
 
-            $audit->record($row->server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALLED, [
+            $audit->record($server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALLED, [
                 'engine' => $row->engine,
                 'version' => $version,
                 'port' => $row->port,
             ]);
 
             $notifications->notify(
-                $row->server,
+                $server,
                 'engine_installed',
                 [__('Engine: :engine :version', ['engine' => $row->engine, 'version' => (string) $version])],
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 ['engine' => $row->engine, 'version' => $version, 'port' => $row->port],
             );
 
@@ -196,7 +202,7 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
                 'status' => ServerDatabaseEngine::STATUS_FAILED,
                 'error_message' => $message,
             ]);
-            $audit->record($row->server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALL_FAILED, [
+            $audit->record($server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALL_FAILED, [
                 'engine' => $row->engine,
                 'error' => $message,
             ]);
@@ -215,16 +221,22 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
      * No-op when already listening — remediation runs only on failure, so a
      * working config is never touched. Throws (→ FAILED) when the engine still
      * isn't reachable after remediation. sqlite has no TCP surface and is excluded.
+     *
+     * @phpstan-impure
      */
-    private function ensureLoopbackListening(ServerDatabaseEngine $row, ExecuteRemoteTaskOnServer $executor, $emit): void
-    {
+    private function ensureLoopbackListening(
+        ServerDatabaseEngine $row,
+        Server $server,
+        ExecuteRemoteTaskOnServer $executor,
+        ConsoleEmitter $emit,
+    ): void {
         $engine = $row->engine;
         if (! in_array($engine, ['postgres', 'mysql', 'mariadb', 'clickhouse', 'mongodb'], true)) {
             return;
         }
 
         $remote = app(ServerDatabaseRemoteExec::class);
-        if ($remote->engineListeningOnLoopback($row->server, $engine)) {
+        if ($remote->engineListeningOnLoopback($server, $engine)) {
             return;
         }
 
@@ -232,7 +244,7 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
         $script = DatabaseEngineInstallScripts::ensureLoopbackListeningScript($engine);
         if ($script !== '') {
             $executor->runInlineBash(
-                $row->server,
+                $server,
                 'database-engine:ensure-listen:'.$engine,
                 $script,
                 timeoutSeconds: 120,
@@ -240,7 +252,7 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
             );
         }
 
-        if (! $remote->engineListeningOnLoopback($row->server, $engine)) {
+        if (! $remote->engineListeningOnLoopback($server, $engine)) {
             throw new \RuntimeException(__(':engine installed but is not listening on 127.0.0.1::port even after remediation — check its service and config.', [
                 'engine' => $engine,
                 'port' => DatabaseEngineInstallScripts::defaultPortFor($engine),
@@ -258,6 +270,6 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
         $lines = array_filter(array_map('trim', explode("\n", $stdout)), fn ($l) => $l !== '');
         $last = end($lines);
 
-        return is_string($last) && $last !== '' ? Str::limit($last, 64, '') : null;
+        return is_string($last) ? Str::limit($last, 64, '') : null;
     }
 }

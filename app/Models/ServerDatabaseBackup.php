@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerDatabaseBackup extends Model
 {
     use HasUlids;
@@ -33,18 +37,18 @@ class ServerDatabaseBackup extends Model
         'error_message',
     ];
 
-    public function serverDatabase(): BelongsTo
-    {
+    /** @return BelongsTo<ServerDatabase, $this> */
+    public function serverDatabase(): BelongsTo {
         return $this->belongsTo(ServerDatabase::class, 'server_database_id');
     }
 
-    public function backupConfiguration(): BelongsTo
-    {
+    /** @return BelongsTo<BackupConfiguration, $this> */
+    public function backupConfiguration(): BelongsTo {
         return $this->belongsTo(BackupConfiguration::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

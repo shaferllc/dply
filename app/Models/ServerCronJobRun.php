@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerCronJobRun extends Model
 {
     use HasUlids;
@@ -37,6 +41,7 @@ class ServerCronJobRun extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,8 +50,8 @@ class ServerCronJobRun extends Model
         ];
     }
 
-    public function cronJob(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCronJob, $this> */
+    public function cronJob(): BelongsTo {
         return $this->belongsTo(ServerCronJob::class, 'server_cron_job_id');
     }
 }

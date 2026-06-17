@@ -8,6 +8,7 @@ use App\Services\HetznerService;
 use App\Support\Servers\SnapshotBakeScript;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Crypt\RSA;
 use phpseclib3\Net\SSH2;
@@ -185,10 +186,7 @@ class SnapshotBakeHetznerCommand extends Command
     {
         foreach ([
             $this->option('token'),
-            env('DPLY_SNAPSHOT_HETZNER_TOKEN'),
-            env('DPLY_MANAGED_HETZNER_API_TOKEN'),
-            env('HETZNER_API_TOKEN'),
-            env('HETZNER_TOKEN'),
+            ...config('dply.snapshot_hetzner_tokens', []),
         ] as $candidate) {
             if (is_string($candidate) && trim($candidate) !== '') {
                 return trim($candidate);
@@ -266,6 +264,9 @@ class SnapshotBakeHetznerCommand extends Command
     {
         $deadline = time() + max(30, $timeoutSeconds);
         $key = PublicKeyLoader::load($privateKey);
+        if (! $key instanceof PrivateKey) {
+            throw new \RuntimeException('SSH private key could not be loaded as a private key.');
+        }
         $attempt = 0;
 
         while (time() < $deadline) {
@@ -295,6 +296,9 @@ class SnapshotBakeHetznerCommand extends Command
         $this->info('Uploading and running bake script…');
 
         $key = PublicKeyLoader::load($privateKey);
+        if (! $key instanceof PrivateKey) {
+            throw new \RuntimeException('SSH private key could not be loaded as a private key.');
+        }
         $ssh = new SSH2($ip, 22, 15);
         if (! $ssh->login('root', $key)) {
             throw new \RuntimeException('SSH login failed during bake.');

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
+ * @property string $id
  * A recurring, cron-scheduled deploy for a site. Evaluated on the control-plane
  * Laravel scheduler (see {@see RunDueDeploymentSchedulesCommand}),
  * which dispatches {@see RunSiteDeploymentJob} when a schedule is due —
@@ -47,8 +48,8 @@ class SiteDeploymentSchedule extends Model
         'last_run_at' => 'datetime',
     ];
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

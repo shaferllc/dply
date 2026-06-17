@@ -67,6 +67,7 @@ class TestSiteHealthJob implements ShouldQueue
         $emit = new ConsoleEmitter($this->consoleActionId);
 
         // 1) HTTP check.
+        $httpFailed = false;
         $httpOk = $this->httpCheck($site, $emit, $httpFailed);
 
         // 2) Server-state checks (driver / config cache / assets) + log on failure.
@@ -132,9 +133,9 @@ class TestSiteHealthJob implements ShouldQueue
     }
 
     /**
-     * @param  bool  $httpFailed  set true when the site did not load
+     * @param-out bool $httpFailed
      */
-    private function httpCheck(Site $site, ConsoleEmitter $emit, ?bool &$httpFailed): bool
+    private function httpCheck(Site $site, ConsoleEmitter $emit, bool &$httpFailed): bool
     {
         $httpFailed = false;
         $url = $this->siteUrl($site);

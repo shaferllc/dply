@@ -21,7 +21,7 @@ class ProvisionDefaultUserSshKeysToServerJob implements ShouldQueue
 
     public function handle(UserSshKeyDeploymentService $deployment): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server || ! $server->isReady() || empty($server->ssh_private_key)) {
             return;
         }

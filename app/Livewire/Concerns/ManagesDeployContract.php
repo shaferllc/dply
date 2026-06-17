@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\DeployContract\WaiveDeployContractRun;
 use App\Models\DeployContractRun;
 use App\Models\Site;
@@ -21,6 +22,7 @@ use Livewire\Component;
  */
 trait ManagesDeployContract
 {
+    use DispatchesToastNotifications;
     public string $deployContractWaiverReason = '';
 
     protected function contractParentSite(): Site

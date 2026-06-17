@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A reusable error-tracking credential set scoped to an organization, so the
  * team can attach the same Sentry/Bugsnag/Flare project to multiple sites
  * without re-entering the DSN/key each time.
@@ -31,6 +32,7 @@ class ErrorTrackingCredential extends Model
         'credentials',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -38,13 +40,13 @@ class ErrorTrackingCredential extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function createdByUser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function createdByUser(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

@@ -29,7 +29,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class QuickDownloadController extends Controller
 {
-    public function fetch(QuickDownload $quickDownload, QuickDownloadBuildStager $stager): StreamedResponse|Response
+    public function fetch(QuickDownload $quickDownload, QuickDownloadBuildStager $stager): StreamedResponse
     {
         $server = $quickDownload->server;
         if ($server === null) {

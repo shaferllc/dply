@@ -55,7 +55,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -70,7 +70,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(SiteEnvReader $reader, DotEnvFileParser $parser): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

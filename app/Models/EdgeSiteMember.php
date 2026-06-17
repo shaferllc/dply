@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Per-site role grant for an Edge site (P12). Stacks on top of the
  * org-level membership — grants only ELEVATE rights, never restrict.
  *
@@ -34,18 +35,18 @@ class EdgeSiteMember extends Model
         'invited_by_user_id',
     ];
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function invitedBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function invitedBy(): BelongsTo {
         return $this->belongsTo(User::class, 'invited_by_user_id');
     }
 

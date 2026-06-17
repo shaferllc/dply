@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerBackupSchedule extends Model
 {
     use DescribesCronExpression, HasUlids;
@@ -29,6 +33,7 @@ class ServerBackupSchedule extends Model
         'last_run_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -38,18 +43,18 @@ class ServerBackupSchedule extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function backupConfiguration(): BelongsTo
-    {
+    /** @return BelongsTo<BackupConfiguration, $this> */
+    public function backupConfiguration(): BelongsTo {
         return $this->belongsTo(BackupConfiguration::class);
     }
 
-    public function serverCronJob(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCronJob, $this> */
+    public function serverCronJob(): BelongsTo {
         return $this->belongsTo(ServerCronJob::class);
     }
 

@@ -13,8 +13,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * @property string $id
+ */
+
 class ProviderCredential extends Model
 {
+    /** @use HasFactory<ProviderCredentialFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -25,6 +30,7 @@ class ProviderCredential extends Model
         'credentials',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,18 +51,18 @@ class ProviderCredential extends Model
         static::deleted($flushMemo);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function servers(): HasMany
-    {
+    /** @return HasMany<Server, $this> */
+    public function servers(): HasMany {
         return $this->hasMany(Server::class, 'provider_credential_id');
     }
 

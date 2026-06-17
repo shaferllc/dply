@@ -43,7 +43,7 @@ class PruneEdgeAnalyticsCommand extends Command
     }
 
     /**
-     * @param  Builder<Model>  $query
+     * @param  Builder<covariant Model>  $query
      */
     private function pruneTable($query, int $keep, int $days): int
     {

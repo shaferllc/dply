@@ -271,7 +271,7 @@ trait AppliesProvisionOutcome
         }
 
         $failureBodyLines = [
-            sprintf('Provider: %s', $server->provider?->label() ?? '—'),
+            sprintf('Provider: %s', $server->provider->label()),
             sprintf('Address: %s', $server->ip_address ?: '—'),
         ];
         if (is_string($excerpt) && trim($excerpt) !== '') {
@@ -303,7 +303,7 @@ trait AppliesProvisionOutcome
      *                                   body (joined with \n). Inbox uses the
      *                                   shorter `$inboxBody`.
      */
-    private static function dispatchProvisionEvent(
+    protected static function dispatchProvisionEvent(
         Server $server,
         string $eventKey,
         string $channelSubject,
@@ -359,10 +359,10 @@ trait AppliesProvisionOutcome
      *
      * @return list<string>
      */
-    private static function successBodyLines(Server $server): array
+    protected static function successBodyLines(Server $server): array
     {
         $lines = [
-            sprintf('Provider: %s', $server->provider?->label() ?? '—'),
+            sprintf('Provider: %s', $server->provider->label()),
             sprintf('Address: %s', $server->ip_address ?: '—'),
         ];
 
@@ -397,7 +397,7 @@ trait AppliesProvisionOutcome
      * a more chat-friendly label. Falls back to ucfirst when the pattern isn't
      * recognised so new engines render legibly without code changes here.
      */
-    private static function humanizeDatabase(string $engine): string
+    protected static function humanizeDatabase(string $engine): string
     {
         if (preg_match('/^postgres(\d+)$/', $engine, $m)) {
             return 'PostgreSQL '.$m[1];
@@ -429,7 +429,7 @@ trait AppliesProvisionOutcome
      * without making the recipient open the journey to know what broke.
      * Returns null when no usable error string is available.
      */
-    private static function extractLastProvisionError(Server $server): ?string
+    protected static function extractLastProvisionError(Server $server): ?string
     {
         $meta = $server->meta ?? [];
         $snapshots = $meta['provision_step_snapshots'] ?? null;
@@ -466,7 +466,7 @@ trait AppliesProvisionOutcome
      * Idempotent via updateOrCreate — re-applying a provision outcome (manual
      * retry, etc.) won't duplicate rows.
      */
-    private static function hydrateAuthorizedKeyPanelRowsFromCreator(Server $server): void
+    protected static function hydrateAuthorizedKeyPanelRowsFromCreator(Server $server): void
     {
         $creator = $server->user;
         if ($creator === null) {

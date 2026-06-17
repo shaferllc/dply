@@ -48,7 +48,7 @@ class ApplyFirewallJob implements ShouldQueue
         ServerFirewallApplyRecorder $recorder,
         ServerFirewallNotificationDispatcher $notifications,
     ): void {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -91,7 +91,7 @@ class ApplyFirewallJob implements ShouldQueue
             $flush();
         };
 
-        $user = $this->userId !== null ? User::query()->find($this->userId) : null;
+        $user = $this->userId !== null ? User::find($this->userId) : null;
 
         try {
             $firewall->withOutputCallback($callback);

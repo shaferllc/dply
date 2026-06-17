@@ -48,7 +48,7 @@ class CloudDoctorCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site (no container_backend).");
 
             return self::FAILURE;
@@ -93,7 +93,7 @@ class CloudDoctorCommand extends Command
         }
 
         $liveUrl = $site->containerLiveUrl();
-        if ($site->status === Site::STATUS_CONTAINER_ACTIVE && $liveUrl === null) {
+        if ($site->status === Site::STATUS_CONTAINER_ACTIVE && $liveUrl === '') {
             $drift[] = 'Status is container_active but no live URL is recorded — backend may be ingressless or meta is stale.';
         }
         if ($site->status === Site::STATUS_CONTAINER_ACTIVE && empty($container['backend_id'])) {
@@ -162,7 +162,7 @@ class CloudDoctorCommand extends Command
             ],
             'mode' => is_array($container['source'] ?? null) ? 'source' : 'image',
             'env' => [
-                'runtime_set' => $site->env_file_content !== null && $site->env_file_content !== '',
+                'runtime_set' => $site->env_file_content !== '',
                 'build_set' => is_string($container['build_env_file_content'] ?? null) && $container['build_env_file_content'] !== '',
             ],
             'image' => [

@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerDatabaseExtraUser extends Model
 {
     use HasUlids;
@@ -19,6 +23,7 @@ class ServerDatabaseExtraUser extends Model
         'host',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -26,8 +31,8 @@ class ServerDatabaseExtraUser extends Model
         ];
     }
 
-    public function serverDatabase(): BelongsTo
-    {
+    /** @return BelongsTo<ServerDatabase, $this> */
+    public function serverDatabase(): BelongsTo {
         return $this->belongsTo(ServerDatabase::class, 'server_database_id');
     }
 }

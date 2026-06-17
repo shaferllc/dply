@@ -35,6 +35,7 @@ use Illuminate\Support\Carbon;
  */
 class SiteAuditEvent extends Model
 {
+    /** @use HasFactory<SiteAuditEventFactory> */
     use HasFactory;
 
     protected $table = 'site_audit_events';
@@ -63,6 +64,7 @@ class SiteAuditEvent extends Model
 
     public const RESULT_FAILURE = 'failure';
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -71,13 +73,13 @@ class SiteAuditEvent extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

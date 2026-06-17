@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceEnvironment;
 use App\Models\WorkspaceDeployRun;
 use App\Models\WorkspaceMember;
 use App\Models\WorkspaceRunbook;
@@ -380,7 +381,7 @@ class ProjectApiController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
-            ->map(fn ($environment): array => [
+            ->map(fn (WorkspaceEnvironment $environment): array => [
                 'id' => (string) $environment->id,
                 'name' => (string) $environment->name,
                 'slug' => (string) $environment->slug,
@@ -591,7 +592,7 @@ class ProjectApiController extends Controller
             'servers_count' => (int) ($workspace->servers_count ?? $workspace->servers()->count()),
             'sites_count' => (int) ($workspace->sites_count ?? $workspace->sites()->count()),
             'role' => $workspace->memberRole($user),
-            'created_at' => $workspace->created_at?->toIso8601String(),
+            'created_at' => $workspace->created_at->toIso8601String(),
         ];
     }
 

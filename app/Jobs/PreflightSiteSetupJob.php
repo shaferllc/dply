@@ -142,21 +142,21 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
                 $this->scanLog($site, 'Looking for .env.example, .env.local.example, or .env.dist…');
 
                 $requirements = $scanner->scanLocalPath($checkout);
-                $allKeys = $requirements['keys'] ?? [];
+                $allKeys = $requirements['keys'];
 
                 $examplePath = $requirements['example_path'] ?? null;
                 if ($examplePath !== null) {
                     $exampleFile = basename($examplePath);
-                    $exampleCount = count(array_filter($allKeys, fn ($k) => in_array('example', $k['sources'] ?? [], true)));
+                    $exampleCount = count(array_filter($allKeys, fn ($k) => in_array('example', $k['sources'], true)));
                     $this->scanLog($site, "Found {$exampleFile} ({$exampleCount} declared key(s)).");
                 } else {
                     $this->scanLog($site, 'No .env.example found — inferring required keys from code and config.');
                 }
 
-                $requiredCount = count(array_filter($allKeys, fn ($k) => (bool) ($k['required'] ?? false)));
+                $requiredCount = count(array_filter($allKeys, fn ($k) => (bool) $k['required']));
                 $optionalCount = count($allKeys) - $requiredCount;
-                $codeCount = count(array_filter($allKeys, fn ($k) => in_array('code', $k['sources'] ?? [], true)));
-                $configCount = count(array_filter($allKeys, fn ($k) => in_array('config', $k['sources'] ?? [], true)));
+                $codeCount = count(array_filter($allKeys, fn ($k) => in_array('code', $k['sources'], true)));
+                $configCount = count(array_filter($allKeys, fn ($k) => in_array('config', $k['sources'], true)));
                 $this->scanLog($site, sprintf(
                     'Scanned %d key(s) total: %d required, %d optional (%d from code, %d from config).',
                     count($allKeys), $requiredCount, $optionalCount, $codeCount, $configCount,
@@ -243,7 +243,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     public function failed(\Throwable $e): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null) {
             return;
         }
@@ -268,7 +268,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
             return $repoUrl;
         }
 
-        $user = User::query()->find($this->userId);
+        $user = User::find($this->userId);
         $identity = $user !== null ? $resolver->forId($user, $accountId) : null;
         if ($identity === null) {
             return $repoUrl;
@@ -396,6 +396,9 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         $site->forceFill(['meta' => $meta])->save();
     }
 
+    /**
+     * @param  array<string, mixed>  $extra
+     */
     private function writeSetup(Site $site, string $state, array $extra = []): void
     {
         $meta = is_array($site->meta) ? $site->meta : [];

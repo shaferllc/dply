@@ -11,6 +11,8 @@ final class EdgeLocalDevDiagnostics
 {
     /**
      * @return list<array{name: string, ok: bool, detail: string}>
+     *
+     * @phpstan-impure
      */
     public static function checks(): array
     {

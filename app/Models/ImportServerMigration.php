@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class ImportServerMigration extends Model
 {
     use HasUlids;
@@ -55,6 +59,7 @@ class ImportServerMigration extends Model
         'paused_nudge_sent_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -69,33 +74,33 @@ class ImportServerMigration extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 
-    public function targetServer(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function targetServer(): BelongsTo {
         return $this->belongsTo(Server::class, 'target_server_id');
     }
 
-    public function siteMigrations(): HasMany
-    {
+    /** @return HasMany<ImportSiteMigration, $this> */
+    public function siteMigrations(): HasMany {
         return $this->hasMany(ImportSiteMigration::class);
     }
 
-    public function steps(): HasMany
-    {
+    /** @return HasMany<ImportMigrationStep, $this> */
+    public function steps(): HasMany {
         return $this->hasMany(ImportMigrationStep::class)->orderBy('sequence');
     }
 }

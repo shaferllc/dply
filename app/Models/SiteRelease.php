@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SiteRelease extends Model
 {
     use HasUlids;
@@ -17,6 +21,7 @@ class SiteRelease extends Model
         'is_active',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -24,8 +29,8 @@ class SiteRelease extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 }

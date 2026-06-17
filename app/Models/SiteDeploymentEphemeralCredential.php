@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
+/**
+ * @property string $id
+ */
+
 class SiteDeploymentEphemeralCredential extends Model
 {
     use HasUlids;
@@ -22,6 +26,7 @@ class SiteDeploymentEphemeralCredential extends Model
         'revoked_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -30,28 +35,28 @@ class SiteDeploymentEphemeralCredential extends Model
         ];
     }
 
-    public function siteDeployment(): BelongsTo
-    {
+    /** @return BelongsTo<SiteDeployment, $this> */
+    public function siteDeployment(): BelongsTo {
         return $this->belongsTo(SiteDeployment::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function serverAuthorizedKey(): BelongsTo
-    {
+    /** @return BelongsTo<ServerAuthorizedKey, $this> */
+    public function serverAuthorizedKey(): BelongsTo {
         return $this->belongsTo(ServerAuthorizedKey::class);
     }
 
-    public function authorizedKey(): MorphOne
-    {
+    /** @return MorphOne<ServerAuthorizedKey, $this> */
+    public function authorizedKey(): MorphOne {
         return $this->morphOne(ServerAuthorizedKey::class, 'managedKey', 'managed_key_type', 'managed_key_id');
     }
 

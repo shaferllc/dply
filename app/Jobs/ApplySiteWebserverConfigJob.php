@@ -54,7 +54,7 @@ class ApplySiteWebserverConfigJob implements ShouldBeUniqueUntilProcessing, Shou
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -69,7 +69,7 @@ class ApplySiteWebserverConfigJob implements ShouldBeUniqueUntilProcessing, Shou
 
     public function handle(SiteWebserverConfigApplier $applier): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

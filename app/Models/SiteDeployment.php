@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
+ * @property string $id
  * @property string $status
  * @property ?Carbon $started_at
  * @property ?Carbon $finished_at
@@ -69,6 +70,7 @@ class SiteDeployment extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -276,8 +278,8 @@ class SiteDeployment extends Model
         return $this->resumeStartPhase() !== null;
     }
 
-    public function resumeOf(): BelongsTo
-    {
+    /** @return BelongsTo<self, $this> */
+    public function resumeOf(): BelongsTo {
         return $this->belongsTo(self::class, 'resume_of_deployment_id');
     }
 
@@ -326,18 +328,18 @@ class SiteDeployment extends Model
         return ($step['ok'] ?? false) === true ? '✓' : '✗';
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function project(): BelongsTo
-    {
+    /** @return BelongsTo<Project, $this> */
+    public function project(): BelongsTo {
         return $this->belongsTo(Project::class);
     }
 
-    public function ephemeralCredential(): HasOne
-    {
+    /** @return HasOne<SiteDeploymentEphemeralCredential, $this> */
+    public function ephemeralCredential(): HasOne {
         return $this->hasOne(SiteDeploymentEphemeralCredential::class);
     }
 }

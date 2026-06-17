@@ -43,7 +43,7 @@ class CloudEnvCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;
@@ -91,7 +91,6 @@ class CloudEnvCommand extends Command
     {
         $file = $this->option('file');
         $sets = $this->option('set');
-        $sets = is_array($sets) ? $sets : [];
 
         if (is_string($file) && $file !== '' && $sets !== []) {
             $this->error('Pass either --file or --set, not both.');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Server;
 use App\Models\ServerLogAggregator;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\VectorLogAggregatorInstallScripts;
@@ -51,8 +52,13 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
     ): void {
         /** @var ServerLogAggregator|null $aggregator */
         $aggregator = ServerLogAggregator::query()->with('server')->find($this->serverLogAggregatorId);
-        if ($aggregator === null || $aggregator->server === null || ! $aggregator->server->isVmHost()) {
-            $aggregator?->update([
+        if ($aggregator === null) {
+            return;
+        }
+
+        $server = $aggregator->server;
+        if (! $server instanceof Server || ! $server->isVmHost()) {
+            $aggregator->update([
                 'status' => ServerLogAggregator::STATUS_FAILED,
                 'error_message' => 'Aggregator server is not a reachable VM host.',
             ]);
@@ -135,7 +141,7 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
      */
     protected function resolveEndpoint(ServerLogAggregator $aggregator): string
     {
-        $ip = trim((string) ($aggregator->server?->ip_address ?? ''));
+        $ip = trim((string) $aggregator->server->ip_address);
         $port = $aggregator->listen_port > 0 ? $aggregator->listen_port : 6000;
 
         return $ip !== '' ? "{$ip}:{$port}" : '';

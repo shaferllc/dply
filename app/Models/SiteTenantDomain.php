@@ -7,8 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SiteTenantDomain extends Model
 {
+    /** @use HasFactory<SiteTenantDomainFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -21,6 +26,7 @@ class SiteTenantDomain extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -28,8 +34,8 @@ class SiteTenantDomain extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

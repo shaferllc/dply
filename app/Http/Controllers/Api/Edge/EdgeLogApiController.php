@@ -44,7 +44,7 @@ class EdgeLogApiController extends EdgeApiController
 
         return response()->json([
             'data' => $rows->map(fn (EdgeAccessLog $row) => [
-                'occurred_at' => $row->occurred_at?->toIso8601String(),
+                'occurred_at' => $row->occurred_at->toIso8601String(),
                 'deployment_id' => $row->edge_deployment_id,
                 'hostname' => $row->hostname,
                 'method' => $row->method,

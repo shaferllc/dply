@@ -22,10 +22,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ */
+
 class Site extends Model
 {
     use DerivesWorkerEnvironment;
     use GuardsSiteAccess;
+    /** @use HasFactory<SiteFactory> */
     use HasFactory, HasUlids;
     use HasSiteRelationships;
     use ManagesEdgeHosting;
@@ -188,6 +193,7 @@ class Site extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

@@ -19,7 +19,7 @@ class SyncServerAuthorizedKeysJob implements ShouldQueue
 
     public function handle(ServerAuthorizedKeysSynchronizer $synchronizer): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server || ! $server->isReady() || empty($server->ssh_private_key)) {
             return;
         }

@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class FirewallRuleTemplate extends Model
 {
     use HasUlids;
@@ -18,6 +22,7 @@ class FirewallRuleTemplate extends Model
         'rules',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -25,13 +30,13 @@ class FirewallRuleTemplate extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 }

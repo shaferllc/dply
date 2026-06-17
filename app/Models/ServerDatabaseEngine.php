@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A database engine (postgres / mysql / mariadb / etc.) installed on a
  * server. Distinct from {@see ServerDatabase}, which represents a named
  * database schema + credentials *on top of* an engine.
@@ -49,6 +50,7 @@ class ServerDatabaseEngine extends Model
         'allowed_from',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -58,8 +60,8 @@ class ServerDatabaseEngine extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

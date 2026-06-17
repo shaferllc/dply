@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class SiteDeployPipeline extends Model
 {
     use HasUlids;
@@ -28,6 +32,7 @@ class SiteDeployPipeline extends Model
     /**
      * @return array<string, string>
      */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -37,18 +42,18 @@ class SiteDeployPipeline extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function steps(): HasMany
-    {
+    /** @return HasMany<SiteDeployStep, $this> */
+    public function steps(): HasMany {
         return $this->hasMany(SiteDeployStep::class, 'pipeline_id')->orderBy('sort_order');
     }
 
-    public function hooks(): HasMany
-    {
+    /** @return HasMany<SiteDeployHook, $this> */
+    public function hooks(): HasMany {
         return $this->hasMany(SiteDeployHook::class, 'pipeline_id')->orderBy('sort_order');
     }
 

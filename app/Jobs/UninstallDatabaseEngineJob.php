@@ -121,7 +121,7 @@ class UninstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
                 $serverForAudit,
                 'engine_removed',
                 [__('Engine: :engine', ['engine' => $engine])],
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 ['engine' => $engine],
             );
 

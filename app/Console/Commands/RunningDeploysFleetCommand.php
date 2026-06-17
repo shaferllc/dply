@@ -106,8 +106,8 @@ class RunningDeploysFleetCommand extends Command
             array_map(fn (array $r) => [
                 $r['site_name'],
                 $r['server_name'] ?? '—',
-                $r['runtime'] ?? '—',
-                $r['trigger'] ?? '—',
+                $r['runtime'],
+                $r['trigger'],
                 $r['age_minutes'] !== null ? $r['age_minutes'].'m' : '—',
                 $r['deployment_id'],
             ], $rows),

@@ -51,9 +51,7 @@ trait BuildsSwitchSiteConfigs
      */
     private function siteConfigPathFor(Site $site, string $target): string
     {
-        $basename = method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        $basename = $site->webserverConfigBasename();
 
         return match ($target) {
             'nginx' => '/etc/nginx/sites-available/'.$basename,
@@ -90,9 +88,7 @@ trait BuildsSwitchSiteConfigs
      */
     private function ensureSiteEnabled(Server $server, SshConnection $ssh, Site $site, string $target): void
     {
-        $basename = method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        $basename = $site->webserverConfigBasename();
         $cmd = match ($target) {
             'nginx' => sprintf(
                 'ln -sf %s %s',
@@ -122,8 +118,6 @@ trait BuildsSwitchSiteConfigs
      * the first time we write — a fresh `apt install openlitespeed` ships a
      * stock config with WebAdmin + Example vhosts that we don't want to keep,
      * but we preserve it for forensic recovery.
-     *
-     * @param  Collection<int, Site>  $sites
      */
     private function ensureCaddyRuntimeOwnership(Server $server, SshConnection $ssh): void
     {

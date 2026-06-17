@@ -61,18 +61,18 @@ use Illuminate\Support\Collection;
  */
 trait HasSiteRelationships
 {
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
     /**
      * The serving points of a multi-backend site (this site behind a balancer on
      * ≥2 app servers). Empty for an ordinary single-server site. See
-     * docs/MULTI_BACKEND_SITES.md.
-     */
-    public function backends(): HasMany
-    {
+     * docs/MULTI_BACKEND_SITES.md. *
+ * @return HasMany<SiteBackend, $this>
+ */
+    public function backends(): HasMany {
         return $this->hasMany(SiteBackend::class);
     }
 
@@ -116,10 +116,10 @@ trait HasSiteRelationships
 
     /**
      * Explicitly-attached worker pools (the operator-defined set). Many-to-many
-     * so a site can be served by several pools and a pool can serve several sites.
-     */
-    public function workerPools(): BelongsToMany
-    {
+     * so a site can be served by several pools and a pool can serve several sites. *
+ * @return BelongsToMany<WorkerPool, $this>
+ */
+    public function workerPools(): BelongsToMany {
         return $this->belongsToMany(WorkerPool::class, 'site_worker_pool')->withTimestamps();
     }
 
@@ -146,48 +146,48 @@ trait HasSiteRelationships
             ->get();
     }
 
-    public function webserverConfigProfile(): HasOne
-    {
+    /** @return HasOne<SiteWebserverConfigProfile, $this> */
+    public function webserverConfigProfile(): HasOne {
         return $this->hasOne(SiteWebserverConfigProfile::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function workspace(): BelongsTo
-    {
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function deployScript(): BelongsTo
-    {
+    /** @return BelongsTo<Script, $this> */
+    public function deployScript(): BelongsTo {
         return $this->belongsTo(Script::class, 'deploy_script_id');
     }
 
-    public function project(): BelongsTo
-    {
+    /** @return BelongsTo<Project, $this> */
+    public function project(): BelongsTo {
         return $this->belongsTo(Project::class);
     }
 
-    public function dnsProviderCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function dnsProviderCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class, 'dns_provider_credential_id');
     }
 
-    public function edgeProviderCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function edgeProviderCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class, 'edge_provider_credential_id');
     }
 
-    public function serverlessProviderCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function serverlessProviderCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class, 'serverless_provider_credential_id');
     }
 
@@ -219,45 +219,45 @@ trait HasSiteRelationships
             ->first();
     }
 
-    public function domains(): HasMany
-    {
+    /** @return HasMany<SiteDomain, $this> */
+    public function domains(): HasMany {
         return $this->hasMany(SiteDomain::class);
     }
 
     /**
      * The OpenWhisk actions on this serverless function-Site. A Site is an
      * OpenWhisk package: one `kind=code` action for a plain function, more
-     * once the package model lands. Code actions sort before sequences.
-     */
-    public function functionActions(): HasMany
-    {
+     * once the package model lands. Code actions sort before sequences. *
+ * @return HasMany<FunctionAction, $this>
+ */
+    public function functionActions(): HasMany {
         return $this->hasMany(FunctionAction::class)
             ->orderByRaw("CASE WHEN kind = 'code' THEN 0 ELSE 1 END")
             ->orderBy('name');
     }
 
-    public function previewDomains(): HasMany
-    {
+    /** @return HasMany<SitePreviewDomain, $this> */
+    public function previewDomains(): HasMany {
         return $this->hasMany(SitePreviewDomain::class)->orderByDesc('is_primary')->orderBy('hostname');
     }
 
-    public function domainAliases(): HasMany
-    {
+    /** @return HasMany<SiteDomainAlias, $this> */
+    public function domainAliases(): HasMany {
         return $this->hasMany(SiteDomainAlias::class)->orderBy('sort_order')->orderBy('hostname');
     }
 
-    public function basicAuthUsers(): HasMany
-    {
+    /** @return HasMany<SiteBasicAuthUser, $this> */
+    public function basicAuthUsers(): HasMany {
         return $this->hasMany(SiteBasicAuthUser::class)->orderBy('sort_order')->orderBy('username');
     }
 
-    public function accessGate(): HasOne
-    {
+    /** @return HasOne<SiteAccessGate, $this> */
+    public function accessGate(): HasOne {
         return $this->hasOne(SiteAccessGate::class);
     }
 
-    public function accessGatePasswords(): HasMany
-    {
+    /** @return HasMany<SiteAccessGatePassword, $this> */
+    public function accessGatePasswords(): HasMany {
         return $this->hasMany(SiteAccessGatePassword::class)->orderBy('sort_order')->orderBy('label');
     }
 
@@ -294,23 +294,23 @@ trait HasSiteRelationships
         )->values();
     }
 
-    public function uptimeMonitors(): HasMany
-    {
+    /** @return HasMany<SiteUptimeMonitor, $this> */
+    public function uptimeMonitors(): HasMany {
         return $this->hasMany(SiteUptimeMonitor::class)->orderBy('sort_order')->orderBy('id');
     }
 
-    public function tenantDomains(): HasMany
-    {
+    /** @return HasMany<SiteTenantDomain, $this> */
+    public function tenantDomains(): HasMany {
         return $this->hasMany(SiteTenantDomain::class)->orderBy('sort_order')->orderBy('hostname');
     }
 
-    public function certificates(): HasMany
-    {
+    /** @return HasMany<SiteCertificate, $this> */
+    public function certificates(): HasMany {
         return $this->hasMany(SiteCertificate::class)->latest('created_at');
     }
 
-    public function deployments(): HasMany
-    {
+    /** @return HasMany<SiteDeployment, $this> */
+    public function deployments(): HasMany {
         return $this->hasMany(SiteDeployment::class)->orderByDesc('id');
     }
 
@@ -334,18 +334,18 @@ trait HasSiteRelationships
         });
     }
 
-    public function webhookDeliveryLogs(): HasMany
-    {
+    /** @return HasMany<WebhookDeliveryLog, $this> */
+    public function webhookDeliveryLogs(): HasMany {
         return $this->hasMany(WebhookDeliveryLog::class)->orderByDesc('id');
     }
 
-    public function releases(): HasMany
-    {
+    /** @return HasMany<SiteRelease, $this> */
+    public function releases(): HasMany {
         return $this->hasMany(SiteRelease::class)->orderByDesc('id');
     }
 
-    public function processes(): HasMany
-    {
+    /** @return HasMany<SiteProcess, $this> */
+    public function processes(): HasMany {
         return $this->hasMany(SiteProcess::class)->orderBy('name');
     }
 
@@ -353,15 +353,15 @@ trait HasSiteRelationships
      * Databases on the site's server that belong to this site (via the
      * server_databases.site_id single-owner link). Server-wide databases
      * with a null site_id are not included — they surface only on the
-     * server-level Databases manager.
-     */
-    public function serverDatabases(): HasMany
-    {
+     * server-level Databases manager. *
+ * @return HasMany<ServerDatabase, $this>
+ */
+    public function serverDatabases(): HasMany {
         return $this->hasMany(ServerDatabase::class)->orderBy('name');
     }
 
-    public function bindings(): HasMany
-    {
+    /** @return HasMany<SiteBinding, $this> */
+    public function bindings(): HasMany {
         return $this->hasMany(SiteBinding::class);
     }
 
@@ -369,20 +369,20 @@ trait HasSiteRelationships
      * Per-key secret residency records — the env vars this site keeps OUT of the
      * loose plaintext-in-DB `.env` blob (escrowed under an org key, or referenced
      * from an external store). The blob carries only placeholders for these keys;
-     * {@see SecretResidencyResolver} resolves them at push.
-     */
-    public function secretResidencies(): HasMany
-    {
+     * {@see SecretResidencyResolver} resolves them at push. *
+ * @return HasMany<SiteSecretResidency, $this>
+ */
+    public function secretResidencies(): HasMany {
         return $this->hasMany(SiteSecretResidency::class);
     }
 
-    public function redirects(): HasMany
-    {
+    /** @return HasMany<SiteRedirect, $this> */
+    public function redirects(): HasMany {
         return $this->hasMany(SiteRedirect::class)->orderBy('sort_order');
     }
 
-    public function deployHooks(): HasMany
-    {
+    /** @return HasMany<SiteDeployHook, $this> */
+    public function deployHooks(): HasMany {
         $relation = $this->hasMany(SiteDeployHook::class)->orderBy('sort_order');
 
         if ($this->active_deploy_pipeline_id) {
@@ -392,26 +392,26 @@ trait HasSiteRelationships
         return $relation;
     }
 
-    public function deployPipelines(): HasMany
-    {
+    /** @return HasMany<SiteDeployPipeline, $this> */
+    public function deployPipelines(): HasMany {
         return $this->hasMany(SiteDeployPipeline::class)->orderBy('sort_order')->orderBy('name');
     }
 
-    public function deploymentSchedules(): HasMany
-    {
+    /** @return HasMany<SiteDeploymentSchedule, $this> */
+    public function deploymentSchedules(): HasMany {
         return $this->hasMany(SiteDeploymentSchedule::class)->orderBy('created_at');
     }
 
-    public function activeDeployPipeline(): BelongsTo
-    {
+    /** @return BelongsTo<SiteDeployPipeline, $this> */
+    public function activeDeployPipeline(): BelongsTo {
         return $this->belongsTo(SiteDeployPipeline::class, 'active_deploy_pipeline_id');
     }
 
     /**
-     * Ordered steps for the pipeline used on deploy (active pipeline).
-     */
-    public function deploySteps(): HasMany
-    {
+     * Ordered steps for the pipeline used on deploy (active pipeline). *
+ * @return HasMany<SiteDeployStep, $this>
+ */
+    public function deploySteps(): HasMany {
         $relation = $this->hasMany(SiteDeployStep::class)->orderBy('sort_order');
 
         if ($this->active_deploy_pipeline_id) {
@@ -421,50 +421,50 @@ trait HasSiteRelationships
         return $relation;
     }
 
-    public function fileBackups(): HasMany
-    {
+    /** @return HasMany<SiteFileBackup, $this> */
+    public function fileBackups(): HasMany {
         return $this->hasMany(SiteFileBackup::class)->orderByDesc('created_at');
     }
 
-    public function edgeDeployments(): HasMany
-    {
+    /** @return HasMany<EdgeDeployment, $this> */
+    public function edgeDeployments(): HasMany {
         return $this->hasMany(EdgeDeployment::class)->orderByDesc('created_at');
     }
 
-    public function edgeSiteAccessRule(): HasOne
-    {
+    /** @return HasOne<EdgeSiteAccessRule, $this> */
+    public function edgeSiteAccessRule(): HasOne {
         return $this->hasOne(EdgeSiteAccessRule::class);
     }
 
-    public function edgeEnvVars(): HasMany
-    {
+    /** @return HasMany<EdgeSiteEnvVar, $this> */
+    public function edgeEnvVars(): HasMany {
         return $this->hasMany(EdgeSiteEnvVar::class)->orderBy('key');
     }
 
-    public function edgeSiteMembers(): HasMany
-    {
+    /** @return HasMany<EdgeSiteMember, $this> */
+    public function edgeSiteMembers(): HasMany {
         return $this->hasMany(EdgeSiteMember::class);
     }
 
-    public function deploySyncGroups(): BelongsToMany
-    {
+    /** @return BelongsToMany<SiteDeploySyncGroup, $this> */
+    public function deploySyncGroups(): BelongsToMany {
         return $this->belongsToMany(SiteDeploySyncGroup::class, 'site_deploy_sync_group_sites', 'site_id', 'site_deploy_sync_group_id')
             ->withPivot('sort_order')
             ->withTimestamps();
     }
 
-    public function notificationSubscriptions(): MorphMany
-    {
+    /** @return MorphMany<NotificationSubscription, $this> */
+    public function notificationSubscriptions(): MorphMany {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
     }
 
-    public function insightSetting(): MorphOne
-    {
+    /** @return MorphOne<InsightSetting, $this> */
+    public function insightSetting(): MorphOne {
         return $this->morphOne(InsightSetting::class, 'settingsable');
     }
 
-    public function insightFindings(): HasMany
-    {
+    /** @return HasMany<InsightFinding, $this> */
+    public function insightFindings(): HasMany {
         return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
     }
 }

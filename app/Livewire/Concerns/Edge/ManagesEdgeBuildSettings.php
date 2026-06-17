@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Forms\EdgeBuildSettingsForm;
 use App\Models\EdgeDeployHook;
 use App\Models\EdgeDeployment;
@@ -28,6 +29,7 @@ use Livewire\Component;
  */
 trait ManagesEdgeBuildSettings
 {
+    use DispatchesToastNotifications;
     /**
      * Form input for minting a new deploy hook (P10b). Cleared after
      * a successful mint; the resulting plaintext URL surfaces via

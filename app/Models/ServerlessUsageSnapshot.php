@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A daily usage roll-up for a dply-managed serverless function. Mirrors
  * {@see EdgeUsageSnapshot}: one row per (site, day, source), summed over the
  * billing month to compute the metered usage charge on top of the flat fee.
@@ -35,6 +36,7 @@ class ServerlessUsageSnapshot extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -46,13 +48,13 @@ class ServerlessUsageSnapshot extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 }

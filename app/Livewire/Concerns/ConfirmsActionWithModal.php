@@ -5,6 +5,7 @@ namespace App\Livewire\Concerns;
 use BadMethodCallException;
 use Livewire\Component;
 use ReflectionMethod;
+use ReflectionNamedType;
 
 /**
  * @phpstan-require-extends Component
@@ -103,7 +104,7 @@ trait ConfirmsActionWithModal
             }
 
             $type = $parameter->getType();
-            if ($type !== null && ! $type->isBuiltin()) {
+            if ($type instanceof ReflectionNamedType && ! $type->isBuiltin()) {
                 $resolved[] = app()->make($type->getName());
 
                 continue;

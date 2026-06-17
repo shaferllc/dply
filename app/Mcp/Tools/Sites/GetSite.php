@@ -19,7 +19,7 @@ class GetSite extends AbstractDplyTool
     protected string $ability = 'sites.read';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {
@@ -53,7 +53,7 @@ class GetSite extends AbstractDplyTool
                 'document_root' => $site->document_root,
                 'git_repository_url' => $site->git_repository_url,
                 'git_branch' => $site->git_branch,
-                'ssl_status' => $site->ssl,
+                'ssl_status' => $site->ssl_status,
                 'last_deploy_at' => $site->last_deploy_at?->toIso8601String(),
                 'created_at' => $site->created_at?->toIso8601String(),
             ],

@@ -37,14 +37,11 @@ class EdgeEnvController extends Controller
         }
 
         $payload = $request->json()->all();
-        if (! is_array($payload)) {
-            return response()->json(['message' => 'Body must be a JSON object of KEY → value pairs.'], 422);
-        }
 
         $errors = [];
         $normalized = [];
         foreach ($payload as $key => $value) {
-            $strKey = is_string($key) ? $key : (string) $key;
+            $strKey = (string) $key;
             $reason = EdgeSiteEnvVar::rejectionReason($strKey);
             if ($reason !== null) {
                 $errors[$strKey] = $reason;
@@ -128,7 +125,7 @@ class EdgeEnvController extends Controller
         }
 
         $body = $request->json()->all();
-        $value = is_array($body) ? ($body['value'] ?? null) : null;
+        $value = $body['value'] ?? null;
         if (! is_scalar($value) && $value !== null) {
             return response()->json(['message' => 'Body must include a string `value`.'], 422);
         }

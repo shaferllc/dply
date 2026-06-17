@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerDatabaseCredentialShare extends Model
 {
     use HasUlids;
@@ -21,6 +25,7 @@ class ServerDatabaseCredentialShare extends Model
         'max_views',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -28,13 +33,13 @@ class ServerDatabaseCredentialShare extends Model
         ];
     }
 
-    public function serverDatabase(): BelongsTo
-    {
+    /** @return BelongsTo<ServerDatabase, $this> */
+    public function serverDatabase(): BelongsTo {
         return $this->belongsTo(ServerDatabase::class, 'server_database_id');
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

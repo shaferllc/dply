@@ -68,13 +68,13 @@ class EnableSiteQuickDeployCommand extends Command
         $this->line("Registering {$provider} webhook for <fg=white;options=bold>{$site->name}</> using identity <fg=gray>{$account->id()}</> ({$account->kind()})…");
 
         $result = $provisioner->enable($site->fresh(), $account);
-        if (! ($result['ok'] ?? false)) {
-            $this->error((string) ($result['message'] ?? 'Could not enable quick deploy.'));
+        if (! $result['ok']) {
+            $this->error($result['message']);
 
             return self::FAILURE;
         }
 
-        $this->info((string) ($result['message'] ?? 'Quick deploy enabled.'));
+        $this->info($result['message']);
         $this->line('  Deploy hook: <fg=gray>'.$site->deployHookUrl().'</>');
 
         return self::SUCCESS;

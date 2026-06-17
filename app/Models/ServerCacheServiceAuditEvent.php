@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Audit trail for the Caches workspace. One row per significant operator
  * action — install / uninstall / restart / stop / start / flush. Rendered
  * as a list on the workspace's Advanced tab.
@@ -93,6 +94,7 @@ class ServerCacheServiceAuditEvent extends Model
         'ip_address',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -100,13 +102,13 @@ class ServerCacheServiceAuditEvent extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One execution of a CloudDeployTask. For pre/post/failed triggers the
  * run row is created by the deploy-sync pass that scrapes DO's per-job
  * status after each rollout; for MANUAL the row is created inline when
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CloudDeployTaskRun extends Model
 {
+    /** @use HasFactory<CloudDeployTaskRunFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_RUNNING = 'running';
@@ -44,6 +46,7 @@ class CloudDeployTaskRun extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -55,8 +58,8 @@ class CloudDeployTaskRun extends Model
         ];
     }
 
-    public function task(): BelongsTo
-    {
+    /** @return BelongsTo<CloudDeployTask, $this> */
+    public function task(): BelongsTo {
         return $this->belongsTo(CloudDeployTask::class, 'cloud_deploy_task_id');
     }
 

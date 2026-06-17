@@ -117,7 +117,7 @@ trait ManagesNotificationChannels
     }
 
     #[Computed]
-    public function channels()
+    public function channels(): Collection
     {
         $q = $this->owner()->notificationChannels()->withCount('subscriptions')->orderBy('label');
         $s = trim($this->search);
@@ -152,6 +152,7 @@ trait ManagesNotificationChannels
             'label' => $this->new_label,
             'config' => $config,
         ]);
+        assert($channel instanceof NotificationChannel);
 
         $this->recordChannelAudit('notification_channel.created', $channel, null, [
             'channel_id' => (string) $channel->id,
@@ -202,6 +203,7 @@ trait ManagesNotificationChannels
     public function startEdit(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
+        assert($channel instanceof NotificationChannel);
         Gate::authorize('update', $channel);
         $this->editing_id = $channel->id;
         $this->edit_type = $channel->type;
@@ -262,6 +264,7 @@ trait ManagesNotificationChannels
     public function saveEdit(): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($this->editing_id);
+        assert($channel instanceof NotificationChannel);
         Gate::authorize('update', $channel);
         $this->resetErrorBag();
 
@@ -298,6 +301,7 @@ trait ManagesNotificationChannels
     public function deleteChannel(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
+        assert($channel instanceof NotificationChannel);
         Gate::authorize('delete', $channel);
         $snapshot = [
             'channel_id' => (string) $channel->id,
@@ -313,6 +317,7 @@ trait ManagesNotificationChannels
     public function sendTest(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
+        assert($channel instanceof NotificationChannel);
         Gate::authorize('update', $channel);
         $this->testing_id = (string) $id;
         $result = $channel->sendTest(Auth::user());
@@ -339,16 +344,19 @@ trait ManagesNotificationChannels
      * route to that org; user-owned (personal) channels route to the user's
      * current org so the action surfaces alongside their other audit events.
      */
-    protected function recordChannelAudit(string $action, ?Model $subject, ?array $oldValues, ?array $newValues): void
+    /**
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
+     */
+    protected function recordChannelAudit(string $action, ?NotificationChannel $subject, ?array $oldValues, ?array $newValues): void
     {
         $owner = $this->owner();
         $org = match (true) {
             $owner instanceof Organization => $owner,
             $owner instanceof Team => $owner->organization,
-            $owner instanceof User => Auth::user()?->currentOrganization(),
-            default => null,
+            default => Auth::user()?->currentOrganization(),
         };
-        if ($org === null) {
+        if (! $org instanceof Organization) {
             return;
         }
         audit_log($org, Auth::user(), $action, $subject, $oldValues, $newValues);
@@ -430,6 +438,9 @@ trait ManagesNotificationChannels
         };
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function configFromInput(string $type, string $prefix): array
     {
         return match ($type) {

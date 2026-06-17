@@ -29,8 +29,8 @@ trait DerivesWorkerEnvironment
         'REDIS_QUEUE',
     ];
 
-    public function parentSite(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function parentSite(): BelongsTo {
         return $this->belongsTo(Site::class, 'parent_site_id');
     }
 

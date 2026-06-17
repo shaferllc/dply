@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * no per-component metadata. Falls back to deriving the tab key from the
  * route name (servers.settings -> "settings") for routes absent from the nav.
  *
- * @property Server $server Set in mount() by InteractsWithServerWorkspace.
+ * @property Server|null $server Set in mount() by InteractsWithServerWorkspace.
  */
 trait RendersWorkspacePlaceholder
 {
@@ -26,7 +26,7 @@ trait RendersWorkspacePlaceholder
         // mount() runs before the placeholder, but guard anyway: a component
         // whose mount() redirected (e.g. non-VM host) never reaches here, and
         // one that hasn't set $server shouldn't fatal the skeleton.
-        if (! isset($this->server)) {
+        if ($this->server === null) {
             return view('livewire.servers.partials.workspace-placeholder-empty');
         }
 

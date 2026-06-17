@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Services\Serverless\ServerlessRoutingResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -56,7 +57,7 @@ class ServerlessFunctionProxyController extends Controller
             return $redirect;
         }
 
-        if (($routing['cors']['enabled'] ?? false) && $request->isMethod('OPTIONS')) {
+        if ($routing['cors']['enabled'] && $request->isMethod('OPTIONS')) {
             $preflight = $this->corsPreflight($request, $routing['cors']);
             if ($preflight !== null) {
                 return $preflight;
@@ -90,8 +91,8 @@ class ServerlessFunctionProxyController extends Controller
         $path = '/'.ltrim($path, '/');
 
         foreach ($redirects as $rule) {
-            $from = '/'.ltrim((string) ($rule['from'] ?? ''), '/');
-            $kind = (string) ($rule['kind'] ?? 'exact');
+            $from = '/'.ltrim($rule['from'], '/');
+            $kind = $rule['kind'];
             $matched = match ($kind) {
                 'prefix' => $from !== '/' && str_starts_with($path, $from),
                 default => $path === $from,
@@ -143,7 +144,7 @@ class ServerlessFunctionProxyController extends Controller
      * them. Catches network failures and surfaces a 502 — the caller would
      * otherwise see an opaque 500.
      */
-    private function forward(Request $request, string $actionUrl, string $path)
+    private function forward(Request $request, string $actionUrl, string $path): HttpClientResponse
     {
         $target = rtrim($actionUrl, '/');
         if ($path !== '') {
@@ -179,9 +180,14 @@ class ServerlessFunctionProxyController extends Controller
      * layering the operator-configured static headers (skipping reserved
      * names), and tacking on CORS headers when the request had an Origin.
      *
-     * @param  array{redirects: array, headers: list<array{name: string, value: string}>, cors: array, custom_domains: array}  $routing
+     * @param  array{
+     *   redirects: list<array{from: string, to: string, status: int, kind: string}>,
+     *   headers: list<array{name: string, value: string}>,
+     *   cors: array{enabled: bool, origins: list<string>, methods: list<string>, headers: list<string>, allow_credentials: bool, max_age: int},
+     *   custom_domains: list<array{hostname: string, mode: string, dns_status: string, cname_target: string, verified_at: ?string, error: ?string}>
+     * }  $routing
      */
-    private function decorate(Request $request, $upstream, array $routing): Response
+    private function decorate(Request $request, HttpClientResponse $upstream, array $routing): Response
     {
         $passHeaders = [];
         foreach (['Content-Type', 'Cache-Control', 'Location'] as $header) {
@@ -192,21 +198,21 @@ class ServerlessFunctionProxyController extends Controller
         }
 
         foreach ($routing['headers'] as $entry) {
-            $name = (string) ($entry['name'] ?? '');
+            $name = $entry['name'];
             if ($name === '' || in_array(strtolower($name), ['content-type', 'cache-control', 'location'], true)) {
                 continue;
             }
-            $passHeaders[$name] = (string) ($entry['value'] ?? '');
+            $passHeaders[$name] = $entry['value'];
         }
 
-        if (($routing['cors']['enabled'] ?? false)) {
+        if ($routing['cors']['enabled']) {
             $origin = (string) $request->header('Origin', '');
             if ($origin !== '') {
-                $allowed = $this->resolveAllowedOrigin($origin, $routing['cors']['origins'] ?? []);
+                $allowed = $this->resolveAllowedOrigin($origin, $routing['cors']['origins']);
                 if ($allowed !== null) {
                     $passHeaders['Access-Control-Allow-Origin'] = $allowed;
                     $passHeaders['Vary'] = 'Origin';
-                    if ($routing['cors']['allow_credentials'] ?? false) {
+                    if ($routing['cors']['allow_credentials']) {
                         $passHeaders['Access-Control-Allow-Credentials'] = 'true';
                     }
                 }

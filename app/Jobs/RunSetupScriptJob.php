@@ -158,7 +158,7 @@ class RunSetupScriptJob implements ShouldQueue
             );
         }
 
-        $body = $this->provisionScriptPreamble($taskModel->id, $run).$body;
+        $body = $this->provisionScriptPreamble((string) $taskModel->id, $run).$body;
         $taskModel->update(['script_content' => $body]);
 
         $task = AnonymousTask::script('Server stack provision', $body, ['timeout' => $timeout]);
@@ -191,18 +191,17 @@ class RunSetupScriptJob implements ShouldQueue
 
             $output = $dispatcher->runInBackgroundWithModel($tracked, $taskModel);
 
-            if ($output === null || ! $output->isSuccessful()) {
+            if (! $output->isSuccessful()) {
                 ProvisionPipelineLog::warning('server.provision.run_setup.background_start_failed', $server, [
                     'phase' => 'task_runner',
                     'task_runner_task_id' => $taskModel->id,
                     'provision_run_id' => $run->id,
-                    'output_null' => $output === null,
-                    'successful' => $output?->isSuccessful(),
+                    'successful' => $output->isSuccessful(),
                 ]);
                 $taskModel->update([
                     'status' => TaskStatus::Failed,
                     'completed_at' => now(),
-                    'output' => $output !== null ? $output->getBuffer() : 'Background start returned no output.',
+                    'output' => $output->getBuffer(),
                 ]);
                 static::applyProvisionOutcomeToServer($server, false);
             } else {

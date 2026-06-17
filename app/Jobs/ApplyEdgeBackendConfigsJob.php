@@ -48,7 +48,7 @@ class ApplyEdgeBackendConfigsJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -63,7 +63,7 @@ class ApplyEdgeBackendConfigsJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(SiteEdgeBackendProvisioner $provisioner): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

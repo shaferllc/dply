@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Audit trail for engine-level operations in the Databases workspace.
  * Mirrors {@see ServerCacheServiceAuditEvent} — install / uninstall flows
  * record successes and failures; the workspace's Advanced tab renders the
@@ -42,6 +43,7 @@ class ServerDatabaseEngineAuditEvent extends Model
         'ip_address',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -49,13 +51,13 @@ class ServerDatabaseEngineAuditEvent extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

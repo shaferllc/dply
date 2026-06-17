@@ -33,7 +33,7 @@ class RunServerInsightsJob implements ShouldQueue
 
     public function handle(InsightRunCoordinator $coordinator, InsightHealthScoreService $healthScore): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null || ! $server->isReady()) {
             return;
         }

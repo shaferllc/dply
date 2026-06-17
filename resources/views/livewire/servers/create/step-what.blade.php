@@ -108,36 +108,14 @@
                 <div class="space-y-5 p-6 sm:p-7">
                     @if ($canCreateNew)
                         {{-- Source toggle: use existing vs create new. --}}
-                        <div role="tablist" class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-1 text-sm">
-                            <button
-                                type="button"
-                                wire:click="$set('form.do_kubernetes_source', 'existing')"
-                                @class([
-                                    'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 font-semibold transition',
-                                    'bg-white text-brand-ink shadow-sm' => ! $isCreatingNew,
-                                    'text-brand-moss hover:text-brand-ink' => $isCreatingNew,
-                                ])
-                                role="tab"
-                                aria-selected="{{ $isCreatingNew ? 'false' : 'true' }}"
-                            >
-                                <x-heroicon-m-link class="h-4 w-4" />
+                        <x-server-workspace-tablist :aria-label="__('Cluster source')" class="!mb-0">
+                            <x-server-workspace-tab icon="heroicon-o-link" :active="! $isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'existing')">
                                 {{ __('Use existing cluster') }}
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="$set('form.do_kubernetes_source', 'new')"
-                                @class([
-                                    'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 font-semibold transition',
-                                    'bg-white text-brand-ink shadow-sm' => $isCreatingNew,
-                                    'text-brand-moss hover:text-brand-ink' => ! $isCreatingNew,
-                                ])
-                                role="tab"
-                                aria-selected="{{ $isCreatingNew ? 'true' : 'false' }}"
-                            >
-                                <x-heroicon-m-plus class="h-4 w-4" />
+                            </x-server-workspace-tab>
+                            <x-server-workspace-tab icon="heroicon-o-plus" :active="$isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'new')">
                                 {{ __('Create new') }}
-                            </button>
-                        </div>
+                            </x-server-workspace-tab>
+                        </x-server-workspace-tablist>
                     @endif
 
                     @if ($isCreatingNew)

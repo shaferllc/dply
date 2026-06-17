@@ -57,7 +57,7 @@ class VerifySiteOctaneJob implements ShouldBeUnique, ShouldQueue
         }
 
         $dir = rtrim($site->effectiveEnvDirectory(), '/');
-        $port = $site->octane_port !== null ? (int) $site->octane_port : null;
+        $port = filled($site->octane_port) ? (int) $site->octane_port : null;
 
         try {
             $output = $exec->runInlineBash(
@@ -67,7 +67,7 @@ class VerifySiteOctaneJob implements ShouldBeUnique, ShouldQueue
                 45,
             );
 
-            $verdict = OctaneRuntimeVerifier::interpret($output->buffer ?? '');
+            $verdict = OctaneRuntimeVerifier::interpret($output->buffer);
             OctaneRuntimeVerifier::persist($site, $verdict);
         } catch (\Throwable $e) {
             // Leave the previous verdict untouched — a transient SSH failure

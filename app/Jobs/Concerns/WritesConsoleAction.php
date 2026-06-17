@@ -123,7 +123,9 @@ trait WritesConsoleAction
                 ->orderByDesc('created_at')
                 ->first();
 
-            $this->consoleRunId = $existing?->id ?? $this->seedQueuedConsoleAction();
+            $this->consoleRunId = $existing !== null
+                ? (string) $existing->id
+                : $this->seedQueuedConsoleAction();
         }
 
         DB::table('console_actions')->where('id', $this->consoleRunId)

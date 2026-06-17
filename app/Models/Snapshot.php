@@ -36,6 +36,7 @@ use Illuminate\Support\Carbon;
  */
 class Snapshot extends Model
 {
+    /** @use HasFactory<SnapshotFactory> */
     use HasFactory;
 
     protected $table = 'snapshots';
@@ -76,6 +77,7 @@ class Snapshot extends Model
 
     public const REASON_SCHEDULED = 'scheduled';
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -84,13 +86,13 @@ class Snapshot extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function takenByUser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function takenByUser(): BelongsTo {
         return $this->belongsTo(User::class, 'taken_by_user_id');
     }
 

@@ -97,7 +97,7 @@ class FeatureSetCommand extends Command
     }
 
     /**
-     * Returns a map of "namespace.leaf" => default, mirroring config/features.php.
+     * @return array<string, mixed>
      */
     private function definedFlags(): array
     {

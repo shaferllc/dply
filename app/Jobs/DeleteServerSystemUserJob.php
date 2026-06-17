@@ -45,7 +45,7 @@ class DeleteServerSystemUserJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -62,7 +62,7 @@ class DeleteServerSystemUserJob implements ShouldBeUnique, ShouldQueue
         ServerSystemUserService $service,
         ServerSystemUserNotificationDispatcher $notifications,
     ): void {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             return;
         }
@@ -80,7 +80,7 @@ class DeleteServerSystemUserJob implements ShouldBeUnique, ShouldQueue
                 $server,
                 'removed',
                 [$this->username],
-                $this->userId ? User::query()->find($this->userId) : null,
+                $this->userId ? User::find($this->userId) : null,
             );
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'system_user');

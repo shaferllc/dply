@@ -14,13 +14,13 @@ class InsightDigestQueue extends Model
         'organization_id',
     ];
 
-    public function finding(): BelongsTo
-    {
+    /** @return BelongsTo<InsightFinding, $this> */
+    public function finding(): BelongsTo {
         return $this->belongsTo(InsightFinding::class, 'insight_finding_id');
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 }

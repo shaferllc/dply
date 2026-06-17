@@ -16,7 +16,7 @@ trait InteractsWithServerWorkspace
 {
     use DispatchesToastNotifications;
 
-    public Server $server;
+    public ?Server $server = null;
 
     protected function bootWorkspace(Server $server): void
     {
@@ -52,6 +52,9 @@ trait InteractsWithServerWorkspace
     protected function kickClusterPollIfStale(int $staleAfterSeconds = 30): void
     {
         $server = $this->server;
+        if ($server === null) {
+            return;
+        }
         if (($server->meta['host_kind'] ?? null) !== Server::HOST_KIND_KUBERNETES) {
             return;
         }
@@ -107,9 +110,16 @@ trait InteractsWithServerWorkspace
             && filled($s->ssh_private_key);
     }
 
+    /**
+     * @param  array<string, mixed>|null  $server
+     */
     #[On('server-state-updated')]
     public function onServerStateUpdated(string $organizationId, string $action, ?string $serverId = null, ?array $server = null): void
     {
+        if ($this->server === null) {
+            return;
+        }
+
         if ($this->server->organization_id !== $organizationId) {
             return;
         }
@@ -127,6 +137,10 @@ trait InteractsWithServerWorkspace
 
     public function cancelScheduledServerRemoval(): void
     {
+        if ($this->server === null) {
+            return;
+        }
+
         $this->authorize('delete', $this->server);
         $server = $this->server->fresh();
         if ($server->scheduled_deletion_at === null) {
@@ -155,7 +169,7 @@ trait InteractsWithServerWorkspace
      */
     protected function workspacesForCurrentServerOrg(): Collection
     {
-        if (! $this->server->organization_id) {
+        if ($this->server === null || ! $this->server->organization_id) {
             return collect();
         }
 

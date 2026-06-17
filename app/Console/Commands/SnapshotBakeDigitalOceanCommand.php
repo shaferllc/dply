@@ -8,6 +8,7 @@ use App\Services\DigitalOceanService;
 use App\Support\Servers\SnapshotBakeScript;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Crypt\RSA;
 use phpseclib3\Net\SSH2;
@@ -193,7 +194,7 @@ class SnapshotBakeDigitalOceanCommand extends Command
 
     private function resolveToken(): ?string
     {
-        foreach ([$this->option('token'), env('DPLY_SNAPSHOT_DO_TOKEN'), env('DIGITALOCEAN_TOKEN')] as $candidate) {
+        foreach ([$this->option('token'), config('dply.snapshot_do_token'), config('dply.digitalocean_token')] as $candidate) {
             if (is_string($candidate) && trim($candidate) !== '') {
                 return trim($candidate);
             }
@@ -270,6 +271,9 @@ class SnapshotBakeDigitalOceanCommand extends Command
     {
         $deadline = time() + max(30, $timeoutSeconds);
         $key = PublicKeyLoader::load($privateKey);
+        if (! $key instanceof PrivateKey) {
+            throw new \RuntimeException('SSH private key could not be loaded as a private key.');
+        }
         $attempt = 0;
 
         while (time() < $deadline) {
@@ -299,6 +303,9 @@ class SnapshotBakeDigitalOceanCommand extends Command
         $this->info('Uploading and running bake script…');
 
         $key = PublicKeyLoader::load($privateKey);
+        if (! $key instanceof PrivateKey) {
+            throw new \RuntimeException('SSH private key could not be loaded as a private key.');
+        }
         $ssh = new SSH2($ip, 22, 15);
         if (! $ssh->login('root', $key)) {
             throw new \RuntimeException('SSH login failed during bake.');

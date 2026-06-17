@@ -34,7 +34,7 @@ class ApplyInsightFixJob implements ShouldQueue
     public function handle(InsightRunCoordinator $coordinator): void
     {
         $finding = InsightFinding::query()->with(['server', 'site'])->find($this->insightFindingId);
-        $user = User::query()->find($this->userId);
+        $user = User::find($this->userId);
         if ($finding === null || $user === null || ! $finding->isOpen()) {
             return;
         }
@@ -77,7 +77,7 @@ class ApplyInsightFixJob implements ShouldQueue
 
         if ((bool) ($fix['mutates_config'] ?? false)) {
             $org = $server->organization;
-            $prefs = is_array($org?->insights_preferences ?? null) ? $org->insights_preferences : [];
+            $prefs = is_array($org->insights_preferences ?? null) ? $org->insights_preferences : [];
             $allow = array_key_exists('allow_config_mutation', $prefs)
                 ? (bool) $prefs['allow_config_mutation']
                 : true;
@@ -245,8 +245,8 @@ class ApplyInsightFixJob implements ShouldQueue
     private function auditLog(InsightFinding $finding, User $user, string $action, array $extra = []): void
     {
         $server = $finding->server;
-        $org = $server?->organization;
-        if ($org === null || $server === null) {
+        $org = $server->organization;
+        if ($org === null) {
             return;
         }
         audit_log($org, $user, $action, $server, null, array_merge([
