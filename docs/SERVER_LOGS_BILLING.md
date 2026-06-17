@@ -38,27 +38,48 @@ below is just a free feature.
 
 Ship these three together; none is useful alone.
 
-### 1.1 Per-org ingest metering
-- **Source of truth:** a daily rollup `SELECT org_id, toDate(ingested_at) d,
-  count() events, sum(length(message)) bytes FROM dply_logs.server_logs GROUP BY org_id, d`,
-  written to a new Postgres table `server_log_usage_daily (org_id, day, events, bytes,
-  created_at)`. Idempotent upsert so re-runs are safe.
-- **Job:** `AggregateServerLogUsageCommand` (`dply:logs:meter`) scheduled hourly for the
-  current day + a nightly finalize for the prior day. Cursor by `day` like the roadmap-AI
-  `to_commit` pattern.
+### 1.1 Per-org ingest metering — **BUILT (PR A)**
+- **Source of truth:** a daily rollup `SELECT org_id, count() events,
+  sum(length(message)) bytes FROM dply_logs.server_logs WHERE ingested_at IN [day]
+  GROUP BY org_id`, written to the Postgres table `server_log_usage_daily
+  (organization_id, day, events, bytes, source, meta)`. Idempotent upsert keyed on
+  `(organization_id, day, source)` so re-runs are safe.
+  - *As built:* the column is `organization_id` (FK to `organizations`, cascade-delete)
+    to match the `*_usage_snapshots` convention and the billing scanner; ClickHouse's
+    `org_id` is mapped onto it. A `source` column (`clickhouse`/`manual`) leaves room for
+    adjustment rows. Org_ids present in ClickHouse but absent from Postgres are skipped
+    (logged) rather than violating the FK. Metered by `ingested_at` (the billable
+    "accepted at the aggregator" moment), not the log's own `timestamp`.
+- **Job:** `MeterServerLogUsageCommand` (`dply:logs:meter`), service
+  `App\Services\Logs\ServerLogUsageMeter`. Scheduled hourly for the current day +
+  a nightly `--yesterday` finalize at 02:05 (before the 02:10 billing snapshot).
+  No cursor table needed — the day-keyed idempotent upsert is the cursor; `--date` +
+  `--days=N` backfill any window. Skips quietly (`ping()`) where ClickHouse isn't wired.
 - **Why ClickHouse-side, not Vector-side:** survives aggregator restarts, no double-count,
   and ClickHouse aggregates this in milliseconds. (Vector internal metrics can feed a live
   gauge later for the dashboard, but the billable number comes from the store.)
 - **Edge case:** redaction/drops happen before insert, so we meter exactly what we stored —
   defensible to the customer.
 
-### 1.2 Per-org entitlement + plan attributes
-- New plan attributes (on the org's plan / a `server_logs` Pennant value):
-  `retention_days`, `monthly_included_gb`, `overage_per_gb`, `max_servers`,
-  `alerting_enabled`, `drains_enabled`.
-- **Gate the enable action:** `ManageServerLogShipping::assertAddonAvailable()` becomes
-  per-org (plan has logs) instead of the global config flag. Free plan = the MVP defaults.
-- **Retention becomes per-org**, see §3.1.
+### 1.2 Per-org entitlement + plan attributes — **BUILT (PR B1); store-side enforcement = PR B2**
+- New plan attributes live in `config('server_logs.entitlements')`: a `defaults` block
+  (the free MVP) overlaid with per-plan overrides keyed by subscription-plan key
+  (`free`/`starter`/`pro`/`business`): `available`, `retention_days`,
+  `monthly_included_gb`, `overage_per_gb_cents`, `max_servers`, `alerting_enabled`,
+  `drains_enabled`. Resolved by `App\Services\Logs\ServerLogEntitlements::forOrganization()`
+  → readonly `ServerLogEntitlement` value object (with `includedBytes()` / `isOverIncluded()`).
+  Config-driven (like the realtime tiers), not a Pennant value — simpler, and the gate +
+  billing + UI all read one place. Volume/retention numbers are uncalibrated placeholders;
+  `overage_per_gb_cents` stays 0 until PR C.
+- **Gate the enable action:** ✅ `ManageServerLogShipping::assertAddonAvailable(Server)` is
+  now per-org — the env kill-switch (`server_logs.enabled`) first, then the org's
+  entitlement `available`. `status()` now also returns the resolved `entitlement` + an
+  org-wide month-to-date `usage` block (bytes vs included), reading PR A's
+  `server_log_usage_daily`. Free defaults unchanged → no behaviour change for current users.
+- **Retention becomes per-org:** the *value* resolves now (`entitlement->retentionDays`);
+  **enforcement at the store (ClickHouse `retention_days` column + `MODIFY TTL` + stamping
+  the per-org value at the aggregator) is PR B2** — see §3.1. Deferred because it mutates
+  the live store DDL + aggregator install scripts and only bites once paid tiers differ.
 
 ### 1.3 Billing line item + quota enforcement
 - **Meter → Stripe:** push `server_log_usage_daily` into a Stripe usage record (or the
@@ -136,10 +157,17 @@ reads (Vector `enrichment_tables`/file source), refreshed by the meter job. Keep
 
 ## Build order (smallest shippable slices)
 
-1. **PR A — metering:** `server_log_usage_daily` table + `dply:logs:meter` rollup +
-   schedule. Read-only; no customer impact. Lets us *see* volume before pricing anything.
-2. **PR B — entitlement:** plan attributes + per-org `assertAddonAvailable()` gate +
-   `retention_days` column/TTL + stamp at aggregator. Free defaults unchanged.
+1. **PR A — metering:** ✅ **DONE.** `server_log_usage_daily` table + `dply:logs:meter`
+   rollup (`ServerLogUsageMeter`) + hourly/nightly schedule + tests. Read-only; no
+   customer impact. Lets us *see* volume before pricing anything.
+2. **PR B — entitlement:**
+   - **B1 ✅ DONE.** `config('server_logs.entitlements')` + `ServerLogEntitlements`
+     resolver + `ServerLogEntitlement` value object + per-org `assertAddonAvailable(Server)`
+     gate + entitlement/usage in `status()` + tests. Free defaults unchanged.
+   - **B2 (next, infra):** ClickHouse `retention_days` column + `MODIFY TTL` (via
+     `dply:logs:schema-sync`, online/idempotent, backfill 7) + stamp the org's
+     `retention_days` at the aggregator from a generated org→days enrichment map
+     (refreshed by the meter job). Touches the live store + install scripts.
 3. **PR C — billing:** usage → estimate/Stripe line item + soft/hard quota drop at aggregator.
 4. **PR D+ — value features:** alerting, then drains, then search, each on its own.
 5. **Phase 3 — HA** before any durability marketing.
