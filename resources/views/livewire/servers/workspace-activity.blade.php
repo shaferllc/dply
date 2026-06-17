@@ -26,24 +26,45 @@
     $rangeDays = \App\Livewire\Servers\WorkspaceActivity::rangeDays($range);
 @endphp
 
-<x-server-workspace-layout
-    :server="$server"
-    active="activity"
-    :title="__('Activity')"
-    :description="__('Audit events for this server and its sites — who did what, when, and what changed.')"
->
+{{-- Single root: this component is nested inside the Logs page's Activity tab,
+     so it must not emit page chrome (no <x-server-workspace-layout>). --}}
+<div class="space-y-6">
 
-    <x-server-workspace-tablist :aria-label="__('Activity sections')">
-        <x-server-workspace-tab id="activity-tab-feed" :active="$tab === 'feed'" wire:click="setTab('feed')" icon="heroicon-o-list-bullet">
+    {{-- Inline header replaces the page-layout title now that Activity is a tab. --}}
+    <div>
+        <h2 class="text-base font-semibold text-brand-ink">{{ __('Activity') }}</h2>
+        <p class="mt-0.5 max-w-2xl text-sm leading-relaxed text-brand-moss">
+            {{ __('Audit events for this server and its sites — who did what, when, and what changed.') }}
+        </p>
+    </div>
+
+    {{-- Feed / Trends switch — a light segmented control so it reads as a sub-view
+         of the Logs › Activity tab rather than a second, peer-level tab bar. --}}
+    <div class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-1" role="tablist" aria-label="{{ __('Activity sections') }}">
+        <button type="button" role="tab" id="activity-tab-feed" wire:click="setTab('feed')"
+            aria-selected="{{ $tab === 'feed' ? 'true' : 'false' }}"
+            @class([
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'feed',
+                'text-brand-moss hover:text-brand-ink' => $tab !== 'feed',
+            ])>
+            <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
             {{ __('Feed') }}
-        </x-server-workspace-tab>
-        <x-server-workspace-tab id="activity-tab-trends" :active="$tab === 'trends'" wire:click="setTab('trends')" icon="heroicon-o-chart-bar">
+        </button>
+        <button type="button" role="tab" id="activity-tab-trends" wire:click="setTab('trends')"
+            aria-selected="{{ $tab === 'trends' ? 'true' : 'false' }}"
+            @class([
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'trends',
+                'text-brand-moss hover:text-brand-ink' => $tab !== 'trends',
+            ])>
+            <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
             {{ __('Trends') }}
-        </x-server-workspace-tab>
-    </x-server-workspace-tablist>
+        </button>
+    </div>
 
     {{-- Filter card — shared across both subtabs so the URL state and the visual range stay coherent. --}}
-    <div class="{{ $card }} mb-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 px-6 py-5 sm:px-8">
             <div class="flex flex-wrap items-end gap-x-6 gap-y-3">
                 <div>
@@ -344,4 +365,4 @@
             </div>
         </x-server-workspace-tab-panel>
     @endif
-</x-server-workspace-layout>
+</div>

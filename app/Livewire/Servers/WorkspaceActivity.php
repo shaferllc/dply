@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
-use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\AuditLog;
@@ -20,22 +19,20 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Layout;
-use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Layout('layouts.app')]
-#[Lazy]
+/**
+ * Server audit timeline. Rendered as a child component inside the Logs page's
+ * Activity tab (servers.logs?tab=activity) — it no longer owns a route or page
+ * chrome. The parent only renders it while that tab is active, so the AuditLog
+ * queries below don't run on ordinary Logs page hits.
+ */
 class WorkspaceActivity extends Component
 {
-    use RendersWorkspacePlaceholder;
-    use RequiresFeature;
-
-    protected string $requiredFeature = 'workspace.activity';
-
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use WithPagination;
 
     public string $tab = 'feed';
@@ -77,8 +74,10 @@ class WorkspaceActivity extends Component
         $this->bootWorkspace($server);
 
         // Deep links from sibling workspace pages can pre-apply category / range filters
-        // via the query string (e.g. servers.activity?category=background) so operators
-        // land on a focused view without an extra click.
+        // via the query string (e.g. servers.logs?tab=activity&cat=background) so
+        // operators land on a focused view without an extra click. The #[Url(as: 'cat')]
+        // binding covers the canonical `cat` key; this also accepts the legacy
+        // long-form `category` param for back-compat.
         $category = request()->query('category');
         if (is_string($category) && array_key_exists($category, self::CATEGORIES)) {
             $this->category = $category;
@@ -343,10 +342,6 @@ class WorkspaceActivity extends Component
 
     public function render(): View
     {
-        if (in_array('activity', config('server_workspace.coming_soon_keys', []), true)) {
-            return view('livewire.servers.workspace-activity-preview', ['server' => $this->server]);
-        }
-
         return view('livewire.servers.workspace-activity');
     }
 }

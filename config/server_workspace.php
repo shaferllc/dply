@@ -34,7 +34,7 @@ return [
         ['key' => 'run', 'route' => 'servers.run', 'preview_route' => 'servers.run-preview', 'icon' => 'play-circle', 'label' => 'Run', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.run', 'preview_feature' => 'workspace.run_preview'],
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites', 'group' => 'overview'],
         // monitor (alphabetical by label)
-        ['key' => 'activity', 'route' => 'servers.activity', 'icon' => 'clipboard-document-list', 'label' => 'Activity', 'group' => 'monitor', 'feature' => 'workspace.activity'],
+        // Activity was merged into the Logs page as a tab (servers.logs?tab=activity).
         ['key' => 'cert-inventory', 'route' => 'servers.cert-inventory', 'icon' => 'lock-closed', 'label' => 'Certificates', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cert_inventory'],
         ['key' => 'deploys', 'route' => 'servers.deploys', 'icon' => 'rocket-launch', 'label' => 'Deploys', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'errors', 'route' => 'servers.errors', 'icon' => 'exclamation-triangle', 'label' => 'Errors', 'group' => 'monitor'],
@@ -110,7 +110,7 @@ return [
         // different group than its base config entry; `overrides[key].label`
         // swaps the displayed label.
         'redis' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'tools', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'tools', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Redis', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -119,7 +119,7 @@ return [
             ],
         ],
         'valkey' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'tools', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'tools', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Valkey', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -128,7 +128,7 @@ return [
             ],
         ],
         'load_balancer' => [
-            'keys' => ['overview', 'load-balancers', 'console', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'cron', 'tools', 'settings'],
+            'keys' => ['overview', 'load-balancers', 'console', 'health', 'monitor', 'logs', 'firewall', 'networking', 'ssh', 'cron', 'tools', 'settings'],
             'overrides' => [
                 'load-balancers' => ['label' => 'Load balancer', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -136,7 +136,7 @@ return [
             ],
         ],
         'database' => [
-            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'networking', 'load-balancers', 'ssh', 'cron', 'files', 'tools', 'settings'],
+            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'logs', 'backups', 'firewall', 'networking', 'load-balancers', 'ssh', 'cron', 'files', 'tools', 'settings'],
             'overrides' => [
                 'databases' => ['label' => 'Database', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -152,7 +152,7 @@ return [
             // webserver, backups, snapshots, load balancers). `services` is
             // included so the systemd inventory (incl. the per-site Horizon
             // unit + queue workers) is reachable on worker hosts.
-            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'services', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'tools', 'settings'],
+            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'services', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'logs', 'firewall', 'networking', 'ssh', 'files', 'tools', 'settings'],
             'overrides' => [
                 'daemons' => ['label' => 'Workers', 'group' => 'overview'],
                 'worker-pool' => ['group' => 'overview'],

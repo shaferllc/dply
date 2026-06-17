@@ -121,7 +121,6 @@ use App\Livewire\Servers\Deploys as ServerDeploys;
 use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
-use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceBackupsPreview;
 use App\Livewire\Servers\WorkspaceBlueprint;
@@ -882,9 +881,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
-    Route::middleware('feature:workspace.activity')->group(function (): void {
-        Route::livewire('servers/{server}/activity', WorkspaceActivity::class)->name('servers.activity');
-    });
+    // Activity was merged into the Logs page (servers.logs?tab=activity); the
+    // standalone route and its workspace.activity gate were retired.
     Route::middleware('feature:workspace.services')->group(function (): void {
         Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     });

@@ -25,7 +25,8 @@ return [
         'deploy-policy' => 'server-deploy-windows',
         'insights' => 'server-insights',
         'monitor' => 'server-metrics',
-        'activity' => 'server-activity',
+        // Activity is now a tab on the Logs page; its doc is surfaced via the
+        // tab-aware `contextual-docs.routes` entry (servers.logs?tab=activity).
         'caches' => 'server-caches',
         'docker' => 'server-docker',
         'databases' => 'server-databases',
