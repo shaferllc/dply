@@ -58,7 +58,7 @@ final class DeployPipelineBranchResolver
 
     private function matchesBranch(SiteDeployPipeline $pipeline, string $branch): bool
     {
-        $patterns = $pipeline->deploy_branches;
+        $patterns = $pipeline->deploy_branches ?? [];
         if ($patterns === []) {
             return false;
         }

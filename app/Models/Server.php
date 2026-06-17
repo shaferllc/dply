@@ -207,7 +207,7 @@ class Server extends Model
      */
     public function logoUrl(): ?string
     {
-        if ($this->logo_path === '') {
+        if (blank($this->logo_path)) {
             return null;
         }
 
@@ -216,7 +216,7 @@ class Server extends Model
 
     public function hasLogo(): bool
     {
-        return $this->logo_path !== '';
+        return filled($this->logo_path);
     }
 
     /** @return BelongsTo<User, $this> */

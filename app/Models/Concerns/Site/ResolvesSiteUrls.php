@@ -147,7 +147,7 @@ trait ResolvesSiteUrls
     public function logoUrl(): ?string
     {
         $path = $this->logo_path;
-        if ($path === '') {
+        if (blank($path)) {
             return null;
         }
 
@@ -156,7 +156,7 @@ trait ResolvesSiteUrls
 
     public function hasLogo(): bool
     {
-        return $this->logo_path !== '';
+        return filled($this->logo_path);
     }
 
     /**
