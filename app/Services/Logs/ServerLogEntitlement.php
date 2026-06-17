@@ -23,6 +23,9 @@ final class ServerLogEntitlement
         public readonly ?int $maxServers,
         public readonly bool $alertingEnabled,
         public readonly bool $drainsEnabled,
+        // Customer-protecting ingest ceiling. 0 = disabled (fail open — never
+        // drop), so quota dropping does nothing until a cap is explicitly set.
+        public readonly int $hardCapGb = 0,
     ) {}
 
     /**
@@ -44,6 +47,7 @@ final class ServerLogEntitlement
             maxServers: isset($merged['max_servers']) ? (int) $merged['max_servers'] : null,
             alertingEnabled: (bool) ($merged['alerting_enabled'] ?? false),
             drainsEnabled: (bool) ($merged['drains_enabled'] ?? false),
+            hardCapGb: max(0, (int) ($merged['hard_cap_gb'] ?? 0)),
         );
     }
 
@@ -59,6 +63,18 @@ final class ServerLogEntitlement
         return $usedBytes > $this->includedBytes();
     }
 
+    /** The hard ingest ceiling in bytes, or 0 when no cap is set (fail open). */
+    public function hardCapBytes(): int
+    {
+        return $this->hardCapGb * self::BYTES_PER_GB;
+    }
+
+    /** True only when a cap is set AND usage has crossed it — the aggregator drops past this. */
+    public function isHardCapped(int $usedBytes): bool
+    {
+        return $this->hardCapGb > 0 && $usedBytes > $this->hardCapBytes();
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
@@ -71,6 +87,7 @@ final class ServerLogEntitlement
             'max_servers' => $this->maxServers,
             'alerting_enabled' => $this->alertingEnabled,
             'drains_enabled' => $this->drainsEnabled,
+            'hard_cap_gb' => $this->hardCapGb,
         ];
     }
 }
