@@ -147,11 +147,11 @@ BASH;
                 body: implode("\n", $reasons),
                 meta: [
                     'signal' => [
-                        'installed' => $values['installed'],
-                        'auto_upgrades_file' => $values['auto_upgrades_file'],
-                        'unattended_enabled' => $values['unattended_enabled'],
-                        'timer_present' => $values['timer_present'],
-                        'timer_state' => $values['timer_state'],
+                        'installed' => $values['installed'] ?? null,
+                        'auto_upgrades_file' => $values['auto_upgrades_file'] ?? null,
+                        'unattended_enabled' => $values['unattended_enabled'] ?? null,
+                        'timer_present' => $values['timer_present'] ?? null,
+                        'timer_state' => $values['timer_state'] ?? null,
                     ],
                 ],
                 kind: $kind,

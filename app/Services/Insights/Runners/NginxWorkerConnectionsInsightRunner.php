@@ -92,9 +92,9 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $wp = (int) ($values['worker_processes']);
-        $wc = (int) ($values['worker_connections']);
-        $rl = (int) ($values['worker_rlimit_nofile']);
+        $wp = (int) ($values['worker_processes'] ?? 0);
+        $wc = (int) ($values['worker_connections'] ?? 0);
+        $rl = (int) ($values['worker_rlimit_nofile'] ?? 0);
         $conns = (int) ($values['established_connections'] ?? 0);
 
         if ($wp <= 0 || $wc <= 0) {

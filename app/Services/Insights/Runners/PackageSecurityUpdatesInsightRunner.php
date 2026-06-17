@@ -65,8 +65,8 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $security = (int) ($values['security']);
-        $total = (int) ($values['total']);
+        $security = (int) ($values['security'] ?? 0);
+        $total = (int) ($values['total'] ?? 0);
 
         $threshold = max(0, (int) ($parameters['min_security_updates'] ?? 1));
         if ($security < $threshold || $security <= 0) {

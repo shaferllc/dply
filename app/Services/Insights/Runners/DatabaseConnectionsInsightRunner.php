@@ -79,10 +79,10 @@ BASH;
         }
 
         $values = $this->parseKeyValues($buffer);
-        $maxConn = (int) ($values['max_connections']);
-        $maxUsed = (int) ($values['max_used_connections']);
-        $threadsConn = (int) ($values['threads_connected']);
-        $aborted = (int) ($values['aborted_connects']);
+        $maxConn = (int) ($values['max_connections'] ?? 0);
+        $maxUsed = (int) ($values['max_used_connections'] ?? 0);
+        $threadsConn = (int) ($values['threads_connected'] ?? 0);
+        $aborted = (int) ($values['aborted_connects'] ?? 0);
         $errorsMax = (int) ($values['connection_errors_max_connections'] ?? 0);
 
         if ($maxConn <= 0) {
