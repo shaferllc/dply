@@ -33,7 +33,7 @@ use App\Actions\Decorators\CompensationDecorator;
  *     ReserveInventory::run($product, 5);
  *     // ... other actions
  * } catch (\Exception $e) {
- *     ReserveInventory::compensate($product, 5); // Rollback
+ *     ReserveInventory::dispatchCompensation($product, 5); // Rollback
  * }
  *
  * // The design pattern automatically recognizes when the action

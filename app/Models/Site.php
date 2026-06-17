@@ -85,7 +85,7 @@ use Illuminate\Support\Str;
  * @property string $container_region
  * @property string $serverless_backend
  * @property ?string $serverless_provider_credential_id
- * @property string $edge_backend
+ * @property ?string $edge_backend
  * @property ?string $edge_backend_id
  * @property ?string $edge_provider_credential_id
  * @property array<string, mixed> $meta

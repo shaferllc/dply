@@ -81,7 +81,7 @@ use App\Actions\Decorators\CompensationDecorator;
  *     ReserveInventory::run($product, 5);
  *     // ... other actions
  * } catch (\Exception $e) {
- *     ReserveInventory::compensate($product, 5); // Rollback
+ *     ReserveInventory::dispatchCompensation($product, 5); // Rollback
  * }
  * @example
  * // ============================================
@@ -491,17 +491,29 @@ trait AsCompensatable
     }
 
     /**
-     * Execute compensation for this action with given arguments.
+     * Compensation (rollback) hook. Defaults to a no-op; override in the action
+     * to define how its effects are undone. The decorator dispatches to this
+     * method, and so does dispatchCompensation().
+     *
+     * @param  mixed  ...$arguments  The arguments originally passed to handle()
+     */
+    public function compensate(mixed ...$arguments): void
+    {
+        // No-op by default.
+    }
+
+    /**
+     * Resolve an instance and run its compensation (rollback) logic.
+     *
+     * Named distinctly from the instance `compensate()` hook so the static
+     * convenience does not shadow it — a same-named static method would be
+     * overridden by the action's instance method or recurse into itself.
      *
      * @param  mixed  ...$arguments  The arguments to pass to the compensate method
      */
-    public static function compensate(...$arguments): void
+    public static function dispatchCompensation(...$arguments): void
     {
-        $instance = static::make();
-
-        if (method_exists($instance, 'compensate')) {
-            $instance->compensate(...$arguments);
-        }
+        static::make()->compensate(...$arguments);
     }
 
     /**

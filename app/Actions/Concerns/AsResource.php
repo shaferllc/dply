@@ -447,7 +447,8 @@ trait AsResource
         $items = [];
         foreach (is_iterable($resource) ? $resource : [$resource] as $item) {
             // Resource hosts accept the underlying model in their constructor
-            // (JsonResource pattern); the trait cannot declare that signature.
+            // (JsonResource pattern); a trait cannot declare that signature, so
+            // PHPStan can't see the constructor for an arbitrary host class.
             $items[] = new static($item); // @phpstan-ignore new.noConstructor
         }
 

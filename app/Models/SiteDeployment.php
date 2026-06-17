@@ -148,7 +148,7 @@ class SiteDeployment extends Model
      */
     public function phasesAllOk(): bool
     {
-        $results = $this->phase_results;
+        $results = $this->phase_results ?? [];
         if ($results === []) {
             return false;
         }
@@ -172,7 +172,7 @@ class SiteDeployment extends Model
     public function phaseTotalDurationMs(): int
     {
         $total = 0;
-        $results = $this->phase_results;
+        $results = $this->phase_results ?? [];
         foreach ($results as $steps) {
             if (! is_array($steps)) {
                 continue;
@@ -194,7 +194,7 @@ class SiteDeployment extends Model
      */
     public function phaseSteps(string $phase): array
     {
-        $results = $this->phase_results;
+        $results = $this->phase_results ?? [];
         $steps = $results[$phase] ?? null;
 
         return is_array($steps) ? array_values($steps) : [];
@@ -220,7 +220,7 @@ class SiteDeployment extends Model
 
     public function hasPhase(string $phase): bool
     {
-        $results = $this->phase_results;
+        $results = $this->phase_results ?? [];
 
         return is_array($results[$phase] ?? null);
     }
@@ -234,7 +234,7 @@ class SiteDeployment extends Model
      */
     public function failedPhase(): ?string
     {
-        $results = $this->phase_results;
+        $results = $this->phase_results ?? [];
         foreach (\App\Services\Deploy\DeployResumePlan::PHASE_ORDER as $phase) {
             $steps = $results[$phase] ?? null;
             if (! is_array($steps)) {

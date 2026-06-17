@@ -497,7 +497,7 @@ trait ResolvesSiteRuntime
 
     public function usesEdgeRuntime(): bool
     {
-        return $this->edge_backend !== '';
+        return filled($this->edge_backend);
     }
 
     /**
