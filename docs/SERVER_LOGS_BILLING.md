@@ -81,13 +81,23 @@ Ship these three together; none is useful alone.
   the per-org value at the aggregator) is PR B2** — see §3.1. Deferred because it mutates
   the live store DDL + aggregator install scripts and only bites once paid tiers differ.
 
-### 1.3 Billing line item + quota enforcement
-- **Meter → Stripe:** push `server_log_usage_daily` into a Stripe usage record (or the
-  existing monthly-estimate path) as `included_gb` + `overage_gb × overage_per_gb`.
-- **Quota enforcement:** when an org crosses its hard cap, the aggregator stops inserting
-  that org's events (a `transforms.quota` route keyed on `dply_org_id` against a small
-  generated allow/deny list, refreshed by the meter job) — drop, don't buffer, don't bill.
-  Soft cap = notify + show in UI; hard cap = drop. Reuses soft/hard pause semantics.
+### 1.3 Billing line item + quota enforcement — **line item BUILT dark (PR C); quota drop = PR C2 (aggregator)**
+- **Meter → Stripe:** ✅ via the existing monthly-estimate path, mirroring the Edge-usage
+  line. `ServerLogUsageCostCalculator` turns metered bytes + the org's entitlement
+  (included GB, per-GB rate) into `subtotal_cents`; `OrganizationBillingStateComputer`
+  sums the month's `server_log_usage_daily` and threads it through `DesiredBillingState`
+  (`serverLogUsageSubtotalCents` + `serverLogUsageEstimate`); `StripeSubscriptionSyncer::`
+  `reconcileServerLogUsageLine()` drives a metered Stripe line (per-cent quantity, monthly).
+  - **Lands dark — triple-gated:** master switch `server_logs.billing.enabled=false`,
+    every plan's `overage_per_gb_cents=0`, and no `stripe.server_log_usage` price id, so
+    the subtotal is 0 and the line never reconciles. The full path runs in prod (estimate
+    is computed + visible) without charging. Going live = calibrate rates → flip the
+    switch → set the price id.
+- **Quota enforcement (PR C2, aggregator infra — deferred):** the soft/hard cap drop is a
+  `transforms.quota` route at the aggregator keyed on `dply_org_id` against a generated
+  allow/deny list refreshed by the meter job. Same class of change as PR B2 (mutates the
+  live aggregator config), so it ships with the store-side work, not here. Soft cap =
+  notify + UI; hard cap = drop. Reuses soft/hard pause semantics.
 
 **Exit criteria for Phase 1:** an org on a paid plan ships logs, we can see their GB/day,
 it appears on their estimate, and an over-quota org is dropped (not charged) — all verifiable
@@ -168,7 +178,12 @@ reads (Vector `enrichment_tables`/file source), refreshed by the meter job. Keep
      `dply:logs:schema-sync`, online/idempotent, backfill 7) + stamp the org's
      `retention_days` at the aggregator from a generated org→days enrichment map
      (refreshed by the meter job). Touches the live store + install scripts.
-3. **PR C — billing:** usage → estimate/Stripe line item + soft/hard quota drop at aggregator.
+3. **PR C — billing:**
+   - **C1 ✅ DONE (dark).** `ServerLogUsageCostCalculator` + `DesiredBillingState`/
+     `OrganizationBillingStateComputer`/`StripeSubscriptionSyncer` wiring + `server_logs.billing`
+     switch + `stripe.server_log_usage` price key + tests. Triple-gated so nothing bills.
+   - **C2 (next, infra):** soft/hard quota drop at the aggregator (`transforms.quota`).
+     Ships with the PR B2 aggregator work.
 4. **PR D+ — value features:** alerting, then drains, then search, each on its own.
 5. **Phase 3 — HA** before any durability marketing.
 
