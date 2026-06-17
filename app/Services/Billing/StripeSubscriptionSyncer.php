@@ -60,6 +60,7 @@ class StripeSubscriptionSyncer
         $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
         $this->reconcileManagedServerLine($subscription, $desired, $changes);
         $this->reconcileEdgeUsageLine($subscription, $desired, $changes);
+        $this->reconcileServerLogUsageLine($subscription, $desired, $changes);
 
         if ($changes !== []) {
             Log::info('billing.stripe.subscription_synced', [
@@ -382,6 +383,35 @@ class StripeSubscriptionSyncer
         $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
         if ($change !== null) {
             $changes[] = ['tier' => 'edge_usage'] + $change;
+        }
+    }
+
+    /**
+     * Metered dply Logs ingest-overage line (per-cent quantity), monthly only —
+     * mirrors the Edge-usage line. The price id is unset by default, so this
+     * returns early and the line never reconciles until pricing goes live (PR C).
+     *
+     * @param  list<array<string, mixed>>  $changes
+     */
+    private function reconcileServerLogUsageLine(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        if ($this->isYearly($subscription)) {
+            return;
+        }
+
+        $priceId = (string) (config('subscription.standard.stripe.server_log_usage') ?? '');
+        if ($priceId === '') {
+            return;
+        }
+
+        $desiredQty = max(0, $desired->serverLogUsageSubtotalCents);
+        $current = $this->currentQuantity($subscription, $priceId);
+        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => 'server_log_usage'] + $change;
         }
     }
 

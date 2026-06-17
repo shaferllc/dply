@@ -7,7 +7,9 @@ use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\RealtimeApp;
 use App\Models\Server;
+use App\Models\ServerLogUsageDaily;
 use App\Models\Site;
+use App\Services\Logs\ServerLogEntitlements;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -37,6 +39,8 @@ class OrganizationBillingStateComputer
         private ServerlessUsageCostCalculator $serverlessUsageCostCalculator,
         private ServerlessResourceCostCalculator $serverlessResourceCalculator,
         private ServerResourceCostCalculator $serverResourceCalculator,
+        private ServerLogEntitlements $serverLogEntitlements,
+        private ServerLogUsageCostCalculator $serverLogUsageCostCalculator,
     ) {}
 
     /**
@@ -186,6 +190,27 @@ class OrganizationBillingStateComputer
         ]);
         $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents']);
 
+        // dply Logs ingest overage — metered pass-through, billed against the
+        // org's plan entitlement (included GB + per-GB rate). Volume is the
+        // metered bytes for the current month from server_log_usage_daily (PR A).
+        // Dark until billing is enabled + a plan carries a rate; subtotal is 0
+        // otherwise, so this never adds a line today. Reuses the Edge month window.
+        $serverLogBytes = (int) ServerLogUsageDaily::query()
+            ->where('organization_id', $organization->id)
+            ->whereBetween('day', [$usagePeriodStart->toDateString(), $usagePeriodEnd->toDateString()])
+            ->sum('bytes');
+        $serverLogEntitlement = $this->serverLogEntitlements->forOrganization($organization);
+        $serverLogUsageEstimate = array_merge(
+            $this->serverLogUsageCostCalculator->estimate($serverLogEntitlement, $serverLogBytes),
+            [
+                'period_start' => $usagePeriodStart->toDateString(),
+                'period_end' => $usagePeriodEnd->toDateString(),
+                'retention_days' => $serverLogEntitlement->retentionDays,
+                'plan_key' => $serverLogEntitlement->planKey,
+            ],
+        );
+        $serverLogUsageSubtotalCents = (int) ($serverLogUsageEstimate['subtotal_cents']);
+
         // Managed-serverless usage (metered invocations above the included
         // allowance) + managed DB/cache resources, both cost-plus. BYO
         // functions contribute nothing here.
@@ -224,6 +249,8 @@ class OrganizationBillingStateComputer
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
             realtimeTierQuantities: $realtimeTierQuantities,
+            serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
+            serverLogUsageEstimate: $serverLogUsageEstimate,
         );
     }
 }
