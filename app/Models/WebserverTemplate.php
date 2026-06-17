@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class WebserverTemplate extends Model
 {
     /** @use HasFactory<WebserverTemplateFactory> */
@@ -43,13 +47,13 @@ class WebserverTemplate extends Model
         return self::ENGINES[$this->engine] ?? ucfirst((string) $this->engine);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

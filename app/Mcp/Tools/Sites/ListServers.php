@@ -20,7 +20,7 @@ class ListServers extends AbstractDplyTool
     protected string $ability = 'servers.read';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {
@@ -40,7 +40,7 @@ class ListServers extends AbstractDplyTool
                 'name' => $s->name,
                 'status' => $s->status,
                 'ip_address' => $s->ip_address,
-                'provider' => $s->provider?->value,
+                'provider' => $s->provider->value,
                 'created_at' => $s->created_at?->toIso8601String(),
             ])->all(),
         ]);

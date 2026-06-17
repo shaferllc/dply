@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One row per server enrolled in the dply Logs add-on — the per-server edge
  * Vector agent that ships host + service logs to dply. Mirrors the lifecycle
  * shape of {@see ServerCacheService} (status + install_output + version), but
@@ -49,6 +50,7 @@ class ServerLogAgent extends Model
         'cancel_requested_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -58,8 +60,8 @@ class ServerLogAgent extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

@@ -46,7 +46,7 @@ class RecheckRequiredEnvJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -61,7 +61,7 @@ class RecheckRequiredEnvJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(RequiredEnvEvaluator $evaluator): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

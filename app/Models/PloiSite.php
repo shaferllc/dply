@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class PloiSite extends Model
 {
     use HasUlids;
@@ -26,6 +30,7 @@ class PloiSite extends Model
         'source_snapshot',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -35,8 +40,8 @@ class PloiSite extends Model
         ];
     }
 
-    public function ploiServer(): BelongsTo
-    {
+    /** @return BelongsTo<PloiServer, $this> */
+    public function ploiServer(): BelongsTo {
         return $this->belongsTo(PloiServer::class);
     }
 

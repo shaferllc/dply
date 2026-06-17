@@ -30,6 +30,7 @@ class ServerMetricIngestEvent extends Model
     /**
      * @return array<string, string>
      */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

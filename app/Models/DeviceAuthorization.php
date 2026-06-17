@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
+ * @property string $id
  * OAuth device-flow authorization record. The dply CLI calls
  * /api/v1/auth/device/start which mints one of these (status=pending),
  * shows the user the short `user_code` to type into the web approval
@@ -54,6 +55,7 @@ class DeviceAuthorization extends Model
         'delivered_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -64,18 +66,18 @@ class DeviceAuthorization extends Model
         ];
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function apiToken(): BelongsTo
-    {
+    /** @return BelongsTo<ApiToken, $this> */
+    public function apiToken(): BelongsTo {
         return $this->belongsTo(ApiToken::class);
     }
 

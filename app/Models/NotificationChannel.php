@@ -14,6 +14,16 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
+/**
+ * @property string $id
+ * @property string $owner_type
+ * @property string $owner_id
+ * @property string $type
+ * @property string $label
+ * @property array $config
+ * @property-read Model $owner
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationSubscription> $subscriptions
+ */
 class NotificationChannel extends Model
 {
     /** @use HasFactory<NotificationChannelFactory> */
@@ -112,6 +122,7 @@ class NotificationChannel extends Model
         'config',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -124,8 +135,8 @@ class NotificationChannel extends Model
         return $this->morphTo();
     }
 
-    public function subscriptions(): HasMany
-    {
+    /** @return HasMany<NotificationSubscription, $this> */
+    public function subscriptions(): HasMany {
         return $this->hasMany(NotificationSubscription::class);
     }
 

@@ -43,22 +43,22 @@ class EdgeCacheApiController extends EdgeApiController
 
         if ($tag !== '') {
             $result = $purger->purgeByTag($fresh, $tag);
-            if (($result['ok'] ?? false) && $fresh->organization_id) {
+            if ($result['ok'] && $fresh->organization_id) {
                 audit_log($fresh->organization, $request->user(), 'site.edge.cache.purge_tag', $fresh, null, ['tag' => $tag]);
             }
         } else {
             $result = $purger->purgeByPaths($fresh, $paths);
-            if (($result['ok'] ?? false) && $fresh->organization_id) {
+            if ($result['ok'] && $fresh->organization_id) {
                 audit_log($fresh->organization, $request->user(), 'site.edge.cache.purge_paths', $fresh, null, ['paths' => array_values($paths)]);
             }
         }
 
         return response()->json([
             'data' => [
-                'ok' => $result['ok'] ?? false,
-                'purged_keys' => $result['purged_keys'] ?? [],
-                'message' => $result['message'] ?? null,
+                'ok' => $result['ok'],
+                'purged_keys' => $result['purged_keys'],
+                'message' => $result['message'],
             ],
-        ], ($result['ok'] ?? false) ? 200 : 422);
+        ], $result['ok'] ? 200 : 422);
     }
 }

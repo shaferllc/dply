@@ -35,7 +35,7 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
 
     public function handle(): void
     {
-        $cloudSite = Site::query()->find($this->cloudSiteId);
+        $cloudSite = Site::find($this->cloudSiteId);
         if ($cloudSite === null || ! $cloudSite->usesContainerRuntime()) {
             return;
         }
@@ -95,7 +95,7 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
             return;
         }
 
-        $user = User::query()->find($cloudSite->user_id);
+        $user = User::find($cloudSite->user_id);
         $organization = $cloudSite->organization;
         if ($user === null || $organization === null) {
             $this->markFailed($cloudSite, 'Could not resolve stack owner for Edge site creation.');

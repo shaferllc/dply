@@ -61,7 +61,7 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
         $envVars = WorkerPoolHorizonConfig::envVarsFor($pool);
 
         foreach ($pool->servers as $member) {
-            if (! $member instanceof Server || ! $member->isReady()) {
+            if (! $member->isReady()) {
                 continue;
             }
             // Box-authoritative: in seed mode, leave already-configured members

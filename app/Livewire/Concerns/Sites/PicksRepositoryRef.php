@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Sites;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\SourceControl\GitIdentityResolver;
@@ -25,6 +26,7 @@ use Livewire\Component;
  */
 trait PicksRepositoryRef
 {
+    use DispatchesToastNotifications;
     public string $repo_ref_selected_sha = '';
 
     public ?string $repo_ref_selected_label = null;

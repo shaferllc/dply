@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
@@ -13,6 +14,7 @@ use Livewire\Attributes\On;
 
 trait ManagesEdgeSiteProvisioning
 {
+    use DispatchesToastNotifications;
     #[On('site-provisioning-updated')]
     public function refreshProvisioningStatus(string $siteId): void
     {

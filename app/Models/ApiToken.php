@@ -10,6 +10,10 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
+/**
+ * @property string $id
+ */
+
 class ApiToken extends Model
 {
     use HasUlids;
@@ -26,6 +30,7 @@ class ApiToken extends Model
         'allowed_ips',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,13 +41,13 @@ class ApiToken extends Model
         ];
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 

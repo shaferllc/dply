@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Last-observed /etc/passwd snapshot for a server's regular Linux accounts.
  * One row per (server, username). Written by the system-users sync; read by
  * the workspace page so the table survives navigation without a fresh probe.
@@ -25,6 +26,7 @@ class ServerSystemUser extends Model
         'last_seen_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -34,8 +36,8 @@ class ServerSystemUser extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 }

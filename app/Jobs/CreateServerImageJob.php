@@ -40,7 +40,7 @@ class CreateServerImageJob implements ShouldQueue
         }
 
         $server = $image->server;
-        if ($server === null) {
+        if (! $server instanceof Server) {
             $image->update([
                 'status' => ServerImage::STATUS_FAILED,
                 'error_message' => 'Server no longer exists.',

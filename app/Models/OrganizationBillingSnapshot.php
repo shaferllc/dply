@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class OrganizationBillingSnapshot extends Model
 {
     use HasUlids;
@@ -22,6 +26,7 @@ class OrganizationBillingSnapshot extends Model
         'subscription_interval',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -33,8 +38,8 @@ class OrganizationBillingSnapshot extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 }

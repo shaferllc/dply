@@ -114,7 +114,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -129,12 +129,12 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerWebserverNotificationDispatcher $notifications): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $actor = $this->userId !== null ? User::query()->find($this->userId) : null;
+        $actor = $this->userId !== null ? User::find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $from = strtolower(trim((string) ($server->meta['webserver'] ?? 'nginx')));
@@ -153,7 +153,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
 
             $notifications->notify($server, 'engine_switch_failed', [
                 __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
-                __('Reason: :reason', ['reason' => (string) ($preflight['blocker']['label'] ?? 'preflight blocker')]),
+                __('Reason: :reason', ['reason' => (string) $preflight['blocker']['label']]),
             ], $actor, ['from' => $from, 'to' => $this->target, 'reason' => 'preflight_blocker']);
 
             return;
@@ -243,7 +243,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         // Horizon's lost-job detection, so this is the right hook.
         app(UniqueLock::class)->release($this);
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

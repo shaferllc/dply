@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Point-in-time RDB snapshot of a redis-family cache service. Lifecycle states:
  *
  *   pending → completed   when the exporter wrote the file and updated bytes/s3_key
@@ -51,6 +52,7 @@ class RedisSnapshot extends Model
         'error_message',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -58,23 +60,23 @@ class RedisSnapshot extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function cacheService(): BelongsTo
-    {
+    /** @return BelongsTo<ServerCacheService, $this> */
+    public function cacheService(): BelongsTo {
         return $this->belongsTo(ServerCacheService::class, 'server_cache_service_id');
     }
 
-    public function backupConfiguration(): BelongsTo
-    {
+    /** @return BelongsTo<BackupConfiguration, $this> */
+    public function backupConfiguration(): BelongsTo {
         return $this->belongsTo(BackupConfiguration::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

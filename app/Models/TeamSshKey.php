@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
+/**
+ * @property string $id
+ */
+
 class TeamSshKey extends Model
 {
     use HasUlids;
@@ -21,6 +25,7 @@ class TeamSshKey extends Model
         'created_by',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -28,18 +33,18 @@ class TeamSshKey extends Model
         ];
     }
 
-    public function team(): BelongsTo
-    {
+    /** @return BelongsTo<Team, $this> */
+    public function team(): BelongsTo {
         return $this->belongsTo(Team::class);
     }
 
-    public function creator(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function serverAuthorizedKeys(): MorphMany
-    {
+    /** @return MorphMany<ServerAuthorizedKey, $this> */
+    public function serverAuthorizedKeys(): MorphMany {
         return $this->morphMany(ServerAuthorizedKey::class, 'managed_key');
     }
 }

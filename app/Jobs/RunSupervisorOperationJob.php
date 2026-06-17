@@ -34,7 +34,7 @@ class RunSupervisorOperationJob implements ShouldQueue
 
     public function handle(SupervisorProvisioner $provisioner): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->store('failed', 'Server not found.');
 

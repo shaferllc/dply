@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
+ * @property string $id
  * One row in the dedicated error stream surfaced on the site/server "Errors"
  * views. Written by {@see ErrorEventRecorder} from failed
  * ConsoleActions and SiteDeployments. Append-only; triage is a shared
@@ -42,6 +43,7 @@ class ErrorEvent extends Model
         'dismissed_by',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -50,18 +52,18 @@ class ErrorEvent extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
@@ -70,8 +72,8 @@ class ErrorEvent extends Model
         return $this->morphTo();
     }
 
-    public function dismisser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function dismisser(): BelongsTo {
         return $this->belongsTo(User::class, 'dismissed_by');
     }
 

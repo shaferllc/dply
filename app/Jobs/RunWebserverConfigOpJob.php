@@ -56,7 +56,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
 
     public function handle(RemoteWebserverConfigService $service, ServerWebserverNotificationDispatcher $notifications): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->markConsole(ConsoleAction::STATUS_FAILED, error: 'Server not found.');
 
@@ -108,7 +108,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
                 $this->engine,
                 $this->path,
                 $this->contents,
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 $this->revisionSummary,
             );
 
@@ -134,7 +134,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
                 $server,
                 'config_saved',
                 [__(':engine config: :path', ['engine' => $this->engine, 'path' => $this->path])],
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 ['engine' => $this->engine, 'path' => $this->path, 'op' => $this->op],
             );
         }

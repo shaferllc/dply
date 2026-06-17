@@ -89,8 +89,8 @@ class FleetAgeCommand extends Command
             ['server', 'ip', 'status', 'created', 'age'],
             array_map(fn (array $r) => [
                 $r['server_name'],
-                $r['ip_address'] ?? '—',
-                $r['status'] ?? '—',
+                $r['ip_address'],
+                $r['status'],
                 substr((string) ($r['created_at'] ?? '—'), 0, 10),
                 $r['age_days'] !== null ? $r['age_days'].'d' : '—',
             ], $rows),

@@ -297,7 +297,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
         $remaining = [];
         foreach ($pending as $siteId) {
-            $site = Site::query()->find($siteId);
+            $site = Site::find($siteId);
             if (! $site instanceof Site) {
                 continue; // site gone — drop it
             }
@@ -397,7 +397,10 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         }
 
         $pool = WorkerPool::query()->with('servers')->find($this->poolId);
-        $server = $pool?->primaryServer ?? $pool?->sourceServer;
+        if ($pool === null) {
+            return $this->resolvedSubject = new Server;
+        }
+        $server = $pool->primaryServer ?? $pool->sourceServer;
 
         return $this->resolvedSubject = ($server instanceof Server ? $server : new Server);
     }

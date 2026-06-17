@@ -9,8 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class ServerProvisionRun extends Model
 {
+    /** @use HasFactory<ServerProvisionRunFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -24,6 +29,7 @@ class ServerProvisionRun extends Model
         'completed_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -33,18 +39,18 @@ class ServerProvisionRun extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function task(): BelongsTo
-    {
+    /** @return BelongsTo<Task, $this> */
+    public function task(): BelongsTo {
         return $this->belongsTo(Task::class, 'task_id');
     }
 
-    public function artifacts(): HasMany
-    {
+    /** @return HasMany<ServerProvisionArtifact, $this> */
+    public function artifacts(): HasMany {
         return $this->hasMany(ServerProvisionArtifact::class)->orderBy('type')->orderBy('label');
     }
 }

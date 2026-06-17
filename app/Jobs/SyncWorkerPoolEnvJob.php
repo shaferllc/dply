@@ -67,7 +67,7 @@ class SyncWorkerPoolEnvJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->primarySiteId);
+        return Site::findOrFail($this->primarySiteId);
     }
 
     protected function consoleKind(): string
@@ -86,7 +86,7 @@ class SyncWorkerPoolEnvJob implements ShouldBeUnique, ShouldQueue
         SiteEnvPusher $pusher,
         SiteSystemdProvisioner $provisioner,
     ): void {
-        $primary = Site::query()->find($this->primarySiteId);
+        $primary = Site::find($this->primarySiteId);
         if (! $primary) {
             return;
         }

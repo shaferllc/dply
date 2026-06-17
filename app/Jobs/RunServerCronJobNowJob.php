@@ -63,7 +63,7 @@ class RunServerCronJobNowJob implements ShouldQueue
         $ttl = max(60, (int) config('server_workspace.cron_run.cache_ttl_seconds', 900));
         $chunkMs = max(30, (int) config('server_workspace.cron_run.broadcast_chunk_interval_ms', 120));
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->failRun(__('Server not found.'), $ttl);
 
@@ -309,6 +309,9 @@ class RunServerCronJobNowJob implements ShouldQueue
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     protected function mergePayload(array $data, int $ttlSeconds): void
     {
         $key = self::cacheKey($this->runId);

@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SiteBasicAuthUser extends Model
 {
+    /** @use HasFactory<SiteBasicAuthUserFactory> */
     use HasFactory, HasUlids;
 
     protected $table = 'site_basic_auth_users';
@@ -28,6 +33,7 @@ class SiteBasicAuthUser extends Model
         'password_hash',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -35,8 +41,8 @@ class SiteBasicAuthUser extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

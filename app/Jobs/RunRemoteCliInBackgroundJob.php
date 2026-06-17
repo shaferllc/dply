@@ -61,7 +61,7 @@ class RunRemoteCliInBackgroundJob implements ShouldQueue
         }
 
         $site = $run->site;
-        if ($site === null || $site->server === null) {
+        if ($site->server === null) {
             $run->fill([
                 'status' => RemoteCliRun::STATUS_FAILED,
                 'stderr' => 'Site or server no longer exists.',

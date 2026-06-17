@@ -53,7 +53,7 @@ class WorkerPoolJobEventController
                 'queue' => (string) ($row['queue'] ?? 'default'),
                 'status' => (string) ($row['status'] ?? 'processing'),
                 'uuid' => isset($row['uuid']) ? (string) $row['uuid'] : null,
-                'received_at' => $receivedAt,
+                'at' => $receivedAt,
             ]);
             $accepted++;
         }
@@ -65,7 +65,7 @@ class WorkerPoolJobEventController
                 'queue' => '—',
                 'status' => 'dropped',
                 'uuid' => null,
-                'received_at' => $receivedAt,
+                'at' => $receivedAt,
             ]);
         }
 

@@ -10,6 +10,7 @@ use App\Models\SiteDeployStep;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Sites\OctaneRuntimeVerifier;
+use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -87,15 +88,22 @@ class OptimizeSitePipelineJob implements ShouldQueue
             $pipeline = $pipelines->ensureDefaultPipeline($site);
             $existing = $pipeline->steps()->get();
             $existingTypes = $existing->pluck('step_type')->map(static fn ($t): string => (string) $t)->all();
-            $existingCustom = $existing->where('step_type', SiteDeployStep::TYPE_CUSTOM)
-                ->map(static fn ($s): string => strtolower((string) $s->custom_command));
+            /** @var \Illuminate\Support\Collection<int, lowercase-string> $existingCustom */
+            $existingCustom = $existing
+                ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
+                ->map(static function (SiteDeployStep $s): string {
+                    return strtolower($s->custom_command);
+                });
 
             $proposed = [];
             foreach ($needed as $step) {
                 $isCustom = $step['type'] === SiteDeployStep::TYPE_CUSTOM;
-                $already = $isCustom
-                    ? $existingCustom->contains(static fn (string $c): bool => $c === strtolower((string) $step['command']))
-                    : in_array($step['type'], $existingTypes, true);
+                if ($isCustom) {
+                    $command = strtolower((string) $step['command']);
+                    $already = $existingCustom->contains(static fn (string $c): bool => $c === $command);
+                } else {
+                    $already = in_array($step['type'], $existingTypes, true);
+                }
 
                 if ($already) {
                     continue;
@@ -190,14 +198,14 @@ class OptimizeSitePipelineJob implements ShouldQueue
      *
      * @param  array<string, mixed>|null  $composer
      */
-    private function verifyOctane($conn, Site $site, string $dir, ?array $composer, ConsoleEmitter $emit): bool
+    private function verifyOctane(SshConnection $conn, Site $site, string $dir, ?array $composer, ConsoleEmitter $emit): bool
     {
         $require = is_array($composer['require'] ?? null) ? array_change_key_case($composer['require'], CASE_LOWER) : [];
         if (! isset($require['laravel/octane'])) {
             return false;
         }
 
-        $port = $site->octane_port !== null ? (int) $site->octane_port : null;
+        $port = filled($site->octane_port) ? (int) $site->octane_port : null;
         $raw = $conn->exec(OctaneRuntimeVerifier::probeScript($dir, $port), 45);
         $verdict = OctaneRuntimeVerifier::interpret($raw);
         OctaneRuntimeVerifier::persist($site, $verdict);
@@ -240,7 +248,7 @@ class OptimizeSitePipelineJob implements ShouldQueue
     /**
      * @return array<string, mixed>|null
      */
-    private function readJson($conn, string $path): ?array
+    private function readJson(SshConnection $conn, string $path): ?array
     {
         $raw = $conn->exec('cat '.escapeshellarg($path).' 2>/dev/null', 15);
         $raw = trim($raw);
@@ -255,7 +263,7 @@ class OptimizeSitePipelineJob implements ShouldQueue
     /**
      * @return list<string>
      */
-    private function detectLocks($conn, string $dir): array
+    private function detectLocks(SshConnection $conn, string $dir): array
     {
         $cmd = 'cd '.escapeshellarg($dir).' 2>/dev/null && for f in package-lock.json yarn.lock pnpm-lock.yaml bun.lockb composer.lock; do [ -f "$f" ] && echo "$f"; done';
         $out = $conn->exec($cmd, 15);

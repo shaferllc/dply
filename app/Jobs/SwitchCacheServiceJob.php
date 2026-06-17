@@ -306,6 +306,6 @@ class SwitchCacheServiceJob implements ShouldQueue
         $lines = array_filter(array_map('trim', explode("\n", $stdout)), fn ($l) => $l !== '');
         $last = end($lines);
 
-        return is_string($last) && $last !== '' ? Str::limit($last, 64, '') : null;
+        return is_string($last) ? Str::limit($last, 64, '') : null;
     }
 }

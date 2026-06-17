@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ */
+
 class ServerDatabase extends Model
 {
     use HasUlids;
@@ -30,6 +34,7 @@ class ServerDatabase extends Model
         'allowed_from',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -38,32 +43,32 @@ class ServerDatabase extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
     /**
      * The site that owns this database, if any. Server-wide databases
-     * (created from the server-level manager) have a null site_id.
-     */
-    public function site(): BelongsTo
-    {
+     * (created from the server-level manager) have a null site_id. *
+ * @return BelongsTo<Site, $this>
+ */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function extraUsers(): HasMany
-    {
+    /** @return HasMany<ServerDatabaseExtraUser, $this> */
+    public function extraUsers(): HasMany {
         return $this->hasMany(ServerDatabaseExtraUser::class, 'server_database_id');
     }
 
-    public function credentialShares(): HasMany
-    {
+    /** @return HasMany<ServerDatabaseCredentialShare, $this> */
+    public function credentialShares(): HasMany {
         return $this->hasMany(ServerDatabaseCredentialShare::class, 'server_database_id');
     }
 
-    public function backups(): HasMany
-    {
+    /** @return HasMany<ServerDatabaseBackup, $this> */
+    public function backups(): HasMany {
         return $this->hasMany(ServerDatabaseBackup::class, 'server_database_id');
     }
 

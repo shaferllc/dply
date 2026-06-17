@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Cloud\ConfigureCloudAutoscaling;
 use App\Actions\Cloud\ConfigureCloudHealthCheck;
 use App\Actions\Cloud\CreateCloudWorker;
@@ -31,6 +32,7 @@ use App\Services\Cloud\ResolvesMetricWindows;
  */
 trait ManagesContainerSite
 {
+    use DispatchesToastNotifications;
     public string $container_image_input = '';
 
     public string $container_domain_input = '';

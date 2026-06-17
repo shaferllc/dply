@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class NotificationInboxItem extends Model
 {
     use HasUlids;
@@ -23,6 +27,7 @@ class NotificationInboxItem extends Model
         'saved_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -32,13 +37,13 @@ class NotificationInboxItem extends Model
         ];
     }
 
-    public function event(): BelongsTo
-    {
+    /** @return BelongsTo<NotificationEvent, $this> */
+    public function event(): BelongsTo {
         return $this->belongsTo(NotificationEvent::class, 'notification_event_id');
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

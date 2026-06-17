@@ -212,9 +212,9 @@ class WarmPoolAutoscaleCommand extends Command
      * Retire ready members older than max_member_age_seconds so the next refill
      * replaces them with fresh (security-patched) ones. Capped per tick.
      *
-     * @param  Builder  $base
+     * @param  Builder<ServerPoolMember>  $base
      */
-    private function retireStale($base, bool $dry): void
+    private function retireStale(Builder $base, bool $dry): void
     {
         $maxAge = (int) config('warm_pool.max_member_age_seconds', 0);
         if ($maxAge <= 0) {
@@ -230,6 +230,7 @@ class WarmPoolAutoscaleCommand extends Command
             ->get();
 
         foreach ($stale as $member) {
+            /** @var ServerPoolMember $member */
             $this->retireMember($member, $dry, "stale (>{$maxAge}s) — replacing with fresh");
         }
     }

@@ -48,7 +48,7 @@ class PruneServerOrphanVhostsJob implements ShouldBeUniqueUntilProcessing, Shoul
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -63,7 +63,7 @@ class PruneServerOrphanVhostsJob implements ShouldBeUniqueUntilProcessing, Shoul
 
     public function handle(NginxOrphanVhostPruner $pruner): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             return;
         }

@@ -42,7 +42,7 @@ class MeasureSiteDiskUsageJob implements ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -75,7 +75,7 @@ class MeasureSiteDiskUsageJob implements ShouldQueue
             $emit->info(__('Measuring disk usage at :path…', ['path' => $path]));
 
             $output = $exec->runInlineBash($server, 'site-disk-usage', $this->probeScript($path), 180);
-            $parsed = $this->parse($output->buffer ?? '');
+            $parsed = $this->parse($output->buffer);
 
             if (($parsed['MISSING'] ?? '') === '1') {
                 $emit->warn(__('Nothing on disk yet — this site has not been deployed to :path.', ['path' => $path]));
@@ -86,7 +86,7 @@ class MeasureSiteDiskUsageJob implements ShouldQueue
 
             $bytes = $this->intOrNull($parsed['BYTES'] ?? null);
             if ($bytes === null) {
-                throw new \RuntimeException('du returned no byte count (raw: '.trim($output->buffer ?? '').').');
+                throw new \RuntimeException('du returned no byte count (raw: '.trim($output->buffer).').');
             }
 
             $files = $this->intOrNull($parsed['FILES'] ?? null);

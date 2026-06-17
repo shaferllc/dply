@@ -38,6 +38,28 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
     'ui_preferences',
 ])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
+/**
+ * @property string $id
+ * @property string $name
+ * @property string $email
+ * @property ?\Illuminate\Support\Carbon $email_verified_at
+ * @property string $password
+ * @property ?string $country_code
+ * @property ?string $locale
+ * @property ?string $timezone
+ * @property ?string $invoice_email
+ * @property ?string $vat_number
+ * @property ?string $billing_currency
+ * @property ?array $billing_details
+ * @property ?string $two_factor_secret
+ * @property ?string $two_factor_recovery_codes
+ * @property ?\Illuminate\Support\Carbon $two_factor_confirmed_at
+ * @property ?string $referral_code
+ * @property ?\Illuminate\Support\Carbon $referral_converted_at
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property array $ui_preferences
+ */
+
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
@@ -65,67 +87,67 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $code;
     }
 
-    public function organizations(): BelongsToMany
-    {
+    /** @return BelongsToMany<Organization, $this> */
+    public function organizations(): BelongsToMany {
         return $this->belongsToMany(Organization::class, 'organization_user')
             ->withPivot('role')
             ->withTimestamps();
     }
 
-    public function teams(): BelongsToMany
-    {
+    /** @return BelongsToMany<Team, $this> */
+    public function teams(): BelongsToMany {
         return $this->belongsToMany(Team::class, 'team_user')
             ->withPivot('role')
             ->withTimestamps();
     }
 
-    public function socialAccounts(): HasMany
-    {
+    /** @return HasMany<SocialAccount, $this> */
+    public function socialAccounts(): HasMany {
         return $this->hasMany(SocialAccount::class);
     }
 
-    public function gitProviderTokens(): HasMany
-    {
+    /** @return HasMany<GitProviderToken, $this> */
+    public function gitProviderTokens(): HasMany {
         return $this->hasMany(GitProviderToken::class);
     }
 
-    public function providerCredentials(): HasMany
-    {
+    /** @return HasMany<ProviderCredential, $this> */
+    public function providerCredentials(): HasMany {
         return $this->hasMany(ProviderCredential::class, 'user_id');
     }
 
-    public function servers(): HasMany
-    {
+    /** @return HasMany<Server, $this> */
+    public function servers(): HasMany {
         return $this->hasMany(Server::class, 'user_id');
     }
 
-    public function recentResources(): HasMany
-    {
+    /** @return HasMany<RecentResource, $this> */
+    public function recentResources(): HasMany {
         return $this->hasMany(RecentResource::class);
     }
 
-    public function sshKeys(): HasMany
-    {
+    /** @return HasMany<UserSshKey, $this> */
+    public function sshKeys(): HasMany {
         return $this->hasMany(UserSshKey::class);
     }
 
-    public function apiTokens(): HasMany
-    {
+    /** @return HasMany<ApiToken, $this> */
+    public function apiTokens(): HasMany {
         return $this->hasMany(ApiToken::class);
     }
 
-    public function notificationChannels(): MorphMany
-    {
+    /** @return MorphMany<NotificationChannel, $this> */
+    public function notificationChannels(): MorphMany {
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 
-    public function notificationInboxItems(): HasMany
-    {
+    /** @return HasMany<NotificationInboxItem, $this> */
+    public function notificationInboxItems(): HasMany {
         return $this->hasMany(NotificationInboxItem::class)->latest();
     }
 
-    public function referrer(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function referrer(): BelongsTo {
         return $this->belongsTo(User::class, 'referred_by_user_id');
     }
 
@@ -299,6 +321,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      *
      * @return array<string, string>
      */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

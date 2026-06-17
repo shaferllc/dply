@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One row per (server, engine). Coexistence rules: at most one row from the redis-family
  * ({@see ServerCacheService::FAMILY_REDIS_ENGINES}) per server, plus optionally one Memcached
  * row. Enforced at three layers:
@@ -94,6 +95,7 @@ class ServerCacheService extends Model
         'auth_password',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -113,8 +115,8 @@ class ServerCacheService extends Model
         return in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true);
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

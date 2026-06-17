@@ -11,6 +11,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
+/**
+ * @property string $id
+ */
+
 class SiteUptimeMonitor extends Model
 {
     /** @use HasFactory<SiteUptimeMonitorFactory> */
@@ -44,6 +48,7 @@ class SiteUptimeMonitor extends Model
         'last_meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -64,13 +69,13 @@ class SiteUptimeMonitor extends Model
         });
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function statusPageMonitors(): MorphMany
-    {
+    /** @return MorphMany<StatusPageMonitor, $this> */
+    public function statusPageMonitors(): MorphMany {
         return $this->morphMany(StatusPageMonitor::class, 'monitorable');
     }
 
@@ -86,9 +91,10 @@ class SiteUptimeMonitor extends Model
         return $this->hasMany(SiteUptimeIncident::class);
     }
 
-    /** The currently-open (unresolved) incident, if any. */
-    public function ongoingIncident(): HasOne
-    {
+    /** The currently-open (unresolved) incident, if any. *
+ * @return HasOne<SiteUptimeIncident, $this>
+ */
+    public function ongoingIncident(): HasOne {
         return $this->hasOne(SiteUptimeIncident::class)->whereNull('resolved_at')->latestOfMany('started_at');
     }
 

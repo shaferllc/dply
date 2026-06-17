@@ -39,7 +39,7 @@ class RunOpsCopilotLlmAnalysisJob implements ShouldQueue
         }
 
         $organization = Organization::query()->find($this->organizationId);
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($organization === null || $site === null) {
             $recorder->fail($run, 'Organization or site not found.');
 

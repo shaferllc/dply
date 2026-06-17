@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property string $id
  * An org-level private network (Hetzner private network or DigitalOcean VPC).
  * Servers that belong to the network reference it via `private_network_id`.
  * Routes are stored on Hetzner's side — fetched live via the API.
@@ -37,23 +38,24 @@ class PrivateNetwork extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return ['meta' => 'array'];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 
-    public function servers(): HasMany
-    {
+    /** @return HasMany<Server, $this> */
+    public function servers(): HasMany {
         return $this->hasMany(Server::class, 'private_network_id');
     }
 

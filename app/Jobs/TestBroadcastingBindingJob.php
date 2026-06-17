@@ -51,7 +51,7 @@ class TestBroadcastingBindingJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         $binding = SiteBinding::query()->find($this->bindingId);
         $action = ConsoleAction::query()->find($this->consoleActionId);
 

@@ -144,7 +144,8 @@ class InstallCacheServiceJob implements ShouldQueue
 
             // Apt may have completed successfully right before the operator clicked Cancel and
             // before our next poll fired. Honor the intent: revert what we just installed.
-            if ($row->fresh()?->cancel_requested_at !== null) {
+            $freshRow = $row->fresh();
+            if ($freshRow !== null && $freshRow->cancel_requested_at !== null) {
                 $this->finishCancellation($row, $executor, $capabilities, $audit, ranAptInstall: true);
 
                 return;

@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class Incident extends Model
 {
+    /** @use HasFactory<IncidentFactory> */
     use HasFactory, HasUlids;
 
     public const IMPACT_NONE = 'none';
@@ -38,6 +43,7 @@ class Incident extends Model
         'resolved_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -46,18 +52,18 @@ class Incident extends Model
         ];
     }
 
-    public function statusPage(): BelongsTo
-    {
+    /** @return BelongsTo<StatusPage, $this> */
+    public function statusPage(): BelongsTo {
         return $this->belongsTo(StatusPage::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function incidentUpdates(): HasMany
-    {
+    /** @return HasMany<IncidentUpdate, $this> */
+    public function incidentUpdates(): HasMany {
         return $this->hasMany(IncidentUpdate::class)->orderBy('created_at');
     }
 

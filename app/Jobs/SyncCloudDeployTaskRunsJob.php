@@ -43,7 +43,7 @@ class SyncCloudDeployTaskRunsJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null || $site->container_backend !== 'digitalocean_app_platform') {
             return;
         }

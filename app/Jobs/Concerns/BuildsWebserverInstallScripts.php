@@ -316,6 +316,9 @@ BASH;
         );
     }
 
+    /**
+     * @param  Collection<int, Site>  $sites
+     */
     private function writeOlsHttpdConfig(
         Server $server,
         SshConnection $ssh,

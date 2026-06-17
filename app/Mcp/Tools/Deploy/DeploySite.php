@@ -29,7 +29,7 @@ class DeploySite extends AbstractDplyTool
     protected string $ability = 'sites.deploy';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {

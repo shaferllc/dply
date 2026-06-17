@@ -44,6 +44,7 @@ class InsightFinding extends Model
         'ignored_by_user_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -56,23 +57,23 @@ class InsightFinding extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function team(): BelongsTo
-    {
+    /** @return BelongsTo<Team, $this> */
+    public function team(): BelongsTo {
         return $this->belongsTo(Team::class);
     }
 
-    public function acknowledgedBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function acknowledgedBy(): BelongsTo {
         return $this->belongsTo(User::class, 'acknowledged_by_user_id');
     }
 

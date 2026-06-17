@@ -214,7 +214,7 @@ class AccountApiController extends Controller
 
     protected function organizationRole(Organization $organization, User $user): ?string
     {
-        $fromPivot = $organization->pivot?->role;
+        $fromPivot = data_get($organization->pivot, 'role');
         if (is_string($fromPivot) && $fromPivot !== '') {
             return $fromPivot;
         }
@@ -223,7 +223,7 @@ class AccountApiController extends Controller
             ->whereKey($organization->id)
             ->first();
 
-        $role = $membership?->pivot?->role;
+        $role = data_get($membership?->pivot, 'role');
 
         return is_string($role) && $role !== '' ? $role : null;
     }

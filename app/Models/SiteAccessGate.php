@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class SiteAccessGate extends Model
 {
     use HasUlids;
@@ -27,13 +31,13 @@ class SiteAccessGate extends Model
         'cookie_secret',
     ];
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function passwords(): HasMany
-    {
+    /** @return HasMany<SiteAccessGatePassword, $this> */
+    public function passwords(): HasMany {
         return $this->hasMany(SiteAccessGatePassword::class, 'site_id', 'site_id')
             ->orderBy('sort_order')
             ->orderBy('label');

@@ -94,6 +94,7 @@ trait DiagnosesWebserverSwitch
      * On-disk paths (globs) worth dumping when a webserver fails to start.
      * Returns the main config plus per-site enabled configs for the target.
      */
+    /** @return list<string> */
     private function diagnosticConfigPathsFor(string $target): array
     {
         return match ($target) {

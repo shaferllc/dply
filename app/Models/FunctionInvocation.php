@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One recorded invocation of a serverless (DigitalOcean Functions) site.
  *
  * The DO activations list API never returns anything, so this table — not
@@ -52,6 +53,7 @@ class FunctionInvocation extends Model
         'created_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -65,14 +67,15 @@ class FunctionInvocation extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    /** The action this invocation hit — null for rows not yet backfilled. */
-    public function functionAction(): BelongsTo
-    {
+    /** The action this invocation hit — null for rows not yet backfilled. *
+ * @return BelongsTo<FunctionAction, $this>
+ */
+    public function functionAction(): BelongsTo {
         return $this->belongsTo(FunctionAction::class);
     }
 

@@ -11,6 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
+/**
+ * @property string $id
+ */
+
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -23,6 +27,7 @@ class Team extends Model
         'preferences',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -56,20 +61,20 @@ class Team extends Model
         return $merged;
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function users(): BelongsToMany
-    {
+    /** @return BelongsToMany<User, $this> */
+    public function users(): BelongsToMany {
         return $this->belongsToMany(User::class, 'team_user')
             ->withPivot('role')
             ->withTimestamps();
     }
 
-    public function servers(): HasMany
-    {
+    /** @return HasMany<Server, $this> */
+    public function servers(): HasMany {
         return $this->hasMany(Server::class);
     }
 
@@ -98,13 +103,13 @@ class Team extends Model
         return $this->userCanManageSshKeys($user);
     }
 
-    public function sshKeys(): HasMany
-    {
+    /** @return HasMany<TeamSshKey, $this> */
+    public function sshKeys(): HasMany {
         return $this->hasMany(TeamSshKey::class);
     }
 
-    public function notificationChannels(): MorphMany
-    {
+    /** @return MorphMany<NotificationChannel, $this> */
+    public function notificationChannels(): MorphMany {
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 }

@@ -16,6 +16,7 @@ class ServerSystemdServiceAuditEvent extends Model
         'detail',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -23,8 +24,8 @@ class ServerSystemdServiceAuditEvent extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 }

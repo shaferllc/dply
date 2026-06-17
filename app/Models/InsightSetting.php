@@ -14,6 +14,7 @@ class InsightSetting extends Model
         'parameters',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

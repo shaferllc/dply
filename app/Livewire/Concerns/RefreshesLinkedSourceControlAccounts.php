@@ -5,15 +5,14 @@ namespace App\Livewire\Concerns;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Livewire\Attributes\On;
 
+/**
+ * @property list<array<string, mixed>> $linkedSourceControlAccounts
+ */
 trait RefreshesLinkedSourceControlAccounts
 {
     #[On('source-control-linked')]
     public function refreshLinkedSourceControlAccounts(): void
     {
-        if (! property_exists($this, 'linkedSourceControlAccounts')) {
-            return;
-        }
-
         $user = auth()->user();
         if ($user === null) {
             return;

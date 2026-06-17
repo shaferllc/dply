@@ -68,8 +68,8 @@ class SyncServerSystemdServicesJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $server = Server::query()->find($this->serverId);
-        if ($server === null || ! $server->isReady() || $server->ssh_private_key === null || $server->ssh_private_key === '') {
+        $server = Server::find($this->serverId);
+        if ($server === null || ! $server->isReady() || $server->ssh_private_key === '') {
             $this->writeBannerCache('failed', '', __('Server is not ready for inventory sync.'));
             $this->fireBroadcast(false, __('Server is not ready for inventory sync.'), '');
 

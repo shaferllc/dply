@@ -482,30 +482,7 @@ trait AsProgressive
             'metadata' => $metadata,
         ];
 
-        broadcast(new class($this->getProgressChannel(), 'progress.updated', $payload) extends Channel
-        {
-            /**
-             * @param  array<string, mixed>  $payload
-             */
-            public function __construct(
-                public string $channelName,
-                public string $eventName,
-                public array $payload,
-            ) {
-                parent::__construct($channelName);
-            }
-
-            public function broadcastAs(): string
-            {
-                return $this->eventName;
-            }
-
-            /** @return array<string, mixed> */
-            public function broadcastWith(): array
-            {
-                return $this->payload;
-            }
-        });
+        broadcast(new ProgressiveProgressBroadcast($this->getProgressChannel(), 'progress.updated', $payload));
     }
 
     /**
@@ -530,5 +507,30 @@ trait AsProgressive
     protected function shouldBroadcastProgress(): bool
     {
         return config('actions.progress.broadcast', false);
+    }
+}
+
+final class ProgressiveProgressBroadcast extends Channel
+{
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function __construct(
+        public string $channelName,
+        public string $eventName,
+        public array $payload,
+    ) {
+        parent::__construct($channelName);
+    }
+
+    public function broadcastAs(): string
+    {
+        return $this->eventName;
+    }
+
+    /** @return array<string, mixed> */
+    public function broadcastWith(): array
+    {
+        return $this->payload;
     }
 }

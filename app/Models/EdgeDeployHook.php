@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
+ * @property string $id
  * URL-bearing token that triggers a redeploy of the parent Edge site
  * when POSTed to `/hooks/edge/deploy/{plaintext}` (P10b). The
  * plaintext token is shown to the operator once at create-time; only
@@ -30,6 +31,7 @@ class EdgeDeployHook extends Model
         'last_triggered_deployment_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -37,8 +39,8 @@ class EdgeDeployHook extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

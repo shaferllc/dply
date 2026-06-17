@@ -64,12 +64,13 @@ class RunSiteDeploymentJob implements ShouldQueue
         NotificationPublisher $notificationPublisher,
         EphemeralDeployCredentialManager $ephemeralCredentials,
     ): void {
-        $this->site = $this->site->fresh();
-        if (! $this->site) {
+        $freshSite = $this->site->fresh();
+        if ($freshSite === null) {
             $this->clearIdempotencyInflight();
 
             return;
         }
+        $this->site = $freshSite;
 
         $this->site->loadMissing('project');
         if ($this->site->project === null) {
@@ -220,7 +221,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $fingerprint = 'SHA256:'.(string) $ephemeralCredential->public_key_fingerprint;
                 $ephemeralLog[] = '── Ephemeral deploy credentials ──';
                 $ephemeralLog[] = 'Issued a one-time ed25519 deploy key ('.$fingerprint.').';
-                $ephemeralLog[] = 'Installed on '.($this->site->server?->name ?? 'the server')
+                $ephemeralLog[] = 'Installed on '.($this->site->server->name ?? 'the server')
                     .' via the operational SSH key; this deploy authenticates with it.';
             }
 
@@ -270,8 +271,8 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // than silently succeeding. The checker honors
                 // meta.deploy_health_enabled and self-skips when there's no
                 // hostname, so this is a safe no-op where it shouldn't run.
-                if ($this->site->server?->isVmHost()
-                    && filled($this->site->server?->ssh_private_key)
+                if ($this->site->server->isVmHost()
+                    && filled($this->site->server->ssh_private_key)
                     && ! $deployment->hasPhase('health')) {
                     $healthStart = microtime(true);
                     try {
@@ -495,7 +496,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         // deployment's timeline shows the whole pipeline. The atomic deployer
         // skips those phases on disk; these records keep them visible.
         $carried = [];
-        $originPhases = is_array($origin->phase_results) ? $origin->phase_results : [];
+        $originPhases = $origin->phase_results;
         foreach (DeployResumePlan::PHASE_ORDER as $phase) {
             if ($phase === $startPhase) {
                 break;
@@ -577,7 +578,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $org) {
             return;
         }
-        $user = $this->auditUserId ? User::query()->find($this->auditUserId) : null;
+        $user = $this->auditUserId ? User::find($this->auditUserId) : null;
         $action = match ($deployment->status) {
             SiteDeployment::STATUS_SUCCESS => 'site.deploy.success',
             SiteDeployment::STATUS_FAILED => 'site.deploy.failed',
@@ -734,7 +735,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $server,
                 'deploy_blocked',
                 $details,
-                $this->auditUserId ? User::query()->find($this->auditUserId) : null,
+                $this->auditUserId ? User::find($this->auditUserId) : null,
                 [
                     'site_id' => (string) $this->site->id,
                     'site_name' => $this->site->name,

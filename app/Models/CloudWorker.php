@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A background process attached to a Cloud container Site — a queue
  * worker or the Laravel scheduler.
  *
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CloudWorker extends Model
 {
+    /** @use HasFactory<CloudWorkerFactory> */
     use HasFactory, HasUlids;
 
     public const TYPE_WORKER = 'worker';
@@ -83,6 +85,7 @@ class CloudWorker extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -91,8 +94,8 @@ class CloudWorker extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

@@ -9,6 +9,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ * @property string $organization_id
+ * @property ?string $user_id
+ * @property string $name
+ * @property string $content
+ * @property ?string $run_as_user
+ * @property string $source
+ * @property ?string $marketplace_key
+ * @property-read Organization $organization
+ * @property-read ?User $user
+ */
+
 class Script extends Model
 {
     public const SOURCE_USER_CREATED = 'user_created';
@@ -28,18 +41,18 @@ class Script extends Model
         'marketplace_key',
     ];
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function sitesUsingAsDeploy(): HasMany
-    {
+    /** @return HasMany<Site, $this> */
+    public function sitesUsingAsDeploy(): HasMany {
         return $this->hasMany(Site::class, 'deploy_script_id');
     }
 

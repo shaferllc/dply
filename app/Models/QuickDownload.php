@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A queued quick-download request. The build job stages a freshly-built artifact
  * into the operator-managed download bucket (see config/backup_staging.php), the
  * user is notified in-app + by email, and the signed proxy route streams it on
@@ -64,6 +65,7 @@ class QuickDownload extends Model
         'consumed_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -74,23 +76,23 @@ class QuickDownload extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function serverDatabase(): BelongsTo
-    {
+    /** @return BelongsTo<ServerDatabase, $this> */
+    public function serverDatabase(): BelongsTo {
         return $this->belongsTo(ServerDatabase::class);
     }
 
-    public function requestedBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function requestedBy(): BelongsTo {
         return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 

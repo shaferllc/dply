@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Edge\DeployEdgeCommit;
 use App\Models\Site;
 use App\Models\User;
@@ -21,6 +22,7 @@ use Livewire\Component;
  */
 trait ManagesEdgeDeployCommit
 {
+    use DispatchesToastNotifications;
     public string $edge_deploy_commit_sha = '';
 
     public ?string $edge_deploy_commit_branch = null;

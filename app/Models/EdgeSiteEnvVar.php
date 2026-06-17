@@ -57,6 +57,7 @@ class EdgeSiteEnvVar extends Model
         'created_by_user_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -64,13 +65,13 @@ class EdgeSiteEnvVar extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function creator(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 

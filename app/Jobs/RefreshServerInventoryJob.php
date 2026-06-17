@@ -31,7 +31,7 @@ class RefreshServerInventoryJob implements ShouldQueue
 
     public function handle(ServerInventoryProbeScript $svc): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null || ! $server->isReady() || empty($server->ip_address) || ! $server->hasAnySshPrivateKey()) {
             return;
         }

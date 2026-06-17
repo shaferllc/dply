@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * Per-server / per-org override for one webserver-health alert threshold.
  * Resolution precedence + table semantics documented in the migration.
  */
@@ -26,6 +27,7 @@ class WebserverHealthThreshold extends Model
         'severity',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -33,13 +35,13 @@ class WebserverHealthThreshold extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 }

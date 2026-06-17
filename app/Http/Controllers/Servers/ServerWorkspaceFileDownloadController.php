@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class ServerWorkspaceFileDownloadController extends Controller
 {
-    public function __invoke(Request $request, Server $server): StreamedResponse|Response
+    public function __invoke(Request $request, Server $server): StreamedResponse
     {
         if (! Feature::active('workspace.files')) {
             abort(404);
@@ -32,8 +32,9 @@ final class ServerWorkspaceFileDownloadController extends Controller
         Gate::authorize('view', $server);
 
         $user = Auth::user();
-        $org = $user?->currentOrganization();
-        if ($org !== null && $user !== null && $org->userIsDeployer($user)) {
+        abort_if($user === null, 403);
+        $org = $user->currentOrganization();
+        if ($org !== null && $org->userIsDeployer($user)) {
             abort(403, __('Deployer role does not have access to the server file browser.'));
         }
 
@@ -44,7 +45,6 @@ final class ServerWorkspaceFileDownloadController extends Controller
         }
 
         $viewAsRoot = $request->boolean('root')
-            && $user !== null
             && $org !== null
             && $org->hasAdminAccess($user);
 

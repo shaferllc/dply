@@ -33,7 +33,7 @@ class DbRestoreCommand extends Command
         }
 
         $db = $backup->serverDatabase;
-        $target = (string) ($this->option('to-database') ?: ($db?->name ?? ''));
+        $target = (string) ($this->option('to-database') ?: $db->name);
         if ($target === '') {
             $this->error('Could not resolve a target database.');
 

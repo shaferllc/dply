@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property string $id
  * One OpenWhisk action on a serverless function-Site.
  *
  * A Site is an OpenWhisk package holding N actions. A `kind=code` action is
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class FunctionAction extends Model
 {
+    /** @use HasFactory<FunctionActionFactory> */
     use HasFactory, HasUlids;
 
     /** A deployable function with its own code. */
@@ -47,6 +49,7 @@ class FunctionAction extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -59,13 +62,13 @@ class FunctionAction extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function invocations(): HasMany
-    {
+    /** @return HasMany<FunctionInvocation, $this> */
+    public function invocations(): HasMany {
         return $this->hasMany(FunctionInvocation::class);
     }
 

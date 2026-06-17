@@ -4,9 +4,11 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
+use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
+use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerBackupNotificationDispatcher;
 use App\Services\Servers\DatabaseBackupExporter;
@@ -60,7 +62,7 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
         }
 
         $server = ServerDatabaseBackup::query()->with('serverDatabase.server')->find($this->backupId)?->serverDatabase?->server;
-        if ($server === null) {
+        if (! $server instanceof Server) {
             throw new \RuntimeException('Console subject server not found for database backup.');
         }
 
@@ -85,8 +87,9 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
         }
 
         $server = $db->server;
-
-        // On-demand runs seed a row before dispatch; bind + flip to running so
+        if (! $server instanceof Server) {
+            return;
+        }
         // the banner streams. Scheduled runs pass no id → a no-op emitter, and
         // the complete/fail console transitions below are no-ops too.
         $emit = new ConsoleEmitter(null);
@@ -103,25 +106,24 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
             $fresh = $backup->fresh();
 
             $user = $backup->user;
-            if ($user) {
+            if ($user instanceof User) {
                 $auditLogger->record($server, ServerDatabaseAuditEvent::EVENT_BACKUP_EXPORTED, [
                     'server_database_id' => $db->id,
                     'backup_id' => $backup->id,
-                    'bytes' => $fresh?->bytes,
-                    'storage_kind' => $fresh?->storage_kind,
+                    'bytes' => $fresh->bytes,
+                    'storage_kind' => $fresh->storage_kind,
                 ], $user);
             }
 
-            if ($server) {
-                $notifications->notify($server, 'completed', [__('Database — :name', ['name' => $db->name])], $backup->user, [
-                    'backup_type' => 'database',
-                    'backup_id' => (string) $backup->id,
-                    'database_id' => (string) $db->id,
-                    'bytes' => $fresh?->bytes,
-                ]);
-            }
+            $actor = $backup->user instanceof User ? $backup->user : null;
+            $notifications->notify($server, 'completed', [__('Database — :name', ['name' => $db->name])], $actor, [
+                'backup_type' => 'database',
+                'backup_id' => (string) $backup->id,
+                'database_id' => (string) $db->id,
+                'bytes' => $fresh->bytes,
+            ]);
 
-            $emit->success(__('Database backup complete — :size', ['size' => Number::fileSize((int) ($fresh?->bytes ?? 0))]), 'db');
+            $emit->success(__('Database backup complete — :size', ['size' => Number::fileSize((int) $fresh->bytes)]), 'db');
             $this->completeConsoleAction();
         } catch (\Throwable $e) {
             $backup->update([
@@ -129,14 +131,13 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
                 'error_message' => $e->getMessage(),
             ]);
 
-            if ($server) {
-                $notifications->notify($server, 'failed', [__('Database — :name', ['name' => $db->name])], $backup->user, [
+            $actor = $backup->user instanceof User ? $backup->user : null;
+            $notifications->notify($server, 'failed', [__('Database — :name', ['name' => $db->name])], $actor, [
                     'backup_type' => 'database',
                     'backup_id' => (string) $backup->id,
                     'database_id' => (string) $db->id,
                     'error' => $e->getMessage(),
-                ]);
-            }
+            ]);
 
             // Keep the historical no-retry behavior: surface the failure on the
             // row + banner, but do NOT re-throw (no queue retry, no duplicate

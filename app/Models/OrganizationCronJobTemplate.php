@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class OrganizationCronJobTemplate extends Model
 {
     use HasUlids;
@@ -24,13 +28,13 @@ class OrganizationCronJobTemplate extends Model
         'description',
     ];
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function serverCronJobs(): HasMany
-    {
+    /** @return HasMany<ServerCronJob, $this> */
+    public function serverCronJobs(): HasMany {
         return $this->hasMany(ServerCronJob::class, 'applied_template_id');
     }
 }

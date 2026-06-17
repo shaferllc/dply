@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ */
+
 class NotificationEvent extends Model
 {
     use HasUlids;
@@ -35,6 +39,7 @@ class NotificationEvent extends Model
         'cleared_by_user_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -52,13 +57,13 @@ class NotificationEvent extends Model
         return $this->morphTo();
     }
 
-    public function actor(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function actor(): BelongsTo {
         return $this->belongsTo(User::class, 'actor_id');
     }
 
-    public function inboxItems(): HasMany
-    {
+    /** @return HasMany<NotificationInboxItem, $this> */
+    public function inboxItems(): HasMany {
         return $this->hasMany(NotificationInboxItem::class);
     }
 

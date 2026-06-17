@@ -7,8 +7,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $site_id
+ * @property ?string $user_id
+ * @property string $status
+ * @property string $storage_kind
+ * @property ?string $disk_path
+ * @property ?string $remote_path
+ * @property ?int $bytes
+ * @property-read Site $site
+ */
+
 class SiteFileBackup extends Model
 {
+    /** @use HasFactory<SiteFileBackupFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
@@ -36,13 +49,13 @@ class SiteFileBackup extends Model
         'error_message',
     ];
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

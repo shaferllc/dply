@@ -42,7 +42,7 @@ class ScanServerSshLoginsJob implements ShouldQueue
 
     public function handle(NotificationPublisher $publisher): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null || ! $server->isReady() || empty($server->ip_address) || ! $server->hasAnySshPrivateKey()) {
             return;
         }
@@ -169,7 +169,7 @@ class ScanServerSshLoginsJob implements ShouldQueue
 
             // No source address = local console or unresolved; skip — operators
             // care about who logged in from where, not local-console boots.
-            if ($ip === '' || $ip === '-' || ! preg_match('/^[0-9a-f:.]+$/i', $ip)) {
+            if ($ip === '-' || ! preg_match('/^[0-9a-f:.]+$/i', $ip)) {
                 continue;
             }
 

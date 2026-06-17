@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
 use Livewire\Component;
@@ -15,6 +16,7 @@ use Livewire\Component;
  */
 trait ManagesEdgeDanger
 {
+    use DispatchesToastNotifications;
     public function openEdgeTeardownModal(): void
     {
         if (! $this->site->usesEdgeRuntime()) {

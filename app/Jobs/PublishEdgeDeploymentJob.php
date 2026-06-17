@@ -58,7 +58,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             return;
         }
 
-        $site = Site::query()->find($deployment->site_id);
+        $site = Site::find($deployment->site_id);
         if ($site === null) {
             return;
         }

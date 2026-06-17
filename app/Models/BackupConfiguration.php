@@ -8,6 +8,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $organization_id
+ * @property ?string $created_by_user_id
+ * @property string $name
+ * @property string $provider
+ * @property array $config
+ * @property-read Organization $organization
+ * @property-read ?User $createdByUser
+ */
 class BackupConfiguration extends Model
 {
     /** @use HasFactory<BackupConfigurationFactory> */
@@ -88,6 +98,7 @@ class BackupConfiguration extends Model
         'config',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -95,13 +106,13 @@ class BackupConfiguration extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function createdByUser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function createdByUser(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

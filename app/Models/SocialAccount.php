@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SocialAccount extends Model implements GitIdentity
 {
     use AvoidsGitIdentityAttributeRecursion;
@@ -28,8 +32,8 @@ class SocialAccount extends Model implements GitIdentity
         'refresh_token',
     ];
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

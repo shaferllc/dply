@@ -1,7 +1,7 @@
 <div
     class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
-    x-data="{ view: 'form' }"
-    x-init="$watch('view', v => { if (v === 'canvas') $nextTick(() => window.dispatchEvent(new CustomEvent('canvas-shown'))) })"
+    x-data="{ subtab: 'form' }"
+    x-init="$watch('subtab', v => { if (v === 'canvas') $nextTick(() => window.dispatchEvent(new CustomEvent('canvas-shown'))) })"
 >
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
@@ -19,32 +19,14 @@
     >
         <x-slot:topAction>
             <div class="flex flex-col items-stretch gap-3 sm:items-end">
-                <div role="tablist" aria-label="{{ __('View mode') }}" class="inline-flex self-end rounded-xl border border-brand-ink/10 bg-white/90 p-1 shadow-sm dark:border-brand-mist/25 dark:bg-zinc-800/80">
-                    <button
-                        type="button"
-                        role="tab"
-                        x-on:click="view = 'form'"
-                        x-bind:aria-selected="view === 'form'"
-                        x-bind:class="view === 'form' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'"
-                        class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition"
-                        title="{{ __('Form view') }}"
-                    >
-                        <x-heroicon-o-bars-3-bottom-left class="h-4 w-4" aria-hidden="true" />
+                <x-server-workspace-tablist :aria-label="__('View mode')" class="self-end !mb-0">
+                    <x-server-workspace-tab :subtab-key="'form'" icon="heroicon-o-bars-3-bottom-left" title="{{ __('Form view') }}">
                         {{ __('Form') }}
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        x-on:click="view = 'canvas'"
-                        x-bind:aria-selected="view === 'canvas'"
-                        x-bind:class="view === 'canvas' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'"
-                        class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition"
-                        title="{{ __('Canvas view') }}"
-                    >
-                        <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab :subtab-key="'canvas'" icon="heroicon-o-squares-2x2" title="{{ __('Canvas view') }}">
                         {{ __('Canvas') }}
-                    </button>
-                </div>
+                    </x-server-workspace-tab>
+                </x-server-workspace-tablist>
                 <div class="flex flex-wrap gap-3 text-xs text-brand-moss">
                     <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
                         <x-heroicon-o-lock-closed class="h-3.5 w-3.5 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
@@ -99,7 +81,7 @@
     @endif
 
     <form wire:submit="deploy" class="mt-8">
-        <div x-show="view === 'form'" class="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start">
+        <div x-show="subtab === 'form'" class="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start">
         <div class="min-w-0 space-y-6">
             {{-- 01 Source --}}
             <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
@@ -111,26 +93,14 @@
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Deploy from a Git repository or a pre-built image. Source mode rebuilds on every push.') }}</p>
                         </div>
 
-                        <div role="tablist" aria-label="{{ __('Deployment source') }}" class="inline-flex w-full max-w-md rounded-xl border border-brand-ink/10 bg-brand-cream/60 p-1 text-sm dark:border-brand-mist/20 dark:bg-zinc-800/60">
-                            <button type="button" role="tab" aria-selected="{{ $mode === 'source' ? 'true' : 'false' }}" wire:click="$set('mode', 'source')"
-                                @class([
-                                    'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-medium transition',
-                                    'bg-brand-ink text-brand-cream shadow-sm' => $mode === 'source',
-                                    'text-brand-moss hover:text-brand-ink' => $mode !== 'source',
-                                ])>
-                                <x-heroicon-o-code-bracket class="h-4 w-4" aria-hidden="true" />
+                        <x-server-workspace-tablist :aria-label="__('Deployment source')" class="!mb-0">
+                            <x-server-workspace-tab icon="heroicon-o-code-bracket" :active="$mode === 'source'" wire:click="$set('mode', 'source')">
                                 {{ __('From repository') }}
-                            </button>
-                            <button type="button" role="tab" aria-selected="{{ $mode === 'image' ? 'true' : 'false' }}" wire:click="$set('mode', 'image')"
-                                @class([
-                                    'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-medium transition',
-                                    'bg-brand-ink text-brand-cream shadow-sm' => $mode === 'image',
-                                    'text-brand-moss hover:text-brand-ink' => $mode !== 'image',
-                                ])>
-                                <x-heroicon-o-cube class="h-4 w-4" aria-hidden="true" />
+                            </x-server-workspace-tab>
+                            <x-server-workspace-tab icon="heroicon-o-cube" :active="$mode === 'image'" wire:click="$set('mode', 'image')">
                                 {{ __('From image') }}
-                            </button>
-                        </div>
+                            </x-server-workspace-tab>
+                        </x-server-workspace-tablist>
 
                         <div>
                             <x-input-label for="name" :value="__('App name')" />
@@ -962,7 +932,7 @@
         @include('livewire.cloud.partials.create-sidebar', ['cloudFee' => $cloudFee, 'costPreview' => $costPreview, 'resourceEstimate' => $resourceEstimate])
         </div>
 
-        <div x-show="view === 'canvas'" x-cloak>
+        <div x-show="subtab === 'canvas'" x-cloak>
             @include('livewire.cloud.partials.create-canvas')
         </div>
     </form>

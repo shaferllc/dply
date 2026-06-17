@@ -30,7 +30,7 @@ class DetectSiteCloudflareTlsJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }
@@ -64,7 +64,7 @@ class DetectSiteCloudflareTlsJob implements ShouldQueue
 
             // A `cf-ray` header is emitted by every Cloudflare-proxied response;
             // `server: cloudflare` is the belt-and-suspenders signal.
-            $terminating = ($cfRay !== null && $cfRay !== '')
+            $terminating = $cfRay !== null
                 || ($server !== null && str_contains(strtolower($server), 'cloudflare'));
         } catch (\Throwable) {
             // Unreachable / TLS handshake failure — treat as "not detected" and

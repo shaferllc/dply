@@ -31,6 +31,7 @@ use Livewire\Component;
  */
 trait QueuesQuickDownloads
 {
+    use DispatchesToastNotifications;
     /** The quick-download row currently being prepared/polled, if any. */
     public ?string $qdId = null;
 
@@ -41,6 +42,7 @@ trait QueuesQuickDownloads
     public ?string $qdLabel = null;
 
     /** target key => error message, surfaced inline next to the button. */
+    /** @var array<string, string> */
     public array $qdErrors = [];
 
     public function requestSiteQuickDownload(string $siteId, string $artifact): mixed
@@ -201,8 +203,9 @@ trait QueuesQuickDownloads
 
     /**
      * @param  array<string, mixed>  $attrs
+     * @return \Illuminate\Database\Eloquent\Builder<QuickDownload>
      */
-    private function activeQuickDownloadQuery(array $attrs)
+    private function activeQuickDownloadQuery(array $attrs): \Illuminate\Database\Eloquent\Builder
     {
         $query = QuickDownload::query()
             ->where('server_id', $attrs['server_id'])

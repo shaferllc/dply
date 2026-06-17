@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  */
 class ServerCreateDraft extends Model
 {
+    /** @use HasFactory<ServerCreateDraftFactory> */
     use HasFactory, HasUlids;
 
     public const TTL_DAYS = 14;
@@ -42,6 +43,7 @@ class ServerCreateDraft extends Model
         'expires_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -51,13 +53,13 @@ class ServerCreateDraft extends Model
         ];
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 

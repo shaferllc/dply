@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class ImportSiteMigration extends Model
 {
     use HasUlids;
@@ -52,6 +56,7 @@ class ImportSiteMigration extends Model
         'failure_summary',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -63,18 +68,18 @@ class ImportSiteMigration extends Model
         ];
     }
 
-    public function serverMigration(): BelongsTo
-    {
+    /** @return BelongsTo<ImportServerMigration, $this> */
+    public function serverMigration(): BelongsTo {
         return $this->belongsTo(ImportServerMigration::class, 'import_server_migration_id');
     }
 
-    public function targetSite(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function targetSite(): BelongsTo {
         return $this->belongsTo(Site::class, 'target_site_id');
     }
 
-    public function steps(): HasMany
-    {
+    /** @return HasMany<ImportMigrationStep, $this> */
+    public function steps(): HasMany {
         return $this->hasMany(ImportMigrationStep::class)->orderBy('sequence');
     }
 }

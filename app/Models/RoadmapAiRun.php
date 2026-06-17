@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
+ * @property string $id
  * One run of the post-deploy AI roadmap updater — both an audit record and the
  * cursor the next run reads from. {@see latestCompletedToCommit()} returns the
  * commit the previous successful run stopped at, so each deploy only reasons
@@ -42,6 +43,7 @@ class RoadmapAiRun extends Model
         'plan',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

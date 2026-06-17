@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
+ * @property string $id
  * A short-lived, reveal-once link that lets the recipient view a server's
  * credentials (currently the dedicated cache/redis AUTH block) without the
  * secret ever being placed in an email body.
@@ -36,6 +37,7 @@ class ServerCredentialShare extends Model
         'max_views',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -43,13 +45,13 @@ class ServerCredentialShare extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

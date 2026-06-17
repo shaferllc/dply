@@ -122,16 +122,6 @@ class FleetSummaryCommand extends Command
             $this->line('<fg=gray>No database engines registered yet.</>');
         }
 
-        if (! $flyConnected && $edgeEligibleSites > 0) {
-            $this->newLine();
-            $this->line(sprintf(
-                '<fg=cyan>Fly.io edge:</> <fg=gray>not connected.</> %d %s could deploy at the edge.',
-                $edgeEligibleSites,
-                trans_choice('{1} Node/static site|[2,*] Node/static sites', $edgeEligibleSites),
-            ));
-            $this->line('<fg=gray>  Connect: dply:list-engines | docs: https://fly.io/docs/about/pricing</>');
-        }
-
         if ($cloudSites->isNotEmpty()) {
             $this->newLine();
             $this->line('<fg=cyan>Dply cloud</>');

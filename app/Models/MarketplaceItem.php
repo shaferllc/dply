@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property string $id
+ */
+
 class MarketplaceItem extends Model
 {
     /** @use HasFactory<MarketplaceItemFactory> */
@@ -48,6 +52,7 @@ class MarketplaceItem extends Model
         'is_active',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

@@ -4,7 +4,10 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
+use App\Models\Server;
+use App\Models\Site;
 use App\Models\SiteFileBackup;
+use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerBackupNotificationDispatcher;
 use App\Services\Servers\SiteFileBackupExporter;
@@ -55,7 +58,7 @@ class ExportSiteFileBackupJob implements ShouldQueue
         }
 
         $server = SiteFileBackup::query()->with('site.server')->find($this->backupId)?->site?->server;
-        if ($server === null) {
+        if (! $server instanceof Server) {
             throw new \RuntimeException('Console subject server not found for site files backup.');
         }
 
@@ -75,7 +78,7 @@ class ExportSiteFileBackupJob implements ShouldQueue
         }
 
         $site = $backup->site;
-        if (! $site) {
+        if (! $site instanceof Site) {
             return;
         }
 
@@ -86,15 +89,16 @@ class ExportSiteFileBackupJob implements ShouldQueue
         }
 
         $server = $site->server;
-        if (! $server || ! $site->supportsSshFileArchive()) {
+        if (! $server instanceof Server || ! $site->supportsSshFileArchive()) {
             $message = __('This site cannot export files over SSH (runtime or server not ready).');
             $backup->update([
                 'status' => SiteFileBackup::STATUS_FAILED,
                 'error_message' => $message,
             ]);
 
-            if ($server) {
-                $notifications->notify($server, 'failed', [__('Site files — :name', ['name' => $site->name])], $backup->user, [
+            if ($server instanceof Server) {
+                $actor = $backup->user instanceof User ? $backup->user : null;
+                $notifications->notify($server, 'failed', [__('Site files — :name', ['name' => $site->name])], $actor, [
                     'backup_type' => 'site_files',
                     'backup_id' => (string) $backup->id,
                     'site_id' => (string) $site->id,
@@ -114,7 +118,8 @@ class ExportSiteFileBackupJob implements ShouldQueue
             $exporter->export($backup, $emit);
             $backup->refresh();
 
-            $notifications->notify($server, 'completed', [__('Site files — :name', ['name' => $site->name])], $backup->user, [
+            $actor = $backup->user instanceof User ? $backup->user : null;
+            $notifications->notify($server, 'completed', [__('Site files — :name', ['name' => $site->name])], $actor, [
                 'backup_type' => 'site_files',
                 'backup_id' => (string) $backup->id,
                 'site_id' => (string) $site->id,
@@ -129,7 +134,8 @@ class ExportSiteFileBackupJob implements ShouldQueue
                 'error_message' => $e->getMessage(),
             ]);
 
-            $notifications->notify($server, 'failed', [__('Site files — :name', ['name' => $site->name])], $backup->user, [
+            $actor = $backup->user instanceof User ? $backup->user : null;
+            $notifications->notify($server, 'failed', [__('Site files — :name', ['name' => $site->name])], $actor, [
                 'backup_type' => 'site_files',
                 'backup_id' => (string) $backup->id,
                 'site_id' => (string) $site->id,

@@ -8,6 +8,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ * @property string $stream_key
+ * @property ?string $server_id
+ * @property string $subject_type
+ * @property string $subject_id
+ * @property string $kind
+ * @property ?string $user_id
+ * @property ?string $summary
+ * @property array $snapshot
+ * @property ?string $checksum
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property-read Model $subject
+ * @property-read ?Server $server
+ * @property-read ?User $user
+ */
 class ConfigRevision extends Model
 {
     use HasUlids;
@@ -24,6 +40,7 @@ class ConfigRevision extends Model
         'checksum',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,13 +53,13 @@ class ConfigRevision extends Model
         return $this->morphTo();
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

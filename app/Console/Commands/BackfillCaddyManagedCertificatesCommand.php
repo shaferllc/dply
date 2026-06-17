@@ -85,9 +85,9 @@ class BackfillCaddyManagedCertificatesCommand extends Command
             $this->line(sprintf('  %s (ssl_status=%s)', $site->name, $site->ssl_status));
 
             try {
-                $changed = $this->reconcileExistingRows($site, $certificateRequestService, $totals) || $changed;
-                $changed = $this->ensureCustomerCertificate($site, $certificateRequestService, $totals) || $changed;
-                $changed = $this->ensurePreviewCertificate($site, $certificateRequestService, $totals) || $changed;
+                $changed = $this->reconcileExistingRows($site, $certificateRequestService, $totals)
+                    || $this->ensureCustomerCertificate($site, $certificateRequestService, $totals)
+                    || $this->ensurePreviewCertificate($site, $certificateRequestService, $totals);
             } catch (\Throwable $e) {
                 $this->error(sprintf('    [fail] %s: %s', $site->name, $e->getMessage()));
                 $totals['failed']++;
@@ -250,7 +250,6 @@ class BackfillCaddyManagedCertificatesCommand extends Command
         $applied = $certificate->applied_settings ?? [];
 
         return $certificate->status === SiteCertificate::STATUS_ACTIVE
-            && is_array($applied)
             && ($applied['managed_by'] ?? null) === 'caddy';
     }
 }

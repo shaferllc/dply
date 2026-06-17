@@ -50,7 +50,7 @@ class CdnDisableCommand extends Command
             risk: RiskLevel::MutatingRecoverable,
             transport: SiteAuditEvent::TRANSPORT_CLI,
             summary: 'Edge disabled for '.($cfg['hostname'] ?? $site->name),
-            payload: ['provider' => $cfg['provider'] ?? null, 'hostname' => $cfg['hostname'] ?? null],
+            payload: ['provider' => $cfg['provider'], 'hostname' => $cfg['hostname'] ?? null],
         );
 
         if ($this->option('sync')) {

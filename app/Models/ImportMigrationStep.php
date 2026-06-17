@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ImportMigrationStep extends Model
 {
     use HasUlids;
@@ -96,6 +100,7 @@ class ImportMigrationStep extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -105,13 +110,13 @@ class ImportMigrationStep extends Model
         ];
     }
 
-    public function serverMigration(): BelongsTo
-    {
+    /** @return BelongsTo<ImportServerMigration, $this> */
+    public function serverMigration(): BelongsTo {
         return $this->belongsTo(ImportServerMigration::class, 'import_server_migration_id');
     }
 
-    public function siteMigration(): BelongsTo
-    {
+    /** @return BelongsTo<ImportSiteMigration, $this> */
+    public function siteMigration(): BelongsTo {
         return $this->belongsTo(ImportSiteMigration::class, 'import_site_migration_id');
     }
 

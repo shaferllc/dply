@@ -32,7 +32,7 @@ class ResetSiteOpcacheJob implements ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -47,7 +47,7 @@ class ResetSiteOpcacheJob implements ShouldQueue
 
     public function handle(SiteOpcacheManager $opcache): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

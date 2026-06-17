@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ForgeSite extends Model
 {
     use HasUlids;
@@ -26,6 +30,7 @@ class ForgeSite extends Model
         'source_snapshot',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -35,8 +40,8 @@ class ForgeSite extends Model
         ];
     }
 
-    public function forgeServer(): BelongsTo
-    {
+    /** @return BelongsTo<ForgeServer, $this> */
+    public function forgeServer(): BelongsTo {
         return $this->belongsTo(ForgeServer::class);
     }
 

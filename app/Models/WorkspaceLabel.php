@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * @property string $id
+ */
+
 class WorkspaceLabel extends Model
 {
     use HasUlids;
@@ -18,13 +22,13 @@ class WorkspaceLabel extends Model
         'color',
     ];
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function workspaces(): BelongsToMany
-    {
+    /** @return BelongsToMany<Workspace, $this> */
+    public function workspaces(): BelongsToMany {
         return $this->belongsToMany(Workspace::class, 'workspace_label_assignments')
             ->withTimestamps();
     }

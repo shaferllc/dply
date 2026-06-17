@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Concerns\ManagesEdgeDeploymentLifecycle;
@@ -21,6 +22,7 @@ use Livewire\Component;
  */
 trait ManagesEdgePreviews
 {
+    use DispatchesToastNotifications;
     public ?string $edge_adhoc_preview_pending_site_id = null;
 
     public function createAdhocEdgePreview(): void

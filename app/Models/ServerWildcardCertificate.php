@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A wildcard TLS certificate (e.g. *.on-dply.com) issued via DNS-01 and
  * installed on a single server, shared by every testing-hostname site on that
  * server/zone. See the create_server_wildcard_certificates migration and
@@ -46,6 +47,7 @@ class ServerWildcardCertificate extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -57,13 +59,13 @@ class ServerWildcardCertificate extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 

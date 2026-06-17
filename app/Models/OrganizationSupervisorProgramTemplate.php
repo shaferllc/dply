@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class OrganizationSupervisorProgramTemplate extends Model
 {
     use HasUlids;
@@ -34,6 +38,7 @@ class OrganizationSupervisorProgramTemplate extends Model
         'description',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -42,8 +47,8 @@ class OrganizationSupervisorProgramTemplate extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 }

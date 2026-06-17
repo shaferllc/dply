@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property ?string $subject_type
  * @property ?string $subject_id
  * @property ?string $triggered_by_user_id
- * @property ?array $request_context
- * @property ?array $response
+ * @property ?array<string, mixed> $request_context
+ * @property ?array<string, mixed> $response
  * @property ?int $prompt_tokens
  * @property ?int $completion_tokens
  * @property ?int $latency_ms
@@ -58,6 +58,7 @@ class AiAdvisorRun extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -67,8 +68,8 @@ class AiAdvisorRun extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
@@ -77,8 +78,8 @@ class AiAdvisorRun extends Model
         return $this->morphTo();
     }
 
-    public function triggeredBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function triggeredBy(): BelongsTo {
         return $this->belongsTo(User::class, 'triggered_by_user_id');
     }
 

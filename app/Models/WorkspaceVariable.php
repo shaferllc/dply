@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class WorkspaceVariable extends Model
 {
     use HasUlids;
@@ -17,6 +21,7 @@ class WorkspaceVariable extends Model
         'is_secret',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -25,8 +30,8 @@ class WorkspaceVariable extends Model
         ];
     }
 
-    public function workspace(): BelongsTo
-    {
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo {
         return $this->belongsTo(Workspace::class);
     }
 }

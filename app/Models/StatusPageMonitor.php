@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ */
+
 class StatusPageMonitor extends Model
 {
+    /** @use HasFactory<StatusPageMonitorFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -20,8 +25,8 @@ class StatusPageMonitor extends Model
         'sort_order',
     ];
 
-    public function statusPage(): BelongsTo
-    {
+    /** @return BelongsTo<StatusPage, $this> */
+    public function statusPage(): BelongsTo {
         return $this->belongsTo(StatusPage::class);
     }
 

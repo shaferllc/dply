@@ -104,7 +104,7 @@ class ListFleetDomainsCommand extends Command
             array_map(fn (array $r) => [
                 $r['hostname'],
                 $r['site_name'],
-                $r['site_runtime'] ?? '—',
+                $r['site_runtime'],
                 $r['server_name'] ?? '—',
                 $r['is_primary'] ? '★' : '',
             ], $rows),

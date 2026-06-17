@@ -57,7 +57,7 @@ class UpdateDispatchedJobLifecycle
             return;
         }
 
-        $message = (string) ($event->exception?->getMessage() ?? 'failed');
+        $message = (string) $event->exception->getMessage();
 
         $this->safeUpdate($uuid, [
             'status' => TaskStatus::Failed,

@@ -40,7 +40,7 @@ class SiteResourceApiController extends Controller
                 'document_root' => $site->document_root,
                 'git_repository_url' => $site->git_repository_url,
                 'git_branch' => $site->git_branch,
-                'ssl_status' => $site->ssl,
+                'ssl_status' => $site->ssl_status,
                 'last_deploy_at' => $site->last_deploy_at?->toIso8601String(),
                 'created_at' => $site->created_at?->toIso8601String(),
             ],
@@ -143,7 +143,7 @@ class SiteResourceApiController extends Controller
                 'detail' => $e->detail,
                 'link_url' => $e->link_url,
                 'remediation_code' => $e->remediation_code,
-                'occurred_at' => $e->occurred_at?->toIso8601String(),
+                'occurred_at' => $e->occurred_at->toIso8601String(),
             ]),
         ]);
     }
@@ -249,7 +249,7 @@ class SiteResourceApiController extends Controller
             ->get(['id', 'provider_type', 'challenge_type', 'status', 'expires_at', 'last_requested_at', 'last_installed_at']);
 
         return response()->json([
-            'ssl_status' => $site->ssl,
+            'ssl_status' => $site->ssl_status,
             'data' => $certs->map(fn (SiteCertificate $c) => [
                 'id' => $c->id,
                 'provider_type' => $c->provider_type,

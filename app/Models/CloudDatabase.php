@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
+ * @property string $id
  * A managed database — a hosted Postgres / MySQL / Redis instance dply
  * provisions on a cloud provider and attaches to Cloud container sites.
  *
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 class CloudDatabase extends Model
 {
+    /** @use HasFactory<CloudDatabaseFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PROVISIONING = 'provisioning';
@@ -66,6 +68,7 @@ class CloudDatabase extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -74,18 +77,18 @@ class CloudDatabase extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class, 'provider_credential_id');
     }
 
-    public function sites(): BelongsToMany
-    {
+    /** @return BelongsToMany<Site, $this> */
+    public function sites(): BelongsToMany {
         return $this->belongsToMany(Site::class, 'cloud_database_site')
             ->using(CloudDatabaseSite::class)
             ->withPivot('env_prefix')

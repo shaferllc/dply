@@ -42,7 +42,7 @@ class CancelServerProvisionController extends Controller
         $meta = is_array($server->meta) ? $server->meta : [];
         $meta['provision_cancelled'] = [
             'at' => now()->toIso8601String(),
-            'by_user_id' => (string) ($request->user()?->id ?? ''),
+            'by_user_id' => (string) $request->user()->id,
             'via' => 'controller_form',
         ];
 

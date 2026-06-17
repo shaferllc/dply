@@ -11,8 +11,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ */
+
 class Workspace extends Model
 {
+    /** @use HasFactory<WorkspaceFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -75,6 +80,7 @@ class Workspace extends Model
         });
     }
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -82,60 +88,60 @@ class Workspace extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 
-    public function servers(): HasMany
-    {
+    /** @return HasMany<Server, $this> */
+    public function servers(): HasMany {
         return $this->hasMany(Server::class);
     }
 
-    public function sites(): HasMany
-    {
+    /** @return HasMany<Site, $this> */
+    public function sites(): HasMany {
         return $this->hasMany(Site::class);
     }
 
-    public function members(): HasMany
-    {
+    /** @return HasMany<WorkspaceMember, $this> */
+    public function members(): HasMany {
         return $this->hasMany(WorkspaceMember::class)->orderBy('created_at');
     }
 
-    public function environments(): HasMany
-    {
+    /** @return HasMany<WorkspaceEnvironment, $this> */
+    public function environments(): HasMany {
         return $this->hasMany(WorkspaceEnvironment::class)->orderBy('sort_order')->orderBy('name');
     }
 
-    public function labels(): BelongsToMany
-    {
+    /** @return BelongsToMany<WorkspaceLabel, $this> */
+    public function labels(): BelongsToMany {
         return $this->belongsToMany(WorkspaceLabel::class, 'workspace_label_assignments')
             ->withTimestamps()
             ->orderBy('name');
     }
 
-    public function runbooks(): HasMany
-    {
+    /** @return HasMany<WorkspaceRunbook, $this> */
+    public function runbooks(): HasMany {
         return $this->hasMany(WorkspaceRunbook::class)->orderBy('sort_order')->orderBy('title');
     }
 
-    public function variables(): HasMany
-    {
+    /** @return HasMany<WorkspaceVariable, $this> */
+    public function variables(): HasMany {
         return $this->hasMany(WorkspaceVariable::class)->orderBy('env_key');
     }
 
-    public function deployRuns(): HasMany
-    {
+    /** @return HasMany<WorkspaceDeployRun, $this> */
+    public function deployRuns(): HasMany {
         return $this->hasMany(WorkspaceDeployRun::class)->orderByDesc('created_at');
     }
 
-    public function notificationSubscriptions(): MorphMany
-    {
+    /** @return MorphMany<NotificationSubscription, $this> */
+    public function notificationSubscriptions(): MorphMany {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
     }
 

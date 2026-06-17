@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class EdgeSiteAccessRule extends Model
 {
     use HasUlids;
@@ -28,6 +32,7 @@ class EdgeSiteAccessRule extends Model
         'allowed_emails',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,8 +41,8 @@ class EdgeSiteAccessRule extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

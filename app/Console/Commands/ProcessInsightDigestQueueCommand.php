@@ -38,7 +38,7 @@ class ProcessInsightDigestQueueCommand extends Command
                 continue;
             }
 
-            $freq = $org->mergedInsightsPreferences()['digest_frequency'] ?? 'daily';
+            $freq = $org->mergedInsightsPreferences()['digest_frequency'];
             if (! in_array($freq, ['daily', 'weekly'], true)) {
                 $freq = 'daily';
             }
@@ -55,7 +55,7 @@ class ProcessInsightDigestQueueCommand extends Command
                 if ($f === null) {
                     continue;
                 }
-                $serverName = $f->server?->name ?? '?';
+                $serverName = $f->server->name ?? '?';
                 $lines[] = sprintf(
                     '[%s] %s — %s',
                     strtoupper($f->severity),

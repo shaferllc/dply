@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * User-supplied Personal Access Token for a Git provider. Paired with
  * {@see SocialAccount} (OAuth) behind the {@see GitIdentity} contract so
  * the SourceControl service layer treats both kinds the same.
@@ -36,6 +37,7 @@ class GitProviderToken extends Model implements GitIdentity
         'access_token',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -44,8 +46,8 @@ class GitProviderToken extends Model implements GitIdentity
         ];
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ * @property string $email
+ * @property ?string $source
+ */
+
 class ComingSoonSignup extends Model
 {
     use HasUlids;

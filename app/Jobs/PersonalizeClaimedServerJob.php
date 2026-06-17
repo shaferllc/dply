@@ -44,7 +44,7 @@ class PersonalizeClaimedServerJob implements ShouldQueue
 
     public function handle(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             Log::warning('warm_pool.personalize.server_missing', ['server' => $this->serverId, 'member' => $this->memberId]);
 
@@ -81,6 +81,6 @@ class PersonalizeClaimedServerJob implements ShouldQueue
     {
         $slug = Str::of((string) $name)->lower()->replaceMatches('/[^a-z0-9-]+/', '-')->trim('-')->limit(63, '')->value();
 
-        return is_string($slug) ? $slug : '';
+        return $slug !== '' ? $slug : '';
     }
 }

@@ -52,7 +52,7 @@ class DeployGuestMetricsCallbackEnvJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

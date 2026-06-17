@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A customer-owned external secret store dply references but never copies values
  * out of (see the table migration). The connection `config` is APP_KEY-encrypted
  * (auto-covered by secrets:reencrypt) — but it is only credentials TO the store,
@@ -53,8 +54,8 @@ class ExternalSecretStore extends Model
         return $this->resolution === self::RESOLUTION_ONBOX;
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 }

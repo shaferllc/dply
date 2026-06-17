@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A user's recently-visited resource, recorded by the command palette when the
  * operator drills into a site or server. Powers the palette's empty-query
  * "Recently visited" group. One row per (user, resource_type, resource_id); a
@@ -34,6 +35,7 @@ class RecentResource extends Model
         'visited_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -41,8 +43,8 @@ class RecentResource extends Model
         ];
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

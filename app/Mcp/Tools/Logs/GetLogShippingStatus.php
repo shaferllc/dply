@@ -27,7 +27,7 @@ class GetLogShippingStatus extends AbstractDplyTool
     protected string $ability = 'servers.read';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {

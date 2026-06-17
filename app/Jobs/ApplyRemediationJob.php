@@ -46,11 +46,11 @@ class ApplyRemediationJob implements ShouldQueue
     /** Stream to the site when there is one (deploy/site errors), else the server. */
     protected function consoleSubject(): Model
     {
-        if ($this->siteId !== null && ($site = Site::query()->find($this->siteId)) !== null) {
+        if ($this->siteId !== null && ($site = Site::find($this->siteId)) !== null) {
             return $site;
         }
 
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -65,7 +65,7 @@ class ApplyRemediationJob implements ShouldQueue
 
     public function handle(ExecuteRemoteTaskOnServer $exec, RemediationCatalog $catalog): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         $action = $catalog->action($this->code, $this->actionKey);
         $emit = $this->beginConsoleAction();
 
@@ -83,7 +83,7 @@ class ApplyRemediationJob implements ShouldQueue
             && in_array($handlerClass, $catalog->handlerClasses(), true)
             && is_a($handlerClass, RemediationActionInterface::class, true)) {
             $emit->step('fix', sprintf('Applying “%s” …', (string) ($action['label'] ?? $this->actionKey)));
-            $site = $this->siteId !== null ? Site::query()->find($this->siteId) : null;
+            $site = $this->siteId !== null ? Site::find($this->siteId) : null;
             $error = app($handlerClass)->apply($server, $site, $this->userId, $emit);
 
             if ($error === null) {

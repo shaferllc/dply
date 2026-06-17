@@ -48,7 +48,7 @@ class SnapshotDeleteDigitalOceanCommand extends Command
 
     private function resolveToken(): ?string
     {
-        foreach ([$this->option('token'), env('DPLY_SNAPSHOT_DO_TOKEN'), env('DIGITALOCEAN_TOKEN')] as $candidate) {
+        foreach ([$this->option('token'), config('dply.snapshot_do_token'), config('dply.digitalocean_token')] as $candidate) {
             if (is_string($candidate) && trim($candidate) !== '') {
                 return trim($candidate);
             }

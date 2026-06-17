@@ -27,7 +27,7 @@ class SecretsVerifyCanaryCommand extends Command
         $column = (string) config('secret_vault.canary.column');
         $connection = $this->option('connection');
 
-        if (! is_string($modelClass) || ! class_exists($modelClass) || $column === '') {
+        if (! class_exists($modelClass) || $column === '') {
             $this->error('Canary model/column is not configured.');
 
             return self::FAILURE;

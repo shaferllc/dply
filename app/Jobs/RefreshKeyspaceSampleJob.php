@@ -55,7 +55,7 @@ class RefreshKeyspaceSampleJob implements ShouldQueue
             if ($raw === null) {
                 Cache::put(
                     self::resultCacheKey($row->server->id, $row->engine),
-                    ['ok' => false, 'error' => __('Could not read INFO from :engine.', ['engine' => $row->engine])->__toString(), 'at' => now()->toIso8601String()],
+                    ['ok' => false, 'error' => (string) __('Could not read INFO from :engine.', ['engine' => $row->engine]), 'at' => now()->toIso8601String()],
                     now()->addHour(),
                 );
 

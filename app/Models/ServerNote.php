@@ -37,6 +37,7 @@ class ServerNote extends Model
         'updated_by_user_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -44,18 +45,18 @@ class ServerNote extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function creator(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
-    public function editor(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function editor(): BelongsTo {
         return $this->belongsTo(User::class, 'updated_by_user_id');
     }
 }

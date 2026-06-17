@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A full-disk image (snapshot) of a server captured through its cloud provider's
  * API. Lifecycle:
  *
@@ -52,6 +53,7 @@ class ServerImage extends Model
         'error_message',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -59,13 +61,13 @@ class ServerImage extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class SupervisorProgramAuditLog extends Model
 {
     use HasUlids;
@@ -25,6 +29,7 @@ class SupervisorProgramAuditLog extends Model
         'properties',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -32,23 +37,23 @@ class SupervisorProgramAuditLog extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function supervisorProgram(): BelongsTo
-    {
+    /** @return BelongsTo<SupervisorProgram, $this> */
+    public function supervisorProgram(): BelongsTo {
         return $this->belongsTo(SupervisorProgram::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ */
+
 class FeedbackReport extends Model
 {
     use HasUlids;
@@ -61,6 +65,7 @@ class FeedbackReport extends Model
         'attachments_pruned_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

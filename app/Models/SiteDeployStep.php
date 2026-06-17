@@ -7,6 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ * @property string $site_id
+ * @property string $pipeline_id
+ * @property int $sort_order
+ * @property string $step_type
+ * @property string $phase
+ * @property ?string $custom_command
+ * @property ?int $timeout_seconds
+ * @property bool $managed_by_manifest
+ * @property-read Site $site
+ * @property-read SiteDeployPipeline $pipeline
+ */
+
 class SiteDeployStep extends Model
 {
     use HasUlids;
@@ -131,6 +145,7 @@ class SiteDeployStep extends Model
         'managed_by_manifest',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -138,13 +153,13 @@ class SiteDeployStep extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function pipeline(): BelongsTo
-    {
+    /** @return BelongsTo<SiteDeployPipeline, $this> */
+    public function pipeline(): BelongsTo {
         return $this->belongsTo(SiteDeployPipeline::class, 'pipeline_id');
     }
 

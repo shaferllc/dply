@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class LoadBalancerService extends Model
 {
     use HasUlids;
@@ -25,6 +29,7 @@ class LoadBalancerService extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -37,8 +42,8 @@ class LoadBalancerService extends Model
         ];
     }
 
-    public function loadBalancer(): BelongsTo
-    {
+    /** @return BelongsTo<LoadBalancer, $this> */
+    public function loadBalancer(): BelongsTo {
         return $this->belongsTo(LoadBalancer::class);
     }
 }

@@ -46,23 +46,23 @@ class ForwardWorkerPoolJobEvent
 
     public function handleProcessing(JobProcessing $event): void
     {
-        $this->forward($event->job?->resolveName(), $event->job?->getQueue(), 'processing', $event->job?->uuid());
+        $this->forward($event->job->resolveName(), $event->job->getQueue(), 'processing', $event->job->uuid());
     }
 
     public function handleProcessed(JobProcessed $event): void
     {
-        $this->forward($event->job?->resolveName(), $event->job?->getQueue(), 'completed', $event->job?->uuid());
+        $this->forward($event->job->resolveName(), $event->job->getQueue(), 'completed', $event->job->uuid());
     }
 
     public function handleFailed(JobFailed $event): void
     {
-        $this->forward($event->job?->resolveName(), $event->job?->getQueue(), 'failed', $event->job?->uuid());
+        $this->forward($event->job->resolveName(), $event->job->getQueue(), 'failed', $event->job->uuid());
     }
 
     private function forward(?string $name, ?string $queue, string $status, ?string $uuid): void
     {
-        $url = (string) env('DPLY_POOL_EVENT_URL', '');
-        $token = (string) env('DPLY_POOL_EVENT_TOKEN', '');
+        $url = (string) config('dply.worker_pool_event_url', '');
+        $token = (string) config('dply.worker_pool_event_token', '');
         if ($url === '' || $token === '' || $name === null) {
             return;
         }

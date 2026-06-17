@@ -48,7 +48,7 @@ class SyncAuthorizedKeysJob implements ShouldQueue
 
     public function handle(ServerAuthorizedKeysSynchronizer $sync): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -105,7 +105,7 @@ class SyncAuthorizedKeysJob implements ShouldQueue
         };
 
         try {
-            $user = $this->userId !== null ? User::query()->find($this->userId) : null;
+            $user = $this->userId !== null ? User::find($this->userId) : null;
 
             $sync->withOutputCallback($callback)
                 ->sync($server->fresh(['authorizedKeys']), $user, $this->ipAddress);

@@ -40,7 +40,7 @@ class DrainAndDestroyWorkerJob implements ShouldQueue
 
     public function handle(DeleteServerAction $deleteServer, WorkerPoolExposureApplier $exposure): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server instanceof Server) {
             return;
         }
@@ -70,7 +70,7 @@ class DrainAndDestroyWorkerJob implements ShouldQueue
         $this->drain($server);
 
         $actor = $this->actorId !== null
-            ? User::query()->find($this->actorId)
+            ? User::find($this->actorId)
             : null;
 
         $deleteServer->execute(

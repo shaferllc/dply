@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property string $id
  * A review comment attached to a preview Edge site, anchored to a CSS
  * selector + viewport so the dashboard can replay it. Stored centrally
  * (not on GitHub) because we want non-engineer reviewers to leave
@@ -41,13 +42,13 @@ class EdgePreviewComment extends Model
         'resolved_at' => 'datetime',
     ];
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function parent(): BelongsTo
-    {
+    /** @return BelongsTo<self, $this> */
+    public function parent(): BelongsTo {
         return $this->belongsTo(self::class, 'parent_id');
     }
 
@@ -59,18 +60,18 @@ class EdgePreviewComment extends Model
         return $this->hasMany(self::class, 'parent_id')->orderBy('created_at');
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function createdBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function createdBy(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
-    public function resolvedBy(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function resolvedBy(): BelongsTo {
         return $this->belongsTo(User::class, 'resolved_by_user_id');
     }
 

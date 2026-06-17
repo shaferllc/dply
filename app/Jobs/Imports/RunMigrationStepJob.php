@@ -41,7 +41,7 @@ class RunMigrationStepJob implements ShouldQueue
     {
         // Lock per-migration so step jobs for the same migration serialise.
         $step = ImportMigrationStep::find($this->stepId);
-        $lockKey = $step?->import_server_migration_id ?? $this->stepId;
+        $lockKey = ($step !== null ? $step->import_server_migration_id : null) ?? $this->stepId;
 
         return [
             (new WithoutOverlapping('import-migration:'.$lockKey))

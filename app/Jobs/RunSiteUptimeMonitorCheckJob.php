@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteUptimeCheckResult;
 use App\Models\SiteUptimeIncident;
 use App\Models\SiteUptimeMonitor;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\UptimeProbeWorkerResolver;
@@ -113,11 +114,14 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
         }
 
         $monitor = SiteUptimeMonitor::query()->with('site')->find($this->siteUptimeMonitorId);
-        if (! $monitor || ! $monitor->site) {
+        if (! $monitor) {
             return;
         }
 
         $site = $monitor->site;
+        if (! $site instanceof Site) {
+            return;
+        }
         $previousState = $this->previousState($monitor);
 
         $emit = $this->beginConsoleAction();
@@ -160,16 +164,16 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
      * Prior operational state, derived from last_state with a fallback to the
      * legacy last_ok column for rows checked before last_state existed.
      */
-    private function previousState(SiteUptimeMonitor $monitor): ?string
+    private function previousState(SiteUptimeMonitor $monitor): string
     {
-        if ($monitor->last_state !== null) {
+        if ($monitor->last_state !== null && $monitor->last_state !== '') {
             return $monitor->last_state;
         }
 
         return match ($monitor->last_ok) {
             true => MonitorOperationalState::OPERATIONAL,
             false => MonitorOperationalState::OUTAGE,
-            default => null,
+            default => MonitorOperationalState::OPERATIONAL,
         };
     }
 
@@ -197,7 +201,7 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
      *
      * @return array{state: string, ok: bool, http_status: ?int, latency_ms: int, error: ?string, checked_url: ?string, meta: array<string, mixed>, ssl_should_warn: bool}
      */
-    private function runHttpCheck(SiteUptimeMonitor $monitor, string $url, $emit): array
+    private function runHttpCheck(SiteUptimeMonitor $monitor, string $url, ConsoleEmitter $emit): array
     {
         $attempts = [$url];
         if (str_starts_with(strtolower($url), 'https://')) {
@@ -302,7 +306,7 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
      *
      * @return array{state: string, ok: bool, http_status: ?int, latency_ms: int, error: ?string, checked_url: ?string, meta: array<string, mixed>, ssl_should_warn: bool}
      */
-    private function runSslCheck(SiteUptimeMonitor $monitor, string $base, $emit): array
+    private function runSslCheck(SiteUptimeMonitor $monitor, string $base, ConsoleEmitter $emit): array
     {
         $host = parse_url($base, PHP_URL_HOST) ?: $base;
         $emit->info(__('TLS handshake :host:443', ['host' => $host]));
@@ -388,7 +392,7 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
         // Alert once on crossing into the warn window: warn only when the prior
         // reading was outside it (or unknown). A renewed cert that drops back in
         // later re-arms this naturally.
-        $previousDays = is_array($monitor->last_meta) ? ($monitor->last_meta['ssl_days_remaining'] ?? null) : null;
+        $previousDays = $monitor->last_meta['ssl_days_remaining'] ?? null;
         $wasWithin = is_numeric($previousDays) && (int) $previousDays <= $warnDays && (int) $previousDays >= 0;
         $shouldWarn = $withinWindow && ! $wasWithin;
 
@@ -476,7 +480,7 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
      *
      * @param  array{state: string, ok: bool, http_status: ?int, latency_ms: int, error: ?string, checked_url: ?string, meta: array<string, mixed>, ssl_should_warn: bool}  $outcome
      */
-    private function syncIncident(SiteUptimeMonitor $monitor, Site $site, ?string $previousState, array $outcome): void
+    private function syncIncident(SiteUptimeMonitor $monitor, Site $site, string $previousState, array $outcome): void
     {
         $state = $outcome['state'];
         $ongoing = $monitor->incidents()->whereNull('resolved_at')->latest('started_at')->first();
@@ -541,7 +545,7 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
     private function maybePublishTransition(
         SiteUptimeMonitor $monitor,
         Site $site,
-        ?string $previousState,
+        string $previousState,
         array $outcome,
         NotificationPublisher $notificationPublisher,
     ): void {

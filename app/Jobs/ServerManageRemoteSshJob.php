@@ -85,7 +85,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
         if ($this->logId !== null) {
             $userId = ServerManageAction::query()->whereKey($this->logId)->value('user_id');
             if ($userId) {
-                $actor = User::query()->find($userId);
+                $actor = User::find($userId);
             }
         }
 
@@ -141,7 +141,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
 
     public function handle(ServerManageSshExecutor $executor): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->failCache(__('Server not found.'));
 
@@ -286,7 +286,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
             $this->maybeNotifyPatchAction($server, true, null);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
-                $server = Server::query()->find($this->serverId);
+                $server = Server::find($this->serverId);
                 if ($server !== null) {
                     app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
                 }

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One recorded scheduler run's captured output. Rolling history, count-capped
  * per heartbeat (pruned inline on write). See [[project_schedule_mirrors_workers]].
  */
@@ -36,6 +37,7 @@ class SchedulerTickOutput extends Model
         'ran_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,8 +47,8 @@ class SchedulerTickOutput extends Model
         ];
     }
 
-    public function heartbeat(): BelongsTo
-    {
+    /** @return BelongsTo<ServerSchedulerHeartbeat, $this> */
+    public function heartbeat(): BelongsTo {
         return $this->belongsTo(ServerSchedulerHeartbeat::class, 'server_scheduler_heartbeat_id');
     }
 

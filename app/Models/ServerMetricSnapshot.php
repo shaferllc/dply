@@ -13,6 +13,7 @@ class ServerMetricSnapshot extends Model
         'payload',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -21,8 +22,8 @@ class ServerMetricSnapshot extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 }

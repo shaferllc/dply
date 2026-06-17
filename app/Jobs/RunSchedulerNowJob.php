@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Models\SchedulerTickOutput;
 use App\Models\Server;
 use App\Models\ServerSchedulerHeartbeat;
+use App\Models\Site;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -60,7 +61,7 @@ class RunSchedulerNowJob implements ShouldQueue
     {
         $this->store('running', '');
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         $heartbeat = ServerSchedulerHeartbeat::query()
             ->where('server_id', $this->serverId)
             ->whereKey($this->heartbeatId)
@@ -91,7 +92,7 @@ class RunSchedulerNowJob implements ShouldQueue
         // Resolve the site's repository path so the wrapper can `cd` into it.
         // The site relationship gives us the path; missing site = nothing to do.
         $site = $heartbeat->site;
-        if ($site === null) {
+        if (! $site instanceof Site) {
             $this->store('failed', 'Site not found for this scheduler.');
 
             return;

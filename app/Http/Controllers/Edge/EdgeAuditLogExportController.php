@@ -84,8 +84,8 @@ class EdgeAuditLogExportController extends Controller
                 foreach ($chunk as $e) {
                     fputcsv($handle, [
                         $e->created_at?->toIso8601String() ?? '',
-                        (string) ($e->user?->name ?? ''),
-                        (string) ($e->user?->email ?? ''),
+                        (string) ($e->user->name ?? ''),
+                        (string) ($e->user->email ?? ''),
                         (string) $e->action,
                         (string) ($e->subject_type ?? ''),
                         (string) ($e->subject_id ?? ''),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Models\ServerMetricSnapshot;
 use App\Models\User;
 use App\Notifications\WebserverHealthAlertNotification;
 use App\Services\Servers\WebserverHealthThresholdResolver;
@@ -43,12 +44,13 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
 
     public function handle(WebserverHealthThresholdResolver $resolver): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
 
         // Most recent snapshot — the one whose ingest spawned this job.
+        /** @var ServerMetricSnapshot|null $snapshot */
         $snapshot = $server->metricSnapshots()
             ->orderByDesc('captured_at')
             ->orderByDesc('id')
@@ -56,7 +58,7 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
         if ($snapshot === null) {
             return;
         }
-        $payload = is_array($snapshot->payload) ? $snapshot->payload : [];
+        $payload = $snapshot->payload;
         $healthBlocks = is_array($payload['webserver_health'] ?? null) ? $payload['webserver_health'] : [];
 
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -92,7 +94,7 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
                     continue; // Recovery on a metric that no longer has a threshold — silent.
                 }
 
-                if ($recipients === []) {
+                if ($recipients->isEmpty()) {
                     continue;
                 }
 

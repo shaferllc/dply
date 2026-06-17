@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class LoadBalancer extends Model
 {
     use HasUlids;
@@ -50,6 +54,7 @@ class LoadBalancer extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -58,14 +63,15 @@ class LoadBalancer extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    /** The HAProxy server (software LBs only). */
-    public function server(): BelongsTo
-    {
+    /** The HAProxy server (software LBs only). *
+ * @return BelongsTo<Server, $this>
+ */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
@@ -74,18 +80,18 @@ class LoadBalancer extends Model
         return $this->provider === self::PROVIDER_HAPROXY;
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 
-    public function targets(): HasMany
-    {
+    /** @return HasMany<LoadBalancerTarget, $this> */
+    public function targets(): HasMany {
         return $this->hasMany(LoadBalancerTarget::class);
     }
 
-    public function services(): HasMany
-    {
+    /** @return HasMany<LoadBalancerService, $this> */
+    public function services(): HasMany {
         return $this->hasMany(LoadBalancerService::class);
     }
 

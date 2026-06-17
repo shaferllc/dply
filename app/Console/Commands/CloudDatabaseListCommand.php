@@ -66,7 +66,7 @@ class CloudDatabaseListCommand extends Command
         $rows = $query->get()->map(fn (CloudDatabase $db): array => [
             'id' => $db->id,
             'name' => $db->name,
-            'organization' => $db->organization?->name ?? '—',
+            'organization' => $db->organization->name ?? '—',
             'engine' => $db->engine,
             'version' => $db->version,
             'size' => $db->size,

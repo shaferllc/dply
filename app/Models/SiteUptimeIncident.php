@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A continuous span where a monitor was not operational. Opened on the
  * down/degraded transition and closed on recovery (resolved_at set). An
  * `outage` counts against uptime %; a `degraded` shows on the timeline but
@@ -29,6 +30,7 @@ class SiteUptimeIncident extends Model
         'resolved_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -37,13 +39,13 @@ class SiteUptimeIncident extends Model
         ];
     }
 
-    public function monitor(): BelongsTo
-    {
+    /** @return BelongsTo<SiteUptimeMonitor, $this> */
+    public function monitor(): BelongsTo {
         return $this->belongsTo(SiteUptimeMonitor::class, 'site_uptime_monitor_id');
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 

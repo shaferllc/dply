@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerFirewallRule extends Model
 {
     use HasUlids;
@@ -28,6 +32,7 @@ class ServerFirewallRule extends Model
         'sort_order',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,13 +41,13 @@ class ServerFirewallRule extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 }

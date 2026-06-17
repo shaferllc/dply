@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ */
+
 class WorkspaceDeployRun extends Model
 {
     use HasUlids;
@@ -29,6 +33,7 @@ class WorkspaceDeployRun extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -39,13 +44,13 @@ class WorkspaceDeployRun extends Model
         ];
     }
 
-    public function workspace(): BelongsTo
-    {
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo {
         return $this->belongsTo(Workspace::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 }

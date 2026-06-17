@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Jobs\OptimizeSitePipelineJob;
 use App\Jobs\VerifySiteOctaneJob;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
@@ -28,6 +29,7 @@ use Livewire\Component;
  */
 trait OptimizesPipeline
 {
+    use DispatchesToastNotifications;
     /**
      * Deferred (wire:init) trigger that confirms Octane is actually installed
      * and serving this site before the "Reload Octane workers" suggestion is

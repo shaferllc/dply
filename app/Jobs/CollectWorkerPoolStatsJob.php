@@ -43,7 +43,10 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
             return $this->resolvedSubject;
         }
         $pool = WorkerPool::query()->with('servers')->find($this->poolId);
-        $server = $pool?->primaryServer ?? $pool?->sourceServer;
+        if ($pool === null) {
+            return $this->resolvedSubject = new Server;
+        }
+        $server = $pool->primaryServer ?? $pool->sourceServer;
 
         return $this->resolvedSubject = ($server instanceof Server ? $server : new Server);
     }

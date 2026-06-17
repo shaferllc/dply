@@ -11,6 +11,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
+ * @property string $id
+ * @property string $subject_type
+ * @property string $subject_id
+ * @property string $kind
+ * @property string $status
+ * @property ?\Illuminate\Support\Carbon $started_at
+ * @property ?\Illuminate\Support\Carbon $finished_at
+ * @property ?\Illuminate\Support\Carbon $dismissed_at
+ * @property ?string $error
+ * @property ?string $label
+ * @property ?array $output
+ * @property ?string $user_id
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property-read Model $subject
+ * @property-read ?User $user
+ *
  * One row per backgrounded action whose progress we want to surface in the
  * page-top console banner. Polymorphic so anything (Site, Server, Deploy, …)
  * can have console-able runs without per-model schema gymnastics.
@@ -28,6 +44,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class ConsoleAction extends Model
 {
+    /** @use HasFactory<ConsoleActionFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_QUEUED = 'queued';
@@ -73,6 +90,7 @@ class ConsoleAction extends Model
         'user_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -88,8 +106,8 @@ class ConsoleAction extends Model
         return $this->morphTo();
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

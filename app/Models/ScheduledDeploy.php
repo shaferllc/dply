@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  */
 class ScheduledDeploy extends Model
 {
+    /** @use HasFactory<ScheduledDeployFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
@@ -44,6 +45,7 @@ class ScheduledDeploy extends Model
         'canceled_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -53,13 +55,13 @@ class ScheduledDeploy extends Model
         ];
     }
 
-    public function site(): BelongsTo
-    {
+    /** @return BelongsTo<Site, $this> */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    public function user(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo {
         return $this->belongsTo(User::class);
     }
 

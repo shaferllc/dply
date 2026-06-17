@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ */
+
 class ServerAuthorizedKey extends Model
 {
     use HasUlids;
@@ -22,6 +26,7 @@ class ServerAuthorizedKey extends Model
         'review_after',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -30,8 +35,8 @@ class ServerAuthorizedKey extends Model
         ];
     }
 
-    public function server(): BelongsTo
-    {
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 

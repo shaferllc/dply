@@ -40,7 +40,7 @@ class RunServerMonitoringProbeJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerMonitoringProbe $probe): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->clearPendingFlag();
 
@@ -58,7 +58,7 @@ class RunServerMonitoringProbeJob implements ShouldBeUnique, ShouldQueue
 
     protected function clearPendingFlag(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

@@ -91,7 +91,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -106,7 +106,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -282,6 +282,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             'haproxy' => 'haproxy -c -f /etc/haproxy/haproxy.cfg && caddy validate --config /etc/caddy/Caddyfile',
             'envoy' => 'envoy --mode validate -c /etc/envoy/envoy.yaml && caddy validate --config /etc/caddy/Caddyfile',
             'openresty' => 'mkdir -p /var/log/openresty && openresty -t && caddy validate --config /etc/caddy/Caddyfile',
+            default => throw new \InvalidArgumentException('Unsupported edge proxy target: '.$this->target),
         };
 
         $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
@@ -320,6 +321,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             'haproxy' => $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 80),
             'envoy' => $this->writeEnvoyEdgeConfig($server, $ssh, $sites, listenPort: 80),
             'openresty' => $this->writeOpenRestyEdgeConfig($server, $ssh, $sites, listenPort: 80),
+            default => throw new \InvalidArgumentException('Unsupported edge proxy target: '.$this->target),
         };
 
         // Stop the previous webserver (free :80) — except when it's Caddy,
@@ -372,6 +374,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             'haproxy' => 'haproxy',
             'envoy' => 'envoy',
             'openresty' => 'openresty',
+            default => throw new \InvalidArgumentException('Unsupported edge proxy target: '.$this->target),
         };
 
         if ($this->target === 'envoy') {
@@ -445,6 +448,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             'haproxy' => $caddy."\n".$this->aptInstallIdempotent('haproxy')."\n".$this->aptInstallIdempotent('socat'),
             'envoy' => $caddy."\n".$this->envoyInstallScript(),
             'openresty' => $caddy."\n".OpenRestyStaticConfigOptions::installScript(),
+            default => throw new \InvalidArgumentException('Unsupported edge proxy target: '.$target),
         };
     }
 
@@ -629,9 +633,7 @@ BASH;
 
     private function basenameFor(Site $site): string
     {
-        return method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        return $site->webserverConfigBasename();
     }
 
     private function systemdUnitFor(string $webserver): ?string

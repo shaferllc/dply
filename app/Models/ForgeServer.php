@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ */
+
 class ForgeServer extends Model
 {
     use HasUlids;
@@ -27,6 +31,7 @@ class ForgeServer extends Model
         'source_snapshot',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -38,13 +43,13 @@ class ForgeServer extends Model
         ];
     }
 
-    public function providerCredential(): BelongsTo
-    {
+    /** @return BelongsTo<ProviderCredential, $this> */
+    public function providerCredential(): BelongsTo {
         return $this->belongsTo(ProviderCredential::class);
     }
 
-    public function sites(): HasMany
-    {
+    /** @return HasMany<ForgeSite, $this> */
+    public function sites(): HasMany {
         return $this->hasMany(ForgeSite::class);
     }
 }

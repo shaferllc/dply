@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * A reusable S3 API key pair for an object-storage provider (DigitalOcean
  * Spaces keys, Hetzner S3 credentials, …), scoped to an organization so the
  * whole team can attach or provision buckets without re-pasting secrets.
@@ -33,6 +34,7 @@ class ObjectStorageCredential extends Model
         'endpoint',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -40,13 +42,13 @@ class ObjectStorageCredential extends Model
         ];
     }
 
-    public function organization(): BelongsTo
-    {
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo {
         return $this->belongsTo(Organization::class);
     }
 
-    public function createdByUser(): BelongsTo
-    {
+    /** @return BelongsTo<User, $this> */
+    public function createdByUser(): BelongsTo {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 }

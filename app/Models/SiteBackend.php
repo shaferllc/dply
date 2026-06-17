@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string $id
  * One serving point of a multi-backend Site: the logical Site → a backend app
  * server (and the derived child Site holding the code there). The prerequisite
  * for rolling + canary deploys. See docs/MULTI_BACKEND_SITES.md.
@@ -46,6 +47,7 @@ class SiteBackend extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -55,21 +57,24 @@ class SiteBackend extends Model
         ];
     }
 
-    /** The logical Site that owns the backend group. */
-    public function site(): BelongsTo
-    {
+    /** The logical Site that owns the backend group. *
+ * @return BelongsTo<Site, $this>
+ */
+    public function site(): BelongsTo {
         return $this->belongsTo(Site::class);
     }
 
-    /** The app server this backend runs on. */
-    public function server(): BelongsTo
-    {
+    /** The app server this backend runs on. *
+ * @return BelongsTo<Server, $this>
+ */
+    public function server(): BelongsTo {
         return $this->belongsTo(Server::class);
     }
 
-    /** The derived child Site holding the code on the backend server (nullable). */
-    public function backendSite(): BelongsTo
-    {
+    /** The derived child Site holding the code on the backend server (nullable). *
+ * @return BelongsTo<Site, $this>
+ */
+    public function backendSite(): BelongsTo {
         return $this->belongsTo(Site::class, 'backend_site_id');
     }
 

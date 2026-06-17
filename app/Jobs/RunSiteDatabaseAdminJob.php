@@ -10,6 +10,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseExtraUser;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -57,7 +58,7 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -75,7 +76,7 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
         ServerDatabaseAuditLogger $audit,
     ): void {
         $db = ServerDatabase::query()->with('server')->find($this->serverDatabaseId);
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $db instanceof ServerDatabase || ! $site instanceof Site || $db->server === null) {
             return;
         }
@@ -99,9 +100,9 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
         }
     }
 
-    private function addUser($emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db): void
+    private function addUser(ConsoleEmitter $emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db): void
     {
-        $extra = ServerDatabaseExtraUser::query()->find($this->extraUserId);
+        $extra = ServerDatabaseExtraUser::find($this->extraUserId);
         if (! $extra instanceof ServerDatabaseExtraUser) {
             throw new \RuntimeException('That user record no longer exists.');
         }
@@ -125,9 +126,9 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
         $emit->success(sprintf('User %s created on %s.', $extra->username, $db->name), 'db');
     }
 
-    private function dropUser($emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db): void
+    private function dropUser(ConsoleEmitter $emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db): void
     {
-        $extra = ServerDatabaseExtraUser::query()->find($this->extraUserId);
+        $extra = ServerDatabaseExtraUser::find($this->extraUserId);
         if (! $extra instanceof ServerDatabaseExtraUser) {
             return;
         }
@@ -147,7 +148,7 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
         $emit->success(sprintf('User %s removed from %s.', $username, $db->name), 'db');
     }
 
-    private function dropDatabase($emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db, Site $site): void
+    private function dropDatabase(ConsoleEmitter $emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db, Site $site): void
     {
         $emit->step('db', sprintf('DROP %s DATABASE %s', strtoupper($db->engine), $db->name));
         $out = $provisioner->dropFromServer($db);
@@ -165,7 +166,7 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
         $emit->success(sprintf('Database %s dropped on the server and removed from Dply.', $name), 'db');
     }
 
-    private function rotatePassword($emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db): void
+    private function rotatePassword(ConsoleEmitter $emit, ServerDatabaseProvisioner $provisioner, ServerDatabaseAuditLogger $audit, ServerDatabase $db): void
     {
         // The new password was already written to the encrypted row by the
         // dispatching component (so a credential-share link works immediately);
@@ -183,7 +184,7 @@ class RunSiteDatabaseAdminJob implements ShouldQueue
         $emit->success(sprintf('Password rotated for %s on %s.', $db->username, $db->name), 'db');
     }
 
-    private function echoLines($emit, ?string $out): void
+    private function echoLines(ConsoleEmitter $emit, ?string $out): void
     {
         foreach (preg_split("/\r?\n/", (string) $out) ?: [] as $line) {
             $line = trim($line);

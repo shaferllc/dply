@@ -17,10 +17,12 @@ class BillingController extends Controller
         $this->authorize('update', $organization);
 
         $subscription = $organization->subscription('default');
-        $status = $subscription ? $subscription->stripe_status : null;
+        $status = $subscription !== null ? (string) data_get($subscription->getAttributes(), 'stripe_status') : null;
         $planName = null;
-        if ($subscription) {
-            $priceId = $subscription->stripe_price ?? $subscription->items->first()?->stripe_price;
+        if ($subscription !== null) {
+            $firstItem = $subscription->items->first();
+            $priceId = (string) (data_get($subscription->getAttributes(), 'stripe_price')
+                ?: data_get($firstItem?->getAttributes(), 'stripe_price'));
             if ($priceId) {
                 $plans = config('subscription.plans', []);
                 foreach ($plans as $plan) {
@@ -44,7 +46,9 @@ class BillingController extends Controller
             }
         }
 
-        $plans = collect(config('subscription.plans', []))->filter(fn ($p) => ! empty($p['price_id']));
+        /** @var array<string, array<string, mixed>> $planDefinitions */
+        $planDefinitions = config('subscription.plans', []);
+        $plans = collect($planDefinitions)->filter(fn (array $p): bool => ! empty($p['price_id']));
         $canManageBilling = $organization->hasStripeId();
 
         return view('billing.show', [

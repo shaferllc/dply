@@ -77,7 +77,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -92,12 +92,12 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerWebserverNotificationDispatcher $notifications): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $actor = $this->userId !== null ? User::query()->find($this->userId) : null;
+        $actor = $this->userId !== null ? User::find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $ssh = new SshConnection($server);
@@ -147,7 +147,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         // rationale.
         app(UniqueLock::class)->release($this);
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -183,9 +183,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
             ->where('server_id', $server->id)
             ->get()
             ->map(function (Site $site): string {
-                $basename = method_exists($site, 'webserverConfigBasename')
-                    ? (string) $site->webserverConfigBasename()
-                    : (string) $site->slug;
+                $basename = (string) $site->webserverConfigBasename();
 
                 return '/etc/caddy/sites-enabled/'.$basename.'.caddy';
             })
