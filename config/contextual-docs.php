@@ -10,6 +10,15 @@
 return [
     'routes' => [
         [
+            // Activity merged into the Logs page; surface its audit-log doc when
+            // the Activity tab is active. Without the tab param, the Logs page
+            // falls through to its own `server-logs` doc via the nav-key map.
+            'route' => 'servers.logs',
+            'params' => ['tab' => 'activity'],
+            'slug' => 'server-activity',
+            'group' => 'servers',
+        ],
+        [
             'route' => 'edge.index',
             'slug' => 'edge-fleet',
             'group' => 'edge',

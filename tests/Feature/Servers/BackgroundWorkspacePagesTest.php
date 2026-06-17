@@ -43,7 +43,7 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
-usesFeatures('workspace.schedule', 'workspace.activity', 'workspace.backups');
+usesFeatures('workspace.schedule', 'workspace.backups');
 
 function actingOrgUser(): User
 {

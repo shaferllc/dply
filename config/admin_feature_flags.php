@@ -89,7 +89,6 @@ $serverWorkspaceSections = [
         'workspace.services' => 'System services',
         'workspace.caches' => 'Server caches',
         'workspace.schedule' => 'Schedule workspace',
-        'workspace.activity' => 'Activity log tab',
     ],
 ];
 

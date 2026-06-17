@@ -213,8 +213,6 @@ return [
         'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
-        // exit: ship once audit-log filtering UI is reviewed
-        'activity' => env('FEATURE_WORKSPACE_ACTIVITY', true),
         // exit: ship once remote-script execution surface is reviewed (security risk)
         'run' => env('FEATURE_WORKSPACE_RUN', false),
         // exit: ship alongside run GA; teaser only when run is off

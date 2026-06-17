@@ -32,7 +32,7 @@ class WorkspaceLogs extends Component
     use RendersWorkspacePlaceholder;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'related'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'activity', 'related'];
 
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';
