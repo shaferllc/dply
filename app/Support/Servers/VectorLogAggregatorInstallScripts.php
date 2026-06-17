@@ -40,6 +40,9 @@ class VectorLogAggregatorInstallScripts
     /** Small on-box handoff file the job reads (then deletes) to capture edge certs. */
     public const MATERIAL_PATH = '/etc/dply-aggregator/.edge-material';
 
+    /** Per-org policy CSV (Vector enrichment table): org_id → retention_days, allowed. */
+    public const POLICY_PATH = '/etc/dply-aggregator/policy.csv';
+
     public const DATA_DIR = '/var/lib/dply-aggregator';
 
     public const UNIT_NAME = 'dply-aggregator.service';
@@ -59,6 +62,8 @@ class VectorLogAggregatorInstallScripts
         $chPort = (int) config('server_logs.clickhouse.http_port', 8123);
         $chDb = (string) config('server_logs.clickhouse.database', 'dply_logs');
         $chUser = (string) config('server_logs.clickhouse.username', 'default');
+        $defaultRetention = max(1, (int) config('server_logs.clickhouse.retention_days', 7));
+        $policyHeader = \App\Services\Logs\ServerLogAggregatorPolicyMap::HEADER;
 
         return <<<BASH
         # --- fetch + verify Vector ----------------------------------------------
@@ -78,10 +83,17 @@ class VectorLogAggregatorInstallScripts
         printf 'CH_PASSWORD=%s\n' "\$CH_PW" > "{$this->envPath()}"
         chmod 0600 "{$this->envPath()}"
 
+        # --- per-org policy enrichment table (seed header so `validate` passes;
+        #     the real rows are shipped + refreshed by SyncLogAggregatorPolicyJob) -
+        if [ ! -s "{$this->policyPath()}" ]; then
+          printf '%s\n' "{$policyHeader}" > "{$this->policyPath()}"
+        fi
+        chmod 0644 "{$this->policyPath()}"
+
         # --- config --------------------------------------------------------------
         echo "{$configB64}" | base64 -d > "{$this->configPath()}"
         # Bake the listen address + ClickHouse target that are known only here.
-        sed -i "s|__LISTEN_PORT__|{$port}|g; s|__CH_HOST__|{$chHost}|g; s|__CH_PORT__|{$chPort}|g; s|__CH_DB__|{$chDb}|g; s|__CH_USER__|{$chUser}|g" "{$this->configPath()}"
+        sed -i "s|__LISTEN_PORT__|{$port}|g; s|__CH_HOST__|{$chHost}|g; s|__CH_PORT__|{$chPort}|g; s|__CH_DB__|{$chDb}|g; s|__CH_USER__|{$chUser}|g; s|__DEFAULT_RETENTION__|{$defaultRetention}|g" "{$this->configPath()}"
         chmod 0640 "{$this->configPath()}"
 
         CH_PASSWORD="\$CH_PW" "{$this->binaryPath()}" validate "{$this->configPath()}" || { echo "aggregator config validation failed"; exit 1; }
@@ -213,9 +225,26 @@ class VectorLogAggregatorInstallScripts
         key_file = "/etc/dply-aggregator/tls/server.key"
         verify_certificate = true
 
+        # Per-org policy table (org_id → retention_days, allowed), refreshed on the
+        # box by SyncLogAggregatorPolicyJob. Orgs absent here take the defaults below
+        # (fail open): __DEFAULT_RETENTION__ days, allowed. CSV is seeded header-only
+        # at install so `vector validate` succeeds before any rows are shipped.
+        [enrichment_tables.policy]
+        type = "file"
+
+        [enrichment_tables.policy.file]
+        path = "/etc/dply-aggregator/policy.csv"
+        encoding = { type = "csv" }
+
+        [enrichment_tables.policy.schema]
+        org_id = "string"
+        retention_days = "integer"
+        allowed = "boolean"
+
         # Map the edge-stamped fields onto the ClickHouse columns; server-side tenant
         # identity comes from the edge-sent dply_org_id/dply_server_id. Replace the
-        # event with exactly the sink's columns so nothing unexpected is inserted.
+        # event with exactly the sink's columns so nothing unexpected is inserted,
+        # then stamp per-org retention_days + an allow flag from the policy table.
         [transforms.normalize]
         type = "remap"
         inputs = ["edges"]
@@ -239,11 +268,27 @@ class VectorLogAggregatorInstallScripts
         .host = host
         .message = msg
         if ts != null { .timestamp = ts }
+        .retention_days = __DEFAULT_RETENTION__
+        .dply_allowed = true
+        policy, perr = get_enrichment_table_record("policy", {"org_id": org})
+        if perr == null {
+            rd = to_int(policy.retention_days) ?? __DEFAULT_RETENTION__
+            if rd > 0 { .retention_days = rd }
+            .dply_allowed = to_bool(policy.allowed) ?? true
+        }
         '''
+
+        # Hard-cap quota gate (PR C2): drop events for orgs the policy marks
+        # allowed=false (over their hard cap) BEFORE the ClickHouse insert — no
+        # store cost, no bill. Default-allow, so an absent/blank policy never drops.
+        [transforms.quota]
+        type = "filter"
+        inputs = ["normalize"]
+        condition = '.dply_allowed != false'
 
         [sinks.clickhouse]
         type = "clickhouse"
-        inputs = ["normalize"]
+        inputs = ["quota"]
         endpoint = "http://__CH_HOST__:__CH_PORT__"
         database = "__CH_DB__"
         table = "server_logs"
@@ -313,6 +358,39 @@ class VectorLogAggregatorInstallScripts
     protected function materialPath(): string
     {
         return self::MATERIAL_PATH;
+    }
+
+    public function policyPath(): string
+    {
+        return self::POLICY_PATH;
+    }
+
+    /**
+     * Bash that writes the shipped policy CSV to the box and reloads the
+     * aggregator so Vector reloads the enrichment table. Run by
+     * {@see \App\Jobs\SyncLogAggregatorPolicyJob}; $csvB64 is the rendered CSV.
+     */
+    public function syncPolicyScript(string $csvB64): string
+    {
+        $policy = $this->policyPath();
+
+        return <<<BASH
+        install -d -m 0750 "{$this->configDir()}"
+        echo "{$csvB64}" | base64 -d > "{$policy}.new"
+        # Only swap + reload when the policy actually changed — Vector rereads the
+        # enrichment table on restart, and a no-op restart every hour is needless
+        # churn (and a brief blip for connected edges).
+        if cmp -s "{$policy}.new" "{$policy}"; then
+          rm -f "{$policy}.new"
+          echo "policy unchanged"
+          exit 0
+        fi
+        mv "{$policy}.new" "{$policy}"
+        chmod 0644 "{$policy}"
+        systemctl restart {$this->unitName()}
+        systemctl is-active --quiet {$this->unitName()} || { echo "dply-aggregator failed to restart after policy sync"; exit 1; }
+        echo "policy synced + reloaded ($(wc -l < "{$policy}") line(s))"
+        BASH;
     }
 
     protected function dataDir(): string

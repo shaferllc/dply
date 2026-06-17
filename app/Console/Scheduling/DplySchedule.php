@@ -62,6 +62,7 @@ use App\Console\Commands\SweepSiteHttpErrorsCommand;
 use App\Console\Commands\SweepStalledTasksCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
+use App\Console\Commands\SyncLogAggregatorPolicyCommand;
 use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
@@ -179,6 +180,14 @@ final class DplySchedule
         $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday' => true])
             ->dailyAt('02:05')
             ->name('server-log-usage-finalize')
+            ->withoutOverlapping();
+
+        // Refresh per-org retention + hard-cap policy on the aggregator(s), after
+        // the hourly meter so caps reflect the latest usage. No-ops on the box when
+        // the policy is unchanged. Inert today (all plans default → empty policy).
+        $schedule->command(SyncLogAggregatorPolicyCommand::class)
+            ->hourlyAt(10)
+            ->name('server-log-policy-sync')
             ->withoutOverlapping();
 
         $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);

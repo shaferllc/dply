@@ -139,6 +139,7 @@ return [
             'max_servers' => null,          // null = unlimited shipping servers
             'alerting_enabled' => false,
             'drains_enabled' => false,
+            'hard_cap_gb' => 0,             // 0 = no ingest cap (fail open; PR C2)
         ],
         'plans' => [
             'pro' => [

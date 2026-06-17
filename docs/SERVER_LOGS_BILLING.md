@@ -134,25 +134,29 @@ Ordered by willingness-to-pay. Each is independently shippable once the gate exi
 
 ## Architecture changes the gate forces
 
-### 3.1 Per-org retention on a shared table
-The store is one multi-tenant `MergeTree` with a **fixed** `TTL timestamp + INTERVAL 7 DAY`.
-Per-org retention needs one of:
-- **(preferred) Column-expression TTL:** add a `retention_days UInt16` column, stamped at
-  the aggregator from the org's plan (a generated org→days map in the `normalize` transform,
-  like the quota map), and change the table to
-  `TTL toDateTime(timestamp) + INTERVAL retention_days DAY`. One table, per-row retention,
-  no query changes.
-- (fallback) Per-tier tables + a routing layer — more moving parts, avoid unless the
-  column-TTL approach underperforms at scale.
+### 3.1 Per-org retention on a shared table — **BUILT (PR B2)** ⚠️ needs live validation
+Took the preferred **column-expression TTL**: `dply:logs:schema-sync` now creates the
+table with a `retention_days UInt16 DEFAULT <default>` column and
+`TTL toDateTime(timestamp) + toIntervalDay(retention_days)`, and idempotently upgrades an
+existing table via `ALTER TABLE … ADD COLUMN IF NOT EXISTS retention_days` +
+`MODIFY TTL …` (online; existing rows take the DEFAULT). One table, per-row retention, no
+query changes. **Not yet run against the live `dply-logs-1` store** — verify the online
+`MODIFY TTL` on the real table before relying on it.
 
-Migration: `ALTER TABLE … ADD COLUMN retention_days` + `MODIFY TTL` (online in ClickHouse).
-Backfill default 7 for existing rows.
-
-### 3.2 Metering & quota maps at the aggregator
-The `normalize`/new `quota` transforms need a small, frequently-refreshed lookup of
-`org_id → {retention_days, allowed}`. Generate it from Postgres into a file the aggregator
-reads (Vector `enrichment_tables`/file source), refreshed by the meter job. Keep it tiny
-(only paying/over-quota orgs differ from defaults).
+### 3.2 Metering & quota maps at the aggregator — **BUILT (PR B2 + C2)** ⚠️ needs live validation
+`ServerLogAggregatorPolicyMap` generates the tiny `org_id → {retention_days, allowed}` CSV
+from Postgres (only orgs that differ from the default — non-default retention or hard-capped).
+The aggregator reads it as a Vector `enrichment_tables` file: `normalize` stamps
+`.retention_days` (default-on-miss = fail open) and a transient `.dply_allowed`; a new
+`transforms.quota` **filter** drops `allowed=false` events before the ClickHouse insert (no
+store cost, no bill). `SyncLogAggregatorPolicyJob` / `dply:logs:sync-policy` ships the CSV +
+reloads Vector (only when changed), scheduled hourly after the meter.
+**⚠️ The Vector enrichment-table config (`enrichment_tables.policy` schema/encoding keys),
+the `get_enrichment_table_record` VRL, and the SIGHUP-vs-restart reload were written against
+the docs but NOT validated against a running Vector** — confirm on the box (and watch the
+`$VAR`→`$$` interpolation gotcha noted in SERVER_LOGS_ADDON.md) before enabling per-org
+retention/caps in prod. Hard cap defaults to 0 (disabled) everywhere, so the filter drops
+nothing until a cap is set.
 
 ---
 
@@ -174,16 +178,17 @@ reads (Vector `enrichment_tables`/file source), refreshed by the meter job. Keep
    - **B1 ✅ DONE.** `config('server_logs.entitlements')` + `ServerLogEntitlements`
      resolver + `ServerLogEntitlement` value object + per-org `assertAddonAvailable(Server)`
      gate + entitlement/usage in `status()` + tests. Free defaults unchanged.
-   - **B2 (next, infra):** ClickHouse `retention_days` column + `MODIFY TTL` (via
-     `dply:logs:schema-sync`, online/idempotent, backfill 7) + stamp the org's
-     `retention_days` at the aggregator from a generated org→days enrichment map
-     (refreshed by the meter job). Touches the live store + install scripts.
+   - **B2 ✅ DONE (⚠️ needs live validation):** ClickHouse `retention_days` column +
+     `MODIFY TTL` (via `dply:logs:schema-sync`, online/idempotent) + `ServerLogAggregatorPolicyMap`
+     + aggregator enrichment-table config + `dply:logs:sync-policy` / `SyncLogAggregatorPolicyJob`.
+     Written but not yet exercised against the live store/aggregator — see §3.1/§3.2.
 3. **PR C — billing:**
    - **C1 ✅ DONE (dark).** `ServerLogUsageCostCalculator` + `DesiredBillingState`/
      `OrganizationBillingStateComputer`/`StripeSubscriptionSyncer` wiring + `server_logs.billing`
      switch + `stripe.server_log_usage` price key + tests. Triple-gated so nothing bills.
-   - **C2 (next, infra):** soft/hard quota drop at the aggregator (`transforms.quota`).
-     Ships with the PR B2 aggregator work.
+   - **C2 ✅ DONE (⚠️ needs live validation):** hard-cap quota drop at the aggregator
+     (`transforms.quota` filter on the policy `allowed` flag), shipped with the PR B2
+     aggregator work. Hard cap defaults to 0 (disabled) so nothing drops yet.
 4. **PR D+ — value features:** alerting, then drains, then search, each on its own.
 5. **Phase 3 — HA** before any durability marketing.
 
