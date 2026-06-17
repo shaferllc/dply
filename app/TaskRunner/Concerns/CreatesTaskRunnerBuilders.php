@@ -7,6 +7,7 @@ namespace App\Modules\TaskRunner\Concerns;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Modules\TaskRunner\Task;
 use Illuminate\Support\Facades\Log;
 
 /**

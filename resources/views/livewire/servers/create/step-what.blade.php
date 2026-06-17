@@ -307,6 +307,8 @@
                 'provisionOptions' => $provisionOptions,
                 'stepWhereRoute' => $stepWhereRoute,
                 'dedicatedCacheEngineOptions' => $dedicatedCacheEngineOptions ?? [],
+                'operatorPublicIp' => $operatorPublicIp ?? null,
+                'networkCidr' => $networkCidr ?? null,
             ])
         @else
         @php

@@ -76,6 +76,8 @@
             @include('livewire.servers.create._dedicated-cache-options', [
                 'form' => $form,
                 'cacheEngineOptions' => $cacheEngineOptions,
+                'operatorPublicIp' => $operatorPublicIp ?? null,
+                'networkCidr' => $networkCidr ?? null,
             ])
         @endif
 
@@ -100,6 +102,7 @@
             @include('livewire.servers.create._dedicated-database-options', [
                 'form' => $form,
                 'operatorPublicIp' => $operatorPublicIp ?? null,
+                'networkCidr' => $networkCidr ?? null,
             ])
         @endif
 

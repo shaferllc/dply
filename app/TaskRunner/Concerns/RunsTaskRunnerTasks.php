@@ -20,6 +20,7 @@ use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\PendingTask;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\RemoteProcessRunner;
+use App\Modules\TaskRunner\Task;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

@@ -127,6 +127,20 @@
                             autocomplete="off"
                         />
                         <div class="flex flex-wrap gap-1.5">
+                            @if (! empty($networkCidr ?? null))
+                                @php
+                                    $currentForNet = trim((string) $form->database_allowed_from);
+                                    $nextWithNet = $currentForNet === '' ? $networkCidr : $currentForNet.', '.$networkCidr;
+                                @endphp
+                                <button
+                                    type="button"
+                                    wire:click="$set('form.database_allowed_from', @js($nextWithNet))"
+                                    class="rounded-full bg-sky-50 px-2.5 py-1 font-mono text-[11px] font-medium text-sky-800 ring-1 ring-sky-200 transition hover:bg-sky-100"
+                                    title="{{ __('Allow the private network this server attaches to') }}"
+                                >
+                                    + {{ __('this network') }} ({{ $networkCidr }})
+                                </button>
+                            @endif
                             @foreach (['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'] as $exampleCidr)
                                 @php
                                     $current = trim((string) $form->database_allowed_from);

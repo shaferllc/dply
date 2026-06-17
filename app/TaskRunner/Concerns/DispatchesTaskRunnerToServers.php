@@ -9,6 +9,7 @@ use App\Modules\TaskRunner\ConnectionManager;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\MultiServerDispatcher;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Modules\TaskRunner\Task;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
