@@ -27,7 +27,7 @@ class WebhookDesignPattern extends DesignPattern
         return true;
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         // Create decorator directly to avoid container resolution triggering re-decoration
         return new WebhookDecorator($instance);

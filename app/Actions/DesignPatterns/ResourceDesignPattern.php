@@ -49,7 +49,7 @@ class ResourceDesignPattern extends DesignPattern
             || $frame->matches(JsonResource::class, 'resolve');
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         // Try to get the resource from the frame object
         $frameObject = $frame->getObject();

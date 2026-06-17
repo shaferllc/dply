@@ -24,7 +24,7 @@ class RequiresBillingFeatureDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -80,7 +80,8 @@ class RequiresBillingFeatureDecorator
     }
 
     /**
-     * Get required features from action.
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, string>
      */
     protected function getRequiredFeatures(array $arguments): array
     {
@@ -102,7 +103,7 @@ class RequiresBillingFeatureDecorator
     }
 
     /**
-     * Check if user can access required feature(s).
+     * @param  array<int, string>  $requiredFeatures
      */
     protected function userCanAccessFeatures(User $user, array $requiredFeatures, bool $requireAll): bool
     {

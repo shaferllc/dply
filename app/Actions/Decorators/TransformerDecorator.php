@@ -10,12 +10,12 @@ class TransformerDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->action->handle(...$arguments);
 
@@ -27,7 +27,7 @@ class TransformerDecorator
         return $result;
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
@@ -82,7 +82,10 @@ class TransformerDecorator
         return $this->fromActionMethod('shouldNestTransformed', [], true);
     }
 
-    protected function setTransformedProperty($object, array $transformed): void
+    /**
+     * @param  array<string, mixed>  $transformed
+     */
+    protected function setTransformedProperty(object $object, array $transformed): void
     {
         try {
             $reflection = new \ReflectionClass($object);
@@ -100,7 +103,12 @@ class TransformerDecorator
         }
     }
 
-    protected function applyTransformationsToObject($object, array $transformed, array $original, array $transformations): void
+    /**
+     * @param  array<string, mixed>  $transformed
+     * @param  array<string, mixed>  $original
+     * @param  array<string, mixed>  $transformations
+     */
+    protected function applyTransformationsToObject(object $object, array $transformed, array $original, array $transformations): void
     {
         // Apply transformations: set new properties with transformed keys/values
         foreach ($transformations as $originalKey => $transformation) {
@@ -134,7 +142,7 @@ class TransformerDecorator
         }
     }
 
-    protected function setObjectProperty($object, string $key, $value): void
+    protected function setObjectProperty(object $object, string $key, mixed $value): void
     {
         try {
             $reflection = new \ReflectionClass($object);
@@ -152,7 +160,10 @@ class TransformerDecorator
         }
     }
 
-    protected function transformObject($object, array $transformations): mixed
+    /**
+     * @param  array<string, mixed>  $transformations
+     */
+    protected function transformObject(object $object, array $transformations): mixed
     {
         // Convert object to array for transformation
         $data = [];
@@ -174,6 +185,11 @@ class TransformerDecorator
         return $object;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $transformations
+     * @return array<string, mixed>
+     */
     protected function transformArray(array $data, array $transformations): array
     {
         $result = [];
@@ -205,6 +221,9 @@ class TransformerDecorator
         return $result;
     }
 
+    /**
+     * @param  array<string, mixed>  $transformations
+     */
     protected function getTransformedKey(string $originalKey, array $transformations): string
     {
         if (isset($transformations[$originalKey]) && is_string($transformations[$originalKey])) {
@@ -224,6 +243,9 @@ class TransformerDecorator
         return is_array($data) || (is_object($data) && method_exists($data, 'toArray'));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getTransformations(): array
     {
         // Check for attribute first
@@ -236,6 +258,9 @@ class TransformerDecorator
         return $this->fromActionMethod('getTransformations', [], []);
     }
 
+    /**
+     * @return array<string, mixed>|string|null
+     */
     protected function getAttributeValue(string $attributeClass): array|string|null
     {
         // Unwrap decorators to get the original action
@@ -261,7 +286,7 @@ class TransformerDecorator
         return null;
     }
 
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 

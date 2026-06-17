@@ -11,10 +11,21 @@
         onchange="if (this.value && window.Livewire) { window.Livewire.navigate(this.value); }"
     >
         @foreach (server_workspace_nav_for_server($server) as $item)
-            <option
-                value="{{ server_workspace_nav_item_url($server, $item) }}"
-                @selected($active === $item['key'])
-            >{{ __($item['label']) }}@if (! empty($item['preview_only']) || ! empty($item['soon_badge'])) — {{ __('coming soon') }}@endif @if (! empty($item['needs_setup'])) &nbsp;•@endif</option>
+            @if (! empty($item['tabs']))
+                {{-- Collapsed cluster (Access, Network, …): expand its member pages
+                     so every destination stays reachable on mobile. --}}
+                @foreach ($item['tabs'] as $tab)
+                    <option
+                        value="{{ $tab['url'] }}"
+                        @selected($active === $tab['key'])
+                    >{{ __($item['label']) }} › {{ $tab['label'] }}@if (! empty($tab['preview_only']) || ! empty($tab['soon_badge'])) — {{ __('coming soon') }}@endif @if (! empty($tab['needs_setup'])) &nbsp;•@endif</option>
+                @endforeach
+            @else
+                <option
+                    value="{{ server_workspace_nav_item_url($server, $item) }}"
+                    @selected($active === $item['key'])
+                >{{ __($item['label']) }}@if (! empty($item['preview_only']) || ! empty($item['soon_badge'])) — {{ __('coming soon') }}@endif @if (! empty($item['needs_setup'])) &nbsp;•@endif</option>
+            @endif
         @endforeach
     </select>
 </div>

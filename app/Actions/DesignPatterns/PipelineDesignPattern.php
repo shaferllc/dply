@@ -23,7 +23,7 @@ class PipelineDesignPattern extends DesignPattern
             || ($frame->instanceOf(Pipeline::class) && ($frame->function === null || str_contains($frame->function ?? '', 'closure')));
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(PipelineDecorator::class, ['action' => $instance]);
     }

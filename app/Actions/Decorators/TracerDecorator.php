@@ -65,7 +65,7 @@ class TracerDecorator
 
     protected ActionTracer $tracer;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         $this->tracer = app(ActionTracer::class);
@@ -189,14 +189,8 @@ class TracerDecorator
     }
 
     /**
-     * Get trace attributes.
-     *
-     * Checks for:
-     * 1. getTraceAttributes() method on the original action (receives arguments)
-     * 2. traceAttributes property on the original action
-     * 3. Defaults to empty array
-     *
-     * @param  array  $arguments  Action arguments
+     * @param  array<int, mixed>  $arguments
+     * @return array<string, mixed>
      */
     protected function getTraceAttributes(array $arguments): array
     {
@@ -251,12 +245,7 @@ class TracerDecorator
         return null;
     }
 
-    /**
-     * Get the original action (unwrap decorators).
-     *
-     * @return mixed
-     */
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 
@@ -276,24 +265,7 @@ class TracerDecorator
     }
 
     /**
-     * Add trace metadata to the result.
-     *
-     * Adds a `_trace` property to the result indicating:
-     * - Trace ID
-     * - Span ID
-     * - Trace name
-     * - Success status
-     * - Enabled status (whether tracing was active)
-     * - Attributes (custom trace attributes)
-     *
-     * @param  mixed  $result  The action result
-     * @param  string  $traceId  The trace ID
-     * @param  string  $spanId  The span ID
-     * @param  string  $traceName  The trace name
-     * @param  bool  $success  Whether the operation succeeded
-     * @param  bool  $enabled  Whether tracing was enabled
-     * @param  array  $attributes  Custom trace attributes
-     * @return mixed The result with trace metadata added
+     * @param  array<string, mixed>  $attributes
      */
     protected function addTraceMetadata(mixed $result, string $traceId, string $spanId, string $traceName, bool $success, bool $enabled = true, array $attributes = []): mixed
     {

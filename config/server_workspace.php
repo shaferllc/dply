@@ -165,6 +165,46 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Nav clusters (one sidebar item → several sub-tab pages)
+    |--------------------------------------------------------------------------
+    | Collapses several related nav `key`s into a single sidebar item that, when
+    | active, renders a secondary tab strip linking to each member's existing
+    | route/page. Keeps the sidebar short without merging the underlying Livewire
+    | components. Applied only to the default (non-role) sidebar — role navs are
+    | already curated short lists.
+    |
+    | A cluster only collapses when ≥2 of its members survive feature/structural
+    | filtering; with 0–1 present the lone member renders as its normal item. The
+    | representative lands on the first non-preview member and is highlighted when
+    | any member key is the active page. `tab_labels` overrides the sub-tab label
+    | (defaults to the member's own nav label).
+    */
+    'clusters' => [
+        'access' => [
+            'label' => 'Access',
+            'icon' => 'finger-print',
+            'members' => ['ssh-access', 'ssh', 'system-users'],
+            'tab_labels' => ['ssh-access' => 'Map', 'ssh' => 'SSH keys', 'system-users' => 'System users'],
+        ],
+        'network' => [
+            'label' => 'Network',
+            'icon' => 'share',
+            'members' => ['firewall', 'networking', 'load-balancers'],
+        ],
+        'backups' => [
+            'label' => 'Backups',
+            'icon' => 'archive-box',
+            'members' => ['backups', 'snapshots'],
+        ],
+        'scheduled' => [
+            'label' => 'Scheduled tasks',
+            'icon' => 'clock',
+            'members' => ['cron', 'schedule'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sidebar group labels
     |--------------------------------------------------------------------------
     | Display labels for the group keys above. Only groups actually present in

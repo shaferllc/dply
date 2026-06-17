@@ -1,2 +1,2263 @@
 parameters:
-    ignoreErrors: []
+	ignoreErrors:
+		-
+			message: '#^App\\Actions\\AbstractCreate\:\:collection\(\) calls parent\:\:collection\(\) but App\\Actions\\AbstractCreate does not extend any class\.$#'
+			identifier: class.noParent
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractCreate\:\:callMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 30
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractCreate\:\:getProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractCreate\:\:handle\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractCreate\:\:hasMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 30
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractCreate\:\:hasProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractCreate\:\:view\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined static method App\\Actions\\AbstractCreate\:\:dispatchEventSyncIf\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Support\\Facades\\Queue\:\:pushed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractCreate\) and ''getMailData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractCreate\) and ''getViewName'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Constructor of class App\\Actions\\AbstractCreate has an unused parameter \$arguments\.$#'
+			identifier: constructor.unusedParameter
+			count: 2
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractCreate\:\:makeUniqueJob\(\) should return App\\Actions\\Decorators\\UniqueJobDecorator but returns App\\Actions\\Decorators\\JobDecorator&Illuminate\\Contracts\\Queue\\ShouldBeUnique\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractCreate\:\:partialMock\(\) should return Mockery\\MockInterface but returns Mockery\\LegacyMockInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^PHPDoc tag @return has invalid value \(\\stdClass\{user\: \\Illuminate\\Contracts\\Auth\\Authenticatable\|null, ip\: string\|null, user_agent\: string\|null, timestamp\: \\Illuminate\\Support\\Carbon, request_id\: string\|null, \.\.\.\}\)\: Unexpected token "\{", expected TOKEN_HORIZONTAL_WS at offset 393 on line 12$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 7
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/AbstractCreate.php
+
+		-
+			message: '#^App\\Actions\\AbstractDelete\:\:collection\(\) calls parent\:\:collection\(\) but App\\Actions\\AbstractDelete does not extend any class\.$#'
+			identifier: class.noParent
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractDelete\:\:callMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractDelete\:\:getProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractDelete\:\:handle\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractDelete\:\:hasMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractDelete\:\:hasProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractDelete\:\:view\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined static method App\\Actions\\AbstractDelete\:\:dispatchEventSyncIf\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Support\\Facades\\Queue\:\:pushed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractDelete\) and ''getMailData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractDelete\) and ''getViewName'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractDelete\) and ''setReversalData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Constructor of class App\\Actions\\AbstractDelete has an unused parameter \$arguments\.$#'
+			identifier: constructor.unusedParameter
+			count: 2
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractDelete\:\:makeUniqueJob\(\) should return App\\Actions\\Decorators\\UniqueJobDecorator but returns App\\Actions\\Decorators\\JobDecorator&Illuminate\\Contracts\\Queue\\ShouldBeUnique\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractDelete\:\:partialMock\(\) should return Mockery\\MockInterface but returns Mockery\\LegacyMockInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^PHPDoc tag @return has invalid value \(\\stdClass\{user\: \\Illuminate\\Contracts\\Auth\\Authenticatable\|null, ip\: string\|null, user_agent\: string\|null, timestamp\: \\Illuminate\\Support\\Carbon, request_id\: string\|null, \.\.\.\}\)\: Unexpected token "\{", expected TOKEN_HORIZONTAL_WS at offset 393 on line 12$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 7
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/AbstractDelete.php
+
+		-
+			message: '#^App\\Actions\\AbstractEdit\:\:collection\(\) calls parent\:\:collection\(\) but App\\Actions\\AbstractEdit does not extend any class\.$#'
+			identifier: class.noParent
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractEdit\:\:callMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractEdit\:\:getProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractEdit\:\:handle\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractEdit\:\:hasMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractEdit\:\:hasProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractEdit\:\:view\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined static method App\\Actions\\AbstractEdit\:\:dispatchEventSyncIf\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Support\\Facades\\Queue\:\:pushed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractEdit\) and ''getMailData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractEdit\) and ''getViewName'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractEdit\) and ''setReversalData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Constructor of class App\\Actions\\AbstractEdit has an unused parameter \$arguments\.$#'
+			identifier: constructor.unusedParameter
+			count: 2
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractEdit\:\:makeUniqueJob\(\) should return App\\Actions\\Decorators\\UniqueJobDecorator but returns App\\Actions\\Decorators\\JobDecorator&Illuminate\\Contracts\\Queue\\ShouldBeUnique\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractEdit\:\:partialMock\(\) should return Mockery\\MockInterface but returns Mockery\\LegacyMockInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^PHPDoc tag @return has invalid value \(\\stdClass\{user\: \\Illuminate\\Contracts\\Auth\\Authenticatable\|null, ip\: string\|null, user_agent\: string\|null, timestamp\: \\Illuminate\\Support\\Carbon, request_id\: string\|null, \.\.\.\}\)\: Unexpected token "\{", expected TOKEN_HORIZONTAL_WS at offset 393 on line 12$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 7
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/AbstractEdit.php
+
+		-
+			message: '#^App\\Actions\\AbstractView\:\:collection\(\) calls parent\:\:collection\(\) but App\\Actions\\AbstractView does not extend any class\.$#'
+			identifier: class.noParent
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractView\:\:callMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractView\:\:getProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractView\:\:handle\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractView\:\:hasMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractView\:\:hasProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\AbstractView\:\:view\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined static method App\\Actions\\AbstractView\:\:dispatchEventSyncIf\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Support\\Facades\\Queue\:\:pushed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractView\) and ''getMailData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\AbstractView\) and ''getViewName'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Constructor of class App\\Actions\\AbstractView has an unused parameter \$arguments\.$#'
+			identifier: constructor.unusedParameter
+			count: 2
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractView\:\:makeUniqueJob\(\) should return App\\Actions\\Decorators\\UniqueJobDecorator but returns App\\Actions\\Decorators\\JobDecorator&Illuminate\\Contracts\\Queue\\ShouldBeUnique\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Method App\\Actions\\AbstractView\:\:partialMock\(\) should return Mockery\\MockInterface but returns Mockery\\LegacyMockInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^PHPDoc tag @return has invalid value \(\\stdClass\{user\: \\Illuminate\\Contracts\\Auth\\Authenticatable\|null, ip\: string\|null, user_agent\: string\|null, timestamp\: \\Illuminate\\Support\\Carbon, request_id\: string\|null, \.\.\.\}\)\: Unexpected token "\{", expected TOKEN_HORIZONTAL_WS at offset 393 on line 12$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 7
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/AbstractView.php
+
+		-
+			message: '#^Call to static method classes\(\) on an unknown class Lorisleiva\\Lody\\Lody\.$#'
+			identifier: class.notFound
+			count: 2
+			path: app/Actions/ActionManager.php
+
+		-
+			message: '#^Parameter &\$frame by\-ref type of method App\\Actions\\ActionManager\:\:identifyFromBacktrace\(\) expects App\\Actions\\BacktraceFrame\|null, array\<string, int\|list\<mixed\>\|object\|string\> given\.$#'
+			identifier: parameterByRef.type
+			count: 1
+			path: app/Actions/ActionManager.php
+
+		-
+			message: '#^PHPDoc tag @var has invalid value \(\$job AsJob\)\: Unexpected token "\$job", expected type at offset 9 on line 1$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/ActionPendingChain.php
+
+		-
+			message: '#^Call to an undefined method ReflectionType\:\:getName\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/ActionRegistry.php
+
+		-
+			message: '#^Call to static method classes\(\) on an unknown class Lorisleiva\\Lody\\Lody\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/ActionRegistry.php
+
+		-
+			message: '#^Method App\\Actions\\ActionRequest\:\:failedValidation\(\) with return type void returns mixed but should not return anything\.$#'
+			identifier: return.void
+			count: 1
+			path: app/Actions/ActionRequest.php
+
+		-
+			message: '#^Method App\\Actions\\ActionRequest\:\:prepareForValidation\(\) with return type void returns mixed but should not return anything\.$#'
+			identifier: return.void
+			count: 1
+			path: app/Actions/ActionRequest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Actions/ActionRequest.php
+
+		-
+			message: '#^App\\Actions\\Actions\:\:collection\(\) calls parent\:\:collection\(\) but App\\Actions\\Actions does not extend any class\.$#'
+			identifier: class.noParent
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Actions\:\:callMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Actions\:\:getProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Actions\:\:handle\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Actions\:\:hasMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 31
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Actions\:\:hasProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Actions\:\:view\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined static method App\\Actions\\Actions\:\:dispatchEventSyncIf\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Support\\Facades\\Queue\:\:pushed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\Actions\) and ''getMailData'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(App\\Actions\\Actions\) and ''getViewName'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Constructor of class App\\Actions\\Actions has an unused parameter \$arguments\.$#'
+			identifier: constructor.unusedParameter
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Method App\\Actions\\Actions\:\:makeUniqueJob\(\) should return App\\Actions\\Decorators\\UniqueJobDecorator but returns App\\Actions\\Decorators\\JobDecorator&Illuminate\\Contracts\\Queue\\ShouldBeUnique\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Method App\\Actions\\Actions\:\:partialMock\(\) should return Mockery\\MockInterface but returns Mockery\\LegacyMockInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^PHPDoc tag @return has invalid value \(\\stdClass\{user\: \\Illuminate\\Contracts\\Auth\\Authenticatable\|null, ip\: string\|null, user_agent\: string\|null, timestamp\: \\Illuminate\\Support\\Carbon, request_id\: string\|null, \.\.\.\}\)\: Unexpected token "\{", expected TOKEN_HORIZONTAL_WS at offset 393 on line 12$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 4
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Actions/Actions.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: app/Actions/AttributeValidator.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/Auth/EnsureLocalDevAdminUser.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Auth/EnsureLocalDevAdminUser.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$password\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Auth/UnlinkSocialAccount.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Cloud/ApplyCloudSiteExtras.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/Cloud/ApplyCloudSiteExtras.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$container_backend\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Cloud/ConfigureCloudAutoscaling.php
+
+		-
+			message: '#^Parameter \#1 \$siteId of job class App\\Jobs\\SyncCloudScalingJob constructor expects string in App\\Jobs\\SyncCloudScalingJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/ConfigureCloudAutoscaling.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$container_backend\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Cloud/ConfigureCloudHealthCheck.php
+
+		-
+			message: '#^Parameter \#1 \$siteId of job class App\\Jobs\\SyncCloudScalingJob constructor expects string in App\\Jobs\\SyncCloudScalingJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/ConfigureCloudHealthCheck.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$container_backend\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$container_port\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$container_region\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$env_file_content\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Method App\\Actions\\Cloud\\CreateCloudPreviewSite\:\:findExisting\(\) should return App\\Models\\Site\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Method App\\Actions\\Cloud\\CreateCloudPreviewSite\:\:listForParent\(\) should return Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Site\> but returns Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Parameter \#1 \$siteId of job class App\\Jobs\\ProvisionCloudSiteJob constructor expects string in App\\Jobs\\ProvisionCloudSiteJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudPreviewSite.php
+
+		-
+			message: '#^Parameter \#1 \$organizationId of static method App\\Services\\Cloud\\CloudRouter\:\:pickAutoBackend\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudSite.php
+
+		-
+			message: '#^Parameter \#1 \$siteId of job class App\\Jobs\\ProvisionCloudSiteJob constructor expects string in App\\Jobs\\ProvisionCloudSiteJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudSite.php
+
+		-
+			message: '#^Parameter \#1 \$organizationId of static method App\\Services\\Cloud\\CloudRouter\:\:pickAutoBackend\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudSiteFromSource.php
+
+		-
+			message: '#^Parameter \#1 \$siteId of job class App\\Jobs\\ProvisionCloudSiteJob constructor expects string in App\\Jobs\\ProvisionCloudSiteJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudSiteFromSource.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$container_backend\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Cloud/CreateCloudWorker.php
+
+		-
+			message: '#^Parameter \#1 \$siteId of job class App\\Jobs\\SyncCloudWorkersJob constructor expects string in App\\Jobs\\SyncCloudWorkersJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Cloud/CreateCloudWorker.php
+
+		-
+			message: '#^Trait App\\Actions\\Concerns\\AsFeatureFlagged is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Actions/Concerns/AsFeatureFlagged.php
+
+		-
+			message: '''
+				#^PHPDoc tag @foreach has invalid value \(\(\$posts\-\>get\(\) as \$post\)
+				    \{\{ \$post\-\>title \}\}\)\: Unexpected token "\$posts", expected type at offset 15774 on line 556$#
+			'''
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/Concerns/AsLazy.php
+
+		-
+			message: '''
+				#^PHPDoc tag @if has invalid value \(\(\$posts\-\>isExecuted\(\)\)
+				    \<p\>Posts loaded\</p\>\)\: Unexpected token "\$posts", expected type at offset 15697 on line 551$#
+			'''
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/Concerns/AsLazy.php
+
+		-
+			message: '#^Trait App\\Actions\\Concerns\\WithAttributes is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Actions/Concerns/WithAttributes.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:with\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Actions/Concerns/tests/AsABTestableTest.php
+
+		-
+			message: '#^Parameter \#1 \$decorator of method class@anonymous/app/Actions/Concerns/tests/AsABTestableTest\.php\:19\:\:setABTestableDecorator\(\) expects App\\Actions\\Decorators\\ABTestableDecorator, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Concerns/tests/AsABTestableTest.php
+
+		-
+			message: '#^Parameter \#1 \$decorator of method class@anonymous/app/Actions/Concerns/tests/AsABTestableTest\.php\:65\:\:setABTestableDecorator\(\) expects App\\Actions\\Decorators\\ABTestableDecorator, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Concerns/tests/AsABTestableTest.php
+
+		-
+			message: '#^Parameter \#1 \$decorator of method class@anonymous/app/Actions/Concerns/tests/AsABTestableTest\.php\:80\:\:setABTestableDecorator\(\) expects App\\Actions\\Decorators\\ABTestableDecorator, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Concerns/tests/AsABTestableTest.php
+
+		-
+			message: '#^Parameter \#1 \$decorator of method class@anonymous/app/Actions/Concerns/tests/AsABTestableTest\.php\:95\:\:setABTestableDecorator\(\) expects App\\Actions\\Decorators\\ABTestableDecorator, Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Concerns/tests/AsABTestableTest.php
+
+		-
+			message: '#^Call to an undefined static method class@anonymous/app/Actions/Concerns/tests/AsCompensatableTest\.php\:9\:\:make\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/Concerns/tests/AsCompensatableTest.php
+
+		-
+			message: '#^Call to an undefined method class@anonymous/app/Actions/Concerns/tests/AsRateLimiterTest\.php\:9\:\:getProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Actions/Concerns/tests/AsRateLimiterTest.php
+
+		-
+			message: '#^Call to an undefined method class@anonymous/app/Actions/Concerns/tests/AsRateLimiterTest\.php\:9\:\:hasProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Actions/Concerns/tests/AsRateLimiterTest.php
+
+		-
+			message: '#^Call to an undefined method class@anonymous/app/Actions/Concerns/tests/AsResourceTest\.php\:9\:\:callMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 5
+			path: app/Actions/Concerns/tests/AsResourceTest.php
+
+		-
+			message: '#^Call to an undefined method class@anonymous/app/Actions/Concerns/tests/AsResourceTest\.php\:9\:\:hasMethod\(\)\.$#'
+			identifier: method.notFound
+			count: 5
+			path: app/Actions/Concerns/tests/AsResourceTest.php
+
+		-
+			message: '#^Class class@anonymous/app/Actions/Concerns/tests/AsResourceTest\.php\:9 does not have a constructor and must be instantiated without any parameters\.$#'
+			identifier: new.noConstructor
+			count: 1
+			path: app/Actions/Concerns/tests/AsResourceTest.php
+
+		-
+			message: '#^class@anonymous/app/Actions/Concerns/tests/AsResourceTest\.php\:9\:\:collection\(\) calls parent\:\:collection\(\) but class@anonymous/app/Actions/Concerns/tests/AsResourceTest\.php\:9 does not extend any class\.$#'
+			identifier: class.noParent
+			count: 1
+			path: app/Actions/Concerns/tests/AsResourceTest.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Actions/Decorators/AuditableDecorator.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/Decorators/BatchDecorator.php
+
+		-
+			message: '#^Call to an undefined method ReflectionType\:\:getName\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Actions/Decorators/ControllerDecorator.php
+
+		-
+			message: '#^Call to an undefined method ReflectionType\:\:isBuiltin\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Decorators/ControllerDecorator.php
+
+		-
+			message: '#^Parameter \#3 \$options of static method Redis\:\:set\(\) expects array\|int, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Decorators/DistributedLockDecorator.php
+
+		-
+			message: '#^Static method Redis\:\:set\(\) invoked with 5 parameters, 2\-3 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Actions/Decorators/DistributedLockDecorator.php
+
+		-
+			message: '#^Parameter \#2 \$methodParameters of method App\\Actions\\Decorators\\JWTDecorator\:\:fromActionMethod\(\) expects array, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Decorators/JWTDecorator.php
+
+		-
+			message: '#^Variable \$firstParameter in PHPDoc tag @var does not exist\.$#'
+			identifier: varTag.variableNotFound
+			count: 1
+			path: app/Actions/Decorators/JobDecorator.php
+
+		-
+			message: '#^Parameter \#2 \$methodParameters of method App\\Actions\\Decorators\\LockDecorator\:\:fromActionMethod\(\) expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Decorators/LockDecorator.php
+
+		-
+			message: '#^PHPDoc tag @var has invalid value \(object\{scopes\(\)\: array\} \$token\)\: Unexpected token "\(", expected ''\:'' at offset 22 on line 1$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: app/Actions/Decorators/OAuthDecorator.php
+
+		-
+			message: '#^Cannot call method getAllPermissions\(\) on class\-string\|object\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Actions/Decorators/PermissionDecorator.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Decorators/ProgressDecorator.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Decorators\\ProgressiveDecorator\:\:setProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Decorators/ProgressiveDecorator.php
+
+		-
+			message: '#^Parameter \#2 \$callback of static method Illuminate\\Support\\Facades\\Broadcast\:\:channel\(\) expects \(callable\(\)\: mixed\)\|string, array\{progress_id\: string\|null, percentage\: float, status\: string, current\: int, total\: int, metadata\: array\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Decorators/ProgressiveDecorator.php
+
+		-
+			message: '#^Call to method canAccessFeature\(\) on an unknown class App\\Modules\\Billing\\Services\\FeatureGate\.$#'
+			identifier: class.notFound
+			count: 2
+			path: app/Actions/Decorators/RequiresBillingFeatureDecorator.php
+
+		-
+			message: '#^Class App\\Modules\\Billing\\Services\\FeatureGate not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresBillingFeatureDecorator.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\User and ''currentTeam'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Call to method hasCapability\(\) on an unknown class App\\Modules\\Roles\\Services\\RolesService\.$#'
+			identifier: class.notFound
+			count: 2
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Class App\\Modules\\Roles\\Services\\RolesService not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Class App\\Modules\\Teams\\Models\\Team not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Method App\\Actions\\Decorators\\RequiresCapabilityDecorator\:\:getTeam\(\) has invalid return type App\\Modules\\Teams\\Models\\Team\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Method App\\Actions\\Decorators\\RequiresCapabilityDecorator\:\:getTeam\(\) should return App\\Modules\\Teams\\Models\\Team\|null but returns App\\Models\\Team\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Parameter \$team of method App\\Actions\\Decorators\\RequiresCapabilityDecorator\:\:userHasRequiredCapabilities\(\) has invalid type App\\Modules\\Teams\\Models\\Team\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresCapabilityDecorator.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\User and ''currentTeam'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Decorators/RequiresPlanDecorator.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\User and ''currentTeam'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Decorators/RequiresRoleDecorator.php
+
+		-
+			message: '#^Class App\\Modules\\Teams\\Models\\Team not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresRoleDecorator.php
+
+		-
+			message: '#^Method App\\Actions\\Decorators\\RequiresRoleDecorator\:\:getTeam\(\) has invalid return type App\\Modules\\Teams\\Models\\Team\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresRoleDecorator.php
+
+		-
+			message: '#^Method App\\Actions\\Decorators\\RequiresRoleDecorator\:\:getTeam\(\) should return App\\Modules\\Teams\\Models\\Team\|null but returns App\\Models\\Team\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Decorators/RequiresRoleDecorator.php
+
+		-
+			message: '#^Parameter \$team of method App\\Actions\\Decorators\\RequiresRoleDecorator\:\:userHasRequiredRole\(\) has invalid type App\\Modules\\Teams\\Models\\Team\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Decorators/RequiresRoleDecorator.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\User and ''currentTeam'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Decorators/RequiresSubscriptionDecorator.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ''Illuminate\\\\Http\\\\Resources\\\\Json\\\\JsonResource'' and ''collection'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Decorators/ResourceDecorator.php
+
+		-
+			message: '#^Method App\\Actions\\Decorators\\ResourceDecorator\:\:collection\(\) should return Illuminate\\Http\\Resources\\Json\\AnonymousResourceCollection but returns Illuminate\\Support\\Collection\<\(int\|string\), static\(App\\Actions\\Decorators\\ResourceDecorator\)\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Decorators/ResourceDecorator.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Decorators\\ReversibleDecorator\:\:setProperty\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Actions/Decorators/ReversibleDecorator.php
+
+		-
+			message: '#^Offset ''action_name'' does not exist on array\{\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Actions/Decorators/tests/AuditableDecoratorTest.php
+
+		-
+			message: '#^Offset ''exception'' does not exist on array\{\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Actions/Decorators/tests/AuditableDecoratorTest.php
+
+		-
+			message: '#^Offset ''result'' does not exist on array\{\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Actions/Decorators/tests/AuditableDecoratorTest.php
+
+		-
+			message: '#^Call to an undefined method Pest\\PendingCalls\\TestCall\:\:withHeaders\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Decorators/tests/AuthenticatedDecoratorTest.php
+
+		-
+			message: '#^Class App\\Actions\\Concerns\\AsGate not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/DesignPatterns/GateDesignPattern.php
+
+		-
+			message: '#^Class Illuminate\\Http\\Kernel not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/DesignPatterns/MiddlewareDesignPattern.php
+
+		-
+			message: '#^Class App\\Actions\\Concerns\\AsPolicy not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/DesignPatterns/PolicyDesignPattern.php
+
+		-
+			message: '#^Class App\\Actions\\Concerns\\AsQuery not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/DesignPatterns/QueryDesignPattern.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and int will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Actions/Edge/CancelStuckEdgeDeployment.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Actions/Edge/CancelStuckEdgeDeployment.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$edge_backend\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 11
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Call to function is_array\(\) with null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 2
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Call to function is_string\(\) with null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Method App\\Actions\\Edge\\CreateEdgePreviewSite\:\:findExisting\(\) should return App\\Models\\Site\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Method App\\Actions\\Edge\\CreateEdgePreviewSite\:\:findExistingByCommit\(\) should return App\\Models\\Site\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Method App\\Actions\\Edge\\CreateEdgePreviewSite\:\:listForParent\(\) should return Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Site\> but returns Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Offset ''mode'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Offset ''previews'' does not exist on string\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Offset ''previews'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Offset ''protection'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between '''' and '''' will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between \*NEVER\* and ''none'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Actions/Edge/CreateEdgePreviewSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Edge/CreateHybridEdgeStack.php
+
+		-
+			message: '#^Parameter \#1 \$cloudSiteId of job class App\\Jobs\\ProvisionHybridEdgeStackJob constructor expects string in App\\Jobs\\ProvisionHybridEdgeStackJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Edge/CreateHybridEdgeStack.php
+
+		-
+			message: '#^Parameter \#1 \$organizationId of static method App\\Services\\Cloud\\CloudRouter\:\:pickAutoBackend\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Edge/CreateHybridEdgeStack.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/DeployEdgeCommit.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Edge/PromoteEdgePreview.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/PromoteEdgePreview.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Actions/Edge/PromoteEdgePreview.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/QueueEdgeDeployReplay.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Edge/RedeployEdgeSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/RedeployEdgeSite.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Edge/RollbackEdgeDeployment.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Edge/UpdateEdgeSplitTraffic.php
+
+		-
+			message: '#^Call to static method classes\(\) on an unknown class Lorisleiva\\Lody\\Lody\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Helpers/ListenerAutoDiscovery.php
+
+		-
+			message: '#^Call to an undefined method ReflectionType\:\:getName\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/IDE/ActionIDEHelper.php
+
+		-
+			message: '#^PHPDoc tag @var with type Illuminate\\Routing\\Router is not subtype of native type \$this\(App\\Actions\\Macros\\ActionRouteMacros\)\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: app/Actions/Macros/ActionRouteMacros.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Organizations/EnsureUserHasWorkspaceOrganization.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Organizations/EnsureUserHasWorkspaceOrganization.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:attachUserToDefaultTeam\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Organizations/EnsureUserHasWorkspaceOrganization.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:createDefaultTeamIfMissing\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Organizations/EnsureUserHasWorkspaceOrganization.php
+
+		-
+			message: '#^Method App\\Actions\\Organizations\\EnsureUserHasWorkspaceOrganization\:\:run\(\) should return App\\Models\\Organization but returns Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Organizations/EnsureUserHasWorkspaceOrganization.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$password\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/PasswordConfirmationAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Realtime/CreateRealtimeApp.php
+
+		-
+			message: '#^Method App\\Actions\\Realtime\\CreateRealtimeApp\:\:handle\(\) should return App\\Models\\RealtimeApp but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Realtime/CreateRealtimeApp.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Actions/Routing/ActionResourceRegistrar.php
+
+		-
+			message: '#^Unsafe access to private property App\\Actions\\Routing\\ActionResourceRegistrar\:\:\$actionResolver through static\:\:\.$#'
+			identifier: staticClassAccess.privateProperty
+			count: 3
+			path: app/Actions/Routing/ActionResourceRegistrar.php
+
+		-
+			message: '#^Parameter \#1 \$serverId of job class App\\Jobs\\ProvisionServerlessHostJob constructor expects string in App\\Jobs\\ProvisionServerlessHostJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Serverless/CreateServerlessFunction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ApplyFakeCloudProvisionAsReady.php
+
+		-
+			message: '#^Result of method App\\Actions\\Servers\\ApplyFakeCloudProvisionAsReady\:\:handle\(\) \(void\) is used\.$#'
+			identifier: method.void
+			count: 3
+			path: app/Actions/Servers/ApplyFakeCloudProvisionAsReady.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ServerDatabaseEngine\:\:\$is_default\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/AttachDatabaseEngineToServer.php
+
+		-
+			message: '#^Offset ''sizes'' on array\{credentials\: Illuminate\\Support\\Collection\<int, mixed\>, regions\: list\<array\<string, mixed\>\>, sizes\: list\<array\<string, mixed\>\>, region_label\: string, size_label\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Servers/BuildServerCreatePreflight.php
+
+		-
+			message: '#^Offset ''state'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Servers/BuildServerCreatePreflight.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Servers/BuildServerProvisionMeta.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$hetzner_network_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$ip_address\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$private_ip_address\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$region\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$size\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$ssh_port\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$ssh_private_key\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$ssh_public_key\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$ssh_user\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Parameter \#1 \$serverId of job class App\\Jobs\\PersonalizeClaimedServerJob constructor expects string in App\\Jobs\\PersonalizeClaimedServerJob\:\:dispatch\(\), int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Actions/Servers/ClaimWarmServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider_credential_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$region\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$size\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\CloneServerOnDigitalOcean\:\:handle\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Parameter \#1 \$clone of method App\\Actions\\Servers\\CloneServerOnDigitalOcean\:\:seedCloneConsoleAction\(\) expects App\\Models\\Server, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Parameter \#2 \$clone of method App\\Actions\\Servers\\CloneServerOnDigitalOcean\:\:buildSnapshotName\(\) expects App\\Models\\Server, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 3
+			path: app/Actions/Servers/CloneServerOnDigitalOcean.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/CreateWarmPoolMember.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionHetznerServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionHetznerServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/CreateWarmPoolMember.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 9
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$region\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:users\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credential of class App\\Services\\AzureComputeService constructor expects App\\Models\\ProviderCredential, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credential of class App\\Services\\OracleComputeService constructor expects App\\Models\\ProviderCredential, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credential of class App\\Services\\UpCloudService constructor expects App\\Models\\ProviderCredential, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credential of method App\\Services\\AwsEc2ServiceFactory\:\:make\(\) expects App\\Models\\ProviderCredential, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credentialOrKeys of class App\\Services\\OvhService constructor expects App\\Models\\ProviderCredential\|array\{endpoint\?\: string, application_key\: string, application_secret\: string, consumer_key\: string\}, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credentialOrToken of class App\\Services\\DigitalOceanService constructor expects App\\Models\\ProviderCredential\|non\-empty\-string, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credentialOrToken of class App\\Services\\HetznerService constructor expects App\\Models\\ProviderCredential\|string, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credentialOrToken of class App\\Services\\LinodeService constructor expects App\\Models\\ProviderCredential\|non\-empty\-string, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$credentialOrToken of class App\\Services\\VultrService constructor expects App\\Models\\ProviderCredential\|non\-empty\-string, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$org of static method App\\Support\\Servers\\ServerHostingPlatformContext\:\:forOrg\(\) expects App\\Models\\Organization, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Parameter \#1 \$organization of function audit_log expects App\\Models\\Organization, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/DeleteServerAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ServerDatabaseEngine\:\:\$is_default\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/DetachDatabaseEngineFromServer.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Servers/FilterServerProvisionOptionsForCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 2
+			path: app/Actions/Servers/FilterServerProvisionOptionsForCreateForm.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 3
+			path: app/Actions/Servers/FilterServerProvisionOptionsForCreateForm.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/InstallRuntimeOnServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/ListExistingProviderServers.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ListExistingProviderServers.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/ListExistingProviderServers.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ListExistingProviderServers.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$error_message\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_seen_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isBusy\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:resolvedSources\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\ManageServerLogShipping\:\:disable\(\) should return App\\Models\\ServerLogAgent\|null but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 2
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\ManageServerLogShipping\:\:resync\(\) should return App\\Models\\ServerLogAgent but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/ManageServerLogShipping.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/RecordProvisionStepDurations.php
+
+		-
+			message: '#^Access to an undefined property App\\Modules\\TaskRunner\\Models\\Task\:\:\$output\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/RecordProvisionStepDurations.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ProviderCredential\:\:\$provider\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/ResolveKubernetesClusters.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Servers/ResolveKubernetesClusters.php
+
+		-
+			message: '#^Call to an undefined method App\\Actions\\Servers\\ResolveServerCreateCatalog\:\:catalogOvh\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\ResolveServerCreateCatalog\:\:extractInt\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Offset ''id'' on array\{id\: string, name\: string, memory_mb\?\: int\|null, vcpus\?\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Offset ''id'' on array\{id\: string, name\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 4
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Offset ''name'' on array\{id\: string, name\: string, memory_mb\?\: int\|null, vcpus\?\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Offset ''name'' on array\{id\: string, name\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 4
+			path: app/Actions/Servers/ResolveServerCreateCatalog.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ServerCacheService\:\:\$engine\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/Servers/SeedProvisionedEnginesForServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ServerCacheService\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/SeedProvisionedEnginesForServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ServerCacheService\:\:\$port\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/SeedProvisionedEnginesForServer.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreManagedServer\:\:handle\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreManagedServer.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionHetznerServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionHetznerServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreManagedServer.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionVultrServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionVultrServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreManagedServer.php
+
+		-
+			message: '#^Parameter \#1 \$server of method App\\Actions\\Servers\\ClaimWarmServer\:\:attempt\(\) expects App\\Models\\Server, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreManagedServer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Call to method getMessage\(\) on an unknown class App\\Actions\\Servers\\Concerns\\Throwable\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Caught class App\\Actions\\Servers\\Concerns\\Throwable not found\.$#'
+			identifier: class.notFound
+			count: 4
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeAws\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeAwsKubernetes\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeAwsLambda\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeAzure\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeCustom\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeDigitalOcean\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeDigitalOceanFunctions\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeDigitalOceanKubernetes\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeHetzner\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeLinode\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeOracle\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeUpcloud\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Method App\\Actions\\Servers\\StoreServerFromCreateForm\:\:storeVultr\(\) should return App\\Models\\Server but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$scriptKeys$#'
+			identifier: parameter.notFound
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\PollDoksClusterStatusJob constructor expects App\\Models\\Server in App\\Jobs\\PollDoksClusterStatusJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\PollEksClusterStatusJob constructor expects App\\Models\\Server in App\\Jobs\\PollEksClusterStatusJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionAwsEc2ServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionAwsEc2ServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionAzureServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionAzureServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionDigitalOceanDropletJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionDigitalOceanDropletJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionHetznerServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionHetznerServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionLinodeServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionLinodeServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionOracleServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionOracleServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionUpCloudServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionUpCloudServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\ProvisionVultrServerJob constructor expects App\\Models\\Server in App\\Jobs\\ProvisionVultrServerJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of job class App\\Jobs\\WaitForServerSshReadyJob constructor expects App\\Models\\Server in App\\Jobs\\WaitForServerSshReadyJob\:\:dispatch\(\), Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Parameter \#1 \$server of static method App\\Jobs\\RunSetupScriptJob\:\:shouldDispatch\(\) expects App\\Models\\Server, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Servers/StoreServerFromCreateForm.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Organization\:\:\$default_site_script_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Sites/CreateContainerSiteFromInspection.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/Sites/CreateContainerSiteFromInspection.php
+
+		-
+			message: '#^Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage\:\:andThrow\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/Testing/ActionTestSuite.php
+
+		-
+			message: '#^PHPDoc tag @var with type array\<string, string\> is not subtype of native type array\{14\: ''2023\-04\-30'', 16\: ''2023\-09\-11'', 18\: ''2025\-04\-30'', 20\: ''2026\-04\-30'', 22\: ''2027\-04\-30'', 24\: ''2028\-04\-30''\}\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: config/insights_nodejs_eol.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/factories/ServerBlueprintFactory.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\SiteUptimeMonitor\:\:\$probe_region\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/migrations/2026_06_02_080000_add_probe_worker_to_site_uptime_monitors_table.php
+
+		-
+			message: '#^Parameter \#1 \$site of method App\\Services\\Sites\\UptimeProbeWorkerResolver\:\:forSite\(\) expects App\\Models\\Site, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: database/migrations/2026_06_02_080000_add_probe_worker_to_site_uptime_monitors_table.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 3
+			path: database/migrations/2026_06_06_190000_backfill_logging_binding_specs.php
+
+		-
+			message: '#^Offset ''provider'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: database/migrations/2026_06_06_190000_backfill_logging_binding_specs.php
+
+		-
+			message: '#^Property App\\Models\\SiteBinding\:\:\$config \(string\|null\) does not accept array\<string, mixed\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: database/migrations/2026_06_06_190000_backfill_logging_binding_specs.php
+
+		-
+			message: '#^Property App\\Models\\SiteBinding\:\:\$config \(string\|null\) does not accept array\<string, string\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: database/migrations/2026_06_06_190000_backfill_logging_binding_specs.php
+
+		-
+			message: '#^Property App\\Models\\SiteBinding\:\:\$injected_env \(string\|null\) does not accept array\<string, string\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: database/migrations/2026_06_06_190000_backfill_logging_binding_specs.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$meta\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/migrations/2026_06_11_030000_drop_redundant_restart_steps.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/LocalDemoServersSeeder.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$project_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/LocalDemoServersSeeder.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Site\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/LocalDemoServersSeeder.php
+
+		-
+			message: '#^Match arm comparison between ''2026\-12'' and ''2026\-12'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: database/seeders/RoadmapItemSeeder.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Organization\:\:\$default_site_script_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: database/seeders/ScriptSeeder.php
+
+		-
+			message: '#^Parameter \#1 \$user of method Database\\Seeders\\ScriptSeeder\:\:seedScriptsForOrganization\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: database/seeders/ScriptSeeder.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Organization\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: routes/channels.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: routes/channels.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:userIsDeployer\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: routes/channels.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$setup_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: routes/web.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Server\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: routes/web.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 5
+			path: routes/web.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\Organization\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: routes/web.php

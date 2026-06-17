@@ -19,7 +19,7 @@ class ABTestableDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it

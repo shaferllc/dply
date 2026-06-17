@@ -19,12 +19,12 @@ class RateLimiterDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function __invoke($request = null, ?string $key = null, ?int $maxAttempts = null, int $decaySeconds = 60): bool
+    public function __invoke(mixed $request = null, ?string $key = null, ?int $maxAttempts = null, int $decaySeconds = 60): bool
     {
         // Rate limiters can be called with just a request, or with explicit parameters
         if ($request !== null && $key === null) {
@@ -57,7 +57,7 @@ class RateLimiterDecorator
         return false;
     }
 
-    protected function buildKeyFromRequest($request): string
+    protected function buildKeyFromRequest(mixed $request): string
     {
         if (is_object($request) && method_exists($request, 'user')) {
             $user = $request->user();

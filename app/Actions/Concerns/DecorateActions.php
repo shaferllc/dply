@@ -6,7 +6,7 @@ trait DecorateActions
 {
     protected mixed $action = null;
 
-    public function setAction($action): self
+    public function setAction(mixed $action): self
     {
         $this->action = $action;
 
@@ -23,7 +23,7 @@ trait DecorateActions
         return property_exists($this->action, $property);
     }
 
-    protected function getProperty(string $property)
+    protected function getProperty(string $property): mixed
     {
         return $this->action->{$property};
     }
@@ -33,31 +33,43 @@ trait DecorateActions
         return isset($this->action) && method_exists($this->action, $method);
     }
 
-    protected function callMethod(string $method, array $parameters = [])
+    /**
+     * @param  array<int, mixed>  $parameters
+     */
+    protected function callMethod(string $method, array $parameters = []): mixed
     {
         return call_user_func_array([$this->action, $method], $parameters);
     }
 
-    protected function resolveAndCallMethod(string $method, array $extraArguments = [])
+    /**
+     * @param  array<string, mixed>  $extraArguments
+     */
+    protected function resolveAndCallMethod(string $method, array $extraArguments = []): mixed
     {
         return app()->call([$this->action, $method], $extraArguments);
     }
 
-    protected function fromActionMethod(string $method, array $methodParameters = [], $default = null)
+    /**
+     * @param  array<int, mixed>  $methodParameters
+     */
+    protected function fromActionMethod(string $method, array $methodParameters = [], mixed $default = null): mixed
     {
         return $this->hasMethod($method)
             ? $this->callMethod($method, $methodParameters)
             : value($default);
     }
 
-    protected function fromActionProperty(string $property, $default = null)
+    protected function fromActionProperty(string $property, mixed $default = null): mixed
     {
         return $this->hasProperty($property)
             ? $this->getProperty($property)
             : value($default);
     }
 
-    protected function fromActionMethodOrProperty(string $method, string $property, $default = null, array $methodParameters = [])
+    /**
+     * @param  array<int, mixed>  $methodParameters
+     */
+    protected function fromActionMethodOrProperty(string $method, string $property, mixed $default = null, array $methodParameters = []): mixed
     {
         if ($this->hasMethod($method)) {
             return $this->callMethod($method, $methodParameters);

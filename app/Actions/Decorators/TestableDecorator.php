@@ -51,7 +51,7 @@ class TestableDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -157,14 +157,7 @@ class TestableDecorator
     }
 
     /**
-     * Record a call in the call history.
-     *
-     * @param  string  $callId  Unique call identifier
-     * @param  int  $callNumber  Sequential call number
-     * @param  array  $arguments  Action arguments
-     * @param  mixed  $result  Action result
-     * @param  float  $executionTime  Execution time in milliseconds
-     * @param  \Throwable|null  $exception  Exception if call failed
+     * @param  array<int, mixed>  $arguments
      */
     protected function recordCall(string $callId, int $callNumber, array $arguments, mixed $result, float $executionTime, ?\Throwable $exception = null): void
     {
@@ -196,7 +189,8 @@ class TestableDecorator
     }
 
     /**
-     * Serialize arguments for storage.
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, mixed>
      */
     protected function serializeArguments(array $arguments): array
     {

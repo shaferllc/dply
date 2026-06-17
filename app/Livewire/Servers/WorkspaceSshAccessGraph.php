@@ -376,6 +376,7 @@ class WorkspaceSshAccessGraph extends Component
         return view('livewire.servers.workspace-ssh-access-graph', [
             'report' => $payload['report'],
             'timeline' => $payload['timeline'],
+            'accessMap' => $payload['access_map'],
             'sessionsEnabled' => Feature::active('workspace.ssh_sessions'),
             'durationPresets' => config('server_ssh_sessions.duration_presets', [4, 8, 24, 72, 168]),
             'eventsPagination' => [

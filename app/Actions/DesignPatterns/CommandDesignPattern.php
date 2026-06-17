@@ -32,7 +32,7 @@ class CommandDesignPattern extends DesignPattern
         return false;
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         // Unwrap any existing decorators to get the original action
         // CommandDecorator must be the outermost decorator
@@ -42,7 +42,7 @@ class CommandDesignPattern extends DesignPattern
         return new CommandDecorator($originalAction);
     }
 
-    protected function unwrapDecorator($instance)
+    protected function unwrapDecorator(mixed $instance): mixed
     {
         // If instance is a decorator, get the wrapped action
         if (str_starts_with(get_class($instance), 'App\\Actions\\Decorators\\')) {

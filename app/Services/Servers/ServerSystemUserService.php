@@ -22,7 +22,7 @@ class ServerSystemUserService
      * flags). Stale records (users no longer present on the host) are removed
      * in the same transaction so the table reflects reality on each sync.
      *
-     * @return list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     public function listPasswdUsersWithSiteCounts(Server $server, ServerPasswdUserLister $lister): array
     {
@@ -36,7 +36,7 @@ class ServerSystemUserService
      * DB-backed read of the last persisted snapshot. Used by the workspace
      * page on mount so the table is populated without a fresh SSH probe.
      *
-     * @return list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     public function storedSystemUsersWithMetadata(Server $server): array
     {
@@ -91,24 +91,31 @@ class ServerSystemUserService
 
     /**
      * @param  list<array{username: string, uid?: int|null, home?: string, shell?: string, groups?: list<string>}>  $details
-     * @return list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     private function buildEnrichedRows(Server $server, array $details): array
     {
         $sitesByUser = $this->sitesByEffectiveUser($server);
+        $workerCounts = $this->deletionPolicy->workerCountsByUsername($server);
+        $cronCounts = $this->deletionPolicy->cronCountsByUsername($server);
 
         $rows = [];
         foreach ($details as $d) {
-            $key = strtolower($d['username']);
+            $key = strtolower(trim($d['username']));
             $sites = $sitesByUser[$key] ?? [];
             $siteCount = count($sites);
+            $workerCount = $workerCounts[$key] ?? 0;
+            $cronCount = $cronCounts[$key] ?? 0;
             $protected = $this->deletionPolicy->isProtected($server, $d['username']);
+            $inUse = $siteCount > 0 || $workerCount > 0 || $cronCount > 0;
 
             $rows[] = [
                 'username' => $d['username'],
                 'site_count' => $siteCount,
+                'worker_count' => $workerCount,
+                'cron_count' => $cronCount,
                 'is_protected' => $protected,
-                'is_orphan' => ! $protected && $siteCount === 0,
+                'is_orphan' => ! $protected && ! $inUse,
                 'uid' => $d['uid'] ?? null,
                 'home' => (string) ($d['home'] ?? ''),
                 'shell' => (string) ($d['shell'] ?? ''),

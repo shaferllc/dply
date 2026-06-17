@@ -52,7 +52,7 @@ class ThrottleDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -143,13 +143,7 @@ class ThrottleDecorator
     }
 
     /**
-     * Get the throttle key for tracking concurrent executions.
-     *
-     * Checks for:
-     * 1. buildThrottleKey() method on the action (receives arguments)
-     * 2. Defaults to 'throttle:{action_class}'
-     *
-     * @param  array  $arguments  Action arguments
+     * @param  array<int, mixed>  $arguments
      */
     protected function getThrottleKey(array $arguments): string
     {

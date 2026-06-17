@@ -20,15 +20,18 @@ class ResourceDecorator extends JsonResource
 {
     use DecorateActions;
 
-    protected $actionInstance;
+    protected mixed $actionInstance;
 
-    public function __construct($action, $resource = null)
+    public function __construct(mixed $action, mixed $resource = null)
     {
         $this->actionInstance = is_string($action) ? app($action) : $action;
         $this->setAction($this->actionInstance);
         parent::__construct($resource ?? $this->actionInstance);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray($request): array
     {
         // Call toArray on the action if it exists
@@ -58,7 +61,10 @@ class ResourceDecorator extends JsonResource
         $actionClass = static::class;
         $actionInstance = app($actionClass);
 
-        return collect($resource)->map(function ($item) use ($actionClass, $actionInstance) {
+        /** @var \Illuminate\Support\Collection<int, mixed> $items */
+        $items = collect($resource);
+
+        return $items->map(function ($item) use ($actionClass, $actionInstance) {
             return new $actionClass($actionInstance, $item);
         });
     }

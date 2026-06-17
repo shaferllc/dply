@@ -7,6 +7,12 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
+final class AuditableDecoratorTestCapture
+{
+    /** @var array<string, mixed> */
+    public array $data = [];
+}
+
 describe('AuditableDecorator', function () {
     it('executes wrapped action and returns result', function () {
         $action = new class
@@ -24,12 +30,11 @@ describe('AuditableDecorator', function () {
     });
 
     it('calls storeAuditRecord when action defines it', function () {
-        $captured = new stdClass;
-        $captured->data = [];
+        $captured = new AuditableDecoratorTestCapture();
         $action = new class($captured)
         {
             public function __construct(
-                public stdClass $captured
+                public AuditableDecoratorTestCapture $captured
             ) {}
 
             public function handle(): string
@@ -37,6 +42,9 @@ describe('AuditableDecorator', function () {
                 return 'result';
             }
 
+            /**
+             * @param  array<string, mixed>  $data
+             */
             public function storeAuditRecord(array $data): void
             {
                 $this->captured->data = $data;
@@ -52,12 +60,11 @@ describe('AuditableDecorator', function () {
     });
 
     it('records audit on action failure when storeAuditRecord defined', function () {
-        $captured = new stdClass;
-        $captured->data = [];
+        $captured = new AuditableDecoratorTestCapture();
         $action = new class($captured)
         {
             public function __construct(
-                public stdClass $captured
+                public AuditableDecoratorTestCapture $captured
             ) {}
 
             public function handle(): never
@@ -65,6 +72,9 @@ describe('AuditableDecorator', function () {
                 throw new RuntimeException('Action failed');
             }
 
+            /**
+             * @param  array<string, mixed>  $data
+             */
             public function storeAuditRecord(array $data): void
             {
                 $this->captured->data = $data;

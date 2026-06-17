@@ -122,7 +122,7 @@
                         <div class="min-w-0">
                             <p class="font-semibold">{{ trans_choice('{1} :count orphan account|[2,*] :count orphan accounts', $orphanRows->count(), ['count' => $orphanRows->count()]) }}</p>
                             <p class="mt-0.5 text-xs text-amber-900/80">
-                                {{ __('Not protected and not assigned to any site:') }}
+                                {{ __('Not protected and not used by any site, worker, or cron job:') }}
                                 <span class="font-mono">{{ $orphanRows->pluck('username')->join(', ') }}</span>
                                 — {{ __('expand a row to inspect, or remove them all in one go.') }}
                             </p>
@@ -165,6 +165,9 @@
                                 $home = (string) ($row['home'] ?? '');
                                 $shell = (string) ($row['shell'] ?? '');
                                 $isRemoving = in_array($row['username'], $pending_remove_usernames, true);
+                                $workerCount = (int) ($row['worker_count'] ?? 0);
+                                $cronCount = (int) ($row['cron_count'] ?? 0);
+                                $inUse = ($row['site_count'] ?? 0) > 0 || $workerCount > 0 || $cronCount > 0;
                             @endphp
                             <li class="px-6 py-4 sm:px-8" wire:key="su-{{ $row['username'] }}">
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -201,6 +204,14 @@
 
                                         <p class="mt-0.5 text-[11px] text-brand-mist">
                                             {{ trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $row['site_count'], ['count' => $row['site_count']]) }}
+                                            @if ($workerCount > 0)
+                                                <span class="text-brand-mist/60">·</span>
+                                                {{ trans_choice('{1} :count worker|[2,*] :count workers', $workerCount, ['count' => $workerCount]) }}
+                                            @endif
+                                            @if ($cronCount > 0)
+                                                <span class="text-brand-mist/60">·</span>
+                                                {{ trans_choice('{1} :count cron job|[2,*] :count cron jobs', $cronCount, ['count' => $cronCount]) }}
+                                            @endif
                                             @if ($shell !== '')
                                                 <span class="text-brand-mist/60">·</span>
                                                 <span class="font-mono">{{ $shell }}</span>
@@ -262,6 +273,26 @@
                                                             @endif
                                                         </dd>
                                                     </div>
+                                                    @if ($workerCount > 0 || $cronCount > 0)
+                                                        <div class="sm:col-span-2">
+                                                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Also used by') }}</dt>
+                                                            <dd class="mt-1 flex flex-wrap gap-1.5">
+                                                                @if ($workerCount > 0)
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                                        <x-heroicon-m-cog-6-tooth class="h-3 w-3" />
+                                                                        {{ trans_choice('{1} :count worker process|[2,*] :count worker processes', $workerCount, ['count' => $workerCount]) }}
+                                                                    </span>
+                                                                @endif
+                                                                @if ($cronCount > 0)
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                                        <x-heroicon-m-clock class="h-3 w-3" />
+                                                                        {{ trans_choice('{1} :count cron job|[2,*] :count cron jobs', $cronCount, ['count' => $cronCount]) }}
+                                                                    </span>
+                                                                @endif
+                                                            </dd>
+                                                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Removing this account would orphan these — reassign or remove them first.') }}</p>
+                                                        </div>
+                                                    @endif
                                                 </dl>
                                             </div>
                                         </div>
@@ -271,9 +302,9 @@
                                         <button
                                             type="button"
                                             wire:click="openRemoveModal('{{ $row['username'] }}')"
-                                            @disabled($isRemoving || ($row['site_count'] ?? 0) > 0 || ! empty($row['is_protected']))
+                                            @disabled($isRemoving || $inUse || ! empty($row['is_protected']))
                                             class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                            title="{{ $isRemoving ? __('Removal in progress…') : (! empty($row['is_protected']) ? __('Protected accounts cannot be removed') : (($row['site_count'] ?? 0) > 0 ? __('Reassign all sites first') : __('Remove this account'))) }}"
+                                            title="{{ $isRemoving ? __('Removal in progress…') : (! empty($row['is_protected']) ? __('Protected accounts cannot be removed') : ($inUse ? __('Reassign its sites, workers, and cron jobs first') : __('Remove this account'))) }}"
                                         >
                                             @if ($isRemoving)
                                                 <x-spinner variant="forest" size="sm" />

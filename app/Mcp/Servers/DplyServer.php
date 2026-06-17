@@ -16,6 +16,10 @@ use App\Mcp\Tools\Env\DeleteSiteEnvVar;
 use App\Mcp\Tools\Env\GetSiteEnv;
 use App\Mcp\Tools\Env\PushSiteEnv;
 use App\Mcp\Tools\Env\SetSiteEnvVar;
+use App\Mcp\Tools\Logs\DisableLogShipping;
+use App\Mcp\Tools\Logs\EnableLogShipping;
+use App\Mcp\Tools\Logs\GetLogShippingStatus;
+use App\Mcp\Tools\Logs\ResyncLogShipping;
 use App\Mcp\Tools\Sites\GetSite;
 use App\Mcp\Tools\Sites\ListServers;
 use App\Mcp\Tools\Sites\ListSites;
@@ -72,6 +76,11 @@ class DplyServer extends Server
         // Database
         ListSiteDatabases::class,
         CreateSiteDatabase::class,
+        // Logs add-on (per-server edge Vector agent)
+        GetLogShippingStatus::class,
+        EnableLogShipping::class,
+        ResyncLogShipping::class,
+        DisableLogShipping::class,
         // Async operation polling
         GetOperationStatus::class,
     ];

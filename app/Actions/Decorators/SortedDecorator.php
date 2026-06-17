@@ -4,6 +4,7 @@ namespace App\Actions\Decorators;
 
 use App\Actions\Concerns\DecorateActions;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Sorted Decorator
@@ -38,18 +39,12 @@ class SortedDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    /**
-     * Execute the action and apply sorting if result is a Builder.
-     *
-     * @param  mixed  ...$arguments
-     * @return mixed
-     */
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->action->handle(...$arguments);
 
@@ -61,19 +56,14 @@ class SortedDecorator
         return $result;
     }
 
-    /**
-     * Make the decorator callable.
-     *
-     * @param  mixed  ...$arguments
-     * @return mixed
-     */
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
 
     /**
-     * Apply sorting to the query based on request parameters.
+     * @param  Builder<Model>  $query
+     * @return Builder<Model>
      */
     protected function applySorting(Builder $query): Builder
     {

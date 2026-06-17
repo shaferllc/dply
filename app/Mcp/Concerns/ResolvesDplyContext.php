@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Mcp\Exceptions\DplyMcpException;
 use App\Models\ApiToken;
 use App\Models\Organization;
+use App\Models\Server;
 use App\Models\Site;
 
 /**
@@ -66,6 +67,22 @@ trait ResolvesDplyContext
         }
 
         return $site;
+    }
+
+    /**
+     * Load a server by id and assert it belongs to the token's org.
+     */
+    protected function resolveServer(string $serverId, ?Organization $organization = null): Server
+    {
+        $organization ??= $this->organization();
+
+        $server = Server::query()->find($serverId);
+
+        if (! $server || $server->organization_id !== $organization->id) {
+            throw new DplyMcpException("Server \"{$serverId}\" was not found in this organization.");
+        }
+
+        return $server;
     }
 
     /**

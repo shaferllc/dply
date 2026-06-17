@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\OperatorSummaryController;
 use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\ServerController;
 use App\Http\Controllers\Api\ServerFirewallController;
+use App\Http\Controllers\Api\ServerLogShippingController;
 use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
@@ -153,6 +154,15 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/servers/{server}/system-users/{username}', [ServerSystemUserApiController::class, 'destroy'])
             ->middleware('ability:'.$apiAbilities['servers.system_users.destroy'])
             ->where('username', '[a-zA-Z0-9._-]+');
+
+        Route::get('/servers/{server}/log-shipping', [ServerLogShippingController::class, 'show'])
+            ->middleware('ability:'.$apiAbilities['servers.log_shipping.show']);
+        Route::post('/servers/{server}/log-shipping/enable', [ServerLogShippingController::class, 'enable'])
+            ->middleware('ability:'.$apiAbilities['servers.log_shipping.enable']);
+        Route::post('/servers/{server}/log-shipping/resync', [ServerLogShippingController::class, 'resync'])
+            ->middleware('ability:'.$apiAbilities['servers.log_shipping.resync']);
+        Route::delete('/servers/{server}/log-shipping', [ServerLogShippingController::class, 'disable'])
+            ->middleware('ability:'.$apiAbilities['servers.log_shipping.disable']);
 
         Route::get('/servers/{server}/firewall', [ServerFirewallController::class, 'show'])->middleware('ability:'.$apiAbilities['firewall.show']);
         Route::post('/servers/{server}/firewall/apply', [ServerFirewallController::class, 'apply'])->middleware('ability:'.$apiAbilities['firewall.apply']);

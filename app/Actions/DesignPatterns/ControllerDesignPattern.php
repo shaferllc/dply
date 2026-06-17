@@ -19,7 +19,7 @@ class ControllerDesignPattern extends DesignPattern
         return $frame->matches(Route::class, 'getController');
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(ControllerDecorator::class, [
             'action' => $instance,

@@ -273,7 +273,147 @@ if (! function_exists('server_workspace_nav_for_server')) {
             });
         }
 
+        // Collapse related items into single cluster entries (Access, Network,
+        // Backups, Scheduled tasks) for the default sidebar only — role navs are
+        // already short, curated lists and reference member keys directly.
+        if ($roleKeyPositions === null && $filtered !== []) {
+            $filtered = server_workspace_collapse_clusters($server, $filtered);
+        }
+
         return $navCache[$cacheKey] = $filtered;
+    }
+}
+
+if (! function_exists('server_workspace_collapse_clusters')) {
+    /**
+     * Collapse already-filtered nav items into single cluster entries per
+     * config('server_workspace.clusters'). A cluster with ≥2 surviving members
+     * becomes one representative item (carrying a `tabs` list + `match_keys`);
+     * a cluster with 0–1 present is left untouched.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    function server_workspace_collapse_clusters(Server $server, array $items): array
+    {
+        $clusters = (array) config('server_workspace.clusters', []);
+        if ($clusters === []) {
+            return $items;
+        }
+
+        $memberToCluster = [];
+        foreach ($clusters as $clusterId => $cluster) {
+            foreach ((array) ($cluster['members'] ?? []) as $memberKey) {
+                if (is_string($memberKey)) {
+                    $memberToCluster[$memberKey] = $clusterId;
+                }
+            }
+        }
+        if ($memberToCluster === []) {
+            return $items;
+        }
+
+        // Gather surviving members per cluster, preserving filtered order.
+        $present = [];
+        foreach ($items as $item) {
+            $key = $item['key'] ?? null;
+            if (is_string($key) && isset($memberToCluster[$key])) {
+                $present[$memberToCluster[$key]][] = $item;
+            }
+        }
+
+        $emitted = [];
+        $out = [];
+        foreach ($items as $item) {
+            $key = $item['key'] ?? null;
+            if (! is_string($key) || ! isset($memberToCluster[$key])) {
+                $out[] = $item;
+
+                continue;
+            }
+
+            $clusterId = $memberToCluster[$key];
+            if (isset($emitted[$clusterId])) {
+                continue;
+            }
+            $emitted[$clusterId] = true;
+
+            $members = $present[$clusterId] ?? [];
+            if (count($members) <= 1) {
+                // Only one member survived filtering — keep it as its own item
+                // rather than wrapping a single page in a redundant tab strip.
+                $out[] = $item;
+
+                continue;
+            }
+
+            $out[] = server_workspace_build_cluster_item($server, (array) $clusters[$clusterId], (string) $clusterId, $members);
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('server_workspace_build_cluster_item')) {
+    /**
+     * Build the single representative sidebar item for a cluster of nav members.
+     *
+     * @param  list<array<string, mixed>>  $members
+     * @return array<string, mixed>
+     */
+    function server_workspace_build_cluster_item(Server $server, array $cluster, string $clusterId, array $members): array
+    {
+        $tabLabels = (array) ($cluster['tab_labels'] ?? []);
+
+        // Order tabs by the cluster's configured member order (so e.g. a "Soon"
+        // member sorts where intended), not the incidental filtered-nav order.
+        $order = array_flip(array_values(array_filter((array) ($cluster['members'] ?? []), 'is_string')));
+        usort($members, static fn (array $a, array $b): int => ($order[$a['key'] ?? ''] ?? PHP_INT_MAX) <=> ($order[$b['key'] ?? ''] ?? PHP_INT_MAX));
+
+        $tabs = [];
+        $primary = null;
+        $allPreview = true;
+        foreach ($members as $member) {
+            $memberKey = (string) ($member['key'] ?? '');
+            $isPreview = (bool) ($member['preview_only'] ?? false) || (bool) ($member['soon_badge'] ?? false);
+            $allPreview = $allPreview && $isPreview;
+
+            $tabs[] = [
+                'key' => $memberKey,
+                'label' => __($tabLabels[$memberKey] ?? ($member['label'] ?? $memberKey)),
+                'url' => server_workspace_nav_item_url($server, $member),
+                'preview_only' => $isPreview,
+                'soon_badge' => (bool) ($member['soon_badge'] ?? false),
+                'needs_setup' => (bool) ($member['needs_setup'] ?? false),
+            ];
+
+            if ($primary === null && ! $isPreview) {
+                $primary = $member;
+            }
+        }
+        $primary ??= $members[0];
+
+        $needsSetup = false;
+        foreach ($members as $member) {
+            if ((bool) ($member['needs_setup'] ?? false)) {
+                $needsSetup = true;
+                break;
+            }
+        }
+
+        return [
+            'key' => $clusterId,
+            'icon' => $cluster['icon'] ?? ($primary['icon'] ?? 'square-2-stack'),
+            'label' => $cluster['label'] ?? $clusterId,
+            'group' => $primary['group'] ?? ($cluster['group'] ?? null),
+            'route' => $primary['route'] ?? '',
+            'preview_route' => $primary['preview_route'] ?? null,
+            'preview_only' => $allPreview,
+            'soon_badge' => false,
+            'needs_setup' => $needsSetup,
+            'match_keys' => array_values(array_map(static fn (array $m): string => (string) ($m['key'] ?? ''), $members)),
+            'tabs' => $tabs,
+        ];
     }
 }
 

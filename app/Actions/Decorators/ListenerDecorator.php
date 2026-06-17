@@ -16,13 +16,13 @@ class ListenerDecorator
      */
     protected $container;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         $this->container = new Container;
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         // Try asListener() method first
         if ($this->hasMethod('asListener')) {
@@ -42,12 +42,12 @@ class ListenerDecorator
         return null;
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
 
-    public function shouldQueue(...$arguments)
+    public function shouldQueue(mixed ...$arguments): bool
     {
         if ($this->hasMethod('shouldQueue')) {
             return $this->resolveFromArgumentsAndCall('shouldQueue', $arguments);
@@ -56,7 +56,10 @@ class ListenerDecorator
         return true;
     }
 
-    protected function resolveFromArgumentsAndCall($method, $arguments)
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    protected function resolveFromArgumentsAndCall(string $method, array $arguments): mixed
     {
         $arguments = $this->resolveClassMethodDependencies(
             $arguments,

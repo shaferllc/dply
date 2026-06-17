@@ -22,7 +22,7 @@ class UpdateDesignPattern extends DesignPattern
         return true;
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return new UpdateDecorator($instance);
     }

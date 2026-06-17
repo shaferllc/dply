@@ -133,7 +133,54 @@
         </x-hero-card>
     @endunless
 
+    @php
+        // When the active page belongs to a collapsed cluster (Access, Network,
+        // Backups, Scheduled tasks), surface the cluster's member pages as a
+        // secondary tab strip. Derived from the same role-aware nav the sidebar
+        // uses, so feature/structural gating is already applied.
+        $clusterTabs = null;
+        if (filled($active)) {
+            foreach (server_workspace_nav_for_server($server) as $navItem) {
+                if (is_array($navItem)
+                    && ! empty($navItem['tabs'])
+                    && in_array($active, (array) ($navItem['match_keys'] ?? []), true)
+                ) {
+                    $clusterTabs = $navItem['tabs'];
+                    break;
+                }
+            }
+        }
+    @endphp
+
     <div @class(['space-y-8', 'mt-6 sm:mt-8' => ! $hideHero])>
+        @if ($clusterTabs && count($clusterTabs) > 1)
+            <div class="border-b border-brand-ink/10">
+                <nav class="-mb-px flex flex-wrap gap-x-6" aria-label="{{ __('Section tabs') }}">
+                    @foreach ($clusterTabs as $tab)
+                        @php $tabActive = $active === $tab['key']; @endphp
+                        <a
+                            href="{{ $tab['url'] }}"
+                            wire:navigate
+                            @class([
+                                'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors',
+                                'border-brand-forest text-brand-ink' => $tabActive,
+                                'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink' => ! $tabActive,
+                            ])
+                            @if ($tabActive) aria-current="page" @endif
+                        >
+                            {{ $tab['label'] }}
+                            @if (! empty($tab['preview_only']) || ! empty($tab['soon_badge']))
+                                <span class="rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Soon') }}</span>
+                            @endif
+                            @if (! empty($tab['needs_setup']))
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" role="img" aria-label="{{ __('Setup required') }}"></span>
+                            @endif
+                        </a>
+                    @endforeach
+                </nav>
+            </div>
+        @endif
+
         {{ $slot }}
     </div>
 

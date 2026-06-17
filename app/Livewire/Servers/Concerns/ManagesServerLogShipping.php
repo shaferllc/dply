@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\InstallLogAgentJob;
-use App\Jobs\UninstallLogAgentJob;
+use App\Actions\Servers\ManageServerLogShipping;
+use App\Exceptions\LogShippingException;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ServerLogAgent;
 
@@ -87,40 +87,14 @@ trait ManagesServerLogShipping
     {
         $this->authorize('update', $this->server);
 
-        if (! $this->logShippingEnabled) {
-            $this->toastError(__('The Logs add-on is not enabled in this environment yet.'));
+        try {
+            app(ManageServerLogShipping::class)->enable($this->server, $this->logShippingSources);
+        } catch (LogShippingException $e) {
+            $this->toastError($e->getMessage());
 
             return;
         }
 
-        if (! $this->server->isVmHost()) {
-            $this->toastError(__('Log shipping is only available on VM servers.'));
-
-            return;
-        }
-
-        $agent = ServerLogAgent::query()->firstOrCreate(
-            ['server_id' => $this->server->id],
-            [
-                'status' => ServerLogAgent::STATUS_PENDING,
-                'enabled_sources' => $this->logShippingSources,
-            ],
-        );
-
-        if ($agent->isBusy()) {
-            $this->toastError(__('The log agent is already installing — hang tight.'));
-
-            return;
-        }
-
-        $agent->update([
-            'status' => ServerLogAgent::STATUS_INSTALLING,
-            'enabled_sources' => $this->logShippingSources,
-            'install_output' => '',
-            'error_message' => null,
-        ]);
-
-        InstallLogAgentJob::dispatch($agent->id);
         $this->server->load('logAgent');
         $this->toastSuccess(__('Installing the log agent — progress will stream below.'));
     }
@@ -132,26 +106,14 @@ trait ManagesServerLogShipping
     {
         $this->authorize('update', $this->server);
 
-        $agent = $this->server->logAgent;
-        if ($agent === null) {
-            $this->toastError(__('No log agent to re-sync — enable it first.'));
+        try {
+            app(ManageServerLogShipping::class)->resync($this->server);
+        } catch (LogShippingException $e) {
+            $this->toastError($e->getMessage());
 
             return;
         }
 
-        if ($agent->isBusy()) {
-            $this->toastError(__('The log agent is busy — wait for the current operation to finish.'));
-
-            return;
-        }
-
-        $agent->update([
-            'status' => ServerLogAgent::STATUS_INSTALLING,
-            'install_output' => '',
-            'error_message' => null,
-        ]);
-
-        InstallLogAgentJob::dispatch($agent->id);
         $this->server->load('logAgent');
         $this->toastSuccess(__('Re-syncing the log agent with the latest sources.'));
     }
@@ -160,13 +122,11 @@ trait ManagesServerLogShipping
     {
         $this->authorize('update', $this->server);
 
-        $agent = $this->server->logAgent;
+        $agent = app(ManageServerLogShipping::class)->disable($this->server);
         if ($agent === null) {
             return;
         }
 
-        $agent->update(['status' => ServerLogAgent::STATUS_UNINSTALLING, 'error_message' => null]);
-        UninstallLogAgentJob::dispatch($agent->id);
         $this->server->load('logAgent');
         $this->toastSuccess(__('Removing the log agent from this server.'));
     }

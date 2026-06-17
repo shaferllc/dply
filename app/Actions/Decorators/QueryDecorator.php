@@ -21,11 +21,14 @@ class QueryDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
+    /**
+     * @return Builder<\Illuminate\Database\Eloquent\Model>
+     */
     public function query(): Builder
     {
         // Try query() method first

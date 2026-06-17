@@ -238,15 +238,18 @@
                             $needsSetup = (bool) ($item['needs_setup'] ?? false);
                             $previewOnly = (bool) ($item['preview_only'] ?? false);
                             $soonBadge = (bool) ($item['soon_badge'] ?? false);
+                            // Cluster items (Access, Network, …) highlight when any of
+                            // their member pages is active, not just the cluster key.
+                            $isActive = $active === $key || in_array($active, (array) ($item['match_keys'] ?? []), true);
                         @endphp
                         <a
                             href="{{ $navHref }}"
                             wire:navigate
                             @class([
                                 $navLink,
-                                'bg-brand-sand/60 text-brand-ink' => $active === $key,
-                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== $key,
-                                'opacity-90' => $previewOnly && $active !== $key,
+                                'bg-brand-sand/60 text-brand-ink' => $isActive,
+                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $isActive,
+                                'opacity-90' => $previewOnly && ! $isActive,
                             ])
                         >
                             @switch($icon)

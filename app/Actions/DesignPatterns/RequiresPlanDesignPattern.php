@@ -18,7 +18,7 @@ class RequiresPlanDesignPattern extends DesignPattern
         return true;
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(RequiresPlanDecorator::class, ['action' => $instance]);
     }
