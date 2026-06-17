@@ -767,11 +767,20 @@ class RunSiteDeploymentJob implements ShouldQueue
             ->first();
 
         if ($deployment !== null) {
+            // $exception is null when the worker was killed outright (OOM,
+            // SIGKILL, a self-deploy restarting this very queue) rather than
+            // throwing — guard against a blank reason so the deploy never reads
+            // as "failed with no output" in the UI.
+            $reason = trim((string) ($exception?->getMessage() ?? ''));
+            if ($reason === '') {
+                $reason = 'The deploy worker was terminated mid-deploy before it could record an error (e.g. restart, timeout, or out-of-memory). Trigger the deploy again.';
+            }
+
             $deployment->update([
                 'status' => SiteDeployment::STATUS_FAILED,
                 'exit_code' => $deployment->exit_code ?? 1,
                 'log_output' => trim(($deployment->log_output ? $deployment->log_output."\n\n" : '')
-                    .'Deployment failed: '.($exception?->getMessage() ?? 'job terminated')),
+                    .'Deployment failed: '.$reason),
                 'finished_at' => now(),
             ]);
         }

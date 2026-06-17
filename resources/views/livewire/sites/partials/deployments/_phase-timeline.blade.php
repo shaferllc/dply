@@ -171,6 +171,11 @@
         @if ($failLog !== '')
             @php($failTail = mb_strlen($failLog) > 4000 ? '…'.mb_substr($failLog, -4000) : $failLog)
             <pre class="max-h-60 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
+        @else
+            {{-- No output was captured (e.g. the worker was restarted mid-deploy,
+                 so the job's catch/failed handlers never ran). Don't leave the
+                 failure reasonless — always say *something*. --}}
+            <p class="text-xs text-rose-700/90">{{ __('Deploy failed before any output was captured — the worker may have been restarted mid-deploy. Trigger the deploy again.') }}</p>
         @endif
     </div>
 @endif

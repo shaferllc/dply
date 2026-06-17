@@ -58,8 +58,11 @@ final class DeployPipelineBranchResolver
 
     private function matchesBranch(SiteDeployPipeline $pipeline, string $branch): bool
     {
-        $patterns = $pipeline->deploy_branches ?? [];
-        if ($patterns === []) {
+        // deploy_branches is an `array` cast, but a NULL column value casts to
+        // null (not []), and a malformed value could be a scalar — either would
+        // fatal the foreach below. Coerce defensively so this can never throw.
+        $patterns = $pipeline->deploy_branches;
+        if (! is_array($patterns) || $patterns === []) {
             return false;
         }
 
