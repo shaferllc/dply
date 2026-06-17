@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string $edge_client_cert_b64
  * @property string $edge_client_key_b64
  * @property string $endpoint
+ * @property ?string $private_endpoint
  * @property ?string $error_message
  * @property string $install_output
  * @property ?Carbon $last_seen_at
@@ -58,6 +59,7 @@ class ServerLogAggregator extends Model
         'version',
         'listen_port',
         'endpoint',
+        'private_endpoint',
         'edge_ca_cert_b64',
         'edge_client_cert_b64',
         'edge_client_key_b64',

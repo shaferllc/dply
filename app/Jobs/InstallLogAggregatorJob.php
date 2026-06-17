@@ -121,6 +121,7 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
                 'status' => ServerLogAggregator::STATUS_RUNNING,
                 'version' => $scripts->parseVersion($output->buffer),
                 'endpoint' => $this->resolveEndpoint($aggregator),
+                'private_endpoint' => $this->resolvePrivateEndpoint($aggregator),
                 'edge_ca_cert_b64' => $parsed['ca'] ?? $aggregator->edge_ca_cert_b64,
                 'edge_client_cert_b64' => $parsed['crt'] ?? $aggregator->edge_client_cert_b64,
                 'edge_client_key_b64' => $parsed['key'] ?? $aggregator->edge_client_key_b64,
@@ -142,6 +143,20 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
     protected function resolveEndpoint(ServerLogAggregator $aggregator): string
     {
         $ip = trim((string) $aggregator->server->ip_address);
+        $port = $aggregator->listen_port > 0 ? $aggregator->listen_port : 6000;
+
+        return $ip !== '' ? "{$ip}:{$port}" : '';
+    }
+
+    /**
+     * The private (VPC) address, when the box has one. Same-network edges prefer
+     * this over the public endpoint so log traffic stays off the public internet
+     * and clear of any provider cloud-firewall on the listen port. Empty when the
+     * box has no private IP — edges then just use the public endpoint.
+     */
+    protected function resolvePrivateEndpoint(ServerLogAggregator $aggregator): string
+    {
+        $ip = trim((string) ($aggregator->server->private_ip_address ?? ''));
         $port = $aggregator->listen_port > 0 ? $aggregator->listen_port : 6000;
 
         return $ip !== '' ? "{$ip}:{$port}" : '';

@@ -64,6 +64,9 @@ class VectorLogAgentInstallScripts
         echo "{$configB64}" | base64 -d > "{$this->configPath()}"
         chmod 0640 "{$this->configPath()}"
 
+        # --- aggregator address: prefer the private (VPC) endpoint when reachable -
+        {$this->aggregatorAddressSelectFragment()}
+
         # Validate config before we (re)start so a bad render fails loudly here
         # instead of crash-looping the unit.
         "{$this->binaryPath()}" validate "{$this->configPath()}" || { echo "vector config validation failed"; exit 1; }
@@ -139,7 +142,7 @@ class VectorLogAgentInstallScripts
      * generated + captured the edge certs — so edges auto-configure with no manual
      * env. Falls back to the SERVER_LOGS_* config env (the legacy/manual path).
      *
-     * @return array{endpoint:string,ca:string,crt:string,key:string}
+     * @return array{endpoint:string,private_endpoint:string,ca:string,crt:string,key:string}
      */
     protected function resolveAggregatorTarget(): array
     {
@@ -152,6 +155,7 @@ class VectorLogAgentInstallScripts
         if ($aggregator !== null && trim((string) $aggregator->endpoint) !== '' && $aggregator->hasEdgeMaterial()) {
             return [
                 'endpoint' => trim((string) $aggregator->endpoint),
+                'private_endpoint' => trim((string) $aggregator->private_endpoint),
                 'ca' => trim((string) $aggregator->edge_ca_cert_b64),
                 'crt' => trim((string) $aggregator->edge_client_cert_b64),
                 'key' => trim((string) $aggregator->edge_client_key_b64),
@@ -160,6 +164,7 @@ class VectorLogAgentInstallScripts
 
         return [
             'endpoint' => trim((string) config('server_logs.aggregator_endpoint', '')),
+            'private_endpoint' => '',
             'ca' => trim((string) config('server_logs.mtls.ca_cert_b64', '')),
             'crt' => trim((string) config('server_logs.mtls.client_cert_b64', '')),
             'key' => trim((string) config('server_logs.mtls.client_key_b64', '')),
@@ -192,30 +197,35 @@ class VectorLogAgentInstallScripts
             '',
         ];
 
-        $sourceNames = [];
+        // Each source flows through a tiny tag transform that stamps `.source` with
+        // its key (web/auth/journald/…) — Vector doesn't carry the component name as
+        // a field, so without this the aggregator has no way to populate the column.
+        $enrichInputs = [];
         foreach ($active as $key) {
             $fragment = $this->sourceFragment($key);
             if ($fragment === null) {
                 continue;
             }
             [$name, $toml] = $fragment;
-            $sourceNames[] = $name;
             $blocks[] = $toml;
             $blocks[] = '';
+            $blocks[] = $this->sourceTagTransform($name);
+            $blocks[] = '';
+            $enrichInputs[] = 'tag_'.$name;
         }
 
         // Nothing enabled → a minimal valid config that ships nothing. Keeps the
         // unit healthy rather than crash-looping on an empty pipeline.
-        if ($sourceNames === []) {
+        if ($enrichInputs === []) {
             $blocks[] = "[sources.heartbeat]\ntype = \"internal_metrics\"";
             $blocks[] = '';
-            $sourceNames[] = 'heartbeat';
+            $enrichInputs[] = 'heartbeat';
         }
 
         // --- enrich: always stamp tenant identity (dply renders these server-side,
         //     so they're trusted-ish) + optional edge redaction ------------------
         $orgId = (string) ($agent->server->organization_id ?? '');
-        $blocks[] = $this->enrichTransform($sourceNames, $serverId, $orgId);
+        $blocks[] = $this->enrichTransform($enrichInputs, $serverId, $orgId);
         $blocks[] = '';
         $sinkInput = ['enrich'];
 
@@ -305,6 +315,21 @@ class VectorLogAgentInstallScripts
     }
 
     /**
+     * One-line remap that stamps `.source` with the source key so the aggregator can
+     * populate the ClickHouse `source` column (Vector carries no component-name field
+     * on events). Input is the source of the same name; output id is `tag_<name>`.
+     */
+    protected function sourceTagTransform(string $name): string
+    {
+        return <<<TOML
+        [transforms.tag_{$name}]
+        type = "remap"
+        inputs = ["{$name}"]
+        source = '.source = "{$name}"'
+        TOML;
+    }
+
+    /**
      * VRL transform: stamp tenant identity (server_id + org_id, both known to dply
      * at render time) and — when enabled — scrub common secret patterns at the edge
      * before logs leave the box. The aggregator consumes .dply_org_id/.dply_server_id
@@ -376,6 +401,11 @@ class VectorLogAgentInstallScripts
             TOML;
         }
 
+        // The address is a placeholder the install script fills on-box, picking the
+        // private (VPC) endpoint when reachable and the public one otherwise — see
+        // aggregatorAddressSelectFragment(). The mTLS server cert SANs both IPs, so
+        // verification holds either way.
+        //
         // Vector's disk buffer is bounded at max_size; it has no "drop_oldest", so
         // we use drop_newest — disk stays capped (the goal: never fill the customer's
         // disk during a dply outage); only which events drop differs.
@@ -383,7 +413,7 @@ class VectorLogAgentInstallScripts
         [sinks.dply]
         type = "vector"
         inputs = {$inputsToml}
-        address = "{$endpoint}"
+        address = "__DPLY_AGG_ADDR__"
 
         [sinks.dply.tls]
         enabled = true
@@ -396,6 +426,59 @@ class VectorLogAgentInstallScripts
         max_size = {$bufferBytes}
         when_full = "drop_newest"
         TOML;
+    }
+
+    /**
+     * Bash that resolves the `__DPLY_AGG_ADDR__` placeholder in the rendered config.
+     * When the aggregator advertises a private (VPC) endpoint, the edge probes it
+     * (a short /dev/tcp connect) and ships there if reachable — keeping log traffic
+     * on the private network and clear of any provider cloud-firewall on the public
+     * listen port — otherwise it falls back to the public endpoint. A no-op for the
+     * blackhole sink (no endpoint → no placeholder in the config).
+     */
+    protected function aggregatorAddressSelectFragment(): string
+    {
+        $target = $this->resolveAggregatorTarget();
+        $public = $target['endpoint'];
+        if ($public === '') {
+            return ': # blackhole sink — no aggregator address to resolve';
+        }
+
+        $private = $target['private_endpoint'];
+        $config = $this->configPath();
+
+        if ($private === '' || $private === $public) {
+            return <<<BASH
+            sed -i "s|__DPLY_AGG_ADDR__|{$public}|g" "{$config}"
+            BASH;
+        }
+
+        [$privHost, $privPort] = $this->splitHostPort($private);
+
+        return <<<BASH
+        DPLY_AGG_ADDR="{$public}"
+        if timeout 3 bash -c "echo > /dev/tcp/{$privHost}/{$privPort}" 2>/dev/null; then
+          DPLY_AGG_ADDR="{$private}"
+        fi
+        echo "dply Logs: shipping to \${DPLY_AGG_ADDR}"
+        sed -i "s|__DPLY_AGG_ADDR__|\${DPLY_AGG_ADDR}|g" "{$config}"
+        BASH;
+    }
+
+    /**
+     * Split a "host:port" endpoint on the last colon (IPv4 / hostname). Falls back to
+     * the default listen port when no colon is present.
+     *
+     * @return array{0:string,1:string}
+     */
+    protected function splitHostPort(string $endpoint): array
+    {
+        $pos = strrpos($endpoint, ':');
+        if ($pos === false) {
+            return [$endpoint, '6000'];
+        }
+
+        return [substr($endpoint, 0, $pos), substr($endpoint, $pos + 1)];
     }
 
     /**

@@ -227,12 +227,13 @@ class VectorLogAggregatorInstallScripts
         host = string(.host) ?? string(.hostname) ?? ""
         lvl = string(.level) ?? string(.PRIORITY) ?? ""
         msg = string(.message) ?? ""
+        src = string(.source) ?? ""
         ts = .timestamp
         . = {}
         .org_id = org
         .server_id = srv
         .site_id = site
-        .source = ""
+        .source = src
         .unit = unit
         .level = lvl
         .host = host
