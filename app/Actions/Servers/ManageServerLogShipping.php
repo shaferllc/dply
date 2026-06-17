@@ -126,7 +126,17 @@ class ManageServerLogShipping
     public function status(Server $server): array
     {
         $agent = $server->logAgent;
-        $endpoint = trim((string) config('server_logs.aggregator_endpoint', ''));
+
+        // Prefer the codified aggregator's recorded endpoint; fall back to the
+        // manual config env. Mirrors VectorLogAgentInstallScripts::resolveAggregatorTarget().
+        $aggregator = \App\Models\ServerLogAggregator::query()
+            ->where('status', \App\Models\ServerLogAggregator::STATUS_RUNNING)
+            ->whereNotNull('endpoint')
+            ->orderByDesc('updated_at')
+            ->first();
+        $endpoint = $aggregator !== null && $aggregator->hasEdgeMaterial()
+            ? trim((string) $aggregator->endpoint)
+            : trim((string) config('server_logs.aggregator_endpoint', ''));
 
         return [
             'server_id' => $server->id,

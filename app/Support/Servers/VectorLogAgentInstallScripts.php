@@ -6,6 +6,7 @@ namespace App\Support\Servers;
 
 use App\Jobs\InstallLogAgentJob;
 use App\Models\ServerLogAgent;
+use App\Support\Servers\Concerns\InstallsVectorBinary;
 
 /**
  * Builds the bash that installs/uninstalls the dply Logs edge agent (Vector) on a
@@ -24,6 +25,8 @@ use App\Models\ServerLogAgent;
  */
 class VectorLogAgentInstallScripts
 {
+    use InstallsVectorBinary;
+
     public const BINARY_PATH = '/usr/local/bin/dply-vector';
 
     public const CONFIG_DIR = '/etc/dply-logship';
@@ -43,54 +46,12 @@ class VectorLogAgentInstallScripts
      */
     public function installScript(ServerLogAgent $agent): string
     {
-        $version = (string) config('server_logs.vector_version', '0.48.0');
-        $sha = trim((string) config('server_logs.vector_sha256', ''));
-        $url = $this->tarballUrl($version);
-
         $configB64 = base64_encode($this->renderVectorToml($agent));
         $unitB64 = base64_encode($this->renderSystemdUnit());
 
-        $shaCheck = $sha !== ''
-            ? <<<BASH
-            echo "{$sha}  \$TMP_TGZ" | sha256sum -c - || { echo "vector tarball sha mismatch"; exit 1; }
-            BASH
-            : 'echo "WARN: vector sha256 not pinned — skipping integrity check (dev only)"';
-
         return <<<BASH
-        export DEBIAN_FRONTEND=noninteractive
-
-        # --- prerequisites -------------------------------------------------------
-        if ! command -v curl >/dev/null 2>&1; then
-          apt-get update -y >/dev/null 2>&1 || true
-          apt-get install -y curl ca-certificates >/dev/null 2>&1 || true
-        fi
-
-        ARCH="\$(uname -m)"
-        case "\$ARCH" in
-          x86_64|amd64) VEC_ARCH="x86_64-unknown-linux-musl" ;;
-          aarch64|arm64) VEC_ARCH="aarch64-unknown-linux-musl" ;;
-          *) echo "unsupported arch: \$ARCH"; exit 1 ;;
-        esac
-
         # --- fetch + verify Vector ----------------------------------------------
-        NEED_INSTALL=1
-        if [ -x "{$this->binaryPath()}" ]; then
-          CUR="\$({$this->binaryPath()} --version 2>/dev/null | awk '{print \$2}' || true)"
-          [ "\$CUR" = "{$version}" ] && NEED_INSTALL=0
-        fi
-
-        if [ "\$NEED_INSTALL" = "1" ]; then
-          TMP_TGZ="\$(mktemp)"
-          URL="\$(echo "{$url}" | sed "s/__ARCH__/\$VEC_ARCH/")"
-          curl -fsSL --retry 3 -o "\$TMP_TGZ" "\$URL" || { echo "vector download failed: \$URL"; rm -f "\$TMP_TGZ"; exit 1; }
-          {$shaCheck}
-          TMP_DIR="\$(mktemp -d)"
-          tar -xzf "\$TMP_TGZ" -C "\$TMP_DIR" || { echo "vector extract failed"; rm -rf "\$TMP_TGZ" "\$TMP_DIR"; exit 1; }
-          VEC_BIN="\$(find "\$TMP_DIR" -type f -name vector -perm -u+x | head -n1)"
-          [ -n "\$VEC_BIN" ] || { echo "vector binary not found in tarball"; rm -rf "\$TMP_TGZ" "\$TMP_DIR"; exit 1; }
-          install -m 0755 "\$VEC_BIN" "{$this->binaryPath()}"
-          rm -rf "\$TMP_TGZ" "\$TMP_DIR"
-        fi
+        {$this->vectorBinaryInstallFragment($this->binaryPath())}
 
         # --- directories ---------------------------------------------------------
         install -d -m 0750 "{$this->configDir()}"
@@ -147,14 +108,15 @@ class VectorLogAgentInstallScripts
      */
     protected function certDeployFragment(): string
     {
-        $endpoint = trim((string) config('server_logs.aggregator_endpoint', ''));
+        $target = $this->resolveAggregatorTarget();
+        $endpoint = $target['endpoint'];
         if ($endpoint === '') {
             return ': # no aggregator endpoint configured — edge ships to blackhole, no certs needed';
         }
 
-        $ca = trim((string) config('server_logs.mtls.ca_cert_b64', ''));
-        $crt = trim((string) config('server_logs.mtls.client_cert_b64', ''));
-        $key = trim((string) config('server_logs.mtls.client_key_b64', ''));
+        $ca = $target['ca'];
+        $crt = $target['crt'];
+        $key = $target['key'];
 
         if ($ca === '' || $crt === '' || $key === '') {
             return 'echo "dply Logs: aggregator endpoint set but mTLS material (SERVER_LOGS_*_B64) is missing"; exit 1';
@@ -169,6 +131,39 @@ class VectorLogAgentInstallScripts
         chmod 0640 "{$dir}/ca.crt" "{$dir}/client.crt" "{$dir}/client.key"
         test -s "{$dir}/client.key" || { echo "dply Logs: client.key empty after deploy"; exit 1; }
         BASH;
+    }
+
+    /**
+     * Resolve where the edge ships + which mTLS material it presents. Prefers a
+     * live, codified aggregator ({@see ServerLogAggregator}) whose installer
+     * generated + captured the edge certs — so edges auto-configure with no manual
+     * env. Falls back to the SERVER_LOGS_* config env (the legacy/manual path).
+     *
+     * @return array{endpoint:string,ca:string,crt:string,key:string}
+     */
+    protected function resolveAggregatorTarget(): array
+    {
+        $aggregator = \App\Models\ServerLogAggregator::query()
+            ->where('status', \App\Models\ServerLogAggregator::STATUS_RUNNING)
+            ->whereNotNull('endpoint')
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($aggregator !== null && trim((string) $aggregator->endpoint) !== '' && $aggregator->hasEdgeMaterial()) {
+            return [
+                'endpoint' => trim((string) $aggregator->endpoint),
+                'ca' => trim((string) $aggregator->edge_ca_cert_b64),
+                'crt' => trim((string) $aggregator->edge_client_cert_b64),
+                'key' => trim((string) $aggregator->edge_client_key_b64),
+            ];
+        }
+
+        return [
+            'endpoint' => trim((string) config('server_logs.aggregator_endpoint', '')),
+            'ca' => trim((string) config('server_logs.mtls.ca_cert_b64', '')),
+            'crt' => trim((string) config('server_logs.mtls.client_cert_b64', '')),
+            'key' => trim((string) config('server_logs.mtls.client_key_b64', '')),
+        ];
     }
 
     /**
@@ -369,7 +364,7 @@ class VectorLogAgentInstallScripts
     protected function sinkBlock(array $inputs): string
     {
         $inputsToml = $this->tomlStringArray($inputs);
-        $endpoint = trim((string) config('server_logs.aggregator_endpoint', ''));
+        $endpoint = $this->resolveAggregatorTarget()['endpoint'];
         $bufferBytes = (int) config('server_logs.limits.disk_buffer_max_bytes', 512 * 1024 * 1024);
 
         if ($endpoint === '') {

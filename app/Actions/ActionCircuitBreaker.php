@@ -108,15 +108,18 @@ class ActionCircuitBreaker
     /**
      * Get open circuit breakers.
      *
-     * @return Collection<array> Open circuit breakers
+     * @return Collection<int, array<string, mixed>> Open circuit breakers
      */
     public static function getOpenCircuits(): Collection
     {
         $actions = ActionRegistry::getByTrait(AsCircuitBreaker::class);
 
-        return collect($actions)
+        /** @var Collection<int, array<string, mixed>> $openCircuits */
+        $openCircuits = collect($actions)
             ->map(fn ($action) => static::getStatus($action))
             ->filter(fn ($status) => $status['state'] === 'open');
+
+        return $openCircuits;
     }
 
     /**

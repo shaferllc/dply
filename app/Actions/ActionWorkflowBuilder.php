@@ -31,8 +31,10 @@ class ActionWorkflowBuilder
 {
     protected string $name;
 
+    /** @var array<int, array<string, mixed>> */
     protected array $steps = [];
 
+    /** @var array<string, mixed> */
     protected array $conditions = [];
 
     protected bool $stopOnFailure = true;
@@ -56,7 +58,7 @@ class ActionWorkflowBuilder
      * Add a step to the workflow.
      *
      * @param  string|callable  $action  Action class or callable
-     * @param  array  $args  Additional arguments
+     * @param  array<int, mixed>  $args  Additional arguments
      */
     public function add(string|callable $action, array $args = []): self
     {
@@ -163,7 +165,7 @@ class ActionWorkflowBuilder
     /**
      * Get available templates.
      *
-     * @return array<string, array> Templates
+     * @return array<string, array<string, mixed>> Templates
      */
     public static function getTemplates(): array
     {

@@ -52,6 +52,16 @@ return [
     'aggregator_endpoint' => env('SERVER_LOGS_AGGREGATOR_ENDPOINT', ''),
 
     /**
+     * Port the dply Vector aggregator listens on for the vector-to-vector mTLS
+     * link from edges. The codified installer ({@see \App\Jobs\InstallLogAggregatorJob})
+     * stands the aggregator up on this port, opens it in UFW, and records the
+     * resulting edge endpoint (server IP + this port) on the {@see \App\Models\ServerLogAggregator}
+     * row — which then becomes the source of truth edges read from (config above is
+     * the manual/legacy fallback).
+     */
+    'aggregator_listen_port' => (int) env('SERVER_LOGS_AGGREGATOR_PORT', 6000),
+
+    /**
      * mTLS material the edge agent presents to the aggregator, deployed to
      * /etc/dply-logship/ during install. Base64-encoded PEM (keeps multi-line keys
      * out of .env). For the MVP this is a SHARED client cert across all edges;

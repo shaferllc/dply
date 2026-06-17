@@ -10,7 +10,7 @@ namespace App\Actions\Concerns;
  * - ControllerDesignPattern recognizes when the action is used in routes
  * - ControllerDecorator is automatically applied when Laravel resolves the controller
  *
- * @method array getControllerMiddleware() Get middleware to apply to this controller action
+ * @method array<int, mixed> getControllerMiddleware() Get middleware to apply to this controller action
  * @method \Illuminate\Http\Resources\Json\JsonResource jsonResponse(mixed $response, \Illuminate\Http\Request $request) Transform response for JSON requests
  * @method \Illuminate\Http\Response htmlResponse(mixed $response, \Illuminate\Http\Request $request) Transform response for HTML requests
  * @method void routes(\Illuminate\Routing\Router $router) Register routes for this action

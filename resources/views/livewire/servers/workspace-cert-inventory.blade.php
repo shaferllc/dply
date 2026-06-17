@@ -43,23 +43,14 @@
 
     {{-- In-page sub-tabs: the certificate inventory vs. notification routing for this
          server's server.cert.* events. Mirrors the system-users page. --}}
-    <div class="mb-6 border-b border-brand-ink/10">
-        <nav class="-mb-px flex gap-6" aria-label="{{ __('Certificate sections') }}">
-            @php
-                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-                $tabOn = 'border-brand-forest text-brand-ink';
-                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-            @endphp
-            <button type="button" wire:click="setCertWorkspaceTab('inventory')" @class([$tabBase, $cert_workspace_tab === 'inventory' ? $tabOn : $tabOff])>
-                <x-heroicon-o-lock-closed class="h-4 w-4" aria-hidden="true" />
-                {{ __('Certificates') }}
-            </button>
-            <button type="button" wire:click="setCertWorkspaceTab('notifications')" @class([$tabBase, $cert_workspace_tab === 'notifications' ? $tabOn : $tabOff])>
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </button>
-        </nav>
-    </div>
+    <x-server-workspace-tablist :aria-label="__('Certificate sections')">
+        <x-server-workspace-tab icon="heroicon-o-lock-closed" :active="$cert_workspace_tab === 'inventory'" wire:click="setCertWorkspaceTab('inventory')">
+            {{ __('Certificates') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-bell" :active="$cert_workspace_tab === 'notifications'" wire:click="setCertWorkspaceTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
 
     <div @class(['space-y-6', 'hidden' => $cert_workspace_tab !== 'inventory'])>
         @if ($isDeployer)

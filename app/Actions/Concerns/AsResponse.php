@@ -432,7 +432,7 @@ trait AsResponse
         }
     }
 
-    protected function successResponse($result): Response|JsonResponse|RedirectResponse
+    protected function successResponse(mixed $result): Response|JsonResponse|RedirectResponse
     {
         if ($this->hasMethod('successResponse')) {
             return $this->callMethod('successResponse', [$result]);
@@ -458,11 +458,17 @@ trait AsResponse
         return response()->make($exception->getMessage(), 500);
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     protected function json(array $data, int $status = 200): JsonResponse
     {
         return response()->json($data, $status);
     }
 
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
     protected function redirect(string $route, array $parameters = []): RedirectResponse
     {
         return redirect()->route($route, $parameters);

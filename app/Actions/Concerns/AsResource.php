@@ -3,7 +3,7 @@
 namespace App\Actions\Concerns;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
  * Allows actions to be used as API resources.
@@ -390,7 +390,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 trait AsResource
 {
-    public function toArray($requestOrNotifiable): array
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(mixed $requestOrNotifiable): array
     {
         // If called with Request (for JsonResource), use resource logic
         if ($requestOrNotifiable instanceof Request) {
@@ -413,8 +416,7 @@ trait AsResource
     }
 
     /**
-     * Get the resource array representation (for JsonResource).
-     * This is the primary method for resource transformation.
+     * @return array<string, mixed>
      */
     public function toResourceArray(Request $request): array
     {
@@ -423,6 +425,9 @@ trait AsResource
             : [];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function with(Request $request): array
     {
         return $this->hasMethod('getResourceWith')
@@ -430,14 +435,16 @@ trait AsResource
             : [];
     }
 
-    public static function collection($resource)
+    /**
+     * @param  mixed  $resource
+     */
+    public static function collection($resource): AnonymousResourceCollection
     {
-        // This should be implemented by the class using this trait
-        // when extending JsonResource or ResourceCollection
-        if (method_exists(get_called_class(), 'parent::collection')) {
-            return parent::collection($resource);
+        $items = [];
+        foreach (is_iterable($resource) ? $resource : [$resource] as $item) {
+            $items[] = new static($item);
         }
 
-        return collect($resource)->map(fn ($item) => new static($item));
+        return new AnonymousResourceCollection($items, static::class);
     }
 }

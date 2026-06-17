@@ -1044,6 +1044,9 @@ trait AsEvent
      *
      * This is used when the event implements ShouldBroadcast interface.
      */
+    /**
+     * @return array<int, \Illuminate\Broadcasting\Channel|\Illuminate\Broadcasting\PrivateChannel|\Illuminate\Broadcasting\PresenceChannel>
+     */
     public function broadcastOn(): array
     {
         return [];

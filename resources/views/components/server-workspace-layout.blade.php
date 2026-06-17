@@ -154,31 +154,25 @@
 
     <div @class(['space-y-8', 'mt-6 sm:mt-8' => ! $hideHero])>
         @if ($clusterTabs && count($clusterTabs) > 1)
-            <div class="border-b border-brand-ink/10">
-                <nav class="-mb-px flex flex-wrap gap-x-6" aria-label="{{ __('Section tabs') }}">
-                    @foreach ($clusterTabs as $tab)
-                        @php $tabActive = $active === $tab['key']; @endphp
-                        <a
-                            href="{{ $tab['url'] }}"
-                            wire:navigate
-                            @class([
-                                'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors',
-                                'border-brand-forest text-brand-ink' => $tabActive,
-                                'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink' => ! $tabActive,
-                            ])
-                            @if ($tabActive) aria-current="page" @endif
-                        >
-                            {{ $tab['label'] }}
-                            @if (! empty($tab['preview_only']) || ! empty($tab['soon_badge']))
-                                <span class="rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Soon') }}</span>
-                            @endif
-                            @if (! empty($tab['needs_setup']))
-                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" role="img" aria-label="{{ __('Setup required') }}"></span>
-                            @endif
-                        </a>
-                    @endforeach
-                </nav>
-            </div>
+            <x-server-workspace-tablist :aria-label="__('Section tabs')" scroll>
+                @foreach ($clusterTabs as $tab)
+                    <x-server-workspace-tab
+                        as="a"
+                        href="{{ $tab['url'] }}"
+                        wire:navigate
+                        :icon="$tab['icon'] ?? null"
+                        :active="$active === $tab['key']"
+                    >
+                        {{ $tab['label'] }}
+                        @if (! empty($tab['preview_only']) || ! empty($tab['soon_badge']))
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                        @endif
+                        @if (! empty($tab['needs_setup']))
+                            <span class="h-1.5 w-1.5 rounded-full bg-amber-500" role="img" aria-label="{{ __('Setup required') }}"></span>
+                        @endif
+                    </x-server-workspace-tab>
+                @endforeach
+            </x-server-workspace-tablist>
         @endif
 
         {{ $slot }}

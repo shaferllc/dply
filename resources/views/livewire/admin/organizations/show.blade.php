@@ -41,19 +41,12 @@
         </ul>
     </div>
 
-    <div class="mb-6 flex flex-wrap gap-2">
-        @foreach ($tabs as $slug => $label)
-            <button
-                type="button"
-                wire:click="setTab('{{ $slug }}')"
-                @class([
-                    'rounded-lg px-3 py-2 text-sm font-medium transition',
-                    $tab === $slug ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm' : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent',
-                ])
-            >
-                {{ $label }}
-            </button>
-        @endforeach
+    <div class="mb-6">
+        <x-server-workspace-tablist :aria-label="__('Feature flag product lines')" scroll>
+            @foreach ($tabs as $slug => $label)
+                <x-server-workspace-tab :active="$tab === $slug" icon="heroicon-o-flag" wire:click="setTab('{{ $slug }}')">{{ $label }}</x-server-workspace-tab>
+            @endforeach
+        </x-server-workspace-tablist>
     </div>
 
     <div class="space-y-4">

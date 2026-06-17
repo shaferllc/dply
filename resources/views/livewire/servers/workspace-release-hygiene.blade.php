@@ -27,31 +27,20 @@
     {{-- In-page tabs: pressure overview, atomic release detail, log/failed-job
          sizes, and notification routing for this server's server.release_hygiene.*
          events. Mirrors the security-digest workspace. --}}
-    <div class="mb-6 border-b border-brand-ink/10">
-        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Release hygiene sections') }}">
-            @php
-                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-                $tabOn = 'border-brand-forest text-brand-ink';
-                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-            @endphp
-            <button type="button" wire:click="setHygieneTab('overview')" @class([$tabBase, $hygiene_tab === 'overview' ? $tabOn : $tabOff])>
-                <x-heroicon-o-archive-box class="h-4 w-4" aria-hidden="true" />
-                {{ __('Overview') }}
-            </button>
-            <button type="button" wire:click="setHygieneTab('releases')" @class([$tabBase, $hygiene_tab === 'releases' ? $tabOn : $tabOff])>
-                <x-heroicon-o-square-3-stack-3d class="h-4 w-4" aria-hidden="true" />
-                {{ __('Releases') }}
-            </button>
-            <button type="button" wire:click="setHygieneTab('logs')" @class([$tabBase, $hygiene_tab === 'logs' ? $tabOn : $tabOff])>
-                <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
-                {{ __('Logs & jobs') }}
-            </button>
-            <button type="button" wire:click="setHygieneTab('notifications')" @class([$tabBase, $hygiene_tab === 'notifications' ? $tabOn : $tabOff])>
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </button>
-        </nav>
-    </div>
+    <x-server-workspace-tablist :aria-label="__('Release hygiene sections')">
+        <x-server-workspace-tab icon="heroicon-o-archive-box" :active="$hygiene_tab === 'overview'" wire:click="setHygieneTab('overview')">
+            {{ __('Overview') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-square-3-stack-3d" :active="$hygiene_tab === 'releases'" wire:click="setHygieneTab('releases')">
+            {{ __('Releases') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-document-text" :active="$hygiene_tab === 'logs'" wire:click="setHygieneTab('logs')">
+            {{ __('Logs & jobs') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-bell" :active="$hygiene_tab === 'notifications'" wire:click="setHygieneTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
 
     {{-- Overview --}}
     <div @class(['space-y-6', 'hidden' => $hygiene_tab !== 'overview'])>

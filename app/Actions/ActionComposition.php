@@ -69,6 +69,7 @@ class ActionComposition
 {
     protected mixed $value;
 
+    /** @var list<array{action: string|callable, additionalArgs: array<int, mixed>}> */
     protected array $actions = [];
 
     protected bool $stopOnFailure = true;
@@ -104,6 +105,8 @@ class ActionComposition
 
     /**
      * Pipe the value through an action (alias for then).
+     *
+     * @param  mixed  ...$additionalArgs
      */
     public function pipe(string|callable $action, ...$additionalArgs): self
     {
@@ -156,6 +159,8 @@ class ActionComposition
 
     /**
      * Execute a single action in the chain.
+     *
+     * @param  array<int, mixed>  $additionalArgs
      */
     protected function executeAction(string|callable $action, mixed $value, array $additionalArgs): mixed
     {

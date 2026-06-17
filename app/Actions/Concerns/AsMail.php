@@ -605,6 +605,8 @@ trait AsMail
     /**
      * Get data to pass to the email view.
      * Override this method to provide view data.
+     *
+     * @return array<string, mixed>
      */
     protected function getMailData(): array
     {

@@ -378,9 +378,11 @@ if (! function_exists('server_workspace_build_cluster_item')) {
             $isPreview = (bool) ($member['preview_only'] ?? false) || (bool) ($member['soon_badge'] ?? false);
             $allPreview = $allPreview && $isPreview;
 
+            $memberIcon = is_string($member['icon'] ?? null) && $member['icon'] !== '' ? 'heroicon-o-'.$member['icon'] : null;
             $tabs[] = [
                 'key' => $memberKey,
                 'label' => __($tabLabels[$memberKey] ?? ($member['label'] ?? $memberKey)),
+                'icon' => $memberIcon,
                 'url' => server_workspace_nav_item_url($server, $member),
                 'preview_only' => $isPreview,
                 'soon_badge' => (bool) ($member['soon_badge'] ?? false),

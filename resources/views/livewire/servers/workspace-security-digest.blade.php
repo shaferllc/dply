@@ -63,31 +63,20 @@
     {{-- In-page tabs: posture overview, auth/brute-force detail, host hardening,
          and notification routing for this server's server.security_digest.* events.
          Mirrors the cert-inventory workspace. --}}
-    <div class="mb-6 border-b border-brand-ink/10">
-        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Security digest sections') }}">
-            @php
-                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-                $tabOn = 'border-brand-forest text-brand-ink';
-                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-            @endphp
-            <button type="button" wire:click="setDigestTab('overview')" @class([$tabBase, $digest_tab === 'overview' ? $tabOn : $tabOff])>
-                <x-heroicon-o-shield-exclamation class="h-4 w-4" aria-hidden="true" />
-                {{ __('Overview') }}
-            </button>
-            <button type="button" wire:click="setDigestTab('auth')" @class([$tabBase, $digest_tab === 'auth' ? $tabOn : $tabOff])>
-                <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
-                {{ __('Auth & fail2ban') }}
-            </button>
-            <button type="button" wire:click="setDigestTab('hardening')" @class([$tabBase, $digest_tab === 'hardening' ? $tabOn : $tabOff])>
-                <x-heroicon-o-lock-closed class="h-4 w-4" aria-hidden="true" />
-                {{ __('Hardening') }}
-            </button>
-            <button type="button" wire:click="setDigestTab('notifications')" @class([$tabBase, $digest_tab === 'notifications' ? $tabOn : $tabOff])>
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </button>
-        </nav>
-    </div>
+    <x-server-workspace-tablist :aria-label="__('Security digest sections')">
+        <x-server-workspace-tab icon="heroicon-o-shield-exclamation" :active="$digest_tab === 'overview'" wire:click="setDigestTab('overview')">
+            {{ __('Overview') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-document-text" :active="$digest_tab === 'auth'" wire:click="setDigestTab('auth')">
+            {{ __('Auth & fail2ban') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-lock-closed" :active="$digest_tab === 'hardening'" wire:click="setDigestTab('hardening')">
+            {{ __('Hardening') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-bell" :active="$digest_tab === 'notifications'" wire:click="setDigestTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
 
     {{-- Overview --}}
     <div @class(['space-y-6', 'hidden' => $digest_tab !== 'overview'])>

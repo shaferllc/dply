@@ -14,6 +14,9 @@ class BacktraceFrame
 
     public mixed $object;
 
+    /**
+     * @param  array<string, mixed>  $frame
+     */
     public function __construct(array $frame)
     {
         $this->class = Arr::get($frame, 'class');
@@ -46,6 +49,9 @@ class BacktraceFrame
             && $matchesStatic;
     }
 
+    /**
+     * @return mixed
+     */
     public function getObject()
     {
         return $this->object;

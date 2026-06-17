@@ -39,12 +39,6 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @php
-        $maintTabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-        $maintTabOn = 'border-brand-forest text-brand-ink';
-        $maintTabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-    @endphp
-
     {{-- The one shared console-action banner for everything that runs on this
          page — host-upkeep ops (apt/cleanup/reboot, vhost prune) AND the
          webserver applies a maintenance toggle queues. Same component every
@@ -61,29 +55,23 @@
         'kindLabels' => $consoleKindLabels,
     ])
 
-    <div class="mb-6 border-b border-brand-ink/10">
-        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Maintenance sections') }}">
-            <button type="button" wire:click="setMaintenanceTab('window')" @class([$maintTabBase, $maintenance_tab === 'window' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-pause-circle class="h-4 w-4" aria-hidden="true" />
-                {{ __('Visitor window') }}
-                @if ($active)
-                    <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
-                @endif
-            </button>
-            <button type="button" wire:click="setMaintenanceTab('operations')" @class([$maintTabBase, $maintenance_tab === 'operations' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
-                {{ __('Operations') }}
-            </button>
-            <button type="button" wire:click="setMaintenanceTab('schedule')" @class([$maintTabBase, $maintenance_tab === 'schedule' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-calendar-days class="h-4 w-4" aria-hidden="true" />
-                {{ __('Schedule') }}
-            </button>
-            <button type="button" wire:click="setMaintenanceTab('notifications')" @class([$maintTabBase, $maintenance_tab === 'notifications' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </button>
-        </nav>
-    </div>
+    <x-server-workspace-tablist :aria-label="__('Maintenance sections')">
+        <x-server-workspace-tab icon="heroicon-o-pause-circle" :active="$maintenance_tab === 'window'" wire:click="setMaintenanceTab('window')">
+            {{ __('Visitor window') }}
+            @if ($active)
+                <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
+            @endif
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-wrench-screwdriver" :active="$maintenance_tab === 'operations'" wire:click="setMaintenanceTab('operations')">
+            {{ __('Operations') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-calendar-days" :active="$maintenance_tab === 'schedule'" wire:click="setMaintenanceTab('schedule')">
+            {{ __('Schedule') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-bell" :active="$maintenance_tab === 'notifications'" wire:click="setMaintenanceTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
 
     {{-- Webserver apply failures — a maintenance toggle can leave a box's vhost
          broken if the async apply failed. Surface it loudly with one-click re-apply. --}}

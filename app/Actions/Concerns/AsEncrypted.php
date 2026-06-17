@@ -62,6 +62,10 @@ trait AsEncrypted
         return $data;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function encryptArray(array $data): array
     {
         $fields = $this->getEncryptedFields();
@@ -77,6 +81,10 @@ trait AsEncrypted
         return $data;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function decryptArray(array $data): array
     {
         $fields = $this->getEncryptedFields();
@@ -96,6 +104,9 @@ trait AsEncrypted
         return $data;
     }
 
+    /**
+     * @return array<int, string>
+     */
     protected function getEncryptedFields(): array
     {
         return $this->hasMethod('getEncryptedFields')

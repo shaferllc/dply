@@ -37,23 +37,14 @@
         {{-- In-page sub-tabs: the /etc/passwd account list vs. notification routing
              for this server's system_user.* events. Keeps "set up alerts" one click
              away instead of bouncing the operator out to global settings. --}}
-        <div class="mb-6 border-b border-brand-ink/10">
-            <nav class="-mb-px flex gap-6" aria-label="{{ __('System users sections') }}">
-                @php
-                    $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-                    $tabOn = 'border-brand-forest text-brand-ink';
-                    $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-                @endphp
-                <button type="button" wire:click="$set('activeTab', 'accounts')" @class([$tabBase, $activeTab === 'accounts' ? $tabOn : $tabOff])>
-                    <x-heroicon-o-users class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Accounts') }}
-                </button>
-                <button type="button" wire:click="$set('activeTab', 'notifications')" @class([$tabBase, $activeTab === 'notifications' ? $tabOn : $tabOff])>
-                    <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Notifications') }}
-                </button>
-            </nav>
-        </div>
+        <x-server-workspace-tablist :aria-label="__('System users sections')">
+            <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="$set('activeTab', 'accounts')">
+                {{ __('Accounts') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab icon="heroicon-o-bell" :active="$activeTab === 'notifications'" wire:click="$set('activeTab', 'notifications')">
+                {{ __('Notifications') }}
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
 
         <div @class(['space-y-6', 'hidden' => $activeTab !== 'accounts'])>
             {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent

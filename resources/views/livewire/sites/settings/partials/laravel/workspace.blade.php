@@ -53,32 +53,22 @@
         </div>
     </div>
 
-    <div class="border-b border-brand-ink/10">
-        <nav class="-mb-px flex flex-wrap gap-4" aria-label="{{ __('Laravel sections') }}">
-            @foreach ([
-                'commands' => __('Commands'),
-                'octane' => __('Octane'),
-                'reverb' => __('Reverb'),
-                'logs' => __('Logs'),
-                'setup' => __('Setup'),
-                'schedule' => __('Schedule'),
-                'migrations' => __('Migrations'),
-                'pail' => __('Pail'),
-            ] as $tabId => $tabLabel)
-                <button
-                    type="button"
-                    wire:click="$set('laravel_tab', '{{ $tabId }}')"
-                    @class([
-                        'border-b-2 py-3 text-sm font-semibold transition',
-                        'border-brand-forest text-brand-forest' => $laravel_tab === $tabId,
-                        'border-transparent text-brand-moss hover:text-brand-ink' => $laravel_tab !== $tabId,
-                    ])
-                >
-                    {{ $tabLabel }}
-                </button>
-            @endforeach
-        </nav>
-    </div>
+    <x-server-workspace-tablist :aria-label="__('Laravel sections')" scroll>
+        @foreach ([
+            'commands' => __('Commands'),
+            'octane' => __('Octane'),
+            'reverb' => __('Reverb'),
+            'logs' => __('Logs'),
+            'setup' => __('Setup'),
+            'schedule' => __('Schedule'),
+            'migrations' => __('Migrations'),
+            'pail' => __('Pail'),
+        ] as $tabId => $tabLabel)
+            <x-server-workspace-tab :active="$laravel_tab === $tabId" wire:click="$set('laravel_tab', '{{ $tabId }}')">
+                {{ $tabLabel }}
+            </x-server-workspace-tab>
+        @endforeach
+    </x-server-workspace-tablist>
 
     @if ($laravel_tab === 'commands')
         <div class="space-y-6">

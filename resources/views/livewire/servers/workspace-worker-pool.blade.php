@@ -210,34 +210,21 @@
         ])
 
         {{-- Tabs --}}
-        @php
-            $tabs = [
-                'overview' => __('Overview'),
-                'members' => __('Members'),
-                'horizon' => __('Horizon'),
-                'traffic' => __('Traffic & Redis'),
-            ];
-        @endphp
-        <div class="mt-6 border-b border-brand-ink/10">
-            <nav class="-mb-px flex flex-wrap gap-1" aria-label="{{ __('Worker pool sections') }}">
-                @foreach ($tabs as $tabKey => $tabLabel)
-                    <button
-                        type="button"
-                        wire:click="$set('tab', @js($tabKey))"
-                        @class([
-                            'border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors',
-                            'border-brand-forest text-brand-forest' => $tab === $tabKey,
-                            'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-ink/20' => $tab !== $tabKey,
-                        ])
-                    >
-                        {{ $tabLabel }}
-                        @if ($tabKey === 'members')
-                            <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $members->count() }}</span>
-                        @endif
-                    </button>
-                @endforeach
-            </nav>
-        </div>
+        <x-server-workspace-tablist :aria-label="__('Worker pool sections')" class="mt-6">
+            <x-server-workspace-tab :active="$tab === 'overview'" wire:click="$set('tab', 'overview')">
+                {{ __('Overview') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'members'" wire:click="$set('tab', 'members')">
+                {{ __('Members') }}
+                <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $members->count() }}</span>
+            </x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'horizon'" wire:click="$set('tab', 'horizon')">
+                {{ __('Horizon') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'traffic'" wire:click="$set('tab', 'traffic')">
+                {{ __('Traffic & Redis') }}
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
 
         @if ($tab === 'overview')
         {{-- Poll the whole component every 15s so pool status, capacity and

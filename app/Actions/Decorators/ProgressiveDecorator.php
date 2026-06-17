@@ -199,10 +199,12 @@ class ProgressiveDecorator
 
         broadcast(new class($this->getProgressChannel(), 'progress.updated', $payload) extends Channel
         {
+            /**
+             * @param  array<string, mixed>  $payload
+             */
             public function __construct(
                 public string $channelName,
                 public string $eventName,
-                /** @var array<string, mixed> */
                 public array $payload,
             ) {
                 parent::__construct($channelName);

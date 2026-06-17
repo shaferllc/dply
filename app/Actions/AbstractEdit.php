@@ -175,7 +175,7 @@ abstract class AbstractEdit
      * Default implementation passes all arguments.
      *
      * @param  mixed  ...$arguments  The action arguments
-     * @return array Arguments to pass to the Gate
+     * @return array<int, mixed> Arguments to pass to the Gate
      */
     protected function getAuthorizationArguments(...$arguments): array
     {
@@ -202,8 +202,8 @@ abstract class AbstractEdit
      * Override to add custom audit data.
      *
      * @param  mixed  $result  The action result
-     * @param  array  $arguments  The action arguments
-     * @return array Custom audit data to merge
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Custom audit data to merge
      */
     protected function getAuditData($result, array $arguments): array
     {
@@ -216,7 +216,7 @@ abstract class AbstractEdit
      * Used by AsWatermarked to add custom metadata to results.
      * Override to add custom watermark data.
      *
-     * @return array Custom watermark data to merge
+     * @return array<string, mixed> Custom watermark data to merge
      */
     protected function getWatermarkData(): array
     {
@@ -231,8 +231,8 @@ abstract class AbstractEdit
      * Used by AsTracer to add custom attributes to trace spans.
      * Override to add custom trace attributes.
      *
-     * @param  array  $arguments  The action arguments
-     * @return array Custom trace attributes
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Custom trace attributes
      */
     protected function getTraceAttributes(array $arguments): array
     {
@@ -262,7 +262,7 @@ abstract class AbstractEdit
      * Used by AsTransformer to transform result data structure.
      * Override to customize transformations.
      *
-     * @return array Transformation rules
+     * @return array<string, mixed> Transformation rules
      */
     protected function getTransformations(): array
     {
@@ -276,8 +276,8 @@ abstract class AbstractEdit
      * Override to customize webhook payload.
      *
      * @param  mixed  $result  The action result
-     * @param  array  $arguments  The action arguments
-     * @return array Webhook payload
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Webhook payload
      */
     protected function getWebhookPayload($result, array $arguments): array
     {
@@ -294,7 +294,7 @@ abstract class AbstractEdit
      * Override to handle webhook success.
      *
      * @param  Response  $response  The HTTP response
-     * @param  array  $payload  The webhook payload
+     * @param  array<string, mixed>  $payload  The webhook payload
      */
     protected function onWebhookSuccess(Response $response, array $payload): void
     {
@@ -308,7 +308,7 @@ abstract class AbstractEdit
      * Override to handle webhook failure.
      *
      * @param  \Throwable  $exception  The exception that occurred
-     * @param  array  $payload  The webhook payload
+     * @param  array<string, mixed>  $payload  The webhook payload
      */
     protected function onWebhookFailure(\Throwable $exception, array $payload): void
     {
@@ -354,7 +354,7 @@ abstract class AbstractEdit
      * Override to customize broadcast channel.
      *
      * @param  mixed  ...$arguments  The action arguments
-     * @return string|array Broadcast channel name(s)
+     * @return string|array<int, string> Broadcast channel name(s)
      */
     protected function getBroadcastChannel(...$arguments): string|array
     {
@@ -385,8 +385,8 @@ abstract class AbstractEdit
      * Override to customize broadcast payload.
      *
      * @param  mixed  $result  The action result
-     * @param  array  $arguments  The action arguments
-     * @return array Broadcast payload
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Broadcast payload
      */
     protected function getBroadcastPayload($result, array $arguments): array
     {

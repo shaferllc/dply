@@ -1,0 +1,88 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * The dply Logs Vector aggregator — the ingest tier that authenticates edges over
+ * mTLS, stamps tenant identity, and bulk-inserts into ClickHouse. At most one per
+ * server (the box designated as the aggregator), enforced by the unique index on
+ * server_id. Stood up by {@see \App\Jobs\InstallLogAggregatorJob}.
+ *
+ * Holds the edge mTLS material (CA + client cert/key) the install generated ON the
+ * box and handed back, so the edge installer ({@see \App\Support\Servers\VectorLogAgentInstallScripts})
+ * can configure shipping without any manual env. The cert material is encrypted at
+ * rest. See docs/SERVER_LOGS_ADDON.md.
+ */
+class ServerLogAggregator extends Model
+{
+    use HasUlids;
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_INSTALLING = 'installing';
+
+    public const STATUS_RUNNING = 'running';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const STATUS_UNINSTALLING = 'uninstalling';
+
+    protected $table = 'server_log_aggregators';
+
+    protected $fillable = [
+        'server_id',
+        'status',
+        'version',
+        'listen_port',
+        'endpoint',
+        'edge_ca_cert_b64',
+        'edge_client_cert_b64',
+        'edge_client_key_b64',
+        'install_output',
+        'error_message',
+        'last_seen_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'listen_port' => 'integer',
+            'last_seen_at' => 'datetime',
+            'edge_ca_cert_b64' => 'encrypted',
+            'edge_client_cert_b64' => 'encrypted',
+            'edge_client_key_b64' => 'encrypted',
+        ];
+    }
+
+    public function server(): BelongsTo
+    {
+        return $this->belongsTo(Server::class);
+    }
+
+    public function isRunning(): bool
+    {
+        return $this->status === self::STATUS_RUNNING;
+    }
+
+    public function isBusy(): bool
+    {
+        return in_array($this->status, [self::STATUS_INSTALLING, self::STATUS_UNINSTALLING], true);
+    }
+
+    /**
+     * True once the install captured the edge mTLS material — i.e. edges can be
+     * pointed here with a real client cert.
+     */
+    public function hasEdgeMaterial(): bool
+    {
+        return filled($this->edge_ca_cert_b64)
+            && filled($this->edge_client_cert_b64)
+            && filled($this->edge_client_key_b64);
+    }
+}

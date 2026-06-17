@@ -475,6 +475,8 @@ trait AsMetrics
 {
     /**
      * Get performance metrics for this action.
+     *
+     * @return array<string, mixed>
      */
     public static function getMetrics(): array
     {

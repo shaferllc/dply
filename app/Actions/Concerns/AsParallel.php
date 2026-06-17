@@ -484,7 +484,7 @@ trait AsParallel
      * Falls back to sequential execution if Spatie Async not available.
      *
      * @param  array<int, callable>  $callbacks  Array of callables to execute
-     * @return array Results from each callback in same order
+     * @return array<int, mixed> Results from each callback in same order
      */
     public static function run(array $callbacks): array
     {
@@ -529,9 +529,9 @@ trait AsParallel
      * Map over items and execute callback in parallel for each item.
      * Convenience method that wraps items in callbacks and calls run().
      *
-     * @param  array  $items  Items to map over
+     * @param  array<int, mixed>  $items  Items to map over
      * @param  callable  $callback  Callback to execute for each item
-     * @return array Results from each callback in same order as items
+     * @return array<int, mixed> Results from each callback in same order as items
      */
     public static function map(array $items, callable $callback): array
     {

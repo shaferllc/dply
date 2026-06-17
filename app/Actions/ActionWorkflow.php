@@ -9,6 +9,9 @@ namespace App\Actions;
  */
 class ActionWorkflow
 {
+    /**
+     * @param  array<int, array<string, mixed>>  $steps
+     */
     public function __construct(
         protected string $name,
         protected array $steps,
@@ -64,6 +67,8 @@ class ActionWorkflow
 
     /**
      * Get workflow steps.
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function getSteps(): array
     {

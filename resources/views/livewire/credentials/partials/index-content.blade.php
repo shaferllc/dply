@@ -101,24 +101,13 @@
          duplication with one responsive segmented control that works at every
          breakpoint. Wires to the same $tab property. --}}
     <section aria-label="{{ __('Capability filter') }}">
-        <div role="tablist" class="inline-flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
+        <x-server-workspace-tablist :aria-label="__('Capability filter')" scroll class="!mb-0">
             @foreach ($capabilityTabs as $tabItem)
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected="{{ $tab === $tabItem['id'] ? 'true' : 'false' }}"
-                    wire:click="$set('tab', '{{ $tabItem['id'] }}')"
-                    @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                        'bg-brand-ink text-brand-cream shadow-sm' => $tab === $tabItem['id'],
-                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $tab !== $tabItem['id'],
-                    ])
-                >
-                    <x-dynamic-component :component="$tabItem['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <x-server-workspace-tab :icon="$tabItem['icon']" :active="$tab === $tabItem['id']" wire:click="$set('tab', '{{ $tabItem['id'] }}')">
                     {{ $tabItem['label'] }}
-                </button>
+                </x-server-workspace-tab>
             @endforeach
-        </div>
+        </x-server-workspace-tablist>
     </section>
 
     {{-- First-run nudge. When the org has zero credentials anywhere,

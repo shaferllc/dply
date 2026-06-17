@@ -504,7 +504,7 @@ trait AsCompensatable
     /**
      * Compensate all actions from a given compensation stack.
      *
-     * @param  array<int, array{action: string, data?: mixed, arguments: array}>  $compensationStack
+     * @param  array<int, array{action: string, data?: mixed, arguments: array<int, mixed>}>  $compensationStack
      */
     public static function compensateAll(array $compensationStack): void
     {
@@ -514,7 +514,7 @@ trait AsCompensatable
     /**
      * Get the compensation stack from the decorator.
      *
-     * @return array<int, array{action: string, data: mixed, arguments: array}>
+     * @return array<int, array{action: string, data: mixed, arguments: array<int, mixed>}>
      */
     public function getCompensationStack(): array
     {

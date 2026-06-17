@@ -37,7 +37,7 @@
     $hasPrefix = $cachePrefixValue !== '';
 @endphp
 @if ($cacheService)
-    <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8" x-data="{ tab: 'laravel' }">
+    <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8" x-data="{ subtab: 'laravel' }">
         <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine — connection snippet', ['engine' => $engineLabel]) }}</h2>
         <p class="mt-2 text-sm text-brand-moss">
             @if ($snippetIsExposed)
@@ -52,41 +52,32 @@
             </p>
         @endif
 
-        <div role="tablist" class="mt-4 flex flex-wrap gap-1.5 border-b border-brand-ink/10">
+        <x-server-workspace-tablist :aria-label="__('Connection snippet languages')" class="mt-4" scroll>
             @foreach (['laravel' => 'Laravel .env', 'node' => 'Node.js', 'python' => 'Python', 'docker' => 'Docker Compose'] as $tabKey => $tabLabel)
-                <button
-                    type="button"
-                    role="tab"
-                    @click="tab = '{{ $tabKey }}'"
-                    :aria-selected="tab === '{{ $tabKey }}' ? 'true' : 'false'"
-                    :class="tab === '{{ $tabKey }}'
-                        ? 'border-b-2 border-brand-forest text-brand-ink'
-                        : 'border-b-2 border-transparent text-brand-moss hover:text-brand-ink'"
-                    class="px-3 py-2 text-xs font-medium transition-colors"
-                >{{ $tabLabel }}</button>
+                <x-server-workspace-tab :subtab-key="$tabKey">{{ $tabLabel }}</x-server-workspace-tab>
             @endforeach
-        </div>
+        </x-server-workspace-tablist>
 
         @if ($isMemcached)
-            <div x-show="tab === 'laravel'" x-cloak>
+            <div x-show="subtab === 'laravel'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 CACHE_STORE=memcached
 MEMCACHED_HOST={{ $snippetHost }}
 MEMCACHED_PORT={{ $cacheService->port }}</pre>
             </div>
-            <div x-show="tab === 'node'" x-cloak>
+            <div x-show="subtab === 'node'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink">// Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 // npm install memjs
 const memjs = require('memjs');
 const client = memjs.Client.create('{{ $snippetHost }}:{{ $cacheService->port }}');</pre>
             </div>
-            <div x-show="tab === 'python'" x-cloak>
+            <div x-show="subtab === 'python'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 # pip install pymemcache
 from pymemcache.client.base import Client
 client = Client(('{{ $snippetHost }}', {{ $cacheService->port }}))</pre>
             </div>
-            <div x-show="tab === 'docker'" x-cloak>
+            <div x-show="subtab === 'docker'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 services:
   app:
@@ -108,7 +99,7 @@ services:
                 $ioredisPrefixArg = $hasPrefix ? ", keyPrefix: '".$cachePrefixValue."'" : '';
                 $pyPrefixComment = $hasPrefix ? "\n# Apply prefix in-app: r.set(f'{prefix}{key}', v) — redis-py has no built-in prefix.\nprefix = '".$cachePrefixValue."'" : '';
             @endphp
-            <div x-show="tab === 'laravel'" x-cloak>
+            <div x-show="subtab === 'laravel'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 CACHE_STORE=redis
 REDIS_HOST={{ $snippetHost }}
@@ -118,7 +109,7 @@ REDIS_PASSWORD={{ $redisPassword }}
 SESSION_DRIVER=redis
 QUEUE_CONNECTION=redis</pre>
             </div>
-            <div x-show="tab === 'node'" x-cloak>
+            <div x-show="subtab === 'node'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink">// Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 // npm install ioredis
 import Redis from 'ioredis';
@@ -127,7 +118,7 @@ const redis = new Redis({
     port: {{ $cacheService->port }}{{ $redisAuthArg }}{{ $ioredisPrefixArg }},
 });</pre>
             </div>
-            <div x-show="tab === 'python'" x-cloak>
+            <div x-show="subtab === 'python'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 # pip install redis
 import redis
@@ -137,7 +128,7 @@ r = redis.Redis(
     decode_responses=True,
 ){{ $pyPrefixComment }}</pre>
             </div>
-            <div x-show="tab === 'docker'" x-cloak>
+            <div x-show="subtab === 'docker'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 services:
   app:

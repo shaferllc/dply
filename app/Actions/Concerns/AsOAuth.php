@@ -456,6 +456,8 @@ trait AsOAuth
     /**
      * Get required OAuth scopes for this action.
      * Override this method to define required scopes.
+     *
+     * @return array<int, string>
      */
     protected function getRequiredScopes(): array
     {
@@ -483,8 +485,8 @@ trait AsOAuth
      * Handle insufficient OAuth scopes.
      * Override this method for custom insufficient scopes handling.
      *
-     * @param  array  $requiredScopes  The scopes that were required
-     * @param  array  $userScopes  The scopes the user actually has
+     * @param  array<int, string>  $requiredScopes  The scopes that were required
+     * @param  array<int, string>  $userScopes  The scopes the user actually has
      */
     protected function handleInsufficientScopes(array $requiredScopes, array $userScopes): void
     {

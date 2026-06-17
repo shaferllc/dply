@@ -479,6 +479,9 @@ use Illuminate\Support\Facades\Bus;
  */
 trait AsQueueBatch
 {
+    /**
+     * @param  array<int, mixed>  $jobs
+     */
     protected function batch(array $jobs): Batch
     {
         $name = $this->getBatchName();

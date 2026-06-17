@@ -604,6 +604,8 @@ trait AsObserver
     /**
      * Get the events this observer should listen to.
      * Override this method to customize observed events.
+     *
+     * @return array<int, string>
      */
     protected function getObservedEvents(): array
     {

@@ -2,7 +2,7 @@
 
 namespace App\Actions\Concerns;
 
-use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -412,6 +412,8 @@ trait AsProgressive
     /**
      * Get progress by progress ID.
      * Static method to retrieve progress from cache.
+     *
+     * @return array<string, mixed>|null
      */
     public static function getProgress(string $progressId): ?array
     {
@@ -442,6 +444,8 @@ trait AsProgressive
     /**
      * Update progress in cache.
      * Called by setProgress() to store progress.
+     *
+     * @param  array<string, mixed>  $metadata
      */
     protected function updateProgressCache(float $percentage, string $status = 'running', array $metadata = []): void
     {
@@ -460,19 +464,48 @@ trait AsProgressive
     /**
      * Broadcast progress update.
      * Called by setProgress() to broadcast progress.
+     *
+     * @param  array<string, mixed>  $metadata
      */
     protected function broadcastProgress(float $percentage, string $status = 'running', array $metadata = []): void
     {
-        if ($this->shouldBroadcastProgress()) {
-            Broadcast::channel($this->getProgressChannel(), [
-                'progress_id' => $this->progressId,
-                'percentage' => $percentage,
-                'status' => $status,
-                'current' => $this->currentProgress,
-                'total' => $this->totalProgress,
-                'metadata' => $metadata,
-            ]);
+        if (! $this->shouldBroadcastProgress()) {
+            return;
         }
+
+        $payload = [
+            'progress_id' => $this->progressId,
+            'percentage' => $percentage,
+            'status' => $status,
+            'current' => $this->currentProgress,
+            'total' => $this->totalProgress,
+            'metadata' => $metadata,
+        ];
+
+        broadcast(new class($this->getProgressChannel(), 'progress.updated', $payload) extends Channel
+        {
+            /**
+             * @param  array<string, mixed>  $payload
+             */
+            public function __construct(
+                public string $channelName,
+                public string $eventName,
+                public array $payload,
+            ) {
+                parent::__construct($channelName);
+            }
+
+            public function broadcastAs(): string
+            {
+                return $this->eventName;
+            }
+
+            /** @return array<string, mixed> */
+            public function broadcastWith(): array
+            {
+                return $this->payload;
+            }
+        });
     }
 
     /**
