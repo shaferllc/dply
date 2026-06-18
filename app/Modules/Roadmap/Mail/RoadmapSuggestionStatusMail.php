@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Mail;
+namespace App\Modules\Roadmap\Mail;
 
 use App\Models\RoadmapItem;
 use App\Models\RoadmapSuggestion;

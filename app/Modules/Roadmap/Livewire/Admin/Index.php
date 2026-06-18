@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Admin\Roadmap;
+namespace App\Modules\Roadmap\Livewire\Admin;
 
 use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
-use App\Livewire\Admin\Roadmap\Concerns\ManagesRoadmapReleases;
+use App\Modules\Roadmap\Livewire\Admin\Concerns\ManagesRoadmapReleases;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\AuditLog;
@@ -14,9 +14,9 @@ use App\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use App\Models\User;
-use App\Services\Roadmap\RoadmapSuggestionNotifier;
-use App\Support\Roadmap\RoadmapQuarter;
-use App\Support\Roadmap\RoadmapReleaseTrain;
+use App\Modules\Roadmap\Services\RoadmapSuggestionNotifier;
+use App\Modules\Roadmap\Support\RoadmapQuarter;
+use App\Modules\Roadmap\Support\RoadmapReleaseTrain;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;

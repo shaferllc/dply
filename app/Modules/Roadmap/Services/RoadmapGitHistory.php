@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Roadmap;
+namespace App\Modules\Roadmap\Services;
 
 use Symfony\Component\Process\Process;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Roadmap;
+namespace App\Modules\Roadmap\Support;
 
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;

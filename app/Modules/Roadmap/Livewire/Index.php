@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Roadmap;
+namespace App\Modules\Roadmap\Livewire;
 
 use App\Models\RoadmapItem;
 use App\Models\RoadmapRelease;

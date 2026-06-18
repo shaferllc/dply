@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\Roadmap\RoadmapReleaseTrain;
+use App\Modules\Roadmap\Support\RoadmapReleaseTrain;
 use Database\Factories\RoadmapReleaseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;

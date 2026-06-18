@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Roadmap\Jobs;
 
-use App\Services\Roadmap\RoadmapAiUpdater;
+use App\Modules\Roadmap\Services\RoadmapAiUpdater;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;

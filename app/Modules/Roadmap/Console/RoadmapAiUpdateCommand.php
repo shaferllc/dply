@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Roadmap\Console;
 
-use App\Jobs\RunRoadmapAiUpdateJob;
+use App\Modules\Roadmap\Jobs\RunRoadmapAiUpdateJob;
 use App\Models\RoadmapAiRun;
-use App\Services\Roadmap\RoadmapAiUpdater;
+use App\Modules\Roadmap\Services\RoadmapAiUpdater;
 use Illuminate\Console\Command;
 
 /**

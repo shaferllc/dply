@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\Roadmap\RoadmapQuarter;
+use App\Modules\Roadmap\Support\RoadmapQuarter;
 use Database\Factories\RoadmapItemFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

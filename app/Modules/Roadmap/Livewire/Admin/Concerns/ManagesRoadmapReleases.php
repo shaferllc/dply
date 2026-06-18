@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Admin\Roadmap\Concerns;
+namespace App\Modules\Roadmap\Livewire\Admin\Concerns;
 
 use App\Models\RoadmapRelease;
-use App\Support\Roadmap\RoadmapReleaseTrain;
+use App\Modules\Roadmap\Support\RoadmapReleaseTrain;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 

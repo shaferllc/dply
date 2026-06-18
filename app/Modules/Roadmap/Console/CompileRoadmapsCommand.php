@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Roadmap\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
