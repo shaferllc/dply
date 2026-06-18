@@ -9,7 +9,7 @@ use App\Models\RealtimeApp;
 use App\Models\Server;
 use App\Models\ServerLogUsageDaily;
 use App\Models\Site;
-use App\Services\Logs\ServerLogEntitlements;
+use App\Modules\Logs\Services\ServerLogEntitlements;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 

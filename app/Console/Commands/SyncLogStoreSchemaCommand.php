@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Logs\ClickHouseClient;
+use App\Modules\Logs\Services\ClickHouseClient;
 use Illuminate\Console\Command;
 
 /**

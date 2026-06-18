@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Models\ServerLogAggregator;
-use App\Services\Logs\ServerLogAggregatorPolicyMap;
+use App\Modules\Logs\Services\ServerLogAggregatorPolicyMap;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\VectorLogAggregatorInstallScripts;
 use Illuminate\Contracts\Queue\ShouldBeUnique;

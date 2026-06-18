@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Logs\ServerLogUsageMeter;
+use App\Modules\Logs\Services\ServerLogUsageMeter;
 use Illuminate\Console\Command;
 
 /**

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Services\Logs\LogExplorerQuery;
+use App\Modules\Logs\Services\LogExplorerQuery;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Url;
 

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Logs\LogExplorerWindowTest;
 
 use App\Models\Server;
-use App\Services\Logs\ClickHouseClient;
-use App\Services\Logs\LogExplorerQuery;
+use App\Modules\Logs\Services\ClickHouseClient;
+use App\Modules\Logs\Services\LogExplorerQuery;
 use Illuminate\Support\Carbon;
 use Mockery;
 

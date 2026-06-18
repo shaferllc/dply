@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Logs;
+namespace App\Modules\Logs\Services;
 
 /**
  * Resolved dply Logs entitlements for one org — the merge of the free-MVP

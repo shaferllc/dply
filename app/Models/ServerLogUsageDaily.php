@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * Per-org daily rollup of dply Logs ingest volume, metered from the ClickHouse
- * log store ({@see \App\Services\Logs\ServerLogUsageMeter}). The billable unit is
+ * log store ({@see \App\Modules\Logs\Services\ServerLogUsageMeter}). The billable unit is
  * ingest volume (bytes accepted at the aggregator), measured here as
  * `sum(length(message))` — what we actually stored after edge redaction/drops,
  * which is what's defensible to the customer. See docs/SERVER_LOGS_BILLING.md.

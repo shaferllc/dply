@@ -122,7 +122,7 @@ return [
      * pre-billing behaviour (7-day retention, add-on available, no overage) so
      * turning this on changes nothing for current users. `plans` overrides
      * individual keys per subscription-plan key (see config('subscription.standard.plans'):
-     * free/starter/pro/business). Resolved by {@see \App\Services\Logs\ServerLogEntitlements}.
+     * free/starter/pro/business). Resolved by {@see \App\Modules\Logs\Services\ServerLogEntitlements}.
      *
      * The volume/retention numbers are uncalibrated placeholders — the doc's
      * "Open quantities" stay unset until Phase 1 dogfooding produces real bytes/day.

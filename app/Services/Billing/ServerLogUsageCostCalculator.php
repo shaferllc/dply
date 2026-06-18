@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
-use App\Services\Logs\ServerLogEntitlement;
+use App\Modules\Logs\Services\ServerLogEntitlement;
 
 /**
  * Converts an org's metered dply Logs ingest volume into customer-facing cents:

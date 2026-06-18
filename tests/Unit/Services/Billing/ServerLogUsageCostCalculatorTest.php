@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Billing\ServerLogUsageCostCalculatorTest;
 
 use App\Services\Billing\ServerLogUsageCostCalculator;
-use App\Services\Logs\ServerLogEntitlement;
+use App\Modules\Logs\Services\ServerLogEntitlement;
 use Illuminate\Support\Facades\Config;
 
 const GB = 1073741824; // 1024^3

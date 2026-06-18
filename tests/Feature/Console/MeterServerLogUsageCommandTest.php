@@ -6,7 +6,7 @@ namespace Tests\Feature\Console\MeterServerLogUsageCommandTest;
 
 use App\Models\Organization;
 use App\Models\ServerLogUsageDaily;
-use App\Services\Logs\ClickHouseClient;
+use App\Modules\Logs\Services\ClickHouseClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 

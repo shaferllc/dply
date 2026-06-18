@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\SyncLogAggregatorPolicyJob;
 use App\Models\ServerLogAggregator;
-use App\Services\Logs\ServerLogAggregatorPolicyMap;
+use App\Modules\Logs\Services\ServerLogAggregatorPolicyMap;
 use Illuminate\Console\Command;
 
 /**

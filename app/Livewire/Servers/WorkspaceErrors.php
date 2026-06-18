@@ -12,7 +12,7 @@ use App\Livewire\Servers\Concerns\ManagesErrorsNotifications;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ErrorEvent;
 use App\Models\Server;
-use App\Services\Logs\ServerLogCorrelator;
+use App\Modules\Logs\Services\ServerLogCorrelator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;

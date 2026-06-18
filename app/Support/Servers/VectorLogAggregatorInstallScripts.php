@@ -63,7 +63,7 @@ class VectorLogAggregatorInstallScripts
         $chDb = (string) config('server_logs.clickhouse.database', 'dply_logs');
         $chUser = (string) config('server_logs.clickhouse.username', 'default');
         $defaultRetention = max(1, (int) config('server_logs.clickhouse.retention_days', 7));
-        $policyHeader = \App\Services\Logs\ServerLogAggregatorPolicyMap::HEADER;
+        $policyHeader = \App\Modules\Logs\Services\ServerLogAggregatorPolicyMap::HEADER;
 
         return <<<BASH
         # --- fetch + verify Vector ----------------------------------------------

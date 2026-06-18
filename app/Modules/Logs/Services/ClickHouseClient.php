@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Logs;
+namespace App\Modules\Logs\Services;
 
 use App\Console\Commands\SyncLogStoreSchemaCommand;
 use Illuminate\Http\Client\PendingRequest;

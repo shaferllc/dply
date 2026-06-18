@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Logs\ServerLogEntitlementsTest;
 
 use App\Models\Organization;
-use App\Services\Logs\ServerLogEntitlement;
-use App\Services\Logs\ServerLogEntitlements;
+use App\Modules\Logs\Services\ServerLogEntitlement;
+use App\Modules\Logs\Services\ServerLogEntitlements;
 use Illuminate\Support\Facades\Config;
 use Mockery;
 
