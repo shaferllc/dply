@@ -10,7 +10,7 @@ use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\ConfigRevision;
 use App\Models\ConsoleAction;
 use App\Models\Server;
-use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
+use App\Modules\ConfigRevisions\Services\Diff\ConfigRevisionDiffRegistry;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;

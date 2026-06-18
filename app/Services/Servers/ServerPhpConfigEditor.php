@@ -5,8 +5,8 @@ namespace App\Services\Servers;
 use App\Models\ConfigRevision;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\ConfigRevisions\ConfigRevisionContext;
-use App\Services\ConfigRevisions\ConfigRevisionRecorder;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionContext;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionRecorder;
 use App\Support\Servers\ServerPhpMutationLock;
 
 class ServerPhpConfigEditor

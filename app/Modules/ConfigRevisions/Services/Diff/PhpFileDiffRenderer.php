@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\ConfigRevisions\Diff;
+namespace App\Modules\ConfigRevisions\Services\Diff;
 
 use SebastianBergmann\Diff\Differ;
 use SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder;

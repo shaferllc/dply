@@ -5,7 +5,7 @@ namespace Tests\Unit\Services\ServerPhpConfigEditorTest;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\ConfigRevisions\ConfigRevisionRecorder;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionRecorder;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;

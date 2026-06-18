@@ -10,7 +10,7 @@ use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\ProcessOutput;
-use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
+use App\Modules\ConfigRevisions\Services\Diff\ConfigRevisionDiffRegistry;
 use App\Services\Servers\ConfigFileDescriptionResolver;
 use App\Services\Servers\RemoteServerConfigService;
 use App\Services\Servers\RemoteWebserverConfigService;

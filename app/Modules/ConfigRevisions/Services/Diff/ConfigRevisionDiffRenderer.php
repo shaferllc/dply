@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\ConfigRevisions\Diff;
+namespace App\Modules\ConfigRevisions\Services\Diff;
 
 /**
  * Renders a diff between two snapshots of the same kind. Each kind has

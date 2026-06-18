@@ -6,7 +6,7 @@ use App\Models\ConfigRevision;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\ConfigRevisions\ConfigRevisionRecorder;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionRecorder;
 use App\Services\Servers\ServerPhpConfigEditor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;

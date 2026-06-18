@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\ConfigRevisions;
+namespace App\Modules\ConfigRevisions\Services;
 
 use App\Models\Server;
 use App\Models\User;

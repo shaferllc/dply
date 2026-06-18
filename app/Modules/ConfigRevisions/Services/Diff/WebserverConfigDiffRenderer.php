@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\ConfigRevisions\Diff;
+namespace App\Modules\ConfigRevisions\Services\Diff;
 
 /**
  * Diff renderer for webserver_config snapshots:

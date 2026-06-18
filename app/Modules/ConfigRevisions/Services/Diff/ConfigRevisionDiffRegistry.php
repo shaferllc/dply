@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\ConfigRevisions\Diff;
+namespace App\Modules\ConfigRevisions\Services\Diff;
 
 use Illuminate\Contracts\Container\Container;
 use RuntimeException;

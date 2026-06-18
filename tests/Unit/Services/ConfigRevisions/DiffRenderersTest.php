@@ -2,9 +2,9 @@
 
 namespace Tests\Unit\Services\ConfigRevisions\DiffRenderersTest;
 
-use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
-use App\Services\ConfigRevisions\Diff\PhpFileDiffRenderer;
-use App\Services\ConfigRevisions\Diff\WebserverConfigDiffRenderer;
+use App\Modules\ConfigRevisions\Services\Diff\ConfigRevisionDiffRegistry;
+use App\Modules\ConfigRevisions\Services\Diff\PhpFileDiffRenderer;
+use App\Modules\ConfigRevisions\Services\Diff\WebserverConfigDiffRenderer;
 
 test('php file renderer produces unified diff lines for changed content', function () {
     $renderer = new PhpFileDiffRenderer;
