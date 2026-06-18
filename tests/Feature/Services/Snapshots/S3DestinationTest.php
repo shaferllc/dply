@@ -11,7 +11,7 @@ use App\Models\Snapshot;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Snapshots\S3Destination;
+use App\Modules\Snapshots\Services\S3Destination;
 use Aws\Command;
 use Aws\S3\S3Client;
 use GuzzleHttp\Psr7\Request;

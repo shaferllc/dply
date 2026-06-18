@@ -12,8 +12,8 @@ use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteScopedCommandWrapper;
-use App\Services\Snapshots\LocalDiskDestination;
-use App\Services\Snapshots\SnapshotService;
+use App\Modules\Snapshots\Services\LocalDiskDestination;
+use App\Modules\Snapshots\Services\SnapshotService;
 use App\Services\SshConnection;
 use Illuminate\Validation\Rule;
 

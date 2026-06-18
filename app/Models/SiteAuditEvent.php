@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Modules\RemoteCli\Services\RemoteCli;
 use App\Modules\RemoteCli\Services\RiskLevel;
-use App\Services\Snapshots\SnapshotService;
+use App\Modules\Snapshots\Services\SnapshotService;
 use Database\Factories\SiteAuditEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

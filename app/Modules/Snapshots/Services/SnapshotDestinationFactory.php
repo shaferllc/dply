@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Snapshots;
+namespace App\Modules\Snapshots\Services;
 
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Aws\S3\S3Client;

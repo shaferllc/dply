@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Jobs\CreateServerImageJob;
-use App\Jobs\RestoreSiteSnapshotJob;
-use App\Jobs\TakeSiteSnapshotJob;
+use App\Modules\Snapshots\Jobs\RestoreSiteSnapshotJob;
+use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;

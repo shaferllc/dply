@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Snapshots\Jobs;
 
 use App\Console\Commands\SnapshotRestoreCommand;
 use App\Models\Snapshot;
-use App\Services\Snapshots\SnapshotDestinationFactory;
-use App\Services\Snapshots\SnapshotService;
+use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
+use App\Modules\Snapshots\Services\SnapshotService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
