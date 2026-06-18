@@ -126,7 +126,7 @@ class SiteDoctorCommand extends Command
         $envLocation = [
             'path' => $site->effectiveEnvFilePath(),
             'in_docroot' => $envInDocroot,
-            'overridden' => trim($site->env_file_path) !== '',
+            'overridden' => trim((string) $site->env_file_path) !== '',
         ];
 
         $domains = $site->domains()
