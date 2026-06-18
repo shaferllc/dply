@@ -4,7 +4,7 @@ namespace Tests\Feature\Livewire\Serverless\JourneyTest;
 
 use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use App\Models\Organization;
 use App\Models\Server;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Sites;
 
 use App\Jobs\RecheckRequiredEnvJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 
 /**

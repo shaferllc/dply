@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Modules\Deploy\Console;
 
 use App\Modules\Notifications\Services\DeployDigestBuffer;
 use Illuminate\Console\Command;

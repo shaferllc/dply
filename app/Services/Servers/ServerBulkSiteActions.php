@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;

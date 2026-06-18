@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Jobs\RunSiteFixerJob;
 use App\Models\ConsoleAction;
 use App\Models\Site;

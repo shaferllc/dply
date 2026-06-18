@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Livewire\Sites\ServerlessDashboardTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Organization;
 use App\Models\Server;

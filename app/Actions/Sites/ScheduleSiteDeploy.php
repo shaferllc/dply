@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Sites;
 
-use App\Console\Commands\RunDueScheduledDeploysCommand;
+use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
 use App\Models\ScheduledDeploy;
 use App\Models\Site;
 use Illuminate\Support\Carbon;

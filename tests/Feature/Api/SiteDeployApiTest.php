@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Api\SiteDeployApiTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\Server;

@@ -8,7 +8,7 @@ use RuntimeException;
 
 /**
  * Thrown from a serverless deploy step checkpoint when the operator has
- * requested cancellation. {@see App\Jobs\RunSiteDeploymentJob} catches it
+ * requested cancellation. {@see App\Modules\Deploy\Jobs\RunSiteDeploymentJob} catches it
  * like any deploy failure and records the deployment as failed.
  */
 class ServerlessDeployCancelledException extends RuntimeException {}

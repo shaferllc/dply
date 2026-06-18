@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\FunctionInvocation;
 use App\Models\Server;

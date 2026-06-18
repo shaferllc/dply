@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Jobs\RunSiteDeploymentJobTrialGatingTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Server;

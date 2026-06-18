@@ -2,6 +2,7 @@
 
 use App\Modules\Backups\BackupsServiceProvider;
 use App\Modules\Certificates\CertificatesServiceProvider;
+use App\Modules\Deploy\DeployServiceProvider;
 use App\Modules\Docs\DocsServiceProvider;
 use App\Modules\Edge\EdgeServiceProvider;
 use App\Modules\Feedback\FeedbackServiceProvider;
@@ -25,6 +26,7 @@ return [
     TaskServiceProvider::class,
     BackupsServiceProvider::class,
     CertificatesServiceProvider::class,
+    DeployServiceProvider::class,
     DocsServiceProvider::class,
     EdgeServiceProvider::class,
     FeedbackServiceProvider::class,

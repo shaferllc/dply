@@ -2,49 +2,45 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Deploy\Console;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Models\ScheduledDeploy;
 use App\Models\SiteDeployment;
-use App\Models\SiteDeploymentSchedule;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Control-plane tick (every minute) that dispatches any scheduled deploys whose
- * cron cadence has come due. Deploys are control-plane orchestrated, so this
- * runs on the dply scheduler — not a remote crontab. Mirrors the auto-pause
- * behaviour of the backup/redis snapshot schedule runners.
+ * Control-plane tick (every minute) that fires one-off DELAYED deploys whose
+ * {@see ScheduledDeploy::$run_at} has arrived. The single-shot counterpart to
+ * {@see RunDueDeploymentSchedulesCommand} (cron) — each row dispatches once and
+ * is marked dispatched. Mirrors its VM-host guards.
  */
-class RunDueDeploymentSchedulesCommand extends Command
+class RunDueScheduledDeploysCommand extends Command
 {
-    protected $signature = 'dply:run-due-deployment-schedules';
+    protected $signature = 'dply:run-due-scheduled-deploys';
 
-    protected $description = 'Dispatch scheduled site deploys that are due to run.';
+    protected $description = 'Dispatch one-off delayed site deploys that are now due.';
 
     public function handle(): int
     {
         $now = now();
 
-        $schedules = SiteDeploymentSchedule::query()
-            ->where('is_active', true)
+        $due = ScheduledDeploy::query()
+            ->due($now)
             ->with('site.server')
             ->get();
 
         $dispatched = 0;
 
-        foreach ($schedules as $schedule) {
-            if (! $schedule->isDue($now)) {
-                continue;
-            }
-
-            // Always advance last_run_at so a deployable-check failure doesn't
-            // make us re-evaluate the same tick as "due" every minute.
-            $schedule->recordRun($now);
-
-            $site = $schedule->site;
+        foreach ($due as $scheduled) {
+            $site = $scheduled->site;
             $server = $site?->server;
+
+            // Consume the row regardless of deployability so a non-VM / deleted
+            // site doesn't re-evaluate as due every minute forever.
+            $scheduled->markDispatched($now);
 
             if ($site === null || $server === null) {
                 continue;
@@ -68,15 +64,15 @@ class RunDueDeploymentSchedulesCommand extends Command
             RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_SCHEDULE);
             $dispatched++;
 
-            Log::info('Scheduled deploy dispatched', [
+            Log::info('Delayed deploy dispatched', [
                 'site_id' => $site->id,
-                'schedule_id' => $schedule->id,
-                'cron' => $schedule->cron_expression,
+                'scheduled_deploy_id' => $scheduled->id,
+                'run_at' => $scheduled->run_at->toIso8601String(),
             ]);
         }
 
         if ($dispatched > 0) {
-            $this->info("Dispatched {$dispatched} scheduled deploy(s).");
+            $this->info("Dispatched {$dispatched} delayed deploy(s).");
         }
 
         return self::SUCCESS;

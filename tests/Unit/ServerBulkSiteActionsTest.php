@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ServerBulkSiteActionsTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

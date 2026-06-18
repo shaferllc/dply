@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Deploy\Console;
 
 use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\GitProviderToken;

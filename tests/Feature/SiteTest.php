@@ -8,7 +8,7 @@ use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;

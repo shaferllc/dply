@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeploymentsListPageTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\DeploymentsList;
 use App\Models\Organization;
 use App\Models\Server;

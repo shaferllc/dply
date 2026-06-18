@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Deploy\Console;
+
+use App\Jobs\ProvisionSiteSystemdUnitsJob;
 
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdProvisioner;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Livewire;
 
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;

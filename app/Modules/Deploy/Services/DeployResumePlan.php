@@ -2,7 +2,7 @@
 
 namespace App\Modules\Deploy\Services;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 
 /**
  * Instructs the atomic deployer to re-attach to an already-staged release

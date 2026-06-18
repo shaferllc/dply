@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\EnsureVmPlatformEnabled;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Server;

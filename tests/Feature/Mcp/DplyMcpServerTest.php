@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Mcp\DplyMcpServerTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Mcp\Resources\SiteListResource;
 use App\Mcp\Servers\DplyServer;
 use App\Mcp\Tools\Deploy\DeploySite;

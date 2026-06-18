@@ -4,7 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
 use App\Enums\ServerProvider;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Livewire\Concerns\ManagesServerRemovalForm;

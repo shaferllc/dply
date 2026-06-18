@@ -13,7 +13,7 @@ use Throwable;
  * Restart this box's Horizon AFTER the deploy queue has drained — the safe way
  * for dply's control-plane to bounce its OWN Horizon during a self-deploy.
  *
- * The problem: deploys run as {@see App\Jobs\RunSiteDeploymentJob} on the `dply`
+ * The problem: deploys run as {@see App\Modules\Deploy\Jobs\RunSiteDeploymentJob} on the `dply`
  * queue, processed by the control-plane Horizon. A self-deploy's restart step
  * runs `horizon:terminate` on that same box; the master exits and systemd
  * (KillMode=mixed) reaps the cgroup, SIGKILLing every IN-FLIGHT deploy worker —

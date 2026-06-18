@@ -1,6 +1,10 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Deploy\Jobs;
+
+use App\Jobs\PushSiteEnvJob;
+use App\Jobs\ScanSiteEnvRequirementsJob;
+use App\Jobs\TestSiteHealthJob;
 
 use App\Enums\DeploymentMethod;
 use App\Models\ConsoleAction;

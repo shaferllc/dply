@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Servers\Deploys;
 
 /**
