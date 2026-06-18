@@ -7,9 +7,9 @@ namespace App\Support\Servers;
 use App\Models\AiAdvisorRun;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Services\Ai\AiAdvisorRunRecorder;
-use App\Services\Ai\AiRateLimiter;
-use App\Services\Ai\LlmSynthesizer;
+use App\Modules\Ai\Services\AiAdvisorRunRecorder;
+use App\Modules\Ai\Services\AiRateLimiter;
+use App\Modules\Ai\Services\LlmSynthesizer;
 
 final class SharedHostLlmAdvisor
 {

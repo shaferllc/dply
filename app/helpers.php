@@ -5,7 +5,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Ai\LlmSynthesizer;
+use App\Modules\Ai\Services\LlmSynthesizer;
 use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;

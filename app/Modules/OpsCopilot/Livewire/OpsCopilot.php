@@ -11,7 +11,7 @@ use App\Models\AiAdvisorRun;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Ai\AiAdvisorRunRecorder;
+use App\Modules\Ai\Services\AiAdvisorRunRecorder;
 use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Modules\OpsCopilot\Services\OpsCopilotLlmAdvisor;
 use Illuminate\Contracts\View\View;

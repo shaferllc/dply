@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Ai;
+namespace App\Modules\Ai\Services;
 
 use App\Models\AiAdvisorRun;
 use App\Models\Organization;

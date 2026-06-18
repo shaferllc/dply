@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Ai;
+namespace App\Modules\Ai\Services;
 
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
