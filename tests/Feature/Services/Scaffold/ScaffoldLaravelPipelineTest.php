@@ -16,6 +16,7 @@ use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Modules\Scaffold\Services\PrerequisiteResult;
 use App\Modules\Scaffold\Services\ScaffoldLaravelPipeline;
 use App\Modules\Scaffold\Services\ScaffoldPrerequisites;
+use App\Modules\Scaffold\Services\ScaffoldRepoSeeder;
 use App\Modules\Scaffold\Services\ScaffoldStep;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -90,7 +91,7 @@ test('happy path walks all steps and settles pending', function () {
 
     $audit = app(SiteAuditWriter::class);
 
-    $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site)))->run($site);
+    $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site), new ScaffoldRepoSeeder($executor)))->run($site);
 
     expect($result['ok'])->toBeTrue();
     expect($result['failed_step'])->toBeNull();
@@ -132,7 +133,7 @@ test('failed prereq marks site failed and audits', function () {
 
     $audit = app(SiteAuditWriter::class);
 
-    $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site)))->run($site);
+    $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site), new ScaffoldRepoSeeder($executor)))->run($site);
 
     expect($result['ok'])->toBeFalse();
     expect($result['failed_step'])->toBe('prereqs');
@@ -170,7 +171,7 @@ test('executor failure aborts at that step', function () {
 
     $audit = app(SiteAuditWriter::class);
 
-    $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site)))->run($site);
+    $result = (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site), new ScaffoldRepoSeeder($executor)))->run($site);
 
     expect($result['ok'])->toBeFalse();
     expect($result['failed_step'])->toBe('composer_create');
@@ -198,7 +199,7 @@ test('sqlite install records a server database row', function () {
 
     $audit = app(SiteAuditWriter::class);
 
-    (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site)))
+    (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, $audit, placeholderDnsAlwaysAssigns($site), new ScaffoldRepoSeeder($executor)))
         ->run($site);
 
     $db = ServerDatabase::query()->where('engine', 'sqlite')->sole();
@@ -221,7 +222,7 @@ test('placeholder dns step creates primary site domain', function () {
 
     $dns = placeholderDnsAlwaysAssigns($site, hostname: 'my-laravel-app.203-0-113-7.nip.io');
 
-    (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns))
+    (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns, new ScaffoldRepoSeeder($executor)))
         ->run($site);
 
     $domain = $site->fresh()->primaryDomain();
@@ -253,7 +254,7 @@ test('write env uses placeholder hostname in app url', function () {
 
     $dns = placeholderDnsAlwaysAssigns($site, hostname: 'my-laravel-app.198-51-100-9.nip.io');
 
-    (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns))
+    (new ScaffoldLaravelPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), $dns, new ScaffoldRepoSeeder($executor)))
         ->run($site);
 
     expect($hostnameSeen)->not->toBeNull('write_env step should have run');
