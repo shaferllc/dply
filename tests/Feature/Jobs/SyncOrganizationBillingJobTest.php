@@ -4,7 +4,7 @@ namespace Tests\Feature\Jobs\SyncOrganizationBillingJobTest;
 
 use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
-use App\Models\Subscription;
+use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\BillingSubscriptionSyncEventRecorder;
 use App\Modules\Billing\Services\DesiredBillingState;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;

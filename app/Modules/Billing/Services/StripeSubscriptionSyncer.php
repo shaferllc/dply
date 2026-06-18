@@ -3,7 +3,7 @@
 namespace App\Modules\Billing\Services;
 
 use App\Models\Organization;
-use App\Models\Subscription;
+use App\Modules\Billing\Models\Subscription;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -122,7 +122,7 @@ class StripeSubscriptionSyncer
 
         $item = $subscription->items->firstWhere('stripe_price', $priceId);
 
-        return $item instanceof \App\Models\SubscriptionItem ? (int) $item->quantity : null;
+        return $item instanceof \App\Modules\Billing\Models\SubscriptionItem ? (int) $item->quantity : null;
     }
 
     /**

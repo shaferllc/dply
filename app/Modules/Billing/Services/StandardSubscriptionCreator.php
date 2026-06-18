@@ -3,7 +3,7 @@
 namespace App\Modules\Billing\Services;
 
 use App\Models\Organization;
-use App\Models\Subscription;
+use App\Modules\Billing\Models\Subscription;
 use InvalidArgumentException;
 use RuntimeException;
 

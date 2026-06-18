@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Modules\Billing\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Laravel\Cashier\SubscriptionItem as CashierSubscriptionItem;

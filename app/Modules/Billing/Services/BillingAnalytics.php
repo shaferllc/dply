@@ -9,7 +9,7 @@ use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\OrganizationBillingSnapshot;
 use App\Models\Server;
-use App\Models\Subscription;
+use App\Modules\Billing\Models\Subscription;
 use App\Models\Site;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -620,7 +620,7 @@ final class BillingAnalytics
 
         $items = [];
         foreach ($subscription->items as $item) {
-            /** @var \App\Models\SubscriptionItem $item */
+            /** @var \App\Modules\Billing\Models\SubscriptionItem $item */
             $items[] = [
                 'price_id' => $item->stripe_price,
                 'quantity' => (int) $item->quantity,

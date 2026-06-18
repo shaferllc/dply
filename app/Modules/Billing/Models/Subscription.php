@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Modules\Billing\Models;
 
 use Database\Factories\SubscriptionFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
