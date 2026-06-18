@@ -58,6 +58,9 @@ test('addWorker appends with defaults', function () {
 
     Livewire::actingAs($user)
         ->test(CloudCreate::class)
+        // Default worker/scheduler commands are pre-filled in source mode only
+        // (image mode is BYO — command left blank to force a deliberate value).
+        ->set('mode', 'source')
         ->call('addWorker', 'worker')
         ->call('addWorker', 'scheduler')
         ->assertCount('workers', 2)
@@ -94,14 +97,16 @@ test('deploy passes workers + autoscaling + health + database into the action', 
         ->set('workers.0.command', 'php artisan queue:work redis')
         ->set('workers.0.size', 'medium')
         ->set('workers.0.instance_count', 3)
+        ->set('workers.1.command', 'php artisan schedule:run') // image mode leaves it blank
+        ->set('size_tier', 'small-pro') // CPU autoscaling requires a Pro-tier size
         ->set('autoscaling_enabled', true)
         ->set('autoscaling_min', 2)
         ->set('autoscaling_max', 6)
         ->set('autoscaling_cpu_percent', 65)
         ->set('health_check_enabled', true)
         ->set('health_check_path', '/up')
-        ->set('database_mode', 'attach')
-        ->set('database_id', $db->id)
+        // Databases are a multi-entry list now (attach/create per row).
+        ->set('databases', [['_id' => 'db-1', 'mode' => 'attach', 'cloud_database_id' => $db->id, 'name' => 'main', 'engine' => 'postgres', 'version' => '16', 'size' => 'small', 'env_prefix' => 'DB']])
         ->call('deploy')
         ->assertHasNoErrors();
 
@@ -170,10 +175,9 @@ test('attach database requires a selection', function () {
         ->set('image', 'x:1')
         ->set('backend', 'digitalocean_app_platform')
         ->set('region', 'nyc')
-        ->set('database_mode', 'attach')
-        ->set('database_id', '')
+        ->set('databases', [['_id' => 'db-1', 'mode' => 'attach', 'cloud_database_id' => '', 'name' => 'main', 'engine' => 'postgres', 'version' => '16', 'size' => 'small', 'env_prefix' => 'DB']])
         ->call('deploy')
-        ->assertHasErrors(['database_id']);
+        ->assertHasErrors(['databases.0.cloud_database_id']);
 });
 
 test('addDomain accepts a hostname and dedups; removeDomain re-indexes', function () {
@@ -225,6 +229,11 @@ test('deploy with database mode create provisions a fresh DB row', function () {
     Bus::fake();
     [$user] = bootCloudOrg();
 
+    // Route through the FakeCloudBackend (no real DO calls): fake mode + no
+    // persisted credential so CloudRouter resolves the fake backend.
+    config(['server_provision_fake.env_flag' => true]);
+    ProviderCredential::query()->delete();
+
     Livewire::actingAs($user)
         ->test(CloudCreate::class)
         ->set('mode', 'image')
@@ -232,10 +241,7 @@ test('deploy with database mode create provisions a fresh DB row', function () {
         ->set('image', 'x:1')
         ->set('backend', 'digitalocean_app_platform')
         ->set('region', 'nyc')
-        ->set('database_mode', 'create')
-        ->set('new_database_name', 'fresh-db')
-        ->set('new_database_engine', 'postgres')
-        ->set('new_database_size', 'small')
+        ->set('databases', [['_id' => 'db-1', 'mode' => 'create', 'name' => 'fresh-db', 'engine' => 'postgres', 'version' => '16', 'size' => 'small', 'env_prefix' => 'DB']])
         ->call('deploy')
         ->assertHasNoErrors();
 
@@ -256,10 +262,9 @@ test('deploy with database mode create validates required fields', function () {
         ->set('image', 'x:1')
         ->set('backend', 'digitalocean_app_platform')
         ->set('region', 'nyc')
-        ->set('database_mode', 'create')
-        ->set('new_database_name', 'a') // too short
+        ->set('databases', [['_id' => 'db-1', 'mode' => 'create', 'name' => 'a', 'engine' => 'postgres', 'version' => '16', 'size' => 'small', 'env_prefix' => 'DB']]) // name too short
         ->call('deploy')
-        ->assertHasErrors(['new_database_name']);
+        ->assertHasErrors(['databases.0.name']);
 });
 
 test('removeWorker re-indexes', function () {
