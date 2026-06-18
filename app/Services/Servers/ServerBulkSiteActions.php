@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Modules\Certificates\Services\ServerCertificateInventory;
+
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Server;
 use App\Models\Site;
