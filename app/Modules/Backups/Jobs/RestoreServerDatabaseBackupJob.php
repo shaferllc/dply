@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Backups\Jobs;
 
 use App\Models\ServerDatabaseBackup;
-use App\Services\Servers\ServerDatabaseBackupRestorer;
+use App\Modules\Backups\Services\ServerDatabaseBackupRestorer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

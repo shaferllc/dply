@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\ConsoleAction;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerDatabase;
@@ -13,7 +13,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Attributes\On;
 

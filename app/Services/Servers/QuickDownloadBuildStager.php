@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\QuickDownload;
-use App\Services\Backups\BackupStagingS3ClientFactory;
+use App\Modules\Backups\Services\BackupStagingS3ClientFactory;
 use Illuminate\Support\Str;
 use Psr\Http\Message\StreamInterface;
 

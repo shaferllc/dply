@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Backups\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
@@ -10,7 +10,7 @@ use App\Models\SiteFileBackup;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\Notifications\Services\ServerBackupNotificationDispatcher;
-use App\Services\Servers\SiteFileBackupExporter;
+use App\Modules\Backups\Services\SiteFileBackupExporter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;

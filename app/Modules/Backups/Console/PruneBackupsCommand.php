@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Backups\Console;
 
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Servers;
+namespace App\Modules\Backups\Services;
 
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;

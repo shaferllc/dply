@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Backups;
+namespace App\Modules\Backups\Services;
 
 use Aws\S3\S3Client;
 use RuntimeException;

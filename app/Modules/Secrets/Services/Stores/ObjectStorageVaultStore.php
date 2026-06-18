@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Secrets\Services\Stores;
 
 use App\Modules\Secrets\Services\Contracts\VaultStore;
-use App\Services\Servers\DatabaseBackupS3ClientFactory;
+use App\Modules\Backups\Services\DatabaseBackupS3ClientFactory;
 use Aws\S3\S3Client;
 use RuntimeException;
 

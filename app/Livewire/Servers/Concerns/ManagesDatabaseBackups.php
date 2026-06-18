@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Models\BackupConfiguration;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
-use App\Services\Servers\DatabaseBackupDownloader;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupDownloader;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use Illuminate\Http\Response;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 use App\Jobs\AddEdgeProxyJob;
-use App\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RemoveEdgeProxyJob;

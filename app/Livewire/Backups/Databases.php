@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Backups;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Models\ServerBackupSchedule;
@@ -12,7 +12,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;

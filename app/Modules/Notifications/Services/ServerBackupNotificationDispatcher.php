@@ -3,8 +3,8 @@
 namespace App\Modules\Notifications\Services;
 
 use App\Events\Servers\BackupStatusBroadcast;
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Models\Server;
 use App\Models\User;

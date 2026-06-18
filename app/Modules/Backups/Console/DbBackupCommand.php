@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Backups\Console;
 
 use App\Modules\Secrets\Services\Scope;
 use App\Modules\Secrets\Services\SecretVault;

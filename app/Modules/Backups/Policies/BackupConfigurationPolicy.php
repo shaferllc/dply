@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Policies;
+namespace App\Modules\Backups\Policies;
 
 use App\Models\BackupConfiguration;
 use App\Models\User;

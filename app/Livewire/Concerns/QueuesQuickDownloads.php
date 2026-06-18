@@ -7,7 +7,7 @@ use App\Models\QuickDownload;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\Site;
-use App\Services\Backups\BackupStagingS3ClientFactory;
+use App\Modules\Backups\Services\BackupStagingS3ClientFactory;
 use App\Services\Servers\QuickDownloadNotifier;
 use App\Services\Servers\QuickDownloadStreamer;
 use Illuminate\Database\Eloquent\Builder;

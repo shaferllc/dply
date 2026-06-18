@@ -34,7 +34,7 @@ use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
-use App\Console\Commands\PruneBackupDownloadStagingsCommand;
+use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
 use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;

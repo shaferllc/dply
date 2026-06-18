@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Concerns;
 
-use App\Jobs\StageBackupDownloadJob;
+use App\Modules\Backups\Jobs\StageBackupDownloadJob;
 use App\Models\BackupDownloadStaging;
-use App\Services\Backups\BackupDownloadStager;
-use App\Services\Backups\BackupStagingS3ClientFactory;
+use App\Modules\Backups\Services\BackupDownloadStager;
+use App\Modules\Backups\Services\BackupStagingS3ClientFactory;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Component;
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Servers\BackgroundWorkspacePagesTest;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
-use App\Jobs\StageBackupDownloadJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\StageBackupDownloadJob;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;

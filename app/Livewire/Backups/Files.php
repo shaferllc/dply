@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Backups;
 
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\StagesBackupDownloads;

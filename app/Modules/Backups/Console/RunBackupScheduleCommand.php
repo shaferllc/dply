@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Backups\Console;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 
 /**

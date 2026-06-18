@@ -1,6 +1,6 @@
 <?php
 
-use App\Console\Commands\PruneBackupsCommand;
+use App\Modules\Backups\Console\PruneBackupsCommand;
 
 return [
 

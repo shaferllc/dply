@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Observers;
+namespace App\Modules\Backups\Observers;
 
-use App\Console\Commands\RunBackupScheduleCommand;
+use App\Modules\Backups\Console\RunBackupScheduleCommand;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;

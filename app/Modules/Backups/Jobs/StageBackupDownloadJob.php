@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Backups\Jobs;
 
 use App\Models\BackupDownloadStaging;
-use App\Services\Backups\BackupDownloadStager;
+use App\Modules\Backups\Services\BackupDownloadStager;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

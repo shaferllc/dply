@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Backups\Console;
 
 use App\Models\BackupDownloadStaging;
-use App\Services\Backups\BackupDownloadStager;
+use App\Modules\Backups\Services\BackupDownloadStager;
 use Illuminate\Console\Command;
 
 /**

@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Jobs\ExportServerDatabaseBackupJobSqliteTest;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\User;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;

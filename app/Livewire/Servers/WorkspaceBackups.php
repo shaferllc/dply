@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Servers;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\QueuesQuickDownloads;
@@ -31,10 +31,10 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\Servers\SiteFileBackupExporter;
+use App\Modules\Backups\Services\SiteFileBackupExporter;
 use App\Support\Servers\DatabaseBackupSettings;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Cron\CronExpression;

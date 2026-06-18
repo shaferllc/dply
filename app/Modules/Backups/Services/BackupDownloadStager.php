@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Backups;
+namespace App\Modules\Backups\Services;
 
 use App\Models\BackupDownloadStaging;
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Support\Servers\DatabaseBackupSettings;
 use Illuminate\Support\Facades\Storage;

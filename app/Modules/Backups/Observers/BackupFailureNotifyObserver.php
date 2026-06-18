@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Observers;
+namespace App\Modules\Backups\Observers;
 
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerDatabaseBackup;

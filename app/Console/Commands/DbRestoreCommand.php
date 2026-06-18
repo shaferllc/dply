@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ServerDatabaseBackup;
-use App\Services\Servers\ServerDatabaseBackupRestorer;
+use App\Modules\Backups\Services\ServerDatabaseBackupRestorer;
 use Illuminate\Console\Command;
 
 /**
