@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Logs\Console;
 
-use App\Jobs\SyncLogAggregatorPolicyJob;
+use App\Modules\Logs\Jobs\SyncLogAggregatorPolicyJob;
 use App\Models\ServerLogAggregator;
 use App\Modules\Logs\Services\ServerLogAggregatorPolicyMap;
 use Illuminate\Console\Command;

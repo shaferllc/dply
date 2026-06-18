@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * absent org gets the aggregator's built-in default (fail open). The pure
  * row/CSV builders are static so they can be unit-tested without a DB.
  *
- * Refreshed + shipped to the box by {@see \App\Jobs\SyncLogAggregatorPolicyJob}.
+ * Refreshed + shipped to the box by {@see \App\Modules\Logs\Jobs\SyncLogAggregatorPolicyJob}.
  * See docs/SERVER_LOGS_BILLING.md §3.2.
  */
 class ServerLogAggregatorPolicyMap

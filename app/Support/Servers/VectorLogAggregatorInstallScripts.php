@@ -11,7 +11,7 @@ use App\Support\Servers\Concerns\InstallsVectorBinary;
  * Builds the bash that installs/uninstalls the dply Logs Vector AGGREGATOR on the
  * designated log box, plus the rendered aggregator vector.toml. Sibling to
  * {@see VectorLogAgentInstallScripts} (the edge side); pure string builders, no SSH
- * — {@see \App\Jobs\InstallLogAggregatorJob} runs the output.
+ * — {@see \App\Modules\Logs\Jobs\InstallLogAggregatorJob} runs the output.
  *
  * Pipeline it stands up: `vector` source on the listen port (mTLS, verify the edge
  * client cert) → remap that maps the edge-stamped fields onto the ClickHouse columns
@@ -390,7 +390,7 @@ class VectorLogAggregatorInstallScripts
     /**
      * Bash that writes the shipped policy CSV to the box and reloads the
      * aggregator so Vector reloads the enrichment table. Run by
-     * {@see \App\Jobs\SyncLogAggregatorPolicyJob}; $csvB64 is the rendered CSV.
+     * {@see \App\Modules\Logs\Jobs\SyncLogAggregatorPolicyJob}; $csvB64 is the rendered CSV.
      */
     public function syncPolicyScript(string $csvB64): string
     {

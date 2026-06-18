@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Jobs\InstallLogAggregatorJob;
+use App\Modules\Logs\Jobs\InstallLogAggregatorJob;
 use App\Support\Servers\VectorLogAgentInstallScripts;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
