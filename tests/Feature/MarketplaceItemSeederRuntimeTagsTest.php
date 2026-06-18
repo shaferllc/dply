@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\MarketplaceItemSeederRuntimeTagsTest;
 
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use Database\Seeders\MarketplaceItemSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

@@ -82,7 +82,7 @@
                             <p class="mt-2 flex-1 text-sm text-brand-moss">{{ $item->summary }}</p>
                         @endif
                         <div class="mt-4 flex flex-wrap gap-2">
-                            @if ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_WEBSERVER_TEMPLATE)
+                            @if ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_WEBSERVER_TEMPLATE)
                                 @if ($canImportWebserver)
                                     <button
                                         type="button"
@@ -100,7 +100,7 @@
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Org admin only') }}</span>
                                 @endif
-                            @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_DEPLOY_COMMAND)
+                            @elseif ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_DEPLOY_COMMAND)
                                 @if ($hasOrganization && $servers->isNotEmpty())
                                     <button
                                         type="button"
@@ -112,7 +112,7 @@
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Requires a server in this organization') }}</span>
                                 @endif
-                            @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_SERVER_RECIPE)
+                            @elseif ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_SERVER_RECIPE)
                                 @if ($hasOrganization && $servers->isNotEmpty())
                                     <button
                                         type="button"
@@ -124,7 +124,7 @@
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Requires a server in this organization') }}</span>
                                 @endif
-                            @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK)
+                            @elseif ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK)
                                 @if ($hasOrganization && $workspaces->isNotEmpty())
                                     <button
                                         type="button"
@@ -136,7 +136,7 @@
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Requires a project in this organization') }}</span>
                                 @endif
-                            @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_EXTERNAL_LINK)
+                            @elseif ($item->recipe_type === \App\Modules\Marketplace\Models\MarketplaceItem::RECIPE_EXTERNAL_LINK)
                                 @php
                                     $url = $item->payload['url'] ?? '/';
                                     $href = str_starts_with($url, 'http') ? $url : url($url);

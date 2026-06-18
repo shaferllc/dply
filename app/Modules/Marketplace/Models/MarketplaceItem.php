@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Modules\Marketplace\Models;
 
 use Database\Factories\MarketplaceItemFactory;
 use Illuminate\Database\Eloquent\Builder;

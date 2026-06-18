@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use Illuminate\Database\Seeder;
 
 class MarketplaceItemSeeder extends Seeder

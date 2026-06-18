@@ -330,6 +330,20 @@ class AppServiceProvider extends ServiceProvider
 
         $this->mergeEnvoyServiceActionScripts();
 
+        // Models extracted into app/Modules/<Domain>/Models keep their factories
+        // in database/factories/ (namespace Database\Factories). Laravel's default
+        // resolver would look for Database\Factories\Modules\<Domain>\Models\<X>Factory;
+        // map module models back to the flat Database\Factories\<X>Factory.
+        \Illuminate\Database\Eloquent\Factories\Factory::guessFactoryNamesUsing(function (string $modelName): string {
+            $relative = \Illuminate\Support\Str::startsWith($modelName, 'App\\Models\\')
+                ? \Illuminate\Support\Str::after($modelName, 'App\\Models\\')
+                : (str_starts_with($modelName, 'App\\Modules\\')
+                    ? class_basename($modelName)
+                    : \Illuminate\Support\Str::after($modelName, 'App\\'));
+
+            return 'Database\\Factories\\'.$relative.'Factory';
+        });
+
         Cashier::useCustomerModel(Organization::class);
         Cashier::useSubscriptionModel(Subscription::class);
         Cashier::useSubscriptionItemModel(SubscriptionItem::class);

@@ -4,7 +4,7 @@ namespace App\Modules\Marketplace\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use App\Models\Server;
 use App\Models\User;
 use App\Models\Workspace;
