@@ -3112,9 +3112,13 @@ test('site settings aliases section shows quick ssl action only for uncovered al
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
+    // The aliases routing tab is coming-soon-gated; enable the live surface.
+    config(['features.workspace.site_aliases' => true]);
+    \Laravel\Pennant\Feature::flushCache();
+
     Livewire::actingAs($user)
-        ->withQueryParams(['tab' => 'aliases'])
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+        ->set('routingTab', 'aliases')
         ->assertSee('SSL missing')
         ->assertSee("openQuickDomainSslModal('alias.example.com')", escape: false)
         ->assertDontSee("openQuickDomainSslModal('app.example.com')", escape: false);
