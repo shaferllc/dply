@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Notifications;
+namespace App\Modules\Feedback\Notifications;
 
 use App\Models\FeedbackReport;
 use Illuminate\Bus\Queueable;

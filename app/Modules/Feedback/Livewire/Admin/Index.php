@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Admin\Feedback;
+namespace App\Modules\Feedback\Livewire\Admin;
 
 use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\FeedbackReport;
-use App\Notifications\FeedbackReportStatusChanged;
+use App\Modules\Feedback\Notifications\FeedbackReportStatusChanged;
 use App\Support\Admin\PlatformAdmins;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;

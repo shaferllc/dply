@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Feedback\Console;
 
 use App\Models\FeedbackReport;
 use Illuminate\Console\Command;

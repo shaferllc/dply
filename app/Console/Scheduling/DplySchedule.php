@@ -36,7 +36,7 @@ use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
-use App\Console\Commands\PruneFeedbackAttachmentsCommand;
+use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneNotificationInboxItemsCommand;

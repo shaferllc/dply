@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Feedback;
+namespace App\Modules\Feedback\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\FeedbackReport;
-use App\Notifications\FeedbackReportSubmitted;
+use App\Modules\Feedback\Notifications\FeedbackReportSubmitted;
 use App\Support\Admin\PlatformAdmins;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Notification;
