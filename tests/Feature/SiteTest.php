@@ -2288,9 +2288,14 @@ test('site show displays preview and certificate summary', function () {
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
+    // The preview routing tab renders a "coming soon" teaser unless the real
+    // workspace.site_preview flag is active; enable it so the live panel shows.
+    config(['features.workspace.site_preview' => true]);
+    \Laravel\Pennant\Feature::flushCache();
+
     Livewire::actingAs($user)
-        ->withQueryParams(['tab' => 'preview'])
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+        ->set('routingTab', 'preview')
         ->assertSee('Preview domains')
         ->assertSee('preview-app.dply.cc')
         ->assertSee('ready');
