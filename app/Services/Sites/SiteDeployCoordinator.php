@@ -304,7 +304,9 @@ class SiteDeployCoordinator
     public function completedFixerKeys(Site $site, ?SiteDeployment $latest = null): array
     {
         $latest ??= $this->latestDeployment($site);
-        $since = $latest->finished_at ?? $latest->created_at;
+        // $latest is null for a site that has never deployed — guard the reads so
+        // the deploy-control panel renders (no deploy → no "since" cutoff).
+        $since = $latest?->finished_at ?? $latest?->created_at;
 
         $query = ConsoleAction::query()
             ->where('subject_type', $site->getMorphClass())
