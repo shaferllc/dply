@@ -9,7 +9,7 @@ use App\Models\Server;
 use App\Models\ServerlessUsageSnapshot;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
-use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 

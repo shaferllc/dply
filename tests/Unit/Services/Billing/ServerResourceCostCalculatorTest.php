@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Billing\ServerResourceCostCalculatorTest;
 
 use App\Models\Server;
-use App\Services\Billing\ServerResourceCostCalculator;
+use App\Modules\Billing\Services\ServerResourceCostCalculator;
 use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {

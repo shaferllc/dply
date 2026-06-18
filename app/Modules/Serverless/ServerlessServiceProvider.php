@@ -19,7 +19,7 @@ use Livewire\Livewire;
  * components + 7 embedded panels) under their original serverless.* names.
  *
  * The serverless DEPLOY adapters (App\Modules\Deploy\Services\Serverless*) and BILLING
- * usage services (App\Services\Billing\Serverless*) stay in those hub domains;
+ * usage services (App\Modules\Billing\Services\Serverless*) stay in those hub domains;
  * they reference this module's contract/services via repointed imports. The
  * function models stay in app/Models per the model rule.
  */

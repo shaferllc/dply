@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Livewire\Billing\StandardSubscribeTest;
 
-use App\Livewire\Billing\Show as BillingShow;
+use App\Modules\Billing\Livewire\Show as BillingShow;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\User;

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Console\ProvisionStripeBillingCommandTest;
 
-use App\Services\Billing\StripeBillingProvisioner;
+use App\Modules\Billing\Services\StripeBillingProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Billing;
 
-use App\Services\Billing\SubscriptionPlanResolver;
+use App\Modules\Billing\Services\SubscriptionPlanResolver;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 

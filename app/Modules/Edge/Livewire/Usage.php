@@ -6,8 +6,8 @@ namespace App\Modules\Edge\Livewire;
 
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Site;
-use App\Services\Billing\EdgeOrganizationUsageReader;
-use App\Services\Billing\EdgeSiteBillingAnalytics;
+use App\Modules\Billing\Services\EdgeOrganizationUsageReader;
+use App\Modules\Billing\Services\EdgeSiteBillingAnalytics;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;

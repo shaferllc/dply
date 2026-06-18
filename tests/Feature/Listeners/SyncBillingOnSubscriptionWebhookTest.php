@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Listeners\SyncBillingOnSubscriptionWebhookTest;
 
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Listeners\SyncBillingOnSubscriptionWebhook;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;

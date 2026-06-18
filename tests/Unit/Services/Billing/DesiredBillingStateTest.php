@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\Billing\DesiredBillingStateTest;
 
 use App\Enums\ServerTier;
-use App\Services\Billing\DesiredBillingState;
+use App\Modules\Billing\Services\DesiredBillingState;
 
 const FREE = ['key' => 'free', 'label' => 'Free', 'price_cents' => 0, 'max_servers' => 1];
 

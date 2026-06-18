@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Concerns;
 
 use App\Enums\TrialState;
-use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;

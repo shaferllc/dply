@@ -6,7 +6,7 @@ namespace App\Observers;
 
 use App\Events\Servers\ServerStateUpdated;
 use App\Modules\Imports\Jobs\RunMigrationStepJob;
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\Server;

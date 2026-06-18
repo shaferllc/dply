@@ -17,7 +17,7 @@ use App\Livewire\Forms\EdgeCreateForm;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Services\Billing\ManagedProductCostEstimator;
+use App\Modules\Billing\Services\ManagedProductCostEstimator;
 use App\Modules\Edge\Services\Frameworks\EdgeFrameworkPresetRegistry;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Modules\Edge\Support\EdgeSsrDetection;

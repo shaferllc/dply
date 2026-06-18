@@ -6,7 +6,7 @@ namespace App\Modules\Edge\Services;
 
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Site;
-use App\Services\Billing\EdgeUsageTotals;
+use App\Modules\Billing\Services\EdgeUsageTotals;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;

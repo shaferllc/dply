@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Services\Billing\ServerMonthlyCostNoteParser;
+use App\Modules\Billing\Services\ServerMonthlyCostNoteParser;
 
 test('parses provider-pull formatted cost notes', function () {
     $parser = new ServerMonthlyCostNoteParser;

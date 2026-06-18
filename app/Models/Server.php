@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\ServerProvider;
 use App\Enums\ServerTier;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
-use App\Services\Billing\ServerTierClassifier;
+use App\Modules\Billing\Services\ServerTierClassifier;
 use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;

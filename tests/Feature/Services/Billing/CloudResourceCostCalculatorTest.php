@@ -7,7 +7,7 @@ use App\Models\CloudWorker;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\CloudResourceCostCalculator;
+use App\Modules\Billing\Services\CloudResourceCostCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 

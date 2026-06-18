@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Billing;
 
-use App\Livewire\Billing\Analytics;
+use App\Modules\Billing\Livewire\Analytics;
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;

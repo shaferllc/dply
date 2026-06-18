@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Livewire\Billing\ShowBillBreakdownTest;
 
-use App\Livewire\Billing\Show as BillingShow;
+use App\Modules\Billing\Livewire\Show as BillingShow;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;

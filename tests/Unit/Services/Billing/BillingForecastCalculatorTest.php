@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Billing;
 
 use App\Models\OrganizationBillingSnapshot;
-use App\Services\Billing\BillingForecastCalculator;
-use App\Services\Billing\DesiredBillingState;
+use App\Modules\Billing\Services\BillingForecastCalculator;
+use App\Modules\Billing\Services\DesiredBillingState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

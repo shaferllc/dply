@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Billing\RealtimeTierBillingTest;
 
-use App\Services\Billing\DesiredBillingState;
+use App\Modules\Billing\Services\DesiredBillingState;
 
 const PLAN = ['key' => 'starter', 'label' => 'Starter', 'price_cents' => 1500, 'max_servers' => 3];
 

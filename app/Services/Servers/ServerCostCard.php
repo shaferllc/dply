@@ -7,7 +7,7 @@ namespace App\Services\Servers;
 use App\Enums\ServerTier;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\OrganizationCostObservatory;
+use App\Modules\Billing\Services\OrganizationCostObservatory;
 
 /**
  * Per-server true cost card — provider estimate, dply tier fee, site count,

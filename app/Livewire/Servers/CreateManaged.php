@@ -7,7 +7,7 @@ namespace App\Livewire\Servers;
 use App\Actions\Servers\StoreManagedServer;
 use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Services\Billing\ServerResourceCostCalculator;
+use App\Modules\Billing\Services\ServerResourceCostCalculator;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\ValidationException;

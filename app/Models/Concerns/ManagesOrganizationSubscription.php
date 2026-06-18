@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Models\Concerns;
 
 use App\Models\Server;
-use App\Services\Billing\OrganizationBillingStateComputer;
-use App\Services\Billing\SubscriptionPlanResolver;
+use App\Modules\Billing\Services\OrganizationBillingStateComputer;
+use App\Modules\Billing\Services\SubscriptionPlanResolver;
 use Laravel\Cashier\Billable;
 
 /**

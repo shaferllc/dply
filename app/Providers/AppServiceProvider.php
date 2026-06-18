@@ -45,7 +45,7 @@ use App\Modules\Backups\Observers\BackupFailureNotifyObserver;
 use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
 use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
 use App\Observers\ServerObserver;
-use App\Observers\SiteBillingObserver;
+use App\Modules\Billing\Observers\SiteBillingObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Modules\Backups\Policies\BackupConfigurationPolicy;

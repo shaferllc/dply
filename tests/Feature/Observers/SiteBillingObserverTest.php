@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Observers\SiteBillingObserverTest;
 
 use App\Enums\SiteType;
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

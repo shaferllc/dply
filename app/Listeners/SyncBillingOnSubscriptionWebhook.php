@@ -2,7 +2,7 @@
 
 namespace App\Listeners;
 
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
 use Laravel\Cashier\Events\WebhookReceived;
 

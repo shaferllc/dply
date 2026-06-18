@@ -8,7 +8,7 @@ use App\Models\CloudBucket;
 use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
-use App\Services\Billing\ManagedProductCostEstimator;
+use App\Modules\Billing\Services\ManagedProductCostEstimator;
 use App\Modules\Cloud\Backends\AwsAppRunnerBackend;
 use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
 use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;

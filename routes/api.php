@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\Api\AccountApiController;
 use App\Http\Controllers\Api\Auth\DeviceAuthorizationController;
-use App\Http\Controllers\Api\BillingApiController;
+use App\Modules\Billing\Http\Controllers\Api\BillingApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeAccessApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeAliasApiController;
 use App\Modules\Edge\Http\Controllers\Api\EdgeCacheApiController;

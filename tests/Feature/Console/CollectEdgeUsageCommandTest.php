@@ -9,7 +9,7 @@ use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\EdgeUsageTotals;
+use App\Modules\Billing\Services\EdgeUsageTotals;
 use App\Modules\Edge\Services\EdgeCloudflareClient;
 use App\Modules\Edge\Services\EdgeUsageCollector;
 use Carbon\Carbon;
