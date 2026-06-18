@@ -2408,7 +2408,7 @@ test('site show can repair a failed certificate', function () {
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
         ->call('repairCertificate', $certificate->id)
-        ->assertDispatched('notify', message: 'Certificate repair queued. Track progress in the banner at the top of this page.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     expect(ConsoleAction::query()
         ->where('subject_type', $site->getMorphClass())
@@ -3187,6 +3187,7 @@ test('site settings aliases section can quick add letsencrypt ssl for alias', fu
         ->call('openQuickDomainSslModal', 'alias.example.com')
         ->assertSet('quick_ssl_domain_hostname', 'alias.example.com')
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+        ->set('quick_ssl_force', true)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'SSL request queued for alias.example.com via Let\'s Encrypt.', type: 'success');
@@ -3251,6 +3252,7 @@ test('site settings domains section can quick add letsencrypt ssl', function () 
         ->call('openQuickDomainSslModal', 'app.example.com')
         ->assertSet('quick_ssl_domain_hostname', 'app.example.com')
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+        ->set('quick_ssl_force', true)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'SSL request queued for app.example.com via Let\'s Encrypt.', type: 'success');
@@ -3314,6 +3316,7 @@ test('site settings domains section can quick add zerossl ssl', function () {
         ->set('routingTab', 'domains')
         ->call('openQuickDomainSslModal', 'api.example.com')
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_ZEROSSL)
+        ->set('quick_ssl_force', true)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'SSL request queued for api.example.com via ZeroSSL.', type: 'success');
