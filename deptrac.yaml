@@ -1,0 +1,92 @@
+####################################################################
+# Deptrac — modular-monolith boundary enforcement
+# See docs/adr/modular-monolith-structure.md
+#
+# We lock in ONE architectural invariant:
+#
+#     The domain engine (app/Modules/*) must never depend on the
+#     presentation SHELL — the concrete workspace Livewire components
+#     and HTTP controllers.
+#
+# This keeps the dependency arrow pointing UI -> engine and stops the 29
+# modules we just extracted from silently re-coupling back into the shell
+# UI. Everything else (kernel models, shared services/jobs/support, the
+# generic Livewire concerns the modules legitimately use) is intentionally
+# left unconstrained — this codebase's shared infrastructure calls into
+# modules by design, so a strict layered-purity ruleset would be noise.
+#
+# Run:                vendor/bin/deptrac analyse
+# Regenerate baseline (after an intentional, reviewed change):
+#   vendor/bin/deptrac analyse --formatter=baseline --output=deptrac-baseline.yaml
+#
+# Collectors use `directory` (path regex) to avoid namespace-backslash
+# escaping fragility. One shell command (DemoDigitalOceanServerCommand)
+# uses PHP 8.4 `new X()->m()` syntax that deptrac's bundled parser can't
+# read yet; it is skipped harmlessly.
+####################################################################
+imports:
+  # Existing known-debt violations (module admin pages reaching into the
+  # shell's AuthorizesPlatformAdmin concern). Pay these down, then prune
+  # this list — any NEW Module->Presentation dependency fails the build.
+  - deptrac-baseline.yaml
+
+deptrac:
+  paths:
+    - ./app
+
+  layers:
+    # The presentation shell: concrete workspace Livewire components +
+    # HTTP controllers. Excludes the generic top-level Livewire concerns
+    # and form objects (those are shared building blocks modules may use)
+    # and the base Controller.
+    - name: Presentation
+      collectors:
+        - type: bool
+          must:
+            - { type: directory, value: 'app/Livewire/.*' }
+          must_not:
+            - { type: directory, value: 'app/Livewire/Concerns/.*' }
+            - { type: directory, value: 'app/Livewire/Forms/.*' }
+            - { type: directory, value: 'app/Modules/.*' }
+        - type: bool
+          must:
+            - { type: directory, value: 'app/Http/Controllers/.*' }
+          must_not:
+            - { type: directory, value: 'app/Http/Controllers/Controller\.php' }
+            - { type: directory, value: 'app/Modules/.*' }
+
+    # The extracted domain modules (engine + their own UI/Http).
+    - name: Modules
+      collectors:
+        - { type: directory, value: 'app/Modules/.*' }
+
+    # Everything else under app/ — shared kernel + infrastructure +
+    # generic UI concerns. Intentionally unconstrained. Defined to be
+    # disjoint from Presentation/Modules: all of app/ except those dirs,
+    # plus the generic Livewire concerns/forms + base Controller that
+    # Presentation deliberately excludes (so modules may use them freely).
+    - name: Shared
+      collectors:
+        - type: bool
+          must:
+            - { type: directory, value: 'app/.*' }
+          must_not:
+            - { type: directory, value: 'app/Modules/.*' }
+            - { type: directory, value: 'app/Livewire/.*' }
+            - { type: directory, value: 'app/Http/Controllers/.*' }
+        - { type: directory, value: 'app/Livewire/Concerns/.*' }
+        - { type: directory, value: 'app/Livewire/Forms/.*' }
+        - { type: directory, value: 'app/Http/Controllers/Controller\.php' }
+
+  ruleset:
+    # THE invariant: modules may depend on shared infra (and each other),
+    # but never on the presentation shell.
+    Modules:
+      - Shared
+    # The shell and shared infra may depend on anything.
+    Presentation:
+      - Modules
+      - Shared
+    Shared:
+      - Modules
+      - Presentation

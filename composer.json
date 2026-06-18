@@ -60,6 +60,7 @@
         "barryvdh/laravel-debugbar": "^4.2",
         "beyondcode/expose": "^3.2",
         "brianium/paratest": "^7.0",
+        "deptrac/deptrac": "^3.0",
         "doctrine/dbal": "^4.0",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
@@ -123,6 +124,12 @@
         ],
         "analyse:baseline": [
             "@php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress --generate-baseline=phpstan-baseline.neon"
+        ],
+        "deptrac": [
+            "@php vendor/bin/deptrac analyse --no-progress"
+        ],
+        "deptrac:baseline": [
+            "@php vendor/bin/deptrac analyse --formatter=baseline --output=deptrac-baseline.yaml --no-progress"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
