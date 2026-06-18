@@ -1,5 +1,5 @@
 @php
-    $previews = $edgeIsPreviewChild ? collect() : \App\Actions\Edge\CreateEdgePreviewSite::listForParent($site);
+    $previews = $edgeIsPreviewChild ? collect() : \App\Modules\Edge\Actions\CreateEdgePreviewSite::listForParent($site);
 @endphp
 
 <section class="dply-card overflow-hidden">
@@ -209,7 +209,7 @@
                     $previewPrNumber = $previewMeta['preview_pr_number'] ?? null;
                     // Legacy rows (created before preview_kind existed) all came
                     // from the PR webhook flow, so default to 'pr' for safety.
-                    $previewKind = (string) ($previewMeta['preview_kind'] ?? \App\Actions\Edge\CreateEdgePreviewSite::KIND_PR);
+                    $previewKind = (string) ($previewMeta['preview_kind'] ?? \App\Modules\Edge\Actions\CreateEdgePreviewSite::KIND_PR);
                     $previewRefKind = $previewMeta['preview_ref_kind'] ?? null;
                     $previewHeadSha = (string) ($previewMeta['preview_head_sha'] ?? '');
                     $previewUrl = $preview->edgeLiveUrl();
@@ -242,7 +242,7 @@
                             @endif
                             @if (is_int($previewPrNumber) || (is_string($previewPrNumber) && $previewPrNumber !== ''))
                                 <span class="ms-1 text-xs font-normal text-brand-moss">· PR #{{ $previewPrNumber }}</span>
-                            @elseif ($previewKind === \App\Actions\Edge\CreateEdgePreviewSite::KIND_ADHOC && $previewHeadSha !== '')
+                            @elseif ($previewKind === \App\Modules\Edge\Actions\CreateEdgePreviewSite::KIND_ADHOC && $previewHeadSha !== '')
                                 <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">{{ __('Ad-hoc') }}</span>
                                 <span class="ms-1 text-xs font-normal text-brand-moss">· {{ substr($previewHeadSha, 0, 7) }}</span>
                             @endif

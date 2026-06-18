@@ -90,7 +90,7 @@ class EdgeDeployment extends Model
     {
         return array_values(array_filter(array_map(
             static fn ($value): string => is_string($value) ? strtolower(trim($value)) : '',
-            $this->aliases,
+            $this->aliases ?? [],
         ), static fn (string $value): bool => $value !== ''));
     }
 

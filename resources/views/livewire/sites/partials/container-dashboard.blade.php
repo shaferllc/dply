@@ -490,7 +490,7 @@
         </div>
 
         @php
-            $previews = \App\Actions\Cloud\CreateCloudPreviewSite::listForParent($site);
+            $previews = \App\Modules\Cloud\Actions\CreateCloudPreviewSite::listForParent($site);
         @endphp
         @if ($previews->isNotEmpty())
             <div class="rounded-xl border border-slate-200 bg-white p-4">
