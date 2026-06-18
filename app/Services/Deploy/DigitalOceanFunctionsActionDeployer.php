@@ -5,7 +5,7 @@ namespace App\Services\Deploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
 use Illuminate\Support\Facades\Http;
 
 final class DigitalOceanFunctionsActionDeployer

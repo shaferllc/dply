@@ -7,7 +7,7 @@ namespace Tests\Feature\Serverless\FunctionScheduleServiceTest;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Serverless\FunctionScheduleService;
+use App\Modules\Serverless\Services\FunctionScheduleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

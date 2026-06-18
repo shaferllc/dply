@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Livewire\Serverless\RollbackPanelTest;
 
-use App\Jobs\RollbackServerlessFunctionJob;
-use App\Livewire\Serverless\RollbackPanel;
+use App\Modules\Serverless\Jobs\RollbackServerlessFunctionJob;
+use App\Modules\Serverless\Livewire\RollbackPanel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

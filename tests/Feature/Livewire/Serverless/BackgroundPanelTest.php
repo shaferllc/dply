@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Livewire\Serverless\BackgroundPanelTest;
 
-use App\Livewire\Serverless\BackgroundPanel;
+use App\Modules\Serverless\Livewire\BackgroundPanel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

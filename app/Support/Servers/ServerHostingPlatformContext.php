@@ -12,7 +12,7 @@ use RuntimeException;
 
 /**
  * Platform cloud credentials for dply-managed servers — the VM counterpart to
- * {@see App\Support\Serverless\ServerlessPlatformContext} and
+ * {@see App\Modules\Serverless\Support\ServerlessPlatformContext} and
  * {@see App\Support\Edge\EdgeDeliveryContext} `platform()`.
  *
  * In managed mode dply provisions and pays for the VM on its own platform cloud

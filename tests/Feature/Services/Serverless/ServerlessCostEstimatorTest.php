@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Services\Serverless\ServerlessCostEstimatorTest;
 
 use App\Models\Site;
-use App\Services\Serverless\ServerlessCostEstimator;
+use App\Modules\Serverless\Services\ServerlessCostEstimator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\StepFunctionsDefinitionTest;
 
-use App\Services\Serverless\Aws\StepFunctionsDefinition;
+use App\Modules\Serverless\Services\Aws\StepFunctionsDefinition;
 use InvalidArgumentException;
 
 test('it chains functions into a state machine', function () {

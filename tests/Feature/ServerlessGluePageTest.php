@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ServerlessGluePageTest;
 
-use App\Livewire\Serverless\Glue;
+use App\Modules\Serverless\Livewire\Glue;
 use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;

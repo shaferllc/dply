@@ -11,7 +11,7 @@ use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Serverless\ServerlessGluePlanner;
+use App\Modules\Serverless\Services\ServerlessGluePlanner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

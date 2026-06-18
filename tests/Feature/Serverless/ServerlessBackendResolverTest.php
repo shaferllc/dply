@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Serverless\ServerlessBackendResolverTest;
 
 use App\Models\Server;
-use App\Services\Serverless\Aws\AwsEventBridgeTriggerBackend;
-use App\Services\Serverless\Aws\AwsStepFunctionsSequenceBackend;
-use App\Services\Serverless\Backends\ServerlessSequenceBackend;
-use App\Services\Serverless\Backends\ServerlessTriggerBackend;
-use App\Services\Serverless\ServerlessBackendResolver;
-use App\Services\Serverless\ServerlessSequenceDeployer;
-use App\Services\Serverless\ServerlessTriggerProvisioner;
+use App\Modules\Serverless\Services\Aws\AwsEventBridgeTriggerBackend;
+use App\Modules\Serverless\Services\Aws\AwsStepFunctionsSequenceBackend;
+use App\Modules\Serverless\Services\Backends\ServerlessSequenceBackend;
+use App\Modules\Serverless\Services\Backends\ServerlessTriggerBackend;
+use App\Modules\Serverless\Services\ServerlessBackendResolver;
+use App\Modules\Serverless\Services\ServerlessSequenceDeployer;
+use App\Modules\Serverless\Services\ServerlessTriggerProvisioner;
 
 function server(string $hostKind): Server
 {

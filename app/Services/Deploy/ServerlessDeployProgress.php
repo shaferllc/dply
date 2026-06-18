@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy;
 
-use App\Exceptions\ServerlessDeployCancelledException;
+use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Support\Carbon;

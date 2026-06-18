@@ -10,6 +10,7 @@ use App\Modules\Projects\ProjectsServiceProvider;
 use App\Modules\Realtime\RealtimeServiceProvider;
 use App\Modules\Referrals\ReferralsServiceProvider;
 use App\Modules\Roadmap\RoadmapServiceProvider;
+use App\Modules\Serverless\ServerlessServiceProvider;
 use App\Modules\TaskRunner\TaskServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\FeatureServiceProvider;
@@ -27,6 +28,7 @@ return [
     ProjectsServiceProvider::class,
     RealtimeServiceProvider::class,
     ReferralsServiceProvider::class,
+    ServerlessServiceProvider::class,
     RoadmapServiceProvider::class,
     AppServiceProvider::class,
     FeatureServiceProvider::class,

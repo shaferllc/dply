@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Jobs\ProvisionServerlessDatabaseJobTest;
 
-use App\Jobs\ProvisionServerlessDatabaseJob;
+use App\Modules\Serverless\Jobs\ProvisionServerlessDatabaseJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;

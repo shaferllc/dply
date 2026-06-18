@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Livewire\Serverless\CreateTest;
 
-use App\Livewire\Serverless\Create as ServerlessCreate;
+use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;

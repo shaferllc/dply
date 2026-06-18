@@ -10,7 +10,7 @@ use App\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Serverless\InvokeFunctionTick;
+use App\Modules\Serverless\Services\InvokeFunctionTick;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;

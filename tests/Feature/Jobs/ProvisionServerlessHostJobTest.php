@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Jobs\ProvisionServerlessHostJobTest;
 
-use App\Jobs\ProvisionServerlessHostJob;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

@@ -9,7 +9,7 @@ use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\ResolveEdgeCustomDomain;
-use App\Http\Middleware\ResolveServerlessCustomDomain;
+use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;

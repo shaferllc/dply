@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Livewire\Serverless\IndexTest;
 
-use App\Livewire\Serverless\Index as ServerlessIndex;
+use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

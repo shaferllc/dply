@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Serverless\OpenWhiskClientTest;
 
 use App\Models\Server;
-use App\Services\Serverless\OpenWhiskClient;
+use App\Modules\Serverless\Services\OpenWhiskClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

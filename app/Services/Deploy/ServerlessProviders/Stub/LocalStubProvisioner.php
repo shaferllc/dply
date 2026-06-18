@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy\ServerlessProviders\Stub;
 
-use App\Contracts\ServerlessFunctionProvisioner;
+use App\Modules\Serverless\Contracts\ServerlessFunctionProvisioner;
 use App\Services\Deploy\Support\ProvisionerConfigReport;
 
 final class LocalStubProvisioner implements ServerlessFunctionProvisioner

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\AwsEventBridgeTriggerBackendTest;
 
 use App\Models\FunctionAction;
-use App\Services\Serverless\Aws\AwsEventBridgeTriggerBackend;
+use App\Modules\Serverless\Services\Aws\AwsEventBridgeTriggerBackend;
 use Aws\EventBridge\EventBridgeClient;
 use Aws\Lambda\LambdaClient;
 use Aws\MockHandler;

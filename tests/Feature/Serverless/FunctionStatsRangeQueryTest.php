@@ -6,7 +6,7 @@ namespace Tests\Feature\Serverless\FunctionStatsRangeQueryTest;
 
 use App\Models\FunctionInvocation;
 use App\Models\Site;
-use App\Services\Serverless\FunctionStatsRangeQuery;
+use App\Modules\Serverless\Services\FunctionStatsRangeQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
