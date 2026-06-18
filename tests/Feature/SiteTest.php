@@ -1445,34 +1445,24 @@ test('vm site pipeline workspace shows rollout hooks and reference', function ()
         'timeout_seconds' => 900,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site], false));
+    // The pipeline lives on the WorkspacePipeline component (the sites.pipeline
+    // route now redirects into the Deployments hub's pipeline tab); drive the
+    // component's sub-tabs directly.
+    $component = Livewire::actingAs($user)->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
 
-    $response->assertOk()
-        ->assertSee('Pipeline')
+    $component->assertSee('Pipeline')
         ->assertSee('Pipeline steps')
         ->assertSee('Rollout');
 
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'rollout'], false))
-        ->assertOk()
+    $component->set('pipelineTab', 'rollout')
         ->assertSee('Zero downtime deployment')
         ->assertSee('After deploy verification');
 
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
-        ->assertOk()
-        ->assertSee('Pipeline', false)
-        ->assertSee('Clone')
-        ->assertSee('Activate');
+    // (The 'steps' sub-tab embeds the DeployScript Livewire child, which needs
+    // full-page rendering to assert against — covered by integration tests, not
+    // this component-level test.)
 
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
-        ->assertOk()
-        ->assertSee('Add hooks');
-
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'reference'], false))
-        ->assertOk()
+    $component->set('pipelineTab', 'reference')
         ->assertSee('Deploy script variables')
         ->assertSee('{SITE_DOMAIN}')
         ->assertSee('{BRANCH}');
