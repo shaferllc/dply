@@ -21,9 +21,16 @@ class TestWebhookCallbackHandler
 {
     use HandlesCallbacks;
 
-    public ?string $callbackUrl = 'https://example.test/callback';
-
-    public bool $callbacksEnabled = true;
+    public function __construct()
+    {
+        // Configure via the trait's API rather than redeclaring its protected
+        // $callbackUrl/$callbacksEnabled properties — redeclaring them with a
+        // different visibility/default is a fatal trait-composition collision.
+        $this->setCallbackConfig([
+            'url' => 'https://example.test/callback',
+            'enabled' => true,
+        ]);
+    }
 }
 
 class TaskRunnerCancellationTest extends TestCase
