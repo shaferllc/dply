@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Actions;
 
-use App\Jobs\SyncCloudScalingJob;
+use App\Modules\Cloud\Jobs\SyncCloudScalingJob;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;
 use App\Modules\Cloud\Backends\CloudScalingConfig;

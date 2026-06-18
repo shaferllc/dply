@@ -6,7 +6,7 @@ namespace Tests\Feature\CloudDeployTasksTest;
 
 use App\Modules\Cloud\Actions\ApplyCloudSiteExtras;
 use App\Enums\SiteType;
-use App\Jobs\SyncCloudDeployTaskRunsJob;
+use App\Modules\Cloud\Jobs\SyncCloudDeployTaskRunsJob;
 use App\Models\CloudDeployTask;
 use App\Models\CloudDeployTaskRun;
 use App\Models\Organization;

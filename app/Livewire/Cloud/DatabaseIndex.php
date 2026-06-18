@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use Illuminate\Contracts\View\View;

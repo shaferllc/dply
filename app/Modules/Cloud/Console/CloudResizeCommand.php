@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Console\Command;

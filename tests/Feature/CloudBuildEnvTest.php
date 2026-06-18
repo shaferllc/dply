@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudBuildEnvTest;
 
 use App\Enums\SiteType;
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Livewire\Sites\Settings as SitesSettings;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

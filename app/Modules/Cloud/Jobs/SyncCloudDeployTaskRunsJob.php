@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Cloud\Jobs;
 
 use App\Models\CloudDeployTask;
 use App\Models\CloudDeployTaskRun;

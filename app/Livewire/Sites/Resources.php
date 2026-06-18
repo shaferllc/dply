@@ -6,8 +6,8 @@ namespace App\Livewire\Sites;
 
 use App\Modules\Cloud\Actions\CreateCloudDatabase;
 use App\Modules\Cloud\Actions\CreateCloudWorker;
-use App\Jobs\AttachCloudDatabaseJob;
-use App\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;

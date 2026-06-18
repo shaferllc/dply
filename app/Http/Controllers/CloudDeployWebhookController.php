@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

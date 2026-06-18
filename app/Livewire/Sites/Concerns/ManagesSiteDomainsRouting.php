@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Jobs\AttachCloudDomainJob;
-use App\Jobs\DetachCloudDomainJob;
+use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
+use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;

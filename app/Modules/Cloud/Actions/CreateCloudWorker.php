@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Actions;
 
-use App\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;

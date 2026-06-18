@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use Illuminate\Console\Command;
 

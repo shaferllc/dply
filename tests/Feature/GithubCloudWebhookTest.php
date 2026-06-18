@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\GithubCloudWebhookTest;
 
 use App\Enums\SiteType;
-use App\Jobs\RedeployCloudSiteJob;
-use App\Jobs\TeardownCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\TeardownCloudSiteJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

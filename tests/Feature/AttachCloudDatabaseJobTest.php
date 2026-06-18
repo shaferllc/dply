@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\AttachCloudDatabaseJobTest;
 
 use App\Enums\SiteType;
-use App\Jobs\AttachCloudDatabaseJob;
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\Server;

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Modules\Cloud\Actions\CreateCloudPreviewSite;
-use App\Jobs\RedeployCloudSiteJob;
-use App\Jobs\TeardownCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\TeardownCloudSiteJob;
 use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

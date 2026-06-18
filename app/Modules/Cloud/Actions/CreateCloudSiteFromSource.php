@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Cloud\Actions;
 
 use App\Enums\SiteType;
-use App\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
 use App\Models\CloudDeployTask;
 use App\Models\Organization;
 use App\Models\Server;

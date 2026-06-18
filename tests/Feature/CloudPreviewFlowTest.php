@@ -6,8 +6,8 @@ namespace Tests\Feature\CloudPreviewFlowTest;
 
 use App\Modules\Cloud\Actions\CreateCloudPreviewSite;
 use App\Enums\SiteType;
-use App\Jobs\ProvisionCloudSiteJob;
-use App\Jobs\TeardownCloudSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Cloud\Jobs\TeardownCloudSiteJob;
 use App\Livewire\Sites\Settings;
 use App\Models\Organization;
 use App\Models\Server;

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudDeployCommandTest;
 
 use App\Enums\SiteType;
-use App\Jobs\ProvisionCloudSiteJob;
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudDomainAttachmentTest;
 
 use App\Enums\SiteType;
-use App\Jobs\AttachCloudDomainJob;
-use App\Jobs\DetachCloudDomainJob;
+use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
+use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

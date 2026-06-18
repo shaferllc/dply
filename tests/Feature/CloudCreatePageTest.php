@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudCreatePageTest;
 
-use App\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

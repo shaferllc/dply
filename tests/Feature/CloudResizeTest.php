@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudResizeTest;
 
 use App\Enums\SiteType;
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;

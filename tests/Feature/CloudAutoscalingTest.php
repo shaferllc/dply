@@ -7,7 +7,7 @@ namespace Tests\Feature\CloudAutoscalingTest;
 use App\Modules\Cloud\Actions\ConfigureCloudAutoscaling;
 use App\Modules\Cloud\Actions\ConfigureCloudHealthCheck;
 use App\Enums\SiteType;
-use App\Jobs\SyncCloudScalingJob;
+use App\Modules\Cloud\Jobs\SyncCloudScalingJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\CloudWorker;
 use App\Models\Organization;

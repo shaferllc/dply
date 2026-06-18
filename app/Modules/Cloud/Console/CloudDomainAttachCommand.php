@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Jobs\AttachCloudDomainJob;
+use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
 use App\Models\Site;
 use Illuminate\Console\Command;
 
