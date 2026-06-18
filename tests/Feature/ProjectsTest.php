@@ -3,8 +3,8 @@
 namespace Tests\Feature\ProjectsTest;
 
 use App\Jobs\RunWorkspaceDeployJob;
-use App\Livewire\Projects\Index as ProjectsIndex;
-use App\Livewire\Projects\Show as ProjectsShow;
+use App\Modules\Projects\Livewire\Index as ProjectsIndex;
+use App\Modules\Projects\Livewire\Show as ProjectsShow;
 use App\Models\AuditLog;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;

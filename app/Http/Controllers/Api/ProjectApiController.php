@@ -16,7 +16,7 @@ use App\Models\WorkspaceDeployRun;
 use App\Models\WorkspaceMember;
 use App\Models\WorkspaceRunbook;
 use App\Models\WorkspaceVariable;
-use App\Services\Projects\WorkspaceHealthSummaryService;
+use App\Modules\Projects\Services\WorkspaceHealthSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;

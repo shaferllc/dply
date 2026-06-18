@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Projects;
+namespace App\Modules\Projects\Services;
 
 use App\Models\Server;
 use App\Models\Site;

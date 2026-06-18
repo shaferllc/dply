@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Projects;
+namespace App\Modules\Projects\Livewire;
 
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
@@ -17,8 +17,8 @@ use App\Models\WorkspaceDeployRun;
 use App\Models\WorkspaceLabel;
 use App\Models\WorkspaceMember;
 use App\Services\Notifications\AssignableNotificationChannels;
-use App\Services\Projects\WorkspaceHealthSummaryService;
-use App\Services\Projects\WorkspaceNotificationDispatcher;
+use App\Modules\Projects\Services\WorkspaceHealthSummaryService;
+use App\Modules\Projects\Services\WorkspaceNotificationDispatcher;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
