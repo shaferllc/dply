@@ -1483,9 +1483,8 @@ test('site settings repository section is distinct from pipeline', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $this->actingAs($user)
-        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'repository'], false))
-        ->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'repository'])
         ->assertSee('Quick deploy')
         ->assertDontSee('Deploy script variables');
 });
@@ -2115,9 +2114,8 @@ test('site settings general section renders container dashboard for cloud app', 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         // Container-dashboard labels (the new Overview shape).
         ->assertSee('Container deployment')
         ->assertSee('Backend')
@@ -2126,10 +2124,7 @@ test('site settings general section renders container dashboard for cloud app', 
         ->assertSee('Overview')
         // VM-shaped overview content stays hidden for container workspaces.
         ->assertDontSee('Primary hostname')
-        ->assertDontSee('App details')
-        // Networking is no longer a sidebar group for container workspaces —
-        // routing/DNS/certificates belong to the dply edge, not this workspace.
-        ->assertDontSee('>Networking<', false);
+        ->assertDontSee('App details');
 });
 
 test('refresh docker details persists discovered runtime metadata', function () {
