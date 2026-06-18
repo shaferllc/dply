@@ -12,7 +12,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseExtraUser;
 use App\Notifications\ServerDatabaseCredentialsNotification;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;

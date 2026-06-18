@@ -9,7 +9,7 @@ use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\ServerBackupNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerBackupNotificationDispatcher;
 use App\Services\Servers\SiteFileBackupExporter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;

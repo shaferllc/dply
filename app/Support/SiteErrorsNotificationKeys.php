@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Models\ErrorEvent;
-use App\Services\Notifications\ServerErrorsNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerErrorsNotificationDispatcher;
 
 /**
  * Notification event keys for a single site's error stream, surfaced on the

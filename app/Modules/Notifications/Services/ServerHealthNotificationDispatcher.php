@@ -1,20 +1,21 @@
 <?php
 
-namespace App\Services\Notifications;
+namespace App\Modules\Notifications\Services;
 
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Support\ServerCertInventoryNotificationKeys;
+use App\Services\Servers\ServerHealthNotifier;
+use App\Support\ServerHealthNotificationKeys;
 
 /**
- * Publishes notifications for server-scoped TLS certificate lifecycle events
- * (issue / renewal success + failure), fired from {@see ExecuteSiteCertificateJob}.
+ * Publishes notifications for the server health cockpit — posture transitions
+ * detected when the cockpit is evaluated ({@see ServerHealthNotifier}):
+ * a new critical / warning alert, or a recovery to a healthy posture.
  *
- * Mirrors {@see ServerWebserverNotificationDispatcher}. Subject is the {@see Server}
- * the certificate's site lives on; the per-kind title is pulled from the config label.
+ * Mirrors {@see ServerSecurityDigestNotificationDispatcher}. Subject is the
+ * {@see Server} the cockpit belongs to; the per-kind title is the config label.
  */
-final class ServerCertInventoryNotificationDispatcher
+final class ServerHealthNotificationDispatcher
 {
     public function __construct(
         private readonly NotificationPublisher $publisher,
@@ -31,7 +32,7 @@ final class ServerCertInventoryNotificationDispatcher
         ?User $actor = null,
         array $extraMetadata = [],
     ): void {
-        if (! in_array($kind, ServerCertInventoryNotificationKeys::KINDS, true)) {
+        if (! in_array($kind, ServerHealthNotificationKeys::KINDS, true)) {
             return;
         }
 
@@ -40,7 +41,7 @@ final class ServerCertInventoryNotificationDispatcher
             $detailLines,
         ), static fn (string $n) => $n !== ''));
 
-        $eventKey = ServerCertInventoryNotificationKeys::eventKey($kind);
+        $eventKey = ServerHealthNotificationKeys::eventKey($kind);
         $label = $this->label($eventKey, $kind);
 
         $title = '['.config('app.name').'] '.$server->name.' — '.$label;
@@ -60,7 +61,7 @@ final class ServerCertInventoryNotificationDispatcher
             subject: $server,
             title: $title,
             body: implode("\n", $lines),
-            url: route('servers.cert-inventory', $server, absolute: true),
+            url: route('servers.health', $server, absolute: true),
             metadata: array_merge([
                 'server_id' => $server->id,
                 'kind' => $kind,
@@ -71,7 +72,7 @@ final class ServerCertInventoryNotificationDispatcher
 
     private function label(string $eventKey, string $kind): string
     {
-        $events = (array) config('notification_events.categories.cert_inventory.events', []);
+        $events = (array) config('notification_events.categories.health.events', []);
 
         return (string) ($events[$eventKey] ?? ucfirst(str_replace('_', ' ', $kind)));
     }

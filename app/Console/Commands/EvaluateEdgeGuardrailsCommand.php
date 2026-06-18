@@ -7,7 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Site;
 use App\Services\Edge\EdgeGuardrailStatus;
 use App\Services\Edge\EdgeUsageGuardrail;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Throwable;
 

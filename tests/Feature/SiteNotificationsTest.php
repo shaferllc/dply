@@ -13,7 +13,7 @@ use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteUptimeMonitor;
 use App\Models\User;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;

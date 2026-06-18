@@ -26,7 +26,7 @@ use App\Models\SiteDeployment;
 use App\Models\Team;
 use App\Models\User;
 use App\Modules\Insights\Services\InsightCorrelationService;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;

@@ -7,7 +7,7 @@ namespace App\Services\Servers;
 use App\Jobs\CheckServerHealthJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerHealthNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerHealthNotificationDispatcher;
 use App\Support\ServerHealthNotificationKeys;
 
 /**

@@ -6,7 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Server;
 use App\Notifications\ServerRemovalScheduledNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Notification;
 

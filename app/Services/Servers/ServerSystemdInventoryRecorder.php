@@ -5,7 +5,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\ServerSystemdServiceAuditEvent;
 use App\Models\ServerSystemdServiceState;
-use App\Services\Notifications\ServerSystemdNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSystemdNotificationDispatcher;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 

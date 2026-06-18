@@ -21,7 +21,7 @@ use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\TeamSshKey;
 use App\Models\UserSshKey;
-use App\Services\Notifications\ServerSshKeyNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSshKeyNotificationDispatcher;
 use App\Services\Servers\OrganizationTeamSshKeyServerDeployer;
 use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
 use App\Services\Servers\ServerPasswdUserLister;

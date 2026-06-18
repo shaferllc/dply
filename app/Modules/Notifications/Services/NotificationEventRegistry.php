@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Notifications;
+namespace App\Modules\Notifications\Services;
 
 use App\Support\ServerSystemdServiceNotificationKeys;
 

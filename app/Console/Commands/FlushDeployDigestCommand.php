@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Notifications\DeployDigestBuffer;
+use App\Modules\Notifications\Services\DeployDigestBuffer;
 use Illuminate\Console\Command;
 
 class FlushDeployDigestCommand extends Command

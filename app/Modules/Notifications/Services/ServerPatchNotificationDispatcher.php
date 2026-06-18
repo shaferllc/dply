@@ -1,31 +1,28 @@
 <?php
 
-namespace App\Services\Notifications;
+namespace App\Modules\Notifications\Services;
 
-use App\Jobs\RevertServerWebserverSwitchJob;
-use App\Jobs\RunWebserverConfigOpJob;
-use App\Jobs\SwitchServerWebserverJob;
+use App\Jobs\ServerManageRemoteSshJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Support\ServerWebserverNotificationKeys;
+use App\Support\ServerPatchNotificationKeys;
 
 /**
- * Publishes notifications for server-scoped webserver changes (engine switch,
- * rollback, config-file save), fired from the webserver jobs
- * ({@see SwitchServerWebserverJob}, {@see RevertServerWebserverSwitchJob},
- * {@see RunWebserverConfigOpJob}).
+ * Publishes notifications for server-scoped OS patch / update actions (apt upgrade,
+ * dist-upgrade, reboot, unattended-upgrades toggle), fired from the shared
+ * manage-action job ({@see ServerManageRemoteSshJob}) for patch task names.
  *
- * Mirrors {@see ServerFirewallNotificationDispatcher}. Subject is the {@see Server};
+ * Mirrors {@see ServerWebserverNotificationDispatcher}. Subject is the {@see Server};
  * the per-kind title is pulled from the config label.
  */
-final class ServerWebserverNotificationDispatcher
+final class ServerPatchNotificationDispatcher
 {
     public function __construct(
         private readonly NotificationPublisher $publisher,
     ) {}
 
     /**
-     * @param  array<string, mixed> $detailLines  human detail (e.g. "nginx → caddy", "caddy: /etc/caddy/Caddyfile")
+     * @param  array<string, mixed> $detailLines
      * @param  array<string, mixed> $extraMetadata
      */
     public function notify(
@@ -35,7 +32,7 @@ final class ServerWebserverNotificationDispatcher
         ?User $actor = null,
         array $extraMetadata = [],
     ): void {
-        if (! in_array($kind, ServerWebserverNotificationKeys::KINDS, true)) {
+        if (! in_array($kind, ServerPatchNotificationKeys::KINDS, true)) {
             return;
         }
 
@@ -44,7 +41,7 @@ final class ServerWebserverNotificationDispatcher
             $detailLines,
         ), static fn (string $n) => $n !== ''));
 
-        $eventKey = ServerWebserverNotificationKeys::eventKey($kind);
+        $eventKey = ServerPatchNotificationKeys::eventKey($kind);
         $label = $this->label($eventKey, $kind);
 
         $title = '['.config('app.name').'] '.$server->name.' — '.$label;
@@ -64,7 +61,7 @@ final class ServerWebserverNotificationDispatcher
             subject: $server,
             title: $title,
             body: implode("\n", $lines),
-            url: route('servers.webserver', $server, absolute: true),
+            url: route('servers.patches', $server, absolute: true),
             metadata: array_merge([
                 'server_id' => $server->id,
                 'kind' => $kind,
@@ -75,7 +72,7 @@ final class ServerWebserverNotificationDispatcher
 
     private function label(string $eventKey, string $kind): string
     {
-        $events = (array) config('notification_events.categories.webserver.events', []);
+        $events = (array) config('notification_events.categories.patches.events', []);
 
         return (string) ($events[$eventKey] ?? ucfirst(str_replace('_', ' ', $kind)));
     }

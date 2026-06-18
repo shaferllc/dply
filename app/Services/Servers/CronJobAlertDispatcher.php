@@ -7,7 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Notifications\CronJobAlertNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Str;
 
 final class CronJobAlertDispatcher

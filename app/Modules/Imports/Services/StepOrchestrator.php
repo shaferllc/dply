@@ -8,7 +8,7 @@ use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\User;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;

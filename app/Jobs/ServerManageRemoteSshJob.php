@@ -7,7 +7,7 @@ use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\ServerPatchNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerPatchNotificationDispatcher;
 use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;

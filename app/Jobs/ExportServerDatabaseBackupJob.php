@@ -10,7 +10,7 @@ use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\ServerBackupNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerBackupNotificationDispatcher;
 use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;

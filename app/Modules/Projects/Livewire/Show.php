@@ -16,7 +16,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceDeployRun;
 use App\Models\WorkspaceLabel;
 use App\Models\WorkspaceMember;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Modules\Projects\Services\WorkspaceHealthSummaryService;
 use App\Modules\Projects\Services\WorkspaceNotificationDispatcher;
 use Illuminate\Contracts\View\View;

@@ -9,7 +9,7 @@ use App\Models\QuickDownload;
 use App\Models\User;
 use App\Notifications\QuickDownloadFailedNotification;
 use App\Notifications\QuickDownloadReadyNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 

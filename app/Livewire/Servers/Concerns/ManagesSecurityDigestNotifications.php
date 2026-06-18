@@ -5,7 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerSecurityDigestScanner;
 use App\Support\ServerSecurityDigestNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;

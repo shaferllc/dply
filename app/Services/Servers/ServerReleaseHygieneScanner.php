@@ -8,7 +8,7 @@ use App\Jobs\RunServerReleaseHygieneScanJob;
 use App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerReleaseHygieneNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerReleaseHygieneNotificationDispatcher;
 use App\Services\SshConnection;
 use RuntimeException;
 

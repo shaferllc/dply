@@ -18,7 +18,7 @@ use App\Models\SiteCertificate;
 use App\Models\User;
 use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\ServerWebserverNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerWebserverNotificationDispatcher;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigPreserver;

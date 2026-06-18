@@ -30,7 +30,7 @@ use App\Models\Site;
 use App\Models\Workspace;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Support\SiteErrorsNotificationKeys;

@@ -8,7 +8,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\ServerWebserverNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerWebserverNotificationDispatcher;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Bus\Queueable;

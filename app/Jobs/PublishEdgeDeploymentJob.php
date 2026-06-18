@@ -15,7 +15,7 @@ use App\Services\Edge\EdgeSsrBundleUploader;
 use App\Services\Edge\EdgeTestingHostnameProvisioner;
 use App\Services\Edge\EnsureEdgeRepoDomains;
 use App\Services\Edge\OriginHealthcheckRunner;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

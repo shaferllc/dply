@@ -8,7 +8,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerFirewallRule;
 use App\Models\User;
-use App\Services\Notifications\ServerNetworkingNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerNetworkingNotificationDispatcher;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;

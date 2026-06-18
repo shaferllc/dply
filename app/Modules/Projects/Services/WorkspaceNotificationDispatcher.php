@@ -3,7 +3,7 @@
 namespace App\Modules\Projects\Services;
 
 use App\Models\Workspace;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 
 class WorkspaceNotificationDispatcher
 {

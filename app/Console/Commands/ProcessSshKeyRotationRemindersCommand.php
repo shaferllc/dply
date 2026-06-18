@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Notifications\SshKeyRotationDueNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 

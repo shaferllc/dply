@@ -8,7 +8,7 @@ use App\Jobs\PreviewDriftJob;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\UserSshKey;
-use App\Services\Notifications\ServerSshKeyNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSshKeyNotificationDispatcher;
 use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
 use App\Services\Servers\SshKeyLabelTemplate;
 use App\Services\Servers\SshPublicKeyFingerprint;

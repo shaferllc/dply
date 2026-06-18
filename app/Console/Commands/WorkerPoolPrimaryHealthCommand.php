@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Server;
 use App\Models\WorkerPool;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 

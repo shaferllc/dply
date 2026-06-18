@@ -17,8 +17,8 @@ use App\Modules\Imports\Services\Handlers\CutoverSmokeTestHandler;
 use App\Modules\Imports\Services\MigrationPlanner;
 use App\Modules\Imports\Services\StepOrchestrator;
 use App\Modules\Imports\Services\StepRegistry;
-use App\Services\Notifications\NotificationEventRegistry;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationEventRegistry;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

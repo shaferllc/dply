@@ -12,7 +12,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\Imports\Services\StepHandler;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;

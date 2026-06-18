@@ -10,7 +10,7 @@ use App\Models\Server;
 use App\Models\ServerSystemdServiceAuditEvent;
 use App\Models\ServerSystemdServiceState;
 use App\Modules\TaskRunner\ProcessOutput;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerSystemdServicesCatalog;
 use App\Support\Servers\SystemdServiceStandbyReasonResolver;

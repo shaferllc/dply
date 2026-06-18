@@ -6,7 +6,7 @@ use App\Models\InsightDigestQueue;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Carbon\Carbon;
 
 class InsightsNotificationDispatcher

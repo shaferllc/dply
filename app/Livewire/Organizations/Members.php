@@ -6,7 +6,7 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Notifications\OrganizationInvitationNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;

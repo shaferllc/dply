@@ -10,7 +10,7 @@ use App\Livewire\Servers\Concerns\ManagesDeployPolicyNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;

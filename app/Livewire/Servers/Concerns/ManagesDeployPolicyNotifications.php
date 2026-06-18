@@ -7,7 +7,7 @@ use App\Livewire\Servers\Deploys;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\ServerDeployPolicyNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;

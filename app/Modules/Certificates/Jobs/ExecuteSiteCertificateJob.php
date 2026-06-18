@@ -7,7 +7,7 @@ use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\User;
 use App\Modules\Certificates\Services\CertificateRequestService;
-use App\Services\Notifications\ServerCertInventoryNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerCertInventoryNotificationDispatcher;
 use App\Support\Sites\CertbotOutputParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

@@ -9,7 +9,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionRules;
 use App\Support\ServerSystemdServiceNotificationKeys;
 use Illuminate\Contracts\View\View;

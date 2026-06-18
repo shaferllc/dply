@@ -6,7 +6,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerSystemdServicesCatalog;
 use App\Support\ServerSystemdServiceNotificationKeys;

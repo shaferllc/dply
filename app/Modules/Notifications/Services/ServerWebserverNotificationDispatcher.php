@@ -1,27 +1,31 @@
 <?php
 
-namespace App\Services\Notifications;
+namespace App\Modules\Notifications\Services;
 
+use App\Jobs\RevertServerWebserverSwitchJob;
+use App\Jobs\RunWebserverConfigOpJob;
+use App\Jobs\SwitchServerWebserverJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Servers\ServerMaintenanceWindow;
-use App\Support\ServerMaintenanceNotificationKeys;
+use App\Support\ServerWebserverNotificationKeys;
 
 /**
- * Publishes notifications for server-scoped visitor maintenance windows
- * (enabled / ended / auto-ended), fired from {@see ServerMaintenanceWindow}.
+ * Publishes notifications for server-scoped webserver changes (engine switch,
+ * rollback, config-file save), fired from the webserver jobs
+ * ({@see SwitchServerWebserverJob}, {@see RevertServerWebserverSwitchJob},
+ * {@see RunWebserverConfigOpJob}).
  *
- * Mirrors {@see ServerCertInventoryNotificationDispatcher}. Subject is the {@see Server}
- * the window applies to; the per-kind title is pulled from the config label.
+ * Mirrors {@see ServerFirewallNotificationDispatcher}. Subject is the {@see Server};
+ * the per-kind title is pulled from the config label.
  */
-final class ServerMaintenanceNotificationDispatcher
+final class ServerWebserverNotificationDispatcher
 {
     public function __construct(
         private readonly NotificationPublisher $publisher,
     ) {}
 
     /**
-     * @param  array<string, mixed> $detailLines
+     * @param  array<string, mixed> $detailLines  human detail (e.g. "nginx → caddy", "caddy: /etc/caddy/Caddyfile")
      * @param  array<string, mixed> $extraMetadata
      */
     public function notify(
@@ -31,7 +35,7 @@ final class ServerMaintenanceNotificationDispatcher
         ?User $actor = null,
         array $extraMetadata = [],
     ): void {
-        if (! in_array($kind, ServerMaintenanceNotificationKeys::KINDS, true)) {
+        if (! in_array($kind, ServerWebserverNotificationKeys::KINDS, true)) {
             return;
         }
 
@@ -40,7 +44,7 @@ final class ServerMaintenanceNotificationDispatcher
             $detailLines,
         ), static fn (string $n) => $n !== ''));
 
-        $eventKey = ServerMaintenanceNotificationKeys::eventKey($kind);
+        $eventKey = ServerWebserverNotificationKeys::eventKey($kind);
         $label = $this->label($eventKey, $kind);
 
         $title = '['.config('app.name').'] '.$server->name.' — '.$label;
@@ -60,7 +64,7 @@ final class ServerMaintenanceNotificationDispatcher
             subject: $server,
             title: $title,
             body: implode("\n", $lines),
-            url: route('servers.maintenance', $server, absolute: true),
+            url: route('servers.webserver', $server, absolute: true),
             metadata: array_merge([
                 'server_id' => $server->id,
                 'kind' => $kind,
@@ -71,7 +75,7 @@ final class ServerMaintenanceNotificationDispatcher
 
     private function label(string $eventKey, string $kind): string
     {
-        $events = (array) config('notification_events.categories.maintenance.events', []);
+        $events = (array) config('notification_events.categories.webserver.events', []);
 
         return (string) ($events[$eventKey] ?? ucfirst(str_replace('_', ' ', $kind)));
     }

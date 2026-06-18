@@ -1,22 +1,22 @@
 <?php
 
-namespace App\Services\Notifications;
+namespace App\Modules\Notifications\Services;
 
-use App\Jobs\RunSiteDeploymentJob;
-use App\Livewire\Servers\Deploys;
 use App\Models\Server;
 use App\Models\User;
-use App\Support\ServerDeployPolicyNotificationKeys;
+use App\Services\Servers\ServerReleaseHygieneScanner;
+use App\Support\ServerReleaseHygieneNotificationKeys;
 
 /**
- * Publishes notifications for the server-wide deploy window policy — a deploy
- * blocked by a deny window ({@see RunSiteDeploymentJob}) and enforcement
- * toggled on / off ({@see Deploys}).
+ * Publishes notifications for the server release hygiene workspace — pressure
+ * transitions detected after a scan ({@see ServerReleaseHygieneScanner}):
+ * a new critical / warning finding (disk, release folders, log sizes, failed jobs),
+ * or a recovery to a healthy posture.
  *
- * Mirrors {@see ServerCertInventoryNotificationDispatcher}. Subject is the
- * {@see Server} the policy belongs to; the per-kind title is the config label.
+ * Mirrors {@see ServerSecurityDigestNotificationDispatcher}. Subject is the
+ * {@see Server} the hygiene report belongs to; the per-kind title is the config label.
  */
-final class ServerDeployPolicyNotificationDispatcher
+final class ServerReleaseHygieneNotificationDispatcher
 {
     public function __construct(
         private readonly NotificationPublisher $publisher,
@@ -33,7 +33,7 @@ final class ServerDeployPolicyNotificationDispatcher
         ?User $actor = null,
         array $extraMetadata = [],
     ): void {
-        if (! in_array($kind, ServerDeployPolicyNotificationKeys::KINDS, true)) {
+        if (! in_array($kind, ServerReleaseHygieneNotificationKeys::KINDS, true)) {
             return;
         }
 
@@ -42,7 +42,7 @@ final class ServerDeployPolicyNotificationDispatcher
             $detailLines,
         ), static fn (string $n) => $n !== ''));
 
-        $eventKey = ServerDeployPolicyNotificationKeys::eventKey($kind);
+        $eventKey = ServerReleaseHygieneNotificationKeys::eventKey($kind);
         $label = $this->label($eventKey, $kind);
 
         $title = '['.config('app.name').'] '.$server->name.' — '.$label;
@@ -62,7 +62,7 @@ final class ServerDeployPolicyNotificationDispatcher
             subject: $server,
             title: $title,
             body: implode("\n", $lines),
-            url: route('servers.deploys', ['server' => $server, 'tab' => 'deploy-windows'], absolute: true),
+            url: route('servers.hygiene', $server, absolute: true),
             metadata: array_merge([
                 'server_id' => $server->id,
                 'kind' => $kind,
@@ -73,7 +73,7 @@ final class ServerDeployPolicyNotificationDispatcher
 
     private function label(string $eventKey, string $kind): string
     {
-        $events = (array) config('notification_events.categories.deploy_window.events', []);
+        $events = (array) config('notification_events.categories.release_hygiene.events', []);
 
         return (string) ($events[$eventKey] ?? ucfirst(str_replace('_', ' ', $kind)));
     }

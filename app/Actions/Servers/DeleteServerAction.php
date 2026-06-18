@@ -15,7 +15,7 @@ use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\OracleComputeService;
 use App\Services\OvhService;
 use App\Services\UpCloudService;

@@ -7,7 +7,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\On;

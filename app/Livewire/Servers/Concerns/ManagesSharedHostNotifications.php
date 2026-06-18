@@ -5,7 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\SharedHostNotificationDispatcher;
 use App\Support\Servers\SharedHostBudgetMonitor;
 use Illuminate\Database\Eloquent\Collection;

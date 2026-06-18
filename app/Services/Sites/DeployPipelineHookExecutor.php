@@ -9,7 +9,7 @@ use App\Models\NotificationChannel;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 

@@ -20,7 +20,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseExtraUser;
 use App\Models\Site;
-use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseBackupDownloader;
 use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\DatabaseEngineReadinessGuard;

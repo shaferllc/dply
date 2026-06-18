@@ -6,7 +6,7 @@ use App\Jobs\ServerManageRemoteSshJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\ServerPatchNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;

@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

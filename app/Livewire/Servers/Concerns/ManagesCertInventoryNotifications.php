@@ -6,7 +6,7 @@ use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\ServerCertInventoryNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;

@@ -1,21 +1,20 @@
 <?php
 
-namespace App\Services\Notifications;
+namespace App\Modules\Notifications\Services;
 
-use App\Jobs\ServerManageRemoteSshJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Support\ServerPatchNotificationKeys;
+use App\Services\Servers\ServerMaintenanceWindow;
+use App\Support\ServerMaintenanceNotificationKeys;
 
 /**
- * Publishes notifications for server-scoped OS patch / update actions (apt upgrade,
- * dist-upgrade, reboot, unattended-upgrades toggle), fired from the shared
- * manage-action job ({@see ServerManageRemoteSshJob}) for patch task names.
+ * Publishes notifications for server-scoped visitor maintenance windows
+ * (enabled / ended / auto-ended), fired from {@see ServerMaintenanceWindow}.
  *
- * Mirrors {@see ServerWebserverNotificationDispatcher}. Subject is the {@see Server};
- * the per-kind title is pulled from the config label.
+ * Mirrors {@see ServerCertInventoryNotificationDispatcher}. Subject is the {@see Server}
+ * the window applies to; the per-kind title is pulled from the config label.
  */
-final class ServerPatchNotificationDispatcher
+final class ServerMaintenanceNotificationDispatcher
 {
     public function __construct(
         private readonly NotificationPublisher $publisher,
@@ -32,7 +31,7 @@ final class ServerPatchNotificationDispatcher
         ?User $actor = null,
         array $extraMetadata = [],
     ): void {
-        if (! in_array($kind, ServerPatchNotificationKeys::KINDS, true)) {
+        if (! in_array($kind, ServerMaintenanceNotificationKeys::KINDS, true)) {
             return;
         }
 
@@ -41,7 +40,7 @@ final class ServerPatchNotificationDispatcher
             $detailLines,
         ), static fn (string $n) => $n !== ''));
 
-        $eventKey = ServerPatchNotificationKeys::eventKey($kind);
+        $eventKey = ServerMaintenanceNotificationKeys::eventKey($kind);
         $label = $this->label($eventKey, $kind);
 
         $title = '['.config('app.name').'] '.$server->name.' — '.$label;
@@ -61,7 +60,7 @@ final class ServerPatchNotificationDispatcher
             subject: $server,
             title: $title,
             body: implode("\n", $lines),
-            url: route('servers.patches', $server, absolute: true),
+            url: route('servers.maintenance', $server, absolute: true),
             metadata: array_merge([
                 'server_id' => $server->id,
                 'kind' => $kind,
@@ -72,7 +71,7 @@ final class ServerPatchNotificationDispatcher
 
     private function label(string $eventKey, string $kind): string
     {
-        $events = (array) config('notification_events.categories.patches.events', []);
+        $events = (array) config('notification_events.categories.maintenance.events', []);
 
         return (string) ($events[$eventKey] ?? ucfirst(str_replace('_', ' ', $kind)));
     }

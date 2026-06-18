@@ -9,7 +9,7 @@ use App\Models\ConsoleAction;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
 use App\Models\User;
-use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\DatabaseEngineInstallScripts;

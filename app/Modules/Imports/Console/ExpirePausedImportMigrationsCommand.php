@@ -11,7 +11,7 @@ use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Modules\Imports\Services\Forge\ForgeImportDriver;
 use App\Modules\Imports\Services\Ploi\PloiImportDriver;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;

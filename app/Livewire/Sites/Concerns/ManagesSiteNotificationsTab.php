@@ -7,7 +7,7 @@ namespace App\Livewire\Sites\Concerns;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Models\NotificationWebhookDestination;
 use App\Models\Site;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionMatrix;
 use Livewire\Attributes\On;
 

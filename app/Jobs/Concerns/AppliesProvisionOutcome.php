@@ -18,7 +18,7 @@ use App\Models\UserSshKey;
 use App\Notifications\RedisServerProvisionedNotification;
 use App\Notifications\ServerProvisionFailedNotification;
 use App\Notifications\ServerProvisionedCredentialsNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerProvisionCommandBuilder;

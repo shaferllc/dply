@@ -8,7 +8,7 @@ use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Notifications\ServerMaintenanceNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerMaintenanceNotificationDispatcher;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;

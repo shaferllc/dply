@@ -11,7 +11,7 @@ use App\Livewire\Sites\Settings;
 use App\Models\NotificationChannel;
 use App\Models\NotificationWebhookDestination;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionMatrix;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;

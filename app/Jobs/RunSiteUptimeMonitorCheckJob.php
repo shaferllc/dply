@@ -10,7 +10,7 @@ use App\Models\SiteUptimeCheckResult;
 use App\Models\SiteUptimeIncident;
 use App\Models\SiteUptimeMonitor;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Services\Status\MonitorOperationalState;

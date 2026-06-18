@@ -7,7 +7,7 @@ namespace App\Jobs;
 use App\Models\Server;
 use App\Models\ServerFirewallAuditEvent;
 use App\Models\User;
-use App\Services\Notifications\ServerFirewallNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerFirewallNotificationDispatcher;
 use App\Services\Servers\ServerFirewallApplyRecorder;
 use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;

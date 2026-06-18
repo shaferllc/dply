@@ -7,7 +7,7 @@ namespace App\Jobs;
 use App\Jobs\Middleware\SerializeServerSsh;
 use App\Models\ErrorEvent;
 use App\Models\Site;
-use App\Services\Notifications\SiteErrorsNotificationDispatcher;
+use App\Modules\Notifications\Services\SiteErrorsNotificationDispatcher;
 use App\Services\Sites\SiteHttp5xxLogScanner;
 use App\Support\Errors\ErrorEventRecorder;
 use Illuminate\Contracts\Queue\ShouldBeUnique;

@@ -26,7 +26,7 @@ use App\Notifications\RedisServerProvisionedNotification;
 use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Notifications\ServerProvisionFailedNotification;
 use App\Observers\TaskRunnerTaskObserver;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
 use App\Services\Servers\ServerAptLockBash;

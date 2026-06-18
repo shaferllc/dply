@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerSystemUserNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSystemUserNotificationDispatcher;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;

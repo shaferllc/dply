@@ -8,7 +8,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Bus;

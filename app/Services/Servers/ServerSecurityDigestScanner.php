@@ -8,7 +8,7 @@ use App\Jobs\RunServerSecurityDigestScanJob;
 use App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerSecurityDigestNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSecurityDigestNotificationDispatcher;
 use App\Services\SshConnection;
 use RuntimeException;
 

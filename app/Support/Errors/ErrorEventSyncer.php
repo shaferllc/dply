@@ -8,7 +8,7 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\ErrorEvent;
 use App\Models\SiteDeployment;
-use App\Services\Notifications\ServerErrorsNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerErrorsNotificationDispatcher;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Throwable;

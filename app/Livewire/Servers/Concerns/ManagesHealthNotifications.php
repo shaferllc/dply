@@ -6,7 +6,7 @@ use App\Jobs\CheckServerHealthJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerHealthNotifier;
 use App\Support\ServerHealthNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
