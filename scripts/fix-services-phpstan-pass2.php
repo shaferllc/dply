@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Second-pass: fix bare `array` in PHPDoc shapes and add missing @return for `: array` methods.
  */
 $root = dirname(__DIR__);
-$dirs = [$root.'/app/Services', $root.'/app/Support', $root.'/app/TaskRunner'];
+$dirs = [$root.'/app/Services', $root.'/app/Support', $root.'/app/Modules/TaskRunner'];
 $changed = 0;
 
 foreach ($dirs as $dir) {

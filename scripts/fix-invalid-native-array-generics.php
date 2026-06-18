@@ -7,7 +7,7 @@ declare(strict_types=1);
  * PHP does not support array<string, mixed> in native signatures — only in PHPDoc.
  */
 $root = dirname(__DIR__);
-$dirs = [$root.'/app/Services', $root.'/app/Support', $root.'/app/TaskRunner'];
+$dirs = [$root.'/app/Services', $root.'/app/Support', $root.'/app/Modules/TaskRunner'];
 $changed = 0;
 
 foreach ($dirs as $dir) {

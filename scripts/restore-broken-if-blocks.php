@@ -9,7 +9,7 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 $broken = [];
 
-foreach (['app/Services', 'app/Support', 'app/TaskRunner'] as $relDir) {
+foreach (['app/Services', 'app/Support', 'app/Modules/TaskRunner'] as $relDir) {
     $dir = $root.'/'.$relDir;
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)

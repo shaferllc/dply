@@ -133,7 +133,7 @@ test('build application stack supports apache openlitespeed and traefik', functi
     $this->assertStringContainsString('caddy', $traefikCommands);
 });
 test('build emits named step markers for setup progress', function () {
-    $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+    $keyPath = base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem');
 
     $server = Server::factory()->create([
         'provider' => ServerProvider::DigitalOcean,
@@ -385,7 +385,7 @@ test('build dedicated cache host applies remote access and password from meta', 
     expect($content)->toContain('requirepass '.$password);
 });
 test('build uses operational public key for deploy user bootstrap when present', function () {
-    $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+    $keyPath = base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem');
     $recoveryKey = RSA::createKey(2048)->toString('OpenSSH');
 
     $server = Server::factory()->create([

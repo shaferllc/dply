@@ -9,7 +9,7 @@ parameters:
     paths:
         - app/Livewire
         - app/Models
-        - app/TaskRunner
+        - app/Modules/TaskRunner
     parallel:
         maximumNumberOfProcesses: 1
         processTimeout: 1800.0

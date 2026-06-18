@@ -106,7 +106,7 @@ it('cancel task stops execution', function () {
 
 it('cancel task stops remote process and marks task cancelled', function () {
     $server = Server::factory()->create([
-        'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
     ]);
 
     $task = Task::factory()->create([

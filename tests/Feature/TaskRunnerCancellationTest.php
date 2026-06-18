@@ -41,7 +41,7 @@ class TaskRunnerCancellationTest extends TestCase
     public function test_remote_task_cancellation_stops_process_and_marks_task_cancelled(): void
     {
         $server = Server::factory()->create([
-            'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+            'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
         ]);
 
         $task = Task::query()->create([

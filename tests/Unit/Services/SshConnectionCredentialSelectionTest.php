@@ -7,7 +7,7 @@ use App\Services\SshConnection;
 
 function validPrivateKey(): string
 {
-    $path = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+    $path = base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem');
 
     return file_get_contents($path);
 }

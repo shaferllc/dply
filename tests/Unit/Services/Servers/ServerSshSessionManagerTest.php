@@ -20,7 +20,7 @@ uses(RefreshDatabase::class);
 
 function contractorPublicKeyLine(): string
 {
-    $pem = file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem'));
+    $pem = file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem'));
 
     return trim(PublicKeyLoader::loadPrivateKey($pem)->getPublicKey()->toString('OpenSSH'));
 }

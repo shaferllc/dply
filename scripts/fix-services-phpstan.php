@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Bulk-fix PHPStan level 6 issues in app/Services, app/Support, app/TaskRunner.
+ * Bulk-fix PHPStan level 6 issues in app/Services, app/Support, app/Modules/TaskRunner.
  *
  * Usage: php scripts/fix-services-phpstan.php [--dry-run] [--json=/path/to/phpstan.json]
  */
