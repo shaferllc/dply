@@ -110,6 +110,15 @@
                                 {{ __('Open') }} <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                             </a>
                         @endif
+                        {{-- dply Logs correlation: jump to the host log slice around this error.
+                             Only on the server workspace (with shipping installed) — $showLogCorrelation
+                             is undefined elsewhere, so ?? false hides it for site error views. --}}
+                        @if (($showLogCorrelation ?? false) && $event->server_id)
+                            <button type="button" wire:click="openLogsForError('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="openLogsForError('{{ $event->id }}')"
+                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40 disabled:opacity-60">
+                                <x-heroicon-o-bars-3-bottom-left class="h-4 w-4" aria-hidden="true" /> {{ __('Logs') }}
+                            </button>
+                        @endif
                         @if ($event->dismissed_at)
                             <button type="button" wire:click="restore('{{ $event->id }}')" class="rounded-lg px-2 py-1 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Restore') }}">
                                 <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
