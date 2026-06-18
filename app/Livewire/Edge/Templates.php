@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Edge;
 
-use App\Services\Edge\EdgeTemplateRegistry;
+use App\Modules\Edge\Services\EdgeTemplateRegistry;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Component;

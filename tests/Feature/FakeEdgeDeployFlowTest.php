@@ -11,7 +11,7 @@ use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\EdgeRouter;
+use App\Modules\Edge\Services\EdgeRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 

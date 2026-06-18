@@ -9,7 +9,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Site;
-use App\Services\Edge\EdgeSiteCanceller;
+use App\Modules\Edge\Services\EdgeSiteCanceller;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;

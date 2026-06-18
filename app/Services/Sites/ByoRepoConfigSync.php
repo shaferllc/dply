@@ -10,7 +10,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRedirect;
 use App\Services\Deploy\SiteDeployPipelineManager;
-use App\Services\Edge\Config\EdgeRepoConfig;
+use App\Modules\Edge\Services\Config\EdgeRepoConfig;
 use App\Services\SshConnection;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;

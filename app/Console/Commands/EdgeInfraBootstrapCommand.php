@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Edge\EdgeCloudflareClient;
-use App\Support\Edge\EdgePlatformCredentials;
+use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Edge\Support\EdgePlatformCredentials;
 use Illuminate\Console\Command;
 
 /**

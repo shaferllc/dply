@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Realtime\Services;
 
 use App\Models\RealtimeApp;
-use App\Services\Edge\EdgeBackend;
+use App\Modules\Edge\Services\EdgeBackend;
 
 /**
  * Common interface for realtime backends. The realtime layer talks to backends

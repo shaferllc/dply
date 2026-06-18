@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Edge\Config;
 
-use App\Services\Edge\Config\EdgeRepoConfigLinter;
-use App\Services\Edge\Config\EdgeRepoConfigLoader;
+use App\Modules\Edge\Services\Config\EdgeRepoConfigLinter;
+use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
 
 uses()->group('edge');
 

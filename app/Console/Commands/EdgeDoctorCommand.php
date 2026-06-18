@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Edge\EdgeCloudflareClient;
-use App\Support\Edge\EdgeLocalDevDiagnostics;
-use App\Support\Edge\EdgePlatformCredentials;
-use App\Support\Edge\EdgeTestingDomains;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Edge\Support\EdgeLocalDevDiagnostics;
+use App\Modules\Edge\Support\EdgePlatformCredentials;
+use App\Modules\Edge\Support\EdgeTestingDomains;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;

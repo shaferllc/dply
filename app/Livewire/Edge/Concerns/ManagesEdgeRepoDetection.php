@@ -6,7 +6,7 @@ namespace App\Livewire\Edge\Concerns;
 
 use App\Jobs\DetectRepositoryRuntimeJob;
 use App\Livewire\Forms\EdgeCreateForm;
-use App\Services\Edge\EdgeMonorepoDetector;
+use App\Modules\Edge\Services\EdgeMonorepoDetector;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Carbon\Carbon;

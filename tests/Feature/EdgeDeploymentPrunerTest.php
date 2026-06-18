@@ -9,8 +9,8 @@ use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Edge\EdgeDeploymentPruner;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeDeploymentPruner;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 

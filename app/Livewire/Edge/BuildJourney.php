@@ -8,7 +8,7 @@ use App\Actions\Edge\CancelStuckEdgeDeployment;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\EdgeDeployment;
-use App\Services\Edge\EdgeBuildRunner;
+use App\Modules\Edge\Services\EdgeBuildRunner;
 use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;

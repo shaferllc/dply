@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Models\Site;
-use App\Services\Edge\EdgeDeliveryContextResolver;
-use App\Support\Edge\EdgeLocalDevDiagnostics;
-use App\Support\Edge\EdgePlatformCredentials;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Support\EdgeLocalDevDiagnostics;
+use App\Modules\Edge\Support\EdgePlatformCredentials;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 
 /**
  * Shared Edge site dashboard variables for settings + show views.

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Models\Site;
-use App\Support\Edge\EdgeRepoRoot;
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeRepoRoot;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;

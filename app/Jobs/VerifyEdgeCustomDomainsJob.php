@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Site;
-use App\Services\Edge\EdgeCustomDomainProvisioner;
+use App\Modules\Edge\Services\EdgeCustomDomainProvisioner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

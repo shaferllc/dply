@@ -10,8 +10,8 @@ use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\Cloud\Backends\CloudRouter;
-use App\Support\Edge\EdgeSsrDetection;
-use App\Support\Edge\HybridEdgeOriginMatcher;
+use App\Modules\Edge\Support\EdgeSsrDetection;
+use App\Modules\Edge\Support\HybridEdgeOriginMatcher;
 use Laravel\Pennant\Feature;
 use RuntimeException;
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\Edge\EdgeArtifactPublisher;
-use App\Services\Edge\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Services\EdgeArtifactPublisher;
+use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

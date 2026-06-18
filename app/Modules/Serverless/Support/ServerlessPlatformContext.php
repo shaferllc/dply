@@ -8,7 +8,7 @@ use RuntimeException;
 
 /**
  * OpenWhisk credentials for dply's own managed DigitalOcean Functions
- * namespace — the FaaS counterpart to {@see App\Support\Edge\EdgeDeliveryContext}
+ * namespace — the FaaS counterpart to {@see App\Modules\Edge\Support\EdgeDeliveryContext}
  * `platform()`.
  *
  * In managed mode dply deploys customer functions into a shared, pre-provisioned

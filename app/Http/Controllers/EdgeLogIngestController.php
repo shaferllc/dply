@@ -7,7 +7,7 @@ namespace App\Http\Controllers;
 use App\Events\Edge\EdgeAccessLogReceived;
 use App\Models\EdgeAccessLog;
 use App\Models\Site;
-use App\Services\Edge\EdgePerformanceHourlyRollup;
+use App\Modules\Edge\Services\EdgePerformanceHourlyRollup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;

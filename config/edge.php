@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 
 return [
 

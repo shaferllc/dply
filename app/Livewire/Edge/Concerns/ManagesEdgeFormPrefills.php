@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Edge\Concerns;
 
-use App\Support\Edge\EdgeSsrDetection;
-use App\Support\Edge\HybridEdgeOriginMatcher;
+use App\Modules\Edge\Support\EdgeSsrDetection;
+use App\Modules\Edge\Support\HybridEdgeOriginMatcher;
 use Illuminate\Support\Str;
 
 /**

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\EdgeDeployment;
-use App\Services\Edge\FakeEdgeBackend;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\FakeEdgeBackend;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;

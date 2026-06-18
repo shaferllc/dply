@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Edge\EdgeDeliveryFeaturesEnsurer;
-use App\Support\Edge\EdgePlatformCredentials;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeDeliveryFeaturesEnsurer;
+use App\Modules\Edge\Support\EdgePlatformCredentials;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Console\Command;
 
 class EdgeEnsureDeliveryFeaturesCommand extends Command

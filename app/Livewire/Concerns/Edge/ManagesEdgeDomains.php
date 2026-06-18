@@ -6,8 +6,8 @@ namespace App\Livewire\Concerns\Edge;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
-use App\Services\Edge\EdgeCustomDomainProvisioner;
-use App\Services\Edge\EdgeRouter;
+use App\Modules\Edge\Services\EdgeCustomDomainProvisioner;
+use App\Modules\Edge\Services\EdgeRouter;
 use Livewire\Component;
 
 /**

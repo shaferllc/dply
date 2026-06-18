@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EdgeAccessLog;
 use App\Models\Server;
 use App\Models\Site;
-use App\Support\Edge\EdgeAccessLogQuery;
+use App\Modules\Edge\Support\EdgeAccessLogQuery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;

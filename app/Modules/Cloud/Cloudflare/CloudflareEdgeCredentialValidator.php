@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Cloud\Cloudflare;
 
 use App\Models\ProviderCredential;
-use App\Services\Edge\EdgeCloudflareClient;
+use App\Modules\Edge\Services\EdgeCloudflareClient;
 use RuntimeException;
 
 /**

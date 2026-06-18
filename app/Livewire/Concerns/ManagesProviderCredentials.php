@@ -20,7 +20,7 @@ use App\Modules\Cloud\Services\OvhService;
 use App\Modules\Cloud\Services\UpCloudService;
 use App\Modules\Cloud\Services\VultrService;
 use App\Support\Cloud\GcpAccessToken;
-use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Edge;
 
-use App\Services\Edge\EdgeCustomDomainProvisioner;
-use App\Services\Edge\EdgeRouter;
+use App\Modules\Edge\Services\EdgeCustomDomainProvisioner;
+use App\Modules\Edge\Services\EdgeRouter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;

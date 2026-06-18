@@ -1,5 +1,5 @@
 @php
-    use App\Support\Edge\EdgeBuildLogLintParser;
+    use App\Modules\Edge\Support\EdgeBuildLogLintParser;
 
     $lint = EdgeBuildLogLintParser::parse($buildLog ?? null, $failureReason ?? null);
     $show = ($lint['lint_failed'] ?? false)

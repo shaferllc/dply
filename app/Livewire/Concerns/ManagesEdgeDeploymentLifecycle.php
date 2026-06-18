@@ -13,8 +13,8 @@ use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Services\DeployContract\DeployContractState;
-use App\Services\Edge\EdgePreviewReviewState;
-use App\Support\Edge\EdgeDeploymentConfirmSummary;
+use App\Modules\Edge\Services\EdgePreviewReviewState;
+use App\Modules\Edge\Support\EdgeDeploymentConfirmSummary;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
 

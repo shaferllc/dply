@@ -6,9 +6,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Edge\EdgeMiddlewareBundleUploader;
-use App\Services\Edge\EdgeRouter;
-use App\Services\Edge\EdgeSsrBundleUploader;
+use App\Modules\Edge\Services\EdgeMiddlewareBundleUploader;
+use App\Modules\Edge\Services\EdgeRouter;
+use App\Modules\Edge\Services\EdgeSsrBundleUploader;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

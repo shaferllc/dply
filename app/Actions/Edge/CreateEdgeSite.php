@@ -12,9 +12,9 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\Edge\EdgeOrgCredentialConfig;
-use App\Support\Edge\EdgeRepoRoot;
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
+use App\Modules\Edge\Support\EdgeRepoRoot;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 use Illuminate\Support\Str;
 use RuntimeException;
 

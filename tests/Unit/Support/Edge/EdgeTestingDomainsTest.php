@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Support\Edge;
 
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 
 test('default apex prefers on-dply.site when present', function () {
     config(['edge.testing_domains' => ['dply.host', 'on-dply.site', 'on-dply.cloud']]);

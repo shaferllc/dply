@@ -10,7 +10,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\Edge\EdgeGithubWebhookProvisioner;
+use App\Modules\Edge\Services\EdgeGithubWebhookProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;

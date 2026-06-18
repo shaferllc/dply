@@ -6,7 +6,7 @@ namespace App\Actions\Edge;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
-use App\Services\Edge\EdgeHostMapPublisher;
+use App\Modules\Edge\Services\EdgeHostMapPublisher;
 use RuntimeException;
 
 /**

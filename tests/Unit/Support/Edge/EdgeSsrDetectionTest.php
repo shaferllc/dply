@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Support\Edge;
 
-use App\Support\Edge\EdgeSsrDetection;
+use App\Modules\Edge\Support\EdgeSsrDetection;
 
 test('detects ssr frameworks with start command', function () {
     expect(EdgeSsrDetection::planLooksLikeSsr([

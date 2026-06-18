@@ -6,9 +6,9 @@ namespace App\Actions\Edge;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
-use App\Services\Edge\EdgeArtifactPublisher;
-use App\Services\Edge\EdgeDeliveryContextResolver;
-use App\Services\Edge\EdgeRouter;
+use App\Modules\Edge\Services\EdgeArtifactPublisher;
+use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Services\EdgeRouter;
 use Illuminate\Support\Str;
 
 /**

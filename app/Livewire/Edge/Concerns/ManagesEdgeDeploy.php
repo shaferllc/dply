@@ -7,7 +7,7 @@ namespace App\Livewire\Edge\Concerns;
 use App\Actions\Edge\CreateEdgeSite;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
-use App\Support\Edge\EdgeSsrDetection;
+use App\Modules\Edge\Support\EdgeSsrDetection;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.

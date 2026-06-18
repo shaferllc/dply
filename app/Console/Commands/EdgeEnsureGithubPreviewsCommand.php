@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Edge\EdgeGithubPreviewEnsurer;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeGithubPreviewEnsurer;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Console\Command;
 
 class EdgeEnsureGithubPreviewsCommand extends Command

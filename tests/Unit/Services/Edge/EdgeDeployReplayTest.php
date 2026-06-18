@@ -8,8 +8,8 @@ use App\Models\EdgeAccessLog;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Site;
-use App\Services\Edge\EdgeDeployReplayRunner;
-use App\Services\Edge\EdgeDeployReplaySampler;
+use App\Modules\Edge\Services\EdgeDeployReplayRunner;
+use App\Modules\Edge\Services\EdgeDeployReplaySampler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

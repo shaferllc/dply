@@ -9,7 +9,7 @@ use App\Models\EdgeDeployment;
 use App\Models\EdgeDeployReplay;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\EdgeDeployReplaySampler;
+use App\Modules\Edge\Services\EdgeDeployReplaySampler;
 use Laravel\Pennant\Feature;
 use RuntimeException;
 

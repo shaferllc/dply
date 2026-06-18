@@ -6,9 +6,9 @@ namespace App\Console\Commands;
 
 use App\Models\ProviderCredential;
 use App\Modules\Cloud\Cloudflare\CloudflareEdgeCredentialValidator;
-use App\Services\Edge\EdgeDeliveryFeaturesEnsurer;
-use App\Services\Edge\EdgeOrgInfraBootstrapper;
-use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Modules\Edge\Services\EdgeDeliveryFeaturesEnsurer;
+use App\Modules\Edge\Services\EdgeOrgInfraBootstrapper;
+use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use Illuminate\Console\Command;
 
 /**

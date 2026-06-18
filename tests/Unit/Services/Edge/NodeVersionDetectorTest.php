@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Edge;
 
-use App\Services\Edge\NodeVersionDetector;
+use App\Modules\Edge\Services\NodeVersionDetector;
 use Illuminate\Support\Str;
 
 function fakeRepo(array $files): string

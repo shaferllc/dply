@@ -8,9 +8,9 @@ use App\Models\EdgePerformanceHourly;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Edge\EdgeAnalyticsEngineRollup;
-use App\Services\Edge\EdgeCloudflareClient;
-use App\Services\Edge\EdgePerformanceHourlyRollup;
+use App\Modules\Edge\Services\EdgeAnalyticsEngineRollup;
+use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Edge\Services\EdgePerformanceHourlyRollup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 

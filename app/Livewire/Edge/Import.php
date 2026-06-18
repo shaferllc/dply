@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Edge;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Services\Edge\Importers\CloudflarePagesImporter;
-use App\Services\Edge\Importers\EdgeImporter;
-use App\Services\Edge\Importers\NetlifyImporter;
-use App\Services\Edge\Importers\VercelImporter;
+use App\Modules\Edge\Services\Importers\CloudflarePagesImporter;
+use App\Modules\Edge\Services\Importers\EdgeImporter;
+use App\Modules\Edge\Services\Importers\NetlifyImporter;
+use App\Modules\Edge\Services\Importers\VercelImporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;

@@ -6,8 +6,8 @@ namespace App\Http\Middleware;
 
 use App\Http\Controllers\EdgeStaticDevController;
 use App\Models\Site;
-use App\Services\Edge\FakeEdgeBackend;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\FakeEdgeBackend;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;

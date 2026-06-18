@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Edge;
 
-use App\Services\Edge\EdgeMonorepoDetector;
+use App\Modules\Edge\Services\EdgeMonorepoDetector;
 use Illuminate\Support\Facades\File;
 
 test('detects monorepo markers and package directories', function () {

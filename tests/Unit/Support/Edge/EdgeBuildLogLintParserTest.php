@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Support\Edge;
 
-use App\Support\Edge\EdgeBuildLogLintParser;
+use App\Modules\Edge\Support\EdgeBuildLogLintParser;
 
 test('parse extracts lint errors and warnings from build log lines', function () {
     $log = <<<'LOG'

@@ -7,7 +7,7 @@ namespace App\Livewire\Concerns;
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
-use App\Services\Edge\EdgeSiteCanceller;
+use App\Modules\Edge\Services\EdgeSiteCanceller;
 use App\Services\Sites\SiteProvisioner;
 use Livewire\Attributes\On;
 

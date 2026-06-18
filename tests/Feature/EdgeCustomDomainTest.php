@@ -10,8 +10,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\EdgeCustomDomainProvisioner;
-use App\Services\Edge\EdgeRouter;
+use App\Modules\Edge\Services\EdgeCustomDomainProvisioner;
+use App\Modules\Edge\Services\EdgeRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

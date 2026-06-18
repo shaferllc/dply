@@ -12,7 +12,7 @@ use Carbon\CarbonInterface;
 /**
  * Rolls up the operational {@see FunctionInvocation} log into daily
  * {@see ServerlessUsageSnapshot} rows for dply-managed functions — the FaaS
- * counterpart to {@see App\Services\Edge\EdgeUsageCollector}.
+ * counterpart to {@see App\Modules\Edge\Services\EdgeUsageCollector}.
  *
  * Only managed functions (dply pays the provider) are metered; BYO functions
  * deploy to the customer's own account and are billed by their provider, so

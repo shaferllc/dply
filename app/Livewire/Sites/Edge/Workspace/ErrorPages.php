@@ -9,7 +9,7 @@ use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Edge\EdgeHostMapPublisher;
+use App\Modules\Edge\Services\EdgeHostMapPublisher;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Validate;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Edge;
 
-use App\Support\Edge\EdgeLocalDevDiagnostics;
+use App\Modules\Edge\Support\EdgeLocalDevDiagnostics;
 
 test('fake mode banner hints valet test domain', function () {
     config([

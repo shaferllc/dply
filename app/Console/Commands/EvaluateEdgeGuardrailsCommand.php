@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Services\Edge\EdgeGuardrailStatus;
-use App\Services\Edge\EdgeUsageGuardrail;
+use App\Modules\Edge\Services\EdgeGuardrailStatus;
+use App\Modules\Edge\Services\EdgeUsageGuardrail;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Throwable;

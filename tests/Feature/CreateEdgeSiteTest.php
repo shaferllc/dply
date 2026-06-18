@@ -13,7 +13,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 

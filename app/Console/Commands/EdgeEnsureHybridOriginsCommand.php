@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Services\Edge\EdgeHybridOriginEnsurer;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeHybridOriginEnsurer;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 

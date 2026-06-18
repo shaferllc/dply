@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Edge;
 
-use App\Services\Edge\EdgeCachePurger;
+use App\Modules\Edge\Services\EdgeCachePurger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;

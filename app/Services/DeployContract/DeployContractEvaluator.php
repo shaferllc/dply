@@ -16,7 +16,7 @@ use App\Services\DeployContract\Checks\EdgeHybridOriginHealthCheck;
 use App\Services\DeployContract\Checks\EdgePreviewLiveDeploymentCheck;
 use App\Services\DeployContract\Checks\EdgePreviewReviewReadyCheck;
 use App\Services\DeployContract\Contracts\DeployContractCheck;
-use App\Services\Edge\EdgeGithubDeployContractCheckService;
+use App\Modules\Edge\Services\EdgeGithubDeployContractCheckService;
 
 final class DeployContractEvaluator
 {

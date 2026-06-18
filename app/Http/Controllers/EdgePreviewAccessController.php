@@ -6,8 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Models\EdgeSiteAccessRule;
 use App\Models\Site;
-use App\Services\Edge\EdgeAccessGate;
-use App\Services\Edge\EdgeAccessTokenIssuer;
+use App\Modules\Edge\Services\EdgeAccessGate;
+use App\Modules\Edge\Services\EdgeAccessTokenIssuer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;

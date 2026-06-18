@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\EdgeDeployReplay;
-use App\Services\Edge\EdgeDeployReplayRunner;
+use App\Modules\Edge\Services\EdgeDeployReplayRunner;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

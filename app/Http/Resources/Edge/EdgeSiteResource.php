@@ -6,7 +6,7 @@ namespace App\Http\Resources\Edge;
 
 use App\Models\EdgeSiteAccessRule;
 use App\Models\Site;
-use App\Services\Edge\EdgeAccessGate;
+use App\Modules\Edge\Services\EdgeAccessGate;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

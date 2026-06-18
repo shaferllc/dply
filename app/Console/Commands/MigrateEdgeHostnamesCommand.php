@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
-use App\Services\Edge\EdgeHostMapPublisher;
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Services\EdgeHostMapPublisher;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 

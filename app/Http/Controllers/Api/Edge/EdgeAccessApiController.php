@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\Edge;
 
 use App\Http\Resources\Edge\EdgeAccessRuleResource;
-use App\Services\Edge\EdgeAccessGate;
+use App\Modules\Edge\Services\EdgeAccessGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;

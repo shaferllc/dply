@@ -9,7 +9,7 @@ use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Support\Edge\EdgeEffectiveCrons;
+use App\Modules\Edge\Support\EdgeEffectiveCrons;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
