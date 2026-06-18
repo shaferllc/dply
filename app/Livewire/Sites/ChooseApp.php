@@ -6,7 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\PreflightSiteSetupJob;
-use App\Jobs\RunComposerScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunComposerScaffoldJob;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;

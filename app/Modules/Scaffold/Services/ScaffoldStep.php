@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Scaffold;
+namespace App\Modules\Scaffold\Services;
 
 /**
  * Snapshot of a single pipeline step recorded under

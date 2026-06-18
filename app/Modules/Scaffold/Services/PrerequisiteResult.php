@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Scaffold;
+namespace App\Modules\Scaffold\Services;
 
 /**
  * Tri-state outcome of a single binary-prerequisite check + install.

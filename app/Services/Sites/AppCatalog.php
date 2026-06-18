@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Jobs\RunLaravelScaffoldJob;
-use App\Jobs\RunWordPressScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ChooseApp;
 use App\Models\Server;
 use App\Support\Servers\DatabaseWorkspaceEngines;

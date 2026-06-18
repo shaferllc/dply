@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Scaffold;
+namespace App\Modules\Scaffold\Services;
 
 use App\Models\Server;
 use App\Modules\TaskRunner\ProcessOutput;

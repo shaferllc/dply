@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Enums\SiteType;
-use App\Jobs\RunLaravelScaffoldJob;
-use App\Jobs\RunWordPressScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Models\Site;
 use Illuminate\Support\Str;
 

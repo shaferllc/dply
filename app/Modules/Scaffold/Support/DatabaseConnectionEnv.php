@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Scaffold;
+namespace App\Modules\Scaffold\Support;
 
 /**
  * Single source of truth for database-related Laravel `.env` blocks.

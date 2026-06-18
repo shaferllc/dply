@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Scaffold;
+namespace App\Modules\Scaffold\Services;
 
 use App\Livewire\Sites\ChooseApp;
 use App\Models\ServerDatabase;
@@ -14,7 +14,7 @@ use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\AppCatalog;
-use App\Support\Scaffold\DatabaseConnectionEnv;
+use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

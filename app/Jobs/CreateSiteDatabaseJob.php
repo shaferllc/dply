@@ -14,7 +14,7 @@ use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
-use App\Support\Scaffold\DatabaseConnectionEnv;
+use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;

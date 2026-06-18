@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\ScaffoldJourneyTest;
 
-use App\Jobs\RunLaravelScaffoldJob;
-use App\Jobs\RunWordPressScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ScaffoldJourney;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Scaffold\PlaceholderDnsManager;
-use App\Services\Scaffold\ScaffoldStep;
+use App\Modules\Scaffold\Services\PlaceholderDnsManager;
+use App\Modules\Scaffold\Services\ScaffoldStep;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;

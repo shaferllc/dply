@@ -14,7 +14,7 @@ use App\Models\Concerns\Site\ResolvesSiteRuntime;
 use App\Models\Concerns\Site\ResolvesSiteUrls;
 use App\Models\Concerns\Site\ResolvesWebserverConfig;
 use App\Models\Concerns\Site\TracksProvisioningStatus;
-use App\Services\Scaffold\PlaceholderDnsManager;
+use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Support\Sites\SiteRelationPurger;
 use Database\Factories\SiteFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
