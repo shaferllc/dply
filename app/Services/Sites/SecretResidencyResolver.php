@@ -8,8 +8,8 @@ use App\Models\ExternalSecretStore;
 use App\Models\OrgSecretKey;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
-use App\Services\Secrets\External\SecretStoreDriverFactory;
-use App\Services\Secrets\OrgSecretKeyManager;
+use App\Modules\Secrets\Services\External\SecretStoreDriverFactory;
+use App\Modules\Secrets\Services\OrgSecretKeyManager;
 use RuntimeException;
 
 /**

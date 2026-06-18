@@ -62,10 +62,10 @@ test('every encrypt() write site is classified for rotation coverage', function 
         // --- registry-covered (config/secret_vault.php) ---
         'app/Actions/Servers/BuildServerProvisionMeta.php' => 'json_crypt: servers.meta.{cache,database}_server.password_encrypted',
         'app/Livewire/Auth/TwoFactorChallenge.php' => 'raw_crypt: users.two_factor_recovery_codes',
-        'app/Livewire/Servers/Concerns/ManagesExtendedServerSettings.php' => 'json_crypt: servers.meta.server_event_webhook_secret',
+        'app/Livewire/Servers/Concerns/ManagesServerWebhook.php' => 'json_crypt: servers.meta.server_event_webhook_secret',
         'app/Livewire/TwoFactor/Page.php' => 'raw_crypt: users.two_factor_secret/recovery_codes',
         'app/Services/Deploy/EphemeralDeployCredentialManager.php' => 'raw_crypt: site_deployment_ephemeral_credentials.private_key_encrypted',
-        'app/Services/Imports/Handlers/PushSshKeyHandler.php' => 'raw_crypt: import_server_migrations.ssh_key_private_encrypted',
+        'app/Modules/Imports/Services/Handlers/PushSshKeyHandler.php' => 'raw_crypt: import_server_migrations.ssh_key_private_encrypted',
         'app/Services/Scaffold/ScaffoldComposerPipeline.php' => 'json_crypt: sites.meta.scaffold.database.password',
         'app/Services/Scaffold/ScaffoldLaravelPipeline.php' => 'json_crypt: sites.meta.scaffold.admin_password',
         'app/Services/Scaffold/ScaffoldWordPressPipeline.php' => 'json_crypt: sites.meta.scaffold.admin_password',
@@ -73,9 +73,9 @@ test('every encrypt() write site is classified for rotation coverage', function 
 
         // --- not APP_KEY at-rest data (no registry entry needed) ---
         'app/Actions/Concerns/AsEncrypted.php' => 'trait definition; not used to persist in-app',
-        'app/Console/Commands/SecretsReencryptCommand.php' => 'the rotation engine itself',
-        'app/Services/Secrets/AgeEncryptor.php' => 'age encryption, not APP_KEY',
-        'app/Services/Secrets/SecretVault.php' => 'delegates to age, not APP_KEY',
+        'app/Modules/Secrets/Console/SecretsReencryptCommand.php' => 'the rotation engine itself',
+        'app/Modules/Secrets/Services/AgeEncryptor.php' => 'age encryption, not APP_KEY',
+        'app/Modules/Secrets/Services/SecretVault.php' => 'delegates to age, not APP_KEY',
     ];
 
     expect(encryptWriteSites())->toEqualCanonicalizing(array_keys($classified));

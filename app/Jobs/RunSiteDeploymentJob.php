@@ -16,7 +16,7 @@ use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
-use App\Services\Secrets\EphemeralSecretIdentityContext;
+use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Sites\AtomicDeployHealthChecker;
 use App\Services\Sites\Backends\CanarySiteDeployer;

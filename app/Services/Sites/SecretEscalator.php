@@ -7,7 +7,7 @@ namespace App\Services\Sites;
 use App\Models\ExternalSecretStore;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
-use App\Services\Secrets\OrgSecretKeyManager;
+use App\Modules\Secrets\Services\OrgSecretKeyManager;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 

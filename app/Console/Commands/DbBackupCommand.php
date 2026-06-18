@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Secrets\Scope;
-use App\Services\Secrets\SecretVault;
-use App\Services\Secrets\Sources\DbDumpSource;
+use App\Modules\Secrets\Services\Scope;
+use App\Modules\Secrets\Services\SecretVault;
+use App\Modules\Secrets\Services\Sources\DbDumpSource;
 use Illuminate\Console\Command;
 
 /**

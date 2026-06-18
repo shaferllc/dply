@@ -14,7 +14,7 @@ use App\Modules\TaskRunner\TaskServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\FeatureServiceProvider;
 use App\Providers\HorizonServiceProvider;
-use App\Providers\SecretVaultServiceProvider;
+use App\Modules\Secrets\SecretVaultServiceProvider;
 
 return [
     TaskServiceProvider::class,

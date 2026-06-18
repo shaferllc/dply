@@ -3,7 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\Secrets\EphemeralSecretIdentityContext;
+use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\SshConnection;
 use Illuminate\Support\Str;
 

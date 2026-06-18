@@ -94,7 +94,7 @@ use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
 use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
-use App\Livewire\Organizations\Secrets as OrganizationsSecrets;
+use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Livewire\Organizations\Show as OrganizationsShow;
 use App\Livewire\Organizations\Teams as OrganizationsTeams;
