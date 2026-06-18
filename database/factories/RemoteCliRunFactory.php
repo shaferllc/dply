@@ -6,8 +6,8 @@ namespace Database\Factories;
 
 use App\Models\RemoteCliRun;
 use App\Models\Site;
-use App\Services\RemoteCli\Kind;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

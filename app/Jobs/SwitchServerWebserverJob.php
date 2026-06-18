@@ -19,7 +19,7 @@ use App\Models\User;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerWebserverNotificationDispatcher;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigPreserver;
 use App\Services\Servers\OpenLiteSpeedTlsConfigurator;

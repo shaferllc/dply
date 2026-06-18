@@ -10,7 +10,7 @@ use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\EnvoyEdgeConfigBuilder;
 use App\Services\Servers\EnvoyStaticConfigOptions;
 use App\Services\Servers\HAProxyEdgeConfigBuilder;

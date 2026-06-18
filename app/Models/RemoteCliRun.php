@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\RemoteCli\Kind;
-use App\Services\RemoteCli\RemoteCli;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RemoteCli;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use Database\Factories\RemoteCliRunFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
 use App\Models\Snapshot;
-use App\Services\RemoteCli\Artisan;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\Artisan;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
 use App\Services\Snapshots\SnapshotDestinationFactory;
 use App\Services\Snapshots\SnapshotService;
 use Illuminate\Console\Command;

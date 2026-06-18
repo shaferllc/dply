@@ -10,8 +10,8 @@ use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Services\Cloudflare\CloudflareCdnService;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use Illuminate\Console\Command;
 
 class CdnEnableCommand extends Command

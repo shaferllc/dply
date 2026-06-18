@@ -11,7 +11,7 @@ use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Notifications\ServerWebserverNotificationDispatcher;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\SshConnection;
 use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Bus\Queueable;

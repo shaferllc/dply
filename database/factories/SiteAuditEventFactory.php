@@ -7,7 +7,7 @@ namespace Database\Factories;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

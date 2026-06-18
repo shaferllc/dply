@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\RemoteCli\ArtisanClassificationTest;
 
-use App\Services\RemoteCli\Artisan;
-use App\Services\RemoteCli\Kind;
-use App\Services\RemoteCli\RemoteCliPermissions;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\Artisan;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RemoteCliPermissions;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Mockery;
 

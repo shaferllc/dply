@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\RemoteCli;
+namespace App\Modules\RemoteCli\Services;
 
 /**
  * Discriminator on RemoteCliRun rows so a Site's WP and Laravel command

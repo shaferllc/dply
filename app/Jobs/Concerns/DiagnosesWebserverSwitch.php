@@ -6,7 +6,7 @@ namespace App\Jobs\Concerns;
 
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\SshConnection;
 
 /**

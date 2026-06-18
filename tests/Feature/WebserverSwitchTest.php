@@ -17,7 +17,7 @@ use App\Models\SitePreviewDomain;
 use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\WebserverSwitchPreflight;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;

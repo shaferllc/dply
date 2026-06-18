@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\RemoteCli\Jobs;
 
 use App\Models\RemoteCliRun;
 use App\Models\SiteAuditEvent;
-use App\Services\RemoteCli\Artisan;
-use App\Services\RemoteCli\Kind;
-use App\Services\RemoteCli\RemoteCli;
-use App\Services\RemoteCli\SiteAuditWriter;
-use App\Services\RemoteCli\WpCli;
+use App\Modules\RemoteCli\Services\Artisan;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RemoteCli;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\WpCli;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Models\Site;
 use App\Models\User;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
-use App\Services\RemoteCli\WpCli;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\WpCli;
 use Illuminate\Console\Command;
 
 /**

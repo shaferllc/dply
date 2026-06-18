@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\RemoteCli;
+namespace App\Modules\RemoteCli\Services;
 
-use App\Jobs\RunRemoteCliInBackgroundJob;
+use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;

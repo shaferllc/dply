@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\RemoteCli\RemoteCli;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RemoteCli;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Snapshots\SnapshotService;
 use Database\Factories\SiteAuditEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

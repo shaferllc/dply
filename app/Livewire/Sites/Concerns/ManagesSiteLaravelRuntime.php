@@ -6,8 +6,8 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Models\Site;
 use App\Models\Snapshot;
-use App\Services\RemoteCli\Artisan;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\Artisan;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;

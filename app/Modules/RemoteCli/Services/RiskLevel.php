@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\RemoteCli;
+namespace App\Modules\RemoteCli\Services;
 
 /**
  * Risk classification applied to every wp-cli / artisan command before

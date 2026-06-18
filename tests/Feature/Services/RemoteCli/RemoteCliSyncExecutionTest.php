@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\RemoteCli\RemoteCliSyncExecutionTest;
 
-use App\Jobs\RunRemoteCliInBackgroundJob;
+use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Models\Organization;
 use App\Models\RemoteCliRun;
 use App\Models\Server;
@@ -12,12 +12,12 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
-use App\Services\RemoteCli\Kind;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
-use App\Services\RemoteCli\RemoteCliPermissions;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
-use App\Services\RemoteCli\WpCli;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\RemoteCliPermissions;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\WpCli;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;

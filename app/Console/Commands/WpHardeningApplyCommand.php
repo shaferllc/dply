@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
-use App\Services\RemoteCli\WpCli;
+use App\Modules\RemoteCli\Services\WpCli;
 use Illuminate\Console\Command;
 
 /**

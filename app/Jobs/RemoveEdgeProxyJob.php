@@ -10,7 +10,7 @@ use App\Jobs\Concerns\WritesPerSiteWebserverConfigs;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\TraefikDashboardExposure;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
