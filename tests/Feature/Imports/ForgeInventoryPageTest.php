@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ForgeInventoryPageTest;
 
-use App\Jobs\Imports\SyncForgeInventoryJob;
+use App\Modules\Imports\Jobs\SyncForgeInventoryJob;
 use App\Models\ForgeServer;
 use App\Models\ForgeSite;
 use App\Models\Organization;

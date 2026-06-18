@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Jobs\Imports\RunMigrationStepJobTest;
 
-use App\Jobs\Imports\RunMigrationStepJob;
+use App\Modules\Imports\Jobs\RunMigrationStepJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Imports\Handlers\HandlerManifest;
-use App\Services\Imports\StepOrchestrator;
-use App\Services\Imports\StepRegistry;
+use App\Modules\Imports\Services\Handlers\HandlerManifest;
+use App\Modules\Imports\Services\StepOrchestrator;
+use App\Modules\Imports\Services\StepRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 

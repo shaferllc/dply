@@ -9,8 +9,8 @@ use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Imports\StepOrchestrator;
-use App\Services\Imports\StepRegistry;
+use App\Modules\Imports\Services\StepOrchestrator;
+use App\Modules\Imports\Services\StepRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

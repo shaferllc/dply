@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Jobs\Imports\SyncPloiInventoryJobTest;
 
-use App\Jobs\Imports\SyncPloiInventoryJob;
+use App\Modules\Imports\Jobs\SyncPloiInventoryJob;
 use App\Models\ProviderCredential;
-use App\Services\Imports\Ploi\PloiInventorySync;
-use App\Services\Imports\SyncResult;
+use App\Modules\Imports\Services\Ploi\PloiInventorySync;
+use App\Modules\Imports\Services\SyncResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Mockery;

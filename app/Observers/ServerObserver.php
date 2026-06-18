@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Observers;
 
 use App\Events\Servers\ServerStateUpdated;
-use App\Jobs\Imports\RunMigrationStepJob;
+use App\Modules\Imports\Jobs\RunMigrationStepJob;
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\Server;
-use App\Services\Imports\MigrationPlanner;
+use App\Modules\Imports\Services\MigrationPlanner;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Support\Facades\Log;
 

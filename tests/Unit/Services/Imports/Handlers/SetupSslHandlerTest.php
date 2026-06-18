@@ -14,7 +14,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Imports\Handlers\SetupSslHandler;
+use App\Modules\Imports\Services\Handlers\SetupSslHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;

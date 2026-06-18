@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ReMigrationHistoryTest;
 
-use App\Livewire\Imports\Ploi\Inventory;
+use App\Modules\Imports\Livewire\Ploi\Inventory;
 use App\Models\ForgeServer;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;

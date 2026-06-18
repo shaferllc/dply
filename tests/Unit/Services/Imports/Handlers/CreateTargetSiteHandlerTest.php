@@ -14,8 +14,8 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\User;
-use App\Services\Imports\Handlers\CreateTargetSiteHandler;
-use App\Services\Imports\WaitForTargetServerException;
+use App\Modules\Imports\Services\Handlers\CreateTargetSiteHandler;
+use App\Modules\Imports\Services\WaitForTargetServerException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 

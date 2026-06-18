@@ -24,7 +24,7 @@ use App\Console\Commands\DispatchSshLoginScansCommand;
 use App\Console\Commands\DispatchSystemdInventorySyncCommand;
 use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
 use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
-use App\Console\Commands\ExpirePausedImportMigrationsCommand;
+use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\MeterServerLogUsageCommand;

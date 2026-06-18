@@ -2,6 +2,7 @@
 
 use App\Modules\Docs\DocsServiceProvider;
 use App\Modules\Feedback\FeedbackServiceProvider;
+use App\Modules\Imports\ImportsServiceProvider;
 use App\Modules\OpsCopilot\OpsCopilotServiceProvider;
 use App\Modules\Referrals\ReferralsServiceProvider;
 use App\Modules\Roadmap\RoadmapServiceProvider;
@@ -15,6 +16,7 @@ return [
     TaskServiceProvider::class,
     DocsServiceProvider::class,
     FeedbackServiceProvider::class,
+    ImportsServiceProvider::class,
     OpsCopilotServiceProvider::class,
     ReferralsServiceProvider::class,
     RoadmapServiceProvider::class,

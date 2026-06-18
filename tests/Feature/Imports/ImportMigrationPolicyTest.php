@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ImportMigrationPolicyTest;
 
-use App\Jobs\Imports\RunMigrationStepJob;
-use App\Livewire\Imports\Ploi\MigrationProgress;
+use App\Modules\Imports\Jobs\RunMigrationStepJob;
+use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
 use App\Livewire\Servers\Create\StepReview;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;

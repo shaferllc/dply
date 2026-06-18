@@ -171,7 +171,7 @@
                     // Aggregate the pre-cutover verification data from each staging step's
                     // result_data so the user can audit what we actually did before
                     // pulling the trigger on DNS swap.
-                    $stagingByKey = $site->steps->whereIn('step_key', \App\Services\Imports\MigrationPlanner::STAGING_STEPS)->keyBy('step_key');
+                    $stagingByKey = $site->steps->whereIn('step_key', \App\Modules\Imports\Services\MigrationPlanner::STAGING_STEPS)->keyBy('step_key');
 
                     $checks = [];
                     // CreateTargetSite — confirms the dply Site row + ProvisionSiteJob.

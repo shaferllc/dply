@@ -13,7 +13,7 @@ use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Imports\MigrationPlanner;
+use App\Modules\Imports\Services\MigrationPlanner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

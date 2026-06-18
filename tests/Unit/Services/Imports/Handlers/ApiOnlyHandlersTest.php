@@ -14,10 +14,10 @@ use App\Models\ServerCronJob;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
-use App\Services\Imports\Handlers\CopyEnvHandler;
-use App\Services\Imports\Handlers\RecreateCronsHandler;
-use App\Services\Imports\Handlers\RecreateDaemonsHandler;
-use App\Services\Imports\Handlers\RecreateSchedulerHandler;
+use App\Modules\Imports\Services\Handlers\CopyEnvHandler;
+use App\Modules\Imports\Services\Handlers\RecreateCronsHandler;
+use App\Modules\Imports\Services\Handlers\RecreateDaemonsHandler;
+use App\Modules\Imports\Services\Handlers\RecreateSchedulerHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

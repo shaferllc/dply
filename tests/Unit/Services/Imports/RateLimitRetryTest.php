@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Imports\RateLimitRetryTest;
 
 use App\Models\ProviderCredential;
-use App\Services\Imports\Forge\ForgeClient;
-use App\Services\Imports\Ploi\PloiClient;
+use App\Modules\Imports\Services\Forge\ForgeClient;
+use App\Modules\Imports\Services\Ploi\PloiClient;
 use Carbon\CarbonInterval;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
