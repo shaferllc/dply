@@ -1799,12 +1799,8 @@ test('site show displays docker runtime target summary', function () {
     ]);
 
     // Compose / Dockerfile artifacts live on Pipeline; live discovery on Runtime.
-    $this->actingAs($user)->get(route('sites.pipeline', [
-        'server' => $server,
-        'site' => $site,
-        'tab' => 'overview',
-    ], false))
-        ->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('Compose file')
         ->assertSee('Managed Dockerfile')
@@ -1849,13 +1845,8 @@ test('site show displays kubernetes runtime target summary', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', [
-        'server' => $server,
-        'site' => $site,
-        'tab' => 'overview',
-    ], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('Manifest')
