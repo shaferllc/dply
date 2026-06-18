@@ -6,7 +6,7 @@ use App\Http\Controllers\CliInstallController;
 use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
-use App\Http\Controllers\DocsController;
+use App\Modules\Docs\Http\Controllers\DocsController;
 use App\Http\Controllers\Edge\EdgeAuditLogExportController;
 use App\Http\Controllers\Edge\EdgeLogCsvDownloadController;
 use App\Http\Controllers\Edge\EdgeRepoConfigYamlDownloadController;

@@ -16,7 +16,7 @@ use App\Services\Billing\EdgeSiteBillingAnalytics;
 use App\Services\Billing\EdgeSiteTrafficAnalytics;
 use App\Services\Billing\ManagedProductCostEstimator;
 use App\Support\Deployment\DeploymentContract;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Support\Collection;

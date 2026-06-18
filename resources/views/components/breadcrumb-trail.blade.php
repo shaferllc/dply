@@ -28,7 +28,7 @@
     $docLinkLabel = $docLabel ?? __('Documentation');
     $showDocs = filled($docRoute) || $docContextual;
     $resolvedContextualDocSlug = $docContextual
-        ? ($contextualDocSlug ?? app(\App\Support\Docs\ContextualDocResolver::class)->resolve())
+        ? ($contextualDocSlug ?? app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolve())
         : null;
 
     /** @var array<string, string> Heroicon outline component names (allowlisted; never from raw user input). */

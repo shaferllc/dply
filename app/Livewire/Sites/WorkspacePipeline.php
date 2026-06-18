@@ -12,7 +12,7 @@ use App\Models\SiteDeployHook;
 use App\Services\Deploy\DeployPipelineTemplateCatalog;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Sites\PipelineAnchorScriptRunner;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use App\Support\Sites\DeployPipelineAdvisor;
 use App\Support\Sites\DeployPipelineIssueFixResolver;
 use App\Support\Sites\DeployPipelinePalette;

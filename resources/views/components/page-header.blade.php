@@ -22,7 +22,7 @@
 @php
     $docLinkLabel = $docLabel ?? __('Documentation');
     $resolvedContextualDocSlug = $docContextual
-        ? ($contextualDocSlug ?? app(\App\Support\Docs\ContextualDocResolver::class)->resolve())
+        ? ($contextualDocSlug ?? app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolve())
         : null;
 @endphp
 

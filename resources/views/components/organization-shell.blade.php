@@ -25,7 +25,7 @@
     <x-breadcrumb-trail
         :items="$breadcrumb"
         doc-contextual
-        :contextual-doc-slug="app(\App\Support\Docs\ContextualDocResolver::class)->resolve()"
+        :contextual-doc-slug="app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolve()"
     />
 @endif
 

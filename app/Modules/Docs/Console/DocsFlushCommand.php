@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Docs\Console;
 
-use App\Services\Docs\DocsManifest;
-use App\Services\Docs\DocsSearchIndex;
+use App\Modules\Docs\Services\DocsManifest;
+use App\Modules\Docs\Services\DocsSearchIndex;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 

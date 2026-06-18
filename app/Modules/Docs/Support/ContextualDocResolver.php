@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Support\Docs;
+namespace App\Modules\Docs\Support;
 
 use App\Models\Site;
-use App\Services\Docs\DocsManifest;
+use App\Modules\Docs\Services\DocsManifest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 

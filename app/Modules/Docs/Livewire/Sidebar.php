@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Livewire\Docs;
+namespace App\Modules\Docs\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Services\Docs\DocsAskService;
-use App\Services\Docs\MarkdownDocRenderer;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Services\DocsAskService;
+use App\Modules\Docs\Services\MarkdownDocRenderer;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\On;

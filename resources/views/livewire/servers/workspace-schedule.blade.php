@@ -32,7 +32,7 @@
             'site' => $site,
             'currentLabel' => __('Schedule'),
             'currentIcon' => 'calendar-days',
-            'contextualDocSlug' => app(\App\Support\Docs\ContextualDocResolver::class)->resolveForSiteSection($site, 'schedule'),
+            'contextualDocSlug' => app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolveForSiteSection($site, 'schedule'),
         ])
 
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">

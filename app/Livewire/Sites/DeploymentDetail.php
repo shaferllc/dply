@@ -9,7 +9,7 @@ use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use App\Support\Sites\SiteWorkspaceBreadcrumbs;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;

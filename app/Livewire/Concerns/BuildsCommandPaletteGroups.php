@@ -10,7 +10,7 @@ use App\Models\RecentResource;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\Site;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 

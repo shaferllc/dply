@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Docs;
+namespace App\Modules\Docs\Services;
 
 use App\Models\AiAdvisorRun;
 use App\Models\Organization;
@@ -10,7 +10,7 @@ use App\Models\User;
 use App\Services\Ai\AiAdvisorRunRecorder;
 use App\Services\Ai\AiRateLimiter;
 use App\Services\Ai\LlmSynthesizer;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 
 final class DocsAskService
 {

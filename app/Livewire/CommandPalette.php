@@ -10,7 +10,7 @@ use App\Livewire\Concerns\ResolvesCommandPaletteItems;
 use App\Livewire\Concerns\RunsCommandPaletteActions;
 use App\Models\Server;
 use App\Models\Site;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 

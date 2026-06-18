@@ -91,7 +91,7 @@
             $workspaceBreadcrumbs[] = $activePageItem;
         }
 
-        $contextualDocSlug = app(\App\Support\Docs\ContextualDocResolver::class)
+        $contextualDocSlug = app(\App\Modules\Docs\Support\ContextualDocResolver::class)
             ->resolveForServerWorkspace(is_string($active) ? $active : null);
     @endphp
     {{-- Full-width breadcrumb at the very top of the workspace (above the sidebar

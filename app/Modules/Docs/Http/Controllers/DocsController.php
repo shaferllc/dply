@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Modules\Docs\Http\Controllers;
 
-use App\Services\Docs\DocsManifest;
-use App\Services\Docs\DocsSearchIndex;
-use App\Services\Docs\MarkdownDocRenderer;
+use App\Http\Controllers\Controller;
+
+use App\Modules\Docs\Services\DocsManifest;
+use App\Modules\Docs\Services\DocsSearchIndex;
+use App\Modules\Docs\Services\MarkdownDocRenderer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;

@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\DocsController;
-use App\Services\Docs\DocsManifest;
+use App\Modules\Docs\Http\Controllers\DocsController;
+use App\Modules\Docs\Services\DocsManifest;
 
 /**
  * User-facing docs are now driven by YAML front-matter in the docs/ markdown

@@ -7,7 +7,7 @@ namespace App\Livewire\Concerns;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Docs;
+namespace App\Modules\Docs\Services;
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Docs\Console;
 
-use App\Services\Docs\DocsSearchIndex;
+use App\Modules\Docs\Services\DocsSearchIndex;
 use Illuminate\Console\Command;
 
 /**

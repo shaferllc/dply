@@ -88,7 +88,7 @@ use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Deploy\SiteResourceBindingResolver;
-use App\Services\Docs\DocsManifest;
+use App\Modules\Docs\Services\DocsManifest;
 use App\Services\Edge\CloudflareEdgeDelivery;
 use App\Services\Edge\EdgeArtifactPublisher;
 use App\Services\Edge\EdgeDeliveryContextResolver;

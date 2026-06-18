@@ -68,7 +68,7 @@
             'site' => $site,
             'currentLabel' => __('Backups'),
             'currentIcon' => 'archive-box',
-            'contextualDocSlug' => app(\App\Support\Docs\ContextualDocResolver::class)->resolveForSiteSection($site, 'backups'),
+            'contextualDocSlug' => app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolveForSiteSection($site, 'backups'),
         ])
 
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
