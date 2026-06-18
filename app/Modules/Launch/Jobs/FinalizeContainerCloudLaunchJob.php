@@ -2,6 +2,8 @@
 
 namespace App\Modules\Launch\Jobs;
 
+use App\Jobs\ProvisionSiteJob;
+
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Models\Organization;
 use App\Models\Server;

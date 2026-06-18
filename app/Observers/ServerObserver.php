@@ -205,7 +205,7 @@ class ServerObserver
             'status' => $server->status,
             'setup_status' => $server->setup_status,
             'ip_address' => $server->ip_address,
-            'provider' => $server->provider->value,
+            'provider' => $server->provider?->value,
             'team_id' => $server->team_id,
             'health_status' => $server->health_status,
             'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),

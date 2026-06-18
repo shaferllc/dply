@@ -36,7 +36,7 @@ test('run walks all four phases and persists results on success', function () {
     ]);
 
     $shell = new DeploymentRunnerRecordingShell;
-    $runner = new DeploymentRunner(new DeployPhaseRunner);
+    $runner = new DeploymentRunner(app(\App\Modules\Deploy\Services\DeployPhaseRunner::class));
     $result = $runner->run($deployment, '/var/www/app', fn () => $shell);
 
     expect($result['ok'])->toBeTrue();
@@ -74,7 +74,7 @@ test('run aborts pipeline on build failure', function () {
     $shell = new DeploymentRunnerRecordingShell;
     $shell->failOn = 'composer install';
 
-    $runner = new DeploymentRunner(new DeployPhaseRunner);
+    $runner = new DeploymentRunner(app(\App\Modules\Deploy\Services\DeployPhaseRunner::class));
     $result = $runner->run($deployment, '/var/www/app', fn () => $shell);
 
     expect($result['ok'])->toBeFalse();
@@ -101,7 +101,7 @@ test('run records swap phase for atomic deploys', function () {
     ]);
 
     $shell = new DeploymentRunnerRecordingShell;
-    $runner = new DeploymentRunner(new DeployPhaseRunner);
+    $runner = new DeploymentRunner(app(\App\Modules\Deploy\Services\DeployPhaseRunner::class));
     $result = $runner->run($deployment, '/var/www/jobs/releases/01HXX', fn () => $shell);
 
     expect($result['ok'])->toBeTrue();
@@ -125,7 +125,7 @@ test('run aggregate total duration sums all phases', function () {
     ]);
 
     $shell = new DeploymentRunnerRecordingShell;
-    $runner = new DeploymentRunner(new DeployPhaseRunner);
+    $runner = new DeploymentRunner(app(\App\Modules\Deploy\Services\DeployPhaseRunner::class));
     $result = $runner->run($deployment, '/var/www/app', fn () => $shell);
 
     expect($result['ok'])->toBeTrue();
@@ -138,7 +138,7 @@ test('run throws when deployment has no site', function () {
     // No site_id set; site relation returns null.
     $this->expectException(\RuntimeException::class);
 
-    (new DeploymentRunner(new DeployPhaseRunner))
+    (new DeploymentRunner(app(\App\Modules\Deploy\Services\DeployPhaseRunner::class)))
         ->run($deployment, '/var/www/app', fn () => new DeploymentRunnerRecordingShell);
 });
 /**

@@ -38,6 +38,12 @@ class CloudDeployWebhookController extends Controller
         }
 
         $allowedIps = $site->webhook_allowed_ips;
+        // The 'array' cast round-trips a single configured CIDR/IP back as a
+        // string; normalize to a list so a lone value still filters (and a
+        // null/empty allowlist is a no-op rather than an array_map() fatal).
+        $allowedIps = is_array($allowedIps)
+            ? $allowedIps
+            : ((string) $allowedIps === '' ? [] : [$allowedIps]);
         if ($allowedIps !== []) {
             $allowed = array_filter(array_map(static fn (mixed $ip): string => trim((string) $ip), $allowedIps));
             $clientIp = (string) $request->ip();

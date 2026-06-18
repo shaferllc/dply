@@ -32,7 +32,7 @@ test('run build walks build steps in order and executes in release dir', functio
     ]);
 
     $shell = new DeployRecordingShell;
-    $results = (new DeployPhaseRunner)->runBuild(
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runBuild(
         $site,
         '/var/www/app/releases/01HXX',
         fn () => $shell,
@@ -74,7 +74,7 @@ test('run build aborts on first failure', function () {
     $shell = new DeployRecordingShell;
     $shell->failOn = 'composer install';
 
-    $results = (new DeployPhaseRunner)->runBuild(
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runBuild(
         $site,
         '/var/www/app/releases/01HXX',
         fn () => $shell,
@@ -106,7 +106,7 @@ test('run build skips custom step with blank command', function () {
     ]);
 
     $shell = new DeployRecordingShell;
-    $results = (new DeployPhaseRunner)->runBuild(
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runBuild(
         $site,
         '/var/www/app/releases/01HXX',
         fn () => $shell,
@@ -122,7 +122,7 @@ test('run swap skips when deploys are not atomic', function () {
     [$site] = makeSite(['deploy_strategy' => 'simple']);
 
     $shell = new DeployRecordingShell;
-    $result = (new DeployPhaseRunner)->runSwap(
+    $result = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runSwap(
         $site,
         '/var/www/app/releases/01HXX',
         fn () => $shell,
@@ -139,7 +139,7 @@ test('run swap flips current symlink for atomic deploys', function () {
     ]);
 
     $shell = new DeployRecordingShell;
-    $results = (new DeployPhaseRunner)->runSwap(
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runSwap(
         $site,
         '/var/www/jobs/releases/01HXX',
         fn () => $shell,
@@ -165,7 +165,7 @@ test('run release uses current symlink for atomic deploys', function () {
     ]);
 
     $shell = new DeployRecordingShell;
-    (new DeployPhaseRunner)->runRelease(
+    (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runRelease(
         $site,
         '/var/www/laravel/releases/01HXX',
         fn () => $shell,
@@ -181,7 +181,7 @@ test('run restart reloads php fpm for php sites', function () {
     ]);
 
     $shell = new DeployRecordingShell;
-    $results = (new DeployPhaseRunner)->runRestart($site, fn () => $shell);
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runRestart($site, fn () => $shell);
 
     expect($results)->toHaveCount(1);
     $this->assertStringContainsString('sudo systemctl reload php8.4-fpm', $shell->execCalls[0]);
@@ -193,7 +193,7 @@ test('run restart restarts systemd unit for node sites', function () {
     ]);
 
     $shell = new DeployRecordingShell;
-    $results = (new DeployPhaseRunner)->runRestart($site, fn () => $shell);
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runRestart($site, fn () => $shell);
 
     expect($results)->toHaveCount(1);
     $this->assertStringContainsString('sudo systemctl restart', $shell->execCalls[0]);
@@ -203,7 +203,7 @@ test('run restart is a noop for static sites', function () {
     [$site] = makeSite(['runtime' => 'static']);
 
     $shell = new DeployRecordingShell;
-    $results = (new DeployPhaseRunner)->runRestart($site, fn () => $shell);
+    $results = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runRestart($site, fn () => $shell);
 
     expect($results)->toBe([]);
     expect($shell->execCalls)->toBe([]);
@@ -229,7 +229,7 @@ test('runner throws when server is not ready', function () {
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessage('Server must be ready');
 
-    (new DeployPhaseRunner)->runBuild(
+    (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runBuild(
         $site,
         '/var/www/app/releases/01HXX',
         fn () => new DeployRecordingShell,
@@ -239,7 +239,7 @@ test('runner returns empty for phase with no steps', function () {
     [$site] = makeSite(['runtime' => 'php']);
 
     $shell = new DeployRecordingShell;
-    $result = (new DeployPhaseRunner)->runBuild(
+    $result = (app(\App\Modules\Deploy\Services\DeployPhaseRunner::class))->runBuild(
         $site,
         '/var/www/app/releases/01HXX',
         fn () => $shell,

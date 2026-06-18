@@ -181,7 +181,6 @@
             <file>tests/Feature/FakeCloudBackendTest.php</file>
             <file>tests/Feature/HetznerProviderTest.php</file>
             <file>tests/Feature/LinodeProviderTest.php</file>
-            <file>tests/Feature/ScalewayProviderTest.php</file>
             <file>tests/Feature/UpCloudProviderTest.php</file>
             <file>tests/Feature/VultrProviderTest.php</file>
             <file>tests/Feature/FakeCloudProvisionTest.php</file>
@@ -196,7 +195,6 @@
             <file>tests/Feature/FleetSummaryCommandTest.php</file>
             <file>tests/Feature/FlushDeployDigestCommandTest.php</file>
             <file>tests/Feature/FlushServerSystemdNotificationDigestCommandTest.php</file>
-            <file>tests/Feature/FlyEligibilityCommandTest.php</file>
             <file>tests/Feature/FunctionLogIngestControllerTest.php</file>
             <file>tests/Feature/GetServerMetaCommandTest.php</file>
             <file>tests/Feature/GithubCloudWebhookTest.php</file>
