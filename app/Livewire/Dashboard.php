@@ -7,7 +7,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Insights\OrganizationInsightsMetricsService;
+use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;

@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Servers;
 
-use App\Jobs\ApplyInsightFixJob;
-use App\Jobs\RevertInsightFixJob;
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\RevertInsightFixJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -18,7 +18,7 @@ use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Insights\InsightSettingsRepository;
+use App\Modules\Insights\Services\InsightSettingsRepository;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;

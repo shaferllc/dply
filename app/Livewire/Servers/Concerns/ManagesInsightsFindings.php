@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\User;

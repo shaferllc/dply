@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Models\Organization;
-use App\Services\Insights\InsightSettingsRepository;
+use App\Modules\Insights\Services\InsightSettingsRepository;
 use Illuminate\Support\Str;
 
 /**

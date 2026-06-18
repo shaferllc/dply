@@ -8,7 +8,7 @@ use App\Models\ServerFirewallAuditEvent;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Services\Insights\InsightCorrelationService;
+use App\Modules\Insights\Services\InsightCorrelationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

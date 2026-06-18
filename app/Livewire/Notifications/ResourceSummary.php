@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Notifications;
 
 use App\Models\NotificationEvent;
-use App\Services\Insights\InsightsNotificationDispatcher;
+use App\Modules\Insights\Services\InsightsNotificationDispatcher;
 use App\Support\NotificationTablesReady;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\Insights\Runners\OpcacheFullInsightRunner;
+use App\Modules\Insights\Services\Runners\OpcacheFullInsightRunner;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Jobs\RedeployCloudSiteJob;
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Site;

@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Insights\WorkspaceInsightsBannerTest;
 
-use App\Jobs\ApplyInsightFixJob;
-use App\Jobs\RevertInsightFixJob;
-use App\Jobs\RunServerInsightsJob;
-use App\Jobs\RunSiteInsightsJob;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\RevertInsightFixJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunSiteInsightsJob;
 use App\Livewire\Servers\WorkspaceInsights as ServerWorkspaceInsights;
 use App\Livewire\Sites\WorkspaceInsights as SiteWorkspaceInsights;
 use App\Models\InsightFinding;
@@ -13,10 +13,10 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Insights\Contracts\InsightFixActionInterface;
-use App\Services\Insights\FixResult;
-use App\Services\Insights\InsightHealthScoreService;
-use App\Services\Insights\InsightRunCoordinator;
+use App\Modules\Insights\Services\Contracts\InsightFixActionInterface;
+use App\Modules\Insights\Services\FixResult;
+use App\Modules\Insights\Services\InsightHealthScoreService;
+use App\Modules\Insights\Services\InsightRunCoordinator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;

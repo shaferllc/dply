@@ -3,7 +3,7 @@
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
+use App\Modules\Insights\Services\Runners\PhpFpmWorkersUndersizedInsightRunner;
 use Illuminate\Support\Facades\Log;
 
 /**

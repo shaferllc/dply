@@ -8,7 +8,7 @@ use App\Actions\Servers\SeedProvisionedEnginesForServer;
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\InstallMetricsAgentJob;
 use App\Jobs\RefreshServerInventoryJob;
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Jobs\SyncServerSystemUsersJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Server;

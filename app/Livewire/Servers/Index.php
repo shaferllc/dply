@@ -15,7 +15,7 @@ use App\Models\ServerCreateDraft;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Insights\OrganizationInsightsMetricsService;
+use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisioningDigest;
 use App\Support\Servers\ServerTags;

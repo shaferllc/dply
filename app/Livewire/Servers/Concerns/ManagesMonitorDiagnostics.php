@@ -9,7 +9,7 @@ use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Insights\InsightCorrelationService;
+use App\Modules\Insights\Services\InsightCorrelationService;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;

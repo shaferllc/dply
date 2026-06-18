@@ -5,7 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Insights\InsightsNotificationDispatcher;
+use App\Modules\Insights\Services\InsightsNotificationDispatcher;
 use App\Services\Notifications\AssignableNotificationChannels;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;

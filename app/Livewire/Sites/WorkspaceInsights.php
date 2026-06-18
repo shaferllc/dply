@@ -2,15 +2,15 @@
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\ApplyInsightFixJob;
-use App\Jobs\RunSiteInsightsJob;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\RunSiteInsightsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Insights\InsightSettingsRepository;
+use App\Modules\Insights\Services\InsightSettingsRepository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;

@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\InsightSettingsRepositoryTest;
 
 use App\Models\Organization;
-use App\Services\Insights\InsightSettingsRepository;
+use App\Modules\Insights\Services\InsightSettingsRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 

@@ -9,7 +9,7 @@ use App\Models\NotificationEvent;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Insights\InsightsNotificationDispatcher;
+use App\Modules\Insights\Services\InsightsNotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
