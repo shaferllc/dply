@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Actions\Cloud\CreateCloudDatabase;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use Illuminate\Console\Command;

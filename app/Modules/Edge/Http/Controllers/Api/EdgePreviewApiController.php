@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Http\Controllers\Api;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
-use App\Actions\Edge\PromoteEdgePreview;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\PromoteEdgePreview;
 use App\Modules\Edge\Http\Resources\EdgeDeploymentResource;
 use App\Modules\Edge\Http\Resources\EdgeSiteResource;
 use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;

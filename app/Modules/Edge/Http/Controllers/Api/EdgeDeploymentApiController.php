@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Http\Controllers\Api;
 
-use App\Actions\Edge\DeployEdgeCommit;
-use App\Actions\Edge\RedeployEdgeSite;
-use App\Actions\Edge\RollbackEdgeDeployment;
+use App\Modules\Edge\Actions\DeployEdgeCommit;
+use App\Modules\Edge\Actions\RedeployEdgeSite;
+use App\Modules\Edge\Actions\RollbackEdgeDeployment;
 use App\Modules\Edge\Http\Resources\EdgeDeploymentResource;
 use App\Models\EdgeDeployment;
 use Illuminate\Http\JsonResponse;

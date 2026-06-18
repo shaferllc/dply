@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Actions\Cloud\ConfigureCloudAutoscaling;
-use App\Actions\Cloud\ConfigureCloudHealthCheck;
-use App\Actions\Cloud\CreateCloudWorker;
+use App\Modules\Cloud\Actions\ConfigureCloudAutoscaling;
+use App\Modules\Cloud\Actions\ConfigureCloudHealthCheck;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
 use App\Jobs\AttachCloudDatabaseJob;
 use App\Jobs\AttachCloudDomainJob;
 use App\Jobs\DetachCloudDomainJob;

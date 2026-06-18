@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\FakeEdgeDeployFlowTest;
 
-use App\Actions\Edge\CreateEdgeSite;
+use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Modules\Edge\Jobs\PublishEdgeDeploymentJob;
 use App\Models\EdgeDeployment;

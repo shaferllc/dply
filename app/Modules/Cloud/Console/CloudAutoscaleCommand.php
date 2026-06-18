@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Actions\Cloud\ConfigureCloudAutoscaling;
+use App\Modules\Cloud\Actions\ConfigureCloudAutoscaling;
 use App\Models\Site;
 use Illuminate\Console\Command;
 use Throwable;

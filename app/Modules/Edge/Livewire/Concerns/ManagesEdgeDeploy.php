@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Livewire\Concerns;
 
-use App\Actions\Edge\CreateEdgeSite;
+use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeSsrDetection;

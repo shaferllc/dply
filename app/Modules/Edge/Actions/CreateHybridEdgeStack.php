@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Edge;
+namespace App\Modules\Edge\Actions;
 
-use App\Actions\Cloud\CreateCloudSiteFromSource;
+use App\Modules\Cloud\Actions\CreateCloudSiteFromSource;
 use App\Modules\Edge\Jobs\ProvisionHybridEdgeStackJob;
 use App\Models\Organization;
 use App\Models\Site;

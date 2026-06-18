@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Actions\Edge\RedeployEdgeSite;
+use App\Modules\Edge\Actions\RedeployEdgeSite;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\IssueSiteSslJob;

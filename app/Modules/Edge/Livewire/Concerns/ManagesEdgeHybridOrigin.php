@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Livewire\Concerns;
 
-use App\Actions\Edge\CreateHybridEdgeStack;
+use App\Modules\Edge\Actions\CreateHybridEdgeStack;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;
 use App\Modules\Edge\Support\EdgeSsrDetection;

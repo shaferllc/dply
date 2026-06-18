@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Actions\Cloud\CreateCloudWorker;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
 use App\Models\CloudWorker;
 use App\Models\Site;
 use Illuminate\Console\Command;

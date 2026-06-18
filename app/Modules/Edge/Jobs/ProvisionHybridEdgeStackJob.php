@@ -6,7 +6,7 @@ namespace App\Modules\Edge\Jobs;
 
 use App\Jobs\PollCloudStatusJob;
 
-use App\Actions\Edge\CreateEdgeSite;
+use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Bus\Queueable;

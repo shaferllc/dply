@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateEdgeSiteTest;
 
-use App\Actions\Edge\CreateEdgeSite;
+use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Enums\SiteType;
 use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;

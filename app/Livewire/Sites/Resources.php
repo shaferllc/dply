@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Actions\Cloud\CreateCloudDatabase;
-use App\Actions\Cloud\CreateCloudWorker;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
 use App\Jobs\AttachCloudDatabaseJob;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;

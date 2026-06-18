@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
-use App\Actions\Edge\RedeployEdgeSite;
+use App\Modules\Edge\Actions\RedeployEdgeSite;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use Livewire\Component;

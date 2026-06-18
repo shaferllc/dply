@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use App\Models\EdgeDeployment;
 use App\Models\EdgeSiteAccessRule;
 use App\Models\Site;

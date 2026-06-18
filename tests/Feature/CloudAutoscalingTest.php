@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudAutoscalingTest;
 
-use App\Actions\Cloud\ConfigureCloudAutoscaling;
-use App\Actions\Cloud\ConfigureCloudHealthCheck;
+use App\Modules\Cloud\Actions\ConfigureCloudAutoscaling;
+use App\Modules\Cloud\Actions\ConfigureCloudHealthCheck;
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudScalingJob;
 use App\Livewire\Sites\Settings as SiteSettings;

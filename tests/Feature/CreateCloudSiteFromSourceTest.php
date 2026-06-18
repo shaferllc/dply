@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudSiteFromSourceTest;
 
-use App\Actions\Cloud\CreateCloudSiteFromSource;
+use App\Modules\Cloud\Actions\CreateCloudSiteFromSource;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
 use App\Models\Organization;

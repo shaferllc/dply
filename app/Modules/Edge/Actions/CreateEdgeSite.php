@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Edge;
+namespace App\Modules\Edge\Actions;
 
 use App\Enums\SiteType;
 use App\Modules\Edge\Jobs\BuildEdgeSiteJob;

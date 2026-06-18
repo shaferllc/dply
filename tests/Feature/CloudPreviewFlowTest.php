@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudPreviewFlowTest;
 
-use App\Actions\Cloud\CreateCloudPreviewSite;
+use App\Modules\Cloud\Actions\CreateCloudPreviewSite;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
 use App\Jobs\TeardownCloudSiteJob;

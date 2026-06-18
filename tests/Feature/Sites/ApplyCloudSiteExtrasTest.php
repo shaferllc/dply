@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\ApplyCloudSiteExtrasTest;
 
-use App\Actions\Cloud\ApplyCloudSiteExtras;
+use App\Modules\Cloud\Actions\ApplyCloudSiteExtras;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Organization;

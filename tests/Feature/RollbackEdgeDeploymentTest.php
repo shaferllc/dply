@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\RollbackEdgeDeploymentTest;
 
-use App\Actions\Edge\RollbackEdgeDeployment;
+use App\Modules\Edge\Actions\RollbackEdgeDeployment;
 use App\Enums\SiteType;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;

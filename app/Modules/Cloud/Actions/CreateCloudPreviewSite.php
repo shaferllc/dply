@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Cloud;
+namespace App\Modules\Cloud\Actions;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;

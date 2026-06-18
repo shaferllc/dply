@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Actions\Edge\PromoteEdgePreview;
+use App\Modules\Edge\Actions\PromoteEdgePreview;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesDeployContract;

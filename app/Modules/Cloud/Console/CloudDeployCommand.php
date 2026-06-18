@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Actions\Cloud\CreateCloudSite;
+use App\Modules\Cloud\Actions\CreateCloudSite;
 use App\Jobs\RedeployCloudSiteJob;
 use App\Models\Organization;
 use App\Models\Site;

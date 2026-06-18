@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cloud\Console;
 
-use App\Actions\Cloud\CreateCloudPreviewSite;
+use App\Modules\Cloud\Actions\CreateCloudPreviewSite;
 use App\Jobs\TeardownCloudSiteJob;
 use App\Models\Site;
 use Illuminate\Console\Command;

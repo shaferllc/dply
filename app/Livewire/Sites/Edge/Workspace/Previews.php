@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;

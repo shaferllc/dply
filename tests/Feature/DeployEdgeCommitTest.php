@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\DeployEdgeCommitTest;
 
-use App\Actions\Edge\DeployEdgeCommit;
+use App\Modules\Edge\Actions\DeployEdgeCommit;
 use App\Enums\SiteType;
 use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;

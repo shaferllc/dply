@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Actions\Cloud\CreateCloudSite;
-use App\Actions\Cloud\CreateCloudSiteFromSource;
+use App\Modules\Cloud\Actions\CreateCloudSite;
+use App\Modules\Cloud\Actions\CreateCloudSiteFromSource;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Cloud\Concerns\ManagesCloudCostBackend;
 use App\Livewire\Cloud\Concerns\ManagesCloudRepository;

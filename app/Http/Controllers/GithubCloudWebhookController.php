@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\Cloud\CreateCloudPreviewSite;
+use App\Modules\Cloud\Actions\CreateCloudPreviewSite;
 use App\Jobs\RedeployCloudSiteJob;
 use App\Jobs\TeardownCloudSiteJob;
 use App\Models\Site;

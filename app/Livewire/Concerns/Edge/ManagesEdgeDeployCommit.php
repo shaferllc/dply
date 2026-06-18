@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
-use App\Actions\Edge\DeployEdgeCommit;
+use App\Modules\Edge\Actions\DeployEdgeCommit;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\User;

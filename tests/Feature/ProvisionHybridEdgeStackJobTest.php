@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ProvisionHybridEdgeStackJobTest;
 
-use App\Actions\Edge\CreateHybridEdgeStack;
+use App\Modules\Edge\Actions\CreateHybridEdgeStack;
 use App\Enums\SiteType;
 use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Jobs\ProvisionCloudSiteJob;

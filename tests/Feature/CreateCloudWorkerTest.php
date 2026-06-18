@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudWorkerTest;
 
-use App\Actions\Cloud\CreateCloudWorker;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;

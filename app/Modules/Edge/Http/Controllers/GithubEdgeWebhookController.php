@@ -6,8 +6,8 @@ namespace App\Modules\Edge\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
-use App\Actions\Edge\RedeployEdgeSite;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\RedeployEdgeSite;
 use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgePreviewPolicy;

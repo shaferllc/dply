@@ -6,7 +6,7 @@ namespace App\Modules\Edge\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
-use App\Actions\Edge\RedeployEdgeSite;
+use App\Modules\Edge\Actions\RedeployEdgeSite;
 use App\Models\EdgeDeployHook;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Http\JsonResponse;

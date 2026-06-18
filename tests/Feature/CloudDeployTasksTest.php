@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudDeployTasksTest;
 
-use App\Actions\Cloud\ApplyCloudSiteExtras;
+use App\Modules\Cloud\Actions\ApplyCloudSiteExtras;
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudDeployTaskRunsJob;
 use App\Models\CloudDeployTask;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Fleet;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Services\DeployContract\DeployContractState;
