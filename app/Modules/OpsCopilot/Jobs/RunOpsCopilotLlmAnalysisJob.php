@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\OpsCopilot\Jobs;
 
 use App\Models\AiAdvisorRun;
 use App\Models\Organization;
@@ -10,7 +10,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Ai\AiAdvisorRunRecorder;
 use App\Services\Ai\LlmSynthesizer;
-use App\Services\OpsCopilot\OpsCopilotLlmAdvisor;
+use App\Modules\OpsCopilot\Services\OpsCopilotLlmAdvisor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;

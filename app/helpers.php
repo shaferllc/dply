@@ -6,7 +6,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Ai\LlmSynthesizer;
-use App\Services\OpsCopilot\OpsCopilotContextBuilder;
+use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;

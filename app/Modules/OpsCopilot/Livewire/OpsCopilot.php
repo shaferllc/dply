@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Fleet;
+namespace App\Modules\OpsCopilot\Livewire;
 
-use App\Jobs\RunOpsCopilotLlmAnalysisJob;
+use App\Modules\OpsCopilot\Jobs\RunOpsCopilotLlmAnalysisJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Models\AiAdvisorRun;
@@ -12,8 +12,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Ai\AiAdvisorRunRecorder;
-use App\Services\OpsCopilot\OpsCopilotContextBuilder;
-use App\Services\OpsCopilot\OpsCopilotLlmAdvisor;
+use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
+use App\Modules\OpsCopilot\Services\OpsCopilotLlmAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;

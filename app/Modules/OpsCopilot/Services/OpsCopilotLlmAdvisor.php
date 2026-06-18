@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\OpsCopilot;
+namespace App\Modules\OpsCopilot\Services;
 
 use App\Models\AiAdvisorRun;
 use App\Models\Organization;

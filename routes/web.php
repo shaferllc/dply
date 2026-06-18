@@ -70,7 +70,7 @@ use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Fleet\Intelligence as FleetIntelligence;
-use App\Livewire\Fleet\OpsCopilot as FleetOpsCopilot;
+use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
 use App\Livewire\Fleet\Overview as FleetOverview;
 use App\Livewire\Fleet\Previews as FleetPreviews;
 use App\Livewire\Imports\Forge\Inventory;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\OpsCopilot;
+namespace App\Modules\OpsCopilot\Services;
 
 /**
  * Rule-based deploy failure advisor — scans log excerpts for known
