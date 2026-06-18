@@ -33,7 +33,7 @@ use App\Models\Site;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Servers\ServerPhpManager;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Edge;
 
 use App\Models\Site;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Log;
 

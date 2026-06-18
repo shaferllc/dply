@@ -7,7 +7,7 @@ namespace Tests\Unit\Services\GitIdentityResolverTest;
 use App\Models\GitProviderToken;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

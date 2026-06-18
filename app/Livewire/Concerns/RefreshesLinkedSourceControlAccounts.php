@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Livewire\Attributes\On;
 use Livewire\Component;
 

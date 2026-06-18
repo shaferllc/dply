@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Concerns\AvoidsGitIdentityAttributeRecursion;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;

@@ -10,7 +10,7 @@ use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;

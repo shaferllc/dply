@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Contracts\SourceControl;
+namespace App\Modules\SourceControl\Contracts;
 
 /**
  * Shared shape for anything that can authenticate against a Git host on behalf

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Sites;
 
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\Http;
 
 /**

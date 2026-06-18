@@ -5,7 +5,7 @@ namespace App\Livewire\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\SourceControl\SiteGitCommitsFetcher;
+use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
 use App\Support\SiteSettingsSidebar;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;

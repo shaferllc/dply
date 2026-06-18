@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud\Concerns;
 
-use App\Services\SourceControl\DefaultBranchResolver;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\DefaultBranchResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.

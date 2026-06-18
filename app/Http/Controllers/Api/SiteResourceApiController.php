@@ -15,7 +15,7 @@ use App\Models\SiteDeploymentSchedule;
 use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
-use App\Services\SourceControl\SiteGitCommitsFetcher;
+use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

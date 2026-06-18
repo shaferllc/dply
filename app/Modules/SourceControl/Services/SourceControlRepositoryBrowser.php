@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\SourceControl;
+namespace App\Modules\SourceControl\Services;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 

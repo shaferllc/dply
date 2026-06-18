@@ -18,7 +18,7 @@ use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Services\Deploy\LocalRepositoryInspector;
 use App\Services\Servers\ServerPhpManager;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;

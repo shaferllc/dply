@@ -10,7 +10,7 @@ use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Livewire\Forms\EdgeBuildSettingsForm;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;

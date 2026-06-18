@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Concerns\AvoidsGitIdentityAttributeRecursion;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

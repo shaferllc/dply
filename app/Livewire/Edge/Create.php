@@ -19,7 +19,7 @@ use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Services\Billing\ManagedProductCostEstimator;
 use App\Services\Edge\Frameworks\EdgeFrameworkPresetRegistry;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Edge\EdgeSsrDetection;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Contracts\View\View;

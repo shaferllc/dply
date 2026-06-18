@@ -10,8 +10,8 @@ use App\Models\SiteRelease;
 use App\Services\Deploy\DeployResumePlan;
 use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Servers\SupervisorDeployRestarter;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
 

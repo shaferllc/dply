@@ -123,7 +123,7 @@ use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;

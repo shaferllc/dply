@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Livewire\Sites\Commits;
-use App\Services\SourceControl\SourceControlRepositoryReader;
+use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
 use Illuminate\Support\Facades\Gate;
 
 /**

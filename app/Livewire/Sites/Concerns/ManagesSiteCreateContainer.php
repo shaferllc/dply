@@ -9,8 +9,8 @@ use App\Jobs\ProvisionSiteJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Deploy\LocalRepositoryInspector;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.

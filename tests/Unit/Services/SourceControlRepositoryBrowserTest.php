@@ -6,7 +6,7 @@ namespace Tests\Unit\Services\SourceControlRepositoryBrowserTest;
 
 use App\Models\GitProviderToken;
 use App\Models\SocialAccount;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\Http;
 
 test('it lists github repositories for a linked account', function () {

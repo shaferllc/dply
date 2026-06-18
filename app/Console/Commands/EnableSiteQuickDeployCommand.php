@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\GitProviderToken;
 use App\Models\Site;
 use App\Models\SocialAccount;

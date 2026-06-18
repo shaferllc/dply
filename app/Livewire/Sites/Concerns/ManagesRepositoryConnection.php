@@ -9,9 +9,9 @@ use App\Livewire\Sites\Commits;
 use App\Livewire\Sites\Files;
 use App\Models\Site;
 use App\Services\Sites\RepositoryWebhookProvisioner;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
-use App\Services\SourceControl\SourceControlRepositoryReader;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 

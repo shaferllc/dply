@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\SourceControl;
+namespace App\Modules\SourceControl\Support;
 
 use Illuminate\Http\Client\Response;
 

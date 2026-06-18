@@ -2,11 +2,11 @@
 
 namespace App\Services\Sites;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Site;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Support\GitRemoteRepositoryRef;
-use App\Support\SourceControl\GitHubWebhookFailure;
+use App\Modules\SourceControl\Support\GitHubWebhookFailure;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

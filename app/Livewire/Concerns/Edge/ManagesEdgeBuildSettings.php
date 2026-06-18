@@ -15,7 +15,7 @@ use App\Services\Edge\EdgeAccessGate;
 use App\Services\Edge\EdgeCachePurger;
 use App\Services\Edge\EdgeGithubWebhookProvisioner;
 use App\Services\Edge\EdgeHostMapPublisher;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Support\Edge\EdgeRepoRoot;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;

@@ -10,7 +10,7 @@ use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;

@@ -17,7 +17,7 @@ use App\Services\Sites\AppCatalog;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;

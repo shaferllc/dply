@@ -9,8 +9,8 @@ use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Sites\RepositoryWebhookProvisioner;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\SiteDeployKeyGenerator;
 
 /**

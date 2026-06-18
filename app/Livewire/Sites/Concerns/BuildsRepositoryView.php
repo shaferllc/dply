@@ -9,9 +9,9 @@ use App\Livewire\Sites\Commits;
 use App\Livewire\Sites\SiteSetup;
 use App\Models\Server;
 use App\Models\SiteDeployment;
-use App\Services\SourceControl\SiteGitCommitsFetcher;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
-use App\Services\SourceControl\SourceControlRepositoryReader;
+use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
