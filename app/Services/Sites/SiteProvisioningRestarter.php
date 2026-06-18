@@ -8,7 +8,7 @@ use App\Enums\SiteType;
 use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Site;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 

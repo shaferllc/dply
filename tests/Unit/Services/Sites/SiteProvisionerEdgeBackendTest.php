@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;

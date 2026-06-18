@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 
 /**
  * Notification event keys for server-scoped TLS certificate lifecycle, surfaced on

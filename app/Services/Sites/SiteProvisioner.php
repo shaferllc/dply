@@ -3,12 +3,12 @@
 namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
-use App\Jobs\ExecuteSiteCertificateJob;
-use App\Jobs\IssueServerWildcardCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Deploy\DeploymentRevisionTracker;

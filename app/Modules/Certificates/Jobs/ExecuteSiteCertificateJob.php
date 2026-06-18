@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Certificates\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\User;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Notifications\ServerCertInventoryNotificationDispatcher;
 use App\Support\Sites\CertbotOutputParser;
 use Illuminate\Bus\Queueable;

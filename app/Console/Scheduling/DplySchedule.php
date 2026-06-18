@@ -47,7 +47,7 @@ use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
-use App\Console\Commands\RenewServerWildcardCertificatesCommand;
+use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;

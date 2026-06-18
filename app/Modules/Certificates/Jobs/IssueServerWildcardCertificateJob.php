@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Certificates\Jobs;
 
 use App\Models\ServerWildcardCertificate;
-use App\Services\Certificates\WildcardCertificateIssuer;
+use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Certificates;
+namespace App\Modules\Certificates\Services;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;

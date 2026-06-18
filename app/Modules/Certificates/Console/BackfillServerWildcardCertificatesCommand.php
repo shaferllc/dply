@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Certificates\Console;
 
-use App\Jobs\IssueServerWildcardCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Services\Sites\TestingHostnameProvisioner;

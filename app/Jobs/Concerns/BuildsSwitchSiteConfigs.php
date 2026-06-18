@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Jobs\Concerns;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;

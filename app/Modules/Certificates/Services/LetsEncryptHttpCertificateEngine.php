@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Certificates;
+namespace App\Modules\Certificates\Services;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;

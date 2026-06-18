@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Certificates;
+namespace App\Modules\Certificates\Services;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Services\Sites\SiteWebserverConfigApplier;

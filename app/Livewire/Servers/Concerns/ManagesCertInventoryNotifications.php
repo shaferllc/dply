@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;

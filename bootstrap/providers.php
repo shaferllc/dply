@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Certificates\CertificatesServiceProvider;
 use App\Modules\Docs\DocsServiceProvider;
 use App\Modules\Feedback\FeedbackServiceProvider;
 use App\Modules\Imports\ImportsServiceProvider;
@@ -19,6 +20,7 @@ use App\Modules\Secrets\SecretVaultServiceProvider;
 
 return [
     TaskServiceProvider::class,
+    CertificatesServiceProvider::class,
     DocsServiceProvider::class,
     FeedbackServiceProvider::class,
     ImportsServiceProvider::class,

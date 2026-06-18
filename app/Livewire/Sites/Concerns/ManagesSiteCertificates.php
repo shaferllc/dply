@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\DetectSiteCloudflareTlsJob;
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ScanServerLiveCertsJob;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
-use App\Services\Certificates\CertificateRepairService;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRepairService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Sites\SiteReachabilityChecker;
 use App\Support\HostnameValidator;

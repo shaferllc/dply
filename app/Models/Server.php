@@ -6,7 +6,7 @@ use App\Enums\ServerProvider;
 use App\Enums\ServerTier;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Services\Billing\ServerTierClassifier;
-use App\Services\Certificates\WildcardCertificateIssuer;
+use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerTags;

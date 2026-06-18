@@ -12,7 +12,7 @@ use App\Livewire\Servers\Concerns\ManagesCertInventoryNotifications;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\SiteCertificate;
-use App\Services\Servers\ServerCertificateInventory;
+use App\Modules\Certificates\Services\ServerCertificateInventory;
 use App\Services\Servers\WebserverCertsAggregator;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;

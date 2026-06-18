@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\WebserverSwitchTest;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\SwitchServerWebserverJob;
 use App\Livewire\Servers\WorkspaceWebserver;

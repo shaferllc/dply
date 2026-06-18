@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Certificates\Console;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
-use App\Services\Certificates\CaddyAutomaticHttpsCertificateEngine;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CaddyAutomaticHttpsCertificateEngine;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use Illuminate\Console\Command;
 
 /**

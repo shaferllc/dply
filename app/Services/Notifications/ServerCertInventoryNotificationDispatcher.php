@@ -2,7 +2,7 @@
 
 namespace App\Services\Notifications;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerCertInventoryNotificationKeys;

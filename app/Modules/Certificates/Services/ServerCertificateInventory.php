@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Servers;
+namespace App\Modules\Certificates\Services;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\SiteCertificate;
 use Carbon\CarbonImmutable;
