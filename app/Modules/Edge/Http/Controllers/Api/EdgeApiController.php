@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\Edge;
+namespace App\Modules\Edge\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
  * Edge API controller extends this so org scoping + the Edge-specific
  * 404 ("site exists but is not an Edge site") stay consistent.
  *
- * Payload shaping lives in {@see \App\Http\Resources\Edge\*Resource}
+ * Payload shaping lives in {@see \App\Modules\Edge\Http\Resources\*Resource}
  * classes — the base no longer carries inline `toArray()` builders.
  */
 abstract class EdgeApiController extends Controller

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Modules\Edge\Http\Controllers;
+
+use App\Http\Controllers\Controller;
 
 use App\Models\EdgeWebVital;
 use App\Models\Site;

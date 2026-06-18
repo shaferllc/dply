@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\Edge;
+namespace App\Modules\Edge\Http\Controllers\Api;
 
 use App\Services\Billing\EdgeSiteTrafficAnalytics;
 use Illuminate\Http\JsonResponse;

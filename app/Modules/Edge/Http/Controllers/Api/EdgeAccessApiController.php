@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\Edge;
+namespace App\Modules\Edge\Http\Controllers\Api;
 
-use App\Http\Resources\Edge\EdgeAccessRuleResource;
+use App\Modules\Edge\Http\Resources\EdgeAccessRuleResource;
 use App\Modules\Edge\Services\EdgeAccessGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

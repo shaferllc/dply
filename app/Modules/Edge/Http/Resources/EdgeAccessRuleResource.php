@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Resources\Edge;
+namespace App\Modules\Edge\Http\Resources;
 
 use App\Models\EdgeSiteAccessRule;
 use App\Models\Site;

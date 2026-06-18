@@ -8,7 +8,7 @@ use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Http\Middleware\ResolveEdgeCustomDomain;
+use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;

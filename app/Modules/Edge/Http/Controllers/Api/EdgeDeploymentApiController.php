@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api\Edge;
+namespace App\Modules\Edge\Http\Controllers\Api;
 
 use App\Actions\Edge\DeployEdgeCommit;
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Actions\Edge\RollbackEdgeDeployment;
-use App\Http\Resources\Edge\EdgeDeploymentResource;
+use App\Modules\Edge\Http\Resources\EdgeDeploymentResource;
 use App\Models\EdgeDeployment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

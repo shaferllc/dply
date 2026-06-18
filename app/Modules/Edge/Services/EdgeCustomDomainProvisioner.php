@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
-use App\Http\Middleware\ResolveEdgeCustomDomain;
+use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Models\EdgeDeployment;
 use App\Models\ProviderCredential;
 use App\Models\Site;

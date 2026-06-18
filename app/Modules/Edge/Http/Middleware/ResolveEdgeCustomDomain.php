@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Middleware;
+namespace App\Modules\Edge\Http\Middleware;
 
-use App\Http\Controllers\EdgeStaticDevController;
+use App\Modules\Edge\Http\Controllers\EdgeStaticDevController;
 use App\Models\Site;
 use App\Modules\Edge\Services\FakeEdgeBackend;
 use App\Modules\Edge\Support\FakeEdgeProvision;
