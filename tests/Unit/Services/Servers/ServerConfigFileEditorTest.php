@@ -83,7 +83,10 @@ test('catalog discovers remote files in a single ssh batch', function (): void {
                 '__DPLY_PROBE_0__',
                 '/etc/nginx/nginx.conf|1446|1701383567',
                 '/etc/nginx/sites-available/default|2412|1701383567',
-                '__DPLY_PROBE_6__',
+                // Probes 0-7 are the webserver engines (nginx, caddy, apache,
+                // openlitespeed, traefik, haproxy, envoy, openresty); the php
+                // glob probe (/etc/php/*/fpm/php.ini) is index 8.
+                '__DPLY_PROBE_8__',
                 '/etc/php/8.4/fpm/php.ini|69369|1778773756',
             ]),
             0,
