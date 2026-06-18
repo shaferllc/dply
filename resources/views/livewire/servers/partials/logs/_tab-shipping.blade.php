@@ -24,7 +24,7 @@
             </x-icon-badge>
             <div class="min-w-0 flex-1">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Add-on') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply Logs — ship & search') }}</h3>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply Logs') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Run a lightweight agent (Vector) on this server to ship system + service logs to dply for persistent, searchable storage — beyond the live SSH tail. Hard-capped so it never competes with your app.') }}
                 </p>
@@ -53,26 +53,51 @@
                 </div>
             @endif
 
-            {{-- Source toggles --}}
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Sources') }}</p>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Toggle which logs this server collects. Fewer sources = less volume.') }}</p>
-                <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                    @foreach ($this->logShippingSourceCatalog as $key => $label)
-                        @php $on = (bool) ($this->logShippingSources[$key] ?? false); @endphp
-                        <button
-                            type="button"
-                            wire:click="toggleLogShippingSource('{{ $key }}')"
-                            @disabled($busy)
-                            class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:opacity-50
-                                {{ $on ? 'border-brand-sage/40 bg-brand-sage/10' : 'border-brand-ink/10 bg-white hover:bg-brand-sand/20' }}"
-                        >
-                            <span class="min-w-0 truncate text-brand-ink">{{ $label }}</span>
-                            <span class="inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition {{ $on ? 'bg-brand-sage justify-end' : 'bg-brand-ink/15 justify-start' }}">
-                                <span class="h-4 w-4 rounded-full bg-white shadow"></span>
-                            </span>
-                        </button>
-                    @endforeach
+            {{-- Source toggles (collapsible) --}}
+            @php
+                $sourcesTotal = count($this->logShippingSourceCatalog);
+                $sourcesOnCount = 0;
+                foreach ($this->logShippingSourceCatalog as $catalogKey => $catalogLabel) {
+                    if ((bool) ($this->logShippingSources[$catalogKey] ?? false)) {
+                        $sourcesOnCount++;
+                    }
+                }
+            @endphp
+            <div x-data="{ open: {{ $agent === null ? 'true' : 'false' }} }" class="rounded-lg border border-brand-ink/10">
+                <button
+                    type="button"
+                    x-on:click="open = ! open"
+                    class="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                >
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Sources') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Toggle which logs this server collects. Fewer sources = less volume.') }}</p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <span class="rounded-full bg-brand-ink/5 px-2 py-0.5 text-[11px] font-semibold text-brand-moss">
+                            {{ __(':on / :total on', ['on' => $sourcesOnCount, 'total' => $sourcesTotal]) }}
+                        </span>
+                        <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
+                    </div>
+                </button>
+                <div x-show="open" x-collapse>
+                    <div class="grid gap-2 border-t border-brand-ink/10 px-4 py-4 sm:grid-cols-2">
+                        @foreach ($this->logShippingSourceCatalog as $key => $label)
+                            @php $on = (bool) ($this->logShippingSources[$key] ?? false); @endphp
+                            <button
+                                type="button"
+                                wire:click="toggleLogShippingSource('{{ $key }}')"
+                                @disabled($busy)
+                                class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:opacity-50
+                                    {{ $on ? 'border-brand-sage/40 bg-brand-sage/10' : 'border-brand-ink/10 bg-white hover:bg-brand-sand/20' }}"
+                            >
+                                <span class="min-w-0 truncate text-brand-ink">{{ $label }}</span>
+                                <span class="inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition {{ $on ? 'bg-brand-sage justify-end' : 'bg-brand-ink/15 justify-start' }}">
+                                    <span class="h-4 w-4 rounded-full bg-white shadow"></span>
+                                </span>
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
             </div>
 
