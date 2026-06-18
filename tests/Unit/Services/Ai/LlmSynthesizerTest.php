@@ -10,13 +10,17 @@ use Illuminate\Support\Facades\Http;
 test('llm synthesizer parses json suggestions', function () {
     config([
         'dply_ai.llm.enabled' => true,
+        // Force the OpenAI-compatible HTTP path; without this the test inherits
+        // the ambient provider config and may run the local `claude` CLI via
+        // Process, which Http::fake cannot intercept (and blocks ~45s).
+        'dply_ai.llm.provider' => 'openai',
         'dply_ai.llm.api_key' => 'test-key',
         'dply_ai.llm.model' => 'gpt-4o-mini',
         'dply_ai.llm.base_url' => 'https://api.openai.com/v1',
     ]);
 
     Http::fake([
-        'api.openai.com/v1/chat/completions' => Http::response([
+        'https://api.openai.com/*' => Http::response([
             'choices' => [[
                 'message' => [
                     'content' => json_encode([
