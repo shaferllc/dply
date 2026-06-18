@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Roadmap\Models;
+use App\Models\RoadmapSuggestion;
+use App\Models\RoadmapRelease;
 
 use App\Modules\Roadmap\Support\RoadmapQuarter;
 use Database\Factories\RoadmapItemFactory;

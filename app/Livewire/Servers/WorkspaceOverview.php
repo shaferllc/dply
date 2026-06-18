@@ -20,7 +20,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthCockpit;

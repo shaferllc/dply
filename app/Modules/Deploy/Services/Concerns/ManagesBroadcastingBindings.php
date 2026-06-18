@@ -6,7 +6,7 @@ namespace App\Modules\Deploy\Services\Concerns;
 
 use App\Modules\Realtime\Actions\CreateRealtimeApp;
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;

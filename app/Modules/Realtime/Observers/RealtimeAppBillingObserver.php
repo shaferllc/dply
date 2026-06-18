@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Realtime\Observers;
 
 use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 
 /**

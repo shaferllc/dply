@@ -9,7 +9,7 @@ use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 

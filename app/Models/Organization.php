@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Modules\Realtime\Models\RealtimeApp;
+use AppModulesRealtimeModelsRealtimeApp;
+
 use App\Models\Concerns\ManagesOrganizationBeta;
 use App\Models\Concerns\ManagesOrganizationMembership;
 use App\Models\Concerns\ManagesOrganizationPreferences;

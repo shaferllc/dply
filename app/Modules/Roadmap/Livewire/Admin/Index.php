@@ -10,7 +10,7 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\AuditLog;
 use App\Models\Organization;
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use App\Models\User;

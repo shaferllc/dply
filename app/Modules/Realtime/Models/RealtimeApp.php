@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Realtime\Models;
+
+use App\Models\Organization;
 
 use App\Modules\Realtime\Services\RealtimeBackend;
 use Database\Factories\RealtimeAppFactory;

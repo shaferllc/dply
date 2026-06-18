@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapSuggestion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;

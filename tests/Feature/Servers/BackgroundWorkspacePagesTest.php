@@ -22,7 +22,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Models\User;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Console;
 
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use Illuminate\Console\Command;
 
 /**

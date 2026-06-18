@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Roadmap\Services;
 
 use App\Models\RoadmapAiRun;
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use App\Modules\Ai\Services\AiPromptBuilder;

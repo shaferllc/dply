@@ -33,7 +33,7 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteDeploySyncGroup;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteRedirect;

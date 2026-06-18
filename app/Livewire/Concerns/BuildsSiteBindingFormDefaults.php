@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Models\ObjectStorageCredential;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Deploy\Services\DeploymentSecretInventory;
 
 /**

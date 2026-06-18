@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Roadmap\Services;
 
 use App\Modules\Roadmap\Mail\RoadmapSuggestionStatusMail;
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapSuggestion;
 use Illuminate\Support\Facades\Mail;
 

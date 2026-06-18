@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Services;
 
 use App\Modules\Serverless\Console\ServerlessTickCommand;
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
 
 /**

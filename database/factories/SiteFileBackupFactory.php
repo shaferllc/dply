@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
 use App\Modules\Serverless\Services\FunctionInvoker;
 use App\Modules\Serverless\Services\FunctionScheduleService;

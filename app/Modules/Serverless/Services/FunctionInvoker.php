@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Serverless\Services;
 
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Support\Carbon;

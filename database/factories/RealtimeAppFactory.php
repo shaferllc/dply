@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

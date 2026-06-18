@@ -20,7 +20,7 @@ use App\Models\OauthCredential;
 use App\Models\ObjectStorageCredential;
 use App\Models\PaymentCredential;
 use App\Models\ProviderCredential;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\SearchCredential;
 use App\Models\Server;
 use App\Models\ServerCacheService;

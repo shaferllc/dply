@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Models;
+namespace App\Modules\Backups\Models;
+use App\Models\User;
+use App\Models\Site;
 
 use Database\Factories\SiteFileBackupFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

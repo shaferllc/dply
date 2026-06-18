@@ -29,7 +29,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseProvisioner;

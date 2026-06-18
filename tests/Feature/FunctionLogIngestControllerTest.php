@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\FunctionLogIngestControllerTest;
 
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;

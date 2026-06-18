@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Livewire\Serverless\LogsPanelTest;
 
 use App\Modules\Serverless\Livewire\LogsPanel;
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

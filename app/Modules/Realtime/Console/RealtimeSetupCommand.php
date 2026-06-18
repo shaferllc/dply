@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Realtime\Console;
 
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Realtime\Services\CloudflareRealtimeBackend;
 use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use App\Modules\Realtime\Services\RealtimeCloudflareClient;

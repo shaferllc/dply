@@ -1,9 +1,9 @@
 @php
     $statusTone = [
-        \App\Models\RealtimeApp::STATUS_ACTIVE => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        \App\Models\RealtimeApp::STATUS_PROVISIONING => 'bg-amber-100 text-amber-700 ring-amber-200',
-        \App\Models\RealtimeApp::STATUS_PAUSED => 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10',
-        \App\Models\RealtimeApp::STATUS_FAILED => 'bg-red-100 text-red-700 ring-red-200',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_ACTIVE => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING => 'bg-amber-100 text-amber-700 ring-amber-200',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_PAUSED => 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED => 'bg-red-100 text-red-700 ring-red-200',
     ];
     $money = fn (int $cents): string => '$'.number_format($cents / 100, 2);
 @endphp
@@ -65,7 +65,7 @@
                             $sites = $siteUsage->get($app->id) ?? collect();
                             $tier = $app->tierConfig();
                         @endphp
-                        <article class="dply-card relative p-5 sm:p-6 transition hover:border-brand-forest/40 hover:shadow-md" @if ($app->status === \App\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
+                        <article class="dply-card relative p-5 sm:p-6 transition hover:border-brand-forest/40 hover:shadow-md" @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
                             {{-- Stretched link: the whole card clicks through to the app's detail
                                  page; the action buttons below sit above it via z-10. --}}
                             <a href="{{ route('organizations.realtime.show', [$organization, $app]) }}" wire:navigate
@@ -81,7 +81,7 @@
                                     </div>
                                     <p class="mt-1 font-mono text-xs text-brand-moss">{{ $app->app_key }}</p>
                                     <p class="mt-0.5 font-mono text-[11px] text-brand-moss/80">{{ $app->host() }}</p>
-                                    @if ($app->status === \App\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
+                                    @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
                                         <p class="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
                                     @endif
                                 </div>

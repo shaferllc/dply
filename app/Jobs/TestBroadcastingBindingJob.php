@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\ConsoleAction;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;

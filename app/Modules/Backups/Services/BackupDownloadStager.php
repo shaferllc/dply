@@ -7,7 +7,7 @@ namespace App\Modules\Backups\Services;
 use App\Models\BackupDownloadStaging;
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Support\Servers\DatabaseBackupSettings;

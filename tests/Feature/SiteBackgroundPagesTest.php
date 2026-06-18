@@ -6,7 +6,7 @@ namespace Tests\Feature\SiteBackgroundPagesTest;
 
 use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\Workers;
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

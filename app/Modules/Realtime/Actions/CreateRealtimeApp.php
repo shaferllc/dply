@@ -6,7 +6,7 @@ namespace App\Modules\Realtime\Actions;
 
 use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\User;
 use App\Modules\Realtime\Services\RealtimeBackendFactory;
 

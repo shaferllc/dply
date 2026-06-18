@@ -6,7 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;

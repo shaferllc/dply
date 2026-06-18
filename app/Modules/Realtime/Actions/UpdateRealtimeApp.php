@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Realtime\Actions;
 
 use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use App\Modules\Billing\Services\StripeSubscriptionSyncer;
 use InvalidArgumentException;

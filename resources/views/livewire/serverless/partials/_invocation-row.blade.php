@@ -1,5 +1,5 @@
 @php
-    /** @var \App\Models\FunctionInvocation $invocation */
+    /** @var \App\Modules\Serverless\Models\FunctionInvocation $invocation */
     $logLines = $invocation->logLines();
     $excerpt = trim((string) $invocation->result_excerpt);
     $contextPairs = $invocation->contextPairs();

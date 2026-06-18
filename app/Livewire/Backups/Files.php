@@ -8,7 +8,7 @@ use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Models\BackupConfiguration;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;

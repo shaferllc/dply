@@ -8,7 +8,7 @@ use App\Modules\Backups\Console\RunBackupScheduleCommand;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 
 /**
  * Re-enable a paused {@see ServerBackupSchedule} when a backup against the same

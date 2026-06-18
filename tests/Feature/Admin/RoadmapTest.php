@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Models\AuditLog;
 use App\Models\Organization;
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapSuggestion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -1,9 +1,9 @@
 @php
     $statusTone = [
-        \App\Models\RealtimeApp::STATUS_ACTIVE => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        \App\Models\RealtimeApp::STATUS_PROVISIONING => 'bg-amber-100 text-amber-700 ring-amber-200',
-        \App\Models\RealtimeApp::STATUS_PAUSED => 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10',
-        \App\Models\RealtimeApp::STATUS_FAILED => 'bg-red-100 text-red-700 ring-red-200',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_ACTIVE => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING => 'bg-amber-100 text-amber-700 ring-amber-200',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_PAUSED => 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10',
+        \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED => 'bg-red-100 text-red-700 ring-red-200',
     ];
     $money = fn (int $cents): string => '$'.number_format($cents / 100, 2);
 
@@ -30,7 +30,7 @@
                 iconSize="md"
                 :title="$app->name"
                 :description="$app->host()"
-                @if ($app->status === \App\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif
+                @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif
             >
                 <x-slot:topAction>
                     <div class="text-right">
@@ -56,7 +56,7 @@
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
                     {{ ucfirst($app->status) }}
                 </span>
-                @if ($app->status === \App\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
+                @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
                     <p class="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
                 @endif
             </x-hero-card>
@@ -64,7 +64,7 @@
             {{-- Live stats: polls the relay while active so the current connection
                  count stays fresh; the peak high-water mark is persisted. --}}
             <section class="dply-card mt-6 p-5 sm:p-6"
-                @if (in_array($app->status, [\App\Models\RealtimeApp::STATUS_ACTIVE, \App\Models\RealtimeApp::STATUS_PROVISIONING], true)) wire:poll.30s="pollStats" @endif>
+                @if (in_array($app->status, [\App\Modules\Realtime\Models\RealtimeApp::STATUS_ACTIVE, \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING], true)) wire:poll.30s="pollStats" @endif>
                 @php
                     $cap = max(1, (int) $tier['max_connections']);
                     $peak = (int) ($app->peak_connections ?? 0);

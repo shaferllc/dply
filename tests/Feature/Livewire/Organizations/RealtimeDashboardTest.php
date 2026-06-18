@@ -6,7 +6,7 @@ use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
 use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Modules\Realtime\Livewire\Realtime;
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;

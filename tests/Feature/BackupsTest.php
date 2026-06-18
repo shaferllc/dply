@@ -11,7 +11,7 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;

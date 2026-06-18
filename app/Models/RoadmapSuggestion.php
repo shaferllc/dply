@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Modules\Roadmap\Models\RoadmapItem;
+use AppModulesRoadmapModelsRoadmapItem;
+
 use Database\Factories\RoadmapSuggestionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

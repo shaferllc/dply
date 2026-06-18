@@ -5,7 +5,7 @@ namespace App\Modules\Billing\Services;
 use App\Enums\ServerTier;
 use App\Models\FunctionAction;
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Server;
 use App\Models\ServerLogUsageDaily;
 use App\Models\Site;

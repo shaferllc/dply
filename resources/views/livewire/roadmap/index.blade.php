@@ -264,7 +264,7 @@
                                             @if ($item->targetQuarterLabel())
                                                 <span class="rounded-full bg-brand-sand/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $item->targetQuarterLabel() }}</span>
                                             @endif
-                                            @if ($item->targetRelease && $item->status !== \App\Models\RoadmapItem::STATUS_SHIPPED)
+                                            @if ($item->targetRelease && $item->status !== \App\Modules\Roadmap\Models\RoadmapItem::STATUS_SHIPPED)
                                                 <span class="rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ $item->targetRelease->trainLabel() }}</span>
                                             @endif
                                             @if ($item->shippedRelease)
@@ -277,7 +277,7 @@
                                         @if ($item->description)
                                             <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-brand-moss/90">{{ $item->description }}</p>
                                         @endif
-                                        @if ($item->status === \App\Models\RoadmapItem::STATUS_SHIPPED && $item->shipped_at)
+                                        @if ($item->status === \App\Modules\Roadmap\Models\RoadmapItem::STATUS_SHIPPED && $item->shipped_at)
                                             <p class="mt-3 inline-flex items-center gap-1 text-xs text-brand-mist">
                                                 <x-heroicon-m-check-circle class="h-3.5 w-3.5 text-brand-forest" />
                                                 {{ __('Shipped :date', ['date' => $item->shipped_at->format('M j, Y')]) }}

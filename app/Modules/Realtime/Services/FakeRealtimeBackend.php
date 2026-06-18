@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Realtime\Services;
 
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use Illuminate\Support\Facades\Cache;
 
 /**

@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Models;
+namespace App\Modules\Serverless\Models;
+use App\Models\User;
+use App\Models\Site;
+use App\Models\FunctionAction;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

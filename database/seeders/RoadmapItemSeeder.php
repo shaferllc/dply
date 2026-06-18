@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
