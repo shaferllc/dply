@@ -2780,12 +2780,12 @@ test('site settings logs section renders site deployments and webhook deliveries
         'detail' => 'Accepted deploy webhook.',
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs'], false));
-
-    $response->assertOk()
+    // The logs section now renders deployment activity via the activity console
+    // (status, not raw log_output) and links out to server logs; webhook
+    // deliveries moved to the server notifications surface.
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'logs'])
         ->assertSee('Logs')
-        ->assertSee('Deploy completed successfully.')
-        ->assertSee('Accepted deploy webhook.')
         ->assertSee('Open server logs')
         ->assertSee(route('servers.logs', $server, false), escape: false);
 });
