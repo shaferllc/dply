@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Profile;
+namespace App\Modules\Referrals\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;

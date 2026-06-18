@@ -7,7 +7,7 @@ use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ForwardWorkerPoolJobEvent;
-use App\Listeners\ProcessReferralInvoicePayment;
+use App\Modules\Referrals\Listeners\ProcessReferralInvoicePayment;
 use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\RecordServerRemoteAccessContext;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;

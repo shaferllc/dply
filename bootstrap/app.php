@@ -2,7 +2,7 @@
 
 use App\Console\Scheduling\DplySchedule;
 use App\Http\Middleware\AuthenticateApiToken;
-use App\Http\Middleware\CaptureReferralCode;
+use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;

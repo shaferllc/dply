@@ -100,7 +100,7 @@ use App\Livewire\Organizations\Show as OrganizationsShow;
 use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\OrgNetworking;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
-use App\Livewire\Profile\Referrals as ProfileReferrals;
+use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
 use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
 use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;

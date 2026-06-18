@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Listeners;
+namespace App\Modules\Referrals\Listeners;
 
-use App\Services\Referrals\ReferralConversionService;
+use App\Modules\Referrals\Services\ReferralConversionService;
 use Laravel\Cashier\Events\WebhookReceived;
 
 class ProcessReferralInvoicePayment

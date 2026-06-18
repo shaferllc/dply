@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Referrals;
+namespace App\Modules\Referrals\Services;
 
 use App\Models\User;
 
