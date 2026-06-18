@@ -33,8 +33,12 @@ use Livewire\Component;
 class StepWhere extends Component
 {
     use InteractsWithServerCreateDraft;
-    use ManagesProviderCredentials;
-    use ServerCreateActions;
+    use ManagesProviderCredentials, ServerCreateActions {
+        // Both traits declare afterProviderCredentialStored: ManagesProviderCredentials
+        // ships an empty default hook, ServerCreateActions the real server-create
+        // implementation. Without this the trait composition is a fatal collision.
+        ServerCreateActions::afterProviderCredentialStored insteadof ManagesProviderCredentials;
+    }
 
     public ServerCreateForm $form;
 

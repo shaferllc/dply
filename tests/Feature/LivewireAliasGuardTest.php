@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\LivewireAliasGuardTest;
 
+use Livewire\Component as LivewireComponent;
 use Livewire\Livewire;
 use PHPUnit\Framework\Assert;
 use Symfony\Component\Finder\Finder;
@@ -95,6 +96,97 @@ test('every Livewire alias referenced in Blade resolves to a registered componen
         $broken,
         "These Livewire aliases are referenced in Blade but do not resolve to a registered component.\n"
             ."If you just moved a component into a module, register its alias in that module's ServiceProvider:\n\n"
+            .$report,
+    );
+});
+
+/**
+ * Companion guard for full-page Livewire route components.
+ *
+ * Blade-embedded aliases (above) are not the only way a moved component breaks:
+ * full-page route components (Route::livewire(...) or an invokable Component class
+ * on a route) are resolved by *class* at render time, and Livewire derives a name
+ * from that class. Once the class lives outside App\Livewire that derivation fails
+ * with ComponentNotFoundException — but route:list still resolves the route, so
+ * nothing catches it short of an HTTP render. This enumerates the full-page
+ * components from the route table and asserts each resolves, the same way the
+ * framework does when serving the page.
+ *
+ * Scoped to App\Modules\* components on purpose: this guards the *migration* risk
+ * (a component we relocated into a module). It deliberately does NOT resolve
+ * arbitrary app/Livewire components — some may carry unrelated compile-time fatals
+ * (e.g. trait collisions) that are uncatchable and would crash the runner.
+ *
+ * @return array<string, string> component class => route uri
+ */
+function fullPageRouteComponents(): array
+{
+    $components = [];
+
+    foreach (app('router')->getRoutes()->getRoutes() as $route) {
+        $action = $route->getAction();
+        $uses = $action['uses'] ?? null;
+
+        // Case 2: Route::livewire(...) stores the component class on the action.
+        if (array_key_exists('livewire_component', $action)) {
+            $component = $action['livewire_component'];
+
+            if (is_string($component) && str_starts_with($component, 'App\\Modules\\')) {
+                $components[$component] = $route->uri();
+            }
+
+            continue;
+        }
+
+        // Case 1: an invokable Livewire Component used directly as a route action.
+        if (is_string($uses) && str_ends_with($uses, '@__invoke')) {
+            $class = explode('@', $uses)[0];
+
+            if (str_starts_with($class, 'App\\Modules\\')
+                && class_exists($class)
+                && is_subclass_of($class, LivewireComponent::class)) {
+                $components[$class] = $route->uri();
+            }
+        }
+    }
+
+    return $components;
+}
+
+test('every full-page Livewire route component resolves to a registered component', function () {
+    $components = fullPageRouteComponents();
+
+    // Guard the guard: if this finds nothing, route enumeration or Livewire's
+    // action shape changed and the check has quietly stopped protecting anything.
+    Assert::assertNotEmpty(
+        $components,
+        'No full-page Livewire route components found — the route-enumeration logic likely needs updating.',
+    );
+
+    // Resolve the class the way the router does when binding the page (see
+    // SupportPageComponents::routeActionIsAPageComponent) — WITHOUT instantiating,
+    // so heavy page components (dashboards, etc.) aren't booted just to check them.
+    $factory = app('livewire.factory');
+    $broken = [];
+
+    foreach ($components as $component => $uri) {
+        try {
+            $factory->resolveComponentClass($component);
+        } catch (\Livewire\Exceptions\ComponentNotFoundException) {
+            $broken[$component] = $uri;
+        }
+    }
+
+    $report = collect($broken)
+        ->map(fn (string $uri, string $component): string => sprintf('  - %s  (route: /%s)', $component, $uri))
+        ->implode("\n");
+
+    Assert::assertSame(
+        [],
+        $broken,
+        "These full-page route components do not resolve at render time.\n"
+            ."A component moved out of App\\Livewire must be registered in its module ServiceProvider\n"
+            ."under its original name, e.g. Livewire::component('roadmap.index', RoadmapIndex::class):\n\n"
             .$report,
     );
 });
