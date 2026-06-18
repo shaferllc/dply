@@ -9,7 +9,7 @@ use App\Console\Commands\CheckEdgeRumAlertsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\CloudPollStatusCommand;
 use App\Console\Commands\CollectEdgeUsageCommand;
-use App\Console\Commands\CollectRealtimeUsageCommand;
+use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Console\Commands\CollectServerlessUsageCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;

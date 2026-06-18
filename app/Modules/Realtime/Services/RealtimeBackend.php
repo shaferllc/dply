@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Realtime;
+namespace App\Modules\Realtime\Services;
 
 use App\Models\RealtimeApp;
 use App\Services\Edge\EdgeBackend;

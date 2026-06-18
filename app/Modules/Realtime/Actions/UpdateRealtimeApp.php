@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Realtime;
+namespace App\Modules\Realtime\Actions;
 
-use App\Jobs\ProvisionRealtimeAppJob;
+use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
 use App\Models\RealtimeApp;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StripeSubscriptionSyncer;

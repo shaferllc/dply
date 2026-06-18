@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\Realtime\RealtimeBackend;
+use App\Modules\Realtime\Services\RealtimeBackend;
 use Database\Factories\RealtimeAppFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

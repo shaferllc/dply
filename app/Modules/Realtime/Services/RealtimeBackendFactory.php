@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Realtime;
+namespace App\Modules\Realtime\Services;
 
 /**
  * Resolves the active realtime backend. Returns the local cache-backed fake

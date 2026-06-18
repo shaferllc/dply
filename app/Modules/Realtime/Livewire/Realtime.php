@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Organizations;
+namespace App\Modules\Realtime\Livewire;
 
-use App\Actions\Realtime\CreateRealtimeApp;
-use App\Actions\Realtime\DeleteRealtimeApp;
-use App\Actions\Realtime\UpdateRealtimeApp;
+use App\Modules\Realtime\Actions\CreateRealtimeApp;
+use App\Modules\Realtime\Actions\DeleteRealtimeApp;
+use App\Modules\Realtime\Actions\UpdateRealtimeApp;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
 use App\Models\RealtimeApp;

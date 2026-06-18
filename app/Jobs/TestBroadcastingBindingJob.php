@@ -9,7 +9,7 @@ use App\Models\RealtimeApp;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;

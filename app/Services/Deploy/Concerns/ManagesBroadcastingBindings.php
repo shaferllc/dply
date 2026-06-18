@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy\Concerns;
 
-use App\Actions\Realtime\CreateRealtimeApp;
+use App\Modules\Realtime\Actions\CreateRealtimeApp;
 use App\Models\Organization;
 use App\Models\RealtimeApp;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use InvalidArgumentException;
 use Laravel\Pennant\Feature;
 use RuntimeException;

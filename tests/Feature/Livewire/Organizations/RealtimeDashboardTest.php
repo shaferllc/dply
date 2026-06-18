@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Livewire\Organizations\RealtimeDashboardTest;
 
-use App\Jobs\ProvisionRealtimeAppJob;
+use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
 use App\Jobs\SyncOrganizationBillingJob;
-use App\Livewire\Organizations\Realtime;
+use App\Modules\Realtime\Livewire\Realtime;
 use App\Models\Organization;
 use App\Models\RealtimeApp;
 use App\Models\User;

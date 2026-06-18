@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Realtime;
+namespace App\Modules\Realtime\Actions;
 
 use App\Models\RealtimeApp;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Support\Facades\Log;
 
 /**

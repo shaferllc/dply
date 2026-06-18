@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Realtime\Jobs;
 
 use App\Models\RealtimeApp;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

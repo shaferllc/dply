@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Realtime\Console;
 
 use App\Models\Organization;
 use App\Models\RealtimeApp;
-use App\Services\Realtime\CloudflareRealtimeBackend;
-use App\Services\Realtime\RealtimeBackendFactory;
-use App\Services\Realtime\RealtimeCloudflareClient;
+use App\Modules\Realtime\Services\CloudflareRealtimeBackend;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeCloudflareClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;

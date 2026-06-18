@@ -43,7 +43,7 @@ use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Observers\BackupAutoResumeObserver;
 use App\Observers\BackupFailureNotifyObserver;
 use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
-use App\Observers\RealtimeAppBillingObserver;
+use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
 use App\Observers\ServerObserver;
 use App\Observers\SiteBillingObserver;
 use App\Observers\SupervisorProgramObserver;

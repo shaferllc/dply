@@ -7,6 +7,7 @@ use App\Modules\Insights\InsightsServiceProvider;
 use App\Modules\Launch\LaunchServiceProvider;
 use App\Modules\OpsCopilot\OpsCopilotServiceProvider;
 use App\Modules\Projects\ProjectsServiceProvider;
+use App\Modules\Realtime\RealtimeServiceProvider;
 use App\Modules\Referrals\ReferralsServiceProvider;
 use App\Modules\Roadmap\RoadmapServiceProvider;
 use App\Modules\TaskRunner\TaskServiceProvider;
@@ -24,6 +25,7 @@ return [
     LaunchServiceProvider::class,
     OpsCopilotServiceProvider::class,
     ProjectsServiceProvider::class,
+    RealtimeServiceProvider::class,
     ReferralsServiceProvider::class,
     RoadmapServiceProvider::class,
     AppServiceProvider::class,

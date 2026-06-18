@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Realtime\Console;
 
 use App\Models\RealtimeApp;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Console\Command;
 
 /**

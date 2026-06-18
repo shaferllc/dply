@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Realtime;
+namespace App\Modules\Realtime\Actions;
 
-use App\Jobs\ProvisionRealtimeAppJob;
+use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
 use App\Models\Organization;
 use App\Models\RealtimeApp;
 use App\Models\User;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 
 /**
  * Creates a managed realtime app (status: provisioning) and dispatches the
