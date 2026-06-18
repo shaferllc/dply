@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Models\Site;
-use App\Services\Deploy\ServerlessDeploymentConfigResolver;
+use App\Modules\Deploy\Services\ServerlessDeploymentConfigResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;

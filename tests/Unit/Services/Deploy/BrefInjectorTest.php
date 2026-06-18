@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Deploy\BrefInjectorTest;
 
-use App\Services\Deploy\BrefInjector;
+use App\Modules\Deploy\Services\BrefInjector;
 
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/bref-injector-'.uniqid();

@@ -7,7 +7,7 @@ namespace Tests\Feature\DeployPhaseRunnerTest;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\DeployPhaseRunner;
+use App\Modules\Deploy\Services\DeployPhaseRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

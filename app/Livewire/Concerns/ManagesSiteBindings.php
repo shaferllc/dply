@@ -27,8 +27,8 @@ use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
-use App\Services\Deploy\DeploymentSecretInventory;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Deploy\Services\DeploymentSecretInventory;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Support\Servers\CacheEngineAvailability;
 use Illuminate\Support\Facades\Gate;
 

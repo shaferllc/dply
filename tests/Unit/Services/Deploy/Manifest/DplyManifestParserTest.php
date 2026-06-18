@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\Manifest\DplyManifestParserTest;
 
-use App\Services\Deploy\Manifest\DplyManifest;
-use App\Services\Deploy\Manifest\DplyManifestException;
-use App\Services\Deploy\Manifest\DplyManifestParser;
+use App\Modules\Deploy\Services\Manifest\DplyManifest;
+use App\Modules\Deploy\Services\Manifest\DplyManifestException;
+use App\Modules\Deploy\Services\Manifest\DplyManifestParser;
 
 function parser(): DplyManifestParser
 {

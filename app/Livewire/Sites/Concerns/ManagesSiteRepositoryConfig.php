@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\RemoveSiteRepositoryJob;
-use App\Services\Deploy\ServerlessRepositoryCheckout;
-use App\Services\Deploy\ServerlessRuntimeDetector;
-use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
+use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
+use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;

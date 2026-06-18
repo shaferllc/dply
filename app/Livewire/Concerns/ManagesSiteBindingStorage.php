@@ -7,7 +7,7 @@ namespace App\Livewire\Concerns;
 use App\Models\ObjectStorageCredential;
 use App\Models\ProviderCredential;
 use App\Models\SiteBinding;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
 
 /**

@@ -6,7 +6,7 @@ namespace Tests\Unit\CustomSiteWebserverNoopTest;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\DockerRuntimeDockerfileBuilder;
+use App\Modules\Deploy\Services\DockerRuntimeDockerfileBuilder;
 use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;

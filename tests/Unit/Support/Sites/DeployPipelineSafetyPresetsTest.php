@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineSafetyPresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

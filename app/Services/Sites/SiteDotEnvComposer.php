@@ -3,7 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\Deploy\DeploymentContractBuilder;
+use App\Modules\Deploy\Services\DeploymentContractBuilder;
 
 class SiteDotEnvComposer
 {

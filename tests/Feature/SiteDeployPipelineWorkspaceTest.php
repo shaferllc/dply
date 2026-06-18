@@ -9,7 +9,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployStep;
 use App\Models\User;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineAdvisor;
 use App\Support\Sites\DeployPipelineJsonExporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;

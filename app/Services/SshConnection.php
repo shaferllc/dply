@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Contracts\RemoteShell;
 use App\Models\Server;
-use App\Services\Deploy\EphemeralDeployCredentialContext;
+use App\Modules\Deploy\Services\EphemeralDeployCredentialContext;
 use App\Services\Servers\ServerRemoteAccessLogger;
 use App\Support\Debug\SshCallRecorder;
 use phpseclib3\Crypt\PublicKeyLoader;

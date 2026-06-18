@@ -12,7 +12,7 @@ use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\ResourceSuggestionMapper;

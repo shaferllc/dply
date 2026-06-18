@@ -10,7 +10,7 @@ use App\Livewire\Sites\Create as SiteCreate;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Deploy\LocalRepositoryInspector;
+use App\Modules\Deploy\Services\LocalRepositoryInspector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;

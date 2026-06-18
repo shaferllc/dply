@@ -9,10 +9,10 @@ use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Modules\Certificates\Services\CertificateRequestService;
-use App\Services\Deploy\DeploymentContractBuilder;
-use App\Services\Deploy\DeploymentPreflightValidator;
-use App\Services\Deploy\DeploymentRevisionTracker;
-use App\Services\Deploy\DeploymentValueRedactor;
+use App\Modules\Deploy\Services\DeploymentContractBuilder;
+use App\Modules\Deploy\Services\DeploymentPreflightValidator;
+use App\Modules\Deploy\Services\DeploymentRevisionTracker;
+use App\Modules\Deploy\Services\DeploymentValueRedactor;
 use Illuminate\Database\QueryException;
 
 class SiteProvisioner

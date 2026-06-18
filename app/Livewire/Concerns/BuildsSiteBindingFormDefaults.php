@@ -6,7 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\ObjectStorageCredential;
 use App\Models\RealtimeApp;
-use App\Services\Deploy\DeploymentSecretInventory;
+use App\Modules\Deploy\Services\DeploymentSecretInventory;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.

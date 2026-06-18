@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Deploy\RuntimeAwareDeployStepDefaultsTest;
 
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
+use App\Modules\Deploy\Services\RuntimeAwareDeployStepDefaults;
 
 test('php laravel emits composer install then migrate then optimize', function () {
     $steps = (new RuntimeAwareDeployStepDefaults)->defaultsFor('php', 'laravel');

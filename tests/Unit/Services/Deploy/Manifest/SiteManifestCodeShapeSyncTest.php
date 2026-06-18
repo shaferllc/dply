@@ -10,9 +10,9 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
 use App\Models\User;
-use App\Services\Deploy\Manifest\DplyManifest;
-use App\Services\Deploy\Manifest\DplyManifestParser;
-use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
+use App\Modules\Deploy\Services\Manifest\DplyManifest;
+use App\Modules\Deploy\Services\Manifest\DplyManifestParser;
+use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

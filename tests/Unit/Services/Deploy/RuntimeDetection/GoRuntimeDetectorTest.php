@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\GoRuntimeDetectorTest;
 
-use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\GoRuntimeDetector;
 
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-go-detector-'.uniqid();

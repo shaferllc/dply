@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\DeploymentRunner;
+use App\Modules\Deploy\Services\DeploymentRunner;
 use App\Services\Sites\SiteGitDeployer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;

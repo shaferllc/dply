@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\SiteEnvReader;
 use Illuminate\Bus\Queueable;

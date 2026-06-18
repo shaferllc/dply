@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
 use Illuminate\Console\Command;
 
 /**

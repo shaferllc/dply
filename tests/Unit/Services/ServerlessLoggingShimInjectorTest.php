@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessLoggingShimInjectorTest;
 
-use App\Services\Deploy\ServerlessLoggingShimInjector;
+use App\Modules\Deploy\Services\ServerlessLoggingShimInjector;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 

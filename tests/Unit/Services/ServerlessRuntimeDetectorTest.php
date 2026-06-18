@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\ServerlessRuntimeDetectorTest;
 
-use App\Services\Deploy\ServerlessRuntimeDetector;
+use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
 use Illuminate\Support\Facades\File;
 
 test('ruby repo falls through to unknown since do functions has no ruby runtime', function () {

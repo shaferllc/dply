@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Services\Aws;
 
 use App\Models\FunctionAction;
 use App\Models\Server;
-use App\Services\Deploy\ServerlessProviders\Aws\AwsLambdaClientOptions;
+use App\Modules\Deploy\Services\ServerlessProviders\Aws\AwsLambdaClientOptions;
 use App\Modules\Serverless\Services\Backends\ServerlessTriggerBackend;
 use Aws\EventBridge\EventBridgeClient;
 use Aws\Exception\AwsException;

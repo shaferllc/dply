@@ -11,7 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Services\Deploy\ServerlessDeployProgress;
+use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;

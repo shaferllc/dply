@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessGinAdapterTest;
 
-use App\Services\Deploy\ServerlessGinAdapter;
+use App\Modules\Deploy\Services\ServerlessGinAdapter;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 

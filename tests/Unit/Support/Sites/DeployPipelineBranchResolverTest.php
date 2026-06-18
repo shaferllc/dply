@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineBranchResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

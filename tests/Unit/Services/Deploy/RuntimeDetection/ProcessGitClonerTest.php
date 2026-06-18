@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\ProcessGitClonerTest;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\ProcessGitCloner;
 use Symfony\Component\Process\Process;
 
 beforeEach(function () {

@@ -8,7 +8,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use Illuminate\Support\Str;
 
 /**

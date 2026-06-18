@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\SiteResourceBindingResolverTest;
 
 use App\Models\Site;
-use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Modules\Deploy\Services\SiteResourceBindingResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

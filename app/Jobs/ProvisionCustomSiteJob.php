@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\SyncCustomSiteDeployStep;
+use App\Modules\Deploy\Services\SyncCustomSiteDeployStep;
 use App\Services\SshConnectionFactory;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

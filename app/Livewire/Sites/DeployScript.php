@@ -9,7 +9,7 @@ use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelinePalette;
 use App\Support\Sites\DeployScriptComposer;
 use Illuminate\Contracts\View\View;

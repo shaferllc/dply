@@ -3,7 +3,7 @@
 /**
  * dply logging shim for a raw OpenWhisk PHP action.
  *
- * Injected at deploy time by App\Services\Deploy\ServerlessLoggingShimInjector.
+ * Injected at deploy time by App\Modules\Deploy\Services\ServerlessLoggingShimInjector.
  * Do not edit in the user's repo — dply overwrites this file on every deploy.
  *
  * The DigitalOcean Functions activations list API is structurally empty, so

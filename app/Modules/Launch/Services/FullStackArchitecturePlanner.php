@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Launch\Services;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\GitCloner;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
 use App\Modules\Edge\Services\EdgeMonorepoDetector;
 use App\Modules\Edge\Services\Frameworks\EdgeFrameworkPresetRegistry;
 use App\Modules\Edge\Support\EdgeSsrDetection;

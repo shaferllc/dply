@@ -10,7 +10,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\ServerlessDeployProgress;
+use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;

@@ -4,7 +4,7 @@ namespace App\Services\Sites\Clone;
 
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 final class SiteCloneDeployRowsReplicator
 {

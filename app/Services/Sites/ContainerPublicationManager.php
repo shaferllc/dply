@@ -4,7 +4,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
-use App\Services\Deploy\LocalPublishedPortAllocator;
+use App\Modules\Deploy\Services\LocalPublishedPortAllocator;
 
 class ContainerPublicationManager
 {

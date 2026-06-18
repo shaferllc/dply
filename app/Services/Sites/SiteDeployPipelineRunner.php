@@ -6,7 +6,7 @@ use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\DeployPhaseRunner;
+use App\Modules\Deploy\Services\DeployPhaseRunner;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.

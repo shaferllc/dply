@@ -7,7 +7,7 @@ namespace App\Livewire\Sites;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Services\Deploy\ServerlessDeployHookRunner;
+use App\Modules\Deploy\Services\ServerlessDeployHookRunner;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 

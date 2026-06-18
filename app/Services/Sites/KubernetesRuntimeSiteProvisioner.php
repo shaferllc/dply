@@ -3,7 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\Deploy\KubernetesManifestBuilder;
+use App\Modules\Deploy\Services\KubernetesManifestBuilder;
 use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
 
 final class KubernetesRuntimeSiteProvisioner implements SiteRuntimeProvisioner

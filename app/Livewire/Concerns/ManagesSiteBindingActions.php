@@ -17,7 +17,7 @@ use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
 
 /**

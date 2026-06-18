@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\LaravelComposerPackageDetectorTest;
 
-use App\Services\Deploy\LaravelComposerPackageDetector;
+use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
 
 test('flags are false when composer is null', function () {
     $d = new LaravelComposerPackageDetector;

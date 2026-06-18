@@ -5,7 +5,7 @@ namespace App\Livewire\Concerns;
 use App\Jobs\SendSiteLogTestJob;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Logging\LoggingChannelCatalog;
 use App\Services\Logging\LoggingConfigGenerator;
 use App\Services\Logging\LoggingSpec;

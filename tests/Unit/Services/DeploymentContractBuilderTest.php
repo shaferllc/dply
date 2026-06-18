@@ -5,7 +5,7 @@ namespace Tests\Unit\Services\DeploymentContractBuilderTest;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\Workspace;
-use App\Services\Deploy\DeploymentContractBuilder;
+use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

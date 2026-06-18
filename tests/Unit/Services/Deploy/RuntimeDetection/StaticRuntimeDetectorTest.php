@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\StaticRuntimeDetectorTest;
 
-use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\StaticRuntimeDetector;
 
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-static-detector-'.uniqid();

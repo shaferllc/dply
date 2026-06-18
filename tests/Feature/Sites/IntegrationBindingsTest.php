@@ -12,7 +12,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
 use App\Models\User;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 

@@ -6,8 +6,8 @@ namespace App\Support\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\RuntimeAwareDeployStepDefaults;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 /**
  * The "simple text pipeline": each deploy phase (build / release / restart) is a

@@ -8,7 +8,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployPipeline;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 /**
  * One-click Laravel safety bundles for the deploy pipeline workspace.

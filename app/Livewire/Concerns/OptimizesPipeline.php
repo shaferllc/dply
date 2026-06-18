@@ -9,7 +9,7 @@ use App\Jobs\VerifySiteOctaneJob;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\OctaneRuntimeVerifier;
 use App\Support\Sites\SitePipelineAdvisor;
 use Livewire\Component;

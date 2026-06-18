@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessRepositoryCheckoutTest;
 
-use App\Services\Deploy\ServerlessRepositoryCheckout;
+use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 

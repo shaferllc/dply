@@ -16,7 +16,7 @@ use App\Livewire\Sites\Concerns\ManagesSiteCreateStore;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
-use App\Services\Deploy\LocalRepositoryInspector;
+use App\Modules\Deploy\Services\LocalRepositoryInspector;
 use App\Services\Servers\ServerPhpManager;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;

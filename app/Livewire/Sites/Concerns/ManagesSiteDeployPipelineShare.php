@@ -6,7 +6,7 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineJsonExporter;
 use App\Support\Sites\DeployPipelineJsonImporter;
 use App\Support\Sites\DeployPipelineScriptExporter;

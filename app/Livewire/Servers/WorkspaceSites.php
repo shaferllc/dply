@@ -13,7 +13,7 @@ use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Servers\ServerBulkSiteActions;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerRemovalAdvisor;

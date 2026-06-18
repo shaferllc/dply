@@ -8,7 +8,7 @@ use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\OctaneRuntimeVerifier;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;

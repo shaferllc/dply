@@ -11,7 +11,7 @@
          the whole block is gated to avoid undefined $bindingModal* vars. --}}
     @if (method_exists($this, 'openBindingModal'))
     @php
-        $siteBindings = app(\App\Services\Deploy\SiteResourceBindingResolver::class)->forSite($site);
+        $siteBindings = app(\App\Modules\Deploy\Services\SiteResourceBindingResolver::class)->forSite($site);
         $bindingStatusBadge = [
             'configured' => 'bg-emerald-100 text-emerald-800',
             'pending' => 'bg-amber-100 text-amber-900',
@@ -668,7 +668,7 @@
                         </select>
                     </div>
                     @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
-                    @php $etPackage = \App\Services\Deploy\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
+                    @php $etPackage = \App\Modules\Deploy\Services\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
                     @if ($etPackage)
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                             {{ __('Requires the') }} <code class="font-mono font-semibold">{{ $etPackage }}</code> {{ __('package. Add it to your') }} <code class="font-mono font-semibold">composer.json</code> {{ __('before deploying.') }}
@@ -699,7 +699,7 @@
                     </div>
                     @include('livewire.sites.settings.partials.environment.ai-credential-fields', ['aiProvider' => $aiProvider])
                     <p class="text-xs text-brand-moss">
-                        {{ __('Injects') }} <code class="font-mono">{{ \App\Services\Deploy\SiteBindingManager::AI_KEY_ENV[$aiProvider] ?? 'OPENAI_API_KEY' }}</code>
+                        {{ __('Injects') }} <code class="font-mono">{{ \App\Modules\Deploy\Services\SiteBindingManager::AI_KEY_ENV[$aiProvider] ?? 'OPENAI_API_KEY' }}</code>
                         @if ($aiProvider === 'openai') {{ __('(and OPENAI_ORGANIZATION when set)') }} @endif
                         {{ __('at deploy.') }}
                     </p>
@@ -752,7 +752,7 @@
                         </select>
                     </div>
                     @include('livewire.sites.settings.partials.environment.search-credential-fields', ['searchProvider' => $searchProvider])
-                    @php $searchPackage = \App\Services\Deploy\SiteBindingManager::SEARCH_PACKAGES[$searchProvider] ?? null; @endphp
+                    @php $searchPackage = \App\Modules\Deploy\Services\SiteBindingManager::SEARCH_PACKAGES[$searchProvider] ?? null; @endphp
                     <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                         {{ __('Requires') }} <code class="font-mono font-semibold">laravel/scout</code>@if ($searchPackage) {{ __(' and ') }}<code class="font-mono font-semibold">{{ $searchPackage }}</code>@endif. {{ __('Add to composer.json before deploying.') }}
                     </div>

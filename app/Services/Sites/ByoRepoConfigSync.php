@@ -9,7 +9,7 @@ use App\Models\ServerCronJob;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRedirect;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Modules\Edge\Services\Config\EdgeRepoConfig;
 use App\Services\SshConnection;
 use Illuminate\Support\Facades\Log;

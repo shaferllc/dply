@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\Deploy\Manifest\DplyManifestParser;
+use App\Modules\Deploy\Services\Manifest\DplyManifestParser;
 use App\Services\Sites\ByoRepoConfigLoader;
 use Illuminate\Console\Command;
 

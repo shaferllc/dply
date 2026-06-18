@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessAdapterRuntimeTest;
 
-use App\Services\Deploy\ServerlessDjangoAdapter;
-use App\Services\Deploy\ServerlessExpressAdapter;
-use App\Services\Deploy\ServerlessFlaskAdapter;
-use App\Services\Deploy\ServerlessGinAdapter;
+use App\Modules\Deploy\Services\ServerlessDjangoAdapter;
+use App\Modules\Deploy\Services\ServerlessExpressAdapter;
+use App\Modules\Deploy\Services\ServerlessFlaskAdapter;
+use App\Modules\Deploy\Services\ServerlessGinAdapter;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Assert;
 use Symfony\Component\Process\ExecutableFinder;

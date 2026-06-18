@@ -4,7 +4,7 @@ namespace Tests\Unit\Services\KubernetesManifestBuilderTest;
 
 use App\Enums\SiteType;
 use App\Models\Site;
-use App\Services\Deploy\KubernetesManifestBuilder;
+use App\Modules\Deploy\Services\KubernetesManifestBuilder;
 
 test('it builds manifest yaml for php sites', function () {
     $site = new Site([

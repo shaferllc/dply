@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
-use App\Services\Deploy\ServerlessRepositoryCheckout;
-use App\Services\Deploy\ServerlessRuntimeDetector;
-use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
+use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
+use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
 use Throwable;
 
 /**

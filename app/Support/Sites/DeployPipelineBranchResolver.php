@@ -6,7 +6,7 @@ namespace App\Support\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use Illuminate\Support\Str;
 
 /**

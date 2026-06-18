@@ -31,7 +31,7 @@ class ListFrameworksCommand extends Command
      * Mirrors detector logic. Each entry is [framework => one-line summary].
      *
      * Update when adding a new detector branch in
-     * App\Services\Deploy\RuntimeDetection\*RuntimeDetector.
+     * App\Modules\Deploy\Services\RuntimeDetection\*RuntimeDetector.
      *
      * @var array<string, array<string, string>>
      */

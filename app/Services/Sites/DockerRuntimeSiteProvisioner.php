@@ -3,7 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\Deploy\DockerComposeArtifactBuilder;
+use App\Modules\Deploy\Services\DockerComposeArtifactBuilder;
 use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
 
 final class DockerRuntimeSiteProvisioner implements SiteRuntimeProvisioner

@@ -6,7 +6,7 @@ namespace Tests\Feature\Services\Deploy\ServerlessDeployHookRunnerTest;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Services\Deploy\ServerlessDeployHookRunner;
+use App\Modules\Deploy\Services\ServerlessDeployHookRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 

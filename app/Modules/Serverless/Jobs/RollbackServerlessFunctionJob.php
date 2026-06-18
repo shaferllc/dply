@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Jobs;
 
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
+use App\Modules\Deploy\Services\DigitalOceanFunctionsActionDeployer;
 use App\Support\DeployLogRedactor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

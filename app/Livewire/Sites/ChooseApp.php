@@ -11,7 +11,7 @@ use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
 use App\Services\Sites\SiteDeploySyncCoordinator;

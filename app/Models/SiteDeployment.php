@@ -235,7 +235,7 @@ class SiteDeployment extends Model
     public function failedPhase(): ?string
     {
         $results = $this->phase_results ?? [];
-        foreach (\App\Services\Deploy\DeployResumePlan::PHASE_ORDER as $phase) {
+        foreach (\App\Modules\Deploy\Services\DeployResumePlan::PHASE_ORDER as $phase) {
             $steps = $results[$phase] ?? null;
             if (! is_array($steps)) {
                 continue;
@@ -271,7 +271,7 @@ class SiteDeployment extends Model
             return null;
         }
         $phase = $this->failedPhase();
-        if ($phase === null || ! in_array($phase, \App\Services\Deploy\DeployResumePlan::RESUMABLE_PHASES, true)) {
+        if ($phase === null || ! in_array($phase, \App\Modules\Deploy\Services\DeployResumePlan::RESUMABLE_PHASES, true)) {
             return null;
         }
 

@@ -8,7 +8,7 @@
 @php
     $mailCreds = $this->mailCredentialsFor($mailProvider);
     $mailUsingSaved = ($bindingForm['credential_id'] ?? '') !== '';
-    $mailPackage = \App\Services\Deploy\SiteBindingManager::MAIL_TRANSPORT_PACKAGES[$mailProvider] ?? null;
+    $mailPackage = \App\Modules\Deploy\Services\SiteBindingManager::MAIL_TRANSPORT_PACKAGES[$mailProvider] ?? null;
 @endphp
 @if ($mailCreds !== [])
     <div>

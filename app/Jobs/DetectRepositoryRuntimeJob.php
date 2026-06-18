@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

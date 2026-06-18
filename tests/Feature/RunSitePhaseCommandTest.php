@@ -6,7 +6,7 @@ namespace Tests\Feature\RunSitePhaseCommandTest;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\DeployPhaseRunner;
+use App\Modules\Deploy\Services\DeployPhaseRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Mockery;

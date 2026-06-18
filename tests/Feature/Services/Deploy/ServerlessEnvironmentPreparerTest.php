@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Services\Deploy\ServerlessEnvironmentPreparerTest;
 
 use App\Models\Site;
-use App\Services\Deploy\ServerlessEnvironmentPreparer;
+use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 

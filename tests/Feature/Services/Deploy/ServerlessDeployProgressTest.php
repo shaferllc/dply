@@ -7,7 +7,7 @@ namespace Tests\Feature\Services\Deploy\ServerlessDeployProgressTest;
 use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\ServerlessDeployProgress;
+use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

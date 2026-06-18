@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessDjangoAdapterTest;
 
-use App\Services\Deploy\ServerlessDjangoAdapter;
+use App\Modules\Deploy\Services\ServerlessDjangoAdapter;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 

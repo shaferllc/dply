@@ -6,7 +6,7 @@ namespace App\Services\Sites;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
-use App\Services\Deploy\LaravelComposerPackageDetector;
+use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
 
 /**
  * Persists composer-based Laravel stack hints for VM (atomic SSH) deploys so

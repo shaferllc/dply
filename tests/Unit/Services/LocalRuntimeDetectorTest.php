@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\LocalRuntimeDetectorTest;
 
 use App\Enums\SiteType;
-use App\Services\Deploy\LocalRuntimeDetector;
+use App\Modules\Deploy\Services\LocalRuntimeDetector;
 use Illuminate\Support\Facades\File;
 
 test('it defaults laravel repos to docker php with public docroot', function () {

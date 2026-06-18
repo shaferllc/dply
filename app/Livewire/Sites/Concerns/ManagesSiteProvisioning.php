@@ -13,7 +13,7 @@ use App\Jobs\RestartSiteProvisioningJob;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Modules\Certificates\Services\CertificateRepairService;
-use App\Services\Deploy\SiteRuntimeActionExecutor;
+use App\Modules\Deploy\Services\SiteRuntimeActionExecutor;
 use App\Modules\Edge\Services\EdgeSiteCanceller;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;

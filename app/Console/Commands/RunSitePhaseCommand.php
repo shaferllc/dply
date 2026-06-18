@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\DeployPhaseRunner;
+use App\Modules\Deploy\Services\DeployPhaseRunner;
 use Illuminate\Console\Command;
 use Throwable;
 
