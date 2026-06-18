@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Logs\Console;
 
 use App\Models\AppLogRecord;
 use Illuminate\Console\Command;

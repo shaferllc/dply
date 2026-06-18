@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Backups\Console;
 
 use App\Models\ServerDatabaseBackup;
 use App\Modules\Backups\Services\ServerDatabaseBackupRestorer;

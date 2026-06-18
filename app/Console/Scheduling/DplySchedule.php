@@ -32,7 +32,7 @@ use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
-use App\Console\Commands\PruneAppLogsCommand;
+use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;

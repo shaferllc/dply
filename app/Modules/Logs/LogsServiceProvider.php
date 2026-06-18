@@ -18,6 +18,7 @@ class LogsServiceProvider extends ServiceProvider
                 Console\MeterServerLogUsageCommand::class,
                 Console\InstallLogAggregatorCommand::class,
                 Console\LogDrainListen::class,
+                Console\PruneAppLogsCommand::class,
             ]);
         }
     }
