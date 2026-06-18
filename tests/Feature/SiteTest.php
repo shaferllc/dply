@@ -78,7 +78,7 @@ test('site settings runtime section shows php card with current version and inst
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php'], false));
 
     $response->assertOk()
         ->assertSee('PHP')
@@ -118,9 +118,8 @@ test('site settings deploy section shows docker runtime artifacts', function () 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'overview'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('docker compose up -d --build')
         ->assertSee('FROM php:8.3-apache');
@@ -153,9 +152,8 @@ test('site settings deploy section shows kubernetes runtime artifacts', function
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'overview'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('kind: Deployment');
@@ -183,7 +181,7 @@ test('site settings runtime section shows php mismatch state and server php reme
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php'], false));
 
     $response->assertOk()
         ->assertSee('PHP version mismatch')
@@ -218,7 +216,7 @@ test('site settings runtime section hides unsupported installed versions', funct
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php'], false));
 
     $response->assertOk()
         ->assertSee('PHP 8.4')
