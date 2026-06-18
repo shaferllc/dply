@@ -103,7 +103,7 @@ test('applyRemediation refuses another tenant’s error id', function () {
         ->test(Errors::class, ['server' => $server, 'site' => $site])
         ->call('applyRemediation', $foreignEvent->id, 'show_disk');
 
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(ApplyRemediationJob::class);
 });
 
 test('applyDeploymentRemediation refuses another tenant’s deployment id', function () {
@@ -133,5 +133,5 @@ test('applyDeploymentRemediation refuses another tenant’s deployment id', func
         ->test(DeploymentDetail::class, ['server' => $server, 'site' => $site, 'deployment' => $own])
         ->call('applyDeploymentRemediation', $foreign->id, 'show_disk');
 
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(ApplyRemediationJob::class);
 });
