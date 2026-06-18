@@ -31,6 +31,8 @@ class ServerlessServiceProvider extends ServiceProvider
             $this->commands([
                 Console\CollectServerlessUsageCommand::class,
                 Console\ServerlessTickCommand::class,
+                Console\BackfillFunctionActionsCommand::class,
+                Console\PruneFunctionInvocationsCommand::class,
             ]);
         }
     }

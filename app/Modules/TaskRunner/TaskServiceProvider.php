@@ -114,6 +114,9 @@ class TaskServiceProvider extends ServiceProvider
                 TaskListCommand::class,
                 TaskShowCommand::class,
                 TaskRunCommand::class,
+                Commands\SweepStalledTasksCommand::class,
+                Commands\TaskRunnerVerifyWebhooksCommand::class,
+                Commands\PruneRemoteTaskRunnerCommand::class,
             ]);
         }
 

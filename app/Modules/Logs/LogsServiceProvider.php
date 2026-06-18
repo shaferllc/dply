@@ -16,6 +16,8 @@ class LogsServiceProvider extends ServiceProvider
                 Console\SyncLogStoreSchemaCommand::class,
                 Console\SyncLogAggregatorPolicyCommand::class,
                 Console\MeterServerLogUsageCommand::class,
+                Console\InstallLogAggregatorCommand::class,
+                Console\LogDrainListen::class,
             ]);
         }
     }

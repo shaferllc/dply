@@ -15,6 +15,7 @@ class SnapshotsServiceProvider extends ServiceProvider
             $this->commands([
                 Console\SnapshotTakeCommand::class,
                 Console\SnapshotRestoreCommand::class,
+                Console\SnapshotListCommand::class,
             ]);
         }
     }
