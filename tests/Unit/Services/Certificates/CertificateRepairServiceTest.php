@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Certificates;
 
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\User;
-use App\Services\Certificates\CertificateRepairService;
+use App\Modules\Certificates\Services\CertificateRepairService;
 use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;

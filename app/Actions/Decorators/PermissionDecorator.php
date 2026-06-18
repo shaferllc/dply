@@ -42,7 +42,7 @@ class PermissionDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -95,11 +95,9 @@ class PermissionDecorator
     }
 
     /**
-     * Check if user has required permissions.
-     *
-     * @param  mixed  $user
+     * @param  array<int, string>  $requiredPermissions
      */
-    protected function hasRequiredPermissions($user, array $requiredPermissions): bool
+    protected function hasRequiredPermissions(mixed $user, array $requiredPermissions): bool
     {
         $userPermissions = $this->getUserPermissions($user);
 
@@ -113,11 +111,9 @@ class PermissionDecorator
     }
 
     /**
-     * Get user's permissions.
-     *
-     * @param  mixed  $user
+     * @return array<int, string>
      */
-    protected function getUserPermissions($user): array
+    protected function getUserPermissions(mixed $user): array
     {
         // Try common permission methods
         if (method_exists($user, 'getAllPermissions')) {
@@ -168,7 +164,7 @@ class PermissionDecorator
     }
 
     /**
-     * Get required permissions from the action.
+     * @return array<int, string>
      */
     protected function getRequiredPermissions(): array
     {

@@ -51,7 +51,7 @@ class CloudAlerts
      */
     public static function forSite(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $stored = is_array($meta['container']['alerts'] ?? null) ? $meta['container']['alerts'] : [];
 
         return array_replace_recursive(self::defaultConfig(), $stored);
@@ -102,7 +102,7 @@ class CloudAlerts
      */
     public static function destinationsFor(Site $site, Organization $organization): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $override = is_array($meta['container']['alerts']['destinations_override'] ?? null)
             ? $meta['container']['alerts']['destinations_override']
             : null;

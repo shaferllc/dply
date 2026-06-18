@@ -7,6 +7,7 @@ use App\Support\Servers\CacheServiceNetworkExposure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -40,11 +41,11 @@ abstract class TestCase extends BaseTestCase
         // lazy loading for the whole test process. withoutLazyLoading() resets on
         // each flush-state (per request), so re-arm it once via a flush-state
         // listener — keeps multi-request tests eager too. Production is unaffected.
-        \Livewire\Livewire::withoutLazyLoading();
+        Livewire::withoutLazyLoading();
         static $reArmLazyDisable = false;
         if (! $reArmLazyDisable) {
             $reArmLazyDisable = true;
-            \Livewire\on('flush-state', static fn () => \Livewire\Livewire::withoutLazyLoading());
+            \Livewire\on('flush-state', static fn () => Livewire::withoutLazyLoading());
         }
 
         foreach (class_uses_recursive(static::class) as $trait) {

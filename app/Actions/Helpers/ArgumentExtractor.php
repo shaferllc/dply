@@ -31,9 +31,9 @@ class ArgumentExtractor
      * Extracts arguments by index with optional type validation.
      * Returns an array of extracted arguments that can be destructured.
      *
-     * @param  array  $arguments  The variadic arguments array
+     * @param  array<int, mixed>  $arguments  The variadic arguments array
      * @param  string|null  ...$types  Optional type hints for each argument (class name or 'array', 'string', etc.)
-     * @return array Extracted arguments
+     * @return array<int, mixed> Extracted arguments
      *
      * @example
      * // Extract two arguments: Team and array

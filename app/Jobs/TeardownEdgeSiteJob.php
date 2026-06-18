@@ -26,7 +26,7 @@ class TeardownEdgeSiteJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null || ! $site->usesEdgeRuntime()) {
             return;
         }

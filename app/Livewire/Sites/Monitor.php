@@ -11,7 +11,7 @@ use App\Livewire\Sites\Concerns\ManagesUptimeNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
-use App\Services\Serverless\FunctionStatsRangeQuery;
+use App\Modules\Serverless\Services\FunctionStatsRangeQuery;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\SiteUptimeHistorySummary;
 use App\Services\Sites\UptimeProbeRegionResolver;

@@ -2,18 +2,19 @@
 
 use App\Console\Scheduling\DplySchedule;
 use App\Http\Middleware\AuthenticateApiToken;
-use App\Http\Middleware\CaptureReferralCode;
+use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\ResolveEdgeCustomDomain;
-use App\Http\Middleware\ResolveServerlessCustomDomain;
+use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
 use App\Support\DplyRuntime;
+use App\Support\MachineCallbackPaths;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -62,7 +63,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // health route in that list is a harmless extra here (GETs aren't CSRF
         // checked); webauthn is CSRF-specific so it's appended separately.
         $middleware->preventRequestForgery(except: array_merge(
-            \App\Support\MachineCallbackPaths::PATTERNS,
+            MachineCallbackPaths::PATTERNS,
             [
                 // Passkey ceremony endpoints (cross-origin, token-auth'd).
                 'webauthn/*',

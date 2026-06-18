@@ -1,16 +1,16 @@
 <div class="space-y-6">
 
+    <x-hero-card
+        :eyebrow="__('Site')"
+        :title="__('WordPress')"
+        :description="__('Manage this WordPress install — run wp-cli commands, update plugins, themes and core, take database snapshots, switch the cron handler, and apply hardening defaults.')"
+        icon="globe-alt"
+    />
+
     @if (! $site->isWordPressDetected())
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('WordPress') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('WordPress') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when the site is detected as a WordPress install — either from a wp-config.php in the repo or from a successful WordPress scaffold.') }}</p>
-                </div>
+            <div class="px-6 py-6 sm:px-7">
+                <p class="max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when the site is detected as a WordPress install — either from a wp-config.php in the repo or from a successful WordPress scaffold.') }}</p>
             </div>
         </section>
     @else

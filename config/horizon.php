@@ -48,7 +48,7 @@ if (is_string($horizonQueuesOverride) && trim($horizonQueuesOverride) !== '') {
     // provisioning jobs jump ahead of routine control-plane work. It's always
     // WATCHED here (so routing a job to it can never silently stall), but jobs
     // only land on it when server_provision.queue is set to it (default 'dply').
-    $horizonWorkerQueues = array_values(array_unique(array_merge(['dply-provision', 'dply', 'dply-control'], $horizonExtraQueues, $probeQueues)));
+    $horizonWorkerQueues = array_values(array_unique(array_merge(['default', 'dply-provision', 'dply', 'dply-control', 'dply-manage'], $horizonExtraQueues, $probeQueues)));
 }
 
 // dply-managed Horizon worker knobs — all env-driven so the pool UI can tune
@@ -57,6 +57,32 @@ $horizonBalance = (string) (env('HORIZON_BALANCE') ?: 'auto');
 $horizonMinProcesses = max(1, (int) env('HORIZON_MIN_PROCESSES', 1));
 $horizonWorkerMemory = max(32, (int) env('HORIZON_WORKER_MEMORY', 128));
 $horizonWorkerTries = max(1, (int) env('HORIZON_TRIES', 1));
+
+// Total worker ceiling for the supervisor. Under the 'auto' balancer Horizon
+// scales the pool between minProcesses (kept warm PER watched queue) and
+// maxProcesses (the SUPERVISOR-WIDE total). HORIZON_MAX_PROCESSES, when set, is
+// the AUTHORITATIVE cap: we only floor it to >= the queue count (so every queue
+// can be staffed) and >= 10 — NEVER up to count*minProcesses. The old count*min
+// floor let a large per-queue min silently override the operator's cap (e.g. 6
+// queues * min 9 forced max to 54, ignoring HORIZON_MAX_PROCESSES=16 and pinning
+// the box at 54 always-on workers). When the cap is unset, default to ~3 per queue
+// so the pool can still fan out across all of them.
+$horizonQueueCount = max(1, count($horizonWorkerQueues));
+$horizonMaxProcessesFloor = max(10, $horizonQueueCount);
+$horizonMaxProcesses = max(
+    $horizonMaxProcessesFloor,
+    (int) env('HORIZON_MAX_PROCESSES', $horizonQueueCount * 3)
+);
+// minProcesses is applied PER watched queue, so keep it consistent with the cap:
+// min * queueCount must fit under maxProcesses, else Horizon is handed a min it
+// can never honour and just runs at the ceiling. Clamp to maxProcesses/queueCount.
+$horizonMinProcesses = min($horizonMinProcesses, max(1, intdiv($horizonMaxProcesses, $horizonQueueCount)));
+// How aggressively 'auto' rebalances: how many processes it may add/remove per
+// scaling decision (balanceMaxShift) and how long it waits between decisions
+// (balanceCooldown, seconds). Higher shift + lower cooldown = the pool reaches its
+// ceiling faster when a queue backs up, instead of trickling one process at a time.
+$horizonBalanceMaxShift = max(1, (int) env('HORIZON_BALANCE_MAX_SHIFT', 3));
+$horizonBalanceCooldown = max(1, (int) env('HORIZON_BALANCE_COOLDOWN', 2));
 
 return [
 
@@ -275,10 +301,14 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            // Worker process kill bound. Must be ≥ the longest-running job's $timeout —
-            // currently ApplyInsightFixJob at 700s (apt-security-updates fix can run for
-            // 10 minutes on busy boxes). Override per-environment via HORIZON_*_JOB_TIMEOUT.
-            'timeout' => (int) env('HORIZON_JOB_TIMEOUT', 720),
+            // Worker process kill bound. Must be ≥ the longest-running job's $timeout
+            // (currently 7200s: RunSetupScriptJob / ExportSiteFileBackupJob) AND <
+            // the redis queue retry_after (see config/queue.php). A job's own larger
+            // $timeout overrides the worker --timeout, so a too-low value here does
+            // NOT cap such jobs — it only governs jobs without their own $timeout and
+            // the frozen-job kill bound. Invariant: longest $timeout ≤ this < retry_after.
+            // Override per-environment via HORIZON_*_JOB_TIMEOUT.
+            'timeout' => (int) env('HORIZON_JOB_TIMEOUT', 7320),
             'nice' => 0,
         ],
     ],
@@ -290,12 +320,12 @@ return [
                 'queue' => $horizonWorkerQueues,
                 'balance' => $horizonBalance,
                 'minProcesses' => $horizonMinProcesses,
-                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_MAX_PROCESSES', 10)),
+                'maxProcesses' => $horizonMaxProcesses,
                 'memory' => $horizonWorkerMemory,
                 'tries' => $horizonWorkerTries,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', env('HORIZON_JOB_TIMEOUT', 720)),
+                'balanceMaxShift' => $horizonBalanceMaxShift,
+                'balanceCooldown' => $horizonBalanceCooldown,
+                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', env('HORIZON_JOB_TIMEOUT', 7320)),
             ],
         ],
 
@@ -306,10 +336,12 @@ return [
                 'balance' => (string) (env('HORIZON_BALANCE') ?: 'simple'),
                 'minProcesses' => $horizonMinProcesses,
                 // Concurrent workers for local dev (Redis default maxclients is usually plenty).
-                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_LOCAL_MAX_PROCESSES', 8)),
+                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_LOCAL_MAX_PROCESSES', $horizonMaxProcesses)),
                 'memory' => max(32, (int) env('HORIZON_LOCAL_WORKER_MEMORY', $horizonWorkerMemory)),
                 'tries' => $horizonWorkerTries,
-                'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 720),
+                'balanceMaxShift' => $horizonBalanceMaxShift,
+                'balanceCooldown' => $horizonBalanceCooldown,
+                'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 7320),
                 'nice' => 0,
             ],
         ],

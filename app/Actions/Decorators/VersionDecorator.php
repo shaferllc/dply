@@ -10,12 +10,12 @@ class VersionDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         // Determine and set version before calling action
         $version = $this->getVersion();
@@ -28,7 +28,7 @@ class VersionDecorator
         return $this->appendVersionToResult($result, $version);
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
@@ -89,7 +89,7 @@ class VersionDecorator
         return null;
     }
 
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 

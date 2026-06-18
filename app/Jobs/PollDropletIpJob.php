@@ -87,9 +87,9 @@ class PollDropletIpJob implements ShouldQueue
         $name = null;
         try {
             foreach ($do->listVpcs() as $vpc) {
-                if (($vpc['id'] ?? '') === $vpcUuid) {
-                    $ipRange = ($vpc['ip_range'] ?? '') ?: null;
-                    $name = ($vpc['name'] ?? '') ?: null;
+                if ($vpc['id'] === $vpcUuid) {
+                    $ipRange = $vpc['ip_range'] !== '' ? $vpc['ip_range'] : null;
+                    $name = $vpc['name'] !== '' ? $vpc['name'] : null;
                     break;
                 }
             }

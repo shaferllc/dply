@@ -25,6 +25,7 @@ class CaddyCustomRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, hosts: list<string>, root: string, upstream: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $enabled = rtrim((string) config('sites.caddy_sites_enabled'), '/');
@@ -202,7 +203,7 @@ class CaddyCustomRoutesConfig
         $emit->step('caddy-custom-routes', 'Writing '.$path.' ('.$reason.')');
         $result = app(RemoteWebserverConfigService::class)->write($server, 'caddy', $path, $contents, $emit);
 
-        if (! ($result['validate_ok'] ?? false)) {
+        if (! ($result['validate_ok'])) {
             throw new \RuntimeException(trim((string) ($result['validate_output'] ?? 'caddy validate rejected the new file.')));
         }
 
@@ -253,6 +254,7 @@ class CaddyCustomRoutesConfig
 
     /**
      * @return list<string>
+     * @param  array<string, mixed> $value
      */
     private function normalizeList(array|string $value): array
     {

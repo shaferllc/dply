@@ -6,7 +6,7 @@ namespace Tests\Feature\FlushDeployDigestCommandTest;
 
 use App\Models\Organization;
 use App\Models\User;
-use App\Services\Notifications\DeployDigestBuffer;
+use App\Modules\Notifications\Services\DeployDigestBuffer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;

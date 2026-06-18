@@ -43,7 +43,7 @@ class ObservableDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -106,7 +106,7 @@ class ObservableDecorator
     }
 
     /**
-     * Fire an event if events should be fired.
+     * @param  array<string, mixed>  $data
      */
     protected function fireEvent(string $event, array $data): void
     {

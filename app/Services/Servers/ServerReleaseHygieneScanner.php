@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\RunServerReleaseHygieneScanJob;
+use App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerReleaseHygieneNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerReleaseHygieneNotificationDispatcher;
 use App\Services\SshConnection;
 use RuntimeException;
 
@@ -17,8 +19,8 @@ use RuntimeException;
  * critical state or recovers to healthy.
  *
  * Shared by the interactive "Scan disk" button
- * ({@see \App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan}) and the daily
- * fleet sweep ({@see \App\Jobs\RunServerReleaseHygieneScanJob}) so both run one code path.
+ * ({@see RunsServerReleaseHygieneScan}) and the daily
+ * fleet sweep ({@see RunServerReleaseHygieneScanJob}) so both run one code path.
  * Mirrors {@see ServerSecurityDigestScanner}.
  */
 final class ServerReleaseHygieneScanner
@@ -102,7 +104,7 @@ final class ServerReleaseHygieneScanner
         }
 
         throw new RuntimeException(
-            $lastError?->getMessage() ?: __('SSH connection failed for hygiene scan.'),
+            $lastError->getMessage() ?: __('SSH connection failed for hygiene scan.'),
             0,
             $lastError,
         );
@@ -159,7 +161,7 @@ final class ServerReleaseHygieneScanner
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array

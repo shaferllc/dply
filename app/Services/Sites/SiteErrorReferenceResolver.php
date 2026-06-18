@@ -28,8 +28,12 @@ use Throwable;
  */
 final class SiteErrorReferenceResolver
 {
-    /** Hard caps so a lookup can never stream an unbounded log back. */
-    private const TRACE_LINE_CAP = 150;
+    /**
+     * Hard cap so a lookup can never stream an unbounded log back, but high
+     * enough to carry a complete multi-line stack trace (a Laravel exception
+     * dump is ~90-100 frames) plus a few correlated entries.
+     */
+    private const TRACE_LINE_CAP = 2000;
 
     public function __construct(
         private readonly SshConnectionFactory $sshFactory,
@@ -40,6 +44,7 @@ final class SiteErrorReferenceResolver
     /**
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
+    /** @return array<string, mixed> */
     public function resolve(Site $site, string $reference): array
     {
         $reference = trim($reference);
@@ -93,8 +98,8 @@ final class SiteErrorReferenceResolver
     }
 
     /**
-     * @param  callable(?string): array<string, mixed>  $miss
-     * @param  array<string, 'laravel'|'fpm'|'web'>  $sourceMap
+     * @param  array<string, mixed> $miss
+     * @param  array<string, mixed> $sourceMap
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
     private function parse(string $raw, string $reference, callable $miss, array $sourceMap = []): array
@@ -150,8 +155,8 @@ final class SiteErrorReferenceResolver
      * FPM logs, nginx/apache for the webserver error log). Lines that don't parse
      * are simply dropped from `entries` — they remain verbatim in `trace`.
      *
-     * @param  list<string>  $trace
-     * @param  array<string, 'laravel'|'fpm'|'web'>  $sourceMap
+     * @param  array<string, mixed> $trace
+     * @param  array<string, mixed> $sourceMap
      * @return list<array<string, mixed>>
      */
     private function structureTrace(array $trace, array $sourceMap): array
@@ -199,7 +204,7 @@ final class SiteErrorReferenceResolver
     /**
      * Flatten a parser record (Laravel or webserver) into a uniform entry shape.
      *
-     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed> $record
      * @return array<string, mixed>
      */
     private function normalizeEntry(array $record, string $source, ?string $file): array
@@ -269,7 +274,7 @@ REF={$ref}
 LINE=""
 for f in {$fpmAccess} {$fpmAccess}.1; do
   [ -f "\$f" ] || continue
-  M="\$(grep -F "ref=\${REF} " "\$f" 2>/dev/null | tail -n 1)"
+  M="\$({ sudo -n grep -F "ref=\${REF} " "\$f" 2>/dev/null || grep -F "ref=\${REF} " "\$f" 2>/dev/null; } | tail -n 1)"
   [ -n "\$M" ] && LINE="\$M"
 done
 
@@ -301,8 +306,23 @@ if [ -n "\$PATTERNS" ]; then
   GREPF="\$(mktemp)"
   printf '%b' "\$PATTERNS" | sort -u | grep -v '^$' > "\$GREPF"
   for f in {$laravel} {$fpmError} {$webError}; do
-    [ -f "\$f" ] || continue
-    H="\$(tail -n 4000 "\$f" 2>/dev/null | grep -F -f "\$GREPF" 2>/dev/null | head -n {$cap})"
+    { sudo -n test -f "\$f" 2>/dev/null || [ -f "\$f" ]; } || continue
+    # A Laravel log entry is multi-line: a "[YYYY-MM-DD HH:MM:SS] …" header
+    # followed by the message and the full "#0 … #N {main}" stack trace, none
+    # of which carry their own timestamp. Grepping by timestamp alone would
+    # capture only the header, so walk the file with awk: when a header line
+    # matches one of our time patterns, print the WHOLE entry (header through
+    # the line before the next "[YYYY-…" header), capped at {$cap} lines total.
+    # FPM/webserver error logs are root-owned; try sudo first, then a plain
+    # read (already-readable file, e.g. the dply-owned laravel.log, or no sudo).
+    H="\$({ sudo -n tail -n 8000 "\$f" 2>/dev/null || tail -n 8000 "\$f" 2>/dev/null; } | awk -v capn={$cap} '
+      BEGIN { while ((getline p < "'"\$GREPF"'") > 0) if (p != "") want[p]=1 }
+      /^\\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ {
+        inb=0
+        for (p in want) { if (index(\$0, p)) { inb=1; break } }
+      }
+      inb { print; c++; if (c >= capn) exit }
+    ')"
     if [ -n "\$H" ]; then
       echo "── \$f ──"
       printf '%s\\n' "\$H"

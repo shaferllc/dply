@@ -229,7 +229,7 @@ class SiteFaviconFetcher
         $path = self::DIR.'/'.$site->id.'-'.Str::lower(Str::random(8)).'.'.$ext;
         Storage::disk(self::DISK)->put($path, $bytes);
 
-        if (is_string($old) && $old !== '' && $old !== $path) {
+        if (($old) && $old !== '' && $old !== $path) {
             Storage::disk(self::DISK)->delete($old);
         }
 

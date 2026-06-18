@@ -44,7 +44,7 @@ class CloudScaleCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;
@@ -63,7 +63,7 @@ class CloudScaleCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'instance_count' => $instances,
         ]);

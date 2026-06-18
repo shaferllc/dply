@@ -6,7 +6,7 @@ namespace Tests\Unit\Services\Imports\Ploi\PloiInventorySyncTest;
 
 use App\Models\PloiServer;
 use App\Models\ProviderCredential;
-use App\Services\Imports\Ploi\PloiInventorySync;
+use App\Modules\Imports\Services\Ploi\PloiInventorySync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

@@ -38,7 +38,7 @@ trait ManagesSearchBindings
     ];
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachSearch(Site $site, array $params): SiteBinding
     {
@@ -67,7 +67,7 @@ trait ManagesSearchBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolveSearchCredentials(Site $site, string $provider, array $params): array
@@ -84,7 +84,7 @@ trait ManagesSearchBindings
                 throw new InvalidArgumentException(__('That saved search credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return match ($provider) {
@@ -106,7 +106,7 @@ trait ManagesSearchBindings
         };
     }
 
-    /** @param array<string, string> $creds */
+    /** @param  array<string, mixed> $creds */
     private function validateSearchCredentials(string $provider, array $creds): void
     {
         match ($provider) {
@@ -124,7 +124,7 @@ trait ManagesSearchBindings
     }
 
     /**
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function searchEnv(string $provider, array $creds): array
@@ -178,8 +178,8 @@ trait ManagesSearchBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSaveSearchCredential(Site $site, string $provider, array $params, array $creds): void
     {

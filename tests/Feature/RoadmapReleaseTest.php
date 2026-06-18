@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Livewire\Admin\Roadmap\Index as AdminRoadmapIndex;
+use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Models\Organization;
 use App\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\User;
-use App\Support\Roadmap\RoadmapReleaseTrain;
+use App\Modules\Roadmap\Support\RoadmapReleaseTrain;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 

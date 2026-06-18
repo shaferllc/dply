@@ -27,6 +27,9 @@ class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 1200;
+
     public function uniqueId(): string
     {
         return 'console-action:permissions:'.$this->siteId;
@@ -34,7 +37,7 @@ class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -49,7 +52,7 @@ class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerSystemUserService $service): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }
@@ -67,7 +70,7 @@ class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
 
             // Old job stamped a `system_user_operation` site.meta entry on
             // failure as a side-channel for the system-user UI. Preserve that.
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['system_user_operation'] = [
                 'status' => 'error',
                 'message' => $e->getMessage(),

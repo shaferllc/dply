@@ -109,19 +109,23 @@ return [
 
     /*
     | Database engines offered for install on BYO servers. MySQL, PostgreSQL,
-    | and SQLite are always available; the rest start as "coming soon" until
-    | their install + operate path is validated. When a flag is off the engine
-    | shows a Soon badge + teaser in the Databases workspace and MariaDB
-    | variants are filtered out of the server-create database picker.
+    | and SQLite are always available; the engines below start as "coming
+    | soon" until their install + operate path is validated. When a flag is
+    | off the engine shows a Soon badge + teaser in the Databases workspace
+    | and is filtered out of the server-create database picker. Resolved
+    | per-org by the hybrid resolver, so platform admin can flip them on
+    | per-org or platform-wide from /admin/flags. Gating keys are consumed by
+    | App\Support\Servers\DatabaseEngineAvailability (`database.{engine}`).
     */
     'database' => [
-        // exit: ship once MariaDB install + MySQL-family workspace validated on three OSes
+        // exit: ship once MariaDB variant install + engine-switch validated on three OSes
         'mariadb' => env('FEATURE_DATABASE_MARIADB', false),
-        // exit: ship once MongoDB install + document DB workspace validated on three OSes
+        // exit: ship once MongoDB install + connection snippet validated on three OSes
         'mongodb' => env('FEATURE_DATABASE_MONGODB', false),
-        // exit: ship once ClickHouse install + OLAP workspace validated on three OSes
-        'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', false),
+        // GA: columnar OLAP install + remote access validated; default-on
+        'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', true),
     ],
+
 
     /*
     | Server-workspace tabs that are NOT in the MVP 14. Each maps to a
@@ -138,8 +142,12 @@ return [
         'server_blueprint_preview' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT_PREVIEW', true),
         // exit: ship once server webserver diff + rollback validated on nginx + caddy
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
-        // exit: ship once server maintenance suspend/resume validated on three VM hosts
-        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
+        // Defaulted OFF: suspend/resume churn caused repeated orphan-vhost outages
+        // (tracely.cloud 403s). Held behind the coming-soon teaser below until
+        // suspend/resume is validated on three VM hosts AND the orphan-vhost
+        // prune auto-heal is deployed to prod. Flip back on (env or /admin/flags)
+        // to restore the live workspace.
+        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', false),
         // exit: ship alongside server maintenance GA; teaser only when server maintenance is off
         'server_maintenance_preview' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE_PREVIEW', true),
         // exit: ship once patch advisor rollup validated against inventory probe on three Debian/Ubuntu hosts
@@ -152,10 +160,8 @@ return [
         'daemon_slo' => env('FEATURE_WORKSPACE_DAEMON_SLO', true),
         // exit: ship once server cert inventory + bulk renew validated on three VM hosts
         'cert_inventory' => env('FEATURE_WORKSPACE_CERT_INVENTORY', true),
-        // exit: ship once deploy window policy validated blocking/allowing deploy jobs
-        'deploy_windows' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS', true),
-        // exit: ship alongside deploy windows GA; teaser only when deploy windows is off
-        'deploy_windows_preview' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS_PREVIEW', false),
+        // deploy_windows: GA'd — deploy windows now live as tabs on the Deploys
+        // page (servers.deploys?tab=deploy-windows) with no feature gate.
         // exit: ship once SSH access graph validated against authorized_keys panel
         'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
         // exit: ship alongside SSH access graph GA; teaser only when it is off
@@ -205,8 +211,6 @@ return [
         'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
-        // exit: ship once audit-log filtering UI is reviewed
-        'activity' => env('FEATURE_WORKSPACE_ACTIVITY', true),
         // exit: ship once remote-script execution surface is reviewed (security risk)
         'run' => env('FEATURE_WORKSPACE_RUN', false),
         // exit: ship alongside run GA; teaser only when run is off
@@ -257,7 +261,7 @@ return [
         // to the site directory (see App\Livewire\Sites\Files::siteRoot). Real flag on,
         // preview off.
         'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', true),
-        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW',     ),
+        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW'),
         'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', false),
         'site_cli_preview' => env('FEATURE_WORKSPACE_SITE_CLI_PREVIEW', true),
         // Live: assign the Linux account that owns a VM-backed PHP site's files

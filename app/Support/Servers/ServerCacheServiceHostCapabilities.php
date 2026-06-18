@@ -257,7 +257,7 @@ class ServerCacheServiceHostCapabilities
             }
 
             $parts = explode('|', trim($out), 2);
-            $id = strtolower(trim($parts[0] ?? ''));
+            $id = strtolower(trim($parts[0]));
             $codename = strtolower(trim($parts[1] ?? ''));
 
             // Treat empty fields as failure — caching `['id' => '', 'codename' => '']` for a day
@@ -307,6 +307,9 @@ class ServerCacheServiceHostCapabilities
         return $this->unsupportedReasonForEngine($this->distroInfo($server), $engine);
     }
 
+    /**
+     * @param  array<string, mixed> $info
+     */
     private function unsupportedReasonForEngine(?array $info, string $engine): ?string
     {
         $whitelist = CacheServiceInstallScripts::supportedDistroCodenames($engine);

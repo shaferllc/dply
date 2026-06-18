@@ -82,17 +82,20 @@ use Lorisleiva\Lody\Lody;
  */
 class ActionRegistry
 {
+    /** @var Collection<int, string>|null */
     protected static ?Collection $actions = null;
 
+    /** @var array<string, array<int, string>> */
     protected static array $tags = [];
 
+    /** @var array<string, array<int, string>> */
     protected static array $dependencies = [];
 
     /**
      * Discover all actions in the given paths.
      *
-     * @param  string|array  $paths  Paths to scan (default: app/Actions)
-     * @return Collection<string> Collection of action class names
+     * @param  array<int, string>|string|null  $paths  Paths to scan (default: app/Actions)
+     * @return Collection<int, string> Collection of action class names
      */
     public static function discover(string|array|null $paths = null): Collection
     {
@@ -125,6 +128,8 @@ class ActionRegistry
 
     /**
      * Get all discovered actions.
+     *
+     * @return Collection<int, string>
      */
     public static function all(): Collection
     {
@@ -139,7 +144,7 @@ class ActionRegistry
      * Get actions that use a specific trait.
      *
      * @param  string  $trait  Trait class name
-     * @return Collection<string> Action class names
+     * @return Collection<int, string> Action class names
      */
     public static function getByTrait(string $trait): Collection
     {
@@ -152,10 +157,11 @@ class ActionRegistry
      * Get actions by tag.
      *
      * @param  string  $tag  Tag name
-     * @return Collection<string> Action class names
+     * @return Collection<int, string> Action class names
      */
     public static function getByTag(string $tag): Collection
     {
+        /** @var array<int, string> $taggedActions */
         $taggedActions = static::$tags[$tag] ?? [];
 
         return collect($taggedActions);
@@ -165,7 +171,7 @@ class ActionRegistry
      * Tag an action.
      *
      * @param  string  $actionClass  Action class name
-     * @param  string|array  $tags  Tag(s) to assign
+     * @param  array<int, string>|string  $tags  Tag(s) to assign
      */
     public static function tag(string $actionClass, string|array $tags): void
     {
@@ -197,7 +203,7 @@ class ActionRegistry
      * Register dependencies for an action.
      *
      * @param  string  $actionClass  Action class name
-     * @param  string|array  $dependencies  Dependency action class names
+     * @param  array<int, string>|string  $dependencies  Dependency action class names
      */
     public static function registerDependencies(string $actionClass, string|array $dependencies): void
     {
@@ -208,7 +214,7 @@ class ActionRegistry
      * Get actions that depend on a specific action.
      *
      * @param  string  $actionClass  Action class name
-     * @return Collection<string> Action class names that depend on this action
+     * @return Collection<int, string> Action class names that depend on this action
      */
     public static function getDependents(string $actionClass): Collection
     {
@@ -254,7 +260,7 @@ class ActionRegistry
      * Search actions by name or namespace.
      *
      * @param  string  $query  Search query
-     * @return Collection<string> Matching action class names
+     * @return Collection<int, string> Matching action class names
      */
     public static function search(string $query): Collection
     {

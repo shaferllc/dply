@@ -17,7 +17,7 @@ use App\Support\ServerProviderGate;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Livewire\Livewire;
+use Livewire\Features\SupportTesting\Testable;
 
 /**
  * Local / CI helper: run as dply.demo_user_email (or --email), use that user’s first
@@ -133,8 +133,8 @@ class DemoDigitalOceanServerCommand extends Command
             ]
         );
 
-        $lw = Livewire::actingAs($user)
-            ->test(ServerCreateStepReview::class)
+        Testable::actingAs($user);
+        $lw = Testable::create(ServerCreateStepReview::class)
             ->call('store');
 
         if ($lw->errors()->isNotEmpty()) {
@@ -262,12 +262,12 @@ class DemoDigitalOceanServerCommand extends Command
             return trim($opt);
         }
 
-        $a = env('DPLY_DEMO_DO_TOKEN');
+        $a = config('dply.demo_do_token');
         if (is_string($a) && trim($a) !== '') {
             return trim($a);
         }
 
-        $b = env('DIGITALOCEAN_TOKEN');
+        $b = config('dply.digitalocean_token');
         if (is_string($b) && trim($b) !== '') {
             return trim($b);
         }
@@ -323,7 +323,7 @@ class DemoDigitalOceanServerCommand extends Command
 
                     return;
                 }
-                if ($setup === null && time() > $deadline - 30) {
+                if ($setup === Server::SETUP_STATUS_PENDING && time() > $deadline - 30) {
                     $this->warn('Server is ready but setup_status is still empty — is the queue worker running?');
                 }
             }

@@ -5,7 +5,7 @@ namespace Tests\Feature\PrimaryHostnameRenameTest;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AttachCloudDomainJob;
 use App\Jobs\DetachCloudDomainJob;
-use App\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Livewire\Sites\Show as SitesShow;
 use App\Models\Organization;
 use App\Models\Server;

@@ -27,6 +27,7 @@ class DotEnvFileParser
     /**
      * @return array{variables: array<string, string>, errors: array<int, string>, comments: array<string, string>}
      */
+    /** @return array<string, mixed> */
     public function parse(string $contents): array
     {
         $variables = [];

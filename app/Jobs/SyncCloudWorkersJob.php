@@ -41,7 +41,7 @@ class SyncCloudWorkersJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null) {
             return;
         }
@@ -83,7 +83,7 @@ class SyncCloudWorkersJob implements ShouldQueue
             ->get();
 
         foreach ($workers as $worker) {
-            $meta = is_array($worker->meta) ? $worker->meta : [];
+            $meta = $worker->meta;
             if ($error !== null) {
                 $meta['error'] = $error;
                 $meta['error_at'] = now()->toIso8601String();

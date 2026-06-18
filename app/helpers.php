@@ -6,7 +6,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Ai\LlmSynthesizer;
-use App\Services\OpsCopilot\OpsCopilotContextBuilder;
+use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
@@ -50,6 +50,8 @@ if (! function_exists('reverb_health_check_url')) {
 if (! function_exists('server_workspace_nav_item_url')) {
     /**
      * URL for a server workspace sidebar item (handles settings default tab segment).
+     *
+     * @param  array<string, mixed>  $item
      */
     function server_workspace_nav_item_url(Server $server, array $item): string
     {
@@ -211,9 +213,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 // Role-focused sidebars explicitly list tag-gated rows (e.g.
                 // databases/backups on a database-role box) — show them even
                 // before installed-service tags catch up after provision.
-                $roleBypassesTagGate = $roleKeyPositions !== null
-                    && is_string($key)
-                    && isset($roleKeyPositions[$key]);
+                $roleBypassesTagGate = $roleKeyPositions !== null;
 
                 if (! $roleBypassesTagGate) {
                     $hasRequiredTag = false;
@@ -273,7 +273,150 @@ if (! function_exists('server_workspace_nav_for_server')) {
             });
         }
 
+        // Collapse related items into single cluster entries (Access, Network,
+        // Backups, Scheduled tasks) for the default sidebar only — role navs are
+        // already short, curated lists and reference member keys directly.
+        if ($roleKeyPositions === null && $filtered !== []) {
+            $filtered = server_workspace_collapse_clusters($server, $filtered);
+        }
+
         return $navCache[$cacheKey] = $filtered;
+    }
+}
+
+if (! function_exists('server_workspace_collapse_clusters')) {
+    /**
+     * Collapse already-filtered nav items into single cluster entries per
+     * config('server_workspace.clusters'). A cluster with ≥2 surviving members
+     * becomes one representative item (carrying a `tabs` list + `match_keys`);
+     * a cluster with 0–1 present is left untouched.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    function server_workspace_collapse_clusters(Server $server, array $items): array
+    {
+        $clusters = (array) config('server_workspace.clusters', []);
+        if ($clusters === []) {
+            return $items;
+        }
+
+        $memberToCluster = [];
+        foreach ($clusters as $clusterId => $cluster) {
+            foreach ((array) ($cluster['members'] ?? []) as $memberKey) {
+                if (is_string($memberKey)) {
+                    $memberToCluster[$memberKey] = $clusterId;
+                }
+            }
+        }
+        if ($memberToCluster === []) {
+            return $items;
+        }
+
+        // Gather surviving members per cluster, preserving filtered order.
+        $present = [];
+        foreach ($items as $item) {
+            $key = $item['key'] ?? null;
+            if (is_string($key) && isset($memberToCluster[$key])) {
+                $present[$memberToCluster[$key]][] = $item;
+            }
+        }
+
+        $emitted = [];
+        $out = [];
+        foreach ($items as $item) {
+            $key = $item['key'] ?? null;
+            if (! is_string($key) || ! isset($memberToCluster[$key])) {
+                $out[] = $item;
+
+                continue;
+            }
+
+            $clusterId = $memberToCluster[$key];
+            if (isset($emitted[$clusterId])) {
+                continue;
+            }
+            $emitted[$clusterId] = true;
+
+            $members = $present[$clusterId] ?? [];
+            if (count($members) <= 1) {
+                // Only one member survived filtering — keep it as its own item
+                // rather than wrapping a single page in a redundant tab strip.
+                $out[] = $item;
+
+                continue;
+            }
+
+            $out[] = server_workspace_build_cluster_item($server, (array) $clusters[$clusterId], (string) $clusterId, $members);
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('server_workspace_build_cluster_item')) {
+    /**
+     * Build the single representative sidebar item for a cluster of nav members.
+     *
+     * @param  array<string, mixed>  $cluster
+     * @param  list<array<string, mixed>>  $members
+     * @return array<string, mixed>
+     */
+    function server_workspace_build_cluster_item(Server $server, array $cluster, string $clusterId, array $members): array
+    {
+        $tabLabels = (array) ($cluster['tab_labels'] ?? []);
+
+        // Order tabs by the cluster's configured member order (so e.g. a "Soon"
+        // member sorts where intended), not the incidental filtered-nav order.
+        $order = array_flip(array_values(array_filter((array) ($cluster['members'] ?? []), 'is_string')));
+        usort($members, static fn (array $a, array $b): int => ($order[$a['key'] ?? ''] ?? PHP_INT_MAX) <=> ($order[$b['key'] ?? ''] ?? PHP_INT_MAX));
+
+        $tabs = [];
+        $primary = null;
+        $allPreview = true;
+        foreach ($members as $member) {
+            $memberKey = (string) ($member['key'] ?? '');
+            $isPreview = (bool) ($member['preview_only'] ?? false) || (bool) ($member['soon_badge'] ?? false);
+            $allPreview = $allPreview && $isPreview;
+
+            $memberIcon = is_string($member['icon'] ?? null) && $member['icon'] !== '' ? 'heroicon-o-'.$member['icon'] : null;
+            $tabs[] = [
+                'key' => $memberKey,
+                'label' => __($tabLabels[$memberKey] ?? ($member['label'] ?? $memberKey)),
+                'icon' => $memberIcon,
+                'url' => server_workspace_nav_item_url($server, $member),
+                'preview_only' => $isPreview,
+                'soon_badge' => (bool) ($member['soon_badge'] ?? false),
+                'needs_setup' => (bool) ($member['needs_setup'] ?? false),
+            ];
+
+            if ($primary === null && ! $isPreview) {
+                $primary = $member;
+            }
+        }
+        $primary ??= $members[0];
+
+        $needsSetup = false;
+        foreach ($members as $member) {
+            if ((bool) ($member['needs_setup'] ?? false)) {
+                $needsSetup = true;
+                break;
+            }
+        }
+
+        return [
+            'key' => $clusterId,
+            'icon' => $cluster['icon'] ?? ($primary['icon'] ?? 'square-2-stack'),
+            'label' => $cluster['label'] ?? $clusterId,
+            'group' => $primary['group'] ?? ($cluster['group'] ?? null),
+            'route' => $primary['route'] ?? '',
+            'preview_route' => $primary['preview_route'] ?? null,
+            'preview_only' => $allPreview,
+            'soon_badge' => false,
+            'needs_setup' => $needsSetup,
+            'match_keys' => array_map(static fn (array $m): string => (string) ($m['key'] ?? ''), $members),
+            'tabs' => $tabs,
+        ];
     }
 }
 
@@ -523,25 +666,6 @@ if (! function_exists('workspace_server_maintenance_preview_active')) {
     }
 }
 
-if (! function_exists('workspace_deploy_windows_preview_active')) {
-    /**
-     * True when the deploy windows surface is off but the coming-soon teaser
-     * should surface in nav and the preview workspace page.
-     */
-    function workspace_deploy_windows_preview_active(?Organization $organization = null): bool
-    {
-        if ($organization === null
-            ? Feature::active('workspace.deploy_windows')
-            : Feature::for($organization)->active('workspace.deploy_windows')) {
-            return false;
-        }
-
-        return $organization === null
-            ? Feature::active('workspace.deploy_windows_preview')
-            : Feature::for($organization)->active('workspace.deploy_windows_preview');
-    }
-}
-
 if (! function_exists('workspace_security_digest_preview_active')) {
     /**
      * True when the security digest surface is off but the coming-soon teaser
@@ -758,6 +882,9 @@ if (! function_exists('ai_llm_active')) {
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.
+     *
+     * @param  ?array<string, mixed>  $oldValues
+     * @param  ?array<string, mixed>  $newValues
      */
     function audit_log(
         Organization $organization,

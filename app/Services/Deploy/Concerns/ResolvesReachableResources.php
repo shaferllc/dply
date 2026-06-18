@@ -19,8 +19,8 @@ trait ResolvesReachableResources
      * target_id. Lets the attach pickers warn that a Redis/database/realtime app
      * is shared so the operator sets a prefix / separate DB to avoid collisions.
      *
-     * @param  list<string>  $targetIds
-     * @return array<string, int>  target_id => distinct other-site count
+     * @param  array<string, mixed> $targetIds
+     * @return array<string, int> target_id => distinct other-site count
      */
     private function bindingConsumerCounts(string $targetType, array $targetIds, ?string $exceptSiteId): array
     {

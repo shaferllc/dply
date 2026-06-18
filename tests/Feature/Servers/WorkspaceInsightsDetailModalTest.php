@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Servers\WorkspaceInsightsDetailModalTest;
 
-use App\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Models\InsightFinding;
 use App\Models\Organization;

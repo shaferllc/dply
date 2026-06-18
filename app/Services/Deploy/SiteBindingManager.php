@@ -82,6 +82,10 @@ class SiteBindingManager
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function reachableServerIdsForSite(Site $site): array
     {
         $server = $site->server;
@@ -89,6 +93,13 @@ class SiteBindingManager
         return $server === null ? [] : $this->reachableServerIds($server);
     }
 
+    /**
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function attachableTargets(Site $site, string $type): array
     {
         return match ($type) {
@@ -102,7 +113,7 @@ class SiteBindingManager
     /**
      * Attach an existing resource to the site.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     public function attachExisting(Site $site, string $type, array $params): SiteBinding
     {
@@ -137,7 +148,7 @@ class SiteBindingManager
     /**
      * Provision a brand-new resource, then attach it.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     public function provisionNew(Site $site, string $type, array $params): SiteBinding
     {
@@ -152,6 +163,7 @@ class SiteBindingManager
             default => $this->attachExisting($site, $type, $params),
         };
 
+        $this->stampSetupProvenance($site, $binding);
         $this->adoptInjectedEnv($site, $binding);
 
         return $binding;
@@ -231,6 +243,10 @@ class SiteBindingManager
      *
      * @return list<string> every key removed across all bindings
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function reAdoptAll(Site $site): array
     {
         $removed = [];
@@ -264,9 +280,11 @@ class SiteBindingManager
                 'POSTMARK_TOKEN', 'POSTMARK_MESSAGE_STREAM_ID',
                 'RESEND_KEY',
             ],
-            // Storage fully owns FILESYSTEM_DISK — attaching it sets the disk to
-            // s3, so the loose default (local) should be cleared.
-            'storage' => ['FILESYSTEM_DISK'],
+            // Only the PRIMARY storage disk (s3) owns FILESYSTEM_DISK — attaching
+            // it sets the disk to s3, so the loose default (local) should be
+            // cleared. Additional named disks (AWS_<DISK>_*) don't touch the
+            // default disk, so they own none of the loose env.
+            'storage' => (((array) $binding->config)['disk'] ?? 's3') === 's3' ? ['FILESYSTEM_DISK'] : [],
             // Broadcasting fully owns BROADCAST_CONNECTION — the binding is the
             // single source of truth for the driver, so a loose copy is stale.
             'broadcasting' => ['BROADCAST_CONNECTION'],
@@ -292,6 +310,31 @@ class SiteBindingManager
     }
 
     // ---- shared helpers ---------------------------------------------------
+
+    /**
+     * Stamp provenance on a resource provisioned while the site is still in its
+     * first-deploy setup. These are REAL infra (a database, a bucket) created
+     * BEFORE any deploy — if the operator abandons setup they become orphans
+     * with no deployed app. The flag + timestamp let a reporter surface them for
+     * review. We only tag the binding config; tearing the resource down is a
+     * separate, explicit action (managed databases are unlinked, never
+     * auto-dropped — see {@see \App\Support\Sites\SiteRelationPurger}).
+     */
+    private function stampSetupProvenance(Site $site, SiteBinding $binding): void
+    {
+        if (! $site->isInFirstDeploySetup()) {
+            return;
+        }
+
+        $cfg = ($binding->config );
+        if (($cfg['provisioned_during_setup'] ?? false) === true) {
+            return;
+        }
+
+        $cfg['provisioned_during_setup'] = true;
+        $cfg['provisioned_during_setup_at'] = now()->toIso8601String();
+        $binding->forceFill(['config' => $cfg])->save();
+    }
 
     /**
      * Guard a driver-style binding (queue/cache/session) against a missing
@@ -330,14 +373,27 @@ class SiteBindingManager
     }
 
     /**
-     * @param  array<string, mixed>  $attributes
+     * Upsert a binding row. By default the natural key is (site_id, type) — one
+     * binding per type per site. The storage type passes a wider key including
+     * `name` (the disk slug) so a site can hold several object-storage buckets,
+     * each its own filesystem disk; every other caller keeps the narrow key and
+     * is therefore unaffected.
+     *
+     * @param  array<string, mixed> $attributes
+     * @param  array<string, mixed> $matchOn  Attribute keys (from $attributes, plus the
+     *                                 implicit site_id/type) to match the existing row on.
      */
-    private function persist(Site $site, string $type, array $attributes): SiteBinding
+    private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding
     {
-        return SiteBinding::query()->updateOrCreate(
-            ['site_id' => $site->id, 'type' => $type],
-            $attributes,
-        );
+        $key = ['site_id' => $site->id, 'type' => $type];
+        foreach ($matchOn as $attr) {
+            if (in_array($attr, ['site_id', 'type'], true)) {
+                continue;
+            }
+            $key[$attr] = $attributes[$attr] ?? null;
+        }
+
+        return SiteBinding::query()->updateOrCreate($key, $attributes);
     }
 
     private function assertType(string $type): void

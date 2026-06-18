@@ -66,8 +66,8 @@ final class EnvoyConfigParser
 
         $vhostClusters = [];
         foreach (self::virtualHosts($yaml) as $vh) {
-            if (($vh['cluster'] ?? '') !== '') {
-                $vhostClusters[(string) $vh['cluster']] = true;
+            if ($vh['cluster'] !== '') {
+                $vhostClusters[$vh['cluster']] = true;
             }
         }
 
@@ -120,7 +120,7 @@ final class EnvoyConfigParser
     {
         return array_values(array_filter(
             self::clusters($yaml),
-            fn (array $c): bool => ! ($c['dply_managed'] ?? false),
+            fn (array $c): bool => ! ($c['dply_managed']),
         ));
     }
 
@@ -135,14 +135,14 @@ final class EnvoyConfigParser
 
         $lines = [];
         foreach ($clusters as $cluster) {
-            $name = trim((string) ($cluster['name'] ?? ''));
+            $name = trim($cluster['name']);
             if ($name === '') {
                 continue;
             }
-            $timeout = trim((string) ($cluster['connect_timeout'] ?? '5s')) ?: '5s';
-            $policy = trim((string) ($cluster['lb_policy'] ?? 'ROUND_ROBIN')) ?: 'ROUND_ROBIN';
+            $timeout = trim($cluster['connect_timeout']) ?: '5s';
+            $policy = trim($cluster['lb_policy']) ?: 'ROUND_ROBIN';
             $endpoints = array_values(array_filter(
-                array_map('trim', (array) ($cluster['endpoints'] ?? [])),
+                array_map('trim', $cluster['endpoints']),
                 fn (string $e): bool => $e !== '',
             ));
             if ($endpoints === []) {
@@ -205,7 +205,7 @@ final class EnvoyConfigParser
     }
 
     /**
-     * @param  array<string, mixed>  $settings
+     * @param  array<string, mixed> $settings
      */
     public static function mergeOperatorSettings(string $yaml, array $settings): string
     {
@@ -250,7 +250,7 @@ final class EnvoyConfigParser
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed> $data
      * @return list<array<string, mixed>>
      */
     private static function listenerFilterChains(array $data): array
@@ -271,7 +271,7 @@ final class EnvoyConfigParser
     }
 
     /**
-     * @param  array<string, mixed>  $chain
+     * @param  array<string, mixed> $chain
      * @return array<string, mixed>|null
      */
     private static function httpConnectionManagerRouteConfig(array $chain): ?array

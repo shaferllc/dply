@@ -32,23 +32,14 @@
 
     {{-- In-page sub-tabs: the load-balancer list vs. notification routing for this
          server's load_balancer.* events. Mirrors the system-users page. --}}
-    <div class="mb-6 border-b border-brand-ink/10">
-        <nav class="-mb-px flex gap-6" aria-label="{{ __('Load balancer sections') }}">
-            @php
-                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-                $tabOn = 'border-brand-forest text-brand-ink';
-                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-            @endphp
-            <button type="button" wire:click="setLbWorkspaceTab('load_balancers')" @class([$tabBase, $lb_workspace_tab === 'load_balancers' ? $tabOn : $tabOff])>
-                <x-heroicon-o-arrows-right-left class="h-4 w-4" aria-hidden="true" />
-                {{ __('Load balancers') }}
-            </button>
-            <button type="button" wire:click="setLbWorkspaceTab('notifications')" @class([$tabBase, $lb_workspace_tab === 'notifications' ? $tabOn : $tabOff])>
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </button>
-        </nav>
-    </div>
+    <x-server-workspace-tablist :aria-label="__('Load balancer sections')">
+        <x-server-workspace-tab icon="heroicon-o-arrows-right-left" :active="$lb_workspace_tab === 'load_balancers'" wire:click="setLbWorkspaceTab('load_balancers')">
+            {{ __('Load balancers') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-bell" :active="$lb_workspace_tab === 'notifications'" wire:click="setLbWorkspaceTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
 
     <div @class(['space-y-6', 'hidden' => $lb_workspace_tab !== 'load_balancers'])>
 

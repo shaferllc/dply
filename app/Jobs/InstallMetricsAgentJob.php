@@ -46,6 +46,9 @@ class InstallMetricsAgentJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 600;
+
     public function uniqueId(): string
     {
         return 'install-metrics-agent:'.$this->serverId;
@@ -60,7 +63,7 @@ class InstallMetricsAgentJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null || ! $server->isVmHost()) {
             return;
         }
@@ -140,7 +143,7 @@ BASH;
                 $bundledSha = null;
             }
 
-            $meta = $server->fresh()?->meta ?? [];
+            $meta = $server->fresh()->meta ?? [];
             $meta['metrics_agent_installed_at'] = now()->toIso8601String();
             $meta['monitoring_python_installed'] = true;
             if ($bundledSha !== null) {

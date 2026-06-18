@@ -64,23 +64,17 @@
       <div class="space-y-6 min-w-0">
 
         {{-- Hero --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            <x-heroicon-o-check-circle class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 4, 'total' => $totalSteps]) }}</p>
-                            <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Review and launch') }}</h1>
-                            <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Confirm what dply is about to spin up. The preflight panel on the right surfaces anything blocking before you can create.') }}</p>
-                        </div>
-                    </div>
-                </div>
-                @if (! empty($heroStats))
+        <x-hero-card
+            :eyebrow="__('Step :n of :total', ['n' => 4, 'total' => $totalSteps])"
+            :title="__('Review and launch')"
+            :description="__('Confirm what dply is about to spin up. The preflight panel on the right surfaces anything blocking before you can create.')"
+            icon="check-circle"
+            iconSize="md"
+        >
+            @if (! empty($heroStats))
+                <x-slot:stats>
                     <dl @class([
-                        'grid gap-2 lg:col-span-5',
+                        'grid gap-2',
                         'grid-cols-1' => count($heroStats) === 1,
                         'grid-cols-2' => count($heroStats) === 2,
                         'grid-cols-2 sm:grid-cols-3' => count($heroStats) === 3,
@@ -92,9 +86,9 @@
                             </div>
                         @endforeach
                     </dl>
-                @endif
-            </div>
-        </section>
+                </x-slot:stats>
+            @endif
+        </x-hero-card>
 
         @if (($migrationSourcePloiServerId || $migrationSourceForgeServerId) && ! empty($migrationSiteSelection))
             @php

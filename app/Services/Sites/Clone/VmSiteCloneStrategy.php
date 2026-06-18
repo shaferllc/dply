@@ -84,7 +84,7 @@ final class VmSiteCloneStrategy
         }
 
         $newSite->refresh();
-        $meta = is_array($newSite->meta) ? $newSite->meta : [];
+        $meta = ($newSite->meta );
         $meta['clone'] = [
             'source_site_id' => $source->id,
             'status' => 'completed',
@@ -101,7 +101,7 @@ final class VmSiteCloneStrategy
 
     private function markCloneFailed(Site $newSite, Site $source, string $message): void
     {
-        $meta = is_array($newSite->meta) ? $newSite->meta : [];
+        $meta = ($newSite->meta );
         $meta['clone'] = [
             'source_site_id' => $source->id,
             'status' => 'failed',

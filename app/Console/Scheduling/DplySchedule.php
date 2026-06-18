@@ -9,52 +9,60 @@ use App\Console\Commands\CheckEdgeRumAlertsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\CloudPollStatusCommand;
 use App\Console\Commands\CollectEdgeUsageCommand;
-use App\Console\Commands\CollectRealtimeUsageCommand;
-use App\Console\Commands\CollectServerlessUsageCommand;
+use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
+use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
 use App\Console\Commands\DispatchReleaseHygieneScansCommand;
 use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchServerHealthChecksCommand;
-use App\Console\Commands\DispatchServerInsightsCommand;
-use App\Console\Commands\DispatchSiteInsightsCommand;
+use App\Modules\Insights\Console\DispatchServerInsightsCommand;
+use App\Modules\Insights\Console\DispatchSiteInsightsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
 use App\Console\Commands\DispatchSystemdInventorySyncCommand;
 use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
 use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
-use App\Console\Commands\ExpirePausedImportMigrationsCommand;
+use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
-use App\Console\Commands\ProcessInsightDigestQueueCommand;
+use App\Console\Commands\MeterServerLogUsageCommand;
+use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
+use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
+use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
+use App\Console\Commands\PruneNotificationInboxItemsCommand;
+use App\Console\Commands\PruneOrphanedSiteDataCommand;
+use App\Console\Commands\PruneQuickDownloadsCommand;
 use App\Console\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
-use App\Console\Commands\RenewServerWildcardCertificatesCommand;
+use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\RunDueScheduledDeploysCommand;
-use App\Console\Commands\SecretsCheckDriftCommand;
-use App\Console\Commands\SecretsEscrowCommand;
-use App\Console\Commands\SecretsRestoreDrillCommand;
-use App\Console\Commands\ServerlessTickCommand;
+use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
+use App\Modules\Secrets\Console\SecretsEscrowCommand;
+use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
+use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
+use App\Console\Commands\SweepSiteHttpErrorsCommand;
 use App\Console\Commands\SweepStalledTasksCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
+use App\Console\Commands\SyncLogAggregatorPolicyCommand;
 use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
@@ -78,6 +86,13 @@ final class DplySchedule
         $schedule->command(DispatchSiteUptimeChecksCommand::class)
             ->everyFiveMinutes()
             ->name('dispatch-site-uptime-checks');
+
+        // Tier-2 of the server-error-reference feature: sweep PHP-FPM access logs
+        // for 5xx responses into the Errors stream. Cadence sits under the
+        // sweep_lookback_minutes window so a missed cycle still gets covered.
+        $schedule->command(SweepSiteHttpErrorsCommand::class)
+            ->everyTenMinutes()
+            ->name('sweep-site-http-errors');
 
         $schedule->command(DispatchSshLoginScansCommand::class)
             ->everyFiveMinutes()
@@ -154,6 +169,27 @@ final class DplySchedule
             ->name('realtime-usage-today')
             ->withoutOverlapping();
 
+        // dply Logs ingest metering (read-only; no billing yet). Hourly keeps the
+        // current day's GB/day fresh in the UI; the nightly pass finalizes the prior
+        // day after late-arriving lines settle, before the 02:10 billing snapshot.
+        $schedule->command(MeterServerLogUsageCommand::class)
+            ->hourly()
+            ->name('server-log-usage-today')
+            ->withoutOverlapping();
+
+        $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday' => true])
+            ->dailyAt('02:05')
+            ->name('server-log-usage-finalize')
+            ->withoutOverlapping();
+
+        // Refresh per-org retention + hard-cap policy on the aggregator(s), after
+        // the hourly meter so caps reflect the latest usage. No-ops on the box when
+        // the policy is unchanged. Inert today (all plans default → empty policy).
+        $schedule->command(SyncLogAggregatorPolicyCommand::class)
+            ->hourlyAt(10)
+            ->name('server-log-policy-sync')
+            ->withoutOverlapping();
+
         $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);
 
         $schedule->command(EvaluateEdgeGuardrailsCommand::class)
@@ -169,6 +205,7 @@ final class DplySchedule
         // written via the query builder, which bypasses model events).
         $schedule->command(SyncErrorEventsCommand::class)->everyMinute()->withoutOverlapping();
         $schedule->command(PruneErrorEventsCommand::class)->dailyAt('03:25');
+        $schedule->command(PruneNotificationInboxItemsCommand::class)->dailyAt('03:35');
 
         // Backstop for remote tasks that go silent (rejected webhook, OOM/reboot,
         // dropped network): fail any `running` task past its timeout or with no
@@ -206,7 +243,22 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        // 4h-TTL download stagings need finer-than-daily pruning (S3 lifecycle min
+        // is 1 day), so sweep every 15 minutes. onOneServer is auto-applied below.
+        $schedule->command(PruneBackupDownloadStagingsCommand::class)
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->name('prune-backup-download-stagings');
+        $schedule->command(PruneQuickDownloadsCommand::class)
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->name('prune-quick-downloads');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
+        $schedule->command(PruneFeedbackAttachmentsCommand::class)->dailyAt('04:25');
+
+        // Safety net for orphaned site relations (errors/logs/polymorphic links)
+        // left by any delete that bypassed Site::deleting + SiteRelationPurger.
+        $schedule->command(PruneOrphanedSiteDataCommand::class)->weeklyOn(1, '04:40');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');
         $schedule->command(ExpirePausedImportMigrationsCommand::class)->hourly();

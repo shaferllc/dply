@@ -42,7 +42,7 @@ class ActionErrorTracking
      *
      * @param  string  $actionClass  Action class name
      * @param  \Throwable  $exception  Exception that occurred
-     * @param  array  $context  Additional context
+     * @param  array<string, mixed>  $context  Additional context
      */
     public static function track(string $actionClass, \Throwable $exception, array $context = []): void
     {
@@ -84,12 +84,13 @@ class ActionErrorTracking
      *
      * @param  string  $actionClass  Action class name
      * @param  int  $limit  Number of errors to return
-     * @return Collection<array> Errors
+     * @return Collection<int, array<string, mixed>> Errors
      */
     public static function getErrors(string $actionClass, int $limit = 50): Collection
     {
         if (DB::getSchemaBuilder()->hasTable('action_errors')) {
-            return DB::table('action_errors')
+            /** @var Collection<int, array<string, mixed>> $errors */
+            $errors = DB::table('action_errors')
                 ->where('action', $actionClass)
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
@@ -104,6 +105,8 @@ class ActionErrorTracking
                     'context' => json_decode($error->context, true),
                     'created_at' => $error->created_at,
                 ]);
+
+            return $errors;
         }
 
         return collect();

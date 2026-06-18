@@ -4,6 +4,4 @@ declare(strict_types=1);
 
 namespace Dply\NginxConfig\Exception;
 
-class NgxParserSyntaxException extends NgxParserException
-{
-}
+class NgxParserSyntaxException extends NgxParserException {}

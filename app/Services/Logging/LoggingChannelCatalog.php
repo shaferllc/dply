@@ -2,6 +2,8 @@
 
 namespace App\Services\Logging;
 
+use App\Models\LogDrainCredential;
+
 /**
  * The curated catalog of log channel *types* dply can generate (Q7 of the
  * managed-logging design). Each type maps to a known-good Laravel/Monolog
@@ -49,7 +51,7 @@ final class LoggingChannelCatalog
     public const LEVELS = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
 
     /**
-     * The drain types whose secret lives in a reusable {@see \App\Models\LogDrainCredential}
+     * The drain types whose secret lives in a reusable {@see LogDrainCredential}
      * and whose Composer transport the *app* must already require (dply runs the
      * app's own `composer install`, so it can't add it — same wall the mail
      * binding hit). Keyed slug → package, surfaced as a note in the editor.

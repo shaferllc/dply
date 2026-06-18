@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Jobs\ApplyFirewallJob;
+
 /**
  * Notification event keys for server-scoped firewall changes, surfaced on the
  * /servers/{server}/firewall workspace. The `server.` prefix maps these to the
@@ -10,7 +12,7 @@ namespace App\Support;
  * so they appear in the bulk notification-assignment UI.
  *
  * Mirrors {@see ServerSshKeyNotificationKeys}. `applied` fires when the queued
- * {@see \App\Jobs\ApplyFirewallJob} reconciles UFW on the host.
+ * {@see ApplyFirewallJob} reconciles UFW on the host.
  */
 final class ServerFirewallNotificationKeys
 {

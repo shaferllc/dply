@@ -63,10 +63,10 @@ class ProvisionAzureServerJob implements ShouldQueue
         $meta['azure'] = [
             'resource_group' => $resourceGroup,
             'vm_name' => $vmName,
-            'vm_id' => (string) ($created['vm_id'] ?? ''),
-            'nic_id' => (string) ($created['nic_id'] ?? ''),
-            'pip_id' => (string) ($created['pip_id'] ?? ''),
-            'pip_name' => $this->azureResourceNameFromId((string) ($created['pip_id'] ?? '')),
+            'vm_id' => (string) $created['vm_id'],
+            'nic_id' => (string) $created['nic_id'],
+            'pip_id' => (string) $created['pip_id'],
+            'pip_name' => $this->azureResourceNameFromId((string) $created['pip_id']),
         ];
         unset($meta['provision_error']);
 

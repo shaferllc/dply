@@ -37,7 +37,7 @@ class FlushServerSystemdNotificationDigestCommand extends Command
             $first = $group->first();
             $server = $first !== null ? Server::query()->find($first->server_id) : null;
             $lines = $group->pluck('line')->unique()->values()->implode("\n");
-            $subject = '['.config('app.name').'] '.($server?->name ?? __('Server')).' — '.__(
+            $subject = '['.config('app.name').'] '.($server !== null ? $server->name : __('Server')).' — '.__(
                 'Systemd alerts (:count)',
                 ['count' => $group->count()]
             );

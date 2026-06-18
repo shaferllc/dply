@@ -10,6 +10,13 @@
             />
 
             <main class="min-w-0 space-y-6 mt-6">
+            <x-hero-card
+                :eyebrow="__('Deployments')"
+                :title="__('Deployment detail')"
+                :description="__('Status, timeline, phase steps, and raw log output for a single deployment of this site.')"
+                icon="rocket-launch"
+            />
+
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
@@ -25,8 +32,9 @@
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->status === 'success',
                                     'bg-rose-50 text-rose-800 ring-rose-200' => $deployment->status === 'failed',
                                     'bg-amber-50 text-amber-900 ring-amber-200' => $deployment->status === 'running',
-                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($deployment->status, ['success', 'failed', 'running']),
-                                ])>{{ $deployment->status }}</span>
+                                    'bg-amber-100 text-amber-950 ring-amber-300' => $deployment->isBillingBlocked(),
+                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($deployment->status, ['success', 'failed', 'running']) && ! $deployment->isBillingBlocked(),
+                                ])>{{ $deployment->isBillingBlocked() ? __('blocked — billing') : $deployment->status }}</span>
                             </h1>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site, 'tab' => 'history']) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ __('Back to all deployments') }}</a>
@@ -124,7 +132,7 @@
             @else
                 {{-- Same phase/step timeline the deploy hub's Deploy tab renders, so the two reflect each other. --}}
                 <section class="dply-card overflow-hidden px-6 py-5 sm:px-8">
-                    @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $deployment])
+                    @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $deployment, 'dbFix' => $dbFix ?? null])
                 </section>
             @endif
 

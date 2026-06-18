@@ -24,6 +24,7 @@ class TraefikUdpRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, entry_points: list<string>, server_address: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

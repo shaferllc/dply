@@ -112,33 +112,23 @@
             @endphp
 
             {{-- Hero: positioning + at-a-glance stat strip. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-chart-bar class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Billing') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Billing analytics') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Live estimate, resource breakdown, Edge delivery meters, and Stripe invoice history for :org.', ['org' => $organization->name]) }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-outline-link href="{{ route('billing.show', $organization) }}" wire:navigate>
-                                <x-heroicon-o-credit-card class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Billing & plan') }}
-                            </x-outline-link>
-                            <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
-                                <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Invoices') }}
-                            </x-outline-link>
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Billing')"
+                :title="__('Billing analytics')"
+                :description="__('Live estimate, resource breakdown, Edge delivery meters, and Stripe invoice history for :org.', ['org' => $organization->name])"
+                icon="chart-bar"
+            >
+                <x-outline-link href="{{ route('billing.show', $organization) }}" wire:navigate>
+                    <x-heroicon-o-credit-card class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Billing & plan') }}
+                </x-outline-link>
+                <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
+                    <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Invoices') }}
+                </x-outline-link>
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
                         <div class="rounded-2xl border px-4 py-3 shadow-sm {{ $statusTile }}">
                             <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                             <dd class="mt-1 flex items-center gap-1.5">
@@ -169,8 +159,8 @@
                             </p>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             @if (cost_observatory_active($organization))
                 @php

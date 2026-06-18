@@ -10,8 +10,8 @@ use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Services\Cloudflare\CloudflareCdnService;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use Illuminate\Console\Command;
 
 class CdnEnableCommand extends Command
@@ -46,7 +46,7 @@ class CdnEnableCommand extends Command
 
         $hostname = strtolower(trim((string) ($this->option('hostname') ?: (string) optional($site->primaryDomain())->hostname)));
         $zone = strtolower(trim((string) ($this->option('zone') ?: (Site::apexGuessForHostname($hostname) ?? ''))));
-        $originIp = trim((string) ($this->option('origin-ip') ?: (string) ($site->server?->ip_address ?? '')));
+        $originIp = trim((string) ($this->option('origin-ip') ?: (string) $site->server->ip_address));
         $preset = (string) $this->option('preset');
 
         if ($hostname === '' || $zone === '' || $originIp === '') {
@@ -60,7 +60,7 @@ class CdnEnableCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $existing = is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [];
         $meta['cdn'] = array_merge($existing, [
             'enabled' => true,

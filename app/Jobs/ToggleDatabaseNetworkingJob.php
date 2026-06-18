@@ -8,13 +8,14 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerFirewallRule;
 use App\Models\User;
-use App\Services\Notifications\ServerNetworkingNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerNetworkingNotificationDispatcher;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -129,7 +130,7 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
             $db->server,
             $this->enable ? 'db_access_enabled' : 'db_access_disabled',
             [(string) $db->name],
-            $this->userId ? User::query()->find($this->userId) : null,
+            $this->userId ? User::find($this->userId) : null,
             ['database_id' => $db->id, 'engine' => $db->engine, 'allowed_from' => $this->enable ? $this->allowedCidr : null],
         );
     }
@@ -146,7 +147,7 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
         $server = $db->server;
         $tag = 'dply-db-network-'.$db->engine;
 
-        /** @var \Illuminate\Support\Collection<int, ServerFirewallRule> $existing */
+        /** @var Collection<int, ServerFirewallRule> $existing */
         $existing = ServerFirewallRule::query()
             ->where('server_id', $server->id)
             ->whereJsonContains('tags', $tag)

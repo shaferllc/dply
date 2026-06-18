@@ -37,8 +37,8 @@ class CloneSiteJob implements ShouldQueue
     public function handle(SiteCloneStrategyResolver $resolver): void
     {
         $source = Site::query()->with('server')->find($this->sourceSiteId);
-        $dest = Server::query()->find($this->destinationServerId);
-        $user = User::query()->find($this->userId);
+        $dest = Server::find($this->destinationServerId);
+        $user = User::find($this->userId);
 
         if (! $source || ! $dest || ! $user) {
             return;

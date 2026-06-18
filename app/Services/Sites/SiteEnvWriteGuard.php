@@ -42,8 +42,13 @@ final class SiteEnvWriteGuard
     /**
      * The danger-level findings (only) for a composed env map.
      *
-     * @param  array<string, string>  $vars
+     * @param  array<string, mixed> $vars
      * @return list<array{level: string, key: ?string, message: string}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
+     * @param  array<string, mixed> $vars
      */
     public function dangers(array $vars): array
     {
@@ -58,7 +63,7 @@ final class SiteEnvWriteGuard
      * The message lists every offending key so the operator can fix it in the
      * editor and retry.
      *
-     * @param  array<string, string>  $vars
+     * @param  array<string, mixed> $vars
      */
     public function assertSafeToWrite(array $vars): void
     {
@@ -96,7 +101,7 @@ final class SiteEnvWriteGuard
      * still applies in those cases.
      *
      * @throws \RuntimeException if the app fails to boot/build config with the
-     *   candidate env (the captured artisan output is included).
+     *                           candidate env (the captured artisan output is included).
      */
     public function assertBootsOnServer(SshConnection $ssh, string $activeDir, string $stagedTmpPath): void
     {

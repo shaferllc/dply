@@ -210,34 +210,21 @@
         ])
 
         {{-- Tabs --}}
-        @php
-            $tabs = [
-                'overview' => __('Overview'),
-                'members' => __('Members'),
-                'horizon' => __('Horizon'),
-                'traffic' => __('Traffic & Redis'),
-            ];
-        @endphp
-        <div class="mt-6 border-b border-brand-ink/10">
-            <nav class="-mb-px flex flex-wrap gap-1" aria-label="{{ __('Worker pool sections') }}">
-                @foreach ($tabs as $tabKey => $tabLabel)
-                    <button
-                        type="button"
-                        wire:click="$set('tab', @js($tabKey))"
-                        @class([
-                            'border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors',
-                            'border-brand-forest text-brand-forest' => $tab === $tabKey,
-                            'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-ink/20' => $tab !== $tabKey,
-                        ])
-                    >
-                        {{ $tabLabel }}
-                        @if ($tabKey === 'members')
-                            <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $members->count() }}</span>
-                        @endif
-                    </button>
-                @endforeach
-            </nav>
-        </div>
+        <x-server-workspace-tablist :aria-label="__('Worker pool sections')" class="mt-6">
+            <x-server-workspace-tab :active="$tab === 'overview'" wire:click="$set('tab', 'overview')">
+                {{ __('Overview') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'members'" wire:click="$set('tab', 'members')">
+                {{ __('Members') }}
+                <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $members->count() }}</span>
+            </x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'horizon'" wire:click="$set('tab', 'horizon')">
+                {{ __('Horizon') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'traffic'" wire:click="$set('tab', 'traffic')">
+                {{ __('Traffic & Redis') }}
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
 
         @if ($tab === 'overview')
         {{-- Poll the whole component every 15s so pool status, capacity and
@@ -524,6 +511,11 @@
             // regardless; the Horizon aggregate layer is gated on this.
             $hzInstalled = ($hz['horizon_installed'] ?? null) !== false;
 
+            // Auto-detected queue config (DetectWorkerPoolHorizonConfigJob) —
+            // advisory only; the operator applies it into the form then saves.
+            $hzDetection = is_array($pool->meta['horizon_detection'] ?? null) ? $pool->meta['horizon_detection'] : [];
+            $hzRec = is_array($hzDetection['recommended'] ?? null) ? $hzDetection['recommended'] : [];
+
             // Compact relative-time formatter for a seconds value ("3s", "2m", "1h").
             $fmtAge = function ($seconds) {
                 if ($seconds === null) { return null; }
@@ -548,9 +540,11 @@
                 }
             }
         @endphp
-        {{-- No wire:poll here: the Live jobs feed is pushed over Reverb in real
-             time. Aggregate tiles/lists refresh on Refresh Horizon / Snapshot. --}}
-        <div class="mt-6 space-y-6">
+        {{-- Auto-refresh while the tab is open: pollHorizon re-pulls the SSH
+             snapshot on a throttle so the tiles, workload and Live jobs stay
+             current without a manual Refresh. Real-time Reverb events still take
+             precedence in the Live jobs feed when they arrive. --}}
+        <div class="mt-6 space-y-6" wire:poll.10s="pollHorizon">
             @unless ($hzInstalled)
                 <div class="flex items-start gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" />
@@ -654,9 +648,11 @@
                 @endif
             </section>
 
-            {{-- Live jobs — real-time per-job feed pushed from the worker boxes
-                 over Reverb (no polling); newest first. Populated by the
-                 #[On('worker-pool-job')] handler as Echo delivers events. --}}
+            {{-- Live jobs — newest first. Real-time Reverb/Echo events
+                 (#[On('worker-pool-job')]) when available; otherwise the freshest
+                 recent/pending jobs from the Horizon snapshot pulled over SSH, so
+                 the feed fills in whenever Horizon has activity. --}}
+            @php $liveFeed = $this->liveJobsFeed(); @endphp
             <section class="dply-card overflow-hidden" x-data="{ open: true }">
                 <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
                     <div class="flex items-center gap-2">
@@ -667,14 +663,14 @@
                         </span>
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Live jobs') }}</h3>
                     </div>
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($liveJobs) }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($liveFeed) }}</span>
                 </button>
                 <div x-show="open" x-collapse>
-                @if (empty($liveJobs))
-                    <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… events stream in here the instant workers process them.') }}</div>
+                @if (empty($liveFeed))
+                    <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… recent and in-flight jobs appear here as Horizon picks them up.') }}</div>
                 @else
                     <div class="divide-y divide-brand-ink/5">
-                        @foreach ($liveJobs as $i => $j)
+                        @foreach ($liveFeed as $i => $j)
                             @php $liveAge = ! empty($j['received_at']) ? max(0, now()->timestamp - (int) $j['received_at']) : null; @endphp
                             <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7" wire:key="livejob-{{ $i }}-{{ $j['received_at'] ?? $i }}">
                                 <span class="text-sm font-medium text-brand-ink">{{ $j['name'] }}</span>
@@ -766,12 +762,58 @@
                     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                 </button>
                 <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
+                    {{-- Auto-detect: SSH to a member, introspect the app's real queues +
+                         box spec, and offer a one-click suggestion. Advisory only —
+                         nothing is pushed until the operator hits Save & apply below. --}}
+                    @if ($hzDetecting)
+                        <div wire:poll.3s="checkHorizonDetection" class="flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 animate-spin text-brand-mist" />
+                            <span>{{ __('Detecting the app\'s queues over SSH — this takes a few seconds.') }}</span>
+                        </div>
+                    @elseif (! empty($hzRec['queues']))
+                        @php
+                            $detQueues = implode(', ', array_map('strval', $hzRec['queues']));
+                            $detSource = ($hzDetection['source'] ?? null) === 'package' ? __('package introspection') : __('code scan');
+                            $detDiffers = $detQueues !== implode(', ', \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues']);
+                        @endphp
+                        <div class="rounded-xl border border-brand-forest/25 bg-brand-forest/5 px-4 py-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold text-brand-ink">
+                                        {{ __('Detected configuration') }}
+                                        <span class="ml-1 font-normal text-brand-moss">· {{ $detSource }}</span>
+                                    </p>
+                                    <p class="mt-1 break-words font-mono text-xs text-brand-ink">{{ $detQueues }}</p>
+                                    <p class="mt-1 text-[11px] text-brand-moss">
+                                        {{ __('Suggested :min–:max processes · :mem MB · :to s timeout', [
+                                            'min' => $hzRec['min_processes'] ?? '—',
+                                            'max' => $hzRec['max_processes'] ?? '—',
+                                            'mem' => $hzRec['memory'] ?? '—',
+                                            'to' => $hzRec['timeout'] ?? '—',
+                                        ]) }}
+                                        @unless ($detDiffers)<span class="text-brand-mist"> · {{ __('matches current') }}</span>@endunless
+                                    </p>
+                                </div>
+                                <x-secondary-button type="button" wire:click="applyDetectedHorizonConfig" class="shrink-0 text-xs">
+                                    {{ __('Apply suggestions') }}
+                                </x-secondary-button>
+                            </div>
+                            <p class="mt-2 text-[11px] text-brand-moss">{{ __('Fills the fields below — review, then Save & apply to push to the workers.') }}</p>
+                        </div>
+                    @endif
+
                     <div x-data="{
                         q: @js((string) $hz_queues),
                         get tokens() { return this.q.split(',').map(s => s.trim()).filter(Boolean); },
                         get first() { return this.tokens[0] || '—'; },
-                    }">
-                        <x-input-label for="hz_queues" :value="__('Queues watched')" />
+                    }" x-on:horizon-config-applied.window="q = $event.detail.queues">
+                        <div class="flex items-center justify-between gap-3">
+                            <x-input-label for="hz_queues" :value="__('Queues watched')" />
+                            <button type="button" wire:click="detectHorizonConfig" wire:loading.attr="disabled" wire:target="detectHorizonConfig" class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:text-brand-ink disabled:opacity-50">
+                                <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
+                                {{ __('Detect') }}
+                            </button>
+                        </div>
                         <x-text-input id="hz_queues" wire:model="hz_queues" x-on:input="q = $event.target.value" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>
                         {{-- Live preview: the FIRST queue is the dispatch target (REDIS_QUEUE) —

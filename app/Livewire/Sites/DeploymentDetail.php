@@ -9,7 +9,7 @@ use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use App\Support\Sites\SiteWorkspaceBreadcrumbs;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
@@ -68,13 +68,23 @@ class DeploymentDetail extends Component
         // use build/swap/release/restart; serverless deploys record a single
         // "serverless" phase. Known phases come first in their canonical order,
         // then any others fall in afterwards so nothing is silently dropped.
-        $canonicalOrder = ['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'];
+        $canonicalOrder = ['clone', 'build', 'resources', 'swap', 'activate', 'release', 'restart', 'serverless'];
         $phases = array_values(array_unique([
             ...array_filter($canonicalOrder, static fn (string $p): bool => isset($phaseResults[$p])),
             ...array_keys($phaseResults),
         ]));
 
         $runtimeMode = $this->site->runtimeTargetMode();
+
+        // Inline database-connection fix (Q8/Q10): only on the site's latest,
+        // still-failed deployment whose failure matched the guided remediation —
+        // resume-from-phase only makes sense for the live release, and stale
+        // failures must not dangle live fix buttons.
+        $remediation = $this->remediationForDeployment($this->deployment);
+        $isLatest = $this->site->deployments()->latest()->value('id') === $this->deployment->id;
+        $dbFix = ($isLatest && is_array($remediation) && ($remediation['code'] ?? null) === 'database_connection_failed')
+            ? ['server' => $this->server, 'site' => $this->site]
+            : null;
 
         // Build only the chrome this view actually uses — the Deploy sidebar,
         // the workspace breadcrumb trail, and the per-deployment content.
@@ -98,6 +108,7 @@ class DeploymentDetail extends Component
         return view('livewire.sites.deployment-detail', [
             'phaseResults' => $phaseResults,
             'phases' => $phases,
+            'dbFix' => $dbFix,
             // Deploy workspace chrome (sidebar + breadcrumb trail).
             'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
             'settingsBreadcrumbs' => $breadcrumbs,

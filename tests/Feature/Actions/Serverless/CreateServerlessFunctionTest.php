@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Actions\Serverless\CreateServerlessFunctionTest;
 
-use App\Actions\Serverless\CreateServerlessFunction;
-use App\Jobs\ProvisionServerlessHostJob;
+use App\Modules\Serverless\Actions\CreateServerlessFunction;
+use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;

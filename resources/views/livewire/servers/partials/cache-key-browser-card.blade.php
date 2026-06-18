@@ -44,15 +44,6 @@
     </div>
 
     <div class="px-6 py-6 sm:px-7">
-    <x-explainer class="mt-4">
-        <p>{{ __('Each page runs SCAN with a small COUNT for up to 5 iterations server-side, returning the keys it found. The cursor in the response lets the next "Load more" continue exactly where it left off. Under heavy write traffic SCAN can repeat keys across pages — the explorer dedupes them client-side.') }}</p>
-        <p>
-            {{ __('Pattern is the redis SCAN MATCH glob — ') }}
-            <code>*</code> {{ __('for everything, ') }}<code>session:*</code> {{ __('for one prefix, ') }}<code>?ache</code> {{ __('for single-character wildcard. ') }}
-            {{ __('Inspecting a key fetches TYPE + TTL + value (truncated at 8 KB).') }}
-        </p>
-        <p>{{ __('Deleting a key requires the unlock toggle in the Console sub-tab. Every DEL is recorded in the audit log.') }}</p>
-    </x-explainer>
 
     <div
         class="relative mt-4"

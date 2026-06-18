@@ -149,6 +149,7 @@ class NginxGlobalOptionsConfig
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -206,7 +207,7 @@ class NginxGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -281,8 +282,8 @@ class NginxGlobalOptionsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
-     * @param  array<string, array{type: string, default: string, label: string, help: string}>  $params
+     * @param  array<string, mixed> $values
+     * @param  array<string, mixed> $params
      */
     private function upsertBlockDirectives(string $contents, string $blockName, array $values, array $params, string $keyPrefix): string
     {

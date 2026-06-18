@@ -22,6 +22,7 @@ final class ServerCostCard
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $server->loadMissing(['providerCredential', 'sites']);
@@ -38,7 +39,7 @@ final class ServerCostCard
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
         $hardware = $this->hardware($server, $tier);
-        $providerCents = (int) ($provider['monthly_usd_cents'] ?? 0);
+        $providerCents = (int) ($provider['monthly_usd_cents']);
         $stackCents = $providerCents + $dplyCents;
         $providerKnown = ($provider['source'] ?? '') !== 'unknown';
 
@@ -182,7 +183,7 @@ final class ServerCostCard
             'mem_formatted' => $memMb !== null ? $this->formatMemory($memMb) : null,
             'tier' => $tier->value,
             'tier_label' => $tier->label(),
-            'provider' => $server->provider?->label(),
+            'provider' => $server->provider->label(),
             'plan' => (string) ($server->size ?: '') ?: null,
             'region' => (string) ($server->region ?: '') ?: null,
         ];
@@ -243,7 +244,7 @@ final class ServerCostCard
     }
 
     /**
-     * @param  array<string, mixed>  $provider
+     * @param  array<string, mixed> $provider
      * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}  $capacity
      * @param  array{kind: string, severity: string, title: string, message: string}|null  $nudge
      * @return list<array{severity: string, title: string, message: string, action_label: ?string, action_route: ?string, action_anchor: ?string}>
@@ -327,7 +328,7 @@ final class ServerCostCard
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed> $payload
      */
     private function metricFloat(array $payload, string $key): ?float
     {

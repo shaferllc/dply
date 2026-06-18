@@ -7,7 +7,11 @@
 <li wire:key="server-list-{{ $server->id }}" class="flex items-stretch border-b border-brand-ink/10 last:border-b-0 hover:bg-brand-sand/15 transition-colors">
     <div class="w-1 shrink-0 {{ $stripe($server) }}" aria-hidden="true"></div>
     <div class="flex flex-1 flex-col gap-3 px-4 py-4 sm:px-6 min-w-0 lg:flex-row lg:items-center lg:gap-5">
-        <div class="min-w-0 flex-1">
+        <div class="flex min-w-0 flex-1 items-start gap-3">
+            <a href="{{ route('servers.show', $server) }}" wire:navigate class="shrink-0" title="{{ $server->name }}">
+                <x-entity-avatar :seed="$server->name ?: $server->id" :image="$server->logoUrl()" class="mt-0.5 h-9 w-9 text-sm" />
+            </a>
+            <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <a href="{{ route('servers.show', $server) }}" wire:navigate class="truncate text-sm font-semibold text-brand-ink hover:text-brand-sage">
                     {{ $server->name }}
@@ -54,9 +58,7 @@
                 </div>
             @endif
 
-            <div class="mt-2">
-                @include('livewire.servers.partials.server-sites-disclosure', ['server' => $server])
-            </div>
+            @include('livewire.servers.partials.server-resource-tabs', ['server' => $server])
 
             {{-- Setup-failed detail: red chip + journey link. Shown instead of
                  the live progress block when applyProvisionOutcomeToServer
@@ -109,6 +111,7 @@
                     </div>
                 @endif
             @endif
+            </div>
         </div>
 
         <div class="hidden shrink-0 lg:block">
@@ -118,7 +121,8 @@
             <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
         </div>
 
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            @include('livewire.servers.partials.server-deploy-action', ['server' => $server, 'deployTargets' => $deployTargets])
             <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-xs font-semibold text-brand-cream transition hover:bg-brand-forest">
                 <x-heroicon-m-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Manage') }}

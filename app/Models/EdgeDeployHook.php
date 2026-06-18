@@ -7,14 +7,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * URL-bearing token that triggers a redeploy of the parent Edge site
- * when POSTed to `/hooks/edge/deploy/{plaintext}` (P10b). The
- * plaintext token is shown to the operator once at create-time; only
- * the sha256 hash + first-8-char prefix are persisted, so leaked hook
- * URLs can be revoked without leaking the original credential.
+ * @property string $id
+ *                      URL-bearing token that triggers a redeploy of the parent Edge site
+ *                      when POSTed to `/hooks/edge/deploy/{plaintext}` (P10b). The
+ *                      plaintext token is shown to the operator once at create-time; only
+ *                      the sha256 hash + first-8-char prefix are persisted, so leaked hook
+ *                      URLs can be revoked without leaking the original credential.
+ * @property ?string $created_by_user_id
+ * @property ?string $last_triggered_deployment_id
+ * @property ?Carbon $last_used_at
+ * @property string $name
+ * @property ?string $site_id
+ * @property string $token_hash
+ * @property string $token_prefix
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class EdgeDeployHook extends Model
 {
@@ -30,6 +42,7 @@ class EdgeDeployHook extends Model
         'last_triggered_deployment_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -37,6 +50,7 @@ class EdgeDeployHook extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

@@ -26,14 +26,14 @@ class UniqueJobDecorator extends JobDecorator implements ShouldBeUnique
         return $prefix.$uniqueId;
     }
 
-    public function uniqueVia()
+    public function uniqueVia(): Cache
     {
         return $this->fromActionMethod('getJobUniqueVia', $this->parameters, function () {
             return Container::getInstance()->make(Cache::class);
         });
     }
 
-    protected function fromActionWithParameters(string $method, string $property, $default = null)
+    protected function fromActionWithParameters(string $method, string $property, mixed $default = null): mixed
     {
         return $this->fromActionMethodOrProperty($method, $property, $default, $this->parameters);
     }

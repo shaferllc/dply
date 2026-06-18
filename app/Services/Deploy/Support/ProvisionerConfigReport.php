@@ -7,7 +7,7 @@ namespace App\Services\Deploy\Support;
 final class ProvisionerConfigReport
 {
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return list<string>
      */
     public static function safeConfigKeys(array $config): array

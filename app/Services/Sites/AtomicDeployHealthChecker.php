@@ -17,90 +17,171 @@ final class AtomicDeployHealthChecker
      */
     public function verify(Site $site, SshConnection $ssh): string
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
-        if (! ($meta['deploy_health_enabled'] ?? false)) {
+        $meta = ($site->meta );
+
+        // Validate-by-default: every atomic deploy is HTTP-smoke-tested after
+        // cutover unless explicitly opted out (meta.deploy_health_enabled=false
+        // or a global config flag). A deploy that renders a 5xx (missing build,
+        // fatal boot, bad config) must NOT be reported as a success — the
+        // pre-cutover TCP resource probe cannot see a render-time 500.
+        if (($meta['deploy_health_enabled'] ?? config('deploy.health_check_default', true)) === false) {
             return '';
         }
 
-        $domain = $site->primaryDomain();
-        if ($domain === null || trim($domain->hostname) === '') {
-            throw new \RuntimeException(
-                __('Deploy health check is enabled but this site has no primary domain. Add a primary domain or disable the check.')
-            );
+        // Probe EVERY live surface — the primary domain(s) AND the testing
+        // hostname (*.on-dply.<tld>). Probing only the first let a 500 on the
+        // OTHER surface (e.g. the testing host while a primary domain exists, or
+        // vice versa) sail through as a green deploy — exactly how a homepage 500
+        // got past the gate. With no hostname at all there's nothing to
+        // smoke-test yet — skip, don't fail.
+        $hosts = $this->hostnamesToProbe($site);
+        if ($hosts === []) {
+            return "\n--- deploy health check ---\nskipped: site has no hostname to probe yet.\n";
         }
 
-        $hostHeader = strtolower(trim($domain->hostname));
-        $path = $this->normalizePath((string) ($meta['deploy_health_path'] ?? '/up'));
-        $expect = (int) ($meta['deploy_health_expect_status'] ?? 200);
+        // Default gate = "the app rendered a non-5xx response" against the
+        // homepage — the real layout/assets, so a missing Vite manifest or boot
+        // fatal is caught (a bare /up route can return 200 while every real page
+        // 500s). An explicit deploy_health_expect_status keeps exact-match mode.
+        $explicitExpect = isset($meta['deploy_health_expect_status']) && is_numeric($meta['deploy_health_expect_status']);
+        $expect = $explicitExpect ? (int) $meta['deploy_health_expect_status'] : 0;
+
+        // ALWAYS probe the homepage '/', plus any configured health path. A site
+        // whose meta still carries deploy_health_path='/up' (Laravel's bare health
+        // route) would otherwise pass while every real, Vite-rendering page 500s —
+        // the exact gap that let a homepage 500 through. Probing '/' too closes it
+        // with no per-site backfill.
+        $configuredPath = $this->normalizePath((string) ($meta['deploy_health_path'] ?? '/'));
+        $paths = array_values(array_unique(['/', $configuredPath]));
         $attempts = max(1, min(30, (int) ($meta['deploy_health_attempts'] ?? 5)));
-        $delayMs = max(0, min(10000, (int) ($meta['deploy_health_delay_ms'] ?? 500)));
+        $delayMs = max(0, min(10000, (int) ($meta['deploy_health_delay_ms'] ?? 1000)));
 
-        // Default to https: nginx 301-redirects http→https for TLS sites, so an
-        // http probe expecting 200 can NEVER pass — it always sees the 301.
-        $scheme = strtolower((string) ($meta['deploy_health_scheme'] ?? 'https'));
+        // Connect to the box itself; pin BOTH :80 and :443 of the hostname to it
+        // and follow redirects (-L) so an http→https hop still lands here and the
+        // FINAL status reflects what the app actually rendered. -k tolerates a
+        // not-yet-valid cert on this loopback probe — we validate that the app
+        // renders, not the TLS chain. Default scheme http so http-only sites work.
+        $scheme = strtolower((string) ($meta['deploy_health_scheme'] ?? 'http'));
         if (! in_array($scheme, ['http', 'https'], true)) {
-            $scheme = 'https';
+            $scheme = 'http';
         }
-        // `deploy_health_host` is the IP to CONNECT to (the box itself). The URL
-        // is built from the real hostname and pinned to that IP via --resolve, so
-        // TLS SNI + certificate validation match the site's hostname (a bare
-        // `Host:` header would mismatch the cert) and the request lands on the
-        // site's server block instead of nginx's default server. Any non-IP value
-        // (or none) collapses to loopback — the intent is an on-box probe.
         $targetHost = trim((string) ($meta['deploy_health_host'] ?? '127.0.0.1'));
         if ($targetHost === '' || filter_var($targetHost, FILTER_VALIDATE_IP) === false) {
             $targetHost = '127.0.0.1';
         }
-        $portRaw = $meta['deploy_health_port'] ?? null;
-        $port = is_numeric($portRaw)
-            ? max(1, min(65535, (int) $portRaw))
-            : ($scheme === 'https' ? 443 : 80);
-
-        $url = $scheme.'://'.$hostHeader.$path;
-
-        $curl = 'curl -sS --max-time 20 -o /dev/null -w \'%{http_code}\' --resolve '
-            .escapeshellarg($hostHeader.':'.$port.':'.$targetHost).' '
-            .escapeshellarg($url).' 2>&1';
 
         $log = "\n--- deploy health check ---\n";
-        $log .= 'GET '.$url.' (resolve '.$hostHeader.':'.$port.' → '.$targetHost.")\n";
-        $log .= 'Expect HTTP '.$expect.', up to '.$attempts." attempt(s)\n";
+        $log .= 'Probing '.count($hosts).' hostname(s) × '.count($paths).' path(s): '
+            .implode(', ', $hosts).' @ '.implode(', ', $paths)."\n";
 
-        $expectStr = (string) $expect;
+        // Every host × path must pass; the first 5xx fails the whole deploy so a
+        // broken surface can't hide behind a healthy sibling (or behind /up).
+        foreach ($hosts as $hostHeader) {
+            foreach ($paths as $probePath) {
+                $result = $this->probeHost($ssh, $hostHeader, $probePath, $scheme, $targetHost, $attempts, $delayMs, $explicitExpect, $expect);
+                $log .= $result['log'];
+
+                if (! $result['ok']) {
+                    $lastRaw = $result['lastRaw'];
+                    $lastCode = preg_match('/^\d{3}$/', $lastRaw) ? $lastRaw : '';
+                    $gotStr = $lastCode !== '' ? 'HTTP '.$lastCode : ($lastRaw !== '' ? $lastRaw : '(no response)');
+                    $expectMsg = $explicitExpect ? __('expected HTTP :e', ['e' => $expect]) : __('expected a non-5xx response');
+                    $url = $scheme.'://'.$hostHeader.$probePath;
+
+                    // The thrown message carries the REAL cause pulled off the box
+                    // (laravel.log tail, nginx error log, php-fpm state) so the deploy
+                    // failure record shows *why* it 500'd — not just "got 500".
+                    throw new \RuntimeException(
+                        __('Deploy health check failed for :host after :n attempts — last response was :got (:expect).', [
+                            'host' => $hostHeader.$probePath,
+                            'n' => $attempts,
+                            'got' => $gotStr,
+                            'expect' => $expectMsg,
+                        ])."\n\n".$this->diagnose($ssh, $site, $url, $hostHeader, $targetHost, $scheme === 'https' ? 443 : 80)
+                    );
+                }
+            }
+        }
+
+        return $log;
+    }
+
+    /**
+     * The distinct live hostnames to smoke-test: the primary domain plus the
+     * testing hostname (both, when both exist). Lowercased + de-duplicated.
+     *
+     * @return list<string>
+     */
+    private function hostnamesToProbe(Site $site): array
+    {
+        $candidates = [];
+
+        $domain = $site->primaryDomain();
+        if ($domain !== null && trim((string) $domain->hostname) !== '') {
+            $candidates[] = strtolower(trim((string) $domain->hostname));
+        }
+
+        $testing = strtolower(trim($site->testingHostname()));
+        if ($testing !== '') {
+            $candidates[] = $testing;
+        }
+
+        return array_values(array_unique(array_filter($candidates)));
+    }
+
+    /**
+     * Probe a single hostname against the box over loopback, retrying up to
+     * $attempts. Returns whether it passed, the per-host log lines, and the last
+     * raw curl output (for the failure diagnostic).
+     *
+     * @return array{ok: bool, log: string, lastRaw: string}
+     */
+    private function probeHost(
+        SshConnection $ssh,
+        string $hostHeader,
+        string $path,
+        string $scheme,
+        string $targetHost,
+        int $attempts,
+        int $delayMs,
+        bool $explicitExpect,
+        int $expect,
+    ): array {
+        $url = $scheme.'://'.$hostHeader.$path;
+
+        $curl = 'curl -sS -L -k --max-time 25 -o /dev/null -w \'%{http_code}\''
+            .' --resolve '.escapeshellarg($hostHeader.':80:'.$targetHost)
+            .' --resolve '.escapeshellarg($hostHeader.':443:'.$targetHost)
+            .' '.escapeshellarg($url).' 2>&1';
+
+        $log = 'GET '.$url.' (resolve '.$hostHeader.' → '.$targetHost.", follow redirects)\n";
+        $log .= ($explicitExpect ? '  expect HTTP '.$expect : '  expect a non-5xx response')
+            .', up to '.$attempts." attempt(s)\n";
+
         $lastRaw = '';
 
         for ($i = 1; $i <= $attempts; $i++) {
             $raw = trim($ssh->exec($curl, 45));
             $lastRaw = $raw;
-            $code = preg_match('/^\d{3}$/', $raw) ? $raw : '';
+            $code = preg_match('/^\d{3}$/', $raw) ? (int) $raw : 0;
 
-            if ($code === $expectStr) {
-                $log .= 'attempt '.$i.': HTTP '.$code." (ok)\n";
+            // Default: pass on any non-5xx (the app rendered). Explicit: exact match.
+            $ok = $explicitExpect ? ($code === $expect) : ($code >= 100 && $code < 500);
+            if ($ok) {
+                $log .= '  attempt '.$i.': HTTP '.$code." (ok)\n";
 
-                return $log;
+                return ['ok' => true, 'log' => $log, 'lastRaw' => $lastRaw];
             }
 
-            $log .= 'attempt '.$i.': got '.($raw !== '' ? $raw : '(empty)')." (expected {$expectStr})\n";
+            $log .= '  attempt '.$i.': got '.($raw !== '' ? $raw : '(empty)')
+                .($explicitExpect ? " (expected {$expect})" : ' (5xx / no response)')."\n";
 
             if ($i < $attempts && $delayMs > 0) {
                 usleep($delayMs * 1000);
             }
         }
 
-        // Never make the operator guess: report the ACTUAL status received, and
-        // pull the real cause off the server — the response body (a Laravel 500
-        // carries the exception; a 502 means PHP-FPM is down), the PHP-FPM unit
-        // state, and the tail of the nginx + PHP-FPM error logs.
-        $lastCode = preg_match('/^\d{3}$/', $lastRaw) ? $lastRaw : '';
-        $gotStr = $lastCode !== '' ? 'HTTP '.$lastCode : ($lastRaw !== '' ? $lastRaw : '(no response)');
-
-        throw new \RuntimeException(
-            __('Deploy health check failed after :n attempts — last response was :got (expected HTTP :expect).', [
-                'n' => $attempts,
-                'got' => $gotStr,
-                'expect' => $expectStr,
-            ])."\n\n".$this->diagnose($ssh, $site, $url, $hostHeader, $targetHost, $port)
-        );
+        return ['ok' => false, 'log' => $log, 'lastRaw' => $lastRaw];
     }
 
     /**

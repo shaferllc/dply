@@ -139,6 +139,7 @@ class OpenLiteSpeedExtAppsConfig
      *     unreadable: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -252,7 +253,7 @@ class OpenLiteSpeedExtAppsConfig
      * pipeline as save(), and rolls back on validation failure.
      *
      * @param  array{name: string, type: string, address: string, path?: string}  $identity
-     * @param  array<string, string>  $values  Tunables keyed by PARAMS keys; missing keys take defaults.
+     * @param  array<string, mixed> $values  Tunables keyed by PARAMS keys; missing keys take defaults.
      *
      * @throws \RuntimeException
      */
@@ -399,7 +400,7 @@ class OpenLiteSpeedExtAppsConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function renderNewBlock(string $name, string $type, string $address, string $path, array $values): string
     {
@@ -478,7 +479,7 @@ class OpenLiteSpeedExtAppsConfig
      * unrecognised directives) pass through unchanged so we don't strip
      * anything the provisioner cares about.
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function rewriteBlock(string $block, array $values): string
     {

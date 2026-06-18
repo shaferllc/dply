@@ -35,6 +35,7 @@ class EdgeDeliveryFeaturesEnsurer
      *     access_gates_republished: int,
      * }
      */
+    /** @return array<string, mixed> */
     public function ensurePlatform(bool $deployWorker = true): array
     {
         if (FakeEdgeProvision::enabled()) {
@@ -98,7 +99,7 @@ class EdgeDeliveryFeaturesEnsurer
         foreach (array_keys($zones) as $zoneName) {
             $result = $client->ensureImageResizingEnabled($zoneName);
             $results[] = [
-                'ok' => (bool) ($result['ok'] ?? false),
+                'ok' => (bool) ($result['ok']),
                 'zone' => (string) ($result['zone'] ?? $zoneName),
                 'detail' => (string) ($result['detail'] ?? ''),
             ];
@@ -157,7 +158,7 @@ class EdgeDeliveryFeaturesEnsurer
     }
 
     /**
-     * @param  array<string, mixed>  $edgeMeta
+     * @param  array<string, mixed> $edgeMeta
      * @return list<string>
      */
     private function defaultImageAllowedHosts(Site $site, string $edgeHostname, array $edgeMeta): array

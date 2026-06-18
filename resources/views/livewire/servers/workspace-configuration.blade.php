@@ -45,9 +45,9 @@
         </div>
     @endif
 
-    <x-explainer>
-        <p>{{ __('Pick a file, edit in the editor, validate the buffer, review the diff, then save. Paths are restricted to the server allowlist. Deployers can browse and view files read-only.') }}</p>
-    </x-explainer>
+    <div class="mb-6">
+        @include('livewire.servers.partials.server-logo-card', ['server' => $server])
+    </div>
 
     @if (! $opsReady)
         @include('livewire.servers.partials.workspace-ops-not-ready')

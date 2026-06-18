@@ -27,6 +27,7 @@ final class ServerJourneyInfrastructureAlerts
      *     ssh_unreachable?: array{headline: string, detail: string}
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $server = $server->fresh();

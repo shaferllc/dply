@@ -273,6 +273,12 @@ return [
         ['id' => 'postgres15', 'label' => 'PostgreSQL 15', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         ['id' => 'postgres14', 'label' => 'PostgreSQL 14', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         ['id' => 'sqlite3', 'label' => 'SQLite 3', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        // Document + OLAP engines. Gated behind database.mongodb / database.clickhouse
+        // (DatabaseEngineAvailability::familyForProvisionOption maps the id → flag),
+        // so they're hidden from the picker until the flag is on. ClickHouse is the
+        // store for the dply logs add-on.
+        ['id' => 'mongodb', 'label' => 'MongoDB 7.0', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
+        ['id' => 'clickhouse', 'label' => 'ClickHouse (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         // Same broadening as php_versions — Static-host preset is role
         // 'static' with no DB; the role list shouldn't gate that.
         ['id' => 'none', 'label' => 'None (external or not on this host)'],

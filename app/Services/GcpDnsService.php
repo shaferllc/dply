@@ -223,8 +223,8 @@ class GcpDnsService
     }
 
     /**
-     * @param  array<string, scalar>  $query
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $query
+     * @param  array<string, mixed> $body
      */
     private function request(string $method, string $path, array $query = [], array $body = []): Response
     {
@@ -235,8 +235,8 @@ class GcpDnsService
     }
 
     /**
-     * @param  array<string, scalar>  $query
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $query
+     * @param  array<string, mixed> $body
      */
     private function rawRequest(string $method, string $path, array $query = [], array $body = []): Response
     {

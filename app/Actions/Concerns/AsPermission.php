@@ -377,6 +377,8 @@ trait AsPermission
     /**
      * Get required permissions for this action.
      * Override this method to define required permissions.
+     *
+     * @return array<int, string>
      */
     protected function getRequiredPermissions(): array
     {

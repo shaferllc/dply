@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\ScanServerLiveCertsJob;
 use App\Services\Servers\WebserverCertsAggregator;
 use Carbon\CarbonImmutable;
 
@@ -11,7 +12,7 @@ use Carbon\CarbonImmutable;
  * Shared "live on-disk TLS certificates" loader for the server surfaces that
  * render the cross-engine cert sweep (the webserver Health tab and the cert
  * inventory page). One mechanism: read the cached sweep, and when it's missing
- * or a rescan is requested, dispatch {@see \App\Jobs\ScanServerLiveCertsJob} and
+ * or a rescan is requested, dispatch {@see ScanServerLiveCertsJob} and
  * poll for the result — the SSH probe never runs in the request.
  *
  * Hosts must expose a public `Server $server`, the `serverOpsReady()` guard, and
@@ -26,7 +27,7 @@ trait LoadsLiveServerCerts
      * comfortably cover the job's own 90s timeout + queue latency without
      * leaving the operator staring at a spinner if the worker is down.
      */
-    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 4;
+    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 1;
 
     private const LIVE_CERTS_POLL_TIMEOUT_SECONDS = 60;
 
@@ -48,6 +49,15 @@ trait LoadsLiveServerCerts
     /** Number of poll ticks elapsed for the in-flight scan; drives the client-side timeout. */
     public int $liveCertsPollCount = 0;
 
+    /**
+     * Live progress lines streamed by the scan job (oldest first), rendered as a
+     * terminal-style log in the panel so the operator sees what the sweep is doing
+     * — and, on timeout, how far it got — instead of a bare spinner.
+     *
+     * @var list<array{t: int, line: string}>
+     */
+    public array $liveCertsProgress = [];
+
     /** Fired from wire:init (and the Rescan button via refreshLiveCerts). */
     public function loadLiveCerts(bool $forceFresh = false): void
     {
@@ -58,6 +68,7 @@ trait LoadsLiveServerCerts
             $this->liveCertsLoaded = true;
             $this->liveCertsScanning = false;
             $this->liveCertsTimedOut = false;
+            $this->liveCertsProgress = [];
 
             return;
         }
@@ -80,6 +91,7 @@ trait LoadsLiveServerCerts
         $this->liveCertsTimedOut = false;
         $this->liveCertsError = null;
         $this->liveCertsPollCount = 0;
+        $this->liveCertsProgress = $aggregator->progress($this->server);
     }
 
     /**
@@ -94,8 +106,18 @@ trait LoadsLiveServerCerts
             return;
         }
 
-        $cached = app(WebserverCertsAggregator::class)->cached($this->server);
+        $aggregator = app(WebserverCertsAggregator::class);
+
+        // Surface whatever the job has streamed so far, every tick, so the log
+        // grows live even before a final result lands (or never does).
+        $this->liveCertsProgress = $aggregator->progress($this->server);
+
+        $cached = $aggregator->cached($this->server);
         if ($cached !== null) {
+            // Capture the complete frame set before resolving — the worker caches
+            // the result only after its final progress line, so this read has them
+            // all — and the panel replays them on completion (see the blade).
+            $this->liveCertsProgress = $aggregator->progress($this->server);
             $this->applyLiveCertResult($cached);
 
             return;
@@ -144,5 +166,6 @@ trait LoadsLiveServerCerts
         $this->liveCertsTimedOut = false;
         $this->liveCertsError = null;
         $this->liveCertsPollCount = 0;
+        $this->liveCertsProgress = [];
     }
 }

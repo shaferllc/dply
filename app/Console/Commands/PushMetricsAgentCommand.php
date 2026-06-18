@@ -63,7 +63,7 @@ class PushMetricsAgentCommand extends Command
         }
 
         foreach ($servers as $server) {
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             $current = (string) ($meta['monitoring_guest_script_sha256'] ?? $meta['monitoring_guest_script_sha'] ?? '');
 
             if ($current === $bundledSha) {

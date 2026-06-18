@@ -108,6 +108,7 @@ BASH;
     /**
      * @return array{values: array<string, string>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $contents = $this->readRemote($server);
@@ -129,7 +130,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, string>  $form
+     * @param  array<string, mixed> $form
      */
     public function save(Server $server, array $form, ?ConsoleEmitter $emitter = null): void
     {

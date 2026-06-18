@@ -9,7 +9,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Services\OpsCopilot\OpsCopilotContextBuilder;
+use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
 

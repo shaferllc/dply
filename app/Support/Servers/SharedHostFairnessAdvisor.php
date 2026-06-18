@@ -99,7 +99,7 @@ final class SharedHostFairnessAdvisor
     }
 
     /**
-     * @param  array<string, mixed>  $event
+     * @param  array<string, mixed> $event
      * @return array<string, mixed>
      */
     private function noisyNeighborRecommendation(Server $server, array $event, ?Site $site): array
@@ -131,7 +131,7 @@ final class SharedHostFairnessAdvisor
         ];
 
         return [
-            'id' => 'noisy-neighbor-'.($site?->slug ?? 'site'),
+            'id' => 'noisy-neighbor-'.($site->slug ?? 'site'),
             'title' => __('Noisy neighbor — :site', ['site' => $siteName]),
             'summary' => (string) ($event['message'] ?? __('One site is consuming a disproportionate share of CPU or memory.')),
             'confidence' => 'high',
@@ -140,7 +140,7 @@ final class SharedHostFairnessAdvisor
     }
 
     /**
-     * @param  array<string, mixed>  $event
+     * @param  array<string, mixed> $event
      * @return array<string, mixed>
      */
     private function deploySpikeRecommendation(Server $server, array $event, ?Site $site): array
@@ -165,7 +165,7 @@ final class SharedHostFairnessAdvisor
         }
 
         return [
-            'id' => 'deploy-spike-'.($site?->slug ?? 'site'),
+            'id' => 'deploy-spike-'.($site->slug ?? 'site'),
             'title' => __('Deploy spike — :site', ['site' => $siteName]),
             'summary' => (string) ($event['message'] ?? __('A recent deploy correlated with elevated host CPU — other sites may have slowed down.')),
             'confidence' => 'high',
@@ -174,7 +174,7 @@ final class SharedHostFairnessAdvisor
     }
 
     /**
-     * @param  array<string, mixed>  $breach
+     * @param  array<string, mixed> $breach
      * @return array<string, mixed>
      */
     private function budgetRecommendation(Server $server, array $breach): array
@@ -198,7 +198,7 @@ final class SharedHostFairnessAdvisor
     }
 
     /**
-     * @param  array<string, mixed>  $dominant
+     * @param  array<string, mixed> $dominant
      * @return array<string, mixed>
      */
     private function dominantSiteRecommendation(Server $server, array $dominant): array
@@ -286,6 +286,7 @@ final class SharedHostFairnessAdvisor
 
     /**
      * @param  list<array<string, mixed>>  $recommendations
+     * @param  array<string, mixed> $report
      */
     private function buildSummary(Server $server, array $report, array $recommendations): string
     {
@@ -314,6 +315,7 @@ final class SharedHostFairnessAdvisor
 
     /**
      * @param  list<array<string, mixed>>  $recommendations
+     * @param  array<string, mixed> $report
      */
     private function resolveSeverity(array $report, array $recommendations): string
     {

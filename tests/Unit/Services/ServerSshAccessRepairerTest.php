@@ -9,7 +9,7 @@ use App\Services\Servers\ServerSshAccessRepairer;
 use Mockery;
 
 test('repair uses root recovery connection and reinstalls operational key', function () {
-    $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+    $keyPath = base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem');
     $server = new Server([
         'name' => 'repair-target',
         'ip_address' => '203.0.113.10',

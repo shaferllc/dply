@@ -5,7 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $content
+ * @property ?Carbon $expires_at
+ * @property string $log_key
+ * @property ?string $server_id
+ * @property string $token
+ * @property ?string $user_id
+ * @property-read ?Server $server
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class LogViewerShare extends Model
 {
     use HasUlids;
@@ -19,6 +33,7 @@ class LogViewerShare extends Model
         'expires_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -26,11 +41,13 @@ class LogViewerShare extends Model
         ];
     }
 
+    /** @return BelongsTo<Server, $this> */
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

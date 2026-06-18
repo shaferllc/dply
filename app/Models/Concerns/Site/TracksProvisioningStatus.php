@@ -5,15 +5,29 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Enums\SiteType;
+use App\Jobs\PreflightSiteSetupJob;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Services\Sites\CaddySiteConfigBuilder;
+use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\SiteWorkerPageBuilder;
+use App\Support\Sites\BootCriticalEnv;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property string $status
+ * @property ?Carbon $last_deploy_at
+ * @property ?Carbon $suspended_at
+ * @property string $git_repository_url
+ * @property SiteType $type
+ * @property string $env_file_content
+ * @property string $deploy_strategy
+ * @property-read ?Server $server
  */
 trait TracksProvisioningStatus
 {
@@ -80,7 +94,7 @@ trait TracksProvisioningStatus
      */
     public function isWorkerSite(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         // Explicit per-site override wins when set (the user toggle). Absent an
         // override, worker mode defaults ON for sites on a worker host and OFF
@@ -98,14 +112,15 @@ trait TracksProvisioningStatus
      */
     public function workerModeIsExplicit(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return array_key_exists('worker_mode', $meta) && $meta['worker_mode'] !== null;
     }
 
+    /** @return array<string, mixed> */
     public function provisioningMeta(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $provisioning = $meta['provisioning'] ?? [];
 
         return is_array($provisioning) ? $provisioning : [];
@@ -155,12 +170,22 @@ trait TracksProvisioningStatus
     {
         $readyUrl = $this->provisioningMeta()['ready_url'] ?? null;
         if (is_string($readyUrl) && $readyUrl !== '') {
+            // Stored ready_urls predate SSL provisioning and can be http:// even
+            // though the host now serves https and forces a redirect. Upgrade the
+            // scheme so visit/preview links hit the live https URL directly.
+            $host = parse_url($readyUrl, PHP_URL_HOST);
+            if (is_string($host) && $host !== ''
+                && str_starts_with($readyUrl, 'http://')
+                && $this->urlSchemeForHostname($host) === 'https') {
+                return 'https://'.substr($readyUrl, strlen('http://'));
+            }
+
             return $readyUrl;
         }
 
         $hostname = $this->provisionedHostname();
 
-        return $hostname ? 'http://'.$hostname : null;
+        return $hostname ? $this->urlSchemeForHostname($hostname).'://'.$hostname : null;
     }
 
     public function isProvisioning(): bool
@@ -381,7 +406,7 @@ trait TracksProvisioningStatus
 
     /**
      * Lifecycle state of the post-repo-connect setup wizard (import/preset
-     * sites), written by {@see \App\Jobs\PreflightSiteSetupJob} into
+     * sites), written by {@see PreflightSiteSetupJob} into
      * meta.setup.state: 'scanning' | 'deploying' | 'needs_setup' |
      * 'scan_failed'. Null once the site has deployed at least once, or for
      * sites that never entered the flow.
@@ -424,7 +449,7 @@ trait TracksProvisioningStatus
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($at)->lt(now()->subSeconds($seconds));
+            return Carbon::parse($at)->lt(now()->subSeconds($seconds));
         } catch (\Throwable) {
             return true;
         }
@@ -450,7 +475,7 @@ trait TracksProvisioningStatus
      * The site has connected a repo but is being held before its first deploy
      * pending setup (missing required env, or a failed scan to fix). Drives the
      * setup wizard and the Overview "finish setting up" card. The site stays
-     * live (no status change) throughout — see {@see \App\Jobs\PreflightSiteSetupJob}.
+     * live (no status change) throughout — see {@see PreflightSiteSetupJob}.
      */
     public function needsFirstDeploySetup(): bool
     {
@@ -485,8 +510,8 @@ trait TracksProvisioningStatus
 
         $current = [];
         if (filled($this->env_file_content)) {
-            $parsed = app(\App\Services\Sites\DotEnvFileParser::class)->parse((string) $this->env_file_content);
-            $current = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+            $parsed = app(DotEnvFileParser::class)->parse((string) $this->env_file_content);
+            $current = $parsed['variables'];
         }
 
         $missing = [];
@@ -513,7 +538,7 @@ trait TracksProvisioningStatus
      * hundreds of keys "required"; only the boot-critical ones (framework URL +
      * database connection) should hold the deploy. Everything else is optional
      * and the operator can fill it from the Environment tab any time.
-     * See {@see \App\Support\Sites\BootCriticalEnv}.
+     * See {@see BootCriticalEnv}.
      *
      * @return list<string>
      */
@@ -521,7 +546,7 @@ trait TracksProvisioningStatus
     {
         return array_values(array_filter(
             $this->unsatisfiedRequiredEnvKeys(),
-            static fn (string $key): bool => \App\Support\Sites\BootCriticalEnv::isBootCritical($key),
+            static fn (string $key): bool => BootCriticalEnv::isBootCritical($key),
         ));
     }
 
@@ -558,15 +583,14 @@ trait TracksProvisioningStatus
         if (data_get($this->meta, 'choose_app.chosen_kind') !== null) {
             return false;
         }
-        if (is_string($this->git_repository_url) && trim($this->git_repository_url) !== '') {
+        if (trim((string) $this->git_repository_url) !== '') {
             // The choose-app picker writes the URL mid-flow (via syncRepoUrlToSite)
             // so the ref picker can resolve branches before the form is submitted.
             // Don't count that as "installed" — require a completed choice or a
             // deploy. Legacy sites with no choose_app meta are pre-flow and their
             // URL is real evidence of an installed app.
             $midFlow = $this->isAwaitingApp()
-                || (data_get($this->meta, 'choose_app') !== null
-                    && data_get($this->meta, 'choose_app.chosen_kind') === null);
+                || data_get($this->meta, 'choose_app') !== null;
             if (! $midFlow) {
                 return false;
             }

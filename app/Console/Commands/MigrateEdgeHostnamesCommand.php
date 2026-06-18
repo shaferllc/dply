@@ -67,7 +67,7 @@ class MigrateEdgeHostnamesCommand extends Command
             $meta['live_url'] = 'https://'.$newHost;
 
             $site->update([
-                'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+                'meta' => array_merge($site->meta, ['edge' => $meta]),
             ]);
 
             $activeId = $meta['active_deployment_id'] ?? null;

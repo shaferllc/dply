@@ -6,7 +6,7 @@ namespace App\Services\Servers;
 
 use App\Models\Organization;
 use App\Models\Server;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\Servers\SharedHostLlmAdvisor;
 use App\Support\Servers\SharedHostReport;
 
@@ -21,7 +21,7 @@ final class SharedHostNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed>  $breach
+     * @param  array<string, mixed> $breach
      */
     public function notifyBudgetBreach(Server $server, array $breach): void
     {
@@ -67,7 +67,7 @@ final class SharedHostNotificationDispatcher
     }
 
     /**
-     * @param  array<string, mixed>  $event
+     * @param  array<string, mixed> $event
      */
     public function notifyContentionEvent(Server $server, array $event): void
     {

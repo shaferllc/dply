@@ -100,7 +100,7 @@ final class SiteCloneAttributeMapper
      */
     private static function sanitizedMetaCopy(Site $source): array
     {
-        $meta = is_array($source->meta) ? $source->meta : [];
+        $meta = ($source->meta );
 
         unset(
             $meta['provisioning'],
@@ -113,7 +113,7 @@ final class SiteCloneAttributeMapper
     }
 
     /**
-     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed> $attributes
      * @return array<string, mixed>
      */
     public static function withCloneMeta(array $attributes, Site $source, string $phase, ?string $message = null): array
@@ -131,7 +131,7 @@ final class SiteCloneAttributeMapper
     }
 
     /**
-     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed> $attributes
      * @return array<string, mixed>
      */
     public static function withPromoteMeta(

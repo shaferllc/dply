@@ -7,7 +7,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $bytes_egress
+ * @property string $cache_hits
+ * @property string $duration_ms_p95
+ * @property string $duration_ms_total
+ * @property Carbon $hour_start
+ * @property ?string $organization_id
+ * @property string $requests
+ * @property ?string $site_id
+ * @property string $source
+ * @property string $status_2xx
+ * @property string $status_4xx
+ * @property string $status_5xx
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class EdgePerformanceHourly extends Model
 {
     use HasUlids;
@@ -29,6 +48,7 @@ class EdgePerformanceHourly extends Model
         'source',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,6 +56,7 @@ class EdgePerformanceHourly extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

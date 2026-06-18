@@ -9,7 +9,7 @@ use App\Models\RealtimeApp;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Realtime\RealtimeBackendFactory;
+use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +51,7 @@ class TestBroadcastingBindingJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         $binding = SiteBinding::query()->find($this->bindingId);
         $action = ConsoleAction::query()->find($this->consoleActionId);
 
@@ -137,7 +137,7 @@ class TestBroadcastingBindingJob implements ShouldQueue
      */
     private function finish(ConsoleEmitter $emit, SiteBinding $binding, bool $ok, ?string $error, bool $failed = false): void
     {
-        $config = is_array($binding->config) ? $binding->config : [];
+        $config = $binding->config;
         $config['connectivity'] = [
             'ok' => $ok,
             'checked_at' => now()->toIso8601String(),

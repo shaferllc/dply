@@ -67,6 +67,7 @@ final class SchedulerCardsBuilder
      *   },
      * }
      */
+    /** @return array<string, mixed> */
     public function build(Server $server, ?Carbon $now = null): array
     {
         $now = $now ?? Carbon::now();
@@ -174,9 +175,9 @@ final class SchedulerCardsBuilder
                     'cron_job' => $cron,
                     'heartbeat' => null,
                     'kind' => $kind,
-                    'cron_expression' => (string) ($cron?->cron_expression ?? ''),
+                    'cron_expression' => (string) ($cron->cron_expression ?? ''),
                     'last_tick_at' => null,
-                    'next_run_at' => $this->nextRunAt((string) ($cron?->cron_expression ?? ''), $now),
+                    'next_run_at' => $this->nextRunAt((string) ($cron->cron_expression ?? ''), $now),
                 ];
                 $stats['unmonitored']++;
             }
@@ -185,6 +186,9 @@ final class SchedulerCardsBuilder
         return ['cards' => $cards, 'stats' => $stats];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function emptyCard(Site $site): array
     {
         return [

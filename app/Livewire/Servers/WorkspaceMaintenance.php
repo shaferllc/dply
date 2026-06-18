@@ -8,9 +8,16 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesMaintenanceNotifications;
+use App\Livewire\Servers\Concerns\ManagesPreferredMaintenanceSchedule;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
+use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\PruneServerOrphanVhostsJob;
+use App\Models\AuditLog;
+use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Models\Site;
 use App\Services\Servers\ServerMaintenanceWindow;
 use App\Support\Servers\MaintenanceWindow;
 use Illuminate\Contracts\View\View;
@@ -20,6 +27,7 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -38,8 +46,10 @@ class WorkspaceMaintenance extends Component
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesMaintenanceNotifications;
+    use ManagesPreferredMaintenanceSchedule;
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
+    use RunsServerConsoleActions;
     use RunsServerMaintenanceActions;
 
     protected string $requiredFeature = 'workspace.server_maintenance';
@@ -48,9 +58,17 @@ class WorkspaceMaintenance extends Component
     public bool $comingSoonPreview = false;
 
     /** In-page sub-tab: 'window', 'operations', 'schedule', or 'notifications'. */
+    #[Url(as: 'tab', except: 'window', history: true)]
     public string $maintenance_tab = 'window';
 
     public string $maintenance_until_local = '';
+
+    /**
+     * IANA timezone of the operator's browser, captured client-side so the
+     * end-time field reads as local wall-clock instead of UTC. Falls back to
+     * the app timezone when JS is unavailable or sends a bad value.
+     */
+    public string $maintenance_timezone = '';
 
     public string $maintenance_note = '';
 
@@ -58,6 +76,64 @@ class WorkspaceMaintenance extends Component
 
     /** Action key awaiting confirmation in the operations confirm modal. */
     public ?string $pendingActionKey = null;
+
+    /**
+     * Briefly nudge re-renders after an enable/disable/re-apply so the shared
+     * console-action banner surfaces the queued webserver-config apply the
+     * instant its row is written (a freshly-queued job has no console row yet,
+     * so without this the banner — which only self-polls once a run exists —
+     * wouldn't appear).
+     */
+    public bool $watchApply = false;
+
+    public int $applyWatchTicks = 0;
+
+    /** Bounded poll target: stop nudging after ~30s so quiet pages go idle. */
+    public function tickApplyWatch(): void
+    {
+        if (++$this->applyWatchTicks >= 15) {
+            $this->watchApply = false;
+        }
+    }
+
+    /**
+     * Latest non-dismissed console-action for this server, feeding the one
+     * shared `console-action-banner-static`. Covers BOTH host-upkeep ops
+     * (Server subject, {@see self::OP_CONSOLE_KIND}) and the webserver applies
+     * a maintenance toggle queues (Site subjects, kind `webserver_config`), so
+     * the page never grows a second, special-cased output box.
+     */
+    protected function maintenanceConsoleRun(): ?ConsoleAction
+    {
+        $siteIds = $this->server->sites->pluck('id');
+
+        return ConsoleAction::query()
+            ->with('subject')
+            ->whereNull('dismissed_at')
+            ->where(function ($q) use ($siteIds): void {
+                $q->where(function ($inner): void {
+                    $inner->where('subject_type', $this->server->getMorphClass())
+                        ->where('subject_id', $this->server->getKey())
+                        ->whereIn('kind', [self::OP_CONSOLE_KIND, 'vhost_prune']);
+                });
+
+                if ($siteIds->isNotEmpty()) {
+                    $q->orWhere(function ($inner) use ($siteIds): void {
+                        $inner->where('subject_type', (new Site)->getMorphClass())
+                            ->whereIn('subject_id', $siteIds)
+                            ->where('kind', 'webserver_config');
+                    });
+                }
+            })
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    protected function beginWatchingApply(): void
+    {
+        $this->watchApply = true;
+        $this->applyWatchTicks = 0;
+    }
 
     public function mount(Server $server): void
     {
@@ -75,6 +151,11 @@ class WorkspaceMaintenance extends Component
         }
 
         $this->bootWorkspace($server);
+        $this->loadPreferredMaintenanceSchedule();
+
+        // A ?tab= value from the URL bypasses setMaintenanceTab()'s allowlist;
+        // clamp unknown values back to the default so every panel isn't hidden.
+        $this->setMaintenanceTab($this->maintenance_tab);
 
         $maintenance = app(ServerMaintenanceWindow::class);
         $maintenance->refreshExpired($server, auth()->user());
@@ -88,8 +169,10 @@ class WorkspaceMaintenance extends Component
             $until = $state['until'] ?? null;
             if (is_string($until) && $until !== '') {
                 try {
+                    // Render as a UTC wall-clock string; the field's Alpine
+                    // wrapper re-localizes it to the operator's browser tz.
                     $this->maintenance_until_local = Carbon::parse($until)
-                        ->timezone(config('app.timezone'))
+                        ->utc()
                         ->format('Y-m-d\TH:i');
                 } catch (\Throwable) {
                     $this->maintenance_until_local = '';
@@ -132,6 +215,11 @@ class WorkspaceMaintenance extends Component
     public function openEnableModal(): void
     {
         $this->authorize('update', $this->server);
+
+        // Validate the window up front so an invalid end time surfaces inline
+        // under the field instead of silently failing behind the open modal.
+        $this->resolveMaintenanceUntil();
+
         $this->dispatch('open-modal', 'enable-maintenance-confirmation');
     }
 
@@ -161,38 +249,23 @@ class WorkspaceMaintenance extends Component
             return;
         }
 
-        $validated = $this->validate([
-            'maintenance_until_local' => ['nullable', 'string'],
-            'maintenance_note' => ['nullable', 'string', 'max:500'],
-            'maintenance_message' => ['nullable', 'string', 'max:500'],
-        ]);
+        // Re-validate at confirm time; if the window has since gone invalid,
+        // close the modal so the inline error is visible rather than hidden
+        // behind it.
+        try {
+            $until = $this->resolveMaintenanceUntil();
+        } catch (ValidationException $e) {
+            $this->closeEnableModal();
 
-        $until = null;
-        if (trim($validated['maintenance_until_local']) !== '') {
-            try {
-                $until = Carbon::parse(
-                    $validated['maintenance_until_local'],
-                    config('app.timezone'),
-                )->utc();
-            } catch (\Throwable) {
-                throw ValidationException::withMessages([
-                    'maintenance_until_local' => __('Enter a valid date and time.'),
-                ]);
-            }
-
-            if ($until->lte(now())) {
-                throw ValidationException::withMessages([
-                    'maintenance_until_local' => __('The end time must be in the future.'),
-                ]);
-            }
+            throw $e;
         }
 
         try {
             $result = $maintenance->enable(
                 $this->server,
                 $until,
-                (string) ($validated['maintenance_note'] ?? ''),
-                (string) ($validated['maintenance_message'] ?? ''),
+                $this->maintenance_note,
+                $this->maintenance_message,
                 auth()->user(),
             );
         } catch (\RuntimeException $e) {
@@ -203,6 +276,7 @@ class WorkspaceMaintenance extends Component
 
         $this->server->refresh();
         $this->closeEnableModal();
+        $this->beginWatchingApply();
 
         $this->toastSuccess(trans_choice(
             'Maintenance enabled — :count site suspended.|Maintenance enabled — :count sites suspended.',
@@ -211,12 +285,68 @@ class WorkspaceMaintenance extends Component
         ).' '.__('Webserver configs queued.'));
     }
 
+    /**
+     * Validate the maintenance form and resolve the optional end time to UTC.
+     *
+     * Shared by {@see openEnableModal()} (gate before the confirm modal opens)
+     * and {@see enableMaintenance()} (re-check at confirm). Throws a
+     * {@see ValidationException} with an inline message when the end time is
+     * unparseable or not in the future.
+     */
+    protected function resolveMaintenanceUntil(): ?Carbon
+    {
+        $validated = $this->validate([
+            'maintenance_until_local' => ['nullable', 'string'],
+            'maintenance_note' => ['nullable', 'string', 'max:500'],
+            'maintenance_message' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (trim($validated['maintenance_until_local']) === '') {
+            return null;
+        }
+
+        try {
+            $until = Carbon::parse(
+                $validated['maintenance_until_local'],
+                $this->operatorTimezone(),
+            )->utc();
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'maintenance_until_local' => __('Enter a valid date and time.'),
+            ]);
+        }
+
+        if ($until->lte(now())) {
+            throw ValidationException::withMessages([
+                'maintenance_until_local' => __('The end time must be in the future.'),
+            ]);
+        }
+
+        return $until;
+    }
+
+    /**
+     * Resolve the timezone the operator's end time is expressed in. Trusts the
+     * browser-supplied {@see $maintenance_timezone} only when it is a known
+     * IANA identifier; otherwise falls back to the app timezone (UTC).
+     */
+    protected function operatorTimezone(): string
+    {
+        $tz = trim($this->maintenance_timezone);
+
+        if ($tz !== '' && in_array($tz, timezone_identifiers_list(), true)) {
+            return $tz;
+        }
+
+        return config('app.timezone');
+    }
+
     public function disableMaintenance(ServerMaintenanceWindow $maintenance): void
     {
         $this->authorize('update', $this->server);
 
         try {
-            $result = $maintenance->disable($this->server, auth()->user());
+            $result = $maintenance->disable($this->server, request()->user());
         } catch (\RuntimeException $e) {
             $this->toastError($e->getMessage());
 
@@ -225,6 +355,7 @@ class WorkspaceMaintenance extends Component
 
         $this->server->refresh();
         $this->closeDisableModal();
+        $this->beginWatchingApply();
 
         $this->toastSuccess(trans_choice(
             'Maintenance cleared — :count site resumed.|Maintenance cleared — :count sites resumed.',
@@ -304,6 +435,143 @@ class WorkspaceMaintenance extends Component
         return $resolved;
     }
 
+    /**
+     * Recent visitor-maintenance enable/disable events for this server, read
+     * from the audit log (already written by ServerMaintenanceWindow).
+     *
+     * @return list<array{action: string, label: string, at: \Illuminate\Support\Carbon, by: ?string, detail: ?string, ok: bool}>
+     */
+    protected function maintenanceHistory(int $limit = 12): array
+    {
+        $rows = AuditLog::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->whereIn('action', ['server.maintenance.enabled', 'server.maintenance.disabled'])
+            ->with('user:id,name,email')
+            ->latest()
+            ->limit($limit)
+            ->get();
+
+        return $rows->map(function (AuditLog $row): array {
+            $values = is_array($row->new_values) ? $row->new_values : [];
+            $enabled = $row->action === 'server.maintenance.enabled';
+
+            if ($enabled) {
+                $count = (int) ($values['suspended_count'] ?? 0);
+                $detail = trans_choice(':count site suspended|:count sites suspended', $count, ['count' => $count]);
+                if (! empty($values['auto_expired'])) {
+                    $detail .= ' · '.__('auto-expired');
+                }
+            } else {
+                $count = (int) ($values['resumed_count'] ?? 0);
+                $detail = trans_choice(':count site resumed|:count sites resumed', $count, ['count' => $count]);
+                if (! empty($values['auto_expired'])) {
+                    $detail .= ' · '.__('auto-cleared on expiry');
+                }
+            }
+
+            return [
+                'action' => $row->action,
+                'label' => $enabled ? __('Maintenance enabled') : __('Maintenance cleared'),
+                'at' => $row->created_at,
+                'by' => $row->user?->name ?: $row->user?->email,
+                'detail' => $detail,
+                'ok' => ! $enabled,
+            ];
+        })->all();
+    }
+
+    /**
+     * Sites on this server whose most recent webserver-config apply failed —
+     * the silent failure mode that can leave a box broken after a maintenance
+     * toggle. Surfaced with a one-click re-apply.
+     *
+     * @return list<array{site_id: string, name: string, error: string, at: ?\Illuminate\Support\Carbon}>
+     */
+    protected function recentApplyFailures(): array
+    {
+        $siteIds = $this->server->sites->pluck('id')->map(fn ($id): string => (string) $id)->all();
+        if ($siteIds === []) {
+            return [];
+        }
+
+        $latest = ConsoleAction::query()
+            ->where('kind', 'webserver_config')
+            ->whereIn('subject_id', $siteIds)
+            ->whereIn('id', function ($q) use ($siteIds): void {
+                $q->selectRaw('max(id)')
+                    ->from('console_actions')
+                    ->where('kind', 'webserver_config')
+                    ->whereIn('subject_id', $siteIds)
+                    ->groupBy('subject_id');
+            })
+            ->where('status', 'failed')
+            ->whereNull('dismissed_at')
+            ->get();
+
+        $names = $this->server->sites->keyBy(fn (Site $s): string => (string) $s->id);
+
+        return $latest->map(fn (ConsoleAction $a): array => [
+            'site_id' => (string) $a->subject_id,
+            'name' => $names->get((string) $a->subject_id)?->name ?? (string) $a->subject_id,
+            'error' => trim((string) ($a->error ?? '')) ?: __('Webserver config apply failed.'),
+            'at' => $a->finished_at ?? $a->created_at,
+        ])->values()->all();
+    }
+
+    /**
+     * Re-dispatch the webserver-config apply for a site whose last apply failed
+     * (e.g. a maintenance toggle left it broken).
+     */
+    public function reapplyWebserverConfig(string $siteId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $site = $this->server->sites->firstWhere('id', $siteId);
+        if ($site === null) {
+            $this->toastError(__('Unknown site.'));
+
+            return;
+        }
+
+        ApplySiteWebserverConfigJob::dispatch((string) $site->id, (string) auth()->id());
+        $this->beginWatchingApply();
+        $this->toastSuccess(__('Re-applying webserver config for :site…', ['site' => $site->name]));
+    }
+
+    /**
+     * Sweep the server for orphaned dply vhost files (`dply-*.conf` whose owning
+     * site is gone) and reload nginx. This is the proactive companion to the
+     * apply-time self-heal — it removes orphans even when none is currently
+     * shadowing a live site, so a stale suspended block can't lie in wait.
+     */
+    public function pruneOrphanVhosts(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot run maintenance operations on servers.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before pruning vhosts.'));
+
+            return;
+        }
+
+        // Seeds the ConsoleAction synchronously, so the shared console-action
+        // banner (fed by maintenanceConsoleRun()) surfaces it on this same
+        // response — same system as every other op on the page. The job mirrors
+        // its output into the same row.
+        $runId = $this->seedConsoleActionRun($this->server, 'vhost_prune', __('Pruning orphaned vhosts'));
+
+        PruneServerOrphanVhostsJob::dispatch((string) $this->server->id, (string) auth()->id(), $runId);
+
+        $this->toastSuccess(__('Scanning for orphaned vhosts…'));
+    }
+
     public function render(ServerMaintenanceWindow $maintenance): View
     {
         if ($this->comingSoonPreview) {
@@ -327,12 +595,6 @@ class WorkspaceMaintenance extends Component
                 ->firstWhere('key', $this->pendingActionKey)
             : null;
 
-        $bannerStatus = match ($this->maintenanceTaskStatus) {
-            'finished' => 'completed',
-            'failed' => 'failed',
-            default => 'running',
-        };
-
         return view('livewire.servers.workspace-maintenance', [
             'report' => $report,
             'active' => $report['active'],
@@ -340,17 +602,19 @@ class WorkspaceMaintenance extends Component
             'preview' => $report['preview'],
             'eligibleCount' => $report['summary']['eligible'],
             'recurringWindow' => $recurringWindow,
+            'maintenanceWeekdays' => config('server_settings.maintenance_weekdays', []),
+            'maintenanceHistory' => $this->maintenanceHistory(),
+            'applyFailures' => $this->recentApplyFailures(),
+            'canEditSchedule' => ! $this->currentUserIsDeployer(),
             'cronMaintenanceActive' => $cronMaintenanceActive,
             'cronMaintenanceUntil' => $org?->cron_maintenance_until,
             'cronMaintenanceNote' => $org?->cron_maintenance_note,
             'operationGroups' => $this->maintenanceOperationGroups(),
             'opsReady' => $this->serverOpsReady() && ! $this->currentUserIsDeployer(),
             'pendingAction' => $pendingAction,
-            'bannerStatus' => $bannerStatus,
-            'bannerBusy' => $this->maintenanceTaskBusy(),
-            'bannerOutputLines' => $this->remote_output !== null && $this->remote_output !== ''
-                ? preg_split('/\r\n|\r|\n/', rtrim($this->remote_output))
-                : [],
+            'opBusy' => $this->maintenanceOpBusy(),
+            'consoleRun' => $this->maintenanceConsoleRun(),
+            'consoleKindLabels' => (array) config('console_actions.kinds', []),
             'notifChannels' => $this->maintenance_tab === 'notifications' ? $this->assignableMaintenanceNotificationChannels() : collect(),
             'notifSubscriptions' => $this->maintenance_tab === 'notifications' ? $this->maintenanceNotificationSubscriptions() : collect(),
             'notifEventLabels' => $this->maintenance_tab === 'notifications' ? $this->maintenanceEventLabels() : [],

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console\RunBackupScheduleCommandTest;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;

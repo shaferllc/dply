@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\MachineCallbackPaths;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Pennant\Feature;
@@ -39,7 +40,7 @@ class EnforceMaintenanceMode
         // callbacks, and customer function traffic silently fail (the caller's
         // bare curl reads the 503 as success). Same canonical list the
         // coming-soon gate uses, so the two gates can't drift apart.
-        if (\App\Support\MachineCallbackPaths::matches($request)) {
+        if (MachineCallbackPaths::matches($request)) {
             return $next($request);
         }
 

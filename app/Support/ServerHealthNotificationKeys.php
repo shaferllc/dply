@@ -2,14 +2,17 @@
 
 namespace App\Support;
 
+use App\Jobs\CheckServerHealthJob;
+use App\Services\Servers\ServerHealthNotifier;
+
 /**
  * Notification event keys for the server health cockpit, surfaced on the
  * /servers/{server}/health workspace. The `server.` prefix maps these to the
  * Server subscribable in {@see NotificationSubscriptionRules::subscribableClassForEvent};
  * they are listed under the "health" category in config/notification_events.php.
  *
- * Fired transition-aware from {@see \App\Services\Servers\ServerHealthNotifier} when
- * {@see \App\Jobs\CheckServerHealthJob} runs (per-server, on the fleet health cadence):
+ * Fired transition-aware from {@see ServerHealthNotifier} when
+ * {@see CheckServerHealthJob} runs (per-server, on the fleet health cadence):
  * `critical_finding` / `warning_finding` when the cockpit's overall posture worsens
  * into that level, and `posture_cleared` when it recovers to healthy. Mirrors
  * {@see ServerSecurityDigestNotificationKeys}.

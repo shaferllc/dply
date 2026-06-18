@@ -4,9 +4,11 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\RunsServerConsoleCommands;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -48,9 +50,52 @@ class ConsoleDrawer extends Component
 
     protected const SESSION_KEY = 'dply.consoleDrawer.serverId';
 
+    /**
+     * A queued/running ConsoleAction (e.g. a one-click "Suggested fix" like
+     * Install PHP Redis) whose live output is streamed into the drawer so the
+     * operator can watch it run. Set via the `console-action-to-drawer` event
+     * that the fix buttons dispatch.
+     */
+    public ?string $watchedActionId = null;
+
     protected $listeners = [
         'refresh-server-status' => 'verifyActiveServer',
     ];
+
+    #[On('console-action-to-drawer')]
+    public function watchConsoleAction(string $actionId): void
+    {
+        // This is browser-callable, so re-resolve through the org-scoped loader
+        // rather than trusting the id — prevents watching another org's action.
+        $this->watchedActionId = $this->loadWatchedAction($actionId)?->id;
+    }
+
+    public function clearWatchedAction(): void
+    {
+        $this->watchedActionId = null;
+    }
+
+    protected function loadWatchedAction(?string $id): ?ConsoleAction
+    {
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        $action = ConsoleAction::query()->with('subject')->find($id);
+        if ($action === null) {
+            return null;
+        }
+
+        $orgId = auth()->user()?->currentOrganization()?->id;
+        // Both Site and Server subjects carry organization_id directly.
+        $subjectOrg = $action->subject->organization_id ?? null;
+
+        if ($orgId === null || $subjectOrg === null || $subjectOrg !== $orgId) {
+            return null;
+        }
+
+        return $action;
+    }
 
     public function mount(?Server $server = null): void
     {
@@ -216,6 +261,7 @@ class ConsoleDrawer extends Component
             // on every server-page render where the active server is set.
             'availableServers' => $this->server ? collect() : $this->availableServers(),
             'serverReady' => $this->server !== null && $this->serverVerified && ! $this->serverLoading,
+            'watchedAction' => $this->loadWatchedAction($this->watchedActionId),
         ]);
     }
 }

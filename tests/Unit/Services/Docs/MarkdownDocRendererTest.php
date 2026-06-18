@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Docs;
 
-use App\Services\Docs\MarkdownDocRenderer;
+use App\Modules\Docs\Services\MarkdownDocRenderer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 test('markdown doc renderer renders edge overview with headings', function () {

@@ -31,6 +31,7 @@ class EdgeUsageCollector
     /**
      * @return array{sites: int, snapshots: int, source: string}
      */
+    /** @return array<string, mixed> */
     public function collectForDate(CarbonInterface $date, bool $dryRun = false): array
     {
         $periodStart = $date->copy()->startOfDay();
@@ -189,7 +190,7 @@ class EdgeUsageCollector
     }
 
     /**
-     * @param  list<string>  $hostnames
+     * @param  array<string, mixed> $hostnames
      * @param  Collection<string, EdgeUsageTotals>  $usageByHostname
      */
     private function usageForSite(array $hostnames, Collection $usageByHostname): EdgeUsageTotals

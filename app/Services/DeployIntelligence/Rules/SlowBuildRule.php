@@ -32,6 +32,10 @@ class SlowBuildRule implements IntelligenceRule
         return DeployIntelligenceAlert::RULE_SLOW_BUILD;
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<App\Services\DeployIntelligence\AlertFinding>
+     */
     public function evaluate(Organization $organization): array
     {
         $serverIds = Server::query()
@@ -124,7 +128,7 @@ class SlowBuildRule implements IntelligenceRule
     }
 
     /**
-     * @param  list<int>  $sortedAsc
+     * @param  array<string, mixed> $sortedAsc
      */
     private function median(array $sortedAsc): float
     {

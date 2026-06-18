@@ -43,6 +43,7 @@ final class DeployContractEvaluator
      *   summary: array{passed_count: int, failed_count: int, skipped_count: int, policy_source: string},
      * }
      */
+    /** @return array<string, mixed> */
     public function evaluate(DeployContractContext $context): array
     {
         $checks = [];

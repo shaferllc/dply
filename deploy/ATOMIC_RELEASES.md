@@ -1,16 +1,21 @@
 # Atomic-release deploys
 
-> **Canonical engine: `AtomicSiteDeployer`, not `deploy.sh`.** Routine deploys go
-> through the dashboard Deploy button / `RunSiteDeploymentJob` / `dply:site:deploy`,
-> which resolve to `AtomicSiteDeployer` for atomic-strategy sites. It clones into a
+> **The only deployer is `AtomicSiteDeployer`.** Routine deploys go through the
+> dashboard Deploy button / `RunSiteDeploymentJob` / `dply:site:deploy`, which
+> resolve to `AtomicSiteDeployer` for atomic-strategy sites. It clones into a
 > fresh `releases/<ts>`, writes `.env` from the DB via the site's `env_file_path`
 > (so `current/.env` is a symlink to the shared env, never a clobbered regular
-> file), flips `current`, and health-checks over `https …/up`. `deploy.sh` below is
-> **retired break-glass** — running both engines on one host is what created the
-> hybrid layout + the recurring `.env` reset. Use one; the engine wins.
+> file), flips `current`, and health-checks over `https …/up`.
+>
+> **The old `deploy.sh` shell deployer has been removed.** It is now `commit.sh`,
+> which only stages, AI-generates a commit message + CHANGELOG entry, commits, and
+> pushes — it does **not** deploy. The `./deploy.sh "…"` commands in the bootstrap
+> and day-to-day sections below are historical; the equivalent today is the engine
+> (`dply:site:deploy`). Running a second deployer alongside the engine is what
+> created prod's hybrid layout + the recurring `.env` reset — there is now only one.
 
-`deploy.sh` ships every host (web + workers) as an **immutable release** and flips
-an atomic `current` symlink. This is what stops a deploy from breaking
+`AtomicSiteDeployer` ships every host (web + workers) as an **immutable release**
+and flips an atomic `current` symlink. This is what stops a deploy from breaking
 queued-job deserialization: a long-running Horizon never half-sees new code, and
 a restart relaunches it against a complete, self-consistent release.
 
@@ -25,7 +30,7 @@ $ROOT/                         # /home/dply/dply (web), /home/dply/worker-1.dply
   current -> releases/<ts>     # the pointer nginx + supervisor read
 ```
 
-`deploy.sh` (section 2/3) does, on each host: fetch → `git archive` a release →
+`AtomicSiteDeployer` does, on each host: fetch → stage a release →
 symlink `shared/.env` + `shared/storage` in → `composer install` (+ `npm build`
 on web) → cache config/route/event/view → `storage:link` + `migrate` (web) →
 **atomic `mv -T` swap of `current`** → restart daemons → prune old releases.
@@ -57,16 +62,15 @@ mv storage shared/storage
 
 ### 2. Build the first release
 
-From your laptop, just run the new deploy once — it creates `repo/`,
-`releases/<ts>/`, and the `current` symlink:
+Trigger a deploy through the engine — it creates `repo/`, `releases/<ts>/`, and
+the `current` symlink:
 
 ```bash
-./deploy.sh "bootstrap atomic releases"
+php artisan dply:site:deploy <site>     # or the dashboard Deploy button
 ```
 
-(The daemon restarts in this run still hit the *flat* paths — harmless, the flat
-checkout is the same commit. The point is that `current -> releases/<ts>` now
-exists.)
+(The point is that `current -> releases/<ts>` now exists; the supervisor/nginx
+repoint in steps 3–4 then moves the running services onto it.)
 
 ### 3. Repoint supervisor at `current/`
 
@@ -112,14 +116,13 @@ leisure. Keep `shared/`, `releases/`, `current`, and `repo/`.
 ## Day-to-day
 
 ```bash
-./deploy.sh "your message"     # commits, pushes, builds a release per host, swaps
+./commit.sh "your message"     # commits + pushes only (AI message + CHANGELOG); no deploy
+php artisan dply:site:deploy <site>   # build a release per host + atomic swap (the deploy)
 ```
 
-Knobs (`.deploy.env`):
-
-- `DEPLOY_KEEP_RELEASES` — releases retained per host (default 5).
-- `DEPLOY_HOST`, `DEPLOY_APP_DIR` — web host + `$ROOT`.
-- `DEPLOY_WORKER_HOSTS`, `DEPLOY_WORKER_APP_DIR` — workers + `$ROOT`.
+Committing and deploying are now two separate steps: `commit.sh` gets the change
+onto origin, and the engine (dashboard Deploy / `dply:site:deploy`) builds and
+swaps the release. Release retention per host is `DEPLOY_KEEP_RELEASES` (default 5).
 
 ## Rollback
 
@@ -134,8 +137,8 @@ sudo supervisorctl restart all            # worker
 
 ## Notes / gotchas
 
-- **`shared/.env` is sacred.** `deploy.sh` refuses to deploy if it's missing
-  rather than ship an empty env that nulls `APP_KEY`. See the prod APP_KEY
+- **`shared/.env` is sacred.** `AtomicSiteDeployer` refuses to deploy if it's
+  missing rather than ship an empty env that nulls `APP_KEY`. See the prod APP_KEY
   caveat in project memory.
 - **php-fpm opcache:** the web deploy reloads php-fpm so it picks up the swapped
   `current` realpath. If your fpm service name isn't auto-detected

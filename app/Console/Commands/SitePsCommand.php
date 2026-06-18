@@ -82,9 +82,9 @@ class SitePsCommand extends Command
      */
     private function renderTable(Site $site, $processes): void
     {
-        $runtimeLabel = $site->runtimeKey() ?? '<unset>';
+        $runtimeLabel = $site->runtimeKey();
         $version = $site->runtimeVersion() ?? '<unset>';
-        $port = $site->internal_port !== null ? (string) $site->internal_port : '<none>';
+        $port = $site->internal_port !== '' ? $site->internal_port : '<none>';
         $this->newLine();
         $this->line("<fg=cyan>Site</> <fg=white;options=bold>{$site->name}</> ({$site->slug}, {$site->id})");
         $this->line("<fg=cyan>Runtime</> {$runtimeLabel}@{$version}  <fg=cyan>Internal port</> {$port}");

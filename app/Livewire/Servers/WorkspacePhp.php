@@ -5,11 +5,12 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\ConfigRevision;
 use App\Models\ConsoleAction;
 use App\Models\Server;
-use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
+use App\Modules\ConfigRevisions\Services\Diff\ConfigRevisionDiffRegistry;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;
@@ -18,18 +19,17 @@ use App\Support\Servers\ServerPhpMutationLock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspacePhp extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use RunsServerConsoleActions;
 
     public ?string $remote_output = null;

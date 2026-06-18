@@ -72,7 +72,9 @@ final class RecommendServerCreateSizes
 
     private function roleLabel(string $serverRole): string
     {
-        $role = collect(config('server_provision_options.server_roles', []))
+        /** @var list<array{id: string, label?: string}> $serverRoles */
+        $serverRoles = config('server_provision_options.server_roles', []);
+        $role = collect($serverRoles)
             ->firstWhere('id', $serverRole);
 
         if (is_array($role) && filled($role['label'] ?? null)) {

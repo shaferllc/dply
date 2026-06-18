@@ -19,7 +19,7 @@ use InvalidArgumentException;
 final class LoggingSpecValidator
 {
     /**
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      */
     public function validate(array $spec): void
     {
@@ -47,7 +47,7 @@ final class LoggingSpecValidator
     }
 
     /**
-     * @param  array<string, mixed>  $channel
+     * @param  array<string, mixed> $channel
      */
     private function channelName(array $channel): string
     {
@@ -66,7 +66,7 @@ final class LoggingSpecValidator
     }
 
     /**
-     * @param  array<string, mixed>  $channel
+     * @param  array<string, mixed> $channel
      */
     private function validateChannel(array $channel, string $name): void
     {
@@ -111,7 +111,7 @@ final class LoggingSpecValidator
     }
 
     /**
-     * @param  array<string, mixed>  $channel
+     * @param  array<string, mixed> $channel
      */
     private function validateCustom(array $channel, string $name): void
     {
@@ -136,8 +136,8 @@ final class LoggingSpecValidator
     }
 
     /**
-     * @param  array<string, mixed>  $spec
-     * @param  array<string, bool>  $names
+     * @param  array<string, mixed> $spec
+     * @param  array<string, mixed> $names
      */
     private function validateStack(array $spec, array $names): void
     {
@@ -150,8 +150,8 @@ final class LoggingSpecValidator
     }
 
     /**
-     * @param  array<string, mixed>  $spec
-     * @param  array<string, bool>  $names
+     * @param  array<string, mixed> $spec
+     * @param  array<string, mixed> $names
      */
     private function validateDefault(array $spec, array $names): void
     {
@@ -173,8 +173,8 @@ final class LoggingSpecValidator
     }
 
     /**
-     * @param  array<string, mixed>  $spec
-     * @param  array<string, bool>  $names
+     * @param  array<string, mixed> $spec
+     * @param  array<string, mixed> $names
      */
     private function validateDeprecations(array $spec, array $names): void
     {

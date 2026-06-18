@@ -76,6 +76,7 @@ class HaproxyFrontendsConfig
     /**
      * @return array{frontends: list<array{name: string, binds: list<string>, values: array<string, string>, raw: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -189,8 +190,8 @@ class HaproxyFrontendsConfig
     }
 
     /**
-     * @param  list<string>  $binds
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $binds
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -266,8 +267,8 @@ class HaproxyFrontendsConfig
      * / option-* / maxconn lines are emitted in a stable order so `haproxy fmt`
      * (no such command, but) and operator-readable diffs stay clean.
      *
-     * @param  list<string>  $binds
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $binds
+     * @param  array<string, mixed> $values
      */
     private function renderFrontend(string $name, array $binds, array $values): string
     {

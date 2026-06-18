@@ -20,6 +20,7 @@ final class AwsLambdaFunctionDeployer
     /**
      * @return array{output: string, revision_id: ?string, url: ?string}
      */
+    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $site->loadMissing('server.providerCredential', 'domains');
@@ -41,7 +42,7 @@ final class AwsLambdaFunctionDeployer
             ],
         ];
 
-        $functionName = trim((string) ($resolvedConfig['function_name'] ?? $site->id));
+        $functionName = trim((string) ($resolvedConfig['function_name']->id));
         $deployResult = $this->provisionerFactory
             ->make('aws')
             ->deployFunction(
@@ -51,7 +52,7 @@ final class AwsLambdaFunctionDeployer
                 $providerConfig,
             );
 
-        $siteMeta = is_array($site->meta) ? $site->meta : [];
+        $siteMeta = ($site->meta );
         $serverlessConfig = $site->serverlessConfig();
         $siteMeta['serverless'] = array_merge($serverlessConfig, [
             'target' => Server::HOST_KIND_AWS_LAMBDA,

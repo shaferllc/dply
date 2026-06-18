@@ -84,15 +84,17 @@ class ActionQueueCommand extends Command
         if (! empty($dashboard['actions'])) {
             $this->line('');
             $this->info('Queue Status by Action:');
+            /** @var list<array<string, mixed>> $actions */
+            $actions = $dashboard['actions'];
             $this->table(
                 ['Action', 'Queued', 'Processed', 'Failed', 'Pending'],
-                collect($dashboard['actions'])->map(fn ($a) => [
+                array_map(fn (array $a): array => [
                     class_basename($a['action']),
                     number_format($a['queued']),
                     number_format($a['processed']),
                     number_format($a['failed']),
                     number_format($a['pending']),
-                ])->toArray()
+                ], $actions)
             );
         }
     }

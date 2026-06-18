@@ -99,7 +99,7 @@ class ActionQueue
      * Get failed jobs for an action.
      *
      * @param  string  $actionClass  Action class name
-     * @return Collection<array> Failed jobs
+     * @return Collection<int, array<string, mixed>> Failed jobs
      */
     public static function getFailedJobs(string $actionClass): Collection
     {
@@ -107,7 +107,8 @@ class ActionQueue
             return collect();
         }
 
-        return DB::table('failed_jobs')
+        /** @var Collection<int, array<string, mixed>> $failedJobs */
+        $failedJobs = DB::table('failed_jobs')
             ->where('payload', 'like', "%{$actionClass}%")
             ->orderBy('failed_at', 'desc')
             ->get()
@@ -117,6 +118,8 @@ class ActionQueue
                 'failed_at' => $job->failed_at,
                 'exception' => $job->exception,
             ]);
+
+        return $failedJobs;
     }
 
     /**

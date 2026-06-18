@@ -4,21 +4,31 @@ namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
 use App\Enums\ServerProvider;
+use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\ServerMetricSnapshot;
-use App\Services\Insights\OrganizationInsightsMetricsService;
+use App\Models\Site;
+use App\Models\SiteDeployment;
+use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisioningDigest;
 use App\Support\Servers\ServerTags;
+use App\Support\Sites\DeployConsoleRows;
+use App\Support\Sites\SiteSyncPeers;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -27,6 +37,7 @@ use Livewire\Component;
 class Index extends Component
 {
     use DispatchesToastNotifications;
+    use GuardsBilledDeploys;
     use ManagesServerRemovalForm;
 
     public string $search = '';
@@ -52,6 +63,9 @@ class Index extends Component
     public string $removeMode = 'now';
 
     public string $scheduledRemovalDate = '';
+
+    /** Site ids launched from a fleet card, driving the global deploy console. */
+    public array $watchedSiteIds = [];
 
     public function resetFilters(): void
     {
@@ -259,6 +273,234 @@ class Index extends Component
     }
 
     /**
+     * Deploy a single site from its server card — the fleet twin of the deploy
+     * sidebar's "Deploy" button. Seeds the same optimistic deploy lock and
+     * dispatches the same job so both surfaces share one "is a deploy running"
+     * source of truth.
+     */
+    public function deploySite(string $siteId): void
+    {
+        $site = Site::query()->with('server')->find($siteId);
+        if ($site === null || ! $this->siteIsDeployable($site)) {
+            return;
+        }
+        if ($this->blockedByDeployPause($site)) {
+            return;
+        }
+        Gate::authorize('update', $site);
+
+        $this->queueSiteDeploy($site);
+        $this->watchDeploys([(string) $site->id]);
+        $this->toastSuccess(__('Deployment queued for :name.', ['name' => $site->name]));
+    }
+
+    /**
+     * Deploy a site together with its synced peers — the fleet twin of the
+     * sidebar's "Sync" button. Peers are this site plus any sharing its Git
+     * repository (or the same server when no repo is set), resolved by the same
+     * {@see SiteSyncPeers} the sidebar uses.
+     */
+    public function deploySyncedSites(string $siteId): void
+    {
+        $site = Site::query()->with('server')->find($siteId);
+        if ($site === null) {
+            return;
+        }
+        if ($this->blockedByDeployPause($site)) {
+            return;
+        }
+
+        [$queuedIds, $skipped] = $this->queueDeploys(SiteSyncPeers::forSite($site));
+        $this->watchDeploys($queuedIds);
+        $this->reportBatchDeploy(count($queuedIds), $skipped);
+    }
+
+    /** Deploy every deployable site on one server (multi-site card "Deploy all"). */
+    public function deployServerSites(string $serverId): void
+    {
+        $server = Server::query()->with('sites')->find($serverId);
+        if ($server === null) {
+            return;
+        }
+
+        $deployable = $server->sites->filter(function (Site $site) use ($server): bool {
+            $site->setRelation('server', $server);
+
+            return $this->siteIsDeployable($site);
+        });
+        if ($deployable->isEmpty()) {
+            return;
+        }
+        if ($this->blockedByDeployPause($deployable->first())) {
+            return;
+        }
+
+        [$queuedIds, $skipped] = $this->queueDeploys($deployable);
+        $this->watchDeploys($queuedIds);
+        $this->reportBatchDeploy(count($queuedIds), $skipped);
+    }
+
+    /**
+     * Queue deploys for an authorised, deployable subset of the given sites.
+     *
+     * @param  Collection<int, Site>  $sites
+     * @return array{0:list<string>,1:int} [queuedSiteIds, skipped]
+     */
+    protected function queueDeploys(Collection $sites): array
+    {
+        $queuedIds = [];
+        $skipped = 0;
+        foreach ($sites as $site) {
+            if (! $this->siteIsDeployable($site)) {
+                $skipped++;
+
+                continue;
+            }
+            $this->queueSiteDeploy($site);
+            $queuedIds[] = (string) $site->id;
+        }
+
+        return [$queuedIds, $skipped];
+    }
+
+    /** Seed the optimistic deploy lock and dispatch the deployment job. */
+    protected function queueSiteDeploy(Site $site): void
+    {
+        Cache::put('site-deploy-active:'.$site->id, [
+            'started_at' => now()->toIso8601String(),
+            'deployment_id' => null,
+        ], 600);
+        RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+    }
+
+    /**
+     * Point the global deploy console at the sites just launched and open it, so
+     * a deploy kicked off from a fleet card can be watched live without leaving
+     * the page. Mirrors DeployControl's `deploy-console-open` event wiring.
+     *
+     * @param  list<string>  $siteIds
+     */
+    protected function watchDeploys(array $siteIds): void
+    {
+        if ($siteIds === []) {
+            return;
+        }
+
+        $this->watchedSiteIds = array_values(array_map('strval', $siteIds));
+        unset($this->watchedRows, $this->watchedInProgress);
+        $this->dispatch('deploy-console-open');
+    }
+
+    /**
+     * Live per-site rows for the global deploy console — the sites launched from
+     * a fleet card, with their phase timelines and in-flight state.
+     *
+     * @return list<array<string, mixed>>
+     */
+    #[Computed]
+    public function watchedRows(): array
+    {
+        return DeployConsoleRows::forSiteIds($this->watchedSiteIds);
+    }
+
+    #[Computed]
+    public function watchedInProgress(): bool
+    {
+        return DeployConsoleRows::anyInProgress($this->watchedRows);
+    }
+
+    protected function reportBatchDeploy(int $queued, int $skipped): void
+    {
+        if ($queued === 0) {
+            $this->toastError(__('No deployable sites to queue.'));
+
+            return;
+        }
+
+        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', $queued, ['count' => $queued]);
+        if ($skipped > 0) {
+            $msg .= ' '.__(':n skipped.', ['n' => $skipped]);
+        }
+        $this->toastSuccess($msg);
+    }
+
+    /**
+     * Whether a site can be VM-deployed by the current user. Mirrors
+     * {@see \App\Livewire\Sites\DeployControl::canDeploy()} — VM host, not a
+     * functions/edge runtime, and the user may update it. Expects the site's
+     * `server` relation to be loaded.
+     */
+    protected function siteIsDeployable(Site $site): bool
+    {
+        $server = $site->server;
+
+        return $server !== null
+            && $server->isVmHost()
+            && ! $site->usesFunctionsRuntime()
+            && ! $site->usesEdgeRuntime()
+            && Gate::allows('update', $site);
+    }
+
+    /**
+     * Per-server deploy targets for the fleet Deploy / Sync buttons. For each
+     * server with at least one deployable site, returns the deployable sites, an
+     * anchor (the first), and the anchor's sync-peer count for the "Sync N"
+     * badge. Sync counts are derived from one org-wide pass over sites so the
+     * fleet never does an N+1 of per-site peer queries.
+     *
+     * @param  Collection<int, Server>  $servers
+     * @return array<int|string, array{sites: Collection<int, Site>, anchor: Site, sync_count: int}>
+     */
+    protected function buildDeployTargets(Collection $servers, ?Organization $org): array
+    {
+        if ($servers->isEmpty()) {
+            return [];
+        }
+
+        // Org-wide repo → count, so a single-site server still shows "Sync N"
+        // when its repository is deployed on other servers too.
+        $repoCounts = collect();
+        if ($org) {
+            $repoCounts = Site::query()
+                ->where('organization_id', $org->id)
+                ->whereNotNull('git_repository_url')
+                ->where('git_repository_url', '!=', '')
+                ->pluck('git_repository_url')
+                ->groupBy(fn (string $repo): string => trim($repo))
+                ->map->count();
+        }
+
+        $targets = [];
+        foreach ($servers as $server) {
+            $deployable = $server->sites
+                ->filter(function (Site $site) use ($server): bool {
+                    $site->setRelation('server', $server);
+
+                    return $this->siteIsDeployable($site);
+                })
+                ->values();
+
+            if ($deployable->isEmpty()) {
+                continue;
+            }
+
+            $anchor = $deployable->first();
+            $repo = trim((string) $anchor->git_repository_url);
+            $syncCount = $repo !== ''
+                ? (int) ($repoCounts[$repo] ?? 1)
+                : (int) $server->sites->count();
+
+            $targets[$server->id] = [
+                'sites' => $deployable,
+                'anchor' => $anchor,
+                'sync_count' => $syncCount,
+            ];
+        }
+
+        return $targets;
+    }
+
+    /**
      * @return Collection<string, Collection<int, Server>>
      */
     protected function groupedServers(Collection $servers): Collection
@@ -275,6 +517,57 @@ class Index extends Component
                 return __('Personal');
             })
             ->sortKeys();
+    }
+
+    /**
+     * Build the per-server "related servers" map for the fleet disclosure.
+     * A peer is related when it shares this server's worker pool, private
+     * network, or project (workspace). The reason shown is the tightest match,
+     * in that priority order, so each peer appears once. Peers are drawn from
+     * the full in-scope set so a server hidden by the active filter still links.
+     *
+     * @param  Collection<int, Server>  $servers   the rows actually rendered
+     * @param  Collection<int, Server>  $candidates the full in-scope fleet
+     * @return array<int|string, list<array{server: Server, reason: string}>>
+     */
+    protected function relatedServersMap(Collection $servers, Collection $candidates): array
+    {
+        $byPool = $candidates->filter(fn (Server $s) => $s->worker_pool_id !== null)->groupBy('worker_pool_id');
+        $byNetwork = $candidates->filter(fn (Server $s) => $s->private_network_id !== null)->groupBy('private_network_id');
+        $byProject = $candidates->filter(fn (Server $s) => $s->workspace_id !== null)->groupBy('workspace_id');
+
+        $map = [];
+        foreach ($servers as $server) {
+            /** @var array<int|string, array{server: Server, reason: string}> $peers */
+            $peers = [];
+
+            // Tightest reason wins: a peer added under "same pool" is not
+            // overwritten by a looser "same project" match later.
+            $collect = function (?Collection $group, string $reason) use (&$peers, $server): void {
+                foreach ($group ?? collect() as $candidate) {
+                    if ($candidate->id === $server->id || isset($peers[$candidate->id])) {
+                        continue;
+                    }
+                    $peers[$candidate->id] = ['server' => $candidate, 'reason' => $reason];
+                }
+            };
+
+            if ($server->worker_pool_id !== null) {
+                $collect($byPool->get($server->worker_pool_id), __('same pool'));
+            }
+            if ($server->private_network_id !== null) {
+                $collect($byNetwork->get($server->private_network_id), __('same VPC'));
+            }
+            if ($server->workspace_id !== null) {
+                $collect($byProject->get($server->workspace_id), __('same project'));
+            }
+
+            if ($peers !== []) {
+                $map[$server->id] = array_values($peers);
+            }
+        }
+
+        return $map;
     }
 
     protected function baseQuery(): ?Builder
@@ -335,12 +628,21 @@ class Index extends Component
         $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)
-                ->with(['sites', 'organization', 'team', 'workspace'])
+                ->with(['sites', 'organization', 'team', 'workspace', 'databaseEngines', 'cacheServices'])
                 ->withCount('sites')
                 ->get()
             : collect();
 
         $groupedServers = $this->groupedServers($servers);
+
+        // Per-server Deploy / Sync targets for the fleet card action buttons.
+        $deployTargets = $this->buildDeployTargets($servers, $org);
+
+        // Per-server "related servers" map for the fleet disclosure: peers that
+        // share a worker pool, private network, or project. Computed against the
+        // full in-scope set ($allInScope) so a peer hidden by the current filter
+        // still shows. Pure column compares on already-loaded rows — no queries.
+        $relatedServers = $this->relatedServersMap($servers, $allInScope);
 
         // Insights is gated (coming soon). Skip the per-server rollup query
         // entirely when the flag is off — the fleet rows hide the badge too.
@@ -431,6 +733,8 @@ class Index extends Component
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
             'groupedServers' => $groupedServers,
+            'deployTargets' => $deployTargets,
+            'relatedServers' => $relatedServers,
             'insightRollup' => $insightRollup,
             'latestSnapshots' => $latestSnapshots,
             'provisioningDigests' => $provisioningDigests,

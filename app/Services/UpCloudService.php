@@ -26,6 +26,7 @@ class UpCloudService
 
     /**
      * Create a server from template with SSH keys. Returns server UUID.
+     * @param  array<string, mixed> $sshPublicKeys
      */
     public function createServer(
         string $zone,
@@ -78,7 +79,9 @@ class UpCloudService
 
     /**
      * Get server by UUID.
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getServer(string $uuid): array
     {
         $response = $this->request('get', '/server/'.$uuid);
@@ -95,6 +98,7 @@ class UpCloudService
 
     /**
      * Get public IPv4 from server.
+     * @param  array<string, mixed> $server
      */
     public static function getPublicIp(array $server): ?string
     {
@@ -128,6 +132,7 @@ class UpCloudService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getZones(): array
     {
         $response = $this->request('get', '/zone');
@@ -143,6 +148,7 @@ class UpCloudService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getPlans(): array
     {
         $response = $this->request('get', '/plan');
@@ -158,6 +164,7 @@ class UpCloudService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getTemplates(): array
     {
         $response = $this->request('get', '/storage/template');
@@ -177,6 +184,9 @@ class UpCloudService
         $this->assertSuccess($response, 'validate credentials');
     }
 
+    /**
+     * @param  array<string, mixed> $body
+     */
     protected function request(string $method, string $path, array $body = []): Response
     {
         $url = $this->baseUrl.$path;

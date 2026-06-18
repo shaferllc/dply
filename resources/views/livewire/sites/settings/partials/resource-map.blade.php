@@ -284,6 +284,10 @@
                 {{-- Resource nodes for this group (left gutter leaves room for the branch curves) --}}
                 <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $col }}; grid-row: 4;">
                     @foreach ($group['types'] as $t)
+                        @if ($t['type'] === 'storage')
+                            @include('livewire.sites.settings.partials._resource-storage-card', ['t' => $t])
+                            @continue
+                        @endif
                         @php
                             $type = $t['type'];
                             $binding = $t['binding'];

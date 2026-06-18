@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy\ServerlessProviders\Stub;
 
-use App\Contracts\ServerlessFunctionProvisioner;
+use App\Modules\Serverless\Contracts\ServerlessFunctionProvisioner;
 use App\Services\Deploy\Support\ProvisionerConfigReport;
 
 final class AwsLambdaStubProvisioner implements ServerlessFunctionProvisioner
 {
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         return [

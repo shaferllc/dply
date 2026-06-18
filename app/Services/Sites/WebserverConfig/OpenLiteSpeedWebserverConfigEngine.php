@@ -31,6 +31,8 @@ class OpenLiteSpeedWebserverConfigEngine implements WebserverConfigEngineInterfa
         return hash('sha256', $this->builder->build($site));
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function validateLocal(string $config): array
     {
         return [
@@ -39,6 +41,8 @@ class OpenLiteSpeedWebserverConfigEngine implements WebserverConfigEngineInterfa
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function validateRemote(Site $site, string $config, ?SiteWebserverConfigProfile $profile): array
     {
         return [

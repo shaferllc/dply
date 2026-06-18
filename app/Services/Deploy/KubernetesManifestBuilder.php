@@ -15,7 +15,7 @@ final class KubernetesManifestBuilder
     {
         $contract = $this->contractBuilder->build($site);
         $name = $this->deploymentName($site);
-        $port = $site->type?->value === 'node'
+        $port = $site->type->value === 'node'
             ? (int) ($site->app_port ?: 3000)
             : 80;
         $image = (string) data_get($site->meta, 'kubernetes_runtime.image_name', 'dply/'.($site->slug ?: 'site').':latest');

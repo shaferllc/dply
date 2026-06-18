@@ -23,6 +23,7 @@ class PoolEnvTransformer
     /**
      * @return array{env: string, exposures: list<array{server_id:string,server_name:string,public_ip:string,private_ip:string,ports:list<int>,keys:list<string>}>}
      */
+    /** @return array<string, mixed> */
     public function rewriteForCrossRegion(string $env, Server $clone): array
     {
         if (trim($env) === '') {
@@ -102,6 +103,7 @@ class PoolEnvTransformer
      *
      * @return list<array{server_id:string,server_name:string,public_ip:string,private_ip:string,ports:list<int>,keys:list<string>}>
      */
+    /** @return array<string, mixed> */
     public function exposurePlan(string $env, Server $clone): array
     {
         return $this->rewriteForCrossRegion($env, $clone)['exposures'];
@@ -109,7 +111,7 @@ class PoolEnvTransformer
 
     /**
      * @param  array<string, array{server_id:string,server_name:string,public_ip:string,private_ip:string,ports:array<int,int>,keys:array<int,string>}>  $exposures
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function recordExposure(array &$exposures, Server $backend, string $privateIp, string $key, array $values): void
     {
@@ -134,7 +136,7 @@ class PoolEnvTransformer
      * Best-effort port for a *_HOST key: prefer its sibling *_PORT, else a
      * well-known default for common services.
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function companionPort(string $key, array $values): ?int
     {

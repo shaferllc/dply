@@ -121,7 +121,7 @@ class AutoscaleWorkerPoolJob implements ShouldQueue
     /** @param array<string,mixed> $cfg */
     private function persistConfig(WorkerPool $pool, array $cfg): void
     {
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $meta['autoscale'] = $cfg;
         $pool->forceFill(['meta' => $meta])->save();
     }

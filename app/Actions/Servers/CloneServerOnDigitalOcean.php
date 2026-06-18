@@ -144,7 +144,7 @@ final class CloneServerOnDigitalOcean
      */
     protected function cloneableMeta(Server $source): array
     {
-        $sourceMeta = is_array($source->meta) ? $source->meta : [];
+        $sourceMeta = $source->meta;
 
         // Allowlist the keys that represent operator intent. Probe / state /
         // per-deploy keys are intentionally absent so the clone starts with a

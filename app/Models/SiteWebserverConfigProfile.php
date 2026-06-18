@@ -5,7 +5,25 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $after_body
+ * @property string $before_body
+ * @property ?Carbon $draft_saved_at
+ * @property string $full_override_body
+ * @property ?Carbon $last_applied_at
+ * @property string $last_applied_core_hash
+ * @property string $last_applied_effective_checksum
+ * @property string $main_snippet_body
+ * @property string $mode
+ * @property ?string $site_id
+ * @property string $webserver
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class SiteWebserverConfigProfile extends Model
 {
     use HasUlids;
@@ -71,6 +89,7 @@ class SiteWebserverConfigProfile extends Model
         'draft_saved_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -79,6 +98,7 @@ class SiteWebserverConfigProfile extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

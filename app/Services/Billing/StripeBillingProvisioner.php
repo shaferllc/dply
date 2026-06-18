@@ -82,6 +82,7 @@ class StripeBillingProvisioner
     /**
      * @return array<string, string>
      */
+    /** @return array<string, mixed> */
     public function provision(): array
     {
         $result = [];
@@ -344,7 +345,7 @@ class StripeBillingProvisioner
     /**
      * Format a provisioning result map into copy-paste-ready .env lines.
      *
-     * @param  array<string, string>  $result
+     * @param  array<string, mixed> $result
      */
     public static function formatEnv(array $result): string
     {

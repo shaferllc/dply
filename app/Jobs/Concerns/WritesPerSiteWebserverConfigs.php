@@ -23,7 +23,7 @@ trait WritesPerSiteWebserverConfigs
 {
     protected function resolveEdgeProxyPreviousWebserver(Server $server): string
     {
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $previous = strtolower(trim((string) ($meta['edge_proxy_previous_webserver'] ?? '')));
         if ($previous !== '' && in_array($previous, ['nginx', 'caddy', 'apache', 'openlitespeed'], true)) {
             return $previous;
@@ -183,8 +183,6 @@ trait WritesPerSiteWebserverConfigs
 
     protected function basenameForSite(Site $site): string
     {
-        return method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        return (string) $site->webserverConfigBasename();
     }
 }

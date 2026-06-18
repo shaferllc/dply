@@ -11,7 +11,7 @@
     $isActive = $site->status === \App\Models\Site::STATUS_FUNCTIONS_ACTIVE;
     $statusBadgeClass = $isActive ? 'bg-brand-forest/15 text-brand-forest' : 'bg-brand-gold/20 text-brand-ink';
     $statusLabel = $isActive ? __('Live') : __('Configured — deploying');
-    $costEstimate = app(\App\Services\Serverless\ServerlessCostEstimator::class)->forSite($site);
+    $costEstimate = app(\App\Modules\Serverless\Services\ServerlessCostEstimator::class)->forSite($site);
 
     // Status pill summarising the routing surface — links to the full
     // page so Overview stays a glance, not an editor.

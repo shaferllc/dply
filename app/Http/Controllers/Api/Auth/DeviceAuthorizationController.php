@@ -79,13 +79,12 @@ class DeviceAuthorizationController extends Controller
             // the same transaction so a leaked device_code can't fetch
             // it a second time.
             $token = DB::transaction(function () use ($record): ?string {
-                /** @var DeviceAuthorization $locked */
                 $locked = DeviceAuthorization::query()
                     ->whereKey($record->id)
                     ->lockForUpdate()
                     ->first();
 
-                if ($locked === null) {
+                if (! $locked instanceof DeviceAuthorization) {
                     return null;
                 }
 

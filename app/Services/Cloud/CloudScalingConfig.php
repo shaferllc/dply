@@ -63,7 +63,7 @@ class CloudScalingConfig
      */
     public static function autoscaling(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $raw = $meta['container']['autoscaling'] ?? [];
         if (! is_array($raw)) {
             $raw = [];
@@ -97,7 +97,7 @@ class CloudScalingConfig
      */
     public static function healthCheck(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $raw = $meta['container']['health_check'] ?? [];
         if (! is_array($raw)) {
             $raw = [];
@@ -127,7 +127,7 @@ class CloudScalingConfig
      * Validate and normalize an autoscaling config payload.
      * Throws InvalidArgumentException on any out-of-range value.
      *
-     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed> $input
      * @return array{enabled: bool, min_instances: int, max_instances: int, cpu_percent: int}
      */
     public static function validateAutoscaling(array $input): array
@@ -162,7 +162,7 @@ class CloudScalingConfig
      * Validate and normalize a health-check config payload.
      * Throws InvalidArgumentException on any invalid value.
      *
-     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed> $input
      * @return array{enabled: bool, http_path: string, initial_delay_seconds: int, period_seconds: int, timeout_seconds: int, success_threshold: int, failure_threshold: int}
      */
     public static function validateHealthCheck(array $input): array
@@ -203,7 +203,7 @@ class CloudScalingConfig
      */
     public static function persistAutoscaling(Site $site, array $config): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $container['autoscaling'] = $config;
         $meta['container'] = $container;
@@ -217,7 +217,7 @@ class CloudScalingConfig
      */
     public static function persistHealthCheck(Site $site, array $config): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $container['health_check'] = $config;
         $meta['container'] = $container;

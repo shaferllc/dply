@@ -9,6 +9,7 @@ class WebserverTemplateRenderer
      *
      * @return array{content: string, replacements: array<string, string>}
      */
+    /** @return array<string, mixed> */
     public function substituteForTest(string $content): array
     {
         $map = [

@@ -21,9 +21,16 @@ class TestWebhookCallbackHandler
 {
     use HandlesCallbacks;
 
-    public ?string $callbackUrl = 'https://example.test/callback';
-
-    public bool $callbacksEnabled = true;
+    public function __construct()
+    {
+        // Configure via the trait's API rather than redeclaring its protected
+        // $callbackUrl/$callbacksEnabled properties — redeclaring them with a
+        // different visibility/default is a fatal trait-composition collision.
+        $this->setCallbackConfig([
+            'url' => 'https://example.test/callback',
+            'enabled' => true,
+        ]);
+    }
 }
 
 class TaskRunnerCancellationTest extends TestCase
@@ -41,7 +48,7 @@ class TaskRunnerCancellationTest extends TestCase
     public function test_remote_task_cancellation_stops_process_and_marks_task_cancelled(): void
     {
         $server = Server::factory()->create([
-            'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+            'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
         ]);
 
         $task = Task::query()->create([

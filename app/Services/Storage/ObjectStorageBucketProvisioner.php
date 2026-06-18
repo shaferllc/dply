@@ -35,6 +35,7 @@ final class ObjectStorageBucketProvisioner
      *
      * @return array{endpoint: string}
      */
+    /** @return array<string, mixed> */
     public function create(string $provider, string $region, string $accessKey, string $secret, string $bucket, bool $awaitKeyPropagation = false): array
     {
         $providers = (array) config('object_storage.providers', []);

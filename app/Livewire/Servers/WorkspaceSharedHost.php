@@ -10,6 +10,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesSharedHostNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsSharedHostAttributionScan;
 use App\Models\AiAdvisorRun;
 use App\Models\Server;
@@ -21,11 +22,10 @@ use App\Support\Servers\SharedHostReport;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Per-site resource attribution, shared stack map, and contention timeline for multi-site VMs.
@@ -34,11 +34,11 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceSharedHost extends Component
 {
-    use RendersWorkspacePlaceholder;
     use CreatesNotificationChannelInline;
     use DispatchesToastNotifications;
     use InteractsWithServerWorkspace;
     use ManagesSharedHostNotifications;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use RunsSharedHostAttributionScan;
 

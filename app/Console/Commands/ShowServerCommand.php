@@ -85,10 +85,8 @@ class ShowServerCommand extends Command
             'name' => $server->name,
             'ip_address' => $server->ip_address,
             'status' => $server->status,
-            'created_at' => $server->created_at?->toIso8601String(),
-            'age_days' => $server->created_at !== null
-                ? (int) round($server->created_at->diffInDays(now()))
-                : null,
+            'created_at' => $server->created_at->toIso8601String(),
+            'age_days' => (int) round($server->created_at->diffInDays(now())),
             'php_version' => is_string($server->meta['php_version'] ?? null)
                 ? $server->meta['php_version']
                 : null,

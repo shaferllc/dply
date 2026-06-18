@@ -185,6 +185,12 @@ final class SiteBindingCatalog
                 'needs' => $meta['needs'] ?? [],
                 'binding' => $binding,
                 'attached' => $binding instanceof SiteBinding,
+                // Storage is multi-instance: a site can attach several buckets,
+                // each its own filesystem disk. The card renders the full list;
+                // every other type stays single (`bindings` is null for them).
+                'bindings' => $type === 'storage'
+                    ? $bindings->filter(fn (SiteBinding $b) => $b->type === 'storage')->values()
+                    : null,
             ];
         }
 

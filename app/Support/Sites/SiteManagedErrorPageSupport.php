@@ -47,7 +47,7 @@ final class SiteManagedErrorPageSupport
      */
     public static function serverErrorsExposed(Site $site): bool
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         return (bool) ($meta[self::META_EXPOSE_FLAG] ?? false);
     }

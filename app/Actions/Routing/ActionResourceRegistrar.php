@@ -13,6 +13,10 @@ class ActionResourceRegistrar extends ResourceRegistrar
      */
     private static array $actionResolver = [];
 
+    /**
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
     protected function getResourceAction($resource, $controller, $method, $options): array
     {
         $action = parent::getResourceAction($resource, $controller, $method, $options);

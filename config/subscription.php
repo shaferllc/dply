@@ -244,6 +244,10 @@ return [
             'edge' => env('STRIPE_PRICE_STANDARD_EDGE', ''),
             'edge_yearly' => env('STRIPE_PRICE_STANDARD_EDGE_YEARLY', ''),
             'edge_usage' => env('STRIPE_PRICE_STANDARD_EDGE_USAGE', ''),
+            // dply Logs ingest overage — metered per-cent quantity, monthly only.
+            // Unset by default: the usage line never reconciles until a price id
+            // exists, so the metering/estimate path lands dark (PR C).
+            'server_log_usage' => env('STRIPE_PRICE_STANDARD_SERVER_LOG_USAGE', ''),
             // Managed Realtime — per connection-tier, monthly + yearly. One line
             // item per tier in use (quantity = active apps on that tier). The flat
             // 'realtime'/'realtime_yearly' keys are retained ONLY so the syncer can

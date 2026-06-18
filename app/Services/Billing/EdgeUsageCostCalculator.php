@@ -26,6 +26,7 @@ class EdgeUsageCostCalculator
      *     included_r2_storage_bytes: int,
      * }
      */
+    /** @return array<string, mixed> */
     public function estimate(EdgeUsageTotals $usage, int $edgeSiteCount): array
     {
         if (! $this->isEnabled() || $edgeSiteCount <= 0) {

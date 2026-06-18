@@ -33,6 +33,7 @@ class DigitalOceanFunctionsArtifactBuilder
     /**
      * @return array{artifact_path: string, working_directory: string, output: string}
      */
+    /** @return array<string, mixed> */
     public function build(Site $site): array
     {
         $site->loadMissing('server');
@@ -288,7 +289,7 @@ class DigitalOceanFunctionsArtifactBuilder
      * successful deploy so serverless-artifacts/<site> stops growing by one
      * zip per deploy. Best-effort: returns the count removed, never throws.
      *
-     * @param  list<string|null>  $keepPaths
+     * @param  array<string, mixed> $keepPaths
      */
     public function pruneArtifactsExcept(Site $site, array $keepPaths): int
     {
@@ -351,7 +352,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  list<string>  $command
+     * @param  array<string, mixed> $command
      */
     private function run(array $command, string $workingDirectory): string
     {
@@ -410,7 +411,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  list<string>  $patterns
+     * @param  array<string, mixed> $patterns
      */
     private function isExcluded(string $localName, array $patterns): bool
     {
@@ -434,7 +435,7 @@ class DigitalOceanFunctionsArtifactBuilder
     }
 
     /**
-     * @param  list<string>  $excludePatterns
+     * @param  array<string, mixed> $excludePatterns
      */
     private function zipPath(string $sourcePath, string $artifactPath, array $excludePatterns = []): void
     {

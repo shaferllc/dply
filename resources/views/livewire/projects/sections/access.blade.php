@@ -1,9 +1,4 @@
 <x-section-card>
-    <h3 class="text-base font-semibold text-brand-ink">{{ __('How to use access') }}</h3>
-    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('Keep access here as narrow as possible. Add only the people who should work on this project. Use owners for long-term accountability, maintainers for day-to-day changes, deployers for release execution, and viewers for read-only visibility.') }}</p>
-</x-section-card>
-
-<x-section-card>
     <div class="mb-4 flex items-center justify-between gap-3">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Access') }}</h3>
         <span class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Strict project membership') }}</span>

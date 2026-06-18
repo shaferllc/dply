@@ -162,7 +162,7 @@ trait DetectsRepositoryRuntime
                 'kind' => 'serverless',
             ];
         } finally {
-            if (is_array($checkout) && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
+            if ($checkout !== null && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
                 app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
             }
         }

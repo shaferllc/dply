@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
-use App\Services\RemoteCli\WpCli;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\WpCli;
 use Illuminate\Console\Command;
 
 /**
@@ -66,7 +66,7 @@ class WpCronSwitchCommand extends Command
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['wp_cron'] = ['handler' => $target === 'system' ? 'system_cron' : 'wp_cron', 'switched_at' => now()->toISOString()];
         $site->meta = $meta;
         $site->save();

@@ -36,9 +36,10 @@ class JobDecorator implements ShouldQueue
 
     protected string $actionClass;
 
+    /** @var array<int, mixed> */
     protected array $parameters = [];
 
-    public function __construct(string $action, ...$parameters)
+    public function __construct(string $action, mixed ...$parameters)
     {
         $this->actionClass = $action;
         $this->setAction(app($action));
@@ -57,7 +58,7 @@ class JobDecorator implements ShouldQueue
         $this->fromActionMethod('configureJob', [$this]);
     }
 
-    public function handle()
+    public function handle(): mixed
     {
         if ($this->hasMethod('asJob')) {
             return $this->callMethod('asJob', $this->getPrependedParameters('asJob'));
@@ -66,13 +67,18 @@ class JobDecorator implements ShouldQueue
         if ($this->hasMethod('handle')) {
             return $this->callMethod('handle', $this->getPrependedParameters('handle'));
         }
+
+        return null;
     }
 
-    public function getAction()
+    public function getAction(): mixed
     {
         return $this->action;
     }
 
+    /**
+     * @return array<int, mixed>
+     */
     public function getParameters(): array
     {
         return $this->parameters;
@@ -111,7 +117,7 @@ class JobDecorator implements ShouldQueue
         return $this->getAction() instanceof $actionClass;
     }
 
-    public function backoff()
+    public function backoff(): mixed
     {
         return $this->fromActionMethodOrProperty(
             'getJobBackoff',
@@ -121,7 +127,7 @@ class JobDecorator implements ShouldQueue
         );
     }
 
-    public function retryUntil()
+    public function retryUntil(): mixed
     {
         return $this->fromActionMethodOrProperty(
             'getJobRetryUntil',
@@ -131,7 +137,10 @@ class JobDecorator implements ShouldQueue
         );
     }
 
-    public function middleware()
+    /**
+     * @return array<int, mixed>
+     */
+    public function middleware(): array
     {
         return $this->fromActionMethod('getJobMiddleware', $this->parameters, []);
     }
@@ -155,11 +164,17 @@ class JobDecorator implements ShouldQueue
         );
     }
 
-    public function tags()
+    /**
+     * @return array<int, string>
+     */
+    public function tags(): array
     {
         return $this->fromActionMethod('getJobTags', $this->parameters, []);
     }
 
+    /**
+     * @return array<int, mixed>
+     */
     protected function getPrependedParameters(string $method): array
     {
         $reflectionMethod = new ReflectionMethod($this->action, $method);
@@ -211,6 +226,9 @@ class JobDecorator implements ShouldQueue
         return $this->serializeFromSerializesModels();
     }
 
+    /**
+     * @param  array<string, mixed>  $values
+     */
     public function __unserialize(array $values): void
     {
         $this->unserializeFromSerializesModels($values);

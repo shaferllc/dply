@@ -24,18 +24,18 @@ final class EdgeOrgCredentialConfig
      */
     public static function read(ProviderCredential $credential): array
     {
-        $creds = is_array($credential->credentials) ? $credential->credentials : [];
+        $creds = ($credential->credentials );
         $edge = $creds['edge'] ?? [];
 
         return is_array($edge) ? $edge : [];
     }
 
     /**
-     * @param  array<string, mixed>  $values
+     * @param  array<string, mixed> $values
      */
     public static function merge(ProviderCredential $credential, array $values): ProviderCredential
     {
-        $creds = is_array($credential->credentials) ? $credential->credentials : [];
+        $creds = ($credential->credentials );
         $existing = self::read($credential);
 
         $credential->credentials = array_merge($creds, [

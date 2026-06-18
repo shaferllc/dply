@@ -118,6 +118,10 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         return $this->readRemoteFile($server, $ssh, $confFile);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingConfig): array
     {
         $server = $this->ensureServerReady($site);

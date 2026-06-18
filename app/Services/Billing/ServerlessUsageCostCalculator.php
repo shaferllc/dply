@@ -29,6 +29,7 @@ class ServerlessUsageCostCalculator
      *     included_gib_seconds: int,
      * }
      */
+    /** @return array<string, mixed> */
     public function estimate(ServerlessUsageTotals $usage, int $functionCount): array
     {
         if (! $this->isEnabled() || $functionCount <= 0) {

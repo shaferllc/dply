@@ -30,7 +30,7 @@ class RedeployCloudSiteJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null) {
             return;
         }
@@ -49,7 +49,7 @@ class RedeployCloudSiteJob implements ShouldQueue
 
         $result = $backend->redeploy($site->fresh(), $credential);
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['container'] = array_merge($meta['container'] ?? [], [
             'last_deployment_id' => $result['deployment_id'],
             'last_deploy_started_at' => now()->toIso8601String(),
@@ -59,8 +59,8 @@ class RedeployCloudSiteJob implements ShouldQueue
         // any previously-deployed tag. Cap at the most recent 10
         // entries — beyond that the dashboard list gets unwieldy.
         $history = is_array($meta['container']['image_history'] ?? null) ? $meta['container']['image_history'] : [];
-        $deployedImage = is_string($this->newImage) && $this->newImage !== '' ? $this->newImage : $previousImage;
-        if (is_string($deployedImage) && $deployedImage !== '') {
+        $deployedImage = $this->newImage !== '' ? $this->newImage : $previousImage;
+        if ($deployedImage !== '') {
             $history[] = [
                 'image' => $deployedImage,
                 'deployed_at' => now()->toIso8601String(),

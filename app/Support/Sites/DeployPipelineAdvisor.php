@@ -61,7 +61,7 @@ final class DeployPipelineAdvisor
      *     ok: bool,
      *     errors: list<string>,
      *     warnings: list<string>,
-     *     checks: list<array{key: string, level: string, message: string}>
+     *     checks: list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>
      * }
      */
     public function analyze(Site $site, SiteDeployPipeline $pipeline): array
@@ -94,7 +94,7 @@ final class DeployPipelineAdvisor
                 'label' => $label,
                 'phase' => $phaseLabel,
             ]);
-            $errors[] = $message;
+            $errors[] = (string) $message;
             $checks[] = $this->check('empty_step_command', 'error', $message);
         }
 
@@ -117,7 +117,7 @@ final class DeployPipelineAdvisor
             );
             if ($hasReleaseMigrate) {
                 $message = __('With simple (in-place) deploys, Release-phase migrations run on the live checkout after code is already updated—prefer atomic zero-downtime if you need isolated release directories.');
-                $warnings[] = $message;
+                $warnings[] = (string) $message;
                 $checks[] = $this->check('simple_deploy_migrations', 'warning', $message);
             }
         }
@@ -133,7 +133,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $steps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkDuplicateStepTypes(Collection $steps, string $phase, string $phaseLabel, array &$warnings, array &$checks): void
     {
@@ -146,7 +148,7 @@ final class DeployPipelineAdvisor
                 'count' => $count,
                 'label' => $label,
             ]);
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $check = $this->check('duplicate_step_'.$type.'_'.$phaseLabel, 'warning', $message);
             $check['meta'] = ['step_type' => (string) $type, 'phase' => $phase];
             $checks[] = $check;
@@ -156,7 +158,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $buildSteps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkMultipleNodeInstallers(Collection $buildSteps, array &$warnings, array &$checks): void
     {
@@ -171,7 +175,7 @@ final class DeployPipelineAdvisor
         }
 
         $message = __('Build lists more than one JS package manager (e.g. npm ci and yarn install)—pick the lockfile your repo actually uses.');
-        $warnings[] = $message;
+        $warnings[] = (string) $message;
         $checks[] = $this->check('multiple_node_installers', 'warning', $message);
     }
 
@@ -179,7 +183,9 @@ final class DeployPipelineAdvisor
      * @param  Collection<int, SiteDeployStep>  $buildSteps
      * @param  Collection<int, SiteDeployStep>  $releaseSteps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkPhaseMisplacement(
         Collection $buildSteps,
@@ -199,7 +205,7 @@ final class DeployPipelineAdvisor
                     'label' => $step->pillLabel(),
                 ]),
             };
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $check = $this->check('release_step_in_build_'.$step->step_type, 'warning', $message);
             $check['meta'] = [
                 'step_type' => (string) $step->step_type,
@@ -217,7 +223,7 @@ final class DeployPipelineAdvisor
             $message = __(':label is in Release—it usually runs in Build (before activate) so dependencies and assets compile in the new release directory.', [
                 'label' => $step->pillLabel(),
             ]);
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $check = $this->check('build_step_in_release_'.$step->step_type, 'warning', $message);
             $check['meta'] = [
                 'step_type' => (string) $step->step_type,
@@ -231,7 +237,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $releaseSteps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkReleaseOrdering(Collection $releaseSteps, array &$warnings, array &$checks): void
     {
@@ -250,25 +258,25 @@ final class DeployPipelineAdvisor
 
         if ($seedPos !== false && $migratePos === false) {
             $message = __('Release includes DB seed without migrate—add migrate first or seed may run against the wrong schema.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('seed_without_migrate', 'warning', $message);
         }
 
         if ($migratePos !== false && $optimizePos !== false && $optimizePos < $migratePos) {
             $message = __('“Optimize” runs before “Migrate” in Release—migrate first, then warm caches.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('optimize_before_migrate', 'warning', $message);
         }
 
         if ($migratePos !== false && $queuePos !== false && $queuePos < $migratePos) {
             $message = __('“Queue restart” is before “Migrate”—workers may boot against an old schema; restart queues after migrations.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('queue_before_migrate', 'warning', $message);
         }
 
         if ($migratePos !== false && $horizonPos !== false && $horizonPos < $migratePos) {
             $message = __('“Horizon terminate” is before “Migrate”—restart Horizon after the database is migrated.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('horizon_before_migrate', 'warning', $message);
         }
     }
@@ -276,7 +284,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $buildSteps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkNpmInstallOrder(Collection $buildSteps, array &$warnings, array &$checks): void
     {
@@ -286,7 +296,7 @@ final class DeployPipelineAdvisor
 
         if ($npmCi !== false && $npmInstall !== false && $npmInstall < $npmCi) {
             $message = __('“npm install” is listed before “npm ci” in Build—ci should run first when you use a lockfile.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('npm_install_before_ci', 'warning', $message);
         }
     }
@@ -294,7 +304,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $buildSteps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkCacheClearVsWarm(Collection $buildSteps, array &$warnings, array &$checks): void
     {
@@ -309,7 +321,7 @@ final class DeployPipelineAdvisor
 
         if ($warmPos !== false && $clearPos < $warmPos) {
             $message = __('“Cache clear” runs before cache-warming steps in Build—clearing after optimize/config cache avoids discarding warmed caches immediately.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('cache_clear_before_warm', 'warning', $message);
         }
     }
@@ -317,7 +329,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $steps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkScaffoldingSteps(Collection $steps, array &$warnings, array &$checks): void
     {
@@ -329,7 +343,7 @@ final class DeployPipelineAdvisor
             $message = __(':label runs on every deploy—scaffolding commands are usually one-time setup, not routine pipeline steps.', [
                 'label' => $step->pillLabel(),
             ]);
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('scaffolding_'.$step->step_type, 'warning', $message);
         }
     }
@@ -337,7 +351,9 @@ final class DeployPipelineAdvisor
     /**
      * @param  Collection<int, SiteDeployStep>  $steps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkEmptyPipeline(Site $site, Collection $steps, array &$warnings, array &$checks): void
     {
@@ -350,7 +366,7 @@ final class DeployPipelineAdvisor
         }
 
         $message = __('This pipeline has no build or release steps—add at least Composer install or your usual build commands.');
-        $warnings[] = $message;
+        $warnings[] = (string) $message;
         $checks[] = $this->check('empty_pipeline', 'warning', $message);
     }
 
@@ -358,8 +374,11 @@ final class DeployPipelineAdvisor
      * @param  Collection<int, SiteDeployHook>  $hooks
      * @param  Collection<int, SiteDeployStep>  $steps
      * @param  list<string>  $errors
+     * @param-out list<string>  $errors
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkHooks(
         Collection $hooks,
@@ -373,19 +392,19 @@ final class DeployPipelineAdvisor
         foreach ($hooks as $hook) {
             if ($hook->hook_kind === SiteDeployHook::KIND_SHELL && trim((string) $hook->script) === '') {
                 $message = __('Shell hook “:label” has no script.', ['label' => $hook->pillLabel()]);
-                $errors[] = $message;
+                $errors[] = (string) $message;
                 $checks[] = $this->check('empty_shell_hook_'.$hook->id, 'error', $message);
             }
 
             if ($hook->hook_kind === SiteDeployHook::KIND_WEBHOOK && trim((string) $hook->webhook_url) === '') {
                 $message = __('Webhook hook “:label” has no URL.', ['label' => $hook->pillLabel()]);
-                $errors[] = $message;
+                $errors[] = (string) $message;
                 $checks[] = $this->check('empty_webhook_'.$hook->id, 'error', $message);
             }
 
             if ($hook->hook_kind === SiteDeployHook::KIND_NOTIFICATION && ! filled($hook->notification_channel_id)) {
                 $message = __('Notification hook “:label” has no channel selected.', ['label' => $hook->pillLabel()]);
-                $errors[] = $message;
+                $errors[] = (string) $message;
                 $checks[] = $this->check('empty_notification_'.$hook->id, 'error', $message);
             }
 
@@ -393,7 +412,7 @@ final class DeployPipelineAdvisor
                 && filled($hook->anchor_step_id)
                 && ! in_array((string) $hook->anchor_step_id, $stepIds, true)) {
                 $message = __('Hook “:label” points at a removed step—edit it or delete the hook.', ['label' => $hook->pillLabel()]);
-                $errors[] = $message;
+                $errors[] = (string) $message;
                 $checks[] = $this->check('orphan_hook_'.$hook->id, 'error', $message);
             }
 
@@ -405,7 +424,7 @@ final class DeployPipelineAdvisor
 
             if (str_contains($script, 'artisan down') && $hook->anchor === SiteDeployHook::ANCHOR_AFTER_ACTIVATE) {
                 $message = __('Maintenance down runs after activate—traffic already hit the new release; use before activate instead.');
-                $warnings[] = $message;
+                $warnings[] = (string) $message;
                 $checks[] = $this->check('maintenance_down_late_'.$hook->id, 'warning', $message);
             }
 
@@ -415,7 +434,7 @@ final class DeployPipelineAdvisor
                 SiteDeployHook::ANCHOR_BEFORE_ACTIVATE,
             ], true)) {
                 $message = __('Maintenance up runs before the site is live—use after activate (or remove if you never ran down).');
-                $warnings[] = $message;
+                $warnings[] = (string) $message;
                 $checks[] = $this->check('maintenance_up_early_'.$hook->id, 'warning', $message);
             }
         }
@@ -425,7 +444,9 @@ final class DeployPipelineAdvisor
      * @param  Collection<int, SiteDeployStep>  $releaseSteps
      * @param  Collection<int, SiteDeployHook>  $hooks
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkLaravelReleaseSafety(
         Site $site,
@@ -450,19 +471,19 @@ final class DeployPipelineAdvisor
 
         if ($migratePos !== false && $pretendPos === false) {
             $message = __('Release runs Migrate without a prior “Migrate (pretend)” step—add pretend or the Laravel safety bundle to preview SQL first.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('migrate_without_pretend', 'warning', $message);
         }
 
         if ($migratePos !== false && $pretendPos !== false && $pretendPos > $migratePos) {
             $message = __('“Migrate (pretend)” is after “Migrate”—pretend should run first to preview pending changes.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('pretend_after_migrate', 'warning', $message);
         }
 
         if ($migratePos !== false && ! $hasBackup) {
             $message = __('Release includes Migrate without a pre-migrate DB snapshot step—use the Laravel safety bundle or Server → Databases → Backups.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('migrate_without_backup', 'warning', $message);
         }
 
@@ -473,7 +494,7 @@ final class DeployPipelineAdvisor
             );
             if ($backupPos !== false && $backupPos > $pretendPos) {
                 $message = __('Pre-migrate backup runs after “Migrate (pretend)”—snapshot the database before dry-run and real migrate.');
-                $warnings[] = $message;
+                $warnings[] = (string) $message;
                 $checks[] = $this->check('backup_after_pretend', 'warning', $message);
             }
         }
@@ -491,13 +512,13 @@ final class DeployPipelineAdvisor
 
         if ($migratePos !== false && ! $hasMaintenanceDown) {
             $message = __('Migrate in Release without a maintenance-down hook before activate—visitors may hit the app during schema changes.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('migrate_without_maintenance_down', 'warning', $message);
         }
 
         if ($hasMaintenanceDown && ! $hasMaintenanceUp) {
             $message = __('Maintenance down is configured without a matching “up” hook after activate.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('maintenance_down_without_up', 'warning', $message);
         }
     }
@@ -510,7 +531,9 @@ final class DeployPipelineAdvisor
      *
      * @param  Collection<int, SiteDeployStep>  $steps
      * @param  list<string>  $warnings
-     * @param  list<array{key: string, level: string, message: string}>  $checks
+     * @param-out list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
+     * @param-out list<array{key: string, level: string, message: string, meta?: array<string, mixed>}>  $checks
      */
     private function checkRestartWithoutManagedProcess(
         Site $site,
@@ -543,13 +566,13 @@ final class DeployPipelineAdvisor
 
         if ($hasHorizon && ! $managesHorizon) {
             $message = __('This pipeline runs “horizon:terminate”, but no worker runs Horizon on this server—terminate only tells a running Horizon to restart, so the workers won’t come back. Add a Horizon worker under this site’s Workers so it stays running.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('horizon_terminate_without_program', 'warning', $message);
         }
 
         if ($hasQueue && ! $managesQueue) {
             $message = __('This pipeline runs “queue:restart”, but no worker runs a queue on this server—restart only signals running workers to exit. Add a queue worker under this site’s Workers so it stays running.');
-            $warnings[] = $message;
+            $warnings[] = (string) $message;
             $checks[] = $this->check('queue_restart_without_program', 'warning', $message);
         }
     }

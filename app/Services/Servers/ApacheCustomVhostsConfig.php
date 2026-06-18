@@ -23,6 +23,7 @@ class ApacheCustomVhostsConfig
     /**
      * @return array{vhosts: list<array{slug: string, path: string, server_name: string, server_aliases: list<string>, document_root: string, php_socket: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $available = rtrim((string) config('sites.apache_sites_available'), '/');
@@ -209,7 +210,7 @@ class ApacheCustomVhostsConfig
         $emit->step('apache-custom-vhosts', 'Writing '.$path.' ('.$reason.')');
         $result = app(RemoteWebserverConfigService::class)->write($server, 'apache', $path, $contents, $emit);
 
-        if (! ($result['validate_ok'] ?? false)) {
+        if (! ($result['validate_ok'])) {
             throw new \RuntimeException(trim((string) ($result['validate_output'] ?? 'apachectl configtest rejected the new file.')));
         }
 
@@ -248,6 +249,7 @@ class ApacheCustomVhostsConfig
 
     /**
      * @return list<string>
+     * @param  array<string, mixed> $value
      */
     private function normalizeList(array|string $value): array
     {

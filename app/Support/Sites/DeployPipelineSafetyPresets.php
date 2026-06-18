@@ -126,30 +126,38 @@ final class DeployPipelineSafetyPresets
 
     public static function preMigrateBackupCommand(): string
     {
+        // Pick the dump tool by the app's actual DB_CONNECTION, NOT by whichever
+        // client binary happens to be installed: a Postgres app on a box that also
+        // has the MySQL client must NOT be dumped with mysqldump (it auths as the
+        // pg user against MySQL → "Access denied"). A missing tool or non-dumpable
+        // engine skips gracefully (exit 0) rather than failing the deploy.
         return <<<'BASH'
 set -euo pipefail
+[ -f .env ] || { echo "No .env present — skipping pre-migrate backup."; exit 0; }
+envval() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'"; }
+DB_CONNECTION=$(envval DB_CONNECTION)
+DB_DATABASE=$(envval DB_DATABASE)
+DB_USERNAME=$(envval DB_USERNAME)
+DB_PASSWORD=$(envval DB_PASSWORD)
+DB_HOST=$(envval DB_HOST)
 BACKUP_DIR="storage/app/dply-pre-migrate-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 FILE="$BACKUP_DIR/pre-migrate.sql"
-if command -v mysqldump >/dev/null 2>&1 && [ -f .env ]; then
-  DB_DATABASE=$(grep -E '^DB_DATABASE=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  DB_USERNAME=$(grep -E '^DB_USERNAME=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  DB_PASSWORD=$(grep -E '^DB_PASSWORD=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  DB_HOST=$(grep -E '^DB_HOST=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  export MYSQL_PWD="$DB_PASSWORD"
-  mysqldump -h "${DB_HOST:-127.0.0.1}" -u "$DB_USERNAME" "$DB_DATABASE" > "$FILE"
-  echo "Pre-migrate backup written to $FILE"
-elif command -v pg_dump >/dev/null 2>&1 && [ -f .env ]; then
-  DB_DATABASE=$(grep -E '^DB_DATABASE=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  DB_USERNAME=$(grep -E '^DB_USERNAME=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  DB_HOST=$(grep -E '^DB_HOST=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  PGPASSWORD=$(grep -E '^DB_PASSWORD=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-  export PGPASSWORD
-  pg_dump -h "${DB_HOST:-127.0.0.1}" -U "$DB_USERNAME" "$DB_DATABASE" -f "$FILE"
-  echo "Pre-migrate backup written to $FILE"
-else
-  echo "No mysqldump/pg_dump — schedule exports under Server → Databases → Backups or edit this step."
-fi
+case "$DB_CONNECTION" in
+  pgsql)
+    command -v pg_dump >/dev/null 2>&1 || { echo "pg_dump not installed — skipping pre-migrate backup."; exit 0; }
+    export PGPASSWORD="$DB_PASSWORD"
+    pg_dump -h "${DB_HOST:-127.0.0.1}" -U "$DB_USERNAME" "$DB_DATABASE" -f "$FILE"
+    echo "Pre-migrate backup written to $FILE" ;;
+  mysql|mariadb)
+    command -v mysqldump >/dev/null 2>&1 || { echo "mysqldump not installed — skipping pre-migrate backup."; exit 0; }
+    export MYSQL_PWD="$DB_PASSWORD"
+    mysqldump -h "${DB_HOST:-127.0.0.1}" -u "$DB_USERNAME" "$DB_DATABASE" > "$FILE"
+    echo "Pre-migrate backup written to $FILE" ;;
+  *)
+    echo "No server-side SQL dump for DB_CONNECTION='${DB_CONNECTION:-unset}' — skipping pre-migrate backup."
+    exit 0 ;;
+esac
 BASH;
     }
 

@@ -31,9 +31,15 @@
     // Env vars the last deploy was blocked on (recorded by the deploy job's
     // preflight). Non-empty → the deploy stopped early asking for these.
     $blockedEnv = $this->deployBlockedEnvKeys();
+
+    // A smart-fix streaming inline (from the shared _deploy-fixers partial) must
+    // keep the panel polling even when no deploy is running, so its output and
+    // the "Deploy now" follow-up appear live.
+    $fixerInFlight = method_exists($this, 'fixerRun')
+        && ($fr = $this->fixerRun) !== null && $fr->isInFlight();
 @endphp
 
-<div class="space-y-6" @if ($deployInProgress) wire:poll.5s @endif>
+<div class="space-y-6" @if ($deployInProgress || $fixerInFlight) wire:poll.5s @endif>
     {{-- While a queued console action is being watched (e.g. "Optimize pipeline"
          scanning the repo), poll so the deploy hub re-renders on completion: the
          success toast fires and the proposed-changes preview modal below auto-opens
@@ -42,9 +48,10 @@
     @if ($watchedConsoleRunId)
         <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
     @endif
-    @if ($latest && $latest->status === 'failed')
-        @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
-    @endif
+    {{-- The recognized-failure card used to sit HERE at the top, duplicating the
+         error that's already shown in context at the bottom of the panel (the
+         failed phase + raw output in the timeline). It now renders ONCE, down by
+         the timeline, so the failure + its fix live in a single place. --}}
 
     {{-- Resume-from-phase: the deploy failed AFTER staging a release but BEFORE
          cutover (a build step or a migration broke), so the prior release is
@@ -257,6 +264,14 @@
                 </x-primary-button>
             </div>
         </x-modal>
+    @endif
+
+    {{-- Verify Octane is actually installed AND serving this site before the
+         advisor is allowed to suggest `octane:reload`. Deferred so it never
+         SSHes from the render path; renders unconditionally (when supported) so
+         the probe still runs when the suppressed Octane step is the only one. --}}
+    @if (method_exists($this, 'ensureOctaneVerificationProbe'))
+        <div wire:init="ensureOctaneVerificationProbe" class="hidden" aria-hidden="true"></div>
     @endif
 
     {{-- Pipeline suggestions — proactively flag missing-but-needed deploy
@@ -588,7 +603,39 @@
                     </a>
                 </div>
 
-                @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest])
+                @php
+                    // Inline database-connection fix under the failed step (Q8/Q10).
+                    // On the deploy hub $latest IS the site's latest deployment, so
+                    // we only gate on "failed + matched the guided DB remediation".
+                    $dbFix = null;
+                    if ($latest && $latest->status === 'failed' && method_exists($this, 'remediationForDeployment')) {
+                        $rem = $this->remediationForDeployment($latest);
+                        if (is_array($rem) && ($rem['code'] ?? null) === 'database_connection_failed') {
+                            $dbFix = ['server' => $server, 'site' => $site];
+                        }
+                    }
+                @endphp
+                @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest, 'dbFix' => $dbFix])
+
+                {{-- Recognized-failure remediation (curated RemediationCatalog
+                     match, e.g. "Rebuild webserver config" for a 502) — rendered
+                     here, with the error it explains, instead of a duplicate card
+                     at the top of the panel. --}}
+                @if ($latest && $latest->status === 'failed')
+                    <div class="mt-4">
+                        @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
+                    </div>
+                @endif
+
+                {{-- Smart fixes for a failed deploy — same inline fix actions the
+                     deploy sidebar offers, driven by the shared coordinator. --}}
+                @include('livewire.sites.partials._deploy-fixers', [
+                    'latest' => $latest,
+                    'phases' => $timelinePhases,
+                    'server' => $server,
+                    'site' => $site,
+                    'deployAction' => 'deployNow',
+                ])
             @endif
             </div>
         </div>
@@ -669,5 +716,40 @@
 
     @if (method_exists($this, 'applyPipelineOptimization'))
         @include('livewire.sites.partials.pipeline._optimize-preview-modal')
+    @endif
+
+    @if (method_exists($this, 'deployWithIdentity'))
+        <x-modal name="supply-deploy-identity" maxWidth="lg" overlayClass="bg-brand-ink/40" focusable>
+            <div class="p-6">
+                <div class="flex items-start gap-3">
+                    <x-heroicon-o-key class="h-6 w-6 shrink-0 text-brand-forest" />
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Supply your organization key') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">
+                            {{ __('This site has secrets under a customer-held key, so dply cannot decrypt them on its own. Paste your age identity to deploy. It is used for this deploy only and is never stored.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <x-input-label for="deploy_identity" :value="__('age identity (AGE-SECRET-KEY-…)')" />
+                    <textarea
+                        id="deploy_identity"
+                        wire:model="deploy_identity"
+                        rows="4"
+                        class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-[12px] shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                        placeholder="AGE-SECRET-KEY-1…"
+                    ></textarea>
+                    <x-input-error :messages="$errors->get('deploy_identity')" class="mt-1" />
+                </div>
+
+                <div class="mt-5 flex items-center justify-end gap-2">
+                    <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'supply-deploy-identity')">{{ __('Cancel') }}</x-secondary-button>
+                    <x-primary-button type="button" wire:click="deployWithIdentity" wire:loading.attr="disabled" wire:target="deployWithIdentity">
+                        {{ __('Deploy') }}
+                    </x-primary-button>
+                </div>
+            </div>
+        </x-modal>
     @endif
 </div>

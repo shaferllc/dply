@@ -8,9 +8,9 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
-use App\Services\RemoteCli\RemoteCliPermissions;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\RemoteCliPermissions;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

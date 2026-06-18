@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
 final class FirewallWorkspaceViewData
 {
     /**
-     * @param  list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: ServerFirewallApplyLog, event?: ServerFirewallAuditEvent}>  $activityItems
+     * @param  list<array<string, mixed>>  $activityItems
      * @return array<string, mixed>
      */
     public static function for(

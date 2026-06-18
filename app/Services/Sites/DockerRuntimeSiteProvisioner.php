@@ -20,7 +20,7 @@ final class DockerRuntimeSiteProvisioner implements SiteRuntimeProvisioner
 
     public function provision(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $runtime = is_array($meta['docker_runtime'] ?? null) ? $meta['docker_runtime'] : [];
         $meta['docker_runtime'] = array_merge($runtime, [
             'compose_yaml' => $this->artifactBuilder->build($site),
@@ -31,6 +31,8 @@ final class DockerRuntimeSiteProvisioner implements SiteRuntimeProvisioner
         $this->publicationManager->provision($site->fresh());
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function readyResult(Site $site): array
     {
         $site->loadMissing(['domains', 'previewDomains']);

@@ -3,8 +3,7 @@
          keys the deployed code expects but that aren't set here, with a
          one-click modal to add them. --}}
     @if ($supportsEnvPush && $envAdvanced && $missingEnv !== [] && ! $envGateOff)
-        <div class="dply-card overflow-hidden">
-            <div class="flex flex-col gap-3 bg-rose-50 px-5 py-4">
+        <div class="flex flex-col gap-3 bg-rose-50/60 px-5 py-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex min-w-0 items-start gap-3">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-100 text-rose-700 ring-rose-200">
@@ -75,13 +74,12 @@
                     </div>
                 </div>
             </div>
-        </div>
     @endif
 
     {{-- Required-env checks are off for this site (operator chose to ignore
          missing vars). Muted reminder with a one-click re-enable. --}}
     @if ($supportsEnvPush && $envGateOff)
-        <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-brand-sand/10 px-5 py-4 text-sm text-brand-moss">
             <span class="inline-flex items-center gap-2">
                 <x-heroicon-o-no-symbol class="h-4 w-4 text-brand-mist" />
                 {{ __('Required-variable checks are off for this site — deploys won\'t be blocked by missing env.') }}

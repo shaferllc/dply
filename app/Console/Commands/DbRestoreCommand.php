@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ServerDatabaseBackup;
-use App\Services\Servers\ServerDatabaseBackupRestorer;
+use App\Modules\Backups\Services\ServerDatabaseBackupRestorer;
 use Illuminate\Console\Command;
 
 /**
@@ -33,7 +33,7 @@ class DbRestoreCommand extends Command
         }
 
         $db = $backup->serverDatabase;
-        $target = (string) ($this->option('to-database') ?: ($db?->name ?? ''));
+        $target = (string) ($this->option('to-database') ?: $db->name);
         if ($target === '') {
             $this->error('Could not resolve a target database.');
 

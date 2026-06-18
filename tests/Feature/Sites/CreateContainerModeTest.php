@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\CreateContainerModeTest;
 
 use App\Enums\SiteType;
-use App\Jobs\FinalizeContainerCloudLaunchJob;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Livewire\Sites\Create as SiteCreate;
 use App\Models\Organization;
 use App\Models\Server;

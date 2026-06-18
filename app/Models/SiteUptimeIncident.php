@@ -5,12 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
- * A continuous span where a monitor was not operational. Opened on the
- * down/degraded transition and closed on recovery (resolved_at set). An
- * `outage` counts against uptime %; a `degraded` shows on the timeline but
- * still counts as up. SSL expiry warnings are not incidents.
+ * @property string $id
+ *                      A continuous span where a monitor was not operational. Opened on the
+ *                      down/degraded transition and closed on recovery (resolved_at set). An
+ *                      `outage` counts against uptime %; a `degraded` shows on the timeline but
+ *                      still counts as up. SSL expiry warnings are not incidents.
+ * @property string $cause
+ * @property ?Carbon $resolved_at
+ * @property string $severity
+ * @property ?string $site_id
+ * @property ?string $site_uptime_monitor_id
+ * @property ?Carbon $started_at
+ * @property-read ?SiteUptimeMonitor $monitor
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteUptimeIncident extends Model
 {
@@ -29,6 +41,7 @@ class SiteUptimeIncident extends Model
         'resolved_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -37,11 +50,13 @@ class SiteUptimeIncident extends Model
         ];
     }
 
+    /** @return BelongsTo<SiteUptimeMonitor, $this> */
     public function monitor(): BelongsTo
     {
         return $this->belongsTo(SiteUptimeMonitor::class, 'site_uptime_monitor_id');
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

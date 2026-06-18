@@ -148,6 +148,7 @@ final class EdgeDeploymentConfirmSummary
 
     /**
      * @param  list<array{label: string, value: string, mono?: bool}>  $rows
+     * @param-out list<array{label: string, value: string, mono?: bool}>  $rows
      * @param  array<string, mixed>  $build
      */
     private static function appendBuildConfigRows(array &$rows, array $build, EdgeDeployment $deployment): void
@@ -170,7 +171,7 @@ final class EdgeDeploymentConfirmSummary
             ];
         }
 
-        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : [];
+        $repoConfig = ($deployment->repo_config );
         $repoBuild = is_array($repoConfig['build'] ?? null) ? $repoConfig['build'] : [];
         foreach ($repoBuild as $key => $value) {
             if (! is_string($value) || $value === '') {

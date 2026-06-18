@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\ServerBlueprint;
 use App\Services\Servers\Blueprint\ServerBlueprintCapture;
@@ -15,9 +16,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 /**
  * Capture this VM as an org golden-server blueprint and manage saved snapshots.
@@ -26,8 +26,8 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceBlueprint extends Component
 {
-    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.server_blueprint';

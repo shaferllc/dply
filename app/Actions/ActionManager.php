@@ -75,6 +75,9 @@ class ActionManager
 
     protected int $backtraceLimit = 10;
 
+    /**
+     * @param  DesignPattern[]  $designPatterns
+     */
     public function __construct(array $designPatterns = [])
     {
         $this->setDesignPatterns($designPatterns);
@@ -103,6 +106,9 @@ class ActionManager
         return $this;
     }
 
+    /**
+     * @param  DesignPattern[]  $designPatterns
+     */
     public function setDesignPatterns(array $designPatterns): ActionManager
     {
         $this->designPatterns = $designPatterns;
@@ -110,6 +116,9 @@ class ActionManager
         return $this;
     }
 
+    /**
+     * @return DesignPattern[]
+     */
     public function getDesignPatterns(): array
     {
         return $this->designPatterns;
@@ -122,6 +131,10 @@ class ActionManager
         return $this;
     }
 
+    /**
+     * @param  array<int|string, string>  $usedTraits
+     * @return DesignPattern[]
+     */
     public function getDesignPatternsMatching(array $usedTraits): array
     {
         $filter = function (DesignPattern $designPattern) use ($usedTraits) {
@@ -161,6 +174,10 @@ class ActionManager
             || in_array(AsFake::class, $usedTraits);
     }
 
+    /**
+     * @param  mixed  $instance
+     * @return mixed
+     */
     public function identifyAndDecorate($instance)
     {
         // Get the original action instance (unwrap if already decorated)
@@ -223,6 +240,10 @@ class ActionManager
         return $decoratedInstance;
     }
 
+    /**
+     * @param  mixed  $instance
+     * @return mixed
+     */
     protected function unwrapDecorator($instance)
     {
         // If instance is a decorator, get the wrapped action
@@ -240,6 +261,9 @@ class ActionManager
         return $instance;
     }
 
+    /**
+     * @param  mixed  $instance
+     */
     protected function hasDecorator($instance, DesignPattern $pattern): bool
     {
         // Check if instance is already decorated with this pattern's decorator
@@ -297,6 +321,9 @@ class ActionManager
         return $decoratorMap[$patternClass] ?? null;
     }
 
+    /**
+     * @param  array<int|string, string>  $usedTraits
+     */
     public function identifyFromBacktrace($usedTraits, ?BacktraceFrame &$frame = null): ?DesignPattern
     {
         $designPatterns = $this->getDesignPatternsMatching($usedTraits);
@@ -322,6 +349,9 @@ class ActionManager
         return null;
     }
 
+    /**
+     * @param  array<int, string>|string  $paths
+     */
     public function registerRoutes(array|string $paths = 'app/Actions'): void
     {
         Lody::classes($paths)
@@ -331,6 +361,9 @@ class ActionManager
             ->each(fn (string $classname) => $this->registerRoutesForAction($classname));
     }
 
+    /**
+     * @param  array<int, string>|string  $paths
+     */
     public function registerCommands(array|string $paths = 'app/Actions'): void
     {
         Lody::classes($paths)

@@ -19,8 +19,8 @@ final class HAProxyConfigBuilder
      * Bash script that writes the HAProxy config file for a load balancer
      * and reloads the service. Idempotent — safe to re-run when targets change.
      *
-     * @param  array<array{name:string,ip:string,port:int,weight?:int,disabled?:bool}>  $backends
-     * @param  array<array{protocol:string,listen_port:int,destination_port:int}>  $services
+     * @param  array<string, mixed> $backends
+     * @param  array<string, mixed> $services
      */
     public static function applyScript(
         LoadBalancer $lb,
@@ -72,8 +72,8 @@ BASH;
     }
 
     /**
-     * @param  array<array{name:string,ip:string,port:int,weight?:int,disabled?:bool}>  $backends
-     * @param  array<array{protocol:string,listen_port:int,destination_port:int}>  $services
+     * @param  array<string, mixed> $backends
+     * @param  array<string, mixed> $services
      */
     private static function buildConfig(
         string $slug,

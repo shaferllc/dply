@@ -15,34 +15,33 @@
     <form wire:submit.prevent="next" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
       <div class="space-y-6 min-w-0">
         {{-- Hero --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            @if ($isKubernetes)
-                                <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                            @else
-                                <x-heroicon-o-puzzle-piece class="h-6 w-6" aria-hidden="true" />
-                            @endif
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 3, 'total' => $totalSteps]) }}</p>
-                            @if ($isKubernetes)
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Pick the cluster') }}</h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Choose an existing managed cluster from your cloud account and the default namespace dply should target.') }}</p>
-                            @elseif ($isDedicatedServerPurpose ?? false)
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Confirm the stack') }}</h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('You already chose a dedicated server purpose. Review what dply will install — no app templates needed.') }}</p>
-                            @else
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('What it runs') }}</h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.') }}</p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        @php
+            if ($isKubernetes) {
+                $heroTitle = __('Pick the cluster');
+                $heroDescription = __('Choose an existing managed cluster from your cloud account and the default namespace dply should target.');
+            } elseif ($isDedicatedServerPurpose ?? false) {
+                $heroTitle = __('Confirm the stack');
+                $heroDescription = __('You already chose a dedicated server purpose. Review what dply will install — no app templates needed.');
+            } else {
+                $heroTitle = __('What it runs');
+                $heroDescription = __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.');
+            }
+        @endphp
+        <x-hero-card
+            :eyebrow="__('Step :n of :total', ['n' => 3, 'total' => $totalSteps])"
+            :title="$heroTitle"
+            :description="$heroDescription"
+        >
+            <x-slot:leading>
+                <x-icon-badge size="md">
+                    @if ($isKubernetes)
+                        <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                    @else
+                        <x-heroicon-o-puzzle-piece class="h-6 w-6" aria-hidden="true" />
+                    @endif
+                </x-icon-badge>
+            </x-slot:leading>
+        </x-hero-card>
 
         @if ($sizeRoleMismatch)
             <section class="dply-card overflow-hidden border-amber-200">
@@ -109,36 +108,14 @@
                 <div class="space-y-5 p-6 sm:p-7">
                     @if ($canCreateNew)
                         {{-- Source toggle: use existing vs create new. --}}
-                        <div role="tablist" class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-1 text-sm">
-                            <button
-                                type="button"
-                                wire:click="$set('form.do_kubernetes_source', 'existing')"
-                                @class([
-                                    'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 font-semibold transition',
-                                    'bg-white text-brand-ink shadow-sm' => ! $isCreatingNew,
-                                    'text-brand-moss hover:text-brand-ink' => $isCreatingNew,
-                                ])
-                                role="tab"
-                                aria-selected="{{ $isCreatingNew ? 'false' : 'true' }}"
-                            >
-                                <x-heroicon-m-link class="h-4 w-4" />
+                        <x-server-workspace-tablist :aria-label="__('Cluster source')" class="!mb-0">
+                            <x-server-workspace-tab icon="heroicon-o-link" :active="! $isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'existing')">
                                 {{ __('Use existing cluster') }}
-                            </button>
-                            <button
-                                type="button"
-                                wire:click="$set('form.do_kubernetes_source', 'new')"
-                                @class([
-                                    'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 font-semibold transition',
-                                    'bg-white text-brand-ink shadow-sm' => $isCreatingNew,
-                                    'text-brand-moss hover:text-brand-ink' => ! $isCreatingNew,
-                                ])
-                                role="tab"
-                                aria-selected="{{ $isCreatingNew ? 'true' : 'false' }}"
-                            >
-                                <x-heroicon-m-plus class="h-4 w-4" />
+                            </x-server-workspace-tab>
+                            <x-server-workspace-tab icon="heroicon-o-plus" :active="$isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'new')">
                                 {{ __('Create new') }}
-                            </button>
-                        </div>
+                            </x-server-workspace-tab>
+                        </x-server-workspace-tablist>
                     @endif
 
                     @if ($isCreatingNew)
@@ -308,6 +285,8 @@
                 'provisionOptions' => $provisionOptions,
                 'stepWhereRoute' => $stepWhereRoute,
                 'dedicatedCacheEngineOptions' => $dedicatedCacheEngineOptions ?? [],
+                'operatorPublicIp' => $operatorPublicIp ?? null,
+                'networkCidr' => $networkCidr ?? null,
             ])
         @else
         @php

@@ -49,6 +49,7 @@ class WebserverSmokeTestRunner
      *     truncated: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function run(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
@@ -146,7 +147,7 @@ class WebserverSmokeTestRunner
      * Errors get a 0 status and the curl --write-out catches `errormsg`
      * via a trailing pipe.
      *
-     * @param  list<string>  $hostnames
+     * @param  array<string, mixed> $hostnames
      */
     private function buildCurlScript(array $hostnames): string
     {
@@ -227,7 +228,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed> $row
      */
     private function urgencyFor(array $row): string
     {
@@ -282,7 +283,7 @@ BASH;
         if (method_exists($site, 'webserverHostnames')) {
             try {
                 $names = $site->webserverHostnames();
-                if (is_array($names) && $names !== []) {
+                if (($names) && $names !== []) {
                     $first = (string) reset($names);
                     if ($first !== '') {
                         return $first;

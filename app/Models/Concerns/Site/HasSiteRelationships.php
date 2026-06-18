@@ -46,6 +46,7 @@ use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\WorkerPool;
 use App\Models\Workspace;
+use App\Services\Sites\SecretResidencyResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -57,9 +58,51 @@ use Illuminate\Support\Collection;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property ?string $active_deploy_pipeline_id
+ * @property array<string, mixed> $meta
+ * @property-read ?Server $server
+ * @property-read ?SiteWebserverConfigProfile $webserverConfigProfile
+ * @property-read ?User $user
+ * @property-read ?Organization $organization
+ * @property-read ?Workspace $workspace
+ * @property-read ?Script $deployScript
+ * @property-read ?Project $project
+ * @property-read ?ProviderCredential $dnsProviderCredential
+ * @property-read ?ProviderCredential $edgeProviderCredential
+ * @property-read ?ProviderCredential $serverlessProviderCredential
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomain> $domains
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SitePreviewDomain> $previewDomains
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomainAlias> $domainAliases
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteBasicAuthUser> $basicAuthUsers
+ * @property-read ?SiteAccessGate $accessGate
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteAccessGatePassword> $accessGatePasswords
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteUptimeMonitor> $uptimeMonitors
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteTenantDomain> $tenantDomains
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteCertificate> $certificates
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployment> $deployments
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, WebhookDeliveryLog> $webhookDeliveryLogs
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteRelease> $releases
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteProcess> $processes
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteBinding> $bindings
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteRedirect> $redirects
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployHook> $deployHooks
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployPipeline> $deployPipelines
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeploymentSchedule> $deploymentSchedules
+ * @property-read ?SiteDeployPipeline $activeDeployPipeline
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteFileBackup> $fileBackups
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeDeployment> $edgeDeployments
+ * @property-read ?EdgeSiteAccessRule $edgeSiteAccessRule
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeSiteEnvVar> $edgeEnvVars
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeSiteMember> $edgeSiteMembers
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeploySyncGroup> $deploySyncGroups
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationSubscription> $notificationSubscriptions
+ * @property-read ?InsightSetting $insightSetting
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, InsightFinding> $insightFindings
  */
 trait HasSiteRelationships
 {
+    /** @return BelongsTo<Server, $this> */
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
@@ -68,8 +111,11 @@ trait HasSiteRelationships
     /**
      * The serving points of a multi-backend site (this site behind a balancer on
      * ≥2 app servers). Empty for an ordinary single-server site. See
-     * docs/MULTI_BACKEND_SITES.md.
+     * docs/MULTI_BACKEND_SITES.md. *
+     *
+     * @return HasMany<SiteBackend, $this>
      */
+    /** @return HasMany<SiteBackend, $this> */
     public function backends(): HasMany
     {
         return $this->hasMany(SiteBackend::class);
@@ -86,17 +132,26 @@ trait HasSiteRelationships
      */
     public function attachedWorkerPools(): Collection
     {
-        $serverId = $this->server_id;
+        // Explicit attachments (see {@see workerPools()}) win: once an operator
+        // defines the set on the Worker servers page, it fully controls which
+        // pools serve this site — even pools whose source server is another box.
+        $explicit = $this->workerPools()
+            ->with(['servers', 'primaryServer'])
+            ->orderBy('created_at')
+            ->get();
 
+        if ($explicit->isNotEmpty()) {
+            return $explicit;
+        }
+
+        // Back-compat fallback (no explicit attachments): a pool that scales this
+        // site's OWN server — its source_server_id. A pool runs the source
+        // server's code + queues, so by default it belongs to sites on that box.
+        $serverId = $this->server_id;
         if ($serverId === null) {
             return new Collection;
         }
 
-        // A worker pool scales out exactly one box — its source_server_id (the
-        // server whose code + queues the replicas run). It's "attached" to a site
-        // only when it scales THAT site's own server. Scoping by workspace/org
-        // instead made every site in a workspace that owns any pool anywhere
-        // (e.g. dply's control-plane pool) falsely show workers attached.
         return WorkerPool::query()
             ->where('source_server_id', $serverId)
             ->with(['servers', 'primaryServer'])
@@ -104,46 +159,90 @@ trait HasSiteRelationships
             ->get();
     }
 
+    /**
+     * Explicitly-attached worker pools (the operator-defined set). Many-to-many
+     * so a site can be served by several pools and a pool can serve several sites. *
+     *
+     * @return BelongsToMany<WorkerPool, $this>
+     */
+    /** @return BelongsToMany<WorkerPool, $this> */
+    public function workerPools(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkerPool::class, 'site_worker_pool')->withTimestamps();
+    }
+
+    /**
+     * Worker pools in this site's organization that are NOT currently attached —
+     * the candidates the Worker servers picker offers. Lets the operator see what
+     * workers exist (answering "I have workers, why aren't they here?") and pick.
+     *
+     * @return Collection<int, WorkerPool>
+     */
+    public function availableWorkerPools(): Collection
+    {
+        if ($this->organization_id === null) {
+            return new Collection;
+        }
+
+        $attachedIds = $this->attachedWorkerPools()->pluck('id')->all();
+
+        return WorkerPool::query()
+            ->where('organization_id', $this->organization_id)
+            ->whereNotIn('id', $attachedIds)
+            ->with(['servers', 'sourceServer'])
+            ->orderBy('name')
+            ->get();
+    }
+
+    /** @return HasOne<SiteWebserverConfigProfile, $this> */
     public function webserverConfigProfile(): HasOne
     {
         return $this->hasOne(SiteWebserverConfigProfile::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<Workspace, $this> */
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
+    /** @return BelongsTo<Script, $this> */
     public function deployScript(): BelongsTo
     {
         return $this->belongsTo(Script::class, 'deploy_script_id');
     }
 
+    /** @return BelongsTo<Project, $this> */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
     }
 
+    /** @return BelongsTo<ProviderCredential, $this> */
     public function dnsProviderCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class, 'dns_provider_credential_id');
     }
 
+    /** @return BelongsTo<ProviderCredential, $this> */
     public function edgeProviderCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class, 'edge_provider_credential_id');
     }
 
+    /** @return BelongsTo<ProviderCredential, $this> */
     public function serverlessProviderCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class, 'serverless_provider_credential_id');
@@ -177,6 +276,7 @@ trait HasSiteRelationships
             ->first();
     }
 
+    /** @return HasMany<SiteDomain, $this> */
     public function domains(): HasMany
     {
         return $this->hasMany(SiteDomain::class);
@@ -185,8 +285,11 @@ trait HasSiteRelationships
     /**
      * The OpenWhisk actions on this serverless function-Site. A Site is an
      * OpenWhisk package: one `kind=code` action for a plain function, more
-     * once the package model lands. Code actions sort before sequences.
+     * once the package model lands. Code actions sort before sequences. *
+     *
+     * @return HasMany<FunctionAction, $this>
      */
+    /** @return HasMany<FunctionAction, $this> */
     public function functionActions(): HasMany
     {
         return $this->hasMany(FunctionAction::class)
@@ -194,26 +297,31 @@ trait HasSiteRelationships
             ->orderBy('name');
     }
 
+    /** @return HasMany<SitePreviewDomain, $this> */
     public function previewDomains(): HasMany
     {
         return $this->hasMany(SitePreviewDomain::class)->orderByDesc('is_primary')->orderBy('hostname');
     }
 
+    /** @return HasMany<SiteDomainAlias, $this> */
     public function domainAliases(): HasMany
     {
         return $this->hasMany(SiteDomainAlias::class)->orderBy('sort_order')->orderBy('hostname');
     }
 
+    /** @return HasMany<SiteBasicAuthUser, $this> */
     public function basicAuthUsers(): HasMany
     {
         return $this->hasMany(SiteBasicAuthUser::class)->orderBy('sort_order')->orderBy('username');
     }
 
+    /** @return HasOne<SiteAccessGate, $this> */
     public function accessGate(): HasOne
     {
         return $this->hasOne(SiteAccessGate::class);
     }
 
+    /** @return HasMany<SiteAccessGatePassword, $this> */
     public function accessGatePasswords(): HasMany
     {
         return $this->hasMany(SiteAccessGatePassword::class)->orderBy('sort_order')->orderBy('label');
@@ -252,21 +360,25 @@ trait HasSiteRelationships
         )->values();
     }
 
+    /** @return HasMany<SiteUptimeMonitor, $this> */
     public function uptimeMonitors(): HasMany
     {
         return $this->hasMany(SiteUptimeMonitor::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    /** @return HasMany<SiteTenantDomain, $this> */
     public function tenantDomains(): HasMany
     {
         return $this->hasMany(SiteTenantDomain::class)->orderBy('sort_order')->orderBy('hostname');
     }
 
+    /** @return HasMany<SiteCertificate, $this> */
     public function certificates(): HasMany
     {
         return $this->hasMany(SiteCertificate::class)->latest('created_at');
     }
 
+    /** @return HasMany<SiteDeployment, $this> */
     public function deployments(): HasMany
     {
         return $this->hasMany(SiteDeployment::class)->orderByDesc('id');
@@ -292,16 +404,19 @@ trait HasSiteRelationships
         });
     }
 
+    /** @return HasMany<WebhookDeliveryLog, $this> */
     public function webhookDeliveryLogs(): HasMany
     {
         return $this->hasMany(WebhookDeliveryLog::class)->orderByDesc('id');
     }
 
+    /** @return HasMany<SiteRelease, $this> */
     public function releases(): HasMany
     {
         return $this->hasMany(SiteRelease::class)->orderByDesc('id');
     }
 
+    /** @return HasMany<SiteProcess, $this> */
     public function processes(): HasMany
     {
         return $this->hasMany(SiteProcess::class)->orderBy('name');
@@ -311,13 +426,17 @@ trait HasSiteRelationships
      * Databases on the site's server that belong to this site (via the
      * server_databases.site_id single-owner link). Server-wide databases
      * with a null site_id are not included — they surface only on the
-     * server-level Databases manager.
+     * server-level Databases manager. *
+     *
+     * @return HasMany<ServerDatabase, $this>
      */
+    /** @return HasMany<ServerDatabase, $this> */
     public function serverDatabases(): HasMany
     {
         return $this->hasMany(ServerDatabase::class)->orderBy('name');
     }
 
+    /** @return HasMany<SiteBinding, $this> */
     public function bindings(): HasMany
     {
         return $this->hasMany(SiteBinding::class);
@@ -327,18 +446,23 @@ trait HasSiteRelationships
      * Per-key secret residency records — the env vars this site keeps OUT of the
      * loose plaintext-in-DB `.env` blob (escrowed under an org key, or referenced
      * from an external store). The blob carries only placeholders for these keys;
-     * {@see \App\Services\Sites\SecretResidencyResolver} resolves them at push.
+     * {@see SecretResidencyResolver} resolves them at push. *
+     *
+     * @return HasMany<SiteSecretResidency, $this>
      */
+    /** @return HasMany<SiteSecretResidency, $this> */
     public function secretResidencies(): HasMany
     {
         return $this->hasMany(SiteSecretResidency::class);
     }
 
+    /** @return HasMany<SiteRedirect, $this> */
     public function redirects(): HasMany
     {
         return $this->hasMany(SiteRedirect::class)->orderBy('sort_order');
     }
 
+    /** @return HasMany<SiteDeployHook, $this> */
     public function deployHooks(): HasMany
     {
         $relation = $this->hasMany(SiteDeployHook::class)->orderBy('sort_order');
@@ -350,24 +474,30 @@ trait HasSiteRelationships
         return $relation;
     }
 
+    /** @return HasMany<SiteDeployPipeline, $this> */
     public function deployPipelines(): HasMany
     {
         return $this->hasMany(SiteDeployPipeline::class)->orderBy('sort_order')->orderBy('name');
     }
 
+    /** @return HasMany<SiteDeploymentSchedule, $this> */
     public function deploymentSchedules(): HasMany
     {
         return $this->hasMany(SiteDeploymentSchedule::class)->orderBy('created_at');
     }
 
+    /** @return BelongsTo<SiteDeployPipeline, $this> */
     public function activeDeployPipeline(): BelongsTo
     {
         return $this->belongsTo(SiteDeployPipeline::class, 'active_deploy_pipeline_id');
     }
 
     /**
-     * Ordered steps for the pipeline used on deploy (active pipeline).
+     * Ordered steps for the pipeline used on deploy (active pipeline). *
+     *
+     * @return HasMany<SiteDeployStep, $this>
      */
+    /** @return HasMany<SiteDeployStep, $this> */
     public function deploySteps(): HasMany
     {
         $relation = $this->hasMany(SiteDeployStep::class)->orderBy('sort_order');
@@ -379,31 +509,37 @@ trait HasSiteRelationships
         return $relation;
     }
 
+    /** @return HasMany<SiteFileBackup, $this> */
     public function fileBackups(): HasMany
     {
         return $this->hasMany(SiteFileBackup::class)->orderByDesc('created_at');
     }
 
+    /** @return HasMany<EdgeDeployment, $this> */
     public function edgeDeployments(): HasMany
     {
         return $this->hasMany(EdgeDeployment::class)->orderByDesc('created_at');
     }
 
+    /** @return HasOne<EdgeSiteAccessRule, $this> */
     public function edgeSiteAccessRule(): HasOne
     {
         return $this->hasOne(EdgeSiteAccessRule::class);
     }
 
+    /** @return HasMany<EdgeSiteEnvVar, $this> */
     public function edgeEnvVars(): HasMany
     {
         return $this->hasMany(EdgeSiteEnvVar::class)->orderBy('key');
     }
 
+    /** @return HasMany<EdgeSiteMember, $this> */
     public function edgeSiteMembers(): HasMany
     {
         return $this->hasMany(EdgeSiteMember::class);
     }
 
+    /** @return BelongsToMany<SiteDeploySyncGroup, $this> */
     public function deploySyncGroups(): BelongsToMany
     {
         return $this->belongsToMany(SiteDeploySyncGroup::class, 'site_deploy_sync_group_sites', 'site_id', 'site_deploy_sync_group_id')
@@ -411,16 +547,19 @@ trait HasSiteRelationships
             ->withTimestamps();
     }
 
+    /** @return MorphMany<NotificationSubscription, $this> */
     public function notificationSubscriptions(): MorphMany
     {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
     }
 
+    /** @return MorphOne<InsightSetting, $this> */
     public function insightSetting(): MorphOne
     {
         return $this->morphOne(InsightSetting::class, 'settingsable');
     }
 
+    /** @return HasMany<InsightFinding, $this> */
     public function insightFindings(): HasMany
     {
         return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');

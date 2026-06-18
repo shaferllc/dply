@@ -53,8 +53,8 @@ class EdgeEnsureDeliveryFeaturesCommand extends Command
         }
 
         foreach ($result['image_zones'] as $zoneResult) {
-            $line = ($zoneResult['zone'] ?? '?').': '.($zoneResult['detail'] ?? '');
-            if ($zoneResult['ok'] ?? false) {
+            $line = $zoneResult['zone'].': '.$zoneResult['detail'];
+            if ($zoneResult['ok']) {
                 $this->info($line);
             } else {
                 $this->warn($line);
@@ -73,7 +73,7 @@ class EdgeEnsureDeliveryFeaturesCommand extends Command
             $this->warn('Worker was not redeployed.');
         }
 
-        if (($result['access_gates_republished'] ?? 0) > 0) {
+        if ($result['access_gates_republished'] > 0) {
             $this->info('Preview access gates republished for '.$result['access_gates_republished'].' site(s).');
         }
 

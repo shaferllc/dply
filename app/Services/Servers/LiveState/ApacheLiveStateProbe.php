@@ -237,7 +237,7 @@ BASH;
      * cross-reference against the vhosts dump to determine which hosts cover
      * which cert.
      *
-     * @param  array<string, string>  $certExpiries
+     * @param  array<string, mixed> $certExpiries
      * @return list<array<string, mixed>>
      */
     private function buildCertUnits(string $vhostsDump, string $certsSection, array $certExpiries): array

@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 
 final class AiAdvisorRunRecorder
 {
+    /**
+     * @param  array<string, mixed> $requestContext
+     */
     public function start(
         Organization $organization,
         string $feature,

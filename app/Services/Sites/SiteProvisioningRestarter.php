@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Sites;
 
 use App\Enums\SiteType;
+use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Site;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 
@@ -62,7 +63,7 @@ class SiteProvisioningRestarter
                 'Installing Caddy on the server before this site can be provisioned…',
                 ['server_id' => (string) $site->server_id],
             );
-            \App\Jobs\InstallServerWebserverJob::dispatch((string) $site->server_id, 'caddy');
+            InstallServerWebserverJob::dispatch((string) $site->server_id, 'caddy');
 
             return;
         }
@@ -177,7 +178,7 @@ class SiteProvisioningRestarter
 
     private function resetLocalState(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         foreach ([
             'caddy_last_output',

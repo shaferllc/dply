@@ -50,7 +50,7 @@ final class RepositoryRuntimePlanComposer
         );
         $buildCommand = $this->pickField(
             'build_command',
-            $this->joinCommandList($manifest?->build ?? []),
+            $this->joinCommandList($manifest->build ?? []),
             $detection?->buildCommand,
             $sources,
             $reasons,
@@ -71,7 +71,7 @@ final class RepositoryRuntimePlanComposer
         $framework = $detection?->framework;
         $confidence = $this->computeConfidence($manifest, $detection);
         $processes = $this->mergeProcesses($manifest, $detection);
-        $warnings = $manifest?->warnings ?? [];
+        $warnings = $manifest->warnings ?? [];
 
         // Surface detection's own reasoning trail — gives the UI panel the
         // human-readable explanations of every inference.
@@ -121,8 +121,8 @@ final class RepositoryRuntimePlanComposer
     }
 
     /**
-     * @param  array<string, string>  $sources
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $sources
+     * @param  array<string, mixed> $reasons
      */
     private function pickRuntime(
         ?DplyManifest $manifest,
@@ -157,8 +157,8 @@ final class RepositoryRuntimePlanComposer
      *
      * @param  T|null  $manifestValue
      * @param  T|null  $detectionValue
-     * @param  array<string, string>  $sources
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $sources
+     * @param  array<string, mixed> $reasons
      * @return T|null
      */
     private function pickField(
@@ -190,7 +190,7 @@ final class RepositoryRuntimePlanComposer
     }
 
     /**
-     * @param  list<string>  $commands
+     * @param  array<string, mixed> $commands
      */
     private function joinCommandList(array $commands): ?string
     {
@@ -233,7 +233,7 @@ final class RepositoryRuntimePlanComposer
     }
 
     /**
-     * @param  array<string, string>  $sources
+     * @param  array<string, mixed> $sources
      */
     private function normalizeAppPort(string $runtime, ?int $detectorPort, array &$sources): ?int
     {
@@ -262,7 +262,7 @@ final class RepositoryRuntimePlanComposer
             return 'high';
         }
 
-        return $detection?->confidence ?? 'low';
+        return $detection->confidence ?? 'low';
     }
 
     /**

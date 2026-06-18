@@ -2,6 +2,7 @@
 
 namespace App\Services\Servers;
 
+use App\Jobs\ValidateBindingConnectivityJob;
 use App\Models\Server;
 use App\Models\ServerDatabaseAdminCredential;
 use App\Models\ServerDatabaseEngine;
@@ -68,13 +69,13 @@ class ServerDatabaseRemoteExec
         $cred = $this->adminCredential($server);
 
         $mysqlUser = $cred?->mysql_root_username ?: 'root';
-        $mysqlPw = (string) ($cred?->mysql_root_password ?? '');
+        $mysqlPw = (string) ($cred->mysql_root_password ?? '');
         $pgUser = $cred?->postgres_superuser ?: 'postgres';
-        $pgPw = (string) ($cred?->postgres_password ?? '');
+        $pgPw = (string) ($cred->postgres_password ?? '');
         $mongoUser = $cred?->mongodb_admin_username ?: 'admin';
-        $mongoPw = (string) ($cred?->mongodb_admin_password ?? '');
+        $mongoPw = (string) ($cred->mongodb_admin_password ?? '');
         $chUser = $cred?->clickhouse_admin_username ?: 'default';
-        $chPw = (string) ($cred?->clickhouse_admin_password ?? '');
+        $chPw = (string) ($cred->clickhouse_admin_password ?? '');
 
         // Postgres: sudo path when no stored superuser password (or explicitly
         // configured for sudo); direct 127.0.0.1 login otherwise — mirrors probePostgres().
@@ -304,7 +305,7 @@ BASH;
 
         $cred = $this->adminCredential($server);
         $user = $cred?->clickhouse_admin_username ?: 'default';
-        $pass = $cred?->clickhouse_admin_password ?? '';
+        $pass = $cred->clickhouse_admin_password ?? '';
         $auth = $pass !== ''
             ? 'clickhouse-client --user '.escapeshellarg($user).' --password '.escapeshellarg($pass)
             : 'clickhouse-client --user '.escapeshellarg($user);
@@ -339,7 +340,7 @@ BASH;
     {
         $cred = $this->adminCredential($server);
         $user = $cred?->clickhouse_admin_username ?: 'default';
-        $pass = $cred?->clickhouse_admin_password ?? '';
+        $pass = $cred->clickhouse_admin_password ?? '';
         $auth = $pass !== ''
             ? 'clickhouse-client --user '.escapeshellarg($user).' --password '.escapeshellarg($pass)
             : 'clickhouse-client --user '.escapeshellarg($user);
@@ -381,6 +382,7 @@ BASH;
     /**
      * Run a one-off mysql command (used after exec to read exit status from same connection — caller must use one SSH exec chain).
      * Prefer {@see mysqlExecute} which runs a single remote bash -lc.
+     * @return array<string, mixed>
      */
     public function mysqlRunWithExit(Server $server, string $sql, int $timeout = 120): array
     {
@@ -395,12 +397,28 @@ BASH;
         return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function postgresRun(Server $server, string $sql, int $timeout = 120): array
     {
         $cred = $this->adminCredential($server);
         $inner = $this->postgresBashFragment($sql, $cred, tuples: false);
 
-        return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+        [$out, $exit] = $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+
+        // Fail loudly. With ON_ERROR_STOP=1 a non-zero exit means the statement
+        // actually failed on the server (role/db missing, perms, auth) — throw so
+        // provisioning can never record success over a rejected statement. Callers
+        // that ran idempotent SQL (DROP ... IF EXISTS, create-if-missing) won't
+        // hit this because those don't error.
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(
+                \Illuminate\Support\Str::limit(trim((string) $out), 800) ?: 'PostgreSQL command failed.'
+            );
+        }
+
+        return [$out, $exit];
     }
 
     /**
@@ -418,9 +436,13 @@ BASH;
 
     private function postgresBashFragment(string $sql, ?ServerDatabaseAdminCredential $cred, bool $tuples): string
     {
+        // ON_ERROR_STOP=1 for BOTH paths: a failing statement must set psql's exit
+        // code so {@see postgresRun} can throw. The old `=0` on write ops let a
+        // failed CREATE/ALTER exit 0, which (with callers ignoring the code) is
+        // how provisioning recorded success over a server that rejected the SQL.
         $flags = $tuples
             ? '-t -A -v ON_ERROR_STOP=1'
-            : '-v ON_ERROR_STOP=0';
+            : '-v ON_ERROR_STOP=1';
 
         if (! $cred || $cred->postgres_use_sudo) {
             return 'sudo -u postgres psql '.$flags.' -c '.escapeshellarg($sql).' 2>&1';
@@ -489,12 +511,14 @@ BASH;
 
     /**
      * Whether the engine is actually accepting TCP connections on 127.0.0.1:<port>
-     * — the address the deployed app (and {@see \App\Jobs\ValidateBindingConnectivityJob})
+     * — the address the deployed app (and {@see ValidateBindingConnectivityJob})
      * dials. This is STRICTER than the socket/sudo-based capability probe: an
      * engine can be "installed" (e.g. `sudo -u postgres psql` over the unix socket
      * works) yet not be listening on TCP localhost, in which case the app can't
      * connect at all — the "I made a database but it can't reach itself" trap.
      * sqlite has no TCP surface, so it's always considered reachable.
+     *
+     * @phpstan-impure
      */
     public function engineListeningOnLoopback(Server $server, string $engine, ?int $port = null): bool
     {
@@ -622,6 +646,107 @@ BASH;
         }
 
         return max(0, (int) trim($out));
+    }
+
+    /**
+     * mysqldump using dply's stored ROOT credentials instead of a per-database
+     * app user — the resilient fallback for {@see DatabaseBackupExporter} when
+     * the app user's stored password/username has drifted from the box (the
+     * classic "Access denied for user … (using password: YES)" on an otherwise
+     * healthy database). Same root creds the provisioner and ad-hoc quick
+     * download already use.
+     *
+     * @throws \RuntimeException when no usable root credential is on file, or the dump fails.
+     */
+    public function mysqldumpAdminToPath(Server $server, string $database, string $destPath, int $timeout = 600): int
+    {
+        $cred = $this->adminCredential($server);
+        if (! $cred || ! $cred->mysql_root_password) {
+            throw new \RuntimeException('No MySQL root credential on file for this server to fall back to.');
+        }
+
+        $dir = dirname($destPath);
+        $inner = 'mkdir -p '.escapeshellarg($dir).' && '.
+            'env MYSQL_PWD='.escapeshellarg((string) $cred->mysql_root_password).' mysqldump -u '.escapeshellarg($cred->mysql_root_username ?: 'root').
+            ' --single-transaction --quick --routines=false '.escapeshellarg($database).
+            ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
+
+        [$out, $exit] = $this->shellRunWithExit($server, $inner, $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        return max(0, (int) trim($out));
+    }
+
+    /**
+     * pg_dump using dply's stored superuser credentials (or `sudo -u postgres`
+     * when that's how the box is configured) — the postgres counterpart to
+     * {@see mysqldumpAdminToPath}. Always usable: with no stored credential it
+     * falls back to the same sudo path the provisioner uses.
+     *
+     * @throws \RuntimeException on dump failure.
+     */
+    public function pgDumpAdminToPath(Server $server, string $database, string $destPath, int $timeout = 600): int
+    {
+        $cred = $this->adminCredential($server);
+        $dir = dirname($destPath);
+        $mkdir = 'mkdir -p '.escapeshellarg($dir).' && ';
+        $redirect = ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
+
+        if (! $cred || $cred->postgres_use_sudo) {
+            $inner = $mkdir.'sudo -u postgres pg_dump '.escapeshellarg($database).$redirect;
+        } else {
+            $user = $cred->postgres_superuser ?: 'postgres';
+            $env = $cred->postgres_password ? 'env PGPASSWORD='.escapeshellarg((string) $cred->postgres_password).' ' : '';
+            $inner = $mkdir.$env.'pg_dump -h 127.0.0.1 -U '.escapeshellarg($user).' '.escapeshellarg($database).$redirect;
+        }
+
+        [$out, $exit] = $this->shellRunWithExit($server, $inner, $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        return max(0, (int) trim($out));
+    }
+
+    /**
+     * Stream mysqldump to stdout using dply's stored ROOT credentials — the
+     * string-output counterpart to {@see mysqldumpAdminToPath} (control-plane
+     * dev backups).
+     */
+    public function mysqldumpAdmin(Server $server, string $database, int $timeout = 600): string
+    {
+        $cred = $this->adminCredential($server);
+        if (! $cred || ! $cred->mysql_root_password) {
+            throw new \RuntimeException('No MySQL root credential on file for this server to fall back to.');
+        }
+
+        $inner = 'env MYSQL_PWD='.escapeshellarg((string) $cred->mysql_root_password).' mysqldump -u '.escapeshellarg($cred->mysql_root_username ?: 'root')
+            .' --single-transaction --quick --routines=false '.escapeshellarg($database).' 2>&1';
+
+        return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
+     * Stream pg_dump to stdout using dply's stored superuser credentials (or
+     * `sudo -u postgres`) — the string-output counterpart to {@see pgDumpAdminToPath}.
+     */
+    public function pgDumpAdmin(Server $server, string $database, int $timeout = 600): string
+    {
+        $cred = $this->adminCredential($server);
+
+        if (! $cred || $cred->postgres_use_sudo) {
+            $inner = 'sudo -u postgres pg_dump '.escapeshellarg($database).' 2>&1';
+        } else {
+            $user = $cred->postgres_superuser ?: 'postgres';
+            $env = $cred->postgres_password ? 'env PGPASSWORD='.escapeshellarg((string) $cred->postgres_password).' ' : '';
+            $inner = $env.'pg_dump -h 127.0.0.1 -U '.escapeshellarg($user).' '.escapeshellarg($database).' 2>&1';
+        }
+
+        return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
+use App\Livewire\Servers\WorkspaceLogs;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\ServerSystemLogsReport;
@@ -21,7 +22,7 @@ use Livewire\Component;
  * source catalog is limited to this site's vhost access/error, app log, Horizon
  * log, and platform activity (see {@see ManagesServerSystemLogs::availableLogSources()}
  * when scopedSite is set). Server-wide sources and Vector shipping stay on the
- * server logs workspace, one click away. Mirrors {@see \App\Livewire\Servers\WorkspaceLogs}.
+ * server logs workspace, one click away. Mirrors {@see WorkspaceLogs}.
  */
 #[Layout('layouts.app')]
 class Logs extends Component

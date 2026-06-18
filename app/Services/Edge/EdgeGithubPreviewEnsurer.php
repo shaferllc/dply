@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Edge;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Site;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 
 /**
  * Connect GitHub webhooks on production Edge sites so PR previews

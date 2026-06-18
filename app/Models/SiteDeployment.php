@@ -2,11 +2,36 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property string $id
+ * @property string $status
+ * @property ?Carbon $started_at
+ * @property ?Carbon $finished_at
+ * @property string $exit_code
+ * @property string $git_sha
+ * @property string $idempotency_key
+ * @property string $log_output
+ * @property array<string, mixed> $phase_results
+ * @property ?string $project_id
+ * @property string $release_folder
+ * @property ?string $resume_of_deployment_id
+ * @property ?string $site_id
+ * @property string $skip_reason
+ * @property string $skip_rule_summary
+ * @property string $trigger
+ * @property-read ?self $resumeOf
+ * @property-read ?Site $site
+ * @property-read ?Project $project
+ * @property-read ?SiteDeploymentEphemeralCredential $ephemeralCredential
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class SiteDeployment extends Model
 {
     use HasUlids;
@@ -33,12 +58,26 @@ class SiteDeployment extends Model
 
     public const STATUS_SKIPPED = 'skipped';
 
+    /** Skipped because the owning org is pause-blocked from billed deploys. */
+    public const SKIP_REASON_BILLING_PAUSED = 'billing_paused';
+
+    /** Skipped by a platform-wide kill switch (product line disabled). */
+    public const SKIP_REASON_PLATFORM_DISABLED = 'platform_disabled';
+
+    /** Skipped by a server deploy-window policy. */
+    public const SKIP_REASON_DEPLOY_WINDOW = 'deploy_window';
+
+    /** Skipped because another deployment for the site was already running. */
+    public const SKIP_REASON_ALREADY_RUNNING = 'already_running';
+
     protected $fillable = [
         'site_id',
         'project_id',
         'idempotency_key',
         'trigger',
         'status',
+        'skip_reason',
+        'skip_rule_summary',
         'git_sha',
         'release_folder',
         'resume_of_deployment_id',
@@ -49,6 +88,7 @@ class SiteDeployment extends Model
         'finished_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -56,6 +96,29 @@ class SiteDeployment extends Model
             'finished_at' => 'datetime',
             'phase_results' => 'array',
         ];
+    }
+
+    /**
+     * True when this deployment was skipped specifically because the owning
+     * org is pause-blocked from billed deploys — drives the distinct
+     * "Blocked — billing" chip instead of a neutral "skipped" that reads as
+     * a mysteriously stuck deploy.
+     */
+    public function isBillingBlocked(): bool
+    {
+        return $this->status === self::STATUS_SKIPPED
+            && $this->skip_reason === self::SKIP_REASON_BILLING_PAUSED;
+    }
+
+    /**
+     * True when this deployment was skipped by a server deploy-window deny
+     * rule — drives the distinct "Deploy window" chip plus the blocking-rule
+     * summary on the Deploys history timeline.
+     */
+    public function isDeployWindowBlocked(): bool
+    {
+        return $this->status === self::STATUS_SKIPPED
+            && $this->skip_reason === self::SKIP_REASON_DEPLOY_WINDOW;
     }
 
     /**
@@ -73,7 +136,7 @@ class SiteDeployment extends Model
      */
     public function recordPhaseResults(string $phase, array $results): void
     {
-        $existing = is_array($this->phase_results) ? $this->phase_results : [];
+        $existing = $this->phase_results;
         $existing[$phase] = $results;
         $this->phase_results = $existing;
         $this->save();
@@ -85,7 +148,7 @@ class SiteDeployment extends Model
      */
     public function phasesAllOk(): bool
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results ?? [];
         if ($results === []) {
             return false;
         }
@@ -109,7 +172,7 @@ class SiteDeployment extends Model
     public function phaseTotalDurationMs(): int
     {
         $total = 0;
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results ?? [];
         foreach ($results as $steps) {
             if (! is_array($steps)) {
                 continue;
@@ -131,7 +194,7 @@ class SiteDeployment extends Model
      */
     public function phaseSteps(string $phase): array
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results ?? [];
         $steps = $results[$phase] ?? null;
 
         return is_array($steps) ? array_values($steps) : [];
@@ -157,7 +220,7 @@ class SiteDeployment extends Model
 
     public function hasPhase(string $phase): bool
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results ?? [];
 
         return is_array($results[$phase] ?? null);
     }
@@ -171,7 +234,7 @@ class SiteDeployment extends Model
      */
     public function failedPhase(): ?string
     {
-        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $results = $this->phase_results ?? [];
         foreach (\App\Services\Deploy\DeployResumePlan::PHASE_ORDER as $phase) {
             $steps = $results[$phase] ?? null;
             if (! is_array($steps)) {
@@ -233,6 +296,7 @@ class SiteDeployment extends Model
         return $this->resumeStartPhase() !== null;
     }
 
+    /** @return BelongsTo<self, $this> */
     public function resumeOf(): BelongsTo
     {
         return $this->belongsTo(self::class, 'resume_of_deployment_id');
@@ -283,16 +347,19 @@ class SiteDeployment extends Model
         return ($step['ok'] ?? false) === true ? '✓' : '✗';
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return BelongsTo<Project, $this> */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
     }
 
+    /** @return HasOne<SiteDeploymentEphemeralCredential, $this> */
     public function ephemeralCredential(): HasOne
     {
         return $this->hasOne(SiteDeploymentEphemeralCredential::class);

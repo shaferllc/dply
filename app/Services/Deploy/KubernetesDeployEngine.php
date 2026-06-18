@@ -14,23 +14,25 @@ final class KubernetesDeployEngine implements DeployEngine
         private readonly DeploymentRevisionTracker $revisionTracker,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function run(DeployContext $context): array
     {
         $site = $context->site();
         if ($site->runtimeTargetFamily() === 'local_orbstack_kubernetes') {
             $result = $this->localRuntimeManager->deploy($site);
-            $siteMeta = is_array($site->meta) ? $site->meta : [];
+            $siteMeta = ($site->meta );
             $kubernetesRuntime = is_array($siteMeta['kubernetes_runtime'] ?? null) ? $siteMeta['kubernetes_runtime'] : [];
             $namespace = (string) ($kubernetesRuntime['namespace'] ?? 'default');
 
             $siteMeta['kubernetes_runtime'] = array_merge($kubernetesRuntime, [
                 'namespace' => $result['namespace'] ?? $namespace,
-                'manifest_yaml' => $result['manifest_yaml'] ?? ($kubernetesRuntime['manifest_yaml'] ?? null),
+                'manifest_yaml' => $result['manifest_yaml'] ?? ($kubernetesRuntime['manifest_yaml']),
                 'deployment_name' => $result['deployment_name'] ?? ($kubernetesRuntime['deployment_name'] ?? $this->manifestBuilder->deploymentName($site)),
                 'kubectl_context' => $result['context'] ?? ($kubernetesRuntime['kubectl_context'] ?? null),
                 'last_apply_output' => $result['output'],
                 'last_revision_id' => $result['sha'],
-                'workspace_path' => $result['workspace_path'] ?? ($kubernetesRuntime['workspace_path'] ?? null),
+                'workspace_path' => $result['workspace_path'] ?? ($kubernetesRuntime['workspace_path']),
                 'repository_checkout_path' => $result['repository_checkout_path'] ?? ($kubernetesRuntime['repository_checkout_path'] ?? null),
                 'generated_manifest_path' => $result['generated_manifest_path'] ?? ($kubernetesRuntime['generated_manifest_path'] ?? null),
                 'applied_at' => now()->toIso8601String(),
@@ -54,7 +56,7 @@ final class KubernetesDeployEngine implements DeployEngine
         }
 
         $serverMeta = is_array($site->server?->meta) ? $site->server->meta : [];
-        $siteMeta = is_array($site->meta) ? $site->meta : [];
+        $siteMeta = ($site->meta );
         $kubernetesRuntime = is_array($siteMeta['kubernetes_runtime'] ?? null) ? $siteMeta['kubernetes_runtime'] : [];
         $namespace = (string) ($kubernetesRuntime['namespace'] ?? $serverMeta['kubernetes']['namespace'] ?? 'default');
         $manifest = $this->manifestBuilder->build($site, $namespace);
@@ -123,8 +125,8 @@ final class KubernetesDeployEngine implements DeployEngine
     }
 
     /**
-     * @param  array<string, mixed>  $serverMeta
-     * @param  array<string, mixed>  $runtime
+     * @param  array<string, mixed> $serverMeta
+     * @param  array<string, mixed> $runtime
      */
     private function resolveKubeconfigPath(array $serverMeta, array $runtime): ?string
     {
@@ -134,8 +136,8 @@ final class KubernetesDeployEngine implements DeployEngine
     }
 
     /**
-     * @param  array<string, mixed>  $serverMeta
-     * @param  array<string, mixed>  $runtime
+     * @param  array<string, mixed> $serverMeta
+     * @param  array<string, mixed> $runtime
      */
     private function resolveContext(array $serverMeta, array $runtime): ?string
     {

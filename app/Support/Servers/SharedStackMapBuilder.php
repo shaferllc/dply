@@ -54,10 +54,6 @@ final class SharedStackMapBuilder
             $siteNodeId = $this->siteNodeId($site);
 
             foreach ($site->bindings as $binding) {
-                if (! $binding instanceof SiteBinding) {
-                    continue;
-                }
-
                 $type = (string) $binding->type;
                 if (! in_array($type, ['database', 'redis', 'queue'], true)) {
                     continue;
@@ -98,16 +94,16 @@ final class SharedStackMapBuilder
 
         foreach ([$databaseGroups, $redisGroups] as $groups) {
             foreach ($groups as $resourceId => $group) {
-                $uniqueSites = $this->uniqueSiteRefs($group['sites'] ?? []);
+                $uniqueSites = $this->uniqueSiteRefs($group['sites']);
                 if (count($uniqueSites) < 2) {
                     continue;
                 }
 
-                $type = (string) ($group['type'] ?? 'service');
+                $type = $group['type'];
                 $sharedResources[] = [
                     'id' => (string) $resourceId,
                     'type' => $type,
-                    'label' => (string) ($group['label'] ?? $resourceId),
+                    'label' => $group['label'],
                     'site_count' => count($uniqueSites),
                     'sites' => $uniqueSites,
                     'restart_impact' => $this->restartImpactCopy($type, count($uniqueSites)),
@@ -150,7 +146,7 @@ final class SharedStackMapBuilder
         $seen = [];
         $unique = [];
         foreach ($sites as $site) {
-            $slug = (string) ($site['slug'] ?? '');
+            $slug = $site['slug'];
             if ($slug === '' || isset($seen[$slug])) {
                 continue;
             }

@@ -42,6 +42,7 @@ final class ByoRepoConfigSync
      *     warnings: list<string>
      * }
      */
+    /** @return array<string, mixed> */
     public function syncAfterDeploy(Site $site, SshConnection $ssh, string $remotePath): array
     {
         $empty = ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'server_crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];
@@ -166,7 +167,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  list<array{schedule: string, command: string, user: ?string}>  $crons
+     * @param  array<string, mixed> $crons
      */
     private function syncCrons(Site $site, array $crons): int
     {
@@ -200,7 +201,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  list<array{schedule: string, command: string, user: ?string}>  $crons
+     * @param  array<string, mixed> $crons
      */
     private function syncServerCrons(Site $site, array $crons): int
     {
@@ -234,7 +235,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  list<array{phase: string, script: string, timeout: int, sort_order: int}>  $hooks
+     * @param  array<string, mixed> $hooks
      */
     private function syncDeployHooks(Site $site, array $hooks): int
     {
@@ -268,7 +269,7 @@ final class ByoRepoConfigSync
      */
     private function persistSnapshot(Site $site, ?array $payload): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         if ($payload === null) {
             unset($meta['byo']['repo_config']);
         } else {

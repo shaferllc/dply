@@ -37,7 +37,7 @@ trait ManagesErrorTrackingBindings
     ];
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachErrorTracking(Site $site, array $params): SiteBinding
     {
@@ -69,7 +69,7 @@ trait ManagesErrorTrackingBindings
      * Resolve provider credentials: from a saved ErrorTrackingCredential when
      * $params['credential_id'] is set, otherwise from the typed form fields.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolveErrorTrackingCredentials(Site $site, string $provider, array $params): array
@@ -86,7 +86,7 @@ trait ManagesErrorTrackingBindings
                 throw new InvalidArgumentException(__('That saved error tracking credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return match ($provider) {
@@ -104,7 +104,7 @@ trait ManagesErrorTrackingBindings
         };
     }
 
-    /** @param  array<string, string>  $creds */
+    /** @param  array<string, mixed> $creds */
     private function validateErrorTrackingCredentials(string $provider, array $creds): void
     {
         match ($provider) {
@@ -124,7 +124,7 @@ trait ManagesErrorTrackingBindings
     /**
      * Build the env vars the error-tracking binding injects at deploy.
      *
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function errorTrackingEnv(string $provider, array $creds): array
@@ -144,7 +144,7 @@ trait ManagesErrorTrackingBindings
         };
     }
 
-    /** @param  array<string, string>  $creds */
+    /** @param  array<string, mixed> $creds */
     private function errorTrackingLabel(string $provider, array $creds): string
     {
         return match ($provider) {
@@ -160,8 +160,8 @@ trait ManagesErrorTrackingBindings
      * operator ticked "save for reuse". No-op when reusing a saved credential or
      * when there's nothing to store.
      *
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSaveErrorTrackingCredential(Site $site, string $provider, array $params, array $creds): void
     {

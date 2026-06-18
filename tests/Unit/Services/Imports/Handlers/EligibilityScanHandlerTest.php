@@ -12,7 +12,7 @@ use App\Models\PloiServer;
 use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Imports\Handlers\EligibilityScanHandler;
+use App\Modules\Imports\Services\Handlers\EligibilityScanHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

@@ -20,19 +20,11 @@
                 </x-slot>
             </x-page-header>
 
-            <div class="mt-6 flex gap-1 rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-1">
-                <button type="button" wire:click="setTab('recipes')"
-                    @class([
-                        'flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition',
-                        'bg-white text-brand-ink shadow-sm' => $tab === 'recipes',
-                        'text-brand-moss hover:text-brand-ink' => $tab !== 'recipes',
-                    ])>{{ __('Recipes') }}</button>
-                <button type="button" wire:click="setTab('sequences')"
-                    @class([
-                        'flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition',
-                        'bg-white text-brand-ink shadow-sm' => $tab === 'sequences',
-                        'text-brand-moss hover:text-brand-ink' => $tab !== 'sequences',
-                    ])>{{ __('Sequences') }}</button>
+            <div class="mt-6">
+                <x-server-workspace-tablist :aria-label="__('Glue sections')">
+                    <x-server-workspace-tab :active="$tab === 'recipes'" icon="heroicon-o-sparkles" wire:click="setTab('recipes')">{{ __('Recipes') }}</x-server-workspace-tab>
+                    <x-server-workspace-tab :active="$tab === 'sequences'" icon="heroicon-o-queue-list" wire:click="setTab('sequences')">{{ __('Sequences') }}</x-server-workspace-tab>
+                </x-server-workspace-tablist>
             </div>
         </div>
     </div>

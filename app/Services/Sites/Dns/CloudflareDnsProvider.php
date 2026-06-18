@@ -10,6 +10,8 @@ class CloudflareDnsProvider implements DnsProvider
         private readonly CloudflareDnsService $service,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         if (strtoupper($type) !== 'A') {

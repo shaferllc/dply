@@ -8,7 +8,6 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployPipeline;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
 use InvalidArgumentException;
 
 final class DeployPipelineJsonImporter
@@ -16,10 +15,6 @@ final class DeployPipelineJsonImporter
     private const MAX_STEPS = 100;
 
     private const MAX_HOOKS = 50;
-
-    public function __construct(
-        private readonly SiteDeployPipelineManager $pipelineManager,
-    ) {}
 
     /**
      * @return array{steps: int, hooks: int}
@@ -160,7 +155,7 @@ final class DeployPipelineJsonImporter
     }
 
     /**
-     * @param  list<mixed>  $steps
+     * @param  array<string, mixed> $steps
      * @return list<array{step_type: string, phase: string, custom_command: ?string, timeout_seconds: int, sort_order: int}>
      */
     private function normalizedSteps(array $steps): array
@@ -198,7 +193,7 @@ final class DeployPipelineJsonImporter
     }
 
     /**
-     * @param  list<mixed>  $hooks
+     * @param  array<string, mixed> $hooks
      * @return list<array<string, mixed>>
      */
     private function normalizedHooks(array $hooks): array
@@ -248,7 +243,7 @@ final class DeployPipelineJsonImporter
     }
 
     /**
-     * @param  array<string, mixed>  $rollout
+     * @param  array<string, mixed> $rollout
      */
     private function applyRollout(Site $site, array $rollout): void
     {
@@ -257,7 +252,7 @@ final class DeployPipelineJsonImporter
             $strategy = 'simple';
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         if (array_key_exists('deploy_health_enabled', $rollout)) {
             $meta['deploy_health_enabled'] = (bool) $rollout['deploy_health_enabled'];
         }

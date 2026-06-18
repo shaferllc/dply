@@ -14,6 +14,9 @@ class ActionRequest extends FormRequest
         // Cancel the auto-resolution trait.
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getDefaultValidationData(): array
     {
         return $this->all();

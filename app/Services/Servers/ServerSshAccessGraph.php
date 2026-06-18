@@ -31,6 +31,7 @@ final class ServerSshAccessGraph
      *     rows: list<array<string, mixed>>,
      * }
      */
+    /** @return array<string, mixed> */
     public function forServer(Server $server, ?ServerSshAccessContext $context = null): array
     {
         $context ??= ServerSshAccessContext::load($server);
@@ -126,7 +127,7 @@ final class ServerSshAccessGraph
                 'id' => (string) $session->id,
                 'name' => (string) $session->name,
                 'expires_at' => $session->expires_at,
-                'created_by' => (string) ($session->createdBy?->name ?? ''),
+                'created_by' => (string) ($session->createdBy->name ?? ''),
                 'fingerprint' => substr((string) $session->public_key_fingerprint, -16),
             ])
             ->all();

@@ -120,54 +120,43 @@
         @endif
 
         {{-- Hero: greeting + at-a-glance fleet counts. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            <x-heroicon-o-squares-2x2 class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Workspace') }}</p>
-                            <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">
-                                {{ __('Welcome back, :name', ['name' => $displayName]) }}
-                            </h2>
-                            <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Run infrastructure, track fleet health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]) }}
-                            </p>
-                        </div>
-                    </div>
-                    {{-- All three actions share one sizing class so they render at
-                         identical height/padding; only color differs. --}}
-                    @php $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors'; @endphp
-                    <div class="mt-4 flex flex-wrap items-center gap-2">
-                        <a
-                            href="{{ route('credentials.index') }}"
-                            wire:navigate
-                            class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
-                        >
-                            <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Provider credentials') }}
-                        </a>
-                        <button
-                            type="button"
-                            class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
-                            x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.connect-provider' } }))"
-                        >
-                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Setup guide') }}
-                        </button>
-                        <a
-                            href="{{ $primaryHref }}"
-                            wire:navigate
-                            class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
-                        >
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ $primaryLabel }}
-                        </a>
-                    </div>
-                </div>
-                <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+        @php $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors'; @endphp
+        <x-hero-card
+            icon="squares-2x2"
+            iconSize="md"
+            :eyebrow="__('Workspace')"
+            :title="__('Welcome back, :name', ['name' => $displayName])"
+            :description="__('Run infrastructure, track fleet health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName])"
+        >
+            {{-- All three actions share one sizing class so they render at
+                 identical height/padding; only color differs. --}}
+            <a
+                href="{{ route('credentials.index') }}"
+                wire:navigate
+                class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+            >
+                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Provider credentials') }}
+            </a>
+            <button
+                type="button"
+                class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+                x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.connect-provider' } }))"
+            >
+                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Setup guide') }}
+            </button>
+            <a
+                href="{{ $primaryHref }}"
+                wire:navigate
+                class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
+            >
+                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ $primaryLabel }}
+            </a>
+
+            <x-slot:stats>
+                <dl class="grid grid-cols-3 gap-2">
                     <div @class([
                         'group relative rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40',
                         'border-brand-sage/30 bg-brand-sage/8 hover:border-brand-sage/50' => $serverCount > 0,
@@ -215,8 +204,8 @@
                         <p class="mt-1 text-[11px] text-brand-mist">{{ $avgHealthScore !== null ? __('Higher is better') : __('Pending insights') }}</p>
                     </div>
                 </dl>
-            </div>
-        </section>
+            </x-slot:stats>
+        </x-hero-card>
 
         <div class="mt-6 space-y-6">
             @unless ($hasProviderCredentials)

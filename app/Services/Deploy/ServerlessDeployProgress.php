@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy;
 
-use App\Exceptions\ServerlessDeployCancelledException;
+use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Support\Carbon;
@@ -139,7 +139,7 @@ class ServerlessDeployProgress
             $steps[$index] = $entry;
         }
 
-        $deployment->recordPhaseResults(self::PHASE, array_values($steps));
+        $deployment->recordPhaseResults(self::PHASE, array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($steps)))))))))))))))))))))))))))))))));
     }
 
     private function runningDeployment(Site $site): ?SiteDeployment

@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Jobs\RunLaravelScaffoldJob;
-use App\Jobs\RunWordPressScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
+use App\Livewire\Sites\ScaffoldJourney;
+use App\Livewire\Sites\Show;
 use App\Models\Site;
-use App\Services\Scaffold\PlaceholderDnsManager;
-use App\Services\Scaffold\ScaffoldStep;
+use App\Modules\Scaffold\Services\PlaceholderDnsManager;
+use App\Modules\Scaffold\Services\ScaffoldStep;
 use Illuminate\Support\Facades\Auth;
 
 /**
  * Drives the app-install (scaffold) pipeline surface — the steps timeline,
  * the three-attempt retry, and the one-time admin-password reveal.
  *
- * Shared by the in-wrapper flow on {@see \App\Livewire\Sites\Show} (rendered
+ * Shared by the in-wrapper flow on {@see Show} (rendered
  * inside the site workspace shell) and the legacy standalone
- * {@see \App\Livewire\Sites\ScaffoldJourney} page. Methods are scaffold-prefixed
+ * {@see ScaffoldJourney} page. Methods are scaffold-prefixed
  * so they never collide with the host component's own actions.
  */
 trait InteractsWithScaffoldJourney

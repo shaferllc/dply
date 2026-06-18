@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Jobs\ServerManageRemoteSshJob;
+
 /**
  * Notification event keys for server-scoped OS patch / update actions, surfaced on
  * the /servers/{server}/patches workspace (apt upgrade / dist-upgrade, reboot,
@@ -11,7 +13,7 @@ namespace App\Support;
  *
  * Distinct from the existing server-level `server.automatic_updates` alert (a
  * monitoring setting, not an action result). Fired from the shared manage-action
- * job ({@see \App\Jobs\ServerManageRemoteSshJob}) for patch task names only.
+ * job ({@see ServerManageRemoteSshJob}) for patch task names only.
  * Mirrors {@see ServerWebserverNotificationKeys}.
  */
 final class ServerPatchNotificationKeys

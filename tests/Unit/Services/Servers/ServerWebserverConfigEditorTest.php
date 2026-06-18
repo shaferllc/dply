@@ -8,7 +8,7 @@ use App\Models\ConfigRevision;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
+use App\Modules\ConfigRevisions\Services\Diff\ConfigRevisionDiffRegistry;
 use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

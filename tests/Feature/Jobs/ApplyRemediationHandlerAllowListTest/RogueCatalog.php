@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Jobs\ApplyRemediationHandlerAllowListTest;
 
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationCatalog;
 
 /** Catalog that hands back the rogue handler yet reports an empty allow-list. */
 class RogueCatalog extends RemediationCatalog

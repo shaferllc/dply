@@ -14,6 +14,7 @@ class SiteRuntimeActionExecutor
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
+    /** @return array<string, mixed> */
     public function run(Site $site, string $action): array
     {
         return match ($site->runtimeTargetFamily()) {
@@ -60,7 +61,7 @@ class SiteRuntimeActionExecutor
     }
 
     /**
-     * @param  array{status: string, output: string}|\ArrayAccess<string, mixed>|array<string, mixed>  $result
+     * @param  array<string, mixed> $result
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
     private function normalizeDeployResult(array $result): array

@@ -38,4 +38,10 @@ Route::middleware('auth')->group(function () {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
+
+    // Stop impersonating — available to the (currently impersonated) session, not
+    // admin-gated, since the effective user is no longer a platform admin. It is
+    // a no-op unless the session was started by an admin via impersonation.
+    Route::post('impersonate/leave', [\App\Http\Controllers\Admin\ImpersonationController::class, 'leave'])
+        ->name('impersonate.leave');
 });

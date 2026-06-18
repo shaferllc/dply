@@ -24,6 +24,7 @@ class TraefikTcpRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, rule: string, entry_points: list<string>, server_address: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         return $this->readByPrefix($server, self::FILE_PREFIX, 'tcp');
@@ -94,6 +95,7 @@ YAML;
     /**
      * @return array{routes: list<array<string, mixed>>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     protected function readByPrefix(Server $server, string $prefix, string $layer): array
     {
         try {

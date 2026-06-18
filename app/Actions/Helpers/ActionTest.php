@@ -135,7 +135,7 @@ class ActionTest
      * Assert that an action was called with specific arguments.
      *
      * @param  string  $actionClass  Action class name
-     * @param  array  $arguments  Expected arguments
+     * @param  array<int, mixed>  $arguments  Expected arguments
      */
     public static function assertActionCalledWith(string $actionClass, array $arguments): void
     {

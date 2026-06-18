@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Actions\Sites\ScheduleSiteDeploy;
+use App\Jobs\PushSiteEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
+use App\Services\Deploy\DockerImageReleaseRollback;
+use App\Services\Sites\SecretResidencyResolver;
+use App\Services\Sites\SiteDeployCoordinator;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteReleaseRollback;
 use Illuminate\Support\Facades\Cache;
@@ -28,23 +31,75 @@ use Livewire\Component;
  */
 trait ManagesSiteDeployExecution
 {
+    /** A customer-held org age identity supplied for one deploy; never persisted. */
+    public string $deploy_identity = '';
+
     public function deployNow(): void
     {
         $this->authorize('update', $this->site);
 
-        // Queue the deploy on a worker instead of running it inline. SSH must
-        // never block a Livewire/HTTP request (PHP max_execution_time), so the
-        // job runs the clone/build/release steps off-request. Seed the active
-        // marker now so the panel immediately reads "Deploying…" and starts
-        // polling; the job overwrites it with the real deployment id once it
-        // creates the running record.
-        Cache::put('site-deploy-active:'.$this->site->id, [
-            'started_at' => now()->toIso8601String(),
-            'deployment_id' => null,
-        ], 600);
+        // A site whose escrowed secrets sit under a CUSTOMER-held org key can't be
+        // resolved by dply alone — prompt for the identity instead of deploying.
+        if (app(SecretResidencyResolver::class)->requiresEphemeralIdentity($this->site)) {
+            $this->dispatch('open-modal', 'supply-deploy-identity');
 
-        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+            return;
+        }
 
+        $this->dispatchDeployJob(null);
+    }
+
+    /**
+     * Deploy after the customer pastes their org key identity. The raw key is
+     * stashed in the cache under a random token (NOT serialized into the job) and
+     * pulled-and-forgotten by {@see RunSiteDeploymentJob}; the field is cleared.
+     */
+    public function deployWithIdentity(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $identity = trim($this->deploy_identity);
+        if ($identity === '') {
+            $this->addError('deploy_identity', __('Paste your organization key identity to deploy.'));
+
+            return;
+        }
+
+        $token = bin2hex(random_bytes(16));
+        Cache::put(
+            PushSiteEnvJob::EPHEMERAL_IDENTITY_CACHE_PREFIX.$token,
+            $identity,
+            now()->addMinutes(10),
+        );
+
+        $this->reset('deploy_identity');
+        $this->dispatch('close-modal', 'supply-deploy-identity');
+        $this->dispatchDeployJob($token);
+    }
+
+    /**
+     * Queue the deploy on a worker instead of running it inline. SSH must never
+     * block a Livewire/HTTP request (PHP max_execution_time), so the job runs the
+     * clone/build/release steps off-request. Seed the active marker now so the
+     * panel immediately reads "Deploying…" and starts polling; the job overwrites
+     * it with the real deployment id once it creates the running record.
+     */
+    private function dispatchDeployJob(?string $ephemeralIdentityToken): void
+    {
+        $queued = app(SiteDeployCoordinator::class)->deploy(
+            $this->site,
+            SiteDeployment::TRIGGER_MANUAL,
+            (string) (auth()->id() ?? ''),
+            ephemeralIdentityToken: $ephemeralIdentityToken,
+        );
+
+        if (! $queued) {
+            $this->toastError(__('A deploy is already running for this site.'));
+
+            return;
+        }
+
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
         $this->toastSuccess(__('Deployment queued. Watch the phase timeline below.'));
     }
 
@@ -123,14 +178,15 @@ trait ManagesSiteDeployExecution
      */
     public function getDeployLockInfoProperty(): ?array
     {
-        return Cache::get('site-deploy-active:'.$this->site->id);
+        return app(SiteDeployCoordinator::class)->deployLockInfo($this->site);
     }
 
     public function releaseDeployLock(): void
     {
         $this->authorize('update', $this->site);
         Cache::lock('site-deploy:'.$this->site->id)->forceRelease();
-        Cache::forget('site-deploy-active:'.$this->site->id);
+        Cache::forget(SiteDeployCoordinator::ACTIVE_KEY_PREFIX.$this->site->id);
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
         $this->toastSuccess(__('Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.'));
     }
 
@@ -150,25 +206,7 @@ trait ManagesSiteDeployExecution
      */
     public function deployIsInProgress(?SiteDeployment $latest): bool
     {
-        if ($latest !== null && $latest->status === SiteDeployment::STATUS_RUNNING) {
-            return true;
-        }
-
-        $lock = $this->deployLockInfo;
-        $startedAt = isset($lock['started_at']) ? \Illuminate\Support\Carbon::parse($lock['started_at']) : null;
-        if ($startedAt === null) {
-            return false;
-        }
-
-        $terminalSinceLock = $latest !== null
-            && in_array($latest->status, [
-                SiteDeployment::STATUS_FAILED,
-                SiteDeployment::STATUS_SUCCESS,
-                SiteDeployment::STATUS_SKIPPED,
-            ], true)
-            && $latest->created_at?->greaterThanOrEqualTo($startedAt->subSeconds(2));
-
-        return ! $terminalSinceLock && $startedAt->greaterThan(now()->subSeconds(90));
+        return app(SiteDeployCoordinator::class)->inProgress($this->site, $latest);
     }
 
     public function confirmRollbackRelease(int|string $releaseId): void
@@ -238,21 +276,22 @@ trait ManagesSiteDeployExecution
             return;
         }
 
-        // Same optimistic marker as deployNow so the panel immediately reads
-        // "Deploying…" and starts polling.
-        Cache::put('site-deploy-active:'.$this->site->id, [
-            'started_at' => now()->toIso8601String(),
-            'deployment_id' => null,
-        ], 600);
-
-        RunSiteDeploymentJob::dispatch(
+        // Routed through the coordinator (same optimistic marker as deployNow so
+        // the panel immediately reads "Deploying…" and starts polling).
+        $queued = app(SiteDeployCoordinator::class)->deploy(
             $this->site,
             SiteDeployment::TRIGGER_RESUME,
-            null,
-            auth()->id(),
-            $deployment->id,
+            (string) (auth()->id() ?? ''),
+            resumeFromDeploymentId: (string) $deployment->id,
         );
 
+        if (! $queued) {
+            $this->toastError(__('A deploy is already running for this site.'));
+
+            return;
+        }
+
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
         $this->toastSuccess(__('Resuming from the :phase phase. Watch the timeline below.', ['phase' => $deployment->resumeStartPhase()]));
     }
 
@@ -266,7 +305,7 @@ trait ManagesSiteDeployExecution
             // Image-method (VM Docker) sites roll back by re-running the prior
             // tagged image, not by flipping the atomic `current` symlink.
             if ($this->site->usesVmDockerRuntime()) {
-                app(\App\Services\Deploy\DockerImageReleaseRollback::class)->rollbackTo($this->site, $release);
+                app(DockerImageReleaseRollback::class)->rollbackTo($this->site, $release);
                 $this->site->refresh();
                 $this->toastSuccess(__('Rolled back to the previous container image.'));
 

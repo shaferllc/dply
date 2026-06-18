@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\InsightsFeatureTest;
 
-use App\Jobs\ApplyInsightFixJob;
-use App\Jobs\RevertInsightFixJob;
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\RevertInsightFixJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Settings\Hub;
 use App\Models\InsightFinding;
@@ -21,20 +21,20 @@ use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\ProcessOutput;
-use App\Services\Insights\Contracts\InsightFixActionInterface;
-use App\Services\Insights\Contracts\InsightRunnerInterface;
-use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
-use App\Services\Insights\FixActions\EnableNtpFixAction;
-use App\Services\Insights\FixResult;
-use App\Services\Insights\InsightCandidate;
-use App\Services\Insights\InsightRunCoordinator;
-use App\Services\Insights\InsightSettingsRepository;
-use App\Services\Insights\InsightsNotificationDispatcher;
-use App\Services\Insights\Runners\HorizonRecommendedInsightRunner;
-use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
-use App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner;
-use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
-use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
+use App\Modules\Insights\Services\Contracts\InsightFixActionInterface;
+use App\Modules\Insights\Services\Contracts\InsightRunnerInterface;
+use App\Modules\Insights\Services\FixActions\BumpFpmWorkersFixAction;
+use App\Modules\Insights\Services\FixActions\EnableNtpFixAction;
+use App\Modules\Insights\Services\FixResult;
+use App\Modules\Insights\Services\InsightCandidate;
+use App\Modules\Insights\Services\InsightRunCoordinator;
+use App\Modules\Insights\Services\InsightSettingsRepository;
+use App\Modules\Insights\Services\InsightsNotificationDispatcher;
+use App\Modules\Insights\Services\Runners\HorizonRecommendedInsightRunner;
+use App\Modules\Insights\Services\Runners\OctaneRecommendedInsightRunner;
+use App\Modules\Insights\Services\Runners\PackageSecurityUpdatesInsightRunner;
+use App\Modules\Insights\Services\Runners\PhpFpmWorkersUndersizedInsightRunner;
+use App\Modules\Insights\Services\Runners\SystemClockSyncInsightRunner;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpFpmProbe;
@@ -847,7 +847,7 @@ test('bump fpm workers fix action backs up substitutes and writes via editor', f
             ];
         }
 
-        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null, ?callable $afterLockAcquired = null): array
         {
             $this->state['saved_content'] = $content;
             $this->state['saved_target'] = $target;
@@ -959,7 +959,7 @@ test('bump fpm workers revert restores backup via editor and clears backup path'
             $this->state = &$state;
         }
 
-        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null, ?callable $afterLockAcquired = null): array
         {
             $this->state['saved_content'] = $content;
 
@@ -1288,7 +1288,7 @@ test('bump fpm workers fix action aborts when pattern not found', function () {
             ];
         }
 
-        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null, ?callable $afterLockAcquired = null): array
         {
             throw new \RuntimeException('saveTarget should not be called when substitution is a no-op');
         }

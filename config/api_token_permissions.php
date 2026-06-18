@@ -72,6 +72,10 @@ return [
     'http_route_abilities' => [
         'servers.index' => 'servers.read',
         'servers.run_command' => 'commands.run',
+        'servers.log_shipping.show' => 'servers.read',
+        'servers.log_shipping.enable' => 'commands.run',
+        'servers.log_shipping.resync' => 'commands.run',
+        'servers.log_shipping.disable' => 'commands.run',
         'sites.index' => 'sites.read',
         'sites.show' => 'sites.read',
         'sites.update' => 'sites.write',

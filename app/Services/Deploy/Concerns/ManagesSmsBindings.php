@@ -22,7 +22,7 @@ trait ManagesSmsBindings
     public const SMS_PROVIDERS = ['twilio', 'vonage', 'fcm'];
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachSms(Site $site, array $params): SiteBinding
     {
@@ -51,7 +51,7 @@ trait ManagesSmsBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolveSmsCredentials(Site $site, string $provider, array $params): array
@@ -68,7 +68,7 @@ trait ManagesSmsBindings
                 throw new InvalidArgumentException(__('That saved SMS credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return match ($provider) {
@@ -89,7 +89,7 @@ trait ManagesSmsBindings
         };
     }
 
-    /** @param array<string, string> $creds */
+    /** @param  array<string, mixed> $creds */
     private function validateSmsCredentials(string $provider, array $creds): void
     {
         match ($provider) {
@@ -107,7 +107,7 @@ trait ManagesSmsBindings
     }
 
     /**
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function smsEnv(string $provider, array $creds): array
@@ -156,8 +156,8 @@ trait ManagesSmsBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSaveSmsCredential(Site $site, string $provider, array $params, array $creds): void
     {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Jobs\RecheckRequiredEnvJob;
+use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 
 /**
@@ -12,8 +14,8 @@ use App\Models\Site;
  * records the result on the site (meta.deploy_blocked_env) so the Deploy panel
  * banner stays in sync.
  *
- * Shared by {@see \App\Jobs\RunSiteDeploymentJob} (which throws to block the
- * deploy) and {@see \App\Jobs\RecheckRequiredEnvJob} (which just re-evaluates
+ * Shared by {@see RunSiteDeploymentJob} (which throws to block the
+ * deploy) and {@see RecheckRequiredEnvJob} (which just re-evaluates
  * on demand, so a stale banner can clear without a full deploy). Both run in a
  * queue worker — the .env read is over SSH and must never run inline.
  */
@@ -69,7 +71,7 @@ final class RequiredEnvEvaluator
             static fn (array $entry): bool => in_array('code', $entry['sources'], true),
         ));
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         if ($missing === []) {
             if (array_key_exists('deploy_blocked_env', $meta)) {

@@ -1,8 +1,8 @@
 {{-- At-a-glance stats (Overview only — other sections are self-contained). --}}
 <div class="grid gap-4 md:grid-cols-4">
     <x-stat-card :label="__('Health')" :value="$health['status_label']" :meta="$health['servers_ready'].'/'.$health['servers_total'].' '.__('servers ready')" />
-    <x-stat-card :label="__('Sites')" :value="$costSummary['sites_used']" :meta="__('Remaining in org plan: :count', ['count' => $costSummary['sites_remaining']])" />
-    <x-stat-card :label="__('Servers')" :value="$costSummary['servers_used']" :meta="__('Remaining in org plan: :count', ['count' => $costSummary['servers_remaining']])" />
+    <x-stat-card :label="__('Sites')" :value="$costSummary['sites_used']" :meta="$costSummary['sites_remaining_label']" />
+    <x-stat-card :label="__('Servers')" :value="$costSummary['servers_used']" :meta="$costSummary['servers_remaining_label']" />
     <x-stat-card :label="__('Deploy runs')" :value="$costSummary['deploy_runs_count']" :meta="__('Variables: :count', ['count' => $costSummary['variables_count']])" />
 </div>
 

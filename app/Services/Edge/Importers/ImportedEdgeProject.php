@@ -13,10 +13,10 @@ namespace App\Services\Edge\Importers;
 final class ImportedEdgeProject
 {
     /**
-     * @param  array<string, string>  $envVars  Plain text env vars to copy onto the site.
-     * @param  list<array{from: string, to: string, status: int}>  $redirects
+     * @param  array<string, mixed> $envVars  Plain text env vars to copy onto the site.
+     * @param  array<string, mixed> $redirects
      * @param  list<array{for: string, values: array<string, string>}>  $headers
-     * @param  list<string>  $customDomains
+     * @param  array<string, mixed> $customDomains
      */
     public function __construct(
         public readonly string $sourceProvider,
@@ -43,6 +43,7 @@ final class ImportedEdgeProject
      *
      * @return array<string, string>
      */
+    /** @return array<string, mixed> */
     public function toCreateFormPrefill(): array
     {
         $prefill = array_filter([

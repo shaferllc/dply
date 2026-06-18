@@ -59,7 +59,7 @@ class ReversibleDesignPattern extends DesignPattern
         return true;
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(ReversibleDecorator::class, ['action' => $instance]);
     }

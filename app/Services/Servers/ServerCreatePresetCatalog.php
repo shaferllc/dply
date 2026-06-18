@@ -68,6 +68,10 @@ final class ServerCreatePresetCatalog
      *     featured: bool,
      * }>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, array<string, string>|bool|string|null>>
+     */
     public function all(): array
     {
         return [
@@ -188,7 +192,7 @@ final class ServerCreatePresetCatalog
     }
 
     /**
-     * @return array{
+     * @return array<int, array<string, array<string, string>|bool|string|null>>
      *     id: string,
      *     name: string,
      *     description: string,
@@ -218,6 +222,7 @@ final class ServerCreatePresetCatalog
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function toServerMeta(string $id): array
     {
         $preset = $this->find($id);

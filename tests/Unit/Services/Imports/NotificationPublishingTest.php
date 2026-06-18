@@ -13,12 +13,12 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Imports\Handlers\CutoverSmokeTestHandler;
-use App\Services\Imports\MigrationPlanner;
-use App\Services\Imports\StepOrchestrator;
-use App\Services\Imports\StepRegistry;
-use App\Services\Notifications\NotificationEventRegistry;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Imports\Services\Handlers\CutoverSmokeTestHandler;
+use App\Modules\Imports\Services\MigrationPlanner;
+use App\Modules\Imports\Services\StepOrchestrator;
+use App\Modules\Imports\Services\StepRegistry;
+use App\Modules\Notifications\Services\NotificationEventRegistry;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

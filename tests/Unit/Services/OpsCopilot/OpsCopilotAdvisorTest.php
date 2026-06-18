@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\OpsCopilot;
 
-use App\Services\OpsCopilot\OpsCopilotAdvisor;
+use App\Modules\OpsCopilot\Services\OpsCopilotAdvisor;
 
 test('advisor detects php memory exhaustion', function () {
     $suggestions = app(OpsCopilotAdvisor::class)->suggest(

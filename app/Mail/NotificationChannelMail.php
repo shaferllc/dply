@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Models\NotificationChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * Branded HTML email for email-type notification channels — both operational
- * alerts ({@see \App\Models\NotificationChannel::sendOperationalMessage()}) and
+ * alerts ({@see NotificationChannel::sendOperationalMessage()}) and
  * the "Test" button on the notification-channels settings page.
  *
  * Renders the markdown view, which Laravel emits as BOTH an HTML part (using the

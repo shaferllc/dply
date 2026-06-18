@@ -5,7 +5,6 @@ namespace App\Livewire\Teams;
 use App\Livewire\Concerns\ManagesNotificationChannels;
 use App\Models\Organization;
 use App\Models\Team;
-use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,7 +27,7 @@ class NotificationChannels extends Component
         $this->syncNotificationChannelTypeDefaults();
     }
 
-    protected function owner(): User|Organization|Team
+    protected function owner(): Team
     {
         return $this->team;
     }

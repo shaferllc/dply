@@ -66,7 +66,7 @@ final class DockerManagedSiteIndex
      */
     public static function siteForContainer(array $container, array $index): ?array
     {
-        $name = strtolower((string) ($container['name'] ?? ''));
+        $name = strtolower($container['name']);
         if ($name === '') {
             return null;
         }
@@ -87,14 +87,14 @@ final class DockerManagedSiteIndex
      */
     public static function siteForComposeProject(array $project, array $index): ?array
     {
-        $name = strtolower((string) ($project['name'] ?? ''));
+        $name = strtolower($project['name']);
 
         return $index['project_to_site'][$name] ?? null;
     }
 
     private static function siteUsesDockerStack(Site $site): bool
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         if (is_array($meta['docker_runtime'] ?? null)
             && (

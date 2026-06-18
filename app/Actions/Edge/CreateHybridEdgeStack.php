@@ -84,7 +84,7 @@ class CreateHybridEdgeStack
             'size_tier' => 'small',
         ]);
 
-        $meta = is_array($cloudSite->meta) ? $cloudSite->meta : [];
+        $meta = $cloudSite->meta;
         $meta['container'] = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $meta['container']['hybrid_edge_stack'] = [
             'status' => 'awaiting_origin',

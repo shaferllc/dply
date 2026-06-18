@@ -3,6 +3,7 @@
 namespace App\Support\Servers;
 
 use App\Models\Server;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -17,15 +18,22 @@ final class ServerPhpMutationLock
 
     public static function isHeld(Server $server): bool
     {
-        return Cache::lock(self::key($server), 1)->isLocked();
+        $lock = Cache::lock(self::key($server), 1);
+        if ($lock->get()) {
+            $lock->release();
+
+            return false;
+        }
+
+        return true;
     }
 
-    public static function acquire(Server $server, int $seconds)
+    public static function acquire(Server $server, int $seconds): Lock
     {
         return Cache::lock(self::key($server), $seconds);
     }
 
-    public static function releaseIfOwned($lock, bool $acquired): void
+    public static function releaseIfOwned(Lock $lock, bool $acquired): void
     {
         if ($acquired) {
             $lock->release();

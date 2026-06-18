@@ -73,6 +73,7 @@ class NginxUpstreamsConfig
     /**
      * @return array{upstreams: list<array{name: string, servers: list<string>, values: array<string, string>, raw: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -180,8 +181,8 @@ class NginxUpstreamsConfig
      * section (or at end-of-file if there's no http block, which would be
      * an unusual nginx.conf but we don't want to fail outright).
      *
-     * @param  list<string>  $servers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $servers
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -274,8 +275,8 @@ class NginxUpstreamsConfig
     /**
      * Build the canonical `upstream <name> { ... }` text from the form data.
      *
-     * @param  list<string>  $servers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $servers
+     * @param  array<string, mixed> $values
      */
     private function renderUpstream(string $name, array $servers, array $values): string
     {

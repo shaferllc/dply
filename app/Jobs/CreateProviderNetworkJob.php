@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\PrivateNetwork;
 use App\Models\Server;
 use App\Services\HetznerService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -47,7 +48,7 @@ class CreateProviderNetworkJob implements ShouldQueue
             return;
         }
 
-        $credential = $servers->first()?->providerCredential;
+        $credential = $servers->first()->providerCredential;
         if (! $credential) {
             Log::warning('CreateProviderNetworkJob: no Hetzner credential found', [
                 'server_ids' => $this->serverIds,
@@ -68,7 +69,7 @@ class CreateProviderNetworkJob implements ShouldQueue
 
         // Store the Hetzner provider ID on the PrivateNetwork row if one was pre-created.
         if ($this->privateNetworkId) {
-            \App\Models\PrivateNetwork::query()
+            PrivateNetwork::query()
                 ->where('id', $this->privateNetworkId)
                 ->update(['provider_id' => (string) $hetznerNetworkId]);
         }

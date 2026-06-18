@@ -43,13 +43,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-    <x-page-header
-        :eyebrow="__('Web server config')"
-        :title="$config_paths['engine_label']"
-        :description="__('Managed configuration for :site', ['site' => $site->name])"
-        :show-documentation="false"
-        flush
-        compact
+    <x-hero-card
+        :eyebrow="__('Settings')"
+        :title="__('Web server config')"
+        :description="__('Edit, validate, and apply your :engine virtual host configuration.', ['engine' => $config_paths['engine_label']])"
+        icon="globe-alt"
     />
 
     @if ($core_changed_warning)

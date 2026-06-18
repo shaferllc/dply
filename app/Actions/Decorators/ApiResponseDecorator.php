@@ -17,11 +17,15 @@ class ApiResponseDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         try {
@@ -33,7 +37,7 @@ class ApiResponseDecorator
         }
     }
 
-    protected function formatSuccessResponse($data): JsonResponse
+    protected function formatSuccessResponse(mixed $data): JsonResponse
     {
         $formatted = $this->formatResponse($data);
 
@@ -47,7 +51,10 @@ class ApiResponseDecorator
         return response()->json($formatted, $this->getErrorStatusCode($exception));
     }
 
-    protected function formatResponse($data): array
+    /**
+     * @return array<string, mixed>
+     */
+    protected function formatResponse(mixed $data): array
     {
         if ($this->hasMethod('formatResponse')) {
             return $this->callMethod('formatResponse', [$data]);
@@ -59,6 +66,9 @@ class ApiResponseDecorator
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function formatError(\Throwable $exception): array
     {
         if ($this->hasMethod('formatError')) {

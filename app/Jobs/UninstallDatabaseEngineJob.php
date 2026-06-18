@@ -8,16 +8,19 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
+use App\Models\User;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 
-class UninstallDatabaseEngineJob implements ShouldQueue
+class UninstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
     use WritesConsoleAction;
@@ -32,6 +35,17 @@ class UninstallDatabaseEngineJob implements ShouldQueue
         if (is_string($q) && $q !== '') {
             $this->onQueue($q);
         }
+    }
+
+    /** One uninstall in flight per engine row (mirrors InstallDatabaseEngineJob). */
+    public function uniqueId(): string
+    {
+        return 'db_engine_uninstall_'.$this->serverDatabaseEngineId;
+    }
+
+    public function uniqueFor(): int
+    {
+        return 60;
     }
 
     protected function consoleSubject(): Model
@@ -53,7 +67,7 @@ class UninstallDatabaseEngineJob implements ShouldQueue
         ExecuteRemoteTaskOnServer $executor,
         ServerDatabaseHostCapabilities $capabilities,
         DatabaseEngineAuditLogger $audit,
-        \App\Services\Notifications\ServerDatabaseNotificationDispatcher $notifications,
+        ServerDatabaseNotificationDispatcher $notifications,
     ): void {
         /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
@@ -107,7 +121,7 @@ class UninstallDatabaseEngineJob implements ShouldQueue
                 $serverForAudit,
                 'engine_removed',
                 [__('Engine: :engine', ['engine' => $engine])],
-                $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 ['engine' => $engine],
             );
 

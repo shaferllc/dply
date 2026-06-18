@@ -40,7 +40,7 @@ class OAuthDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -81,11 +81,7 @@ class OAuthDecorator
     }
 
     /**
-     * Get user's OAuth scopes.
-     *
-     * Tries multiple methods to retrieve scopes:
-     * 1. From token (Laravel Sanctum/Passport)
-     * 2. From session storage
+     * @return array<int, string>
      */
     protected function getUserScopes(): array
     {
@@ -126,9 +122,8 @@ class OAuthDecorator
     }
 
     /**
-     * Check if user has all required scopes.
-     *
-     * User must have ALL required scopes (AND logic).
+     * @param  array<int, string>  $userScopes
+     * @param  array<int, string>  $requiredScopes
      */
     protected function hasRequiredScopes(array $userScopes, array $requiredScopes): bool
     {
@@ -137,8 +132,8 @@ class OAuthDecorator
     }
 
     /**
-     * Handle insufficient OAuth scopes.
-     *
+     * @param  array<int, string>  $requiredScopes
+     * @param  array<int, string>  $userScopes
      *
      * @throws HttpResponseException
      */
@@ -167,7 +162,7 @@ class OAuthDecorator
     }
 
     /**
-     * Get required OAuth scopes from the action.
+     * @return array<int, string>
      */
     protected function getRequiredScopes(): array
     {

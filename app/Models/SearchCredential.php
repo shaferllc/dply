@@ -9,9 +9,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A reusable search-engine credential set scoped to an organization (Algolia /
- * Meilisearch / Typesense). Provider-specific connection details live in the
- * encrypted {@see $credentials} JSON column. Mirrors {@see ErrorTrackingCredential}.
+ * @property string $id
+ *                      A reusable search-engine credential set scoped to an organization (Algolia /
+ *                      Meilisearch / Typesense). Provider-specific connection details live in the
+ *                      encrypted {@see $credentials} JSON column. Mirrors {@see ErrorTrackingCredential}.
+ * @property ?string $created_by_user_id
+ * @property array<string, mixed> $credentials
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $provider
+ * @property-read ?Organization $organization
+ * @property-read ?User $createdByUser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SearchCredential extends Model
 {
@@ -27,6 +37,7 @@ class SearchCredential extends Model
         'credentials',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -34,11 +45,13 @@ class SearchCredential extends Model
         ];
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function createdByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');

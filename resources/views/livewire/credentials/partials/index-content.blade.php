@@ -31,13 +31,13 @@
      here it only renders on the standalone (non-shell) surface. --}}
 @if (empty($useOrgShell))
     @if ($organization)
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
             ['label' => __('Provider credentials'), 'icon' => 'server'],
         ]" />
     @else
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
             ['label' => __('Provider credentials'), 'icon' => 'server'],
@@ -65,10 +65,6 @@
                     </div>
                 </div>
                 <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-docs-link doc-route="docs.connect-provider">
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Provider setup guide') }}
-                    </x-docs-link>
                     <a href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage underline decoration-brand-sage/35 underline-offset-2 transition hover:text-brand-ink hover:decoration-brand-ink/30">
                         {{ __('Roles & limits') }}
                         <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
@@ -105,24 +101,13 @@
          duplication with one responsive segmented control that works at every
          breakpoint. Wires to the same $tab property. --}}
     <section aria-label="{{ __('Capability filter') }}">
-        <div role="tablist" class="inline-flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
+        <x-server-workspace-tablist :aria-label="__('Capability filter')" scroll class="!mb-0">
             @foreach ($capabilityTabs as $tabItem)
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected="{{ $tab === $tabItem['id'] ? 'true' : 'false' }}"
-                    wire:click="$set('tab', '{{ $tabItem['id'] }}')"
-                    @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                        'bg-brand-ink text-brand-cream shadow-sm' => $tab === $tabItem['id'],
-                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $tab !== $tabItem['id'],
-                    ])
-                >
-                    <x-dynamic-component :component="$tabItem['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <x-server-workspace-tab :icon="$tabItem['icon']" :active="$tab === $tabItem['id']" wire:click="$set('tab', '{{ $tabItem['id'] }}')">
                     {{ $tabItem['label'] }}
-                </button>
+                </x-server-workspace-tab>
             @endforeach
-        </div>
+        </x-server-workspace-tablist>
     </section>
 
     {{-- First-run nudge. When the org has zero credentials anywhere,

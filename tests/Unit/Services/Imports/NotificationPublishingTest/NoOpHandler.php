@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Imports\NotificationPublishingTest;
 
 use App\Models\ImportMigrationStep;
-use App\Services\Imports\StepHandler;
+use App\Modules\Imports\Services\StepHandler;
 
 final class NoOpHandler implements StepHandler
 {

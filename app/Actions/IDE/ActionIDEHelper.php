@@ -75,6 +75,9 @@ class ActionIDEHelper
     /**
      * Generate PhpStorm metadata.
      */
+    /**
+     * @param  array<int, array{class: class-string, name: string, namespace: string, parameters: array<int, array{name: string, type: ?string, optional: bool}>}>  $metadata
+     */
     protected static function generatePhpStormMetadata(array $metadata): string
     {
         $php = "<?php\n\n";
@@ -97,6 +100,9 @@ class ActionIDEHelper
 
     /**
      * Generate VS Code metadata.
+     */
+    /**
+     * @param  array<int, array{class: class-string, name: string, namespace: string, parameters: array<int, array{name: string, type: ?string, optional: bool}>}>  $metadata
      */
     protected static function generateVSCodeMetadata(array $metadata): string
     {

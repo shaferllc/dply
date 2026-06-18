@@ -312,7 +312,7 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed> $item
      */
     private static function sidebarItemVisible(array $item): bool
     {
@@ -331,7 +331,7 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed> $item
      * @return array<string, mixed>
      */
     private static function markPreviewOnly(array $item): array

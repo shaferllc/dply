@@ -9,11 +9,19 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteAccessGate;
 use App\Models\SiteBasicAuthUser;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property SiteType $type
+ * @property ?string $octane_port
+ * @property string $php_fpm_user
+ * @property-read ?Server $server
+ * @property-read ?SiteAccessGate $accessGate
+ * @property-read Collection<int, SiteBasicAuthUser> $basicAuthUsers
  */
 trait GuardsSiteAccess
 {

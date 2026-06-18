@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Support\Servers;
 
 use App\Enums\ServerProvider;
+use App\Jobs\CloneServerOnDigitalOceanJob;
+use App\Jobs\CreateServerImageJob;
+use App\Jobs\RefreshServerPrivateIpJob;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
@@ -15,20 +18,20 @@ use Carbon\Carbon;
 /**
  * Thin capability + dispatch layer for full-disk server images, sitting in front
  * of the per-provider service classes (which share no common interface — see
- * {@see \App\Jobs\RefreshServerPrivateIpJob} for the same match-on-provider idiom).
+ * {@see RefreshServerPrivateIpJob} for the same match-on-provider idiom).
  *
  * DigitalOcean, Hetzner, Vultr, and Linode wrap the image API today; everything
  * else reports unsupported so the Snapshots workspace can render a "not
  * available" state rather than a broken button.
  *
  * `create()` blocks while it polls the provider action to completion — it MUST run
- * inside a queue job ({@see \App\Jobs\CreateServerImageJob}), never in a web request.
+ * inside a queue job ({@see CreateServerImageJob}), never in a web request.
  */
 class ServerImageProvider
 {
     public static function supports(Server $server): bool
     {
-        return $server->provider?->supportsImageSnapshots() ?? false;
+        return $server->provider->supportsImageSnapshots();
     }
 
     /**
@@ -56,7 +59,7 @@ class ServerImageProvider
             ServerProvider::Hetzner => $this->createHetzner(new HetznerService($credential), (int) $providerId, $name, $onTick),
             ServerProvider::Vultr => $this->createVultr(new VultrService($credential), $providerId, $name, $onTick),
             ServerProvider::Linode => $this->createLinode(new LinodeService($credential), (int) $providerId, $name, $onTick),
-            default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
+            default => throw new \RuntimeException('Image snapshots are not supported on '.$server->provider->label().'.'),
         };
     }
 
@@ -72,7 +75,7 @@ class ServerImageProvider
             ServerProvider::Hetzner => (new HetznerService($credential))->deleteImage((int) $providerImageId),
             ServerProvider::Vultr => (new VultrService($credential))->deleteSnapshot($providerImageId),
             ServerProvider::Linode => (new LinodeService($credential))->deleteImage($providerImageId),
-            default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
+            default => throw new \RuntimeException('Image snapshots are not supported on '.$server->provider->label().'.'),
         };
     }
 
@@ -114,7 +117,7 @@ class ServerImageProvider
     {
         $result = $h->createImageFromServer($serverId, $name);
         $actionId = (int) ($result['action']['id'] ?? 0);
-        $imageId = (int) ($result['image_id'] ?? 0);
+        $imageId = (int) ($result['image_id']);
 
         $h->waitForAction($actionId, onTick: function (array $a) use ($onTick): void {
             if ($onTick !== null) {
@@ -217,7 +220,7 @@ class ServerImageProvider
     /**
      * Locate the just-created DO snapshot: by exact name first, then the most
      * recent snapshot whose resource_id matches the source droplet (DO sometimes
-     * suffixes the name). Mirrors {@see \App\Jobs\CloneServerOnDigitalOceanJob}.
+     * suffixes the name). Mirrors {@see CloneServerOnDigitalOceanJob}.
      *
      * @return array<string, mixed>|null
      */
@@ -226,7 +229,7 @@ class ServerImageProvider
         $snapshots = $do->getSnapshots('droplet');
 
         foreach ($snapshots as $snapshot) {
-            if (is_array($snapshot) && (string) ($snapshot['name'] ?? '') === $name) {
+            if (($snapshot) && (string) ($snapshot['name'] ?? '') === $name) {
                 return $snapshot;
             }
         }

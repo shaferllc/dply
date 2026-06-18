@@ -1,4 +1,7 @@
 <div>
+    @if ($qdId)
+        <div wire:poll.1500ms="pollQuickDownload" class="hidden"></div>
+    @endif
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
@@ -232,7 +235,7 @@
                                         <td class="px-4 py-3 text-brand-moss">{{ $database->server?->name ?? '—' }}</td>
                                         <td class="px-4 py-3 text-brand-moss">{{ \Illuminate\Support\Str::title($database->engine) }}</td>
                                         <td class="px-4 py-3 text-right">
-                                            <x-quick-download.database-link :server="$database->server" :database="$database" />
+                                            <x-quick-download.database-link :server="$database->server" :database="$database" :active-key="$qdTargetKey" />
                                         </td>
                                     </tr>
                                 @endforeach

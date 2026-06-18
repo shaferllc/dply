@@ -10,6 +10,15 @@
 return [
     'routes' => [
         [
+            // Activity merged into the Logs page; surface its audit-log doc when
+            // the Activity tab is active. Without the tab param, the Logs page
+            // falls through to its own `server-logs` doc via the nav-key map.
+            'route' => 'servers.logs',
+            'params' => ['tab' => 'activity'],
+            'slug' => 'server-activity',
+            'group' => 'servers',
+        ],
+        [
             'route' => 'edge.index',
             'slug' => 'edge-fleet',
             'group' => 'edge',
@@ -218,6 +227,26 @@ return [
             'route' => 'profile.api-keys',
             'slug' => 'api',
             'group' => 'organization',
+        ],
+        [
+            'route' => 'profile.ssh-keys',
+            'slug' => 'account-ssh-keys',
+            'group' => 'account',
+        ],
+        [
+            'route' => 'profile.security',
+            'slug' => 'account-security',
+            'group' => 'account',
+        ],
+        [
+            'route' => 'profile.backup-configurations',
+            'slug' => 'account-backup-destinations',
+            'group' => 'account',
+        ],
+        [
+            'route' => 'profile.cli',
+            'slug' => 'account-cli',
+            'group' => 'account',
         ],
         [
             'route' => 'projects.index',

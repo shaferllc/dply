@@ -39,6 +39,9 @@ class ViewServerEnvJob implements ShouldBeUnique, ShouldQueue
         public ?string $seededConsoleRunId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'console-action:env_view:'.$this->siteId;
@@ -46,7 +49,7 @@ class ViewServerEnvJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -61,7 +64,7 @@ class ViewServerEnvJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(SiteEnvReader $reader, DotEnvFileParser $parser): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

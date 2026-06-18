@@ -53,7 +53,7 @@ class RuleDesignPattern extends DesignPattern
             || $frame->matches(Validator::class, 'validateRule');
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(RuleDecorator::class, ['action' => $instance]);
     }

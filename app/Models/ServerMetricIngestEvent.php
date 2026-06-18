@@ -15,6 +15,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $server_name
  * @property Carbon $captured_at
  * @property array<string, mixed> $metrics
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ServerMetricIngestEvent extends Model
 {
@@ -30,6 +32,7 @@ class ServerMetricIngestEvent extends Model
     /**
      * @return array<string, string>
      */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

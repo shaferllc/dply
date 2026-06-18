@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Imports\Ploi\PloiClientTest;
 
 use App\Models\ProviderCredential;
-use App\Services\Imports\Ploi\PloiClient;
+use App\Modules\Imports\Services\Ploi\PloiClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;

@@ -7,8 +7,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\ConfigRevisions\ConfigRevisionContext;
-use App\Services\ConfigRevisions\ConfigRevisionRecorder;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionContext;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

@@ -5,6 +5,7 @@ namespace App\Livewire\Concerns;
 use BadMethodCallException;
 use Livewire\Component;
 use ReflectionMethod;
+use ReflectionNamedType;
 
 /**
  * @phpstan-require-extends Component
@@ -41,11 +42,17 @@ trait ConfirmsActionWithModal
         bool $destructive = false,
         ?array $details = null,
     ): void {
-        if (! method_exists($this, $method) || in_array($method, [
+        if (in_array($method, [
             'openConfirmActionModal',
             'closeConfirmActionModal',
             'confirmActionModal',
         ], true)) {
+            throw new BadMethodCallException(sprintf('Confirmation target [%s] is not callable.', $method));
+        }
+
+        try {
+            new ReflectionMethod($this, $method);
+        } catch (\ReflectionException) {
             throw new BadMethodCallException(sprintf('Confirmation target [%s] is not callable.', $method));
         }
 
@@ -78,7 +85,7 @@ trait ConfirmsActionWithModal
 
         $this->closeConfirmActionModal();
 
-        if ($method === '' || ! method_exists($this, $method)) {
+        if ($method === '') {
             throw new BadMethodCallException('No confirmation target is available.');
         }
 
@@ -103,7 +110,7 @@ trait ConfirmsActionWithModal
             }
 
             $type = $parameter->getType();
-            if ($type !== null && ! $type->isBuiltin()) {
+            if ($type instanceof ReflectionNamedType && ! $type->isBuiltin()) {
                 $resolved[] = app()->make($type->getName());
 
                 continue;

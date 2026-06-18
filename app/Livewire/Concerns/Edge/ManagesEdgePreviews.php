@@ -6,7 +6,7 @@ namespace App\Livewire\Concerns\Edge;
 
 use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Jobs\TeardownEdgeSiteJob;
-use App\Livewire\Concerns\ManagesEdgeDeploymentLifecycle;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use Livewire\Component;
 
@@ -18,9 +18,16 @@ use Livewire\Component;
  * @phpstan-require-extends Component
  *
  * @property Site $site
+ * @property string $edge_deploy_commit_sha
+ * @property ?string $edge_deploy_commit_branch
+ * @property ?string $edge_deploy_commit_ref_kind
+ *
+ * @method void openConfirmActionModal(string $method, mixed $arguments = [], string $title = 'Confirm action', string $message = 'Are you sure?', string $confirmLabel = 'Confirm', bool $destructive = false, ?list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}> $details = null)
  */
 trait ManagesEdgePreviews
 {
+    use DispatchesToastNotifications;
+
     public ?string $edge_adhoc_preview_pending_site_id = null;
 
     public function createAdhocEdgePreview(): void
@@ -32,9 +39,7 @@ trait ManagesEdgePreviews
 
         $sha = strtolower(trim($this->edge_deploy_commit_sha));
         if (preg_match('/^[a-f0-9]{7,40}$/', $sha) !== 1) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Pick a commit (or type a 7–40 char SHA) before creating a preview.'));
-            }
+            $this->toastError(__('Pick a commit (or type a 7–40 char SHA) before creating a preview.'));
 
             return;
         }
@@ -60,9 +65,7 @@ trait ManagesEdgePreviews
                 $this->edge_deploy_commit_ref_kind,
             );
         } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -72,9 +75,7 @@ trait ManagesEdgePreviews
         $this->edge_deploy_commit_ref_kind = null;
         $this->edge_adhoc_preview_pending_site_id = (string) $preview->id;
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Preview build queued — the URL stays disabled until the worker is live.'));
-        }
+        $this->toastSuccess(__('Preview build queued — the URL stays disabled until the worker is live.'));
     }
 
     public function adhocPreviewIsPending(): bool
@@ -94,11 +95,9 @@ trait ManagesEdgePreviews
 
         if ($preview->status === Site::STATUS_EDGE_FAILED) {
             $this->edge_adhoc_preview_pending_site_id = null;
-            if (method_exists($this, 'toastError')) {
-                $latest = $preview->edgeDeployments()->latest()->first();
-                $reason = $latest?->failure_reason ?: __('Preview build failed — see deploy log.');
-                $this->toastError($reason);
-            }
+            $latest = $preview->edgeDeployments()->latest()->first();
+            $reason = $latest?->failure_reason ?: __('Preview build failed — see deploy log.');
+            $this->toastError($reason);
 
             return false;
         }
@@ -108,9 +107,7 @@ trait ManagesEdgePreviews
             $publishedAt = $deployment?->published_at;
             if ($publishedAt === null || $publishedAt->diffInSeconds(now()) >= 45) {
                 $this->edge_adhoc_preview_pending_site_id = null;
-                if (method_exists($this, 'toastSuccess')) {
-                    $this->toastSuccess(__('Preview is live — the URL should respond now.'));
-                }
+                $this->toastSuccess(__('Preview is live — the URL should respond now.'));
 
                 return false;
             }
@@ -121,12 +118,6 @@ trait ManagesEdgePreviews
 
     public function confirmTearDownEdgePreview(string $previewSiteId): void
     {
-        if (! method_exists($this, 'openConfirmActionModal')) {
-            $this->tearDownEdgePreview($previewSiteId);
-
-            return;
-        }
-
         $this->openConfirmActionModal(
             'tearDownEdgePreview',
             [$previewSiteId],
@@ -148,18 +139,14 @@ trait ManagesEdgePreviews
         if ($preview === null
             || $preview->organization_id !== $this->site->organization_id
             || ($preview->edgeMeta()['preview_parent_site_id'] ?? null) !== $this->site->id) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Preview not found or not a child of this site.'));
-            }
+            $this->toastError(__('Preview not found or not a child of this site.'));
 
             return;
         }
 
         TeardownEdgeSiteJob::dispatch($preview->id);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $branch = (string) ($preview->edgeMeta()['preview_branch'] ?? '');
-            $this->toastSuccess(__('Preview teardown queued for branch :branch.', ['branch' => $branch]));
-        }
+        $branch = (string) ($preview->edgeMeta()['preview_branch'] ?? '');
+        $this->toastSuccess(__('Preview teardown queued for branch :branch.', ['branch' => $branch]));
     }
 }

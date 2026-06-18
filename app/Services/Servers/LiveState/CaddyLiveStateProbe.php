@@ -214,7 +214,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return list<array<string, mixed>>
      */
     private function buildRouteUnits(array $config): array
@@ -250,7 +250,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $route
+     * @param  array<string, mixed> $route
      * @return list<string>
      */
     private function extractHostMatcher(array $route): array
@@ -269,7 +269,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $route
+     * @param  array<string, mixed> $route
      * @return list<string>
      */
     private function summariseHandlers(array $route): array
@@ -328,7 +328,7 @@ BASH;
 
     /**
      * @param  list<array<string, mixed>>  $existing
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return list<array<string, mixed>>
      */
     private function mergePhpSocketUnits(array $existing, string $phpSocketsRaw, array $config): array
@@ -373,7 +373,7 @@ BASH;
 
     /**
      * @param  array<string, mixed>|null  $existing
-     * @param  array<string, mixed>  $incoming
+     * @param  array<string, mixed> $incoming
      * @return array<string, mixed>
      */
     private function mergeUpstreamRow(?array $existing, array $incoming): array
@@ -434,7 +434,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return list<string>
      */
     private function extractPhpFastcgiFromConfig(array $config): array
@@ -446,8 +446,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>|list<mixed>  $node
-     * @param  list<string>  $found
+     * @param  array<string, mixed> $node
+     * @param  array<string, mixed> $found
      */
     private function walkConfigForPhpUpstreams(array $node, array &$found): void
     {
@@ -472,9 +472,9 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $config
-     * @param  array<string, mixed>  $caInfo
-     * @param  array<string, mixed>  $caList
+     * @param  array<string, mixed> $config
+     * @param  array<string, mixed> $caInfo
+     * @param  array<string, mixed> $caList
      * @return list<array<string, mixed>>
      */
     private function buildCertUnits(array $config, array $caInfo, array $caList, string $issuedCertsRaw): array
@@ -499,7 +499,7 @@ BASH;
             }
         }
 
-        if (is_array($caInfo) && ($caInfo['id'] ?? null) !== null) {
+        if (($caInfo) && ($caInfo['id'] ?? null) !== null) {
             $rows[] = [
                 'kind' => 'local_ca',
                 'name' => (string) ($caInfo['name'] ?? 'local'),
@@ -545,7 +545,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $policy
+     * @param  array<string, mixed> $policy
      */
     private function extractIssuerName(array $policy): string
     {
@@ -563,8 +563,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $config
-     * @param  array<string, string>  $sections
+     * @param  array<string, mixed> $config
+     * @param  array<string, mixed> $sections
      * @return list<array<string, string>>
      */
     private function buildAdminUnits(

@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
- * Pivot model for the cloud_database_site table.
- *
- * Carries a ULID primary key, so it needs HasUlids — a plain Eloquent
- * pivot would not populate the `id` column on insert.
+ * @property string $id
+ *                      Pivot model for the cloud_database_site table.
+ *                      Carries a ULID primary key, so it needs HasUlids — a plain Eloquent
+ *                      pivot would not populate the `id` column on insert.
+ * @property string $env_prefix
  */
 class CloudDatabaseSite extends Pivot
 {

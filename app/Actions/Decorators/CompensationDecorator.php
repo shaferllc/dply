@@ -16,9 +16,10 @@ class CompensationDecorator
 {
     use DecorateActions;
 
+    /** @var array<int, array{action: string, data: mixed, arguments: array<int, mixed>}> */
     protected array $compensationStack = [];
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -32,7 +33,7 @@ class CompensationDecorator
         }
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->callMethod('handle', $arguments);
 
@@ -79,7 +80,7 @@ class CompensationDecorator
     /**
      * Get the compensation stack.
      *
-     * @return array<int, array{action: string, data: mixed, arguments: array}>
+     * @return array<int, array{action: string, data: mixed, arguments: array<int, mixed>}>
      */
     public function getCompensationStack(): array
     {
@@ -97,7 +98,7 @@ class CompensationDecorator
     /**
      * Compensate all actions from a given compensation stack.
      *
-     * @param  array<int, array{action: string, data: mixed, arguments: array}>  $compensationStack
+     * @param  array<int, array{action: string, data: mixed, arguments: array<int, mixed>}>  $compensationStack
      */
     public static function compensateAllFromStack(array $compensationStack): void
     {

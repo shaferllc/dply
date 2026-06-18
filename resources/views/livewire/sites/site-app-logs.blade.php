@@ -7,18 +7,17 @@
         'info' => 'bg-emerald-100 text-emerald-800', 'debug' => 'bg-brand-sand/60 text-brand-moss',
     ];
 @endphp
-<section class="dply-card overflow-hidden">
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-8">
-        <div class="flex items-center gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-200">
-                <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('dply Logs') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('App logs') }}</h3>
-            </div>
-        </div>
-        <div class="flex items-center gap-2">
+<div class="space-y-6">
+    <x-hero-card
+        :eyebrow="__('Logs')"
+        :title="__('App logs')"
+        :description="__('Application log records received from this site via the dply Logs drain.')"
+        icon="document-text"
+    />
+
+    <section class="dply-card overflow-hidden">
+        <div class="flex flex-wrap items-center justify-end gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-8">
+            <div class="flex items-center gap-2">
             <input type="search" wire:model.live.debounce.400ms="search" placeholder="{{ __('Search messages') }}" class="dply-input text-xs" />
             <select wire:model.live="levelFilter" class="dply-input text-xs">
                 @foreach ($levels as $lvl)
@@ -51,4 +50,5 @@
             </div>
         @endif
     @endif
-</section>
+    </section>
+</div>

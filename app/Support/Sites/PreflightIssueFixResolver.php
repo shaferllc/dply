@@ -15,9 +15,9 @@ final class PreflightIssueFixResolver
 {
     /**
      * @param  Collection<int, array{key?: string, level?: string, message?: string}>  $checks
-     * @return Collection<int, array{key: string, level: string, message: string, fix: ?array{label: string, url: string}}>
+     * @return list<array{key: string, level: string, message: string, fix: array{label: string, url: string}|null}>
      */
-    public static function actionableChecks(Site $site, Server $server, Collection $checks): Collection
+    public static function actionableChecks(Site $site, Server $server, Collection $checks): array
     {
         return $checks
             ->filter(fn (array $check): bool => in_array((string) ($check['level'] ?? ''), ['warning', 'error'], true))
@@ -31,7 +31,8 @@ final class PreflightIssueFixResolver
                     'fix' => self::fixFor($site, $server, $key),
                 ];
             })
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
@@ -91,9 +92,7 @@ final class PreflightIssueFixResolver
             ),
             'database' => self::link(__('Open server databases'), route('servers.databases', $server)),
             'scheduler' => self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site])),
-            'queue', 'workers' => $site->usesFunctionsRuntime()
-                ? self::link(__('Open workers'), route('sites.workers', ['server' => $server, 'site' => $site]))
-                : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
+            'queue', 'workers' => self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
             default => self::link(
                 __('Open runtime'),
                 route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']),

@@ -5,7 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\ServerSystemUserNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -125,7 +125,7 @@ trait ManagesSystemUserNotifications
         // Mirror the settings tab: only let someone detach a channel they can manage,
         // so an org member can't remove a team-owned channel's routing.
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
+        if ($channel !== null) {
             Gate::authorize('manageNotificationChannels', $channel->owner);
         }
 

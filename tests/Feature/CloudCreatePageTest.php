@@ -14,7 +14,7 @@ use App\Models\User;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;

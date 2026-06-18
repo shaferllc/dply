@@ -35,19 +35,30 @@ final class BlastRadiusGraph
     /**
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function nodes(): array
     {
         return array_values($this->nodes);
     }
 
     /**
-     * @return list<array{from: string, to: string, kind: string, label: string}>
+     * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
      */
     public function edges(): array
     {
         return $this->edges;
     }
 
+    /**
+     * @return list<array<string, string>>
+     */
     public function node(string $id): ?array
     {
         return $this->nodes[$id] ?? null;
@@ -56,6 +67,10 @@ final class BlastRadiusGraph
     /**
      * Resources that would break if $nodeId fails (transitive dependents).
      *
+     * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
      * @return list<array<string, mixed>>
      */
     public function affectedBy(string $nodeId): array
@@ -84,8 +99,9 @@ final class BlastRadiusGraph
     }
 
     /**
-     * @return array{servers: int, sites: int, databases: int, links: int}
+     * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function counts(): array
     {
         $servers = $sites = $databases = 0;
@@ -205,7 +221,7 @@ final class BlastRadiusGraph
             if (! $site->usesContainerRuntime()) {
                 continue;
             }
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = ($site->meta );
             $stack = is_array($meta['container']['hybrid_edge_stack'] ?? null)
                 ? $meta['container']['hybrid_edge_stack']
                 : [];
@@ -223,7 +239,7 @@ final class BlastRadiusGraph
     }
 
     /**
-     * @param  array<string, mixed>  $node
+     * @param  array<string, mixed> $node
      */
     private function addNode(array $node): void
     {

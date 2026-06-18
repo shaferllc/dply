@@ -47,7 +47,7 @@ class CleanupCustomSiteJob implements ShouldQueue
 
     public function handle(SshConnectionFactory $sshFactory): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             return;
         }

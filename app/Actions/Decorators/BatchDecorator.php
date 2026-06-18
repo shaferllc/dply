@@ -16,11 +16,15 @@ class BatchDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         $batchSize = $this->getBatchSize();
@@ -34,6 +38,11 @@ class BatchDecorator
         return $this->callMethod('handle', $arguments);
     }
 
+    /**
+     * @param  iterable<mixed>  $items
+     * @param  array<int, mixed>  $otherArgs
+     * @return array<int, mixed>
+     */
     protected function processBatched(iterable $items, array $otherArgs, int $batchSize): array
     {
         $results = [];
@@ -44,7 +53,7 @@ class BatchDecorator
 
             if (count($batch) >= $batchSize) {
                 $batchResults = $this->processBatch($batch, $otherArgs);
-                $results = array_merge($results, is_array($batchResults) ? $batchResults : [$batchResults]);
+                $results = array_merge($results, $batchResults);
 
                 $this->onBatchComplete($batch);
 
@@ -55,7 +64,7 @@ class BatchDecorator
         // Process remaining items
         if (! empty($batch)) {
             $batchResults = $this->processBatch($batch, $otherArgs);
-            $results = array_merge($results, is_array($batchResults) ? $batchResults : [$batchResults]);
+            $results = array_merge($results, $batchResults);
 
             $this->onBatchComplete($batch);
         }
@@ -63,6 +72,11 @@ class BatchDecorator
         return $results;
     }
 
+    /**
+     * @param  array<int, mixed>  $batch
+     * @param  array<int, mixed>  $otherArgs
+     * @return array<int, mixed>
+     */
     protected function processBatch(array $batch, array $otherArgs): array
     {
         $results = [];
@@ -74,6 +88,9 @@ class BatchDecorator
         return $results;
     }
 
+    /**
+     * @param  array<int, mixed>  $batch
+     */
     protected function onBatchComplete(array $batch): void
     {
         if ($this->hasMethod('onBatchComplete')) {

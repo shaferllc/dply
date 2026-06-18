@@ -81,7 +81,7 @@ class TailCacheServiceMonitorJob implements ShouldQueue
         $duration = max(self::MIN_DURATION, min(self::HARD_MAX_DURATION, $this->durationSeconds));
         $ttl = $duration + 60;
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         $row = ServerCacheService::query()->find($this->cacheServiceId);
 
         if ($server === null || $row === null) {

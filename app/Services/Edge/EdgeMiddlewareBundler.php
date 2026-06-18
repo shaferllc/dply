@@ -43,6 +43,7 @@ class EdgeMiddlewareBundler
      * @param  callable  $log  fn(string) — appends a line to the build log
      * @return array{bundled: false}|array{bundled: true, source_path: string, modules: array<string, string>, entry_module: string, bytes: int}
      */
+    /** @return array<string, mixed> */
     public function bundle(string $checkoutDir, string $dockerImage, callable $log): array
     {
         $sourcePath = $this->detectSource($checkoutDir);

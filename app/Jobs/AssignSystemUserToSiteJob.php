@@ -38,6 +38,9 @@ class AssignSystemUserToSiteJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 900;
+
     public function uniqueId(): string
     {
         return 'console-action:system_user:'.$this->siteId;
@@ -45,7 +48,7 @@ class AssignSystemUserToSiteJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -60,7 +63,7 @@ class AssignSystemUserToSiteJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerSystemUserService $service): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }
@@ -78,7 +81,7 @@ class AssignSystemUserToSiteJob implements ShouldBeUnique, ShouldQueue
             $this->failConsoleAction($e->getMessage());
 
             // Side-channel for the system-user UI banner — keep behavior parity.
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['system_user_operation'] = [
                 'status' => 'error',
                 'message' => $e->getMessage(),

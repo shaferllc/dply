@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 /**
  * Coming-soon placeholder for the Run surface (saved commands + ad-hoc
@@ -22,8 +22,8 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceRunPreview extends Component
 {
-    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
 
     public Server $server;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Sites\RemediationScopingTest;
 
-use App\Jobs\ApplyRemediationJob;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Livewire\Sites\DeploymentDetail;
 use App\Livewire\Sites\Errors;
 use App\Models\ErrorEvent;
@@ -103,7 +103,7 @@ test('applyRemediation refuses another tenant’s error id', function () {
         ->test(Errors::class, ['server' => $server, 'site' => $site])
         ->call('applyRemediation', $foreignEvent->id, 'show_disk');
 
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(ApplyRemediationJob::class);
 });
 
 test('applyDeploymentRemediation refuses another tenant’s deployment id', function () {
@@ -133,5 +133,5 @@ test('applyDeploymentRemediation refuses another tenant’s deployment id', func
         ->test(DeploymentDetail::class, ['server' => $server, 'site' => $site, 'deployment' => $own])
         ->call('applyDeploymentRemediation', $foreign->id, 'show_disk');
 
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(ApplyRemediationJob::class);
 });

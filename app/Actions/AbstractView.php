@@ -145,7 +145,7 @@ abstract class AbstractView
      * Default implementation passes all arguments.
      *
      * @param  mixed  ...$arguments  The action arguments
-     * @return array Arguments to pass to the Gate
+     * @return array<int, mixed> Arguments to pass to the Gate
      */
     protected function getAuthorizationArguments(...$arguments): array
     {
@@ -172,8 +172,8 @@ abstract class AbstractView
      * Override to add custom audit data.
      *
      * @param  mixed  $result  The action result
-     * @param  array  $arguments  The action arguments
-     * @return array Custom audit data to merge
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Custom audit data to merge
      */
     protected function getAuditData($result, array $arguments): array
     {
@@ -186,7 +186,7 @@ abstract class AbstractView
      * Used by AsWatermarked to add custom metadata to results.
      * Override to add custom watermark data.
      *
-     * @return array Custom watermark data to merge
+     * @return array<string, mixed> Custom watermark data to merge
      */
     protected function getWatermarkData(): array
     {
@@ -201,8 +201,8 @@ abstract class AbstractView
      * Used by AsTracer to add custom attributes to trace spans.
      * Override to add custom trace attributes.
      *
-     * @param  array  $arguments  The action arguments
-     * @return array Custom trace attributes
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Custom trace attributes
      */
     protected function getTraceAttributes(array $arguments): array
     {
@@ -248,7 +248,7 @@ abstract class AbstractView
      * Used by AsTransformer to transform result data structure.
      * Override to customize transformations.
      *
-     * @return array Transformation rules
+     * @return array<string, mixed> Transformation rules
      */
     protected function getTransformations(): array
     {
@@ -262,8 +262,8 @@ abstract class AbstractView
      * Override to customize webhook payload.
      *
      * @param  mixed  $result  The action result
-     * @param  array  $arguments  The action arguments
-     * @return array Webhook payload
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Webhook payload
      */
     protected function getWebhookPayload($result, array $arguments): array
     {
@@ -279,7 +279,7 @@ abstract class AbstractView
      * Override to handle webhook success.
      *
      * @param  Response  $response  The HTTP response
-     * @param  array  $payload  The webhook payload
+     * @param  array<string, mixed>  $payload  The webhook payload
      */
     protected function onWebhookSuccess(Response $response, array $payload): void
     {
@@ -293,7 +293,7 @@ abstract class AbstractView
      * Override to handle webhook failure.
      *
      * @param  \Throwable  $exception  The exception that occurred
-     * @param  array  $payload  The webhook payload
+     * @param  array<string, mixed>  $payload  The webhook payload
      */
     protected function onWebhookFailure(\Throwable $exception, array $payload): void
     {
@@ -307,7 +307,7 @@ abstract class AbstractView
      * Override to customize broadcast channel.
      *
      * @param  mixed  ...$arguments  The action arguments
-     * @return string|array Broadcast channel name(s)
+     * @return string|array<int, string> Broadcast channel name(s)
      */
     protected function getBroadcastChannel(...$arguments): string|array
     {
@@ -353,8 +353,8 @@ abstract class AbstractView
      * Override to customize broadcast payload.
      *
      * @param  mixed  $result  The action result
-     * @param  array  $arguments  The action arguments
-     * @return array Broadcast payload
+     * @param  array<int, mixed>  $arguments  The action arguments
+     * @return array<string, mixed> Broadcast payload
      */
     protected function getBroadcastPayload($result, array $arguments): array
     {
@@ -369,9 +369,9 @@ abstract class AbstractView
      * Helper method that delegates to ArgumentExtractor for consistency.
      * This method is kept for backward compatibility and convenience.
      *
-     * @param  array  $arguments  The variadic arguments array
+     * @param  array<int, mixed>  $arguments  The variadic arguments array
      * @param  string|null  ...$types  Optional type hints for each argument
-     * @return array Extracted arguments
+     * @return array<int, mixed> Extracted arguments
      *
      * @example
      * // Extract resource argument
@@ -446,7 +446,7 @@ abstract class AbstractView
      * Automatically includes action class name and trace information.
      *
      * @param  string  $message  The log message
-     * @param  array  $context  Additional context
+     * @param  array<string, mixed>  $context  Additional context
      */
     protected function logInfo(string $message, array $context = []): void
     {
@@ -463,7 +463,7 @@ abstract class AbstractView
      *
      * @param  string  $message  The log message
      * @param  \Throwable|null  $exception  Optional exception
-     * @param  array  $context  Additional context
+     * @param  array<string, mixed>  $context  Additional context
      */
     protected function logError(string $message, ?\Throwable $exception = null, array $context = []): void
     {
@@ -493,7 +493,7 @@ abstract class AbstractView
      * Note: This is an instance method that wraps ActionMetrics::getMetrics().
      * Use static::getMetrics() for the static method from AsMetrics trait.
      *
-     * @return array Performance metrics
+     * @return array<string, mixed> Performance metrics
      */
     public function getActionMetrics(): array
     {
@@ -562,8 +562,8 @@ abstract class AbstractView
      *
      * @param  mixed  $result  The viewed resource
      * @param  string  $message  Success message
-     * @param  array  $metadata  Additional metadata
-     * @return array Standardized response data
+     * @param  array<string, mixed>  $metadata  Additional metadata
+     * @return array<string, mixed> Standardized response data
      */
     protected function successResponseData($result, string $message = 'Retrieved successfully', array $metadata = []): array
     {
@@ -587,9 +587,9 @@ abstract class AbstractView
      * Use AsResponse concern for HTTP responses.
      *
      * @param  string  $message  Error message
-     * @param  array  $errors  Validation errors or additional error details
+     * @param  array<string, mixed>  $errors  Validation errors or additional error details
      * @param  int  $code  Error code
-     * @return array Standardized error response data
+     * @return array<string, mixed> Standardized error response data
      */
     protected function errorResponseData(string $message, array $errors = [], int $code = 400): array
     {
@@ -622,7 +622,7 @@ abstract class AbstractView
      *
      * Override this method to add conditional execution logic.
      *
-     * @param  array  $arguments  The action arguments
+     * @param  array<int, mixed>  $arguments  The action arguments
      * @return bool Whether action should execute
      */
     protected function shouldExecute(array $arguments): bool
@@ -698,7 +698,7 @@ abstract class AbstractView
      *
      * Helper method to extract the resource (typically first argument).
      *
-     * @param  array  $arguments  The action arguments
+     * @param  array<int, mixed>  $arguments  The action arguments
      * @param  string  $resourceClass  Expected resource class
      * @return mixed The resource being viewed
      */
@@ -715,7 +715,7 @@ abstract class AbstractView
      * Convenience method for eager loading relationships.
      *
      * @param  mixed  $resource  The resource to load relationships on
-     * @param  array|string  $relationships  Relationships to load
+     * @param  array<int, string>|string  $relationships  Relationships to load
      * @return mixed Resource with relationships loaded
      */
     protected function loadRelationships($resource, array|string $relationships)
@@ -733,7 +733,7 @@ abstract class AbstractView
      * Override this method to perform tasks before viewing.
      *
      * @param  mixed  $resource  The resource being viewed
-     * @param  array  $arguments  The action arguments
+     * @param  array<int, mixed>  $arguments  The action arguments
      */
     protected function beforeView($resource, array $arguments): void
     {
@@ -747,7 +747,7 @@ abstract class AbstractView
      * Override this method to perform tasks after viewing.
      *
      * @param  mixed  $result  The view result
-     * @param  array  $arguments  The action arguments
+     * @param  array<int, mixed>  $arguments  The action arguments
      */
     protected function afterView($result, array $arguments): void
     {

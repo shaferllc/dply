@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\DocsAskTest;
 
-use App\Livewire\Docs\Sidebar;
+use App\Modules\Docs\Livewire\Sidebar;
 use App\Models\Organization;
 use App\Models\User;
-use App\Services\Docs\DocsAskService;
+use App\Modules\Docs\Services\DocsAskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Pennant\Feature;

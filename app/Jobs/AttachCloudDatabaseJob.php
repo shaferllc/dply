@@ -42,7 +42,7 @@ class AttachCloudDatabaseJob implements ShouldQueue
     public function handle(): void
     {
         $database = CloudDatabase::query()->find($this->cloudDatabaseId);
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($database === null || $site === null) {
             return;
         }

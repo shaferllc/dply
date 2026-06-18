@@ -40,7 +40,7 @@ class CloudMetricsCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;
@@ -75,16 +75,16 @@ class CloudMetricsCommand extends Command
         }
 
         $this->newLine();
-        $this->line('<fg=cyan>Metrics for</> '.$site->name.' <fg=gray>(window: '.($metrics['window'] ?? $window).')</>');
+        $this->line('<fg=cyan>Metrics for</> '.$site->name.' <fg=gray>(window: '.$metrics['window'].')</>');
 
-        if (! ($metrics['available'] ?? false)) {
+        if (! $metrics['available']) {
             $this->newLine();
-            if (is_string($metrics['note'] ?? null) && $metrics['note'] !== '') {
+            if (isset($metrics['note']) && $metrics['note'] !== '') {
                 $this->line('<fg=yellow>'.$metrics['note'].'</>');
             } else {
                 $this->line('<fg=yellow>Metrics are not available for this site.</>');
             }
-            if (is_string($metrics['url'] ?? null) && $metrics['url'] !== '') {
+            if (isset($metrics['url']) && $metrics['url'] !== '') {
                 $this->newLine();
                 $this->line('View in console:');
                 $this->line($metrics['url']);
@@ -93,7 +93,7 @@ class CloudMetricsCommand extends Command
             return self::SUCCESS;
         }
 
-        $series = is_array($metrics['series'] ?? null) ? $metrics['series'] : [];
+        $series = $metrics['series'];
         if ($series === []) {
             $this->newLine();
             $this->line('<fg=gray>No metric series returned.</>');
@@ -102,8 +102,7 @@ class CloudMetricsCommand extends Command
         }
 
         foreach ($series as $name => $points) {
-            $points = is_array($points) ? $points : [];
-            $values = array_map(static fn ($p): float => (float) ($p['v'] ?? 0), $points);
+            $values = array_map(static fn (array $p): float => (float) $p['v'], $points);
             $this->newLine();
             $this->line('<fg=green>'.strtoupper((string) $name).'</> — '.count($points).' point(s)');
             if ($values !== []) {

@@ -27,8 +27,8 @@ class ServerResourcePreflight
      */
     public function check(Server $server, array $requirements): array
     {
-        $minRam = max(0, (int) ($requirements['min_ram_mb'] ?? 0));
-        $minDisk = max(0, (int) ($requirements['min_disk_mb'] ?? 0));
+        $minRam = max(0, (int) ($requirements['min_ram_mb']));
+        $minDisk = max(0, (int) ($requirements['min_disk_mb']));
 
         // `free -m` line 2 (after header): "Mem: total used free shared buff/cache available".
         // We use the `available` column (col 7) — what Linux can hand out without swapping.

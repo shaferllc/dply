@@ -7,8 +7,8 @@ namespace App\Services\Servers;
 use App\Models\ConfigRevision;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\ConfigRevisions\ConfigRevisionContext;
-use App\Services\ConfigRevisions\ConfigRevisionRecorder;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionContext;
+use App\Modules\ConfigRevisions\Services\ConfigRevisionRecorder;
 
 /**
  * ConfigRevision stream for server-level webserver config files edited in
@@ -30,6 +30,7 @@ final class ServerWebserverConfigEditor
     /**
      * @return array{path: string, engine: string, content: string}
      */
+    /** @return array<string, mixed> */
     public function snapshotFor(string $engine, string $path, string $content): array
     {
         return [

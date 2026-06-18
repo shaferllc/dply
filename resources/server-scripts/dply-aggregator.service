@@ -1,0 +1,29 @@
+[Unit]
+Description=dply Logs aggregator (Vector → ClickHouse)
+Documentation=https://dply.io/docs/logs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+# CH_PASSWORD for the ClickHouse sink is read from the box's own credential file
+# at install time and written here (kept out of the rendered vector.toml + the DB).
+EnvironmentFile=-/etc/dply-aggregator/clickhouse.env
+ExecStart=/usr/local/bin/dply-vector --config /etc/dply-aggregator/vector.toml
+ExecReload=/usr/local/bin/dply-vector validate /etc/dply-aggregator/vector.toml && /bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+# Runs on dply's own dedicated log box (not a customer box), so no CPU/memory
+# ceilings — the aggregator IS the workload here.
+User=root
+
+# --- Hardening ---
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/dply-aggregator
+
+[Install]
+WantedBy=multi-user.target

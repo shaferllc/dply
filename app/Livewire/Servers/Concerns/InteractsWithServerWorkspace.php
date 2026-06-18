@@ -10,13 +10,19 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
+use Livewire\Component;
 use Throwable;
 
+/**
+ * @phpstan-require-extends Component
+ *
+ * @property Server|null $server
+ */
 trait InteractsWithServerWorkspace
 {
     use DispatchesToastNotifications;
 
-    public Server $server;
+    public ?Server $server = null;
 
     protected function bootWorkspace(Server $server): void
     {
@@ -52,6 +58,9 @@ trait InteractsWithServerWorkspace
     protected function kickClusterPollIfStale(int $staleAfterSeconds = 30): void
     {
         $server = $this->server;
+        if ($server === null) {
+            return;
+        }
         if (($server->meta['host_kind'] ?? null) !== Server::HOST_KIND_KUBERNETES) {
             return;
         }
@@ -60,7 +69,8 @@ trait InteractsWithServerWorkspace
             return;
         }
 
-        $lastPolledAt = $server->meta['kubernetes']['last_polled_at'] ?? null;
+        $kubernetes = is_array($server->meta['kubernetes'] ?? null) ? $server->meta['kubernetes'] : [];
+        $lastPolledAt = $kubernetes['last_polled_at'] ?? null;
         if (is_string($lastPolledAt) && $lastPolledAt !== '') {
             try {
                 if (Carbon::parse($lastPolledAt)->isAfter(now()->subSeconds($staleAfterSeconds))) {
@@ -71,7 +81,7 @@ trait InteractsWithServerWorkspace
             }
         }
 
-        $provider = (string) ($server->meta['kubernetes']['provider'] ?? 'digitalocean');
+        $provider = (string) ($kubernetes['provider'] ?? 'digitalocean');
         try {
             if ($provider === 'aws') {
                 PollEksClusterStatusJob::dispatchSync($server);
@@ -100,6 +110,9 @@ trait InteractsWithServerWorkspace
     protected function serverOpsReady(?Server $server = null): bool
     {
         $s = $server ?? $this->server;
+        if ($s === null) {
+            return false;
+        }
 
         return $s->isReady()
             && $s->isVmHost()
@@ -107,9 +120,16 @@ trait InteractsWithServerWorkspace
             && filled($s->ssh_private_key);
     }
 
+    /**
+     * @param  array<string, mixed>|null  $server
+     */
     #[On('server-state-updated')]
     public function onServerStateUpdated(string $organizationId, string $action, ?string $serverId = null, ?array $server = null): void
     {
+        if ($this->server === null) {
+            return;
+        }
+
         if ($this->server->organization_id !== $organizationId) {
             return;
         }
@@ -127,6 +147,10 @@ trait InteractsWithServerWorkspace
 
     public function cancelScheduledServerRemoval(): void
     {
+        if ($this->server === null) {
+            return;
+        }
+
         $this->authorize('delete', $this->server);
         $server = $this->server->fresh();
         if ($server->scheduled_deletion_at === null) {
@@ -155,7 +179,7 @@ trait InteractsWithServerWorkspace
      */
     protected function workspacesForCurrentServerOrg(): Collection
     {
-        if (! $this->server->organization_id) {
+        if ($this->server === null || ! $this->server->organization_id) {
             return collect();
         }
 

@@ -73,7 +73,7 @@ class ActionEvents
      * Dispatch a before execution event.
      *
      * @param  string  $actionClass  Action class name
-     * @param  array  $arguments  Arguments being passed to the action
+     * @param  array<int, mixed>  $arguments  Arguments being passed to the action
      */
     public static function beforeExecution(string $actionClass, array $arguments): void
     {
@@ -89,7 +89,7 @@ class ActionEvents
      *
      * @param  string  $actionClass  Action class name
      * @param  mixed  $result  Result from the action
-     * @param  array  $arguments  Arguments that were passed
+     * @param  array<int, mixed>  $arguments  Arguments that were passed
      */
     public static function afterExecution(string $actionClass, mixed $result, array $arguments): void
     {
@@ -106,7 +106,7 @@ class ActionEvents
      *
      * @param  string  $actionClass  Action class name
      * @param  \Throwable  $exception  Exception that was thrown
-     * @param  array  $arguments  Arguments that were passed
+     * @param  array<int, mixed>  $arguments  Arguments that were passed
      */
     public static function onFailure(string $actionClass, \Throwable $exception, array $arguments): void
     {

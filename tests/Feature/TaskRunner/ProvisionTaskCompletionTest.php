@@ -7,7 +7,7 @@ namespace Tests\Feature\TaskRunner\ProvisionTaskCompletionTest;
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\InstallMetricsAgentJob;
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Jobs\SyncServerSystemUsersJob;
@@ -186,7 +186,7 @@ test('observer persists verification and rollback artifacts for provision run', 
     expect($run->artifacts()->where('type', 'rollback_report')->first())->not->toBeNull();
 });
 test('apply provision outcome sets deploy ssh user when key present', function () {
-    $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+    $keyPath = base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem');
     expect($keyPath)->toBeFile();
 
     $server = Server::factory()->create([
@@ -208,7 +208,7 @@ test('apply provision outcome sets deploy ssh user when key present', function (
     }
 });
 test('apply provision outcome requires operational key before switching to deploy user', function () {
-    $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');
+    $keyPath = base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem');
     expect($keyPath)->toBeFile();
 
     $server = Server::factory()->create([

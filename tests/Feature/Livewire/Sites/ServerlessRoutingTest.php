@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Livewire\Sites\ServerlessRoutingTest;
 
-use App\Http\Middleware\ResolveServerlessCustomDomain;
+use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Livewire\Sites\ServerlessRouting;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Serverless\ServerlessRoutingResolver;
+use App\Modules\Serverless\Services\ServerlessRoutingResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;

@@ -39,38 +39,73 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer>
-        <p>{{ __('Enable visitor maintenance to suspend every eligible VM site at once with a shared public message. Deploy hooks and settings still work. Manually suspended sites are left unchanged and are not auto-resumed when maintenance ends.') }}</p>
-    </x-explainer>
+    {{-- The one shared console-action banner for everything that runs on this
+         page — host-upkeep ops (apt/cleanup/reboot, vhost prune) AND the
+         webserver applies a maintenance toggle queues. Same component every
+         other workspace op uses; no per-page output box. --}}
+    {{-- Bridge poll: a just-queued webserver apply hasn't written its console
+         row yet, so nudge a few re-renders after a toggle until the banner can
+         self-poll. Op/prune rows are seeded synchronously and need no bridge. --}}
+    @if ($watchApply)
+        <div wire:poll.2s="tickApplyWatch" class="hidden" aria-hidden="true"></div>
+    @endif
 
-    @php
-        $maintTabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-        $maintTabOn = 'border-brand-forest text-brand-ink';
-        $maintTabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-    @endphp
-    <div class="mb-6 border-b border-brand-ink/10">
-        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Maintenance sections') }}">
-            <button type="button" wire:click="setMaintenanceTab('window')" @class([$maintTabBase, $maintenance_tab === 'window' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-pause-circle class="h-4 w-4" aria-hidden="true" />
-                {{ __('Visitor window') }}
-                @if ($active)
-                    <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
-                @endif
-            </button>
-            <button type="button" wire:click="setMaintenanceTab('operations')" @class([$maintTabBase, $maintenance_tab === 'operations' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
-                {{ __('Operations') }}
-            </button>
-            <button type="button" wire:click="setMaintenanceTab('schedule')" @class([$maintTabBase, $maintenance_tab === 'schedule' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-calendar-days class="h-4 w-4" aria-hidden="true" />
-                {{ __('Schedule') }}
-            </button>
-            <button type="button" wire:click="setMaintenanceTab('notifications')" @class([$maintTabBase, $maintenance_tab === 'notifications' ? $maintTabOn : $maintTabOff])>
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </button>
-        </nav>
-    </div>
+    @include('livewire.partials.console-action-banner-static', [
+        'run' => $consoleRun,
+        'kindLabels' => $consoleKindLabels,
+    ])
+
+    <x-server-workspace-tablist :aria-label="__('Maintenance sections')">
+        <x-server-workspace-tab icon="heroicon-o-pause-circle" :active="$maintenance_tab === 'window'" wire:click="setMaintenanceTab('window')">
+            {{ __('Visitor window') }}
+            @if ($active)
+                <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
+            @endif
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-wrench-screwdriver" :active="$maintenance_tab === 'operations'" wire:click="setMaintenanceTab('operations')">
+            {{ __('Operations') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-calendar-days" :active="$maintenance_tab === 'schedule'" wire:click="setMaintenanceTab('schedule')">
+            {{ __('Schedule') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab icon="heroicon-o-bell" :active="$maintenance_tab === 'notifications'" wire:click="setMaintenanceTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
+
+    {{-- Webserver apply failures — a maintenance toggle can leave a box's vhost
+         broken if the async apply failed. Surface it loudly with one-click re-apply. --}}
+    @if (! empty($applyFailures))
+        <div class="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
+            <div class="flex items-start gap-3">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-rose-800">{{ __('Webserver config apply failed') }}</p>
+                    <p class="mt-0.5 text-sm text-rose-700">{{ __('The live webserver on these sites may not match their saved state. Re-apply to reconcile.') }}</p>
+                    <ul class="mt-3 space-y-2">
+                        @foreach ($applyFailures as $fail)
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-white/70 px-3 py-2">
+                                <span class="font-medium text-brand-ink">{{ $fail['name'] }}</span>
+                                @if ($fail['at'])
+                                    <span class="text-xs text-rose-700/80">{{ $fail['at']->timezone(config('app.timezone'))->diffForHumans() }}</span>
+                                @endif
+                                <span class="w-full truncate font-mono text-xs text-rose-700/80" title="{{ $fail['error'] }}">{{ \Illuminate\Support\Str::limit($fail['error'], 160) }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="reapplyWebserverConfig('{{ $fail['site_id'] }}')"
+                                    wire:loading.attr="disabled"
+                                    class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
+                                >
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Re-apply') }}
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="space-y-6">
         {{-- Overall (window tab) --}}
@@ -158,7 +193,7 @@
 
         {{-- Related maintenance controls (schedule tab) --}}
         <div @class(['hidden' => $maintenance_tab !== 'schedule'])>
-        <div class="grid gap-6 lg:grid-cols-2">
+        <div>
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
@@ -167,71 +202,114 @@
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Advisory recurring local-time schedule for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Connection.') }}</p>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Advisory only — the days and hours you\'d prefer Dply to run disruptive work (upgrades, reboots, firewall apply, supervisor restarts). Dply warns before risky actions outside it; it doesn\'t pause cron or suspend sites. Times use your Dply timezone.') }}</p>
                     </div>
                 </div>
-                <div class="space-y-3 px-6 py-5 text-sm sm:px-7">
+                <div class="px-6 py-5 sm:px-7">
                     @if ($recurringWindow->enabled())
-                        <p class="font-medium text-brand-ink">{{ $recurringWindow->summary() }}</p>
                         <p @class([
-                            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
+                            'mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
                             $recurringWindow->containsNow() ? $tonePalette['emerald'] : $tonePalette['mist'],
                         ])>
                             @if ($recurringWindow->containsNow())
                                 <x-heroicon-o-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Inside preferred window now') }}
+                                {{ __('Inside preferred window now') }} · {{ $recurringWindow->summary() }}
                             @else
                                 <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Outside preferred window now') }}
+                                {{ __('Outside preferred window now') }} · {{ $recurringWindow->summary() }}
                             @endif
                         </p>
-                    @else
-                        <p class="text-brand-moss">{{ __('Not configured — disruptive actions proceed without a schedule gate.') }}</p>
                     @endif
-                    <a
-                        href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}#settings-maintenance"
-                        wire:navigate
-                        class="inline-flex items-center gap-1 text-xs font-semibold text-brand-moss hover:text-brand-ink"
-                    >
-                        {{ __('Edit in Settings') }}
-                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-                    </a>
-                </div>
-            </section>
 
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cron') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Org cron maintenance') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pauses managed cron lines org-wide during migrations or deploy freezes — separate from visitor suspend.') }}</p>
-                    </div>
-                </div>
-                <div class="space-y-3 px-6 py-5 text-sm sm:px-7">
-                    @if ($cronMaintenanceActive && $cronMaintenanceUntil)
-                        <p class="font-medium text-brand-ink">
-                            {{ __('Active until :time', ['time' => $cronMaintenanceUntil->timezone(config('app.timezone'))->format('Y-m-d H:i T')]) }}
-                        </p>
-                        @if (filled($cronMaintenanceNote))
-                            <p class="text-brand-moss">{{ $cronMaintenanceNote }}</p>
+                    <form wire:submit="savePreferredMaintenanceSchedule" class="space-y-5">
+                        <fieldset @disabled(! $canEditSchedule)>
+                            <legend class="text-sm font-medium text-brand-ink">{{ __('Preferred days') }}</legend>
+                            <div class="mt-2 flex flex-wrap gap-2.5">
+                                @foreach ($maintenanceWeekdays as $key => $label)
+                                    <label class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-sm">
+                                        <input type="checkbox" wire:model="schedule_days" value="{{ $key }}" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage" @disabled(! $canEditSchedule) />
+                                        <span>{{ $label }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <x-input-error :messages="$errors->get('schedule_days')" class="mt-2" />
+                        </fieldset>
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="schedule-start" value="{{ __('Start (local)') }}" />
+                                <input id="schedule-start" type="time" wire:model="schedule_start" @disabled(! $canEditSchedule)
+                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:bg-brand-sand/30" />
+                                <x-input-error :messages="$errors->get('schedule_start')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="schedule-end" value="{{ __('End (local)') }}" />
+                                <input id="schedule-end" type="time" wire:model="schedule_end" @disabled(! $canEditSchedule)
+                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:bg-brand-sand/30" />
+                                <x-input-error :messages="$errors->get('schedule_end')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div>
+                            <x-input-label for="schedule-note" value="{{ __('Note (optional)') }}" />
+                            <textarea id="schedule-note" wire:model="schedule_note" rows="2" maxlength="2000" @disabled(! $canEditSchedule)
+                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:bg-brand-sand/30"
+                                placeholder="{{ __('e.g. Prefer Sundays 02:00–04:00 — low traffic') }}"></textarea>
+                            <x-input-error :messages="$errors->get('schedule_note')" class="mt-2" />
+                        </div>
+                        @if ($canEditSchedule)
+                            <div class="flex justify-end">
+                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="savePreferredMaintenanceSchedule">
+                                    {{ __('Save preferred schedule') }}
+                                </x-primary-button>
+                            </div>
+                        @else
+                            <p class="text-xs text-brand-moss">{{ __('Not configured — disruptive actions proceed without a schedule gate.') }}</p>
                         @endif
-                    @else
-                        <p class="text-brand-moss">{{ __('No org-wide cron pause is active.') }}</p>
-                    @endif
-                    <a
-                        href="{{ route('servers.cron', $server) }}?tab=maintenance"
-                        wire:navigate
-                        class="inline-flex items-center gap-1 text-xs font-semibold text-brand-moss hover:text-brand-ink"
-                    >
-                        {{ __('Manage on Cron') }}
-                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-                    </a>
+                    </form>
                 </div>
             </section>
         </div>
+
+        {{-- Maintenance history --}}
+        <section class="dply-card mt-6 overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Maintenance history') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Recent visitor-maintenance windows on this server — when they started, ended, and how many sites were affected.') }}</p>
+                </div>
+            </div>
+            <div class="px-6 py-5 sm:px-7">
+                @if (empty($maintenanceHistory))
+                    <p class="text-sm text-brand-moss">{{ __('No maintenance windows recorded yet.') }}</p>
+                @else
+                    <ol class="relative space-y-4 border-l border-brand-ink/10 pl-5">
+                        @foreach ($maintenanceHistory as $event)
+                            <li class="relative">
+                                <span @class([
+                                    'absolute -left-[1.42rem] mt-1 inline-flex h-3 w-3 rounded-full ring-4 ring-white',
+                                    $event['ok'] ? 'bg-emerald-500' : 'bg-amber-500',
+                                ])></span>
+                                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                    <span class="text-sm font-semibold text-brand-ink">{{ $event['label'] }}</span>
+                                    <span class="text-xs text-brand-moss" title="{{ $event['at']->timezone(config('app.timezone'))->format('Y-m-d H:i T') }}">
+                                        {{ $event['at']->timezone(config('app.timezone'))->diffForHumans() }}
+                                    </span>
+                                    @if ($event['by'])
+                                        <span class="text-xs text-brand-mist">· {{ $event['by'] }}</span>
+                                    @endif
+                                </div>
+                                @if ($event['detail'])
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ $event['detail'] }}</p>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+            </div>
+        </section>
         </div>
 
         {{-- Site impact (window tab) --}}
@@ -318,17 +396,13 @@
             </div>
 
             <div class="space-y-6 px-6 py-6 sm:px-7">
-                @if ($maintenanceRemoteTaskId)
-                    <x-workspace-console-banner
-                        :status="$bannerStatus"
-                        :message="$maintenanceActionLabel ?? __('Maintenance operation')"
-                        :output="$bannerOutputLines"
-                        :busy="$bannerBusy"
-                        :dismiss-action="$bannerBusy ? null : 'dismissMaintenanceTask'"
-                        :poll-action="$bannerBusy ? 'syncMaintenanceRemoteTaskFromCache' : null"
-                        poll-interval="2s"
-                        :default-expanded="true"
-                    />
+                {{-- Host-upkeep ops render in the shared console-action banner at
+                     the top of the page (same as every other workspace op).
+                     While one is in flight we disable the Run buttons; this poll
+                     re-enables them once the mirrored ConsoleAction reaches a
+                     terminal state. --}}
+                @if ($opBusy)
+                    <div wire:poll.3s class="hidden" aria-hidden="true"></div>
                 @endif
 
                 @if (! $opsReady)
@@ -345,35 +419,76 @@
                 @foreach ($operationGroups as $group)
                     <div wire:key="maint-ops-{{ \Illuminate\Support\Str::slug($group['title']) }}">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __($group['title']) }}</p>
-                        <div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            @foreach ($group['actions'] as $action)
-                                <div wire:key="maint-op-{{ $action['key'] }}" class="flex flex-col rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <p class="text-sm font-semibold text-brand-ink">{{ $action['label'] }}</p>
-                                        @if ($action['danger'])
-                                            <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
-                                        @endif
-                                    </div>
-                                    @if ($action['description'] !== '')
-                                        <p class="mt-1 flex-1 text-xs leading-relaxed text-brand-moss">{{ $action['description'] }}</p>
-                                    @endif
-                                    <button
-                                        type="button"
-                                        wire:click="confirmAction('{{ $action['key'] }}')"
-                                        @disabled(! $opsReady || $bannerBusy)
-                                        @class([
-                                            'mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
-                                            'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50' => $action['danger'],
-                                            'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $action['danger'],
-                                        ])
-                                    >
-                                        {{ __('Run') }}
-                                    </button>
-                                </div>
-                            @endforeach
+                        <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
+                            <table class="w-full table-auto text-sm">
+                                <tbody class="divide-y divide-brand-ink/10">
+                                    @foreach ($group['actions'] as $action)
+                                        <tr wire:key="maint-op-{{ $action['key'] }}" class="align-top">
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-semibold text-brand-ink">{{ $action['label'] }}</span>
+                                                    @if ($action['danger'])
+                                                        <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
+                                                    @endif
+                                                </div>
+                                                @if ($action['description'] !== '')
+                                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $action['description'] }}</p>
+                                                @endif
+                                            </td>
+                                            <td class="w-px whitespace-nowrap px-4 py-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    wire:click="confirmAction('{{ $action['key'] }}')"
+                                                    @disabled(! $opsReady || $opBusy)
+                                                    @class([
+                                                        'inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
+                                                        'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50' => $action['danger'],
+                                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $action['danger'],
+                                                    ])
+                                                >
+                                                    {{ __('Run') }}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 @endforeach
+
+                {{-- Webserver hygiene: sweep orphaned dply vhosts (dply-*.conf
+                     whose owning site is gone). A stale suspended block left by a
+                     site recreate can shadow a live site's vhost and silently keep
+                     it on the maintenance page — this removes them and reloads. --}}
+                <div wire:key="maint-ops-vhost-hygiene">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Webserver hygiene') }}</p>
+                    <div class="mt-2 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
+                        <table class="w-full table-auto text-sm">
+                            <tbody class="divide-y divide-brand-ink/10">
+                                <tr class="align-top">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-brand-ink">{{ __('Prune orphaned vhosts') }}</span>
+                                        </div>
+                                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('Remove dply-managed nginx configs whose site no longer exists, then reload. Fixes a stale block shadowing a live site (e.g. a recreate left it stuck on the maintenance page). Never touches hand-authored configs.') }}</p>
+                                    </td>
+                                    <td class="w-px whitespace-nowrap px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            wire:click="pruneOrphanVhosts"
+                                            wire:loading.attr="disabled"
+                                            @disabled(! $opsReady || $opBusy)
+                                            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {{ __('Scan & prune') }}
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
                 <div class="border-t border-brand-ink/10 pt-5">
                     @livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server], key('recent-actions-log-'.$server->id))
@@ -385,6 +500,8 @@
 
         {{-- Enable / settings form (window tab) --}}
         <div @class(['hidden' => $maintenance_tab !== 'window'])>
+
+
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <x-icon-badge tone="amber">
@@ -404,16 +521,35 @@
             </div>
 
             <form class="space-y-5 p-6 sm:p-7">
-                <div>
+                <div
+                    x-data="{ tz: '' }"
+                    x-init="
+                        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || @js(config('app.timezone'));
+                        $wire.set('maintenance_timezone', tz, false);
+                        if ($refs.until && $refs.until.value) {
+                            const utc = new Date($refs.until.value + 'Z');
+                            if (! isNaN(utc.getTime())) {
+                                const local = new Date(utc.getTime() - utc.getTimezoneOffset() * 60000);
+                                $refs.until.value = local.toISOString().slice(0, 16);
+                            }
+                        }
+                    "
+                >
                     <x-input-label for="maintenance_until_local" :value="__('End automatically at (optional)')" />
                     <input
+                        x-ref="until"
                         id="maintenance_until_local"
                         type="datetime-local"
                         wire:model="maintenance_until_local"
                         @disabled($active)
                         class="mt-1 block w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:bg-brand-sand/30"
                     />
-                    <p class="mt-1.5 text-xs text-brand-moss">{{ __('Times use :tz. Leave empty for a manual clear-only window.', ['tz' => config('app.timezone')]) }}</p>
+                    <p class="mt-1.5 text-xs text-brand-moss">
+                        <span x-text="tz
+                            ? @js(__('Times use your local timezone')) + ' (' + tz + ').'
+                            : @js(__('Times use your local timezone.'))"></span>
+                        {{ __('Leave empty for a manual clear-only window.') }}
+                    </p>
                     <x-input-error :messages="$errors->get('maintenance_until_local')" class="mt-1" />
                 </div>
 

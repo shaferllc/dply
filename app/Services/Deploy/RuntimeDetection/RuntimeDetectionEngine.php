@@ -63,7 +63,7 @@ final class RuntimeDetectionEngine
     }
 
     /**
-     * @param  list<RuntimeDetection>  $detections
+     * @param  array<string, mixed> $detections
      */
     private function pickBest(array $detections): ?RuntimeDetection
     {

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
+use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Services\VultrService;
@@ -33,7 +34,7 @@ class ProvisionVultrServerJob implements ShouldQueue
 
         if ($managed) {
             $platform = ServerHostingPlatformContext::forOrg($this->server->organization);
-            if ($platform->provider !== \App\Enums\ServerProvider::Vultr || ! $platform->configured()) {
+            if ($platform->provider !== ServerProvider::Vultr || ! $platform->configured()) {
                 $this->markFailed('dply-managed servers are not configured for Vultr. Set DPLY_MANAGED_PROVIDER=vultr and DPLY_MANAGED_VULTR_API_TOKEN in the environment.');
 
                 return;

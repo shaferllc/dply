@@ -18,7 +18,7 @@ class ListenerAutoDiscovery
     /**
      * Discover and register all action listeners.
      *
-     * @param  string|array  $paths  Paths to scan for actions (default: app/Actions)
+     * @param  string|array<int, string>|null  $paths  Paths to scan for actions (default: app/Actions)
      * @return array<string, array<int, class-string>> Discovered event-to-listener mappings
      */
     public static function discover(string|array|null $paths = null): array
@@ -73,7 +73,7 @@ class ListenerAutoDiscovery
     /**
      * Discover and register listeners, then register them with Laravel's event system.
      *
-     * @param  string|array  $paths  Paths to scan for actions
+     * @param  string|array<int, string>|null  $paths  Paths to scan for actions
      */
     public static function discoverAndRegister(string|array|null $paths = null): void
     {

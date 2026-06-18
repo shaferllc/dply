@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerSystemUserNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSystemUserNotificationDispatcher;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -44,6 +44,9 @@ class DeleteOrphanSystemUsersJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 900;
+
     public function uniqueId(): string
     {
         return 'console-action:system_user:server:'.$this->serverId;
@@ -51,7 +54,7 @@ class DeleteOrphanSystemUsersJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -68,7 +71,7 @@ class DeleteOrphanSystemUsersJob implements ShouldBeUnique, ShouldQueue
         ServerSystemUserService $service,
         ServerSystemUserNotificationDispatcher $notifications,
     ): void {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             return;
         }
@@ -118,7 +121,7 @@ class DeleteOrphanSystemUsersJob implements ShouldBeUnique, ShouldQueue
                 $server,
                 'removed',
                 $deleted,
-                $this->userId ? User::query()->find($this->userId) : null,
+                $this->userId ? User::find($this->userId) : null,
                 ['skipped' => $skipped, 'orphan_cleanup' => true],
             );
         } catch (\Throwable $e) {

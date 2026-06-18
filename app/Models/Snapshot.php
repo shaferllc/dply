@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\Snapshots\SnapshotService;
+use App\Modules\Snapshots\Services\SnapshotService;
 use Database\Factories\SnapshotFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +14,6 @@ use Illuminate\Support\Carbon;
 /**
  * Database snapshot of a Site's data, taken either manually or as the
  * automatic safety net before a destructive operation.
- *
  * Stored either to local server disk (transient, TTL via expires_at) or
  * to a BYO S3-compatible bucket configured at the org level (durable).
  * The {@see SnapshotService} (added in PR 10)
@@ -33,9 +32,18 @@ use Illuminate\Support\Carbon;
  * @property string|null $error_message
  * @property string|null $taken_by_user_id
  * @property Carbon|null $expires_at
+ * @property string $destination
+ * @property string $engine
+ * @property string $reason
+ * @property string $status
+ * @property-read ?Site $site
+ * @property-read ?User $takenByUser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class Snapshot extends Model
 {
+    /** @use HasFactory<SnapshotFactory> */
     use HasFactory;
 
     protected $table = 'snapshots';
@@ -76,6 +84,7 @@ class Snapshot extends Model
 
     public const REASON_SCHEDULED = 'scheduled';
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -84,11 +93,13 @@ class Snapshot extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function takenByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'taken_by_user_id');

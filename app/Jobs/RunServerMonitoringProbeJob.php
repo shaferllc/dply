@@ -30,6 +30,9 @@ class RunServerMonitoringProbeJob implements ShouldBeUnique, ShouldQueue
         return [10, 30, 60];
     }
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'server-monitoring-probe:'.$this->serverId;
@@ -37,7 +40,7 @@ class RunServerMonitoringProbeJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerMonitoringProbe $probe): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->clearPendingFlag();
 
@@ -55,7 +58,7 @@ class RunServerMonitoringProbeJob implements ShouldBeUnique, ShouldQueue
 
     protected function clearPendingFlag(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }

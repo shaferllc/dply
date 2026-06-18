@@ -33,7 +33,7 @@ trait ManagesPaymentsBindings
     ];
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachPayments(Site $site, array $params): SiteBinding
     {
@@ -67,7 +67,7 @@ trait ManagesPaymentsBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolvePaymentCredentials(Site $site, string $provider, array $params): array
@@ -84,7 +84,7 @@ trait ManagesPaymentsBindings
                 throw new InvalidArgumentException(__('That saved payments credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return match ($provider) {
@@ -104,7 +104,7 @@ trait ManagesPaymentsBindings
         };
     }
 
-    /** @param array<string, string> $creds */
+    /** @param  array<string, mixed> $creds */
     private function validatePaymentCredentials(string $provider, array $creds): void
     {
         match ($provider) {
@@ -119,7 +119,7 @@ trait ManagesPaymentsBindings
     }
 
     /**
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function paymentsEnv(string $provider, array $creds): array
@@ -179,8 +179,8 @@ trait ManagesPaymentsBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSavePaymentCredential(Site $site, string $provider, array $params, array $creds): void
     {

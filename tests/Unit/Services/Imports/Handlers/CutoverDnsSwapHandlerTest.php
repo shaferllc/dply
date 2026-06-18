@@ -12,7 +12,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Imports\Handlers\CutoverDnsSwapHandler;
+use App\Modules\Imports\Services\Handlers\CutoverDnsSwapHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;

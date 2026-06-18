@@ -59,6 +59,7 @@ class ServerProviderCostEstimator
      *
      * @throws ProviderCostUnavailableException when the lookup cannot complete.
      */
+    /** @return array<string, mixed> */
     public function estimate(Server $server): array
     {
         $provider = $server->provider;
@@ -97,6 +98,7 @@ class ServerProviderCostEstimator
     /**
      * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
      */
+    /** @return array<string, mixed> */
     protected function lookupDigitalOcean(Server $server): array
     {
         $sizes = $this->cachedCatalog(
@@ -131,6 +133,7 @@ class ServerProviderCostEstimator
     /**
      * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
      */
+    /** @return array<string, mixed> */
     protected function lookupHetzner(Server $server): array
     {
         $types = $this->cachedCatalog(
@@ -183,6 +186,7 @@ class ServerProviderCostEstimator
     /**
      * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
      */
+    /** @return array<string, mixed> */
     protected function lookupVultr(Server $server): array
     {
         $plans = $this->cachedCatalog(
@@ -233,6 +237,7 @@ class ServerProviderCostEstimator
      *   runtime_hours_year: float,
      * }
      */
+    /** @return array<string, mixed> */
     protected function withRuntimeBreakdown(Server $server, array $base): array
     {
         $fetchedAt = CarbonImmutable::now();
@@ -290,6 +295,7 @@ class ServerProviderCostEstimator
      * @template TResult
      *
      * @param  callable(): TResult  $fetcher
+     * @param  array<string, mixed> $base
      * @return TResult
      */
     protected function cachedCatalog(Server $server, string $tag, callable $fetcher): mixed
@@ -300,7 +306,7 @@ class ServerProviderCostEstimator
     }
 
     /**
-     * @param  array<int, mixed>  $rows
+     * @param  array<string, mixed> $rows
      * @param  callable(array<string, mixed>): bool  $predicate
      * @return array<string, mixed>|null
      */

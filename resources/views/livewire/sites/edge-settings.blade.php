@@ -56,20 +56,18 @@
                 </div>
             @endif
 
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Edge')"
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
-                :show-documentation="false"
-                toolbar
-                flush
                 class="mt-3"
             >
-                <x-slot name="leading">
+                <x-slot:leading>
                     <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                         @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
                     </span>
-                </x-slot>
-            </x-page-header>
+                </x-slot:leading>
+            </x-hero-card>
 
             <main class="min-w-0 space-y-6 mt-8">
                 @include('livewire.sites.partials.edge.guardrail-banner')

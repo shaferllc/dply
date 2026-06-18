@@ -19,7 +19,7 @@ use InvalidArgumentException;
 trait ManagesLoggingBindings
 {
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachLogging(Site $site, array $params): SiteBinding
     {
@@ -66,7 +66,7 @@ trait ManagesLoggingBindings
      * resolve. Secrets the operator left blank on an edit are preserved from the
      * existing binding rather than wiped.
      *
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      * @param  array<string, array<string, string>>  $secrets  [channelName][field] => value
      */
     public function saveLoggingSpec(Site $site, array $spec, array $secrets = []): SiteBinding
@@ -111,9 +111,9 @@ trait ManagesLoggingBindings
      * to the previously-stored value when the operator didn't re-enter it.
      * dply Realtime is special: its endpoint comes from config, not the form.
      *
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      * @param  array<string, array<string, string>>  $secrets
-     * @param  array<string, string>  $existingEnv
+     * @param  array<string, mixed> $existingEnv
      * @return array<string, string>
      */
     private function loggingInjectedEnvFromSpec(array $spec, array $secrets, array $existingEnv, Site $site): array
@@ -154,7 +154,7 @@ trait ManagesLoggingBindings
         return $env;
     }
 
-    /** @param  array<string, mixed>  $spec */
+    /** @param  array<string, mixed> $spec */
     private function loggingSpecLabel(array $spec): string
     {
         $channels = (array) ($spec['channels'] ?? []);
@@ -170,7 +170,7 @@ trait ManagesLoggingBindings
      * Resolve drain credentials: from a saved LogDrainCredential when
      * $params['credential_id'] is set, otherwise from the typed form fields.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolveLogDrainCredentials(Site $site, string $provider, array $params): array
@@ -187,7 +187,7 @@ trait ManagesLoggingBindings
                 throw new InvalidArgumentException(__('That saved log drain credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return match ($provider) {
@@ -206,7 +206,7 @@ trait ManagesLoggingBindings
         };
     }
 
-    /** @param  array<string, string>  $creds */
+    /** @param  array<string, mixed> $creds */
     private function validateLogDrainCredentials(string $provider, array $creds): void
     {
         match ($provider) {
@@ -226,7 +226,7 @@ trait ManagesLoggingBindings
     /**
      * Build the env vars the logging binding injects at deploy.
      *
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function logDrainEnv(string $provider, array $creds): array
@@ -258,7 +258,7 @@ trait ManagesLoggingBindings
         };
     }
 
-    /** @param  array<string, string>  $creds */
+    /** @param  array<string, mixed> $creds */
     private function logDrainLabel(string $provider, array $creds): string
     {
         return match ($provider) {
@@ -275,8 +275,8 @@ trait ManagesLoggingBindings
      * operator ticked "save for reuse". No-op when reusing a saved credential
      * or when the provider supplies no user credentials (dply_realtime).
      *
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSaveLogDrainCredential(Site $site, string $provider, array $params, array $creds): void
     {

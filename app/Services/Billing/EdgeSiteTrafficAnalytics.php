@@ -85,10 +85,6 @@ final class EdgeSiteTrafficAnalytics
         $peak = null;
 
         foreach ($daily as $day) {
-            if (! is_array($day)) {
-                continue;
-            }
-
             if ($peak === null || (int) ($day['requests'] ?? 0) > (int) ($peak['requests'] ?? 0)) {
                 $peak = $day;
             }

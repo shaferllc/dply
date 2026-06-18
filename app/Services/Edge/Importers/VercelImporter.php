@@ -36,6 +36,8 @@ class VercelImporter implements EdgeImporter
         return 'Vercel';
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function probe(): array
     {
         $response = $this->http()->get(self::BASE.'/v2/user');
@@ -56,6 +58,10 @@ class VercelImporter implements EdgeImporter
         ];
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string|null>>
+     */
     public function listProjects(): array
     {
         $params = ['limit' => 100];
@@ -159,7 +165,7 @@ class VercelImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $link
+     * @param  array<string, mixed> $link
      */
     private function repoFromLink(array $link): ?string
     {
@@ -180,7 +186,7 @@ class VercelImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed> $project
      */
     private function liveUrlFromProject(array $project): ?string
     {

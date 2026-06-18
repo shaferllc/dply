@@ -549,6 +549,7 @@
                         <x-input-label for="binding_storage_bucket" :value="__('New bucket name')" />
                         <x-text-input id="binding_storage_bucket" wire:model="bindingForm.bucket" class="mt-1 block w-full font-mono text-sm" placeholder="my-app-assets" />
                     </div>
+                    @include('livewire.sites.settings.partials.environment.storage-disk-field')
                     @if ($osApiMode)
                         @if (count($osCloudCreds) > 1)
                             <div class="sm:col-span-2">
@@ -597,6 +598,7 @@
                         <x-input-label for="binding_storage_bucket" :value="__('Bucket')" />
                         <x-text-input id="binding_storage_bucket" wire:model="bindingForm.bucket" class="mt-1 block w-full font-mono text-sm" placeholder="my-app-assets" />
                     </div>
+                    @include('livewire.sites.settings.partials.environment.storage-disk-field')
                     @include('livewire.sites.settings.partials.environment.storage-credential-fields')
                     <div>
                         <x-input-label for="binding_storage_region" :value="$osIsCustom ? __('Region (optional)') : __('Region')" />
@@ -626,7 +628,7 @@
                 @elseif ($osIsCustom)
                     <p class="text-xs text-brand-moss">{{ __('Custom S3 storage needs the endpoint of your provider (path-style or virtual-hosted).') }}</p>
                 @endif
-                <p class="text-xs text-brand-moss">{{ __('Injects FILESYSTEM_DISK=s3 and the AWS_* connection variables at deploy.') }}</p>
+                <p class="text-xs text-brand-moss">{{ __('Injects the AWS_* connection variables at deploy (FILESYSTEM_DISK=s3 for the default disk; namespaced AWS_<DISK>_* for additional disks).') }}</p>
             @elseif ($bindingModalType === 'logging')
                 @php $logProvider = (string) ($bindingForm['provider'] ?? 'papertrail'); @endphp
                 <div class="space-y-4">
@@ -877,6 +879,19 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- One-click: also point cache, sessions, and the queue at
+                             this Redis. Creates the cache/queue/session driver
+                             bindings (redis) so the app uses Redis everywhere
+                             without three more trips through the modal. Existing
+                             driver bindings are preserved server-side. --}}
+                        <label class="mt-4 flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 text-xs text-brand-moss">
+                            <input type="checkbox" wire:model="bindingForm.use_for_drivers" class="mt-0.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                            <span>
+                                <span class="block text-sm font-medium text-brand-ink">{{ __('Use Redis for cache, sessions, and the queue') }}</span>
+                                {{ __('Sets CACHE_STORE, SESSION_DRIVER, and QUEUE_CONNECTION to redis. Cache/session/queue you\'ve already configured are left untouched — repoint each one anytime.') }}
+                            </span>
+                        </label>
                     @endif
                 </div>
             @elseif ($bindingModalType === 'mail')
@@ -1168,7 +1183,7 @@
         <div class="flex items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="button" wire:click="saveBinding" wire:loading.attr="disabled" wire:target="saveBinding">
-                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach')) }}</span>
+                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalType === 'redis' && $bindingTargets === [] ? __('Install & connect') : ($bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach'))) }}</span>
                 <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>

@@ -22,8 +22,45 @@
                 <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">{{ session('settings_status') }}</div>
             @endif
 
+            {{-- Hero: the shared header used across the app. --}}
+            <x-hero-card
+                :eyebrow="__('Organization')"
+                :title="__('General settings')"
+                :description="__('Update this organization\'s name, contact email, time zone, and branding. Changes apply across the dashboard for everyone with access.')"
+                icon="cog-6-tooth"
+                iconSize="md"
+            >
+                <x-outline-link href="{{ route('organizations.show', $organization) }}" wire:navigate>
+                    <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Organization overview') }}
+                </x-outline-link>
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</dt>
+                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Members') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('With access') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created') }}</dt>
+                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">{{ $organization->created_at?->format('M j, Y') ?? '—' }}</dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->created_at?->diffForHumans() ?? '' }}</p>
+                        </div>
+                    </dl>
+                </x-slot:stats>
+            </x-hero-card>
+
             {{-- Icon / branding --}}
-            <section class="dply-card overflow-hidden">
+            <section class="dply-card overflow-hidden mt-6">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge tone="gold">
                         <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\DelayedDeployTest;
 
+use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\ScheduledDeploy;
@@ -94,7 +95,7 @@ test('a due deploy for a non-VM host is consumed but not dispatched', function (
 
 test('scheduling a deploy creates one pending row and replaces an earlier one', function () {
     $site = vmSite();
-    $action = app(\App\Actions\Sites\ScheduleSiteDeploy::class);
+    $action = app(ScheduleSiteDeploy::class);
 
     $first = $action->schedule($site, '60', null);
     $second = $action->schedule($site, '15', null);
@@ -107,7 +108,7 @@ test('scheduling a deploy creates one pending row and replaces an earlier one', 
 
 test('scheduling rejects a non-future time', function () {
     $site = vmSite();
-    $action = app(\App\Actions\Sites\ScheduleSiteDeploy::class);
+    $action = app(ScheduleSiteDeploy::class);
 
     expect($action->schedule($site, '0', null))->toBeNull();
     expect($action->schedule($site, now()->subHour()->toDateTimeString(), null))->toBeNull();
@@ -115,7 +116,7 @@ test('scheduling rejects a non-future time', function () {
 });
 
 test('parseWhen handles minute presets, absolute datetimes, and junk', function () {
-    $action = app(\App\Actions\Sites\ScheduleSiteDeploy::class);
+    $action = app(ScheduleSiteDeploy::class);
 
     expect($action->parseWhen('30')->between(now()->addMinutes(29), now()->addMinutes(31)))->toBeTrue();
     expect($action->parseWhen(now()->addDay()->toDateTimeString())->isFuture())->toBeTrue();
@@ -125,7 +126,7 @@ test('parseWhen handles minute presets, absolute datetimes, and junk', function 
 
 test('canceling clears the pending delayed deploy', function () {
     $site = vmSite();
-    $action = app(\App\Actions\Sites\ScheduleSiteDeploy::class);
+    $action = app(ScheduleSiteDeploy::class);
     $action->schedule($site, '60', null);
 
     $action->cancelPending($site);

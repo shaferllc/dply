@@ -20,51 +20,45 @@
     @endpush
 
     {{-- Hero: positioning + at-a-glance referral stats. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-gift class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Rewards') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Referrals') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            @if ($bonusCreditCents > 0)
-                                {{ __('Share your link. When someone signs up and their organization pays for a Pro plan, you get :amount in account credit on your next invoice (:desc).', [
-                                    'amount' => '$'.number_format($bonusCreditCents / 100, 2),
-                                    'desc' => $bonusDescription !== '' ? $bonusDescription : __('applied automatically in Stripe'),
-                                ]) }}
-                            @else
-                                {{ __('Share your link. When someone signs up and their organization pays for a Pro plan, we record the referral in your account.') }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Back to profile') }}
-                    </x-outline-link>
-                    <button
-                        type="button"
-                        x-data="{ copied: false }"
-                        x-on:click="navigator.clipboard.writeText(@js($referralUrl)); copied = true; clearTimeout(window._refCopyT); window._refCopyT = setTimeout(() => copied = false, 2000)"
-                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                    >
-                        <span x-show="!copied" class="inline-flex items-center gap-2">
-                            <x-heroicon-o-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Copy referral link') }}
-                        </span>
-                        <span x-show="copied" x-cloak class="inline-flex items-center gap-2">
-                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Copied') }}
-                        </span>
-                    </button>
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Rewards')"
+        :title="__('Referrals')"
+        icon="gift"
+        iconSize="md"
+    >
+        <x-slot:description>
+            @if ($bonusCreditCents > 0)
+                {{ __('Share your link. When someone signs up and their organization pays for a Pro plan, you get :amount in account credit on your next invoice (:desc).', [
+                    'amount' => '$'.number_format($bonusCreditCents / 100, 2),
+                    'desc' => $bonusDescription !== '' ? $bonusDescription : __('applied automatically in Stripe'),
+                ]) }}
+            @else
+                {{ __('Share your link. When someone signs up and their organization pays for a Pro plan, we record the referral in your account.') }}
+            @endif
+        </x-slot:description>
+
+        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Back to profile') }}
+        </x-outline-link>
+        <button
+            type="button"
+            x-data="{ copied: false }"
+            x-on:click="navigator.clipboard.writeText(@js($referralUrl)); copied = true; clearTimeout(window._refCopyT); window._refCopyT = setTimeout(() => copied = false, 2000)"
+            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+        >
+            <span x-show="!copied" class="inline-flex items-center gap-2">
+                <x-heroicon-o-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Copy referral link') }}
+            </span>
+            <span x-show="copied" x-cloak class="inline-flex items-center gap-2">
+                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Copied') }}
+            </span>
+        </button>
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Referred') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -98,8 +92,8 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Awaiting Pro') }}</p>
                 </div>
             </dl>
-        </div>
-    </section>
+        </x-slot:stats>
+    </x-hero-card>
 
     <div class="mt-6 space-y-6">
         {{-- Referral link --}}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Jobs\PreflightSiteSetupJob;
 use App\Models\Site;
 use App\Services\SshConnection;
 use Symfony\Component\Process\Process;
@@ -43,6 +44,7 @@ class SiteEnvRequirementScanner
      *     keys: list<array{key: string, sources: list<string>, required: bool, example: ?string}>
      * }
      */
+    /** @return array<string, mixed> */
     public function scan(Site $site): array
     {
         $server = $site->server;
@@ -66,7 +68,7 @@ class SiteEnvRequirementScanner
     /**
      * Pre-flight variant: scan a repository checkout that lives in a LOCAL
      * directory on this worker (e.g. the ephemeral temp clone the
-     * {@see \App\Jobs\PreflightSiteSetupJob} makes before the first deploy
+     * {@see PreflightSiteSetupJob} makes before the first deploy
      * exists on the box). The detection script is plain bash/grep, so we run
      * the exact same program locally via Process instead of over SSH — same
      * markers, same parser, identical result shape to {@see scan()}.
@@ -78,6 +80,7 @@ class SiteEnvRequirementScanner
      *     keys: list<array{key: string, sources: list<string>, required: bool, example: ?string}>
      * }
      */
+    /** @return array<string, mixed> */
     public function scanLocalPath(string $root): array
     {
         $root = rtrim($root, '/');

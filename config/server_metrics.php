@@ -34,7 +34,7 @@ return [
     'guest_script' => [
         'relative_path' => '.dply/bin/server-metrics-snapshot.py',
         'auto_upgrade_on_collect' => (bool) env('DPLY_METRICS_GUEST_SCRIPT_AUTO_UPGRADE', true),
-        'upgrade_queue' => env('SERVER_METRICS_GUEST_SCRIPT_UPGRADE_QUEUE'),
+        'upgrade_queue' => env('SERVER_METRICS_GUEST_SCRIPT_UPGRADE_QUEUE', 'dply'),
     ],
 
     /*
@@ -53,7 +53,7 @@ return [
 
     'guest_push' => [
         'enabled' => (bool) env('DPLY_METRICS_GUEST_PUSH_ENABLED', true),
-        'deploy_queue' => env('SERVER_METRICS_GUEST_PUSH_DEPLOY_QUEUE'),
+        'deploy_queue' => env('SERVER_METRICS_GUEST_PUSH_DEPLOY_QUEUE', 'dply'),
 
         /** Five-field cron expression for the guest user crontab (path uses $HOME). */
         'cron_expression' => env('DPLY_METRICS_GUEST_PUSH_CRON', '* * * * *'),
@@ -121,7 +121,14 @@ return [
     */
 
     'probe' => [
-        'queue' => env('SERVER_METRICS_PROBE_QUEUE'),
+        'queue' => env('SERVER_METRICS_PROBE_QUEUE', 'dply'),
+        // How long the "probe pending" banner may persist before it's treated as
+        // stale and auto-released so the page can re-dispatch. A probe normally
+        // finishes in a few seconds; a much longer wedge means the job was killed
+        // mid-flight (e.g. a deploy restarted Horizon) and never ran its
+        // pending-clear. Keep this short so a killed probe self-heals fast
+        // instead of spinning "still running" for many minutes.
+        'stale_pending_seconds' => max(30, (int) env('SERVER_METRICS_PROBE_STALE_PENDING', 120)),
     ],
 
     /*
@@ -154,7 +161,7 @@ return [
 
         'timeout' => (int) env('DPLY_METRICS_INGEST_TIMEOUT', 15),
 
-        'queue' => env('SERVER_METRICS_INGEST_QUEUE'),
+        'queue' => env('SERVER_METRICS_INGEST_QUEUE', 'dply'),
     ],
 
 ];

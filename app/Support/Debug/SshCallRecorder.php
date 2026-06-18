@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Support\Debug;
 
+use App\Services\SshConnection;
+
 /**
  * Request-scoped, in-memory log of every phpseclib SSH call made by
- * {@see \App\Services\SshConnection} during the current web request.
+ * {@see SshConnection} during the current web request.
  *
  * Only bound in the container when Debugbar is enabled (web/dev), so the
  * accumulator never grows unbounded inside long-lived queue workers — where

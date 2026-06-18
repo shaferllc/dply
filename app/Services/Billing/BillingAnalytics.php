@@ -9,6 +9,7 @@ use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\OrganizationBillingSnapshot;
 use App\Models\Server;
+use App\Models\Subscription;
 use App\Models\Site;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -25,7 +26,6 @@ final class BillingAnalytics
 {
     public function __construct(
         private readonly OrganizationBillingStateComputer $billingStateComputer,
-        private readonly EdgeOrganizationUsageReader $edgeUsageReader,
         private readonly EdgeSiteBillingAnalytics $edgeSiteBillingAnalytics,
         private readonly BillingForecastCalculator $forecastCalculator,
         private readonly OrganizationCostObservatory $costObservatory,
@@ -67,6 +67,8 @@ final class BillingAnalytics
         $monthlyCents = $state->monthlyTotalCents;
         $annualPct = (int) config('subscription.standard.annual_discount_pct', 20);
         $yearlyCents = (int) round($monthlyCents * 12 * (100 - $annualPct) / 100);
+        /** @var Subscription|null $defaultSubscription */
+        $defaultSubscription = $organization->subscription('default');
 
         return [
             'monthly_total_cents' => $monthlyCents,
@@ -77,8 +79,8 @@ final class BillingAnalytics
             'trial_days_left' => $organization->trial_ends_at
                 ? max(0, (int) ceil(now()->diffInDays($organization->trial_ends_at, false)))
                 : 0,
-            'subscribed' => $organization->subscription('default')?->valid() ?? false,
-            'stripe_status' => $organization->subscription('default')?->stripe_status,
+            'subscribed' => $defaultSubscription?->valid() ?? false,
+            'stripe_status' => $defaultSubscription?->stripe_status,
             'next_invoice_at' => $this->nextInvoiceAt($organization)?->toDateString(),
             'server_count' => $state->serverCount(),
             'serverless_count' => $state->serverlessCount,
@@ -356,7 +358,7 @@ final class BillingAnalytics
             ->get(['snapshot_date', 'monthly_total_cents', 'edge_usage_cents']);
 
         $points = $rows->map(function (OrganizationBillingSnapshot $snapshot): array {
-            $date = $snapshot->snapshot_date?->toDateString() ?? now()->toDateString();
+            $date = $snapshot->snapshot_date->toDateString();
 
             return [
                 'date' => $date,
@@ -367,7 +369,7 @@ final class BillingAnalytics
         })->values()->all();
 
         return [
-            'series_30' => array_values(array_slice($points, -30)),
+            'series_30' => array_slice($points, -30),
             'series_90' => $points,
         ];
     }
@@ -407,10 +409,10 @@ final class BillingAnalytics
             ->limit(15)
             ->get(['trigger', 'status', 'changes', 'monthly_total_cents', 'error_message', 'created_at'])
             ->map(function (BillingSubscriptionSyncEvent $event): array {
-                $changes = is_array($event->changes) ? $event->changes : [];
+                $changes = ($event->changes );
 
                 return [
-                    'created_at' => $event->created_at?->toDateTimeString() ?? '',
+                    'created_at' => $event->created_at->toDateTimeString(),
                     'trigger' => (string) $event->trigger,
                     'status' => (string) $event->status,
                     'monthly_total_cents' => (int) $event->monthly_total_cents,
@@ -450,10 +452,12 @@ final class BillingAnalytics
         }
 
         return $invoices->map(function (Invoice $invoice): array {
+            $stripeInvoice = $invoice->asStripeInvoice();
+
             return [
-                'id' => (string) $invoice->asStripeInvoice()->id,
-                'number' => $invoice->number(),
-                'date' => $invoice->date()?->toDateString() ?? '',
+                'id' => (string) $stripeInvoice->id,
+                'number' => is_string($stripeInvoice->number) ? $stripeInvoice->number : null,
+                'date' => $invoice->date()->toDateString(),
                 'total_cents' => (int) $invoice->rawTotal(),
                 'status' => (string) ($invoice->asStripeInvoice()->status ?? 'unknown'),
                 'paid' => $invoice->asStripeInvoice()->paid ?? false,
@@ -541,12 +545,12 @@ final class BillingAnalytics
             ->all();
     }
 
-    /**
-     * @return Collection<int, Server>
-     */
     /** @var array<string, Collection<int, Server>> */
     private array $billableServersCache = [];
 
+    /**
+     * @return Collection<int, Server>
+     */
     private function billableServers(Organization $organization): Collection
     {
         // Memoized per org: billableServersList() and excludedServers() both
@@ -590,7 +594,7 @@ final class BillingAnalytics
                         default => __('Billed as managed product'),
                     },
                     $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
-                    $server->created_at !== null && $server->created_at->gt($cutoff) => __('Under the :days-day billable threshold', ['days' => $minAge]),
+                    $server->created_at->gt($cutoff) => __('Under the :days-day billable threshold', ['days' => $minAge]),
                     default => __('Excluded'),
                 };
 
@@ -604,6 +608,7 @@ final class BillingAnalytics
      */
     private function subscriptionSnapshot(Organization $organization): array
     {
+        /** @var Subscription|null $subscription */
         $subscription = $organization->subscription('default');
 
         if ($subscription === null) {
@@ -615,6 +620,7 @@ final class BillingAnalytics
 
         $items = [];
         foreach ($subscription->items as $item) {
+            /** @var \App\Models\SubscriptionItem $item */
             $items[] = [
                 'price_id' => $item->stripe_price,
                 'quantity' => (int) $item->quantity,
@@ -673,7 +679,7 @@ final class BillingAnalytics
     }
 
     /**
-     * @param  array<string, mixed>  $estimate
+     * @param  array<string, mixed> $estimate
      */
     private function formatEdgeUsageDetail(array $estimate): ?string
     {

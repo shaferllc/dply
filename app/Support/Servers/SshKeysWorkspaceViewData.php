@@ -67,7 +67,7 @@ final class SshKeysWorkspaceViewData
 
         $bannerBusy = ($bannerKind === 'sync' && $syncBusy) || ($bannerKind === 'drift' && $driftBusy);
         $bannerOutput = match ($bannerKind) {
-            'sync' => $syncShowBanner ? $component->syncOutputLines : [],
+            'sync' => $syncShowBanner ? $component->getSyncOutputLinesProperty() : [],
             'drift' => $component->diff_output,
             'panel' => $component->panel_event_lines,
             default => [],

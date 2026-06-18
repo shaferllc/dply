@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Livewire\Roadmap\Index as RoadmapIndex;
+use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
 use App\Models\RoadmapItem;
 use App\Models\RoadmapSuggestion;
 use Illuminate\Foundation\Testing\RefreshDatabase;

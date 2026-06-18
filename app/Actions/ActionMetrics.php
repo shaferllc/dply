@@ -114,7 +114,7 @@ class ActionMetrics
      * Get the slowest actions.
      *
      * @param  int  $limit  Number of actions to return
-     * @return Collection<array> Actions sorted by average duration
+     * @return Collection<int, array<string, mixed>> Actions sorted by average duration
      */
     public static function getSlowestActions(int $limit = 10): Collection
     {
@@ -139,7 +139,7 @@ class ActionMetrics
      * Get the most called actions.
      *
      * @param  int  $limit  Number of actions to return
-     * @return Collection<array> Actions sorted by call count
+     * @return Collection<int, array<string, mixed>> Actions sorted by call count
      */
     public static function getMostCalledActions(int $limit = 10): Collection
     {
@@ -164,7 +164,7 @@ class ActionMetrics
      * Get actions with highest failure rate.
      *
      * @param  int  $limit  Number of actions to return
-     * @return Collection<array> Actions sorted by failure rate
+     * @return Collection<int, array<string, mixed>> Actions sorted by failure rate
      */
     public static function getHighestFailureRate(int $limit = 10): Collection
     {

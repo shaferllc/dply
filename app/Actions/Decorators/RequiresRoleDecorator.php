@@ -35,7 +35,7 @@ class RequiresRoleDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -91,7 +91,7 @@ class RequiresRoleDecorator
     }
 
     /**
-     * Get the team from arguments or current team.
+     * @param  array<int, mixed>  $arguments
      */
     protected function getTeam(array $arguments): ?Team
     {
@@ -112,7 +112,8 @@ class RequiresRoleDecorator
     }
 
     /**
-     * Get required roles from action.
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, string>
      */
     protected function getRequiredRoles(array $arguments): array
     {
@@ -126,7 +127,7 @@ class RequiresRoleDecorator
     }
 
     /**
-     * Check if user has required role(s).
+     * @param  array<int, string>  $requiredRoles
      */
     protected function userHasRequiredRole(User $user, Team $team, array $requiredRoles): bool
     {

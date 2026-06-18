@@ -31,22 +31,6 @@
         </p>
     @endif
 
-    <x-explainer>
-        <p>{{ __('"Run now" creates a pending backup row and queues the export job — progress shows up in the lists below as the job completes. Schedules add a managed cron entry that fires the same job on the cadence you set.') }}</p>
-        <p class="mt-2">
-            <span class="font-semibold text-brand-ink">{{ __('Backups vs Snapshots:') }}</span>
-            {{ __('Backups are logical exports — a single database or a site\'s files — sent to storage you own and restored by importing. They\'re small, granular, and portable. For a full point-in-time capture of the whole machine (disk image, volumes, cache state) that you roll the server back to, use') }}
-            <a href="{{ route('servers.snapshots', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Snapshots') }}</a>{{ __(' instead — those are heavier and billed on your cloud account.') }}
-        </p>
-        @if ($backupConfigurations->isEmpty())
-            <p class="mt-2">
-                {{ __('No backup destinations yet. Add an S3 bucket / Dropbox / Google Drive / SFTP target to send backups somewhere you own — ') }}
-                <button type="button" wire:click="openDestinationModal" class="font-semibold text-brand-ink underline hover:no-underline">{{ __('add one now') }}</button>{{ __('.') }}
-            </p>
-        @endif
-        <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
-    </x-explainer>
-
     {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -151,15 +135,51 @@
 
     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setBackupsWorkspaceTab">
 
+    {{-- One-shot guard-jump: while a run launched THIS session is in flight,
+         poll for its terminal transition so pollBackupRun() can jump us to
+         History (only if still on the originating tab). --}}
+    @if ($watchedBackupRunId)
+        <div wire:poll.2s="pollBackupRun" class="hidden" aria-hidden="true"></div>
+    @endif
+
     @if ($backups_workspace_tab === 'overview')
     <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="space-y-6">
-    {{-- Quick download: live-stream a fresh dump/archive straight off the box (no S3).
+    {{-- On-demand backup progress (database + site files) streams here. The
+         banner derives from the latest non-dismissed backup console run, so it
+         rehydrates across reload and is visible to anyone watching this server. --}}
+    @if ($backupConsoleRun)
+        @include('livewire.partials.console-action-banner-static', [
+            'run' => $backupConsoleRun,
+            'kindLabels' => (array) config('console_actions.kinds', []),
+        ])
+    @endif
+    {{-- Quick download: queue a fresh dump/archive built on the box, staged to our
+         download bucket for 4h, and grabbed once when ready (notify in-app + email).
          detectLiveDatabases() (wire:init) surfaces databases dply never catalogued. --}}
+    @if ($qdId)
+        <div wire:poll.1500ms="pollQuickDownload" class="hidden"></div>
+    @endif
     @php
         $registeredDbNames = $databases->pluck('name')->all();
         $adHocDbTargets = collect($liveDbDumpTargets)->reject(fn ($t) => in_array($t['name'], $registeredDbNames, true))->values();
     @endphp
-    <section class="dply-card overflow-hidden" wire:init="detectLiveDatabases">
+    {{-- Run a backup — one surface, two modes: Save a backup (durable, retained,
+         restorable, to your destination) vs Download now (ephemeral quick download
+         straight to the browser, no S3). They share the "run a backup now" intent
+         but differ in what happens to the artifact, so they're one group + toggle. --}}
+    <div x-data="{ runMode: 'save' }" class="space-y-6">
+        <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
+            <button type="button" x-on:click="runMode = 'save'" :class="runMode === 'save' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
+                <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Save a backup') }}
+            </button>
+            <button type="button" x-on:click="runMode = 'download'" :class="runMode === 'download' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
+                <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Download now') }}
+            </button>
+        </div>
+
+    <section x-show="runMode === 'download'" x-cloak class="dply-card overflow-hidden" wire:init="detectLiveDatabases">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -168,7 +188,7 @@
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stream a fresh dump or archive straight from the server — no schedule, no S3. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Build a fresh dump or archive on the server — we’ll notify you in-app and by email when it’s ready to grab. Saved to your cloud download bucket for :window and re-downloadable until then. Capped at :cap; larger payloads should use a scheduled backup.', ['window' => \App\Services\Servers\QuickDownloadNotifier::retentionWindowLabel(), 'cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
                 </div>
             </div>
         </div>
@@ -180,24 +200,35 @@
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $db->name }}</p>
                         <p class="text-xs text-brand-moss">{{ __('Database') }} · {{ \Illuminate\Support\Str::title($db->engine) }}</p>
                     </div>
-                    <x-quick-download.database-link :server="$server" :database="$db" />
+                    <x-quick-download.database-link :server="$server" :database="$db" :active-key="$qdTargetKey" />
                 </div>
             @endforeach
 
             {{-- Databases discovered on the box but not catalogued by dply (admin-credential dump) --}}
             @foreach ($adHocDbTargets as $target)
+                @php $adhocProcessing = $qdTargetKey === 'adhoc:'.$target['engine'].':'.$target['name']; @endphp
                 <div wire:key="qd-adhoc-{{ $target['engine'] }}-{{ $target['name'] }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $target['name'] }}</p>
                         <p class="text-xs text-brand-moss">{{ \Illuminate\Support\Str::title($target['engine']) }} · {{ __('detected on server (not yet managed)') }}</p>
                     </div>
-                    <a
-                        href="{{ route('servers.quick-dump', $server) }}?engine={{ $target['engine'] }}&name={{ urlencode($target['name']) }}"
-                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    <button
+                        type="button"
+                        wire:click="requestAdhocQuickDownload('{{ $server->id }}', '{{ $target['engine'] }}', @js($target['name']))"
+                        @disabled($adhocProcessing)
+                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                        <x-heroicon-m-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Download dump') }}
-                    </a>
+                        @if ($adhocProcessing)
+                            <svg class="h-4 w-4 animate-spin text-brand-sage" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                            </svg>
+                            {{ __('Processing…') }}
+                        @else
+                            <x-heroicon-m-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Download dump') }}
+                        @endif
+                    </button>
                 </div>
             @endforeach
 
@@ -208,7 +239,7 @@
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $qdSite->name }}</p>
                         <p class="text-xs text-brand-moss">{{ __('Site files, .env, vhost, logs, home, or a combined bundle') }}</p>
                     </div>
-                    <x-quick-download.site-menu :server="$server" :site="$qdSite" />
+                    <x-quick-download.site-menu :server="$server" :site="$qdSite" :active-key="$qdTargetKey" />
                 </div>
             @endforeach
 
@@ -227,7 +258,7 @@
         </div>
     </section>
 
-    <section class="dply-card overflow-hidden">
+    <section x-show="runMode === 'save'" x-cloak class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -280,8 +311,23 @@
                     </div>
                 @else
                     <div>
-                        <label class="block text-sm font-medium text-brand-ink">{{ __('Max space on server (GB)') }}</label>
-                        <input type="number" step="0.1" min="0.1" wire:model="db_backup_remote_max_gb" class="{{ $input }} mt-1" />
+                        <label class="block text-sm font-medium text-brand-ink">{{ __('Max space on server') }}</label>
+                        <div class="mt-1 flex items-stretch overflow-hidden rounded-lg border border-brand-ink/20 bg-white shadow-sm transition focus-within:border-brand-forest focus-within:ring-2 focus-within:ring-brand-forest/30">
+                            <input
+                                type="number" step="any" min="1"
+                                wire:model="db_backup_remote_max_value"
+                                placeholder="10"
+                                class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-brand-ink focus:outline-none focus:ring-0"
+                            />
+                            <select
+                                wire:model="db_backup_remote_max_unit"
+                                aria-label="{{ __('Unit') }}"
+                                class="shrink-0 border-0 border-l border-brand-ink/15 bg-brand-sand/30 py-2 pl-3 pr-9 text-sm font-semibold text-brand-ink focus:outline-none focus:ring-0"
+                            >
+                                <option value="MB">{{ __('MB') }}</option>
+                                <option value="GB">{{ __('GB') }}</option>
+                            </select>
+                        </div>
                         <p class="mt-1 text-xs text-brand-moss">
                             {{ __('Files live under :root — oldest backups are removed when this cap is exceeded.', ['root' => config('server_database.remote_backup_root')]) }}
                         </p>
@@ -295,7 +341,7 @@
     </section>
 
     {{-- Run now -------------------------------------------------------------------- --}}
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div x-show="runMode === 'save'" x-cloak class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
@@ -339,16 +385,27 @@
                             @endforeach
                         </select>
                     @endif
-                    <button type="button" wire:click="runDatabaseBackup" wire:loading.attr="disabled" wire:target="runDatabaseBackup" class="{{ $btnPrimary }}" @disabled(! ($runDatabaseReady ?? false))>
-                        <span wire:loading.remove wire:target="runDatabaseBackup" class="inline-flex items-center gap-2">
-                            <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Run database backup now') }}
-                        </span>
-                        <span wire:loading wire:target="runDatabaseBackup" class="inline-flex items-center gap-2 whitespace-nowrap">
-                            <x-spinner variant="cream" size="sm" />
-                            {{ __('Queueing…') }}
-                        </span>
-                    </button>
+                    @if ($dbBackupRunning ?? false)
+                        {{-- A database backup is already in flight — block a re-click
+                             so an impatient double-click can't spawn a duplicate dump. --}}
+                        <button type="button" disabled class="{{ $btnPrimary }} cursor-not-allowed opacity-60">
+                            <span class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Running…') }}
+                            </span>
+                        </button>
+                    @else
+                        <button type="button" wire:click="runDatabaseBackup" wire:loading.attr="disabled" wire:target="runDatabaseBackup" class="{{ $btnPrimary }}" @disabled(! ($runDatabaseReady ?? false))>
+                            <span wire:loading.remove wire:target="runDatabaseBackup" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Run database backup now') }}
+                            </span>
+                            <span wire:loading wire:target="runDatabaseBackup" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Queueing…') }}
+                            </span>
+                        </button>
+                    @endif
                     @if ($run_database_id !== '' && ! ($runDatabaseReady ?? false))
                         <p class="text-xs text-brand-moss">{{ __('The server that hosts this database isn’t ready for backups yet — it needs a ready status, an IP address, and a stored SSH key in dply.') }}</p>
                     @endif
@@ -379,26 +436,43 @@
                             <option value="{{ $site->id }}">{{ $site->name }}</option>
                         @endforeach
                     </select>
-                    <button type="button" wire:click="runSiteFilesBackup" wire:loading.attr="disabled" wire:target="runSiteFilesBackup" class="{{ $btnPrimary }}" @disabled(! $opsReady || $run_site_id === '')>
-                        <span wire:loading.remove wire:target="runSiteFilesBackup" class="inline-flex items-center gap-2">
-                            <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Run files backup now') }}
-                        </span>
-                        <span wire:loading wire:target="runSiteFilesBackup" class="inline-flex items-center gap-2 whitespace-nowrap">
-                            <x-spinner variant="cream" size="sm" />
-                            {{ __('Queueing…') }}
-                        </span>
-                    </button>
+                    @if ($filesBackupRunning ?? false)
+                        <button type="button" disabled class="{{ $btnPrimary }} cursor-not-allowed opacity-60">
+                            <span class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Running…') }}
+                            </span>
+                        </button>
+                    @else
+                        <button type="button" wire:click="runSiteFilesBackup" wire:loading.attr="disabled" wire:target="runSiteFilesBackup" class="{{ $btnPrimary }}" @disabled(! $opsReady || $run_site_id === '')>
+                            <span wire:loading.remove wire:target="runSiteFilesBackup" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Run files backup now') }}
+                            </span>
+                            <span wire:loading wire:target="runSiteFilesBackup" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Queueing…') }}
+                            </span>
+                        </button>
+                    @endif
                 @endif
             </div>
         </section>
     </div>
+    </div>{{-- /run-a-backup toggle group --}}
 
     </x-server-workspace-tab-panel>
     @endif
 
     @if ($backups_workspace_tab === 'schedules')
     <x-server-workspace-tab-panel id="backups-panel-schedules" labelled-by="backups-tab-schedules" panel-class="space-y-6">
+    {{-- A "Run now" launched from this tab streams into the same banner. --}}
+    @if ($backupConsoleRun)
+        @include('livewire.partials.console-action-banner-static', [
+            'run' => $backupConsoleRun,
+            'kindLabels' => (array) config('console_actions.kinds', []),
+        ])
+    @endif
     {{-- Schedules ------------------------------------------------------------------ --}}
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -675,7 +749,13 @@
             @else
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($databaseBackups as $backup)
-                        <li wire:key="db-bk-{{ $backup->id }}" class="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7">
+                        <li wire:key="db-bk-{{ $backup->id }}"
+                            @if (($highlightBackupId ?? null) === $backup->id && ($highlightBackupType ?? null) === 'database')
+                                x-data="{ flash: true }"
+                                x-init="$el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => flash = false, 4000)"
+                                :class="flash ? 'ring-2 ring-inset ring-brand-forest/60 bg-brand-forest/5' : ''"
+                            @endif
+                            class="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ optional($backup->serverDatabase)->name ?? '(deleted)' }}</p>
@@ -691,13 +771,23 @@
                                 @if ($backup->error_message)
                                     <p class="mt-1 truncate text-xs text-rose-700">{{ $backup->error_message }}</p>
                                 @endif
+                                @if (isset($stagingErrors[$backup->id]))
+                                    <p class="mt-1 text-xs text-rose-700">{{ $stagingErrors[$backup->id] }}</p>
+                                @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
                                 @if ($backup->isDownloadable())
-                                    <button type="button" wire:click="downloadDatabaseBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
-                                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Download') }}
-                                    </button>
+                                    @if ($stagingBackupId === $backup->id)
+                                        <span class="{{ $btnOutline }} cursor-default opacity-70" aria-live="polite">
+                                            <x-spinner size="sm" />
+                                            {{ __('Preparing…') }}
+                                        </span>
+                                    @else
+                                        <button type="button" wire:click="requestDownload('database', '{{ $backup->id }}')" wire:loading.attr="disabled" wire:target="requestDownload" class="{{ $btnOutline }}">
+                                            <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Download') }}
+                                        </button>
+                                    @endif
                                 @endif
                                 <button
                                     type="button"
@@ -740,7 +830,13 @@
             @else
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($fileBackups as $backup)
-                        <li wire:key="fb-{{ $backup->id }}" class="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7">
+                        <li wire:key="fb-{{ $backup->id }}"
+                            @if (($highlightBackupId ?? null) === $backup->id && ($highlightBackupType ?? null) === 'site_files')
+                                x-data="{ flash: true }"
+                                x-init="$el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => flash = false, 4000)"
+                                :class="flash ? 'ring-2 ring-inset ring-brand-forest/60 bg-brand-forest/5' : ''"
+                            @endif
+                            class="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ optional($backup->site)->name ?? '(deleted)' }}</p>
@@ -756,13 +852,23 @@
                                 @if ($backup->error_message)
                                     <p class="mt-1 truncate text-xs text-rose-700">{{ $backup->error_message }}</p>
                                 @endif
+                                @if (isset($stagingErrors[$backup->id]))
+                                    <p class="mt-1 text-xs text-rose-700">{{ $stagingErrors[$backup->id] }}</p>
+                                @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
-                                @if ($backup->status === 'completed' && ! empty($backup->disk_path))
-                                    <button type="button" wire:click="downloadFileBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
-                                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Download') }}
-                                    </button>
+                                @if ($backup->isDownloadable())
+                                    @if ($stagingBackupId === $backup->id)
+                                        <span class="{{ $btnOutline }} cursor-default opacity-70" aria-live="polite">
+                                            <x-spinner size="sm" />
+                                            {{ __('Preparing…') }}
+                                        </span>
+                                    @else
+                                        <button type="button" wire:click="requestDownload('site_files', '{{ $backup->id }}')" wire:loading.attr="disabled" wire:target="requestDownload" class="{{ $btnOutline }}">
+                                            <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Download') }}
+                                        </button>
+                                    @endif
                                 @endif
                                 <button
                                     type="button"
@@ -789,6 +895,11 @@
     @endif
 
     </div>{{-- /tab container --}}
+
+    {{-- Poll the staging row while a download is being prepared, then it redirects. --}}
+    @if ($stagingId !== null)
+        <div wire:poll.2s="pollStaging" class="hidden" aria-hidden="true"></div>
+    @endif
 
     {{-- Lightweight refresh so pending → completed transitions show without manual reload. --}}
     @if ($databaseBackups->where('status', 'pending')->isNotEmpty() || $fileBackups->where('status', 'pending')->isNotEmpty())

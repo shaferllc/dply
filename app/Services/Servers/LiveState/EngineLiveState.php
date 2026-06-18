@@ -28,7 +28,7 @@ final class EngineLiveState
 {
     /**
      * @param  array<string, list<array<string, mixed>>>  $units
-     * @param  array<string, mixed>  $engineSpecific
+     * @param  array<string, mixed> $engineSpecific
      */
     public function __construct(
         public readonly string $engine,
@@ -43,6 +43,7 @@ final class EngineLiveState
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

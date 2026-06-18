@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $role
+ * @property ?string $user_id
+ * @property ?string $workspace_id
+ * @property-read ?Workspace $workspace
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class WorkspaceMember extends Model
 {
     use HasUlids;
@@ -24,6 +34,7 @@ class WorkspaceMember extends Model
         'role',
     ];
 
+    /** @return list<string> */
     public static function roles(): array
     {
         return [
@@ -34,11 +45,13 @@ class WorkspaceMember extends Model
         ];
     }
 
+    /** @return BelongsTo<Workspace, $this> */
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

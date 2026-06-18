@@ -82,7 +82,7 @@ final class DeployPipelineStarterApplier
     public function applyRollout(Site $site, string $starterKey): void
     {
         $changes = $this->catalog->rolloutChangesFor($site, $starterKey);
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
 
         $meta['deploy_health_enabled'] = $changes['deploy_health_enabled'];
         $meta['deploy_health_auto_rollback'] = $changes['deploy_health_auto_rollback'];

@@ -52,7 +52,7 @@ class QueryDesignPattern extends DesignPattern
             || $frame->matches(Builder::class, 'count');
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(QueryDecorator::class, ['action' => $instance]);
     }

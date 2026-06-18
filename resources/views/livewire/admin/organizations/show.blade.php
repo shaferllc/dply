@@ -21,19 +21,32 @@
         </a>
     </div>
 
-    <div class="mb-6 flex flex-wrap gap-2">
-        @foreach ($tabs as $slug => $label)
-            <button
-                type="button"
-                wire:click="setTab('{{ $slug }}')"
-                @class([
-                    'rounded-lg px-3 py-2 text-sm font-medium transition',
-                    $tab === $slug ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm' : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent',
-                ])
-            >
-                {{ $label }}
-            </button>
-        @endforeach
+    {{-- Members — impersonate any member to see the app from their seat. --}}
+    <div class="mb-6 overflow-hidden rounded-xl border border-brand-ink/10 bg-white shadow-sm">
+        <div class="border-b border-brand-ink/10 bg-brand-cream/50 px-4 py-2.5">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Members') }} ({{ $members->count() }})</h2>
+        </div>
+        <ul class="divide-y divide-brand-ink/5">
+            @forelse ($members as $member)
+                <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-brand-ink">{{ $member->name }}</p>
+                        <p class="truncate text-xs text-brand-moss">{{ $member->email }}</p>
+                    </div>
+                    <x-impersonate-button :user="$member" variant="subtle" />
+                </li>
+            @empty
+                <li class="px-4 py-4 text-center text-xs text-brand-mist">{{ __('No members.') }}</li>
+            @endforelse
+        </ul>
+    </div>
+
+    <div class="mb-6">
+        <x-server-workspace-tablist :aria-label="__('Feature flag product lines')" scroll>
+            @foreach ($tabs as $slug => $label)
+                <x-server-workspace-tab :active="$tab === $slug" icon="heroicon-o-flag" wire:click="setTab('{{ $slug }}')">{{ $label }}</x-server-workspace-tab>
+            @endforeach
+        </x-server-workspace-tablist>
     </div>
 
     <div class="space-y-4">

@@ -87,14 +87,14 @@ class SiteDoctorCommand extends Command
         $latest = $site->latestDeployment();
         $latestSummary = null;
         if ($latest !== null) {
-            $phases = is_array($latest->phase_results ?? null) ? $latest->phase_results : [];
+            $phases = $latest->phase_results ?? [];
             $latestSummary = [
                 'id' => $latest->id,
                 'status' => $latest->status,
                 'started_at' => $latest->started_at?->toIso8601String(),
                 'finished_at' => $latest->finished_at?->toIso8601String(),
                 'phases_recorded' => array_keys($phases),
-                'phases_ok' => method_exists($latest, 'phasesAllOk') ? $latest->phasesAllOk() : null,
+                'phases_ok' => $latest->phasesAllOk(),
             ];
         }
 
@@ -126,7 +126,7 @@ class SiteDoctorCommand extends Command
         $envLocation = [
             'path' => $site->effectiveEnvFilePath(),
             'in_docroot' => $envInDocroot,
-            'overridden' => $site->env_file_path !== null && trim((string) $site->env_file_path) !== '',
+            'overridden' => trim($site->env_file_path) !== '',
         ];
 
         $domains = $site->domains()

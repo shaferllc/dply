@@ -25,9 +25,9 @@ function actingOwnerWithServer(): array
         'status' => Server::STATUS_READY,
         'ssh_user' => 'dply',
         'ip_address' => '203.0.113.10',
-        'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
-        'ssh_recovery_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
-        'ssh_operational_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_recovery_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_operational_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
     ]);
 
     return [$user, $server];

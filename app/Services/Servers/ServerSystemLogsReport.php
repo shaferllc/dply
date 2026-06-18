@@ -108,8 +108,8 @@ final class ServerSystemLogsReport
                 'source_count' => count($sourceRows),
                 'site_source_count' => $siteSourceCount,
                 'group_count' => count($groups),
-                'filtered_lines' => (int) ($viewer['log_filtered_lines'] ?? 0),
-                'total_lines' => (int) ($viewer['log_total_lines'] ?? 0),
+                'filtered_lines' => (int) ($viewer['log_filtered_lines']),
+                'total_lines' => (int) ($viewer['log_total_lines']),
             ],
             'active_source' => [
                 'key' => $logKey,
@@ -121,7 +121,7 @@ final class ServerSystemLogsReport
             'source_rows' => $sourceRows,
             'viewer' => [
                 'last_fetched_at' => $this->parseTimestamp($viewer['log_last_fetched_at'] ?? null),
-                'auto_refresh' => (bool) ($viewer['log_auto_refresh'] ?? false),
+                'auto_refresh' => (bool) ($viewer['log_auto_refresh']),
                 'auto_refresh_seconds' => (int) ($viewer['log_auto_refresh_seconds'] ?? 30),
                 'time_range_minutes' => $viewer['log_time_range_minutes'] ?? null,
                 'error' => $remoteError,

@@ -50,8 +50,8 @@ final class EdgeSiteResource extends JsonResource
                 ? $edge['active_deployment_id']
                 : null,
             'preview_protection' => $this->previewProtectionSummary($site),
-            'created_at' => $site->created_at?->toIso8601String(),
-            'updated_at' => $site->updated_at?->toIso8601String(),
+            'created_at' => $site->created_at->toIso8601String(),
+            'updated_at' => $site->updated_at->toIso8601String(),
         ];
     }
 

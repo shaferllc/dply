@@ -42,23 +42,42 @@
                     x-data="{ open: false, count: @js(count($selected)) }"
                     class="overflow-hidden rounded-xl border border-brand-ink/10 bg-white"
                 >
-                    <button type="button" @click="open = ! open"
-                        class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-brand-sand/20">
-                        <span class="min-w-0">
-                            <span class="text-sm font-medium text-brand-ink">{{ $channel->label }}</span>
-                            <span class="ml-1 text-xs text-brand-mist">[{{ \App\Models\NotificationChannel::labelForType($channel->type) }}]</span>
-                        </span>
-                        <span class="flex shrink-0 items-center gap-2">
-                            <span
-                                class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                                :class="count > 0 ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/60 text-brand-mist'"
-                                x-text="count > 0 ? count + ' {{ __('events') }}' : '{{ __('Off') }}'"
-                            ></span>
-                            <span class="text-brand-mist transition" x-bind:class="open && 'rotate-180'">
-                                <x-heroicon-o-chevron-down class="h-4 w-4" aria-hidden="true" />
+                    <div class="flex items-center gap-1 pr-2 hover:bg-brand-sand/20">
+                        <button type="button" @click="open = ! open"
+                            class="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left">
+                            <span class="min-w-0">
+                                <span class="text-sm font-medium text-brand-ink">{{ $channel->label }}</span>
+                                <span class="ml-1 text-xs text-brand-mist">[{{ \App\Models\NotificationChannel::labelForType($channel->type) }}]</span>
                             </span>
-                        </span>
-                    </button>
+                            <span class="flex shrink-0 items-center gap-2">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                    :class="count > 0 ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/60 text-brand-mist'"
+                                    x-text="count > 0 ? count + ' {{ __('events') }}' : '{{ __('Off') }}'"
+                                ></span>
+                                <span class="text-brand-mist transition" x-bind:class="open && 'rotate-180'">
+                                    <x-heroicon-o-chevron-down class="h-4 w-4" aria-hidden="true" />
+                                </span>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="sendTestChannelNotification('{{ $channel->id }}')"
+                            wire:loading.attr="disabled"
+                            wire:target="sendTestChannelNotification('{{ $channel->id }}')"
+                            title="{{ __('Send a test notification to this channel') }}"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="sendTestChannelNotification('{{ $channel->id }}')" class="inline-flex items-center gap-1.5">
+                                <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Test') }}
+                            </span>
+                            <span wire:loading wire:target="sendTestChannelNotification('{{ $channel->id }}')" class="inline-flex items-center gap-1.5">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Sending…') }}
+                            </span>
+                        </button>
+                    </div>
 
                     <div
                         x-show="open"

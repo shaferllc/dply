@@ -48,7 +48,7 @@ class EdgeMiddlewareBundleUploader
             return;
         }
         $entry = is_string($payload['entry_module'] ?? null) ? $payload['entry_module'] : 'middleware.js';
-        /** @var array<string, string> $modules */
+        /** @var array $modules */
         $modules = array_filter($payload['modules'], static fn ($value): bool => is_string($value));
         if ($modules === []) {
             return;
@@ -204,18 +204,18 @@ class EdgeMiddlewareBundleUploader
 
     public function scriptNameOnDeployment(EdgeDeployment $deployment): string
     {
-        $meta = is_array($deployment->meta) ? $deployment->meta : [];
+        $meta = ($deployment->meta );
         $mw = is_array($meta['middleware'] ?? null) ? $meta['middleware'] : [];
 
         return is_string($mw['script_name'] ?? null) ? trim($mw['script_name']) : '';
     }
 
     /**
-     * @param  array<string, mixed>  $sidecarPayload
+     * @param  array<string, mixed> $sidecarPayload
      */
     private function persistScriptName(EdgeDeployment $deployment, string $scriptName, array $sidecarPayload): void
     {
-        $meta = is_array($deployment->meta) ? $deployment->meta : [];
+        $meta = ($deployment->meta );
         $mw = is_array($meta['middleware'] ?? null) ? $meta['middleware'] : [];
         $mw['script_name'] = $scriptName;
         $mw['source_path'] = is_string($sidecarPayload['source_path'] ?? null) ? $sidecarPayload['source_path'] : null;
@@ -230,7 +230,7 @@ class EdgeMiddlewareBundleUploader
      */
     private function clearScriptName(EdgeDeployment $deployment): void
     {
-        $meta = is_array($deployment->meta) ? $deployment->meta : [];
+        $meta = ($deployment->meta );
         $mw = is_array($meta['middleware'] ?? null) ? $meta['middleware'] : [];
         unset($mw['script_name']);
         $mw['deleted_at'] = now()->toIso8601String();

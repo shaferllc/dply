@@ -7,8 +7,8 @@ namespace App\Console\Commands;
 use App\Jobs\ApplySiteCdnJob;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use Illuminate\Console\Command;
 
 class CdnRuleRemoveCommand extends Command
@@ -37,7 +37,7 @@ class CdnRuleRemoveCommand extends Command
             $path = '/'.$path;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $cdn = is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [];
         $rules = ApplySiteCdnJob::normaliseRules(is_array($cdn['rules'] ?? null) ? $cdn['rules'] : []);
 

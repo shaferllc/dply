@@ -53,7 +53,7 @@ final class TaskRunnerBroadcastBridge
      */
     private static function handle(array $logData): void
     {
-        $context = is_array($logData['context'] ?? null) ? $logData['context'] : [];
+        $context = ($logData['context'] );
         $streamType = (string) ($context['stream_type'] ?? '');
 
         $kind = match ($streamType) {
@@ -78,7 +78,7 @@ final class TaskRunnerBroadcastBridge
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      */
     private static function resolveOrganizationId(array $context): ?string
     {
@@ -97,12 +97,12 @@ final class TaskRunnerBroadcastBridge
             return is_string($orgId) && $orgId !== '' ? $orgId : null;
         });
 
-        return is_string($resolved) && $resolved !== '' ? $resolved : null;
+        return is_string($resolved) ? $resolved : null;
     }
 
     /**
      * @param  array{message: string, context: array<string, mixed>}  $logData
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      * @return array<string, mixed>
      */
     private static function buildPayload(string $kind, array $logData, array $context): array
@@ -116,7 +116,7 @@ final class TaskRunnerBroadcastBridge
         if ($kind === 'process.output') {
             return $base + [
                 'type' => $context['type'] ?? 'out',
-                'chunk' => self::truncate((string) ($logData['message'] ?? ''), self::PROCESS_OUTPUT_FRAME_CAP_BYTES),
+                'chunk' => self::truncate($logData['message'], self::PROCESS_OUTPUT_FRAME_CAP_BYTES),
             ];
         }
 
@@ -136,7 +136,7 @@ final class TaskRunnerBroadcastBridge
 
         if ($kind === 'task.error') {
             return $base + [
-                'message' => self::truncate((string) ($logData['message'] ?? ''), self::PROCESS_OUTPUT_FRAME_CAP_BYTES),
+                'message' => self::truncate($logData['message'], self::PROCESS_OUTPUT_FRAME_CAP_BYTES),
                 'max_attempts' => $context['max_attempts'] ?? null,
             ];
         }

@@ -44,11 +44,6 @@
          is read-only — no destructive action that warrants amber framing —
          and the visual inconsistency between cards in the same workspace
          was the original ask. --}}
-    <x-explainer class="mt-4">
-        <p>{{ __('MONITOR is read-only — it doesn\'t change keys — but it forces the engine to copy every command across all connections to this client. On a hot cache that costs a meaningful slice of CPU, so use a short window (5–30 s).') }}</p>
-        <p>{{ __('Output is bounded at 500 lines (oldest dropped). The window stops itself even if the browser tab is closed; the audit log records the started + completed event with the line count.') }}</p>
-        <p>{{ __('Pick a short window — auto-stops when it ends.') }}</p>
-    </x-explainer>
 
     @if (! $running)
         <div class="mt-4 flex flex-wrap items-center gap-2">

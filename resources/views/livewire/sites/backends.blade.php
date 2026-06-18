@@ -14,22 +14,17 @@
         ];
     @endphp
 
+    <x-hero-card
+        :eyebrow="__('Site')"
+        :title="__('Backends')"
+        :description="__('Serve this site from multiple app servers behind a load balancer, enabling Rolling and Canary deploys.')"
+        icon="server-stack"
+    />
+
     {{-- Live refresh while backends/LB are still coming up. --}}
     @if ($this->isConverging || ($lb && $lb->status === 'provisioning'))
         <div wire:poll.5s="refreshState" class="hidden" aria-hidden="true"></div>
     @endif
-
-    <div class="flex items-start gap-3">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div class="min-w-0">
-            <h2 class="text-base font-semibold text-brand-ink">{{ __('Load-balanced backends') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('Serve this site from multiple app servers behind a load balancer. With two or more backends you can deploy with the Rolling or Canary methods. Each backend runs the same code and environment as this site.') }}
-            </p>
-        </div>
-    </div>
 
     @if (! $this->canManage())
         <div class="dply-card p-6 text-sm text-brand-moss">
@@ -100,7 +95,7 @@
                                             type="button"
                                             wire:click="removeBackend('{{ $backend->id }}')"
                                             wire:confirm="{{ __('Remove this backend? It is drained from the load balancer and its server is destroyed. This cannot be undone.') }}"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Remove') }}

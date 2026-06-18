@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Mcp\Exceptions\DplyMcpException;
 use App\Models\ApiToken;
 use App\Models\Organization;
+use App\Models\Server;
 use App\Models\Site;
 
 /**
@@ -69,13 +70,27 @@ trait ResolvesDplyContext
     }
 
     /**
+     * Load a server by id and assert it belongs to the token's org.
+     */
+    protected function resolveServer(string $serverId, ?Organization $organization = null): Server
+    {
+        $organization ??= $this->organization();
+
+        $server = Server::query()->find($serverId);
+
+        if (! $server || $server->organization_id !== $organization->id) {
+            throw new DplyMcpException("Server \"{$serverId}\" was not found in this organization.");
+        }
+
+        return $server;
+    }
+
+    /**
      * Reject sites that are not VM/host sites for SSH/FPM-only operations.
      */
     protected function assertVmSite(Site $site, string $operation): void
     {
-        $type = $site->type instanceof SiteType
-            ? $site->type
-            : SiteType::tryFrom((string) $site->type);
+        $type = $site->type;
 
         if (filled($site->edge_backend) || filled($site->serverless_backend) || $type === SiteType::Container) {
             throw new DplyMcpException(

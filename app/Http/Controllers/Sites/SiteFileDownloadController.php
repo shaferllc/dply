@@ -22,7 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class SiteFileDownloadController extends Controller
 {
-    public function __invoke(Request $request, Server $server, Site $site): StreamedResponse|Response
+    public function __invoke(Request $request, Server $server, Site $site): StreamedResponse
     {
         Gate::authorize('view', $site);
 

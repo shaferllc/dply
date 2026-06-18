@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\VmRoadmapPagesTest;
 
-use App\Livewire\Servers\WorkspaceDeployPolicy;
+use App\Livewire\Servers\Deploys;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
@@ -15,7 +15,7 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-usesFeatures('workspace.daemon_slo', 'workspace.cert_inventory', 'workspace.deploy_windows', 'workspace.ssh_access_graph', 'workspace.ssh_sessions', 'workspace.server_cost', 'workspace.security_digest');
+usesFeatures('workspace.daemon_slo', 'workspace.cert_inventory', 'workspace.ssh_access_graph', 'workspace.ssh_sessions', 'workspace.server_cost', 'workspace.security_digest');
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
@@ -78,11 +78,12 @@ test('cert inventory page renders', function (): void {
         ->assertSee(__('All certificates'));
 });
 
-test('deploy policy page saves weekend freeze', function (): void {
+test('deploys page deploy-window tab saves weekend freeze', function (): void {
     [$user, $server] = vmRoadmapUserWithServer();
 
     Livewire::actingAs($user)
-        ->test(WorkspaceDeployPolicy::class, ['server' => $server])
+        ->test(Deploys::class, ['server' => $server])
+        ->set('tab', 'deploy-windows')
         ->set('policy_enabled', true)
         ->call('applyWeekendFreezePreset')
         ->call('savePolicy')
@@ -93,16 +94,24 @@ test('deploy policy page saves weekend freeze', function (): void {
         ->and($policy['deny_rules'])->not->toBeEmpty();
 });
 
-test('deploy policy page renders expanded workspace', function (): void {
+test('deploys page renders the deploy-windows editor', function (): void {
     [$user, $server] = vmRoadmapUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.deploy-policy', $server))
+        ->get(route('servers.deploys', ['server' => $server, 'tab' => 'deploy-windows']))
         ->assertOk()
         ->assertSee(__('Deploy window policy'))
-        ->assertSee(__('Configured deny windows'))
-        ->assertSee(__('Site coverage'))
-        ->assertSee(__('Recent policy skips'));
+        ->assertSee(__('Edit policy'))
+        ->assertSee(__('Enable deploy window policy'));
+});
+
+test('deploys page renders site coverage', function (): void {
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.deploys', ['server' => $server, 'tab' => 'coverage']))
+        ->assertOk()
+        ->assertSee(__('Site coverage'));
 });
 
 test('cert inventory feature flag returns 400 when disabled', function (): void {

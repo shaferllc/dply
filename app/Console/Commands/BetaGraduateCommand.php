@@ -69,7 +69,7 @@ class BetaGraduateCommand extends Command
             $boxes = $org->servers()
                 ->where('hosting_backend', Server::HOSTING_BACKEND_DPLY)
                 ->get()
-                ->filter(fn (Server $s) => $s->isManagedVm() && ($s->comped_until === null || $s->comped_until->isFuture()));
+                ->filter(fn (Server $s) => $s->isManagedVm() && ($s->getRawOriginal('comped_until') === null || $s->comped_until->isFuture()));
 
             foreach ($boxes as $box) {
                 $this->line("  comp finalize: server {$box->id} comped_until={$cutover->toDateString()}");

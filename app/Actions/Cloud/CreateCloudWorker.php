@@ -36,7 +36,7 @@ class CreateCloudWorker
      */
     public function handle(Site $site, array $payload): CloudWorker
     {
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             throw new InvalidArgumentException('Workers can only be added to Cloud container sites.');
         }
 

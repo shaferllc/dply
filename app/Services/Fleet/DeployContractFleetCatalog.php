@@ -33,6 +33,10 @@ final class DeployContractFleetCatalog
      *   run_at: ?string,
      * }>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, bool|int|string|null>>
+     */
     public function forOrganization(Organization $organization): array
     {
         if (! Feature::active('global.deploy_contract')) {
@@ -60,7 +64,7 @@ final class DeployContractFleetCatalog
                     'branch' => isset($edge['preview_branch']) ? (string) $edge['preview_branch'] : null,
                     'status' => is_string($contract['status'] ?? null) ? $contract['status'] : null,
                     'ready' => ! empty($contract['ready_to_promote']),
-                    'failed_count' => (int) ($contract['failed_count'] ?? 0),
+                    'failed_count' => (int) ($contract['failed_count']),
                     'href' => route('sites.preview-comments', [
                         'server' => $preview->server_id,
                         'site' => $preview,
@@ -82,8 +86,9 @@ final class DeployContractFleetCatalog
     }
 
     /**
-     * @return array{total: int, ready: int, blocked: int, not_run: int}
+     * @return list<array<string, bool|int|string|null>>
      */
+    /** @return array<string, mixed> */
     public function counts(Organization $organization): array
     {
         $rows = $this->forOrganization($organization);

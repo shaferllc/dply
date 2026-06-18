@@ -92,6 +92,10 @@ class OvhService
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function getProjects(): array
     {
         $response = $this->request('get', '/cloud/project');
@@ -150,6 +154,7 @@ class OvhService
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getProject(string $project): array
     {
         $response = $this->request('get', '/cloud/project/'.rawurlencode($project));
@@ -165,6 +170,10 @@ class OvhService
      *
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function getRegions(string $project): array
     {
         $response = $this->request('get', '/cloud/project/'.rawurlencode($project).'/region');
@@ -178,8 +187,9 @@ class OvhService
     /**
      * List instance flavors (sizes). Optionally filter by region.
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<string>
      */
+    /** @return array<string, mixed> */
     public function getFlavors(string $project, ?string $region = null): array
     {
         $query = $region !== null && $region !== '' ? ['region' => $region] : [];
@@ -196,6 +206,7 @@ class OvhService
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function getImages(string $project, ?string $region = null): array
     {
         $query = $region !== null && $region !== '' ? ['region' => $region] : [];
@@ -264,6 +275,7 @@ class OvhService
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function getInstance(string $project, string $id): array
     {
         $response = $this->request('get', '/cloud/project/'.rawurlencode($project).'/instance/'.rawurlencode($id));
@@ -298,7 +310,7 @@ class OvhService
      * Public IPv4 from an instance payload. OVH exposes addresses under
      * `ipAddresses` as a list of {ip, type, version}.
      *
-     * @param  array<string, mixed>  $instance
+     * @param  array<string, mixed> $instance
      */
     public static function getPublicIp(array $instance): ?string
     {
@@ -320,7 +332,7 @@ class OvhService
     /**
      * Private IPv4 from an instance payload (type `private`, IPv4).
      *
-     * @param  array<string, mixed>  $instance
+     * @param  array<string, mixed> $instance
      */
     public static function getPrivateIp(array $instance): ?string
     {
@@ -355,7 +367,7 @@ class OvhService
     }
 
     /**
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $body
      */
     protected function request(string $method, string $path, array $body = []): Response
     {

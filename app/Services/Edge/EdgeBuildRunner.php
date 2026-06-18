@@ -35,7 +35,7 @@ class EdgeBuildRunner
     private const SSR_SCRIPT_MAX_BYTES = 9 * 1024 * 1024;
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      * @return array{
      *     artifact_dir: string,
      *     build_log: string,
@@ -76,7 +76,7 @@ class EdgeBuildRunner
         // filesystem (true for single-host dply deployments). Multi-host
         // setups will want a DB/Redis chunk stream instead — same UI on
         // top, different backing store.
-        $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
+        $existingMeta = ($deployment->meta );
         $deployment->update([
             'meta' => array_merge($existingMeta, ['local_build_log_path' => $buildLog]),
         ]);
@@ -177,7 +177,7 @@ class EdgeBuildRunner
                     $repoArr['contract'] = $contract;
                     $this->appendBuildLog($buildLog, "[dply-contract] Loaded promote requirements from repo.\n");
                 }
-                $yamlBindings = is_array($repoArr['bindings'] ?? null) ? $repoArr['bindings'] : [];
+                $yamlBindings = is_array($repoArr['bindings']) ? $repoArr['bindings'] : [];
 
                 // Merge dply.yaml `bindings:` + wrangler.toml discoveries.
                 // Both are co-equal declarative sources; on conflict
@@ -567,7 +567,7 @@ class EdgeBuildRunner
                 'git_commit_at' => $commitDetails['committed_at'] ?? null,
             ];
 
-            if (($middlewareBundle['bundled'] ?? false) === true) {
+            if (($middlewareBundle['bundled']) === true) {
                 $result['middleware_modules'] = $middlewareBundle['modules'];
                 $result['middleware_entry_module'] = (string) ($middlewareBundle['entry_module'] ?? 'middleware.js');
                 $result['middleware_source_path'] = (string) ($middlewareBundle['source_path'] ?? '');
@@ -1063,7 +1063,7 @@ class EdgeBuildRunner
     }
 
     /**
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
      * @return list<string>
      */
     private function dockerEnvFlags(array $env): array

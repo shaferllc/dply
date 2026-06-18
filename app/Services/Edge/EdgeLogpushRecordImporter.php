@@ -26,6 +26,7 @@ final class EdgeLogpushRecordImporter
      * @param  list<array<string, mixed>>  $records
      * @return array{imported: int, skipped: int}
      */
+    /** @return array<string, mixed> */
     public function import(array $records): array
     {
         $imported = 0;
@@ -49,7 +50,8 @@ final class EdgeLogpushRecordImporter
     }
 
     /**
-     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed> $records
+     * @param  array<string, mixed> $record
      */
     private function importRecord(array $record): bool
     {

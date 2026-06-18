@@ -24,13 +24,15 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
     }
 
     /**
-     * @param  array<string, mixed>  $clientConfig
+     * @param  array<string, mixed> $clientConfig
      */
     public static function fromClientConfig(array $clientConfig): self
     {
         return new self(new LambdaClient($clientConfig));
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function describeFunction(string $functionName): array
     {
         try {
@@ -42,6 +44,8 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
         return $this->configurationToArnRevision($result['Configuration'] ?? []);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function updateFunctionCodeWithZip(string $functionName, string $zipBinary): array
     {
         try {
@@ -60,6 +64,8 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
         ]);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function updateFunctionCodeFromS3(string $functionName, string $bucket, string $key, ?string $objectVersion = null): array
     {
         $params = [
@@ -86,7 +92,7 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
     }
 
     /**
-     * @param  array<string, mixed>  $configuration
+     * @param  array<string, mixed> $configuration
      * @return array{function_arn: string, revision_id: string}
      */
     private function configurationToArnRevision(array $configuration): array
@@ -105,7 +111,7 @@ final class AwsSdkLambdaGateway implements AwsLambdaGateway
     }
 
     /**
-     * @param  array<string, mixed>  $result
+     * @param  array<string, mixed> $result
      * @return array{function_arn: string, revision_id: string}
      */
     private function updateResultToArnRevision(array $result): array

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Servers\WorkspaceActivityTest;
 
 use App\Livewire\Servers\WorkspaceActivity;
+use App\Livewire\Servers\WorkspaceLogs;
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
@@ -13,13 +14,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
-
-uses(WithFeatures::class);
-
-usesFeatures('workspace.activity');
 
 /**
  * @return array{0: User, 1: Server, 2: Organization}
@@ -71,15 +67,17 @@ function writeAudit(Organization $org, ?User $user, string $action, string $subj
         return $row;
     });
 }
-test('route renders for owning org', function () {
+test('logs activity tab renders the nested timeline for owning org', function () {
+    // Activity is now a tab on the Logs page; the standalone route was retired.
     [$user, $server] = userServerOrg();
 
     $this->actingAs($user)
-        ->get(route('servers.activity', $server))
+        ->get(route('servers.logs', ['server' => $server, 'tab' => 'activity']))
         ->assertOk()
+        ->assertSeeLivewire(WorkspaceLogs::class)
         ->assertSeeLivewire(WorkspaceActivity::class);
 });
-test('route blocks users from other orgs', function () {
+test('logs activity tab blocks users from other orgs', function () {
     [, $server] = userServerOrg();
 
     $stranger = User::factory()->create();
@@ -88,7 +86,7 @@ test('route blocks users from other orgs', function () {
     session(['current_organization_id' => $strangerOrg->id]);
 
     $this->actingAs($stranger)
-        ->get(route('servers.activity', $server))
+        ->get(route('servers.logs', ['server' => $server, 'tab' => 'activity']))
         ->assertForbidden();
 });
 test('feed includes server scoped audit events', function () {

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Jobs\RunLaravelScaffoldJob;
-use App\Jobs\RunWordPressScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ChooseApp;
 use App\Models\Server;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 
 /**
  * Data-driven registry of applications the choose-app flow can install on a
@@ -51,6 +52,13 @@ class AppCatalog
         'drupal' => ['mysql', 'mariadb', 'postgres', 'sqlite'],
     ];
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function forServer(Server $server): array
     {
         if (! $server->isVmHost()) {
@@ -85,13 +93,13 @@ class AppCatalog
      * Normalized families (mysql/mariadb/postgres/sqlite) of every engine
      * installed on the server.
      *
-     * @return list<string>
+     * @return array<int, array<string, mixed>>
      */
     private function installedDatabaseFamilies(Server $server): array
     {
         return $server->databaseEngines()
             ->get(['engine'])
-            ->map(fn ($e) => \App\Support\Servers\DatabaseWorkspaceEngines::family((string) $e->engine))
+            ->map(fn ($e) => DatabaseWorkspaceEngines::family((string) $e->engine))
             ->unique()
             ->values()
             ->all();

@@ -4,6 +4,15 @@
     x-on:cli-console-ran.window="$nextTick(() => scrollToBottom())"
     x-init="scrollToBottom()"
 >
+    <x-hero-card
+        :eyebrow="__('Site')"
+        :title="__('CLI Console')"
+        :description="__('Run dply commands against this site straight from the browser, with output streamed back inline.')"
+        icon="command-line"
+    />
+
+    <div class="mt-6"></div>
+
     <x-console-terminal-shell prompt-user="you" :prompt-host="'dply'">
         <x-slot:toolbar>
             <div class="flex items-center gap-1.5">

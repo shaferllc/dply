@@ -10,7 +10,7 @@ use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Imports\Handlers\CollectManualReviewHandler;
+use App\Modules\Imports\Services\Handlers\CollectManualReviewHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

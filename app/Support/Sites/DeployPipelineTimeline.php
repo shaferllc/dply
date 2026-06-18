@@ -86,6 +86,7 @@ final class DeployPipelineTimeline
      */
     /**
      * @param  list<array{type: string, key: string, step?: SiteDeployStep, hook?: SiteDeployHook}>|null  $items
+     * @return array<string, mixed>
      */
     public static function splitForUi(SiteDeployPipeline $pipeline, ?array $items = null): array
     {

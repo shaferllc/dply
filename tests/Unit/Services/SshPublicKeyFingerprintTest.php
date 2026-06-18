@@ -6,7 +6,7 @@ use App\Services\Servers\SshPublicKeyFingerprint;
 use phpseclib3\Crypt\PublicKeyLoader;
 
 it('returns sha256 and md5 for derived openssh line', function () {
-    $pem = file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem'));
+    $pem = file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem'));
     $key = PublicKeyLoader::loadPrivateKey($pem);
     $line = trim($key->getPublicKey()->toString('OpenSSH'));
 

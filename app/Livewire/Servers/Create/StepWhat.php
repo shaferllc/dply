@@ -8,6 +8,7 @@ use App\Actions\Servers\ResolveKubernetesClusters;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
+use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerBlueprint;
@@ -684,7 +685,47 @@ class StepWhat extends Component
             'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
                 ->firstWhere('id', $this->form->server_role),
             'dedicatedCacheEngineOptions' => $this->dedicatedCacheEngineOptions($context['provisionOptions']),
+            ...$this->dedicatedAllowFromSuggestions(),
         ]);
+    }
+
+    /**
+     * Real, context-specific values to offer as one-click "Allow from" chips on
+     * the dedicated database/cache networking panels: the private-network CIDR
+     * the server is being attached to, and the operator's current public IP.
+     * Both are null when unknown, in which case only the generic RFC 1918 blocks
+     * render.
+     *
+     * @return array{networkCidr: ?string, operatorPublicIp: ?string}
+     */
+    private function dedicatedAllowFromSuggestions(): array
+    {
+        $networkCidr = null;
+
+        if ($this->form->type === 'digitalocean' && $this->form->do_vpc_uuid !== '') {
+            $vpc = collect($this->form->do_vpcs)->firstWhere('id', $this->form->do_vpc_uuid);
+            $networkCidr = is_array($vpc) ? ($vpc['ip_range'] ?? null) : null;
+        } elseif ($this->form->type === 'hetzner' && $this->form->hetzner_network_id !== '') {
+            $networkCidr = PrivateNetwork::query()
+                ->where('provider', PrivateNetwork::PROVIDER_HETZNER)
+                ->where('provider_id', $this->form->hetzner_network_id)
+                ->value('ip_range');
+        }
+
+        // request()->ip() resolves the real client IP behind trusted proxies
+        // (Cloudflare). Only offer it when it's a routable public IPv4 — a
+        // private/reserved address (e.g. 127.0.0.1 in local dev) makes a
+        // useless /32 allow rule.
+        $publicIp = request()->ip();
+        if (! is_string($publicIp)
+            || ! filter_var($publicIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            $publicIp = null;
+        }
+
+        return [
+            'networkCidr' => $networkCidr !== null && $networkCidr !== '' ? (string) $networkCidr : null,
+            'operatorPublicIp' => $publicIp,
+        ];
     }
 
     /**

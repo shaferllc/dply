@@ -50,7 +50,7 @@ apt-get install -y gnupg curl ca-certificates
 if [ -f /etc/os-release ]; then
   . /etc/os-release
   if [ "${ID}" = "ubuntu" ] && [ -n "${VERSION_CODENAME}" ]; then
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
     echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
     apt-get update -y
     apt-get install -y mongodb-org || true
@@ -65,7 +65,7 @@ export DEBIAN_FRONTEND=noninteractive
 set -e
 apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl gnupg
-curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" > /etc/apt/sources.list.d/clickhouse.list
 apt-get update -y
 printf '%s\n%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d
@@ -78,6 +78,32 @@ mkdir -p /etc/systemd/system/clickhouse-server.service.d
 printf '[Service]\nTimeoutStartSec=300\n' > /etc/systemd/system/clickhouse-server.service.d/dply.conf
 systemctl daemon-reload
 systemctl enable clickhouse-server
+# Memory-aware tuning. ClickHouse's defaults (cap = 0.9 * RAM, multi-GB caches)
+# can OOM a small or shared app box. When total RAM is modest, cap CH so it
+# coexists with whatever else runs on the box; bigger/dedicated boxes keep the
+# stock defaults so a real log store isn't hobbled.
+RAM_MB=$(awk '/MemTotal/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+if [ "$RAM_MB" -gt 0 ] && [ "$RAM_MB" -lt 4096 ]; then
+  CH_MAX_BYTES=$(( RAM_MB * 1024 * 1024 / 2 ))
+  CH_SPILL_BYTES=$(( CH_MAX_BYTES / 2 ))
+  mkdir -p /etc/clickhouse-server/config.d
+  cat > /etc/clickhouse-server/config.d/99-dply-low-memory.xml <<EOF
+<clickhouse>
+    <max_server_memory_usage>${CH_MAX_BYTES}</max_server_memory_usage>
+    <mark_cache_size>268435456</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <max_concurrent_queries>16</max_concurrent_queries>
+    <profiles>
+        <default>
+            <max_memory_usage>${CH_MAX_BYTES}</max_memory_usage>
+            <max_bytes_before_external_group_by>${CH_SPILL_BYTES}</max_bytes_before_external_group_by>
+            <max_bytes_before_external_sort>${CH_SPILL_BYTES}</max_bytes_before_external_sort>
+        </default>
+    </profiles>
+</clickhouse>
+EOF
+  chown clickhouse:clickhouse /etc/clickhouse-server/config.d/99-dply-low-memory.xml 2>/dev/null || true
+fi
 if ! systemctl start clickhouse-server; then
   systemctl reset-failed clickhouse-server >/dev/null 2>&1 || true
   sleep 3
@@ -195,8 +221,11 @@ BASH,
      *
      * Writes a LOW-numbered conf.d override (`00-dply-loopback`) so a later
      * remote-access override (`99-dply`, listen `*` / bind `0.0.0.0`) still wins —
-     * both of which already include loopback. Returns '' for engines we don't
-     * enforce here.
+     * both of which already include loopback. postgres/mysql/mariadb rewrite the
+     * bind config; clickhouse/mongodb (whose packaged defaults already bind
+     * loopback) restart + wait for the port, since a missed probe there is
+     * usually a slow bind rather than a bad config. Returns '' for engines we
+     * don't enforce here (e.g. sqlite).
      */
     public static function ensureLoopbackListeningScript(string $engine): string
     {
@@ -225,6 +254,49 @@ EOF
   fi
 done
 systemctl restart mysql 2>/dev/null || systemctl restart mariadb
+echo "loopback_listen_ensured"
+BASH,
+            // ClickHouse normally binds 127.0.0.1/::1 out of the box; a failed
+            // loopback probe usually means the HTTP port (8123) was still warming
+            // up when `is-active` returned. Pin a LOW-numbered loopback override
+            // (a later 99-dply-listen remote-access override with 0.0.0.0 still
+            // wins — and 0.0.0.0 includes loopback), restart, then WAIT for the
+            // port so the job's post-script re-probe isn't racing the bind.
+            $engine === 'clickhouse' => <<<'BASH'
+set -e
+mkdir -p /etc/clickhouse-server/config.d
+cat > /etc/clickhouse-server/config.d/00-dply-loopback.xml <<'EOF'
+<clickhouse>
+    <listen_host>127.0.0.1</listen_host>
+    <listen_host>::1</listen_host>
+</clickhouse>
+EOF
+chown clickhouse:clickhouse /etc/clickhouse-server/config.d/00-dply-loopback.xml 2>/dev/null || true
+systemctl restart clickhouse-server
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if timeout 2 bash -c '</dev/tcp/127.0.0.1/8123' >/dev/null 2>&1; then break; fi
+  sleep 2
+done
+echo "loopback_listen_ensured"
+BASH,
+            // MongoDB's packaged /etc/mongod.conf ships `net.bindIp: 127.0.0.1`,
+            // so a missed loopback probe is almost always the port still binding
+            // after `is-active`, not a bad config. We deliberately do NOT rewrite
+            // the yaml (indent-sensitive, multiple valid bindIp forms) — only add
+            // 127.0.0.1 when an existing bindIp line excludes it — then restart
+            // and wait for the port. If it still won't bind, the job throws with a
+            // clear "not listening" error for the operator to investigate.
+            $engine === 'mongodb' => <<<'BASH'
+set -e
+CONF=/etc/mongod.conf
+if [ -f "$CONF" ] && grep -qE '^[[:space:]]*bindIp:' "$CONF" && ! grep -E '^[[:space:]]*bindIp:.*127\.0\.0\.1' "$CONF" >/dev/null 2>&1; then
+  sed -i -E 's/^([[:space:]]*bindIp:[[:space:]]*)(.*)$/\1127.0.0.1,\2/' "$CONF"
+fi
+systemctl restart mongod
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if timeout 2 bash -c '</dev/tcp/127.0.0.1/27017' >/dev/null 2>&1; then break; fi
+  sleep 2
+done
 echo "loopback_listen_ensured"
 BASH,
             default => '',
@@ -387,6 +459,23 @@ EOF
 systemctl restart mysql 2>/dev/null || systemctl restart mariadb
 echo "remote_access_enabled"
 BASH,
+            // ClickHouse: make the server bind all interfaces so the HTTP (8123)
+            // and native (9000) ports are reachable on the private network — the
+            // network boundary is the UFW/cloud-firewall rule scoped to the
+            // allowed CIDR (synced by ToggleDatabaseEngineRemoteAccessJob), NOT
+            // ClickHouse auth, mirroring the mysql bind-address = 0.0.0.0 model.
+            'clickhouse' => <<<'BASH'
+set -e
+mkdir -p /etc/clickhouse-server/config.d
+cat > /etc/clickhouse-server/config.d/99-dply-listen.xml <<'EOF'
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+</clickhouse>
+EOF
+chown clickhouse:clickhouse /etc/clickhouse-server/config.d/99-dply-listen.xml 2>/dev/null || true
+systemctl restart clickhouse-server
+echo "remote_access_enabled"
+BASH,
             default => throw new \InvalidArgumentException("Remote access not supported for engine: {$engine}"),
         };
     }
@@ -428,11 +517,41 @@ EOF
 systemctl restart mysql 2>/dev/null || systemctl restart mariadb
 echo "remote_access_disabled"
 BASH,
+            'clickhouse' => <<<'BASH'
+set -e
+mkdir -p /etc/clickhouse-server/config.d
+cat > /etc/clickhouse-server/config.d/99-dply-listen.xml <<'EOF'
+<clickhouse>
+    <listen_host>127.0.0.1</listen_host>
+    <listen_host>::1</listen_host>
+</clickhouse>
+EOF
+chown clickhouse:clickhouse /etc/clickhouse-server/config.d/99-dply-listen.xml 2>/dev/null || true
+systemctl restart clickhouse-server
+echo "remote_access_disabled"
+BASH,
             default => throw new \InvalidArgumentException("Remote access not supported for engine: {$engine}"),
         };
     }
 
+    /**
+     * Engine-level remote access (server binds all interfaces; the firewall
+     * scopes the source CIDR). ClickHouse is included — its logs-store use case
+     * is the whole reason. {@see enableRemoteAccessScript}.
+     */
     public static function supportsRemoteAccess(string $engine): bool
+    {
+        return in_array($engine, ['postgres', 'mysql', 'mariadb', 'clickhouse'], true);
+    }
+
+    /**
+     * Per-DATABASE remote access (a single database/user grant scoped to a CIDR
+     * via pg_hba / a host-specific MySQL GRANT). Narrower than the engine-level
+     * toggle: ClickHouse and Mongo expose access at the server level only, so
+     * they're excluded here even though ClickHouse supports the engine-level form.
+     * {@see enableDatabaseRemoteAccessScript}.
+     */
+    public static function supportsPerDatabaseRemoteAccess(string $engine): bool
     {
         return in_array($engine, ['postgres', 'mysql', 'mariadb'], true);
     }
@@ -495,7 +614,7 @@ BASH;
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y gnupg curl ca-certificates lsb-release
-curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /usr/share/keyrings/timescaledb.gpg
+curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/timescaledb.gpg
 ARCH=$(dpkg --print-architecture)
 CODENAME=$(lsb_release -cs 2>/dev/null || echo jammy)
 echo "deb [signed-by=/usr/share/keyrings/timescaledb.gpg arch=${ARCH}] https://packagecloud.io/timescale/timescaledb/ubuntu/ ${CODENAME} main" > /etc/apt/sources.list.d/timescaledb.list

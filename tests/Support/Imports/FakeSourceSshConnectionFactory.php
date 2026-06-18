@@ -6,7 +6,7 @@ namespace Tests\Support\Imports;
 
 use App\Contracts\RemoteShell;
 use App\Models\ImportServerMigration;
-use App\Services\Imports\SourceSshConnectionFactory;
+use App\Modules\Imports\Services\SourceSshConnectionFactory;
 
 /**
  * Test double for SourceSshConnectionFactory — returns the RecordingShell

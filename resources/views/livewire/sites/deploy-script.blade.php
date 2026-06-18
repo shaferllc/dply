@@ -14,11 +14,16 @@
             $shellKind = \App\Models\SiteDeployHook::KIND_SHELL;
         @endphp
 
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Deploy script') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm text-brand-moss">{{ __('Plain shell commands run on each deploy, by phase. Start from a preset, then tweak — or use “Insert command” so you don’t have to remember the commands.') }}</p>
-            </div>
+        @unless ($isEmbedded)
+            <x-hero-card
+                :eyebrow="__('Deployments')"
+                :title="__('Deploy script')"
+                :description="__('Plain shell commands run on each deploy, by phase. Start from a preset, then tweak — or use “Insert command” so you don’t have to remember the commands.')"
+                icon="command-line"
+            />
+        @endunless
+
+        <div class="@unless ($isEmbedded) mt-5 @endunless flex flex-wrap items-start justify-end gap-3">
             {{-- Presets --}}
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Preset') }}</span>

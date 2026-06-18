@@ -4,22 +4,12 @@
             <x-livewire-validation-errors />
 
             {{-- Intro --}}
-            <section class="dply-card overflow-hidden">
-                <div class="p-6 sm:p-8">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            <x-heroicon-o-lock-closed class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Secret residency') }}</p>
-                            <h1 class="mt-1 text-xl font-semibold text-brand-ink">{{ __('Organization secrets') }}</h1>
-                            <p class="mt-2 max-w-2xl text-sm text-brand-moss">
-                                {{ __('Choose who holds the key that encrypts secrets you move off the plaintext .env, and register external stores your sites can reference. Move individual variables on each site\'s Environment tab.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <x-hero-card
+                :eyebrow="__('Secret residency')"
+                :title="__('Organization secrets')"
+                :description="__('Choose who holds the key that encrypts secrets you move off the plaintext .env, and register external stores your sites can reference. Move individual variables on each site\'s Environment tab.')"
+                icon="lock-closed"
+            />
 
             {{-- One-time identity reveal --}}
             @if ($revealed_identity)

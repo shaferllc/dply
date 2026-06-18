@@ -28,7 +28,7 @@ use Illuminate\Support\Collection;
  */
 final class SiteWorkerCoverage
 {
-    /** @var array<string, Collection<int, array<string, mixed>>> */
+    /** @var array<string, Collection<int, array{name: string, type: string, command: string, source: string, server_id: string, server_name: string, off_box: bool, instances: int, active: bool}>> */
     private static array $cache = [];
 
     /** Command substrings / process types that indicate a queue worker. */
@@ -64,10 +64,14 @@ final class SiteWorkerCoverage
 
         $ownServer = $site->server;
         if (! $ownServer instanceof Server) {
-            return self::$cache[$site->id] = collect();
+            /** @var Collection<int, array{name: string, type: string, command: string, source: string, server_id: string, server_name: string, off_box: bool, instances: int, active: bool}> $empty */
+            $empty = new Collection;
+
+            return self::$cache[$site->id] = $empty;
         }
 
-        $rows = collect();
+        /** @var Collection<int, array{name: string, type: string, command: string, source: string, server_id: string, server_name: string, off_box: bool, instances: int, active: bool}> $rows */
+        $rows = new Collection;
 
         // (1) + (2) — the site's own server. Supervisor programs scoped to this
         // site or server-wide, plus the site's own SiteProcesses.
@@ -103,7 +107,10 @@ final class SiteWorkerCoverage
                 });
         }
 
-        return self::$cache[$site->id] = $rows->values();
+        /** @var Collection<int, array{name: string, type: string, command: string, source: string, server_id: string, server_name: string, off_box: bool, instances: int, active: bool}> $workers */
+        $workers = $rows->values();
+
+        return self::$cache[$site->id] = $workers;
     }
 
     /** True when some ACTIVE worker anywhere drains this site's queue. */
@@ -157,7 +164,7 @@ final class SiteWorkerCoverage
     }
 
     /**
-     * @param  array<string, mixed>  $worker
+     * @param  array{name: string, type: string, command: string, source: string, server_id: string, server_name: string, off_box: bool, instances: int, active: bool}  $worker
      * @param  list<string>  $types
      * @param  list<string>  $needles
      */
@@ -201,7 +208,7 @@ final class SiteWorkerCoverage
     private static function fromProcess(SiteProcess $p, Server $server, bool $offBox): array
     {
         return [
-            'name' => (string) ($p->name !== null && $p->name !== '' ? $p->name : $p->type),
+            'name' => $p->name !== '' ? $p->name : (string) $p->type,
             'type' => (string) $p->type,
             'command' => (string) $p->command,
             'source' => 'systemd',

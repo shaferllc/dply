@@ -39,6 +39,7 @@ final class ServerManageToolsReport
      *     hero_tool: ?array<string, mixed>,
      * }
      */
+    /** @return array<string, mixed> */
     public function build(Server $server, array $serviceActions = []): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -212,7 +213,8 @@ final class ServerManageToolsReport
     }
 
     /**
-     * @param  array<string, mixed>  $def
+     * @param  array<string, mixed> $serviceActions
+     * @param  array<string, mixed> $def
      */
     private function toolVisible(array $def, bool $phpAvailable, bool $redisRelevant, Server $server): bool
     {
@@ -239,7 +241,7 @@ final class ServerManageToolsReport
     }
 
     /**
-     * @param  array<string, mixed>  $manageRedis
+     * @param  array<string, mixed> $manageRedis
      */
     private function redisRelevant(Server $server, array $manageRedis): bool
     {
@@ -292,7 +294,7 @@ final class ServerManageToolsReport
     }
 
     /**
-     * @param  array<string, mixed>  $meta
+     * @param  array<string, mixed> $meta
      */
     private function packageIsUpgradable(array $meta, string ...$packageNames): bool
     {

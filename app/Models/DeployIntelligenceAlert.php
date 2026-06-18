@@ -20,12 +20,16 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property ?string $subject_id
  * @property string $title
  * @property ?string $summary
- * @property ?array $payload
+ * @property ?array<string, mixed> $payload
  * @property ?Carbon $first_observed_at
  * @property ?Carbon $last_observed_at
  * @property ?Carbon $resolved_at
  * @property ?string $dismissed_by_user_id
  * @property ?Carbon $dismissed_at
+ * @property-read ?Organization $organization
+ * @property-read ?User $dismisser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class DeployIntelligenceAlert extends Model
 {
@@ -60,6 +64,7 @@ class DeployIntelligenceAlert extends Model
         'dismissed_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -71,16 +76,19 @@ class DeployIntelligenceAlert extends Model
         ];
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return MorphTo<Model, $this> */
     public function subject(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /** @return BelongsTo<User, $this> */
     public function dismisser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'dismissed_by_user_id');

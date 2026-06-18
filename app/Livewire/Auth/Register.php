@@ -7,7 +7,7 @@ use App\Http\Controllers\Auth\OAuthController;
 use App\Livewire\Forms\RegisterForm;
 use App\Models\BetaInvitation;
 use App\Models\User;
-use App\Services\Referrals\ReferralAttribution;
+use App\Modules\Referrals\Services\ReferralAttribution;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;

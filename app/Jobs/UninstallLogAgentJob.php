@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Server;
 use App\Models\ServerLogAgent;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\VectorLogAgentInstallScripts;
@@ -35,6 +36,9 @@ class UninstallLogAgentJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 600;
+
     public function uniqueId(): string
     {
         return 'uninstall-log-agent:'.$this->serverLogAgentId;
@@ -51,7 +55,7 @@ class UninstallLogAgentJob implements ShouldBeUnique, ShouldQueue
         }
 
         // No box to reach (deleted/non-VM) — just drop the row.
-        if ($agent->server === null || ! $agent->server->isVmHost()) {
+        if (! $agent->server->isVmHost()) {
             $agent->delete();
 
             return;

@@ -114,7 +114,7 @@ class ActionHealth
     /**
      * Check health of all actions.
      *
-     * @return Collection<array> Health status for all actions
+     * @return Collection<int, array<string, mixed>> Health status for all actions
      */
     public static function checkAll(): Collection
     {
@@ -134,11 +134,14 @@ class ActionHealth
     /**
      * Get unhealthy actions.
      *
-     * @return Collection<array> Unhealthy actions
+     * @return Collection<int, array<string, mixed>> Unhealthy actions
      */
     public static function getUnhealthyActions(): Collection
     {
-        return static::checkAll()->filter(fn ($result) => ! $result['healthy']);
+        /** @var Collection<int, array<string, mixed>> $unhealthy */
+        $unhealthy = static::checkAll()->filter(fn ($result) => ! $result['healthy']);
+
+        return $unhealthy;
     }
 
     /**

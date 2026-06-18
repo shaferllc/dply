@@ -159,7 +159,7 @@ class EdgeWorkerDeployCommand extends Command
             $deployable[] = $pattern;
         }
 
-        if ($deployable === [] && $context->workerRoutes !== []) {
+        if ($deployable === []) {
             $this->warn('No Worker routes deployed. Add the Edge delivery zone to Cloudflare first (see: php artisan dply:edge:doctor).');
         }
 

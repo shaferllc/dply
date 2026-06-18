@@ -7,7 +7,7 @@ namespace App\Console\Commands;
 use App\Models\EdgeAccessLog;
 use App\Models\EdgeWebVital;
 use App\Models\Site;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;

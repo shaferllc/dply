@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Ploi\PloiInventorySyncTest;
 
-use App\Services\Imports\ImportDriver;
+use App\Modules\Imports\Services\ImportDriver;
 
 final class FakeImportDriver implements ImportDriver
 {

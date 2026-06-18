@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Admin\Roadmap\Index as AdminRoadmapIndex;
-use App\Mail\RoadmapSuggestionStatusMail;
+use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
+use App\Modules\Roadmap\Mail\RoadmapSuggestionStatusMail;
 use App\Models\Organization;
 use App\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use App\Models\User;
-use App\Support\Roadmap\RoadmapQuarter;
+use App\Modules\Roadmap\Support\RoadmapQuarter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;

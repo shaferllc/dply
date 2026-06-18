@@ -16,6 +16,7 @@ use Illuminate\Support\Collection;
 final class CacheWorkspaceViewData
 {
     /**
+     * @param  Collection<int, ServerCacheService>  $cacheServices
      * @return array<string, mixed>
      */
     public static function for(Server $server, WorkspaceCaches $component, Collection $cacheServices): array

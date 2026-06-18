@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
  * In-progress draft for the multi-step server create wizard.
- *
  * One row per (user, organization). The payload column holds the entire ServerCreateForm
  * field set encrypted at rest (same APP_KEY mechanism used for ssh_private_key on Server).
  * Drafts auto-expire 14 days after the last save; a daily scheduled command prunes them.
@@ -25,10 +23,12 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $expires_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property-read ?User $user
+ * @property-read ?Organization $organization
  */
 class ServerCreateDraft extends Model
 {
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const TTL_DAYS = 14;
 
@@ -42,6 +42,7 @@ class ServerCreateDraft extends Model
         'expires_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -51,11 +52,13 @@ class ServerCreateDraft extends Model
         ];
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);

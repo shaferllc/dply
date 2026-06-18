@@ -54,20 +54,18 @@ class DestroySiteBackendJob implements ShouldQueue
         $backend->backendSite?->delete();
 
         $server = $backend->server;
-        if ($server !== null) {
-            $actor = $this->actorId !== null ? User::query()->find($this->actorId) : null;
-            try {
-                $deleteServer->execute($server, $actor, [
-                    'reason' => 'site_backend_scale_down',
-                    'site_id' => (string) $backend->site_id,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('site-backend teardown: server deletion failed', [
-                    'backend_id' => $backend->id,
-                    'server_id' => $server->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        $actor = $this->actorId !== null ? User::find($this->actorId) : null;
+        try {
+            $deleteServer->execute($server, $actor, [
+                'reason' => 'site_backend_scale_down',
+                'site_id' => (string) $backend->site_id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('site-backend teardown: server deletion failed', [
+                'backend_id' => $backend->id,
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $backend->delete();

@@ -133,7 +133,7 @@ class EdgeRepoConfigLoader
      * Values can be CF resource ids or titles — the auto-resolver
      * creates the resource on first use when given a title.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>}
      */
     private function normalizeBindings(mixed $value, array &$warnings): array
@@ -171,7 +171,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      */
     private function decode(string $sourcePath, string $raw, array &$warnings): mixed
     {
@@ -191,7 +191,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array<string, string>
      */
     private function normalizeBuild(mixed $value, array &$warnings): array
@@ -232,7 +232,7 @@ class EdgeRepoConfigLoader
      * into the env handed to Docker. Dashboard env vars win on conflict
      * (handled by the runner, not here).
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return list<string>
      */
     private function normalizeEnvFiles(mixed $value, array &$warnings): array
@@ -267,7 +267,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return list<array{from: string, to: string, status: int}>
      */
     private function normalizeRedirects(mixed $value, array &$warnings): array
@@ -302,7 +302,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return list<array{from: string, to: string}>
      */
     private function normalizeRewrites(mixed $value, array &$warnings): array
@@ -332,7 +332,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return list<array{for: string, values: array<string, string>}>
      */
     private function normalizeHeaders(mixed $value, array &$warnings): array
@@ -385,7 +385,7 @@ class EdgeRepoConfigLoader
      * file via `html_404_path` / `html_500_path`. The build runner
      * resolves paths to inline HTML before persisting on edgeMeta.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{html_404?: string, html_500?: string, html_404_path?: string, html_500_path?: string}
      */
     private function normalizeErrorPages(mixed $value, array &$warnings): array
@@ -422,7 +422,7 @@ class EdgeRepoConfigLoader
      * `html_path` (repo-relative file). When enabled, the worker
      * short-circuits every request with 503 + the configured HTML.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{enabled?: bool, html?: string, html_path?: string}
      */
     private function normalizeMaintenance(mixed $value, array &$warnings): array
@@ -459,7 +459,7 @@ class EdgeRepoConfigLoader
      * attached). Removing a hostname from `domains:` does NOT detach
      * — detaches are explicit only, via dashboard or API.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return list<string>
      */
     private function normalizeDomains(mixed $value, array &$warnings): array
@@ -503,7 +503,7 @@ class EdgeRepoConfigLoader
      * is a blacklist applied after the whitelist — useful for the
      * production branch you never want previewed.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{enabled?: bool, pr_only?: bool, branches?: list<string>, exclude_branches?: list<string>}
      */
     private function normalizePreviews(mixed $value, array &$warnings): array
@@ -606,7 +606,7 @@ class EdgeRepoConfigLoader
      * warning. The value isn't dropped — the user might genuinely
      * have a public key — but they get nudged.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{public?: array<string, string>, secret?: list<string>}
      */
     private function normalizeEnv(mixed $value, array &$warnings): array
@@ -680,7 +680,7 @@ class EdgeRepoConfigLoader
      * are generated server-side on enable; the file only expresses
      * intent.
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{enabled?: bool}
      */
     private function normalizeCommentWidget(mixed $value, array &$warnings): array
@@ -714,7 +714,7 @@ class EdgeRepoConfigLoader
      * cron-legal characters) — Cloudflare is the source of truth for
      * semantics. Max 5 schedules per site (CF limit).
      *
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return list<array{schedule: string, handler?: string}>
      */
     private function normalizeCrons(mixed $value, array &$warnings): array
@@ -758,7 +758,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{country_mode?: string, countries?: list<string>}
      */
     private function normalizeFirewall(mixed $value, array &$warnings): array
@@ -806,7 +806,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{url?: string, routes?: list<string>, failover_html?: string}
      */
     private function normalizeOrigin(mixed $value, array &$warnings): array
@@ -855,7 +855,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  list<string>  $warnings
+     * @param  array<string, mixed> $warnings
      * @return array{allowed_hosts?: list<string>}
      */
     private function normalizeImages(mixed $value, array &$warnings): array

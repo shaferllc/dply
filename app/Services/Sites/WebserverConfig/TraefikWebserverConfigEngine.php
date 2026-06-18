@@ -33,7 +33,7 @@ class TraefikWebserverConfigEngine implements WebserverConfigEngineInterface
 
     private function backendPort(Site $site): int
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $existing = $meta['traefik_backend_port'] ?? null;
         if (is_numeric($existing) && (int) $existing >= 20000) {
             return (int) $existing;
@@ -42,6 +42,8 @@ class TraefikWebserverConfigEngine implements WebserverConfigEngineInterface
         return 20000 + (abs(crc32((string) $site->getKey())) % 20000);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function validateLocal(string $config): array
     {
         return [
@@ -50,6 +52,8 @@ class TraefikWebserverConfigEngine implements WebserverConfigEngineInterface
         ];
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function validateRemote(Site $site, string $config, ?SiteWebserverConfigProfile $profile): array
     {
         return [

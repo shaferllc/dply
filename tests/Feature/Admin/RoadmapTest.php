@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Admin\Roadmap\Index as AdminRoadmapIndex;
+use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\RoadmapItem;

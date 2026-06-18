@@ -158,11 +158,16 @@ enum DeploymentMethod: string
     /** Whether the site's backend group has a load balancer provisioned + linked. */
     private function hasLinkedBalancer(Site $site): bool
     {
-        return is_string($site->backendGroup()['load_balancer_id'] ?? null)
-            && ($site->backendGroup()['load_balancer_id'] ?? '') !== '';
+        $loadBalancerId = $site->backendGroup()['load_balancer_id'];
+
+        return is_string($loadBalancerId) && $loadBalancerId !== '';
     }
 
-    /** Methods a site can currently choose, in display order. */
+    /**
+     * Methods a site can currently choose, in display order.
+     *
+     * @return list<self>
+     */
     public static function availableForSite(Site $site): array
     {
         return array_values(array_filter(

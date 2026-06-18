@@ -47,6 +47,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Wedged-probe-worker self-heal threshold
+    |--------------------------------------------------------------------------
+    |
+    | There is no liveness detection for probe workers (see `probe_workers`): a
+    | check is dispatched onto the worker's queue and assumed to run. If that
+    | queue's consumer dies (worker box down, Horizon stops watching the queue),
+    | the jobs pile up unconsumed and `last_checked_at` stops advancing — every
+    | monitor on that worker silently freezes, exactly when you most want to know.
+    |
+    | Guard: when a due monitor hasn't been checked in longer than this many
+    | minutes (i.e. far past even the down-cadence), the dispatcher assumes its
+    | probe worker is wedged and routes THIS cycle's check onto the central
+    | `default` queue instead, which the main app Horizon always drains. Region
+    | accuracy is sacrificed for liveness — a check from the wrong region beats no
+    | check at all. Set comfortably above down_check_interval_minutes to avoid
+    | falling back on a normally backed-off down monitor.
+    */
+    'probe_stall_minutes' => max(10, min(360, (int) env('DPLY_SITE_UPTIME_PROBE_STALL_MINUTES', 30))),
+
+    /*
+    |--------------------------------------------------------------------------
     | SSL certificate checks
     |--------------------------------------------------------------------------
     |

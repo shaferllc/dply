@@ -40,8 +40,8 @@ final class EdgeUsageGuardrail
             ->selectRaw('COALESCE(SUM(requests), 0) AS requests, COALESCE(SUM(bytes_egress), 0) AS bytes_egress')
             ->first();
 
-        $requests = (int) ($totals?->requests ?? 0);
-        $bytesEgress = (int) ($totals?->bytes_egress ?? 0);
+        $requests = (int) ($totals->requests ?? 0);
+        $bytesEgress = (int) ($totals->bytes_egress ?? 0);
 
         $state = $this->resolveState(
             requests: $requests,

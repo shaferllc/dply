@@ -8,6 +8,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $content
+ * @property string $content_after
+ * @property string $content_before
+ * @property string $engine
+ * @property string $label
+ * @property ?string $organization_id
+ * @property ?string $user_id
+ * @property-read ?Organization $organization
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class WebserverTemplate extends Model
 {
     /** @use HasFactory<WebserverTemplateFactory> */
@@ -43,11 +57,13 @@ class WebserverTemplate extends Model
         return self::ENGINES[$this->engine] ?? ucfirst((string) $this->engine);
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

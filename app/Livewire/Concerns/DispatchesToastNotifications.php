@@ -3,7 +3,11 @@
 namespace App\Livewire\Concerns;
 
 use App\Support\NotificationToastPosition;
+use Livewire\Component;
 
+/**
+ * @phpstan-require-extends Component
+ */
 trait DispatchesToastNotifications
 {
     protected function toastSuccess(string|\Stringable $message): void

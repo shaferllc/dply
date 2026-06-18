@@ -16,7 +16,7 @@ class ContainerPublicationManager
 
     public function provision(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $runtimeTarget = is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : [];
         $publication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 
@@ -57,7 +57,7 @@ class ContainerPublicationManager
                 'url' => $preview?->hostname ? 'http://'.$preview->hostname : null,
                 'port' => $port,
                 'dns_provider' => $preview?->provider_type,
-                'status' => $preview?->dns_status ?? 'pending',
+                'status' => $preview->dns_status ?? 'pending',
                 'published_at' => now()->toIso8601String(),
             ]);
             $runtimeTarget['status'] = $runtimeTarget['status'] ?? 'pending';
@@ -79,7 +79,7 @@ class ContainerPublicationManager
                 'hostname' => $preview?->hostname,
                 'url' => $preview?->hostname ? 'http://'.$preview->hostname : null,
                 'dns_provider' => $preview?->provider_type,
-                'status' => $preview?->dns_status ?? 'pending',
+                'status' => $preview->dns_status ?? 'pending',
                 'published_at' => now()->toIso8601String(),
             ]);
         }
@@ -91,6 +91,7 @@ class ContainerPublicationManager
     /**
      * @return array{ok: bool, hostname: ?string, url: ?string, error: ?string, checked_at: string, checks: array<int, array<string, mixed>>}
      */
+    /** @return array<string, mixed> */
     public function readyResult(Site $site): array
     {
         $runtimeTarget = $site->runtimeTarget();
@@ -151,7 +152,7 @@ class ContainerPublicationManager
 
     private function storePublicationStatus(Site $site, string $status): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $runtimeTarget = is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : [];
         $publication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 

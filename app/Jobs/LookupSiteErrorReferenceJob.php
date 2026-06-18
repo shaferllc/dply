@@ -37,7 +37,7 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -52,7 +52,7 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
 
     public function handle(SiteErrorReferenceResolver $resolver): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }
@@ -85,7 +85,10 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
                     'level' => $primary['level'] ?? __('ERROR'),
                     'message' => $primary['message'] ?? '',
                 ]));
-                foreach (array_slice($primary['trace'] ?? [], 0, 20) as $traceLine) {
+                // Emit the entire parsed stack trace — operators need the full
+                // frame list to diagnose, and the console banner is scrollable
+                // with a copy-all button, so there's no reason to truncate it.
+                foreach ($primary['trace'] ?? [] as $traceLine) {
                     $emit->info($traceLine);
                 }
             }

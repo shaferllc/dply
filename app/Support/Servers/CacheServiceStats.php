@@ -119,7 +119,7 @@ class CacheServiceStats
     }
 
     /**
-     * @param  array<string, string>  $parsed
+     * @param  array<string, mixed> $parsed
      * @return array<string, mixed>
      */
     private function buildOverviewPayload(string $engine, array $parsed): array
@@ -321,7 +321,7 @@ class CacheServiceStats
 
             $rows[] = [
                 'id' => (string) ($kv['id'] ?? ''),
-                'addr' => (string) ($kv['addr'] ?? ''),
+                'addr' => (string) $kv['addr'],
                 'name' => (string) ($kv['name'] ?? ''),
                 'age' => (string) ($kv['age'] ?? ''),
                 'idle' => (string) ($kv['idle'] ?? ''),

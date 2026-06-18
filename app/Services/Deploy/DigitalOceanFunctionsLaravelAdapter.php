@@ -35,6 +35,7 @@ class DigitalOceanFunctionsLaravelAdapter
      *
      * @return array{laravel: bool, handler: string, function: string}
      */
+    /** @return array<string, mixed> */
     public function plan(string $workingDirectory): array
     {
         return [
@@ -51,6 +52,7 @@ class DigitalOceanFunctionsLaravelAdapter
      *
      * @return array{laravel: bool, handler: string, function: string, ran: bool, output: string}
      */
+    /** @return array<string, mixed> */
     public function inject(string $workingDirectory): array
     {
         $plan = $this->plan($workingDirectory);

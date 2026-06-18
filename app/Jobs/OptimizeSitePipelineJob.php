@@ -9,6 +9,8 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\Sites\OctaneRuntimeVerifier;
+use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -64,7 +66,12 @@ class OptimizeSitePipelineJob implements ShouldQueue
             $composer = $this->readJson($conn, $dir.'/composer.json');
             $locks = $this->detectLocks($conn, $dir);
 
-            $needed = $this->plan($pkg, $composer, $locks, $emit);
+            // We're already on the box — verify Octane here rather than trusting
+            // composer.json, refresh the cached verdict the advisor reads, and
+            // only let plan() propose octane:reload when Octane really serves.
+            $octaneOk = $this->verifyOctane($conn, $site, $dir, $composer, $emit);
+
+            $needed = $this->plan($pkg, $composer, $locks, $octaneOk, $emit);
             if ($needed === []) {
                 $this->storePreview($site, []);
                 $emit->success('scan', 'No pipeline changes needed — your pipeline already covers what the repo requires.');
@@ -81,15 +88,22 @@ class OptimizeSitePipelineJob implements ShouldQueue
             $pipeline = $pipelines->ensureDefaultPipeline($site);
             $existing = $pipeline->steps()->get();
             $existingTypes = $existing->pluck('step_type')->map(static fn ($t): string => (string) $t)->all();
-            $existingCustom = $existing->where('step_type', SiteDeployStep::TYPE_CUSTOM)
-                ->map(static fn ($s): string => strtolower((string) $s->custom_command));
+            /** @var \Illuminate\Support\Collection<int, lowercase-string> $existingCustom */
+            $existingCustom = $existing
+                ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
+                ->map(static function (SiteDeployStep $s): string {
+                    return strtolower($s->custom_command);
+                });
 
             $proposed = [];
             foreach ($needed as $step) {
                 $isCustom = $step['type'] === SiteDeployStep::TYPE_CUSTOM;
-                $already = $isCustom
-                    ? $existingCustom->contains(static fn (string $c): bool => $c === strtolower((string) $step['command']))
-                    : in_array($step['type'], $existingTypes, true);
+                if ($isCustom) {
+                    $command = strtolower((string) $step['command']);
+                    $already = $existingCustom->contains(static fn (string $c): bool => $c === $command);
+                } else {
+                    $already = in_array($step['type'], $existingTypes, true);
+                }
 
                 if ($already) {
                     continue;
@@ -123,9 +137,10 @@ class OptimizeSitePipelineJob implements ShouldQueue
      * @param  array<string, mixed>|null  $pkg
      * @param  array<string, mixed>|null  $composer
      * @param  list<string>  $locks
+     * @param  bool  $octaneOk  Octane was probed and confirmed installed + serving.
      * @return list<array{type: string, phase: string, command: ?string, label: string}>
      */
-    private function plan(?array $pkg, ?array $composer, array $locks, ConsoleEmitter $emit): array
+    private function plan(?array $pkg, ?array $composer, array $locks, bool $octaneOk, ConsoleEmitter $emit): array
     {
         $needed = [];
 
@@ -165,12 +180,41 @@ class OptimizeSitePipelineJob implements ShouldQueue
             // managed restart (guarded on the package + command existing), so we
             // no longer add an explicit horizon:terminate step — it was redundant
             // and, in the release phase, bounced workers onto the old release.
-            if (isset($require['laravel/octane'])) {
+            // Only when the box-side probe confirmed Octane is installed AND
+            // serving this site — composer alone isn't enough (a require-dev /
+            // FPM-served app would make octane:reload a no-op or failure).
+            if (isset($require['laravel/octane']) && $octaneOk) {
                 $needed[] = ['type' => SiteDeployStep::TYPE_CUSTOM, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => 'php artisan octane:reload', 'label' => 'Reload Octane'];
             }
         }
 
         return $needed;
+    }
+
+    /**
+     * Probe Octane on the box (it's already connected), persist the verdict the
+     * advisor reads, and return whether it's installed AND serving. Returns
+     * false (and skips the probe) when composer doesn't declare laravel/octane.
+     *
+     * @param  array<string, mixed>|null  $composer
+     */
+    private function verifyOctane(SshConnection $conn, Site $site, string $dir, ?array $composer, ConsoleEmitter $emit): bool
+    {
+        $require = is_array($composer['require'] ?? null) ? array_change_key_case($composer['require'], CASE_LOWER) : [];
+        if (! isset($require['laravel/octane'])) {
+            return false;
+        }
+
+        $port = filled($site->octane_port) ? (int) $site->octane_port : null;
+        $raw = $conn->exec(OctaneRuntimeVerifier::probeScript($dir, $port), 45);
+        $verdict = OctaneRuntimeVerifier::interpret($raw);
+        OctaneRuntimeVerifier::persist($site, $verdict);
+
+        $emit->step('scan', $verdict['ok']
+            ? 'Octane verified — installed and serving this site.'
+            : 'Octane is in composer but not serving this site — skipping octane:reload ('.$verdict['reason'].').');
+
+        return $verdict['ok'];
     }
 
     /**
@@ -204,7 +248,7 @@ class OptimizeSitePipelineJob implements ShouldQueue
     /**
      * @return array<string, mixed>|null
      */
-    private function readJson($conn, string $path): ?array
+    private function readJson(SshConnection $conn, string $path): ?array
     {
         $raw = $conn->exec('cat '.escapeshellarg($path).' 2>/dev/null', 15);
         $raw = trim($raw);
@@ -219,7 +263,7 @@ class OptimizeSitePipelineJob implements ShouldQueue
     /**
      * @return list<string>
      */
-    private function detectLocks($conn, string $dir): array
+    private function detectLocks(SshConnection $conn, string $dir): array
     {
         $cmd = 'cd '.escapeshellarg($dir).' 2>/dev/null && for f in package-lock.json yarn.lock pnpm-lock.yaml bun.lockb composer.lock; do [ -f "$f" ] && echo "$f"; done';
         $out = $conn->exec($cmd, 15);
@@ -236,7 +280,7 @@ class OptimizeSitePipelineJob implements ShouldQueue
      */
     private function storePreview(Site $site, array $proposed): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
 
         if ($proposed === []) {
             unset($meta['pipeline_optimize_preview']);

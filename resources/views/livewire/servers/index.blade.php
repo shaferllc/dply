@@ -178,44 +178,46 @@
             </div>
         @endif
 
-        <x-page-header
+        @php
+            $summaryStats = [
+                ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'], 'tone' => 'text-brand-sage'],
+                ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'], 'tone' => 'text-brand-sage'],
+                ['icon' => 'heroicon-o-exclamation-triangle', 'label' => __('Attention'), 'value' => $summary['attention'], 'tone' => $summary['attention'] > 0 ? 'text-amber-500' : 'text-brand-mist'],
+                ['icon' => 'heroicon-o-globe-alt', 'label' => __('Sites'), 'value' => $summary['sites'], 'tone' => 'text-brand-sage'],
+            ];
+        @endphp
+        <x-hero-card
+            icon="server-stack"
+            iconSize="md"
+            :eyebrow="__('Fleet')"
             :title="__('Servers')"
             :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
-            flush
-            compact
-            toolbar
         >
-            <x-slot name="leading">
-                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                    <x-heroicon-o-server-stack class="h-7 w-7 text-brand-ink" aria-hidden="true" />
-                </span>
-            </x-slot>
-            <x-slot name="actions">
-                @can('create', App\Models\Server::class)
-                    @if (multi_surface_active())
-                        <a
-                            href="{{ route('launches.create') }}"
-                            wire:navigate
-                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                        >
-                            <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Open launchpad') }}
-                        </a>
-                    @else
-                        <a
-                            href="{{ route('servers.create') }}"
-                            wire:navigate
-                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                        >
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Create a server') }}
-                        </a>
-                    @endif
-                @endcan
+            @can('create', App\Models\Server::class)
+                @if (multi_surface_active())
+                    <a
+                        href="{{ route('launches.create') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Open launchpad') }}
+                    </a>
+                @else
+                    <a
+                        href="{{ route('servers.create') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Create a server') }}
+                    </a>
+                @endif
+            @endcan
 
-                {{-- Secondary actions collapse into one menu so the top bar stays
-                     a single primary CTA + overflow, not a wall of equal buttons. --}}
-                <x-dropdown align="right" width="w-64">
+            {{-- Secondary actions collapse into one menu so the top bar stays
+                 a single primary CTA + overflow, not a wall of equal buttons. --}}
+            <x-dropdown align="right" width="w-64">
                     <x-slot name="trigger">
                         <button type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                             <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
@@ -246,8 +248,21 @@
                         </a>
                     </x-slot>
                 </x-dropdown>
-            </x-slot>
-        </x-page-header>
+
+            <x-slot:stats>
+                <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    @foreach ($summaryStats as $stat)
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 shadow-sm sm:min-w-[6.5rem]">
+                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
+                                <span class="truncate">{{ $stat['label'] }}</span>
+                            </dt>
+                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </x-slot:stats>
+        </x-hero-card>
 
         @feature('surface.fleet')
             @php
@@ -284,29 +299,9 @@
             </nav>
         @endfeature
 
-        @php
-            $summaryStats = [
-                ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'], 'tone' => 'text-brand-sage'],
-                ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'], 'tone' => 'text-brand-sage'],
-                ['icon' => 'heroicon-o-exclamation-triangle', 'label' => __('Attention'), 'value' => $summary['attention'], 'tone' => $summary['attention'] > 0 ? 'text-amber-500' : 'text-brand-mist'],
-                ['icon' => 'heroicon-o-globe-alt', 'label' => __('Sites'), 'value' => $summary['sites'], 'tone' => 'text-brand-sage'],
-            ];
-        @endphp
-        <div class="dply-card overflow-hidden">
-            <dl class="grid grid-cols-2 divide-y divide-brand-ink/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-                @foreach ($summaryStats as $stat)
-                    <div class="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                        <dt class="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                            <x-dynamic-component :component="$stat['icon']" class="h-4 w-4 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
-                            <span class="truncate">{{ $stat['label'] }}</span>
-                        </dt>
-                        <dd class="text-xl font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
-                    </div>
-                @endforeach
-            </dl>
-
-            @if ($hasServersInScope)
-                <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:px-5">
+        @if ($hasServersInScope)
+            <div class="dply-card overflow-hidden">
+                <div class="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-5">
                     <div class="min-w-[14rem] flex-1">
                         <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
                         <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
@@ -363,8 +358,8 @@
                         {{ __('Reset') }}
                     </button>
                 </div>
-            @endif
-        </div>
+            </div>
+        @endif
 
         @unless ($hasProviderCredentials)
             <section class="dply-card overflow-hidden border-amber-200">
@@ -561,6 +556,80 @@
                 @endif
             </div>
         @endif
+    </div>
+
+    {{-- Global deploy console: opens when Deploy / Sync is clicked on a fleet
+         card so the launched deploy(s) can be watched live without leaving the
+         page. Mirrors the per-site deploy sidebar's console; reuses the same
+         live row partial. The `deploy-console-open` window event is dispatched
+         by watchDeploys(). --}}
+    <div x-data="{ deployConsoleOpen: false }" x-on:deploy-console-open.window="deployConsoleOpen = true">
+        {{-- Floating re-opener: keeps the launched deploy reachable after the
+             console is dismissed. Bottom-left to clear the SSH console button. --}}
+        @if (count($this->watchedRows) > 0)
+            <button
+                type="button"
+                x-show="!deployConsoleOpen"
+                x-on:click="deployConsoleOpen = true"
+                class="fixed bottom-4 left-4 z-40 inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white px-3.5 py-2 text-xs font-semibold text-brand-ink shadow-lg shadow-brand-ink/15 transition hover:bg-brand-sand/40"
+                title="{{ __('Open deploy console') }}"
+            >
+                @if ($this->watchedInProgress)
+                    <x-spinner size="sm" />
+                    {{ trans_choice('Deploying :n site|Deploying :n sites', count($this->watchedRows), ['n' => count($this->watchedRows)]) }}
+                @else
+                    <x-heroicon-m-check-circle class="h-4 w-4 text-emerald-600" />
+                    {{ __('Deploys finished') }}
+                @endif
+            </button>
+        @endif
+
+        <div x-show="deployConsoleOpen" x-cloak class="fixed inset-0 z-50" style="display: none;">
+            <div class="absolute inset-0 bg-brand-ink/40" x-on:click="deployConsoleOpen = false" x-transition.opacity></div>
+            <div
+                class="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="translate-x-full"
+                x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="translate-x-full"
+            >
+                <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy console') }}</p>
+                        <p class="truncate text-sm font-semibold text-brand-ink">
+                            @if ($this->watchedInProgress)
+                                {{ trans_choice('Deploying :n site|Deploying :n sites', count($this->watchedRows), ['n' => count($this->watchedRows)]) }}
+                            @else
+                                {{ trans_choice('{0}No deploys yet|{1}:n deploy|[2,*]:n deploys', count($this->watchedRows), ['n' => count($this->watchedRows)]) }}
+                            @endif
+                        </p>
+                    </div>
+                    <button type="button" x-on:click="deployConsoleOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div class="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 py-4" @if ($this->watchedInProgress) wire:poll.3s @endif>
+                    @forelse ($this->watchedRows as $row)
+                        @include('livewire.sites.partials._deploy-console-row', ['row' => $row, 'keyPrefix' => 'fleet'])
+                    @empty
+                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-10 text-center text-sm text-brand-moss">
+                            {{ __('Hit Deploy or Sync on a server to watch it here.') }}
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-3 text-center text-[11px] text-brand-moss">
+                    @if ($this->watchedInProgress)
+                        <span class="inline-flex items-center gap-1.5"><x-spinner size="sm" /> {{ __('Deploying — this updates live.') }}</span>
+                    @elseif (count($this->watchedRows) > 0)
+                        {{ __('All deploys finished.') }}
+                    @endif
+                </div>
+            </div>
+        </div>
     </div>
 
     @include('livewire.servers.partials.remove-server-modal', [

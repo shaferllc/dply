@@ -32,7 +32,7 @@ final class SharedHostBudgetEvaluator
     public function breaches(Server $server, array $rows, bool $usePeakShares = false): array
     {
         $settings = $this->budgets->forServer($server);
-        if (! ($settings['alerts_enabled'] ?? true)) {
+        if (! ($settings['alerts_enabled'])) {
             return [];
         }
 
@@ -48,7 +48,7 @@ final class SharedHostBudgetEvaluator
 
             $budget = $this->budgets->budgetForSite($server, $slug);
             $site = $sitesBySlug->get($slug);
-            $name = (string) ($row['name'] ?? ($site?->name ?? $slug));
+            $name = (string) ($row['name'] ?? ($site->name ?? $slug));
 
             $cpuShare = $usePeakShares
                 ? ($row['peak_cpu_share_pct'] ?? $row['cpu_share_pct'] ?? null)

@@ -28,9 +28,9 @@ final class ServerDockerRemoteInspector
         }
 
         try {
-            $out = $this->runDockerScript($server, 'docker-ps-all', <<<'BASH'
-docker ps -a --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.State}}\t{{.Ports}}' 2>/dev/null | head -n 500
-BASH);
+            $out = $this->runDockerScript($server, 'docker-ps-all', sprintf(<<<'BASH'
+docker ps -a --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.State}}\t{{.Ports}}' 2>/dev/null | head -n %d
+BASH, self::MAX_LINES));
         } catch (\Throwable $e) {
             return ['containers' => [], 'error' => $e->getMessage()];
         }

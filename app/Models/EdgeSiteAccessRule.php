@@ -8,6 +8,19 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property list<string> $allowed_emails
+ * @property string $cookie_secret
+ * @property string $mode
+ * @property string $password_hash
+ * @property string $password_salt
+ * @property string $password_verifier
+ * @property ?string $site_id
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class EdgeSiteAccessRule extends Model
 {
     use HasUlids;
@@ -28,6 +41,7 @@ class EdgeSiteAccessRule extends Model
         'allowed_emails',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,6 +50,7 @@ class EdgeSiteAccessRule extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
@@ -51,11 +66,9 @@ class EdgeSiteAccessRule extends Model
      */
     public function normalizedAllowedEmails(): array
     {
-        $emails = is_array($this->allowed_emails) ? $this->allowed_emails : [];
-
         return array_values(array_unique(array_filter(array_map(
-            static fn ($email): string => is_string($email) ? strtolower(trim($email)) : '',
-            $emails,
+            static fn (string $email): string => strtolower(trim($email)),
+            $this->allowed_emails,
         ))));
     }
 }

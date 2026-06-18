@@ -1,8 +1,3 @@
-<x-section-card>
-    <h3 class="text-base font-semibold text-brand-ink">{{ __('How to use operations') }}</h3>
-    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('This tab is for day-two work: reviewing what changed, seeing whether the grouped resources are healthy, capturing runbooks, and routing the right alerts. Check here first during incident response or before planned maintenance.') }}</p>
-</x-section-card>
-
 <x-section-card tone="subtle">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="max-w-2xl">

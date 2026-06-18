@@ -33,3 +33,9 @@ Thumbs.db
 .env.prod
 .env.worker
 .env.*.local
+
+storage/blaze/traces/
+
+# refactor helper (local only)
+.dply-extract.py
+.defract-worktrees

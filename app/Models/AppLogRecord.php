@@ -4,18 +4,26 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Console\Commands\LogDrainListen;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
- * One application log record received from a site via the dply Realtime drain
- * (Phase 5). Written by the drain receiver ({@see \App\Console\Commands\LogDrainListen})
- * and read by the App logs panel. Append-only — a row is written once.
- *
+ * @property string $id
+ *                      One application log record received from a site via the dply Realtime drain
+ *                      (Phase 5). Written by the drain receiver ({@see LogDrainListen})
+ *                      and read by the App logs panel. Append-only — a row is written once.
  * @property string $site_id
  * @property string|null $level
  * @property string $message
+ * @property string $channel
+ * @property array<string, mixed> $context
+ * @property ?Carbon $created_at
+ * @property ?Carbon $logged_at
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class AppLogRecord extends Model
 {
@@ -36,6 +44,7 @@ class AppLogRecord extends Model
         'created_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,6 +54,7 @@ class AppLogRecord extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

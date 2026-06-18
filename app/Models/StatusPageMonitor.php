@@ -3,14 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ * @property string $label
+ * @property ?string $monitorable_id
+ * @property string $monitorable_type
+ * @property string $sort_order
+ * @property ?string $status_page_id
+ * @property-read ?StatusPage $statusPage
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class StatusPageMonitor extends Model
 {
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     protected $fillable = [
         'status_page_id',
@@ -20,11 +30,13 @@ class StatusPageMonitor extends Model
         'sort_order',
     ];
 
+    /** @return BelongsTo<StatusPage, $this> */
     public function statusPage(): BelongsTo
     {
         return $this->belongsTo(StatusPage::class);
     }
 
+    /** @return MorphTo<Model, $this> */
     public function monitorable(): MorphTo
     {
         return $this->morphTo();

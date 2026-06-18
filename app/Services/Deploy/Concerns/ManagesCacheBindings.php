@@ -19,7 +19,7 @@ trait ManagesCacheBindings
      * (and the legacy CACHE_DRIVER alias so pre-11 apps pick it up too). Redis
      * needs the Redis binding attached to supply the connection variables.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachCache(Site $site, array $params): SiteBinding
     {

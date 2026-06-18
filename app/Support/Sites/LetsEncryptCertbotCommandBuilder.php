@@ -47,7 +47,7 @@ final class LetsEncryptCertbotCommandBuilder
             default => '',
         };
 
-        return "command -v certbot >/dev/null 2>&1 || { "
+        return 'command -v certbot >/dev/null 2>&1 || { '
             ."echo '[dply] certbot not present — installing for cert issuance…'; "
             .'DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true; '
             .'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends certbot'.$plugin.' || true; '
@@ -159,7 +159,7 @@ BASH;
      */
     private static function acmePreflightScript(array $domains, string $webrootEscaped): string
     {
-        $hostname = $domains[0] ?? '';
+        $hostname = $domains[0];
         if ($hostname === '') {
             return '';
         }

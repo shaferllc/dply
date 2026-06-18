@@ -8,8 +8,8 @@ use App\Models\ExternalSecretStore;
 use App\Models\OrgSecretKey;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
-use App\Services\Secrets\External\SecretStoreDriverFactory;
-use App\Services\Secrets\OrgSecretKeyManager;
+use App\Modules\Secrets\Services\External\SecretStoreDriverFactory;
+use App\Modules\Secrets\Services\OrgSecretKeyManager;
 use RuntimeException;
 
 /**
@@ -37,11 +37,12 @@ class SecretResidencyResolver
     ) {}
 
     /**
-     * @param  array<string, string>  $vars  the merged env map (loose + bindings)
+     * @param  array<string, mixed> $vars  the merged env map (loose + bindings)
      * @param  string|null  $ephemeralIdentity  a customer-held age identity supplied
-     *   for THIS push only and never persisted (Tier 2b). Null for every other tier.
+     *                                          for THIS push only and never persisted (Tier 2b). Null for every other tier.
      * @return array<string, string>
      */
+    /** @return array<string, mixed> */
     public function resolve(Site $site, array $vars, ?string $ephemeralIdentity = null): array
     {
         if (! $this->hasPlaceholder($vars)) {
@@ -59,7 +60,7 @@ class SecretResidencyResolver
 
         $resolved = [];
         foreach ($vars as $key => $value) {
-            $resolved[$key] = (is_string($value) && $byPlaceholder->has($value))
+            $resolved[$key] = (($value) && $byPlaceholder->has($value))
                 ? $this->resolveOne($byPlaceholder->get($value), $orgKey, $ephemeralIdentity)
                 : $value;
         }
@@ -68,12 +69,32 @@ class SecretResidencyResolver
     }
 
     /**
-     * @param  array<string, string>  $vars
+     * Whether deploying/pushing this site needs the customer to supply an age
+     * identity: it has escrowed (Tier 2) secrets AND the org key is customer-held
+     * @param  array<string, mixed> $vars
+     * (dply holds no identity, so it cannot decrypt them on its own).
+     */
+    public function requiresEphemeralIdentity(Site $site): bool
+    {
+        if ($site->organization_id === null) {
+            return false;
+        }
+        if (! $site->secretResidencies()->where('mode', SiteSecretResidency::MODE_ESCROW)->exists()) {
+            return false;
+        }
+
+        $orgKey = $site->organization?->secretKey;
+
+        return $orgKey !== null && ! $orgKey->dplyCanDecrypt();
+    }
+
+    /**
+     * @param  array<string, mixed> $vars
      */
     private function hasPlaceholder(array $vars): bool
     {
         foreach ($vars as $value) {
-            if (is_string($value) && str_contains($value, self::PLACEHOLDER_MARKER)) {
+            if (($value) && str_contains($value, self::PLACEHOLDER_MARKER)) {
                 return true;
             }
         }

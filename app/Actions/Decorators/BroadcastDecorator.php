@@ -17,11 +17,15 @@ class BroadcastDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         $result = $this->callMethod('handle', $arguments);
@@ -31,7 +35,10 @@ class BroadcastDecorator
         return $result;
     }
 
-    protected function broadcastEvent($result, array $arguments): void
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    protected function broadcastEvent(mixed $result, array $arguments): void
     {
         $channel = $this->getBroadcastChannel(...$arguments);
         $eventName = $this->getBroadcastEventName();
@@ -45,6 +52,9 @@ class BroadcastDecorator
         if (class_exists(Channel::class)) {
             broadcast(new class($channel, $eventName, $payload) extends Channel
             {
+                /**
+                 * @param  array<string, mixed>  $payload
+                 */
                 public function __construct(
                     public string $channelName,
                     public string $eventName,
@@ -58,6 +68,9 @@ class BroadcastDecorator
                     return $this->eventName;
                 }
 
+                /**
+                 * @return array<string, mixed>
+                 */
                 public function broadcastWith(): array
                 {
                     return $this->payload;
@@ -66,7 +79,7 @@ class BroadcastDecorator
         }
     }
 
-    protected function getBroadcastChannel(...$arguments): ?string
+    protected function getBroadcastChannel(mixed ...$arguments): ?string
     {
         if ($this->hasMethod('getBroadcastChannel')) {
             return $this->callMethod('getBroadcastChannel', $arguments);
@@ -84,7 +97,11 @@ class BroadcastDecorator
         return class_basename($this->action);
     }
 
-    protected function getBroadcastPayload($result, array $arguments): array
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @return array<string, mixed>
+     */
+    protected function getBroadcastPayload(mixed $result, array $arguments): array
     {
         if ($this->hasMethod('getBroadcastPayload')) {
             return $this->callMethod('getBroadcastPayload', [$result, $arguments]);

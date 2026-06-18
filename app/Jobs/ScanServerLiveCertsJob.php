@@ -34,7 +34,7 @@ class ScanServerLiveCertsJob implements ShouldQueue
 
     public function handle(WebserverCertsAggregator $aggregator): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $aggregator->cacheUnreadable($this->serverId);
 

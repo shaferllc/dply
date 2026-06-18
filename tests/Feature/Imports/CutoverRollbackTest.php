@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\CutoverRollbackTest;
 
-use App\Livewire\Imports\Ploi\MigrationProgress;
+use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Imports\StepOrchestrator;
-use App\Services\Imports\StepRegistry;
+use App\Modules\Imports\Services\StepOrchestrator;
+use App\Modules\Imports\Services\StepRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;

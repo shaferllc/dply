@@ -618,6 +618,7 @@ trait AsNotification
      * Get the notification's delivery channels.
      *
      * @param  mixed  $notifiable
+     * @return array<int, string>
      */
     public function via($notifiable): array
     {

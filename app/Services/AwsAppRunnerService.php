@@ -55,7 +55,7 @@ class AwsAppRunnerService
      * are App Runner's standard slugs (e.g. 0.25 vCPU / 0.5 GB =
      * "256" / "512").
      *
-     * @param  array<string, string>  $envVars
+     * @param  array<string, mixed> $envVars
      * @return array{service_arn: string, service_url: ?string}
      */
     public function createService(
@@ -111,8 +111,9 @@ class AwsAppRunnerService
      * operator authorizes a GitHub App once per AWS account; the
      * connection ARN is what we keep on the ProviderCredential.
      *
-     * @param  array<string, string>  $envVars
+     * @param  array<string, mixed> $envVars
      * @return array{service_arn: string, service_url: ?string}
+     * @param  array<string, mixed> $buildEnvVars
      */
     public function createServiceFromSource(
         string $serviceName,
@@ -174,6 +175,7 @@ class AwsAppRunnerService
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function describeService(string $serviceArn): array
     {
         $result = $this->client->describeService(['ServiceArn' => $serviceArn]);
@@ -183,6 +185,10 @@ class AwsAppRunnerService
 
     /**
      * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
      */
     public function listServices(): array
     {
@@ -198,8 +204,9 @@ class AwsAppRunnerService
      * "v1.2.3" → "v1.2.4" requires updateService first; "latest"
      * just re-pulls).
      *
-     * @return array{operation_id: string}
+     * @return list<mixed>
      */
+    /** @return array<string, mixed> */
     public function startDeployment(string $serviceArn): array
     {
         $result = $this->client->startDeployment(['ServiceArn' => $serviceArn]);
@@ -212,7 +219,7 @@ class AwsAppRunnerService
     /**
      * Patch the service's source image (for image tag bumps).
      *
-     * @param  array<string, string>  $envVars
+     * @param  array<string, mixed> $envVars
      */
     public function updateImage(string $serviceArn, string $image, int $port, array $envVars = []): void
     {
@@ -301,7 +308,8 @@ class AwsAppRunnerService
      * changing the source repo / branch / Dockerfile path. Used by
      * the source-mode env editor.
      *
-     * @param  array<string, string>  $envVars
+     * @param  array<string, mixed> $envVars
+     * @param  array<string, mixed> $buildEnvVars
      */
     public function updateServiceSourceEnv(string $serviceArn, string $repositoryUrl, string $branch, string $connectionArn, int $port, array $envVars, array $buildEnvVars = [], ?string $dockerfilePath = null): void
     {
@@ -341,6 +349,10 @@ class AwsAppRunnerService
      * registrar so AWS can verify ownership and issue the cert.
      *
      * @return list<array{name: string, type: string, value: string, status: string}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
      */
     public function associateCustomDomain(string $serviceArn, string $hostname): array
     {

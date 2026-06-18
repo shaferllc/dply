@@ -19,25 +19,9 @@
             );
             $phases = $latest ? \App\Support\Sites\SiteDeployTimeline::forDeployment($this->site, $latest) : [];
 
-            // Smart-fix detection on the FAILED deploy output (e.g. npm not
-            // found → Install Node.js & npm), so the fix is offered inline.
-            $deployFixers = [];
-            if ($latest && $latest->status === 'failed') {
-                $failOutput = '';
-                foreach ($phases as $ph) {
-                    foreach ($ph['steps'] as $st) {
-                        if (! ($st['ok'] ?? true) && ! ($st['skipped'] ?? false)) {
-                            $failOutput .= ' '.($st['output'] ?? '');
-                        }
-                    }
-                }
-                $alreadyRun = $this->completedFixerKeys;
-                $deployFixers = collect(\App\Support\Sites\SiteFixers::detect($failOutput))
-                    ->reject(fn ($fx) => in_array($fx['key'], $alreadyRun, true))
-                    ->values()
-                    ->all();
-            }
-
+            // Smart-fix in-flight flag drives the live poll below; the fix UI
+            // itself lives in the shared _deploy-fixers partial (rendered on the
+            // Deploy page too) so both surfaces offer identical fixes.
             $fixerRun = $this->fixerRun;
             $fixerInFlight = $fixerRun && $fixerRun->isInFlight();
 
@@ -50,6 +34,7 @@
             $syncRows = $this->syncRows;
             $syncConsoleMode = $syncRows !== [];
             $syncBusy = $this->syncInProgress;
+            $syncFinished = $syncConsoleMode && ! $syncBusy;
         @endphp
 
         <div
@@ -244,62 +229,13 @@
                                 @endforeach
                             </ol>
 
-                            {{-- Inline smart fixes for a failed deploy. --}}
-                            @if ($deployFixers !== [])
-                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                                    <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-                                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
-                                        {{ trans_choice('{1} Suggested fix|[2,*] Suggested fixes', count($deployFixers)) }}
-                                    </p>
-                                    <ul class="mt-2 space-y-2">
-                                        @foreach ($deployFixers as $fx)
-                                            @php $thisRunning = $fixerInFlight && $fixerRunKey === $fx['key']; @endphp
-                                            <li class="flex flex-wrap items-center justify-between gap-2">
-                                                <span class="min-w-0 flex-1 text-xs text-amber-900">{{ $fx['reason'] }}</span>
-                                                <button
-                                                    type="button"
-                                                    wire:click="runFixer(@js($fx['key']))"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="runFixer"
-                                                    @disabled($fixerInFlight)
-                                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 disabled:opacity-60"
-                                                >
-                                                    @if ($thisRunning)
-                                                        <x-spinner variant="white" size="sm" /> {{ __('Processing…') }}
-                                                    @else
-                                                        <x-heroicon-o-play class="h-4 w-4" /> {{ $fx['label'] }}
-                                                    @endif
-                                                </button>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
-
-                            {{-- Live output of the fix running from this drawer. --}}
-                            @if ($fixerRun)
-                                <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
-                                    <div class="flex items-center justify-between gap-2 bg-brand-sand/20 px-3 py-2">
-                                        <span class="flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink">
-                                            @if ($fixerInFlight)
-                                                <x-spinner size="sm" /> {{ $fixerRun->label ?? __('Fix') }} · {{ __('processing…') }}
-                                            @elseif ($fixerRun->status === 'completed')
-                                                <x-heroicon-m-check-circle class="h-4 w-4 text-emerald-600" /> {{ $fixerRun->label ?? __('Fix') }} · {{ __('done') }}
-                                            @else
-                                                <x-heroicon-m-x-circle class="h-4 w-4 text-rose-600" /> {{ $fixerRun->label ?? __('Fix') }} · {{ __('failed') }}
-                                            @endif
-                                        </span>
-                                        @if (! $fixerInFlight && $fixerRun->status === 'completed')
-                                            <button type="button" wire:click="deploy" class="inline-flex items-center gap-1 rounded-lg bg-brand-ink px-2 py-1 text-[10px] font-semibold text-brand-cream hover:bg-brand-forest">
-                                                <x-heroicon-o-rocket-launch class="h-3 w-3" /> {{ __('Deploy now') }}
-                                            </button>
-                                        @endif
-                                    </div>
-                                    @php $fixLines = $fixerRun->lines(); @endphp
-                                    <pre class="max-h-56 overflow-auto bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-brand-cream/95" x-init="$el.scrollTop = $el.scrollHeight">@forelse ($fixLines as $ln)@if (! empty($ln['source']))<span class="text-brand-sage">[{{ $ln['source'] }}]</span> @endif{{ $ln['line'] ?? '' }}
-@empty{{ __('Queued — starting…') }}@endforelse</pre>
-                                </div>
-                            @endif
+                            @include('livewire.sites.partials._deploy-fixers', [
+                                'latest' => $latest,
+                                'phases' => $phases,
+                                'server' => $server,
+                                'site' => $site,
+                                'deployAction' => 'deploy',
+                            ])
                         @endif
                     </div>
                 </div>
@@ -320,7 +256,7 @@
                     <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync deploy') }}</p>
-                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $syncConsoleMode ? __('Deploying :n sites', ['n' => count($syncRows)]) : __('Deploy together') }}</p>
+                            <p class="truncate text-sm font-semibold text-brand-ink">{{ ! $syncConsoleMode ? __('Deploy together') : ($syncBusy ? __('Deploying :n sites', ['n' => count($syncRows)]) : __('Synced :n sites', ['n' => count($syncRows)])) }}</p>
                         </div>
                         <div class="flex items-center gap-2">
                             @if ($syncConsoleMode)
@@ -338,77 +274,7 @@
                         {{-- Combined live console: every launched peer's deploy at a glance. --}}
                         <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-2" @if ($syncBusy) wire:poll.3s @endif>
                             @foreach ($syncRows as $row)
-                                @php($rs = $row['status'])
-                                <div wire:key="sync-row-{{ $row['id'] }}-{{ $rs }}" x-data="{ open: @js($row['in_progress'] || $rs === 'failed') }" @class([
-                                    'overflow-hidden rounded-xl border',
-                                    'border-emerald-200 bg-emerald-50/40' => $rs === 'success',
-                                    'border-rose-200 bg-rose-50/40' => $rs === 'failed',
-                                    'border-amber-200 bg-amber-50/40' => $row['in_progress'],
-                                    'border-brand-ink/10 bg-brand-sand/10' => ! $row['in_progress'] && ! in_array($rs, ['success', 'failed'], true),
-                                ])>
-                                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left">
-                                        <span class="flex min-w-0 items-center gap-2">
-                                            @switch (true)
-                                                @case($rs === 'success') <x-heroicon-m-check-circle class="h-4 w-4 shrink-0 text-emerald-600" /> @break
-                                                @case($rs === 'failed') <x-heroicon-m-x-circle class="h-4 w-4 shrink-0 text-rose-600" /> @break
-                                                @case($row['in_progress']) <x-heroicon-m-arrow-path class="h-4 w-4 shrink-0 animate-spin text-amber-600" /> @break
-                                                @default <x-heroicon-m-clock class="h-4 w-4 shrink-0 text-brand-mist" />
-                                            @endswitch
-                                            <span class="min-w-0">
-                                                <span class="flex items-center gap-1.5">
-                                                    <span class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</span>
-                                                    @if ($row['is_self'])<span class="rounded bg-brand-sand/60 px-1 text-[9px] font-semibold uppercase text-brand-moss">{{ __('this') }}</span>@endif
-                                                    @if ($row['is_worker'])<span class="rounded bg-violet-100 px-1 text-[9px] font-semibold uppercase text-violet-800">{{ __('worker') }}</span>@endif
-                                                </span>
-                                                <span class="block truncate text-[11px] text-brand-moss">
-                                                    @if ($row['current_phase']){{ $row['current_phase'] }} · {{ __('running') }}@else{{ ucfirst($rs) }}@endif
-                                                    @if ($row['phase_total'] > 0)<span class="tabular-nums text-brand-mist"> · {{ $row['phase_done'] }}/{{ $row['phase_total'] }}</span>@endif
-                                                </span>
-                                            </span>
-                                        </span>
-                                        <span class="font-mono text-[10px] text-brand-mist" x-text="open ? '▾' : '▸'"></span>
-                                    </button>
-
-                                    <div x-show="open" x-cloak class="border-t border-brand-ink/10 px-3 py-2">
-                                        @if ($row['phases'] === [])
-                                            <p class="py-2 text-center text-[11px] text-brand-moss">{{ $row['starting_fresh'] ? __('Starting — clearing the previous run…') : __('Queued — waiting for a worker…') }}</p>
-                                        @else
-                                            <ul class="space-y-2">
-                                                @foreach ($row['phases'] as $phase)
-                                                    @php($pst = $phase['status'])
-                                                    <li>
-                                                        <div class="flex items-center gap-2 text-xs">
-                                                            @switch ($pst)
-                                                                @case('success') <x-heroicon-m-check class="h-3.5 w-3.5 shrink-0 text-emerald-600" /> @break
-                                                                @case('failed') <x-heroicon-m-x-mark class="h-3.5 w-3.5 shrink-0 text-rose-600" /> @break
-                                                                @case('running') <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin text-amber-600" /> @break
-                                                                @default <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-ink/20"></span>
-                                                            @endswitch
-                                                            <span @class(['truncate font-semibold', 'text-brand-ink' => $pst === 'running' || $pst === 'success', 'text-rose-800' => $pst === 'failed', 'text-brand-mist' => in_array($pst, ['pending', 'skipped'], true)])>{{ $phase['label'] }}</span>
-                                                            @if ($pst === 'running')<span class="text-[10px] font-semibold text-amber-700">{{ __('running') }}</span>@endif
-                                                        </div>
-                                                        {{-- Per-step output, same auto-expand console as the Deploy tab. --}}
-                                                        @if ($phase['steps'] !== [])
-                                                            <ul class="mt-1.5 space-y-1.5 pl-5">
-                                                                @foreach ($phase['steps'] as $step)
-                                                                    @include('livewire.sites.partials.deployments._phase-timeline-step', [
-                                                                        'step' => $step,
-                                                                        'stepKeyBase' => 'sync-step-'.$row['id'].'-'.($step['id'] ?? ($loop->parent->index.'-'.$loop->index)),
-                                                                    ])
-                                                                @endforeach
-                                                            </ul>
-                                                        @endif
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                            @if ($row['latest'])
-                                                <a href="{{ route('sites.deployments.show', ['server' => $row['latest']->server_id ?? $server, 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:underline">
-                                                    {{ __('Full log') }} <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" />
-                                                </a>
-                                            @endif
-                                        @endif
-                                    </div>
-                                </div>
+                                @include('livewire.sites.partials._deploy-console-row', ['row' => $row, 'keyPrefix' => 'sync'])
                             @endforeach
                         </div>
 
@@ -416,7 +282,14 @@
                             @if ($syncBusy)
                                 <span class="inline-flex items-center gap-1.5"><x-spinner size="sm" /> {{ __('Deploying — this updates live.') }}</span>
                             @else
-                                {{ __('All synced deploys finished.') }}
+                                <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+                                    <button type="button" wire:click="deployAgain" wire:loading.attr="disabled" wire:target="deployAgain" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="deployAgain" />
+                                        <x-spinner size="sm" wire:loading wire:target="deployAgain" />
+                                        {{ __('Deploy again') }}
+                                    </button>
+                                    <span>{{ __('All synced deploys finished.') }}</span>
+                                </div>
                             @endif
                         </div>
                     @else
@@ -426,7 +299,7 @@
                                 @foreach ($syncPeers as $peer)
                                     <li>
                                         <label class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/30">
-                                            <input type="checkbox" wire:model="syncSelected" value="{{ $peer->id }}" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-sage/40" />
+                                            <input type="checkbox" wire:model.live="syncSelected" value="{{ $peer->id }}" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-sage/40" />
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-center gap-2">
                                                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $peer->name }}</span>

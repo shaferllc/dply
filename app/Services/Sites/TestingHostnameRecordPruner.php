@@ -92,7 +92,7 @@ class TestingHostnameRecordPruner
      */
     public function deleteRecord(array $record): void
     {
-        if (($record['record_id'] ?? 0) <= 0) {
+        if (($record['record_id']) <= 0) {
             return;
         }
 
@@ -100,7 +100,7 @@ class TestingHostnameRecordPruner
     }
 
     /**
-     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed> $record
      */
     private function hostnameForRecord(string $zone, array $record): ?string
     {
@@ -117,7 +117,7 @@ class TestingHostnameRecordPruner
     }
 
     /**
-     * @param  list<string>  $zones
+     * @param  array<string, mixed> $zones
      */
     private function isTestingHostname(string $hostname, array $zones): bool
     {

@@ -106,7 +106,7 @@ trait AsDependent
      * class with a constructor, you should call parent::__construct() in
      * your own constructor after using this trait.
      */
-    public function __construct(...$arguments)
+    public function __construct(mixed ...$arguments)
     {
         $dependencies = $this->getDependencies();
         if (! empty($dependencies)) {

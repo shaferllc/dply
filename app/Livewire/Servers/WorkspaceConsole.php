@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerConsoleCommands;
 use App\Models\Server;
 use App\Services\Servers\DplyCliInstaller;
@@ -14,9 +15,8 @@ use App\Support\Console\ConsoleArgspecs;
 use App\Support\Console\ConsoleCatalog;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 /**
  * Basic SSH console — terminal-style surface for one-off shell commands.

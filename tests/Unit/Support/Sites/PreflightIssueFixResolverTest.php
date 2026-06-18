@@ -35,5 +35,5 @@ test('preflight actionable checks include fix links for warnings', function (): 
     ]));
 
     expect($checks)->toHaveCount(1)
-        ->and($checks->first()['fix']['label'] ?? null)->toBe(__('Open environment'));
+        ->and($checks[0]['fix']['label'] ?? null)->toBe(__('Open environment'));
 });

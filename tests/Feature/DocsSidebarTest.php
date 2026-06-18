@@ -3,13 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\SiteType;
-use App\Livewire\Docs\Sidebar;
+use App\Modules\Docs\Livewire\Sidebar;
+use App\Modules\Docs\Services\DocsManifest;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -69,7 +70,7 @@ test('docs sidebar opens contextual edge previews guide with breadcrumbs', funct
         ->assertSee('Edge previews', false)
         ->assertSee('Promote to production', false)
         ->assertSee('Split traffic', false)
-        ->assertSee('docs-sidebar-breadcrumb', false);
+        ->assertSee('Documentation breadcrumb', false);
 });
 
 test('edge previews doc renders markdown tables as side by side compare cards', function () {
@@ -99,7 +100,11 @@ test('docs sidebar loads edge build guide', function () {
 
 test('all edge markdown slugs render in docs sidebar', function () {
     $user = User::factory()->create();
-    $slugs = config('docs.groups.edge.slugs', []);
+    $manifest = app(DocsManifest::class);
+
+    // Edge slugs now come from the front-matter manifest, not the retired
+    // config('docs.groups') registry.
+    $slugs = $manifest->groups()['edge']['slugs'] ?? [];
 
     expect($slugs)->not->toBeEmpty();
 
@@ -108,7 +113,7 @@ test('all edge markdown slugs render in docs sidebar', function () {
             ->test(Sidebar::class)
             ->call('open', $slug)
             ->assertSet('visible', true)
-            ->assertSee(config("docs.markdown.{$slug}.title"));
+            ->assertSee($manifest->find($slug)['title']);
     }
 });
 

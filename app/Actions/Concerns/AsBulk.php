@@ -498,7 +498,7 @@ trait AsBulk
     /**
      * Process items in bulk with automatic batching.
      *
-     * @param  Collection  $items  Collection of items to process
+     * @param  Collection<int, mixed>  $items  Collection of items to process
      * @param  callable|null  $mapper  Optional mapper function to transform items
      */
     public static function bulk(Collection $items, ?callable $mapper = null): void

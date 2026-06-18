@@ -41,7 +41,7 @@ class CloudDeploymentsCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;

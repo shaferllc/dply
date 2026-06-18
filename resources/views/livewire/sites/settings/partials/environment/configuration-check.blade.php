@@ -4,8 +4,7 @@
          keyed warning filters the list to that variable on click. --}}
     @if ($envWarnings !== [])
         @php $hasDanger = collect($envWarnings)->contains(fn ($w) => $w['level'] === 'danger'); @endphp
-        <div class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 {{ $hasDanger ? 'bg-rose-50' : 'bg-amber-50' }} px-5 py-4">
+        <div class="flex items-start gap-3 {{ $hasDanger ? 'bg-rose-50/60' : 'bg-amber-50/60' }} px-5 py-4">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $hasDanger ? 'bg-rose-100 text-rose-700 ring-rose-200' : 'bg-amber-100 text-amber-700 ring-amber-200' }}">
                     <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                 </span>
@@ -46,10 +45,9 @@
                     @endif
                 </div>
             </div>
-        </div>
     @endif
     @if ($envWarnings === [] && $suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings)
-        <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-brand-sand/10 px-5 py-4 text-sm text-brand-moss">
             <span class="inline-flex items-center gap-2">
                 <x-heroicon-o-no-symbol class="h-4 w-4 text-brand-mist" />
                 {{ trans_choice('{1} :count configuration warning is suppressed.|[2,*] :count configuration warnings are suppressed.', $suppressedEnvWarningCount, ['count' => $suppressedEnvWarningCount]) }}

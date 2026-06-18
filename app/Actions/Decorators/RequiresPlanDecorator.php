@@ -23,7 +23,7 @@ class RequiresPlanDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -99,7 +99,8 @@ class RequiresPlanDecorator
     }
 
     /**
-     * Get required plans from action.
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, string>
      */
     protected function getRequiredPlans(array $arguments): array
     {
@@ -113,7 +114,7 @@ class RequiresPlanDecorator
     }
 
     /**
-     * Check if organization has required plan(s).
+     * @param  array<int, string>  $requiredPlans
      */
     protected function hasRequiredPlan(mixed $organization, array $requiredPlans): bool
     {

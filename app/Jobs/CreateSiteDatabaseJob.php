@@ -9,11 +9,12 @@ use App\Models\ConsoleAction;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
-use App\Support\Scaffold\DatabaseConnectionEnv;
+use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -64,7 +65,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -84,7 +85,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
         ServerDatabaseAuditLogger $audit,
     ): void {
         $db = ServerDatabase::query()->with('server')->find($this->serverDatabaseId);
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $db instanceof ServerDatabase || ! $site instanceof Site) {
             return;
         }
@@ -141,7 +142,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
      * mysql-shaped block.
      */
     private function injectEnv(
-        \App\Services\ConsoleActions\ConsoleEmitter $emit,
+        ConsoleEmitter $emit,
         Site $site,
         ServerDatabase $db,
         DotEnvFileParser $parser,
@@ -201,7 +202,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
      * driver job doesn't recognize (it self-filters).
      */
     private function maybeEnsurePhpDriver(
-        \App\Services\ConsoleActions\ConsoleEmitter $emit,
+        ConsoleEmitter $emit,
         Site $site,
         ServerDatabase $db,
     ): void {

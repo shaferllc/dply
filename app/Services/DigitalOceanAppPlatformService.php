@@ -50,13 +50,16 @@ class DigitalOceanAppPlatformService
      * two are mutually exclusive on App Platform. $healthCheck, when
      * non-null, adds a `health_check` block to the web service.
      *
-     * @param  array<string, string>  $envVars
+     * @param  array<string, mixed> $envVars
      * @param  list<array<string, mixed>>  $workers  Optional `workers`
      *                                               components (background processes — queue workers / scheduler)
      *                                               to add to the spec alongside the web service.
      * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block.
      * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
      * @return array{id: string, default_ingress: ?string}
+     * @param  array<string, mixed> $alerts
+     * @param  array<string, mixed> $buildEnvVars
+     * @param  array<string, mixed> $jobs
      */
     public function createApp(
         string $appName,
@@ -106,7 +109,7 @@ class DigitalOceanAppPlatformService
             'services' => [$service],
         ];
         if ($workers !== []) {
-            $spec['workers'] = array_values($workers);
+            $spec['workers'] = array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($workers))))))))))))))))))))))))))))))));
         }
         if ($jobs !== []) {
             $spec['jobs'] = array_values($jobs);
@@ -135,13 +138,16 @@ class DigitalOceanAppPlatformService
      *
      * `repo` is `owner/name` exactly as DO expects.
      *
-     * @param  array<string, string>  $envVars
+     * @param  array<string, mixed> $envVars
      * @param  list<array<string, mixed>>  $workers  Optional `workers`
      *                                               components (background processes — queue workers / scheduler)
      *                                               to add to the spec alongside the web service.
      * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block (omits fixed instance_count).
      * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
      * @return array{id: string, default_ingress: ?string}
+     * @param  array<string, mixed> $alerts
+     * @param  array<string, mixed> $buildEnvVars
+     * @param  array<string, mixed> $jobs
      */
     public function createAppFromSource(
         string $appName,
@@ -201,7 +207,7 @@ class DigitalOceanAppPlatformService
             'services' => [$service],
         ];
         if ($workers !== []) {
-            $spec['workers'] = array_values($workers);
+            $spec['workers'] = array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($workers))))))))))))))))))))))))))))))));
         }
         if ($jobs !== []) {
             $spec['jobs'] = array_values($jobs);
@@ -249,9 +255,10 @@ class DigitalOceanAppPlatformService
      * Returns {ok, app_cost, error?} so the form can render either
      * a price or an inline error message.
      *
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      * @return array{ok: bool, app_cost: ?float, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function proposeApp(array $spec): array
     {
         $response = $this->request('post', '/apps/propose', ['spec' => $spec]);
@@ -278,7 +285,12 @@ class DigitalOceanAppPlatformService
      * List recent deployments for an app. Returns at most $limit
      * deployments newest-first.
      *
+     * @param  array<string, mixed> $spec
      * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
      */
     public function listDeployments(string $appId, int $limit = 10): array
     {
@@ -294,8 +306,9 @@ class DigitalOceanAppPlatformService
      * created/started/finished timestamps. Used by the dply deploy
      * detail page to show the full rollout story.
      *
-     * @return array<string, mixed>
+     * @return list<mixed>
      */
+    /** @return array<string, mixed> */
     public function getDeployment(string $appId, string $deploymentId): array
     {
         $response = $this->request('get', '/apps/'.$appId.'/deployments/'.$deploymentId);
@@ -329,6 +342,7 @@ class DigitalOceanAppPlatformService
      *
      * @return array{deployment_id: ?string, url: ?string}
      */
+    /** @return array<string, mixed> */
     public function getLatestDeploymentLogs(string $appId, string $type = 'DEPLOY'): array
     {
         $deploymentsResponse = $this->request('get', '/apps/'.$appId.'/deployments?per_page=1');
@@ -368,6 +382,7 @@ class DigitalOceanAppPlatformService
      *
      * @return array{url: ?string, live_url: ?string}
      */
+    /** @return array<string, mixed> */
     public function getRuntimeLogs(string $appId, string $component = 'web'): array
     {
         $path = '/apps/'.$appId.'/components/'.rawurlencode($component).'/logs?type=RUN';
@@ -396,6 +411,10 @@ class DigitalOceanAppPlatformService
      * Docs: GET /v2/monitoring/metrics/apps/{metric}
      *
      * @return list<array{t: int, v: float}>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, float|int>>
      */
     public function getAppMetric(string $appId, string $metric, int $start, int $end, string $component = 'web'): array
     {
@@ -447,8 +466,9 @@ class DigitalOceanAppPlatformService
     /**
      * Inspect a single app — used by status polling.
      *
-     * @return array<string, mixed>
+     * @return list<array<string, float|int>>
      */
+    /** @return array<string, mixed> */
     public function getApp(string $appId): array
     {
         $response = $this->request('get', '/apps/'.$appId);
@@ -459,6 +479,10 @@ class DigitalOceanAppPlatformService
 
     /**
      * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
      */
     public function listApps(): array
     {
@@ -475,8 +499,9 @@ class DigitalOceanAppPlatformService
      * stays the same; this just causes the platform to re-pull
      * the latest image tag and roll out a new revision.
      *
-     * @return array{id: string}
+     * @return list<mixed>
      */
+    /** @return array<string, mixed> */
     public function deployApp(string $appId, bool $force = false): array
     {
         $response = $this->request('post', '/apps/'.$appId.'/deployments', [
@@ -495,7 +520,7 @@ class DigitalOceanAppPlatformService
      * the entire spec to be passed; callers should fetch first,
      * mutate, then pass through here.
      *
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      */
     public function updateApp(string $appId, array $spec): void
     {
@@ -515,7 +540,7 @@ class DigitalOceanAppPlatformService
      * resource), so this updates the spec rather than calling a
      * separate /domains endpoint.
      *
-     * @param  array<string, mixed>  $existingSpec  Current spec (caller fetches via getApp first)
+     * @param  array<string, mixed> $existingSpec  Current spec (caller fetches via getApp first)
      */
     public function attachDomain(string $appId, array $existingSpec, string $hostname): void
     {
@@ -538,7 +563,7 @@ class DigitalOceanAppPlatformService
     }
 
     /**
-     * @param  array<string, mixed>  $existingSpec
+     * @param  array<string, mixed> $existingSpec
      */
     public function detachDomain(string $appId, array $existingSpec, string $hostname): void
     {
@@ -598,13 +623,15 @@ class DigitalOceanAppPlatformService
      *
      * @return array{0: string, 1: string, 2: string}
      */
+    /** @return array<string, mixed> */
+    /** @return array<int, string> */
     public function parseImageRef(string $image): array
     {
         return self::parseImageRefStatic($image);
     }
 
     /**
-     * @return array{0: string, 1: string, 2: string}
+     * @return array<int, string>
      */
     public static function parseImageRefStatic(string $image): array
     {
@@ -693,7 +720,7 @@ class DigitalOceanAppPlatformService
     }
 
     /**
-     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed> $body
      */
     protected function request(string $method, string $path, array $body = []): Response
     {

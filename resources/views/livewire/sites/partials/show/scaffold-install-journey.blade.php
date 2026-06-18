@@ -28,14 +28,14 @@
                 <li class="flex items-start gap-3">
                     <span @class([
                         'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
-                        'bg-brand-sage text-white' => $step['state'] === \App\Services\Scaffold\ScaffoldStep::STATE_COMPLETED,
-                        'bg-brand-gold/30 text-brand-ink animate-pulse' => $step['state'] === \App\Services\Scaffold\ScaffoldStep::STATE_RUNNING,
-                        'bg-rose-100 text-rose-700' => $step['state'] === \App\Services\Scaffold\ScaffoldStep::STATE_FAILED,
-                        'bg-brand-mist/30 text-brand-mist' => $step['state'] === \App\Services\Scaffold\ScaffoldStep::STATE_PENDING,
+                        'bg-brand-sage text-white' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_COMPLETED,
+                        'bg-brand-gold/30 text-brand-ink animate-pulse' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_RUNNING,
+                        'bg-rose-100 text-rose-700' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_FAILED,
+                        'bg-brand-mist/30 text-brand-mist' => $step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_PENDING,
                     ])>
-                        @if ($step['state'] === \App\Services\Scaffold\ScaffoldStep::STATE_COMPLETED)
+                        @if ($step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_COMPLETED)
                             <x-heroicon-m-check class="h-4 w-4" />
-                        @elseif ($step['state'] === \App\Services\Scaffold\ScaffoldStep::STATE_FAILED)
+                        @elseif ($step['state'] === \App\Modules\Scaffold\Services\ScaffoldStep::STATE_FAILED)
                             <x-heroicon-m-x-mark class="h-4 w-4" />
                         @else
                             {{ $loop->iteration }}

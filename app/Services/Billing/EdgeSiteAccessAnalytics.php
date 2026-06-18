@@ -19,6 +19,7 @@ final class EdgeSiteAccessAnalytics
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
         $since = now()->subDays(7);

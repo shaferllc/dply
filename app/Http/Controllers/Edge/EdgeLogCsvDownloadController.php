@@ -64,10 +64,10 @@ class EdgeLogCsvDownloadController extends Controller
                 /** @var Collection<int, EdgeAccessLog> $chunk */
                 foreach ($chunk as $log) {
                     fputcsv($handle, [
-                        $log->occurred_at?->toIso8601String() ?? '',
+                        $log->occurred_at->toIso8601String(),
                         (string) $log->method,
                         (string) $log->path,
-                        $log->status_code === null ? '' : (string) $log->status_code,
+                        (string) $log->status_code,
                         (string) (int) $log->duration_ms,
                         (string) (int) $log->bytes_egress,
                         (string) ($log->cache_status ?? ''),

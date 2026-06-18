@@ -7,6 +7,20 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property ?string $comment
+ * @property string $from_path
+ * @property SiteRedirectKind $kind
+ * @property array<string, mixed> $response_headers
+ * @property ?string $site_id
+ * @property string $sort_order
+ * @property int $status_code
+ * @property string $to_url
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class SiteRedirect extends Model
 {
     use HasUlids;
@@ -25,6 +39,7 @@ class SiteRedirect extends Model
     /**
      * @return array<string, string>
      */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -34,6 +49,7 @@ class SiteRedirect extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

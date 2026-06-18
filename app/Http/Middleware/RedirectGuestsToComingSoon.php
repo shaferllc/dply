@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ComingSoonAllowedIp;
+use App\Support\MachineCallbackPaths;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -77,7 +79,7 @@ class RedirectGuestsToComingSoon
      */
     private function isMachineCallback(Request $request): bool
     {
-        return \App\Support\MachineCallbackPaths::matches($request)
+        return MachineCallbackPaths::matches($request)
             || $request->routeIs('webhook.*');
     }
 
@@ -117,7 +119,7 @@ class RedirectGuestsToComingSoon
      */
     private function ipAllowed(Request $request): bool
     {
-        $allowed = \App\Models\ComingSoonAllowedIp::allowList();
+        $allowed = ComingSoonAllowedIp::allowList();
         if ($allowed === []) {
             return false;
         }

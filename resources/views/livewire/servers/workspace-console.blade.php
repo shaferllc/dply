@@ -13,11 +13,6 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer tone="warn">
-        <p>{{ __('A lightweight shell prompt for poking at the server: type a command, hit Enter, output appears below. History is kept per session so you can scroll back through recent runs.') }}</p>
-        <p>{{ __('Each command runs as the dply SSH user with full shell access — same blast radius as the Run page. Output is captured up to 16KB; for streaming/long-running jobs use Run.') }}</p>
-    </x-explainer>
-
     @if ($opsReady)
         {{-- Kick the autocomplete-source SSH probes in the background after first
              paint. wire:init fires one extra request that populates binList +

@@ -15,11 +15,6 @@ class JsonFormatter
     /** @var int|string */
     private $flags;
 
-    /**
-     * @param int    $indent
-     * @param string $newLine
-     * @param int    $flags
-     */
     public function __construct(
         int $indent = 0,
         string $newLine = \PHP_EOL,
@@ -31,9 +26,7 @@ class JsonFormatter
     }
 
     /**
-     * @param mixed $payload
-     *
-     * @return string
+     * @param  mixed  $payload
      */
     public function format($payload): string
     {
@@ -82,7 +75,7 @@ class JsonFormatter
 
         foreach ($it as $character) {
             if ($character === '"') {
-                $withinStringLiteral = !$withinStringLiteral;
+                $withinStringLiteral = ! $withinStringLiteral;
             }
 
             if ($withinStringLiteral) {
@@ -92,7 +85,7 @@ class JsonFormatter
             }
 
             if ($stringLiteral !== '') {
-                $output .= $stringLiteral . $character;
+                $output .= $stringLiteral.$character;
                 $stringLiteral = '';
 
                 continue;
@@ -109,32 +102,32 @@ class JsonFormatter
             }
 
             if ($character === ',') {
-                $output .= $character . $this->newLine . str_repeat($indentStr, $indentLevel);
+                $output .= $character.$this->newLine.str_repeat($indentStr, $indentLevel);
 
                 continue;
             }
 
             if ($character === '{' || $character === '[') {
-                ++$indentLevel;
+                $indentLevel++;
 
-                $output .= $character . $this->newLine . str_repeat($indentStr, $indentLevel);
+                $output .= $character.$this->newLine.str_repeat($indentStr, $indentLevel);
 
                 continue;
             }
 
             if ($character === '}' || $character === ']') {
-                --$indentLevel;
+                $indentLevel--;
 
                 $trimmed = rtrim($output);
                 $previousNonWhitespaceCharacter = mb_substr($trimmed, -1, 1, 'UTF-8');
 
                 if ($previousNonWhitespaceCharacter === '{' || $previousNonWhitespaceCharacter === '[') {
-                    $output = $trimmed . $character;
+                    $output = $trimmed.$character;
 
                     continue;
                 }
 
-                $output .= $this->newLine . str_repeat($indentStr, $indentLevel);
+                $output .= $this->newLine.str_repeat($indentStr, $indentLevel);
             }
 
             $output .= $character;

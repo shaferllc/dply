@@ -5,8 +5,8 @@ namespace App\Jobs;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkspaceDeployRun;
-use App\Services\Projects\WorkspaceHealthSummaryService;
-use App\Services\Projects\WorkspaceNotificationDispatcher;
+use App\Modules\Projects\Services\WorkspaceHealthSummaryService;
+use App\Modules\Projects\Services\WorkspaceNotificationDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -58,7 +58,7 @@ class RunWorkspaceDeployJob implements ShouldQueue
             try {
                 RunSiteDeploymentJob::dispatchSync($site, SiteDeployment::TRIGGER_MANUAL);
                 $latestDeployment = $site->deployments()->latest('created_at')->first();
-                $status = $latestDeployment?->status ?? SiteDeployment::STATUS_SUCCESS;
+                $status = $latestDeployment !== null ? $latestDeployment->status : SiteDeployment::STATUS_SUCCESS;
 
                 if ($status === SiteDeployment::STATUS_SUCCESS) {
                     $summary['successful']++;
@@ -100,12 +100,12 @@ class RunWorkspaceDeployJob implements ShouldQueue
             $workspace,
             'project.deployments',
             '['.config('app.name').'] '.$workspace->name.' deploy '.($status === WorkspaceDeployRun::STATUS_SUCCESS ? 'completed' : 'needs attention'),
-            implode("\n", array_filter([
+            implode("\n", [
                 'Project: '.$workspace->name,
                 'Successful: '.$summary['successful'],
                 'Skipped: '.$summary['skipped'],
                 'Failed: '.$summary['failed'],
-            ])),
+            ]),
             route('projects.show', $workspace, absolute: true),
             __('Open project')
         );

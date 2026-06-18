@@ -80,24 +80,11 @@
         'lg:grid-cols-12' => $showNavigation,
     ])>
         @if ($showNavigation)
-        @php
-            // Deterministic gradient + initials avatar from the server name. Two hue stops
-            // pulled from a stable hash so the same name always renders the same swatch —
-            // no external service, no network roundtrip.
-            $avatarSeed = (string) ($server->name ?: $server->id);
-            $avatarHash = hexdec(substr(sha1($avatarSeed), 0, 12));
-            $avatarHueA = $avatarHash % 360;
-            $avatarHueB = ($avatarHueA + 60 + ((int) (($avatarHash >> 4) % 120))) % 360;
-            $avatarInitials = mb_strtoupper(mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $avatarSeed) ?: 'S', 0, 2));
-            $avatarStyle = "background-image: linear-gradient(135deg, hsl({$avatarHueA}deg 65% 56%) 0%, hsl({$avatarHueB}deg 65% 42%) 100%);";
-        @endphp
         <aside class="sm:col-span-3 mb-8 lg:mb-0">
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 p-4 sm:p-5">
                     <div class="flex items-center gap-3">
-                        <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $avatarStyle }}">
-                            {{ $avatarInitials }}
-                        </span>
+                        <x-entity-avatar :seed="$server->name ?: $server->id" :image="$server->logoUrl()" class="h-12 w-12 text-base" />
                         <div class="min-w-0 flex-1 leading-tight">
                             <p class="truncate text-base font-semibold text-brand-ink">{{ $server->name }}</p>
                             @if ($server->workspace)
@@ -156,7 +143,16 @@
                         @endif
                     </div>
                 </div>
-                <nav class="flex flex-col gap-0.5 p-2" aria-label="{{ __('Server sections') }}">
+                <nav
+                    class="flex flex-col gap-0.5 p-2"
+                    aria-label="{{ __('Server sections') }}"
+                    x-data="{
+                        _k: 'dply.serverNav.collapsed:{{ $server->id }}',
+                        collapsed: {},
+                        init() { try { this.collapsed = JSON.parse(localStorage.getItem(this._k)) || {}; } catch (e) { this.collapsed = {}; } },
+                        toggle(g) { this.collapsed[g] = ! this.collapsed[g]; localStorage.setItem(this._k, JSON.stringify(this.collapsed)); },
+                    }"
+                >
                     @php
                         // Cluster the flat nav into groups by their `group` key. Items
                         // without a group end up in `_ungrouped` and render headerless
@@ -177,15 +173,62 @@
                         }
                     @endphp
                     @foreach ($orderedGroupKeys as $groupKey)
-                        @php $itemsInGroup = $navGroups[$groupKey] ?? collect(); @endphp
+                        @php
+                            $itemsInGroup = $navGroups[$groupKey] ?? collect();
+
+                            // Roll alert signals up to the (collapsible) group header so
+                            // a count/dot is visible even when the section is collapsed.
+                            // Today: open-error count + any "needs setup" item. Add new
+                            // numeric sources to $groupAlertCount as they appear.
+                            $groupAlertCount = 0;
+                            $groupNeedsSetup = false;
+                            foreach ($itemsInGroup as $gi) {
+                                $giPreview = (bool) ($gi['preview_only'] ?? false) || (bool) ($gi['soon_badge'] ?? false);
+                                if (($gi['key'] ?? null) === 'errors' && ! $giPreview) {
+                                    $groupAlertCount += \App\Models\ErrorEvent::undismissedCountForServer((string) $server->id);
+                                }
+                                if ((bool) ($gi['needs_setup'] ?? false)) {
+                                    $groupNeedsSetup = true;
+                                }
+                            }
+                            $isCollapsibleGroup = $groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]);
+                        @endphp
                         @if ($itemsInGroup->isEmpty())
                             @continue
                         @endif
-                        @if ($groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]))
-                            <p class="{{ ! $loop->first ? 'mt-3 ' : '' }}px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
-                                {{ __($groupLabels[$groupKey]) }}
-                            </p>
+                        @if ($isCollapsibleGroup)
+                            <button
+                                type="button"
+                                x-on:click="toggle('{{ $groupKey }}')"
+                                :aria-expanded="(! collapsed['{{ $groupKey }}']).toString()"
+                                class="{{ ! $loop->first ? 'mt-3 ' : '' }}group flex w-full items-center gap-1.5 rounded-md px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-moss"
+                            >
+                                <span x-bind:class="collapsed['{{ $groupKey }}'] ? '' : 'rotate-90'" class="inline-flex transition-transform">
+                                    <x-heroicon-o-chevron-right class="h-3 w-3" />
+                                </span>
+                                <span class="flex-1 text-left">{{ __($groupLabels[$groupKey]) }}</span>
+                                {{-- Rolled-up alerts: a count badge and/or a setup dot, so a
+                                     collapsed section still surfaces what needs attention. --}}
+                                @if ($groupAlertCount > 0)
+                                    <span
+                                        x-show="collapsed['{{ $groupKey }}']"
+                                        class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700"
+                                    >{{ $groupAlertCount > 99 ? '99+' : $groupAlertCount }}</span>
+                                @endif
+                                @if ($groupNeedsSetup)
+                                    <span
+                                        x-show="collapsed['{{ $groupKey }}']"
+                                        class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                        role="img"
+                                        aria-label="{{ __('Setup required') }}"
+                                    ></span>
+                                @endif
+                            </button>
                         @endif
+                        <div
+                            class="flex flex-col gap-0.5"
+                            @if ($isCollapsibleGroup) x-show="! collapsed['{{ $groupKey }}']" x-collapse @endif
+                        >
                         @foreach ($itemsInGroup as $item)
                         @php
                             $key = $item['key'];
@@ -195,15 +238,18 @@
                             $needsSetup = (bool) ($item['needs_setup'] ?? false);
                             $previewOnly = (bool) ($item['preview_only'] ?? false);
                             $soonBadge = (bool) ($item['soon_badge'] ?? false);
+                            // Cluster items (Access, Network, …) highlight when any of
+                            // their member pages is active, not just the cluster key.
+                            $isActive = $active === $key || in_array($active, (array) ($item['match_keys'] ?? []), true);
                         @endphp
                         <a
                             href="{{ $navHref }}"
                             wire:navigate
                             @class([
                                 $navLink,
-                                'bg-brand-sand/60 text-brand-ink' => $active === $key,
-                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== $key,
-                                'opacity-90' => $previewOnly && $active !== $key,
+                                'bg-brand-sand/60 text-brand-ink' => $isActive,
+                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $isActive,
+                                'opacity-90' => $previewOnly && ! $isActive,
                             ])
                         >
                             @switch($icon)
@@ -339,6 +385,7 @@
                             @endif
                         </a>
                         @endforeach
+                        </div>
                     @endforeach
                 </nav>
                 <div class="border-t border-brand-ink/10 p-3">

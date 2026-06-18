@@ -114,8 +114,8 @@ class FirewallRuleTemplateApplicator
     }
 
     /**
-     * @param  list<array<string, mixed>>  $definitions
-     * @param  array<string, mixed>  $auditMeta
+     * @param  array<string, mixed> $definitions
+     * @param  array<string, mixed> $auditMeta
      */
     private function createRulesFromDefinitions(Server $server, array $definitions, ?User $user, array $auditMeta, ?ApiToken $apiToken = null): int
     {

@@ -89,7 +89,10 @@ test('does not show deploys from sites on other servers', function () {
         ->assertDontSee('on-b')
         ->assertSee('No deployments match');
 });
-test('aborts when user is not in org', function () {
+test('forbids when user is not in org', function () {
+    // The merged Deploys page authorizes `view` on the server via
+    // InteractsWithServerWorkspace (ServerPolicy::view), so a stranger gets a
+    // 403 rather than the loose org-equality 404 the standalone page used.
     [, $server] = makeUserOrgWithServer();
     $stranger = User::factory()->create();
     $strangerOrg = Organization::factory()->create();
@@ -98,7 +101,7 @@ test('aborts when user is not in org', function () {
 
     $response = $this->actingAs($stranger)->get(route('servers.deploys', $server));
 
-    $response->assertNotFound();
+    $response->assertForbidden();
 });
 /**
  * @return array{0: User, 1: Organization}

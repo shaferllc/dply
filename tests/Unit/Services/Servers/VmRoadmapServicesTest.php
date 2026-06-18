@@ -11,7 +11,7 @@ use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\SupervisorProgram;
 use App\Models\User;
-use App\Services\Servers\ServerCertificateInventory;
+use App\Modules\Certificates\Services\ServerCertificateInventory;
 use App\Services\Servers\ServerDaemonSloPanel;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Servers\ServerSecurityDigest;

@@ -32,6 +32,7 @@ final class SiteDeployTimeline
     private const PHASES = [
         'clone' => 'Clone & fetch',
         'build' => 'Build',
+        'resources' => 'Verify resources',
         'release' => 'Release',
         'activate' => 'Activate',
     ];
@@ -48,16 +49,35 @@ final class SiteDeployTimeline
         // $site instance — share one query instead of each hitting the DB.
         $site->loadMissing('deploySteps');
 
+        $phaseDefs = self::PHASES;
+        // The pre-cutover RESOURCES gate only exists for sites that have a
+        // networked resource binding to probe (or a deploy that recorded it).
+        // Drop the row otherwise so static/binding-less sites don't show an
+        // always-empty "Verify resources" phase.
+        $site->loadMissing('bindings');
+        $hasResources = ($latest !== null && $latest->hasPhase('resources'))
+            || $site->bindings->contains(static fn ($b): bool => BindingReachability::isNetworked((string) $b->type));
+        if (! $hasResources) {
+            unset($phaseDefs['resources']);
+        }
+
         // Canonical phases, plus a POST-CUTOVER Restart phase when the site has
         // restart-phase steps (queue:restart / horizon:terminate / custom worker
         // restarts) or this deploy recorded one (dply's managed reload also lands
         // under 'restart'). Omitted otherwise so static sites don't show an empty
         // pending Restart row.
-        $phaseDefs = self::PHASES;
         $hasRestart = ($latest !== null && $latest->hasPhase('restart'))
             || $site->deploySteps->contains(static fn ($s): bool => (string) $s->phase === SiteDeployStep::PHASE_RESTART);
         if ($hasRestart) {
             $phaseDefs['restart'] = 'Restart';
+        }
+
+        // Post-cutover HTTP validation gate. Shown only when this deploy recorded
+        // it (the checker is per-site opt-out, and older deploys predate it), so a
+        // FAILED health check renders as a red phase with the cause — the timeline
+        // no longer reads all-green when the deploy actually failed here.
+        if ($latest !== null && $latest->hasPhase('health')) {
+            $phaseDefs['health'] = 'Health check';
         }
 
         // The phase currently executing. With incremental per-step recording a
@@ -178,8 +198,9 @@ final class SiteDeployTimeline
      */
     private static function hooksByPhase(Site $site): Collection
     {
-        $map = collect(array_fill_keys(array_keys(self::PHASES), null))
-            ->map(static fn () => collect());
+        /** @var Collection<string, Collection<int, SiteDeployHook>> $map */
+        $map = (new Collection(array_keys(self::PHASES)))
+            ->mapWithKeys(static fn (string $phase): array => [$phase => new Collection]);
 
         $site->loadMissing('deployHooks.anchorStep');
         foreach ($site->deployHooks as $hook) {
@@ -190,9 +211,12 @@ final class SiteDeployTimeline
                 default => 'build',
             };
             if (! $map->has($phase)) {
-                $map->put($phase, collect());
+                $map->put($phase, new Collection);
             }
-            $map->get($phase)->push($hook);
+
+            /** @var Collection<int, SiteDeployHook> $phaseHooks */
+            $phaseHooks = $map->get($phase);
+            $phaseHooks->push($hook);
         }
 
         return $map;
@@ -252,19 +276,32 @@ final class SiteDeployTimeline
             }
 
             $hasPending = false;
+            $hasOk = false;
             foreach ($steps as $step) {
                 if (($step['pending'] ?? false) === true) {
                     $hasPending = true;
 
                     continue;
                 }
-                if (($step['skipped'] ?? false) !== true && ($step['ok'] ?? false) !== true) {
+                if (($step['skipped'] ?? false) === true) {
+                    continue;
+                }
+                if (($step['ok'] ?? false) !== true) {
                     return 'failed';
                 }
+                $hasOk = true;
             }
 
-            // No failures yet, but steps are still queued → the phase is running.
-            return $hasPending ? 'running' : 'success';
+            // Still-queued steps → the phase is running. Otherwise: a phase whose
+            // every step was SKIPPED (e.g. the no-op Activate on a flat deploy)
+            // is 'skipped', NOT 'success' — a green "done" check on a phase that
+            // never actually ran reads as completed, and worse, completed out of
+            // order (Activate is last but skips early on simple deploys).
+            if ($hasPending) {
+                return 'running';
+            }
+
+            return $hasOk ? 'success' : 'skipped';
         }
 
         if ($running && $isRunningPhase) {
@@ -275,7 +312,7 @@ final class SiteDeployTimeline
     }
 
     /**
-     * @param  array<string, mixed>  $step
+     * @param  array<string, mixed> $step
      * @return array<string, mixed>
      */
     private static function stepView(?SiteDeployment $latest, array $step): array
@@ -300,7 +337,7 @@ final class SiteDeployTimeline
     }
 
     /**
-     * @param  array<string, mixed>  $step
+     * @param  array<string, mixed> $step
      */
     private static function stepLabel(array $step): string
     {
@@ -312,6 +349,7 @@ final class SiteDeployTimeline
             'activate' => __('Activate'),
             'swap' => __('Swap'),
             'restart' => __('Restart'),
+            'resource' => $command !== '' ? $command : __('Resource reachability'),
             'post_deploy' => __('Post-deploy command'),
             'custom' => $command !== '' ? Str::limit($command, 60) : __('Custom command'),
             '' => __('Step'),

@@ -8,6 +8,21 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property string $id
+ * @property string $category
+ * @property array<string, mixed> $frameworks
+ * @property bool $is_active
+ * @property string $name
+ * @property array<string, mixed> $payload
+ * @property string $recipe_type
+ * @property array<string, mixed> $runtimes
+ * @property string $slug
+ * @property string $sort_order
+ * @property string $summary
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class MarketplaceItem extends Model
 {
     /** @use HasFactory<MarketplaceItemFactory> */
@@ -48,6 +63,7 @@ class MarketplaceItem extends Model
         'is_active',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -58,11 +74,19 @@ class MarketplaceItem extends Model
         ];
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeCategory(Builder $query, ?string $category): Builder
     {
         if ($category === null || $category === '' || $category === 'all') {
@@ -78,6 +102,10 @@ class MarketplaceItem extends Model
      *
      * Pass null to return everything regardless of runtime tags — used by the
      * standalone marketplace page where there's no site/server context.
+     */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeForRuntime(Builder $query, ?string $runtime): Builder
     {
@@ -95,6 +123,10 @@ class MarketplaceItem extends Model
     /**
      * Filters to items that apply to the given framework, plus all items that
      * don't declare a framework tag (which are framework-agnostic).
+     */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeForFramework(Builder $query, ?string $framework): Builder
     {

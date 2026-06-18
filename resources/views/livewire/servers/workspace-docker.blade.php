@@ -18,10 +18,6 @@
         ])
     @endif
 
-    <x-explainer>
-        <p>{{ __('Inspect and manage Docker Engine on this server over SSH — containers, images, volumes, networks, compose projects, and cleanup. Overview counts come from the inventory probe; other tabs load live data when you open them.') }}</p>
-    </x-explainer>
-
     @if ($opsReady && ! $isDeployer)
         <x-server-workspace-tablist :aria-label="__('Docker workspace sections')" class="mb-6">
             <x-server-workspace-tab

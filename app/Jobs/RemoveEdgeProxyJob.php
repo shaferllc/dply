@@ -10,7 +10,7 @@ use App\Jobs\Concerns\WritesPerSiteWebserverConfigs;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
-use App\Services\RemoteCli\RiskLevel;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\TraefikDashboardExposure;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
@@ -61,7 +61,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -76,7 +76,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -111,7 +111,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             $emitter->info(sprintf('[cutover]  stop %s, bind %s to :80', $edgeProxy, $previousWebserver));
             $this->executeStageCutover($server, $edgeProxy, $previousWebserver);
 
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             unset($meta['edge_proxy'], $meta['edge_proxy_previous_webserver']);
             $meta['webserver'] = $previousWebserver;
             $server->update(['meta' => $meta]);

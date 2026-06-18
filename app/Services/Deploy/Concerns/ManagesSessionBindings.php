@@ -31,7 +31,7 @@ trait ManagesSessionBindings
      * the chosen SESSION_* keys. Every field is optional — a blank one is left
      * out so the framework default applies; redis needs the Redis binding too.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachSession(Site $site, array $params): SiteBinding
     {

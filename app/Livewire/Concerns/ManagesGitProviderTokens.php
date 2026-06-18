@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\GitProviderToken;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 trait ManagesGitProviderTokens
 {
@@ -21,12 +22,8 @@ trait ManagesGitProviderTokens
             return;
         }
 
-        if (method_exists($this, 'cancelEdit')) {
-            $this->cancelEdit();
-        }
-        if (method_exists($this, 'cancelEditPat')) {
-            $this->cancelEditPat();
-        }
+        $this->cancelEdit();
+        $this->cancelEditPat();
 
         $this->addingPatProvider = $provider;
         $this->patLabel = '';
@@ -105,7 +102,7 @@ trait ManagesGitProviderTokens
         }
 
         if ($status !== null) {
-            $detail = $message ? ' — '.\Illuminate\Support\Str::limit($message, 140) : '';
+            $detail = $message ? ' — '.Str::limit($message, 140) : '';
 
             return __(':provider rejected the token (HTTP :status):detail', [
                 'provider' => $providerLabel,
@@ -117,7 +114,7 @@ trait ManagesGitProviderTokens
         if ($message !== null && $message !== '') {
             return __(':provider could not validate the token: :detail', [
                 'provider' => $providerLabel,
-                'detail' => \Illuminate\Support\Str::limit($message, 160),
+                'detail' => Str::limit($message, 160),
             ]);
         }
 
@@ -125,6 +122,16 @@ trait ManagesGitProviderTokens
     }
 
     protected function afterGitProviderTokenSaved(string $provider): void
+    {
+        //
+    }
+
+    protected function cancelEdit(): void
+    {
+        //
+    }
+
+    protected function cancelEditPat(): void
     {
         //
     }

@@ -9,8 +9,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Per-server / per-org override for one webserver-health alert threshold.
- * Resolution precedence + table semantics documented in the migration.
+ * @property string $id
+ *                      Per-server / per-org override for one webserver-health alert threshold.
+ *                      Resolution precedence + table semantics documented in the migration.
+ * @property string $comparator
+ * @property string $engine
+ * @property string $metric
+ * @property ?string $organization_id
+ * @property ?string $server_id
+ * @property string $severity
+ * @property float $value
+ * @property-read ?Organization $organization
+ * @property-read ?Server $server
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class WebserverHealthThreshold extends Model
 {
@@ -26,6 +38,7 @@ class WebserverHealthThreshold extends Model
         'severity',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -33,11 +46,13 @@ class WebserverHealthThreshold extends Model
         ];
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<Server, $this> */
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);

@@ -127,6 +127,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Worker pool agent event ingest base URL
+    |--------------------------------------------------------------------------
+    | Defaults to app.url. Override when pool members must reach dply on a
+    | different public host (e.g. a dev tunnel).
+    */
+    'worker_pool_event_ingest_base' => env('DPLY_POOL_EVENT_INGEST_BASE'),
+    'worker_pool_event_url' => env('DPLY_POOL_EVENT_URL', ''),
+    'worker_pool_event_token' => env('DPLY_POOL_EVENT_TOKEN', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Demo DigitalOcean flow (php artisan dply:demo-do-server)
     |--------------------------------------------------------------------------
     | Token is never stored here — use --token or DPLY_DEMO_DO_TOKEN / DIGITALOCEAN_TOKEN.
@@ -140,6 +151,24 @@ return [
     'demo_org_slug' => env('DPLY_DEMO_ORG_SLUG', 'dply-automated-demo'),
     'demo_do_region' => env('DPLY_DEMO_DO_REGION', 'nyc1'),
     'demo_do_size' => env('DPLY_DEMO_DO_SIZE', 's-1vcpu-1gb'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Provider API tokens for snapshot / demo CLI commands
+    |--------------------------------------------------------------------------
+    | Read via config() in Artisan commands — never call env() outside config.
+    */
+    'demo_do_token' => env('DPLY_DEMO_DO_TOKEN'),
+    'digitalocean_token' => env('DIGITALOCEAN_TOKEN'),
+    'snapshot_do_token' => env('DPLY_SNAPSHOT_DO_TOKEN'),
+    'snapshot_hetzner_tokens' => array_values(array_filter([
+        env('DPLY_SNAPSHOT_HETZNER_TOKEN'),
+        env('DPLY_MANAGED_HETZNER_API_TOKEN'),
+        env('HETZNER_API_TOKEN'),
+        env('HETZNER_TOKEN'),
+    ])),
+
+    'changelog_timeout' => max(30, (int) env('DPLY_CHANGELOG_TIMEOUT', 90)),
 
     /*
     |--------------------------------------------------------------------------

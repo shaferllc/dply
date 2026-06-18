@@ -25,7 +25,7 @@ return [
      * must list this queue (see config/horizon.php) for workers to pick it up;
      * the default queue is used when unset. Mirrors server_cache.install_queue.
      */
-    'install_queue' => env('SERVER_LOGS_INSTALL_QUEUE'),
+    'install_queue' => env('SERVER_LOGS_INSTALL_QUEUE', 'dply'),
 
     /**
      * Pinned Vector release installed on the box. Vector ships a single static
@@ -50,6 +50,16 @@ return [
      * is exactly what we want for fake-cloud / pre-aggregator testing.
      */
     'aggregator_endpoint' => env('SERVER_LOGS_AGGREGATOR_ENDPOINT', ''),
+
+    /**
+     * Port the dply Vector aggregator listens on for the vector-to-vector mTLS
+     * link from edges. The codified installer ({@see \App\Jobs\InstallLogAggregatorJob})
+     * stands the aggregator up on this port, opens it in UFW, and records the
+     * resulting edge endpoint (server IP + this port) on the {@see \App\Models\ServerLogAggregator}
+     * row — which then becomes the source of truth edges read from (config above is
+     * the manual/legacy fallback).
+     */
+    'aggregator_listen_port' => (int) env('SERVER_LOGS_AGGREGATOR_PORT', 6000),
 
     /**
      * mTLS material the edge agent presents to the aggregator, deployed to
@@ -104,6 +114,60 @@ return [
     'redaction' => [
         'enabled' => (bool) env('SERVER_LOGS_REDACTION', true),
         'redact_ips' => (bool) env('SERVER_LOGS_REDACT_IPS', false),
+    ],
+
+    /**
+     * Per-org entitlements for the paid add-on (docs/SERVER_LOGS_BILLING.md §1.2).
+     * `defaults` is the free MVP baseline EVERY org gets — it MUST match the
+     * pre-billing behaviour (7-day retention, add-on available, no overage) so
+     * turning this on changes nothing for current users. `plans` overrides
+     * individual keys per subscription-plan key (see config('subscription.standard.plans'):
+     * free/starter/pro/business). Resolved by {@see \App\Services\Logs\ServerLogEntitlements}.
+     *
+     * The volume/retention numbers are uncalibrated placeholders — the doc's
+     * "Open quantities" stay unset until Phase 1 dogfooding produces real bytes/day.
+     * `overage_per_gb_cents` is 0 everywhere until PR C flips billing on; these are
+     * just the dials PR C reads. The global `enabled` kill-switch above still gates
+     * the whole add-on per environment; this layers per-org availability on top.
+     */
+    'entitlements' => [
+        'defaults' => [
+            'available' => true,            // may the org enable the add-on at all
+            'retention_days' => (int) env('SERVER_LOGS_DEFAULT_RETENTION_DAYS', 7),
+            'monthly_included_gb' => 1,
+            'overage_per_gb_cents' => 0,    // 0 = no overage billing yet (PR C)
+            'max_servers' => null,          // null = unlimited shipping servers
+            'alerting_enabled' => false,
+            'drains_enabled' => false,
+            'hard_cap_gb' => 0,             // 0 = no ingest cap (fail open; PR C2)
+        ],
+        'plans' => [
+            'pro' => [
+                'retention_days' => 30,
+                'monthly_included_gb' => 10,
+                'alerting_enabled' => true,
+                'drains_enabled' => true,
+            ],
+            'business' => [
+                'retention_days' => 90,
+                'monthly_included_gb' => 50,
+                'alerting_enabled' => true,
+                'drains_enabled' => true,
+            ],
+        ],
+    ],
+
+    /**
+     * Billing master switch (docs/SERVER_LOGS_BILLING.md §1.3 / PR C). When OFF
+     * the usage cost calculator returns 0 regardless of metered volume, so the
+     * full metering → estimate → Stripe path can land dark and be exercised in
+     * prod without charging anyone. Even when ON, an org is only billed if its
+     * plan carries a non-zero `entitlements.*.overage_per_gb_cents` (all 0 today)
+     * AND a `subscription.standard.stripe.server_log_usage` price id is set.
+     * Flip on only after dogfooding calibrates real bytes/day against cost.
+     */
+    'billing' => [
+        'enabled' => (bool) env('SERVER_LOGS_BILLING_ENABLED', false),
     ],
 
     /**

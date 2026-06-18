@@ -14,7 +14,8 @@ use RuntimeException;
 final readonly class EdgeDeliveryContext
 {
     /**
-     * @param  list<string>  $workerRoutes
+     * @param  list<string> $workerRoutes
+     * @param  list<string> $ssrCompatibilityFlags
      */
     public function __construct(
         public string $backendKey,
@@ -46,12 +47,6 @@ final readonly class EdgeDeliveryContext
          */
         public string $dispatchNamespaceName = '',
         public string $dispatchNamespaceId = '',
-        /**
-         * Compatibility date + flags applied to every per-deployment
-         * SSR script uploaded into the dispatch namespace.
-         *
-         * @var list<string>
-         */
         public string $ssrCompatibilityDate = '2024-11-01',
         public array $ssrCompatibilityFlags = [],
     ) {}
@@ -170,6 +165,9 @@ final readonly class EdgeDeliveryContext
         );
     }
 
+    /**
+     * @param  list<string> $workerRoutes
+     */
     public function withWorkerRoutes(array $workerRoutes): self
     {
         return new self(

@@ -26,7 +26,7 @@ class ActionTracer
      * @param  string  $name  The span name (typically the action class name)
      * @param  string  $traceId  The trace ID
      * @param  string  $spanId  The span ID
-     * @param  array  $attributes  Custom attributes for the span
+     * @param  array<string, mixed>  $attributes  Custom attributes for the span
      */
     public function startSpan(string $name, string $traceId, string $spanId, array $attributes = []): void
     {

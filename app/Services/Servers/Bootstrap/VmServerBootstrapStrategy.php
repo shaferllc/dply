@@ -16,11 +16,15 @@ class VmServerBootstrapStrategy implements ServerBootstrapStrategy
         return $server->isVmHost();
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function build(Server $server): array
     {
         return $this->builder->build($server);
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function buildArtifacts(Server $server): array
     {
         return $this->builder->buildArtifacts($server);

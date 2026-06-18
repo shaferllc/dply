@@ -89,7 +89,7 @@ class CloudListCommand extends Command
         }
 
         $rows = $sites->map(function (Site $site): array {
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $source = is_array($meta['container']['source'] ?? null) ? $meta['container']['source'] : null;
             $sourceLabel = $source !== null
                 ? sprintf('%s@%s', (string) ($source['repo'] ?? '?'), (string) ($source['branch'] ?? 'main'))
@@ -97,7 +97,7 @@ class CloudListCommand extends Command
 
             return [
                 'site' => $site->name,
-                'organization' => $site->organization?->name ?? '—',
+                'organization' => $site->organization->name ?? '—',
                 'backend' => $site->container_backend ?? '—',
                 'region' => $site->container_region ?? '—',
                 'mode' => $source !== null ? 'source' : 'image',
@@ -137,9 +137,9 @@ class CloudListCommand extends Command
                 $r['backend'],
                 $r['region'],
                 $r['mode'],
-                $r['mode'] === 'source' ? ($r['source'] ?? '—') : ($r['image'] ?? '—'),
-                (string) ($r['instances'] ?? 1),
-                (string) ($r['size'] ?? 'small'),
+                $r['mode'] === 'source' ? ($r['source'] ?? '—') : $r['image'],
+                (string) $r['instances'],
+                $r['size'],
                 $r['status'],
                 $r['live_url'] ?? '—',
             ], $rows),

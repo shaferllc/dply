@@ -85,9 +85,9 @@ class ListSitesCommand extends Command
         $rows = $sites->map(fn (Site $s) => [
             substr((string) $s->id, -8),
             $s->name,
-            $s->server?->name ?? '—',
-            ($s->runtimeKey() ?? '—').($s->runtimeVersion() ? ' '.$s->runtimeVersion() : ''),
-            $s->internal_port !== null ? (string) $s->internal_port : '—',
+            $s->server->name ?? '—',
+            $s->runtimeKey().($s->runtimeVersion() ? ' '.$s->runtimeVersion() : ''),
+            $s->internal_port !== '' ? $s->internal_port : '—',
             $s->databaseEngine() ?? '—',
             $s->status,
         ])->all();

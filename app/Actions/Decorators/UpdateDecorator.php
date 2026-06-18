@@ -13,12 +13,12 @@ class UpdateDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->action->handle(...$arguments);
 
@@ -35,12 +35,12 @@ class UpdateDecorator
         return $result;
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
 
-    protected function trackChanges($model): void
+    protected function trackChanges(object $model): void
     {
         if (! $this->shouldTrackChanges()) {
             return;
@@ -61,7 +61,10 @@ class UpdateDecorator
         }
     }
 
-    protected function dispatchUpdateEvent($result, array $arguments): void
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    protected function dispatchUpdateEvent(mixed $result, array $arguments): void
     {
         $eventClass = $this->getUpdateEventClass();
         if ($eventClass && class_exists($eventClass)) {
@@ -133,7 +136,7 @@ class UpdateDecorator
         return null;
     }
 
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 

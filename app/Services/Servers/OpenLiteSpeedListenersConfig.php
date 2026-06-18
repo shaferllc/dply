@@ -119,6 +119,7 @@ class OpenLiteSpeedListenersConfig
      *     unreadable: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -206,7 +207,7 @@ class OpenLiteSpeedListenersConfig
 
     /**
      * @param  array{name: string, address: string, secure: string, keyFile?: string, certFile?: string}  $identity
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -344,7 +345,7 @@ class OpenLiteSpeedListenersConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function renderNewBlock(string $name, string $address, string $secure, array $values): string
     {
@@ -370,7 +371,7 @@ class OpenLiteSpeedListenersConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     private function rewriteBlock(string $block, array $values): string
     {

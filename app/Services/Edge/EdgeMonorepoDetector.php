@@ -31,6 +31,7 @@ final class EdgeMonorepoDetector
      *     packages: list<array{path: string, label: string}>
      * }
      */
+    /** @return array<string, mixed> */
     public function inspectDirectory(string $checkoutRoot): array
     {
         $root = rtrim($checkoutRoot, '/');
@@ -68,6 +69,7 @@ final class EdgeMonorepoDetector
      *     packages: list<array{path: string, label: string}>
      * }
      */
+    /** @return array<string, mixed> */
     public function inspectUrl(string $repositoryUrl, string $branch = 'main'): array
     {
         $repositoryUrl = trim($repositoryUrl);
@@ -152,7 +154,7 @@ final class EdgeMonorepoDetector
 
         usort($packages, static fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
 
-        return array_values($packages);
+        return array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($packages))))))))))))))))))))))))))))))));
     }
 
     private function shouldSkipDirectory(string $name): bool

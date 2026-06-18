@@ -4,24 +4,56 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ * @property string $algorithm
+ * @property ?string $error_message
+ * @property ?string $hetzner_network_id
+ * @property string $load_balancer_type
+ * @property array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $private_ip
+ * @property string $provider
+ * @property ?string $provider_credential_id
+ * @property ?string $provider_id
+ * @property string $public_ipv4
+ * @property string $public_ipv6
+ * @property string $region
+ * @property ?string $server_id
+ * @property string $status
+ * @property bool $sticky_sessions
+ * @property-read ?Organization $organization
+ * @property-read ?ProviderCredential $providerCredential
+ * @property-read Collection<int, LoadBalancerTarget> $targets
+ * @property-read Collection<int, LoadBalancerService> $services
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class LoadBalancer extends Model
 {
     use HasUlids;
 
     public const STATUS_PROVISIONING = 'provisioning';
+
     public const STATUS_RUNNING = 'running';
+
     public const STATUS_ERROR = 'error';
+
     public const STATUS_DELETING = 'deleting';
 
     public const ALGORITHM_ROUND_ROBIN = 'round_robin';
+
     public const ALGORITHM_LEAST_CONNECTIONS = 'least_connections';
 
     public const PROVIDER_HETZNER = 'hetzner';
+
     public const PROVIDER_HAPROXY = 'haproxy';
 
     public const TYPES = ['lb11', 'lb21', 'lb31'];
@@ -45,6 +77,7 @@ class LoadBalancer extends Model
         'meta',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -53,15 +86,19 @@ class LoadBalancer extends Model
         ];
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
-    /** The HAProxy server (software LBs only). */
+    /** The HAProxy server (software LBs only). *
+     * @return BelongsTo<Server, $this>
+     */
+    /** @return BelongsTo<Server, $this> */
     public function server(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Server::class);
+        return $this->belongsTo(Server::class);
     }
 
     public function isSoftware(): bool
@@ -69,16 +106,19 @@ class LoadBalancer extends Model
         return $this->provider === self::PROVIDER_HAPROXY;
     }
 
+    /** @return BelongsTo<ProviderCredential, $this> */
     public function providerCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class);
     }
 
+    /** @return HasMany<LoadBalancerTarget, $this> */
     public function targets(): HasMany
     {
         return $this->hasMany(LoadBalancerTarget::class);
     }
 
+    /** @return HasMany<LoadBalancerService, $this> */
     public function services(): HasMany
     {
         return $this->hasMany(LoadBalancerService::class);

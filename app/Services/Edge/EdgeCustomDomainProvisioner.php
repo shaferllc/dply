@@ -9,7 +9,7 @@ use App\Models\EdgeDeployment;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Services\Cloudflare\CloudflareDnsService;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -217,7 +217,7 @@ final class EdgeCustomDomainProvisioner
 
         $routing['custom_domains'] = $domains;
         $meta['routing'] = $routing;
-        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta])]);
+        $site->update(['meta' => array_merge(($site->meta ), ['edge' => $meta])]);
 
         try {
             $this->hostMapPublisher->unpublishHostname($site, $hostname, $this->contextResolver->forSite($site));
@@ -237,7 +237,7 @@ final class EdgeCustomDomainProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $patch
+     * @param  array<string, mixed> $patch
      * @return array<string, mixed>
      */
     private function updateEntry(Site $site, string $hostname, array $patch): array
@@ -251,7 +251,7 @@ final class EdgeCustomDomainProvisioner
 
         $routing['custom_domains'] = $domains;
         $meta['routing'] = $routing;
-        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta])]);
+        $site->update(['meta' => array_merge(($site->meta ), ['edge' => $meta])]);
 
         ResolveEdgeCustomDomain::invalidateHostMap();
 
@@ -315,7 +315,7 @@ final class EdgeCustomDomainProvisioner
     }
 
     /**
-     * @param  array<string, mixed>  $entry
+     * @param  array<string, mixed> $entry
      */
     private function removeAutoDnsRecord(Site $site, string $hostname, array $entry): void
     {

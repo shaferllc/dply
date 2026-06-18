@@ -6,6 +6,8 @@ use App\Actions\Servers\GetProviderCredentialsForServerType;
 use App\Enums\ServerProvider;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Database\Factories\ProviderCredentialFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,8 +15,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * @property string $id
+ * @property array<string, mixed> $credentials
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $provider
+ * @property ?string $user_id
+ * @property-read ?User $user
+ * @property-read ?Organization $organization
+ * @property-read Collection<int, Server> $servers
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class ProviderCredential extends Model
 {
+    /** @use HasFactory<ProviderCredentialFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -25,6 +41,7 @@ class ProviderCredential extends Model
         'credentials',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,16 +62,19 @@ class ProviderCredential extends Model
         static::deleted($flushMemo);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return HasMany<Server, $this> */
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class, 'provider_credential_id');

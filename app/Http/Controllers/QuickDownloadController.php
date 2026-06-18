@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Server;
-use App\Models\ServerDatabase;
-use App\Models\Site;
-use App\Services\Servers\PreparedQuickDownload;
-use App\Services\Servers\QuickDownloadStreamer;
-use App\Services\Servers\QuickDownloadTooLargeException;
+use App\Http\Controllers\Sites\SiteFileDownloadController;
+use App\Models\QuickDownload;
+use App\Services\Servers\QuickDownloadBuildStager;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -17,87 +14,76 @@ use Laravel\Pennant\Feature;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Live "quick download": stream a fresh database dump or site artifact (files,
- * .env, vhost, logs, full home dir, or a combined bundle) straight from the
- * server to the browser — no S3, no control-plane persistence.
+ * Streams a staged quick-download from the operator-managed download bucket to
+ * the browser. The artifact is RETAINED for its full window (see
+ * config/quick_download.php retention_minutes) and stays re-downloadable — the
+ * sweeper prunes it at expiry, not on first download. Reaching it needs BOTH a
+ * valid signed URL (handed out by the in-app inbox + email) AND an authenticated
+ * session authorized on the server — so a leaked link can't, on its own,
+ * exfiltrate a .env or database dump.
  *
- * Plain GET routes on purpose: returning a StreamedResponse from a Livewire
- * action corrupts the page with raw bytes + JSON (same reason as
- * {@see \App\Http\Controllers\Sites\SiteFileDownloadController}).
+ * Plain signed GET route on purpose: returning a StreamedResponse from a Livewire
+ * action corrupts the page with raw bytes (same reason as
+ * {@see SiteFileDownloadController}). The bytes flow
+ * control-plane → browser; the 250MB quick-download cap keeps that tolerable.
  */
 final class QuickDownloadController extends Controller
 {
-    public function databaseDump(Server $server, ServerDatabase $database, QuickDownloadStreamer $streamer): StreamedResponse|Response
+    public function fetch(QuickDownload $quickDownload, QuickDownloadBuildStager $stager): StreamedResponse
     {
-        $this->guard($server);
-
-        if ((string) $database->server_id !== (string) $server->id) {
+        $server = $quickDownload->server;
+        if ($server === null) {
             abort(404);
         }
 
-        return $this->respond(fn () => $streamer->prepareDatabaseDump($database), $streamer);
-    }
-
-    public function adhocDatabaseDump(Server $server, \Illuminate\Http\Request $request, QuickDownloadStreamer $streamer): StreamedResponse|Response
-    {
-        $this->guard($server);
-
-        $engine = (string) $request->query('engine', '');
-        $name = (string) $request->query('name', '');
-
-        return $this->respond(fn () => $streamer->prepareAdHocDatabaseDump($server, $engine, $name), $streamer);
-    }
-
-    public function siteArtifact(Server $server, Site $site, string $artifact, QuickDownloadStreamer $streamer): StreamedResponse|Response
-    {
-        $this->guard($server);
-
-        if ((string) $site->server_id !== (string) $server->id) {
-            abort(404);
-        }
-
-        if (! in_array($artifact, QuickDownloadStreamer::SITE_ARTIFACTS, true)) {
-            abort(404);
-        }
-
-        return $this->respond(fn () => $streamer->prepareSiteArtifact($site, $artifact), $streamer);
-    }
-
-    private function guard(Server $server): void
-    {
         Gate::authorize('update', $server);
 
         $org = Auth::user()?->currentOrganization();
         if ($org === null || ! Feature::for($org)->active('workspace.backups')) {
             abort(404);
         }
-    }
 
-    /**
-     * @param  callable():PreparedQuickDownload  $prepare
-     */
-    private function respond(callable $prepare, QuickDownloadStreamer $streamer): StreamedResponse
-    {
-        try {
-            $prepared = $prepare();
-        } catch (QuickDownloadTooLargeException $e) {
-            abort(413, $e->getMessage());
-        } catch (\RuntimeException $e) {
-            abort(422, $e->getMessage());
+        if (! $quickDownload->isDownloadable()) {
+            // Consumed, expired, still building, or failed — send them back to
+            // re-queue rather than dumping a stale or missing file.
+            abort(410, __('This download is no longer available — request it again.'));
         }
 
+        try {
+            $body = $stager->openReadStream($quickDownload);
+        } catch (\Throwable $e) {
+            abort(410, $e->getMessage());
+        }
+
+        $expectedBytes = (int) ($quickDownload->bytes ?? 0);
+
         return new StreamedResponse(
-            function () use ($streamer, $prepared): void {
-                $streamer->stream($prepared);
+            function () use ($body): void {
+                // Stream-only: the object is retained for its full window and the
+                // sweeper prunes it at expiry, so a download never deletes it and
+                // the same link works again until then.
+                while (! $body->eof()) {
+                    $chunk = $body->read(1_048_576);
+                    if ($chunk === '') {
+                        break;
+                    }
+                    echo $chunk;
+                    @ob_flush();
+                    @flush();
+
+                    if (connection_aborted() !== 0) {
+                        return;
+                    }
+                }
             },
             200,
-            [
-                'Content-Type' => $prepared->mime,
-                'Content-Length' => (string) $prepared->bytes,
-                'Content-Disposition' => 'attachment; filename="'.addslashes($prepared->filename).'"',
+            array_filter([
+                'Content-Type' => $quickDownload->mime ?: 'application/octet-stream',
+                'Content-Length' => $expectedBytes > 0 ? (string) $expectedBytes : null,
+                'Content-Disposition' => 'attachment; filename="'.addslashes((string) ($quickDownload->filename ?: 'download')).'"',
                 'Cache-Control' => 'no-store, max-age=0',
                 'X-Accel-Buffering' => 'no',
-            ],
+            ]),
         );
     }
 }

@@ -54,7 +54,7 @@ final class ServerlessRuntimeDetector
     ];
 
     /**
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array{
      *     framework: string,
      *     deploy_kind: string,
@@ -71,6 +71,7 @@ final class ServerlessRuntimeDetector
      *     unsupported_for_target: bool
      * }
      */
+    /** @return array<string, mixed> */
     public function detect(string $workingDirectory, array $capabilities): array
     {
         $packageJson = $this->readJson($workingDirectory.'/package.json');
@@ -179,7 +180,7 @@ final class ServerlessRuntimeDetector
 
     /**
      * @param  array<string, mixed>|null  $composerJson
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>|null
      */
     private function detectLaravel(string $workingDirectory, ?array $composerJson, array $capabilities): ?array
@@ -227,7 +228,7 @@ final class ServerlessRuntimeDetector
      * Detect a raw OpenWhisk single action — a root entry file that defines
      * the language's `main` handler symbol.
      *
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>|null
      */
     private function detectRawAction(string $workingDirectory, array $capabilities): ?array
@@ -291,7 +292,7 @@ final class ServerlessRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      */
     private function languageSupported(string $language, array $capabilities): bool
     {
@@ -305,7 +306,7 @@ final class ServerlessRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      */
     private function rawRuntime(string $language, array $capabilities): string
     {
@@ -354,8 +355,8 @@ final class ServerlessRuntimeDetector
     /**
      * Build a PHP framework / generic result.
      *
-     * @param  list<string>  $reasons
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $reasons
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>
      */
     private function phpResult(string $framework, string $confidence, string $artifactOutputPath, array $reasons, array $capabilities, string $deployKind): array
@@ -385,7 +386,7 @@ final class ServerlessRuntimeDetector
 
     /**
      * @param  array<string, mixed>|null  $packageJson
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>|null
      */
     private function detectNodeStack(?array $packageJson, array $capabilities): ?array
@@ -457,7 +458,7 @@ final class ServerlessRuntimeDetector
      * Detect a Go web framework from go.mod. Currently recognises Gin; a
      * generic Go module falls through to raw-action detection.
      *
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>|null
      */
     private function detectGoStack(string $workingDirectory, array $capabilities): ?array
@@ -509,7 +510,7 @@ final class ServerlessRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $capabilities
+     * @param  array<string, mixed> $capabilities
      * @return array<string, mixed>|null
      */
     private function detectPythonStack(string $workingDirectory, array $capabilities): ?array
@@ -576,7 +577,7 @@ final class ServerlessRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed>  $composerJson
+     * @param  array<string, mixed> $composerJson
      */
     private function looksLikeSymfony(array $composerJson): bool
     {

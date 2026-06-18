@@ -48,8 +48,8 @@ class KubernetesKubectlExecutor
     }
 
     /**
-     * @param  list<string>  $command
-     * @param  list<string>  $output
+     * @param  array<string, mixed> $command
+     * @param  array<string, mixed> $output
      */
     private function run(array $command, array &$output, bool $allowAlreadyExists = false, ?string $input = null): string
     {

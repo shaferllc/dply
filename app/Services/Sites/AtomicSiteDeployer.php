@@ -10,8 +10,8 @@ use App\Models\SiteRelease;
 use App\Services\Deploy\DeployResumePlan;
 use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Servers\SupervisorDeployRestarter;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
 
@@ -24,6 +24,10 @@ class AtomicSiteDeployer
         protected SshConnectionFactory $sshFactory
     ) {}
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function deploy(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         // A resume re-attaches to an already-staged release and runs only the
@@ -293,10 +297,11 @@ class AtomicSiteDeployer
 
         // ── SHARED STORAGE ── opt-in (Site.meta['shared_storage']): symlink the
         // release's storage/ at a persistent dir so logs/uploads/keys survive
-        // across releases (parity with the hand-rolled deploy.sh, needed for
-        // dply's own self-deploy). Customer sites keep per-release storage unless
+        // across releases (parity with the retired hand-rolled deploy.sh shell
+        // deployer, needed for dply's own self-deploy). Customer sites keep
+        // per-release storage unless
         // they explicitly opt in. Default target = <project root>/shared/storage.
-        $deployMeta = is_array($site->meta) ? $site->meta : [];
+        $deployMeta = ($site->meta );
         if (! empty($deployMeta['shared_storage'])) {
             $sharedStorage = trim((string) ($deployMeta['shared_storage_path'] ?? ''));
             if ($sharedStorage === '') {
@@ -352,6 +357,18 @@ class AtomicSiteDeployer
         // the site has a managed (v2-spec) logging binding.
         if ($server->hostCapabilities()->supportsEnvPushToHost()) {
             $log .= app(SiteLoggingConfigPusher::class)->apply($site, $ssh, $newRelease)['log'];
+        }
+
+        // ── RESOURCES ── verify every networked resource binding (database,
+        // redis, storage, mail, …) is reachable from the box BEFORE the cutover.
+        // A critical binding the server can't dial fails the deploy HERE — the
+        // symlink never flips, so the prior release keeps serving and the new
+        // one (which would immediately 500 on a dead DB/cache/store) never goes
+        // live. Auxiliary bindings (broadcasting/logging) are probed but only
+        // warn. Skipped on a post-cutover (restart) resume: the release is
+        // already live, and re-gating it could fail a deploy that's serving.
+        if ($shouldRun('resources')) {
+            $log .= app(DeployResourceVerifier::class)->verify($site, $ssh, $deployment);
         }
 
         // ── RELEASE ── run release-phase steps (migrations, optimize, custom
@@ -482,11 +499,35 @@ class AtomicSiteDeployer
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
+        $healthStart = microtime(true);
         try {
-            $log .= app(AtomicDeployHealthChecker::class)->verify($site, $ssh);
+            $healthLog = app(AtomicDeployHealthChecker::class)->verify($site, $ssh);
+            $log .= $healthLog;
+            // Record a passing (or skipped) Health check phase so the timeline
+            // shows the gate ran. An empty return means it's disabled → record
+            // nothing (no empty row).
+            if ($deployment !== null && trim($healthLog) !== '') {
+                $deployment->recordPhaseResults('health', [[
+                    'label' => __('HTTP health check'),
+                    'ok' => true,
+                    'skipped' => str_contains($healthLog, 'skipped:'),
+                    'output' => trim($healthLog),
+                    'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+                ]]);
+            }
         } catch (\Throwable $e) {
-            $meta = is_array($site->meta) ? $site->meta : [];
-            $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? false);
+            // Record a FAILED Health check phase whose output carries the on-box
+            // cause (laravel.log + nginx tail from diagnose()), so the timeline
+            // surfaces WHERE and WHY instead of reading all-green on a failure.
+            $deployment?->recordPhaseResults('health', [[
+                'label' => __('HTTP health check'),
+                'ok' => false,
+                'output' => $e->getMessage(),
+                'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+            ]]);
+
+            $meta = ($site->meta );
+            $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? config('deploy.health_check_auto_rollback', true));
             if ($autoRollback && $previousActiveRelease !== null) {
                 try {
                     $log .= "\n--- auto rollback ---\n";

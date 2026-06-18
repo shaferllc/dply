@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support\Sites;
 
+use App\Jobs\ValidateSiteBindingsReachableJob;
 use App\Models\SiteBinding;
 
 /**
  * Resolves the reachable host:port for a site resource binding — the endpoint
  * the site's server must be able to open a TCP socket to at runtime. Used by
- * {@see \App\Jobs\ValidateSiteBindingsReachableJob} to probe every networked
+ * {@see ValidateSiteBindingsReachableJob} to probe every networked
  * binding from the box, and by the Resources map to decide which nodes can show
  * a reachability badge.
  *
@@ -42,7 +43,7 @@ final class BindingReachability
         }
 
         $env = $binding->connectionEnv();
-        $cfg = is_array($binding->config) ? $binding->config : [];
+        $cfg = ($binding->config );
         $provider = strtolower(trim((string) ($cfg['provider'] ?? '')));
 
         return match ($binding->type) {
@@ -65,7 +66,10 @@ final class BindingReachability
         };
     }
 
-    /** @param array<string, string> $env */
+    /**
+     * @param  array<string, mixed> $env
+     * @return array{host: string, port: int}|null
+     */
     private static function storage(array $env): ?array
     {
         $endpoint = trim((string) ($env['AWS_ENDPOINT'] ?? $env['AWS_URL'] ?? ''));
@@ -83,7 +87,10 @@ final class BindingReachability
         return $region !== '' ? self::clean('s3.'.$region.'.amazonaws.com', 443, 443) : null;
     }
 
-    /** @param array<string, string> $env */
+    /**
+     * @param  array<string, mixed> $env
+     * @return array{host: string, port: int}|null
+     */
     private static function mail(array $env, string $provider): ?array
     {
         // SMTP transports carry an explicit host:port.
@@ -106,8 +113,9 @@ final class BindingReachability
     }
 
     /**
-     * @param  array<string, string>  $env
-     * @param  array<string, mixed>  $cfg
+     * @param  array<string, mixed> $env
+     * @param  array<string, mixed> $cfg
+     * @return array{host: string, port: int}|null
      */
     private static function logging(array $env, array $cfg): ?array
     {
@@ -124,7 +132,8 @@ final class BindingReachability
     /**
      * Find the first `<PREFIX>_HOST` env key with a matching `<PREFIX>_PORT`.
      *
-     * @param  array<string, string>  $env
+     * @param  array<string, mixed> $env
+     * @return array{host: string, port: int}|null
      */
     private static function scan(array $env): ?array
     {

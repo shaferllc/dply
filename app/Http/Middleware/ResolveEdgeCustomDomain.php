@@ -69,6 +69,7 @@ class ResolveEdgeCustomDomain
         );
     }
 
+    /** @return array<string, mixed>|null */
     private function resolveRouting(string $host, Site $site): ?array
     {
         $map = Cache::get('edge:fake:host-map', []);

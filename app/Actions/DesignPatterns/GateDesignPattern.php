@@ -48,7 +48,7 @@ class GateDesignPattern extends DesignPattern
             || $frame->matches(Gate::class, 'denies');
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(GateDecorator::class, ['action' => $instance]);
     }

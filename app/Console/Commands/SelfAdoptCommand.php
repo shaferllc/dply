@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\ServerProvider;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAdminCredential;
@@ -82,6 +83,10 @@ class SelfAdoptCommand extends Command
                 'meta' => ['self_managed' => true],
             ],
         );
+
+        // A self-adopted org runs dply's own control plane — exempt it from the
+        // trial/pause ladder so the platform can never bill-pause itself.
+        Organization::query()->whereKey($orgId)->update(['is_internal' => true]);
 
         ServerDatabaseAdminCredential::query()->updateOrCreate(
             ['server_id' => $serverModel->id],

@@ -24,6 +24,18 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'server_maintenance_op' => [
+            'running' => 'Running host maintenance on :host …',
+            'completed' => 'Host maintenance finished.',
+            'failed' => 'Host maintenance failed.',
+            'stale' => 'Host maintenance did not finish.',
+        ],
+        'vhost_prune' => [
+            'running' => 'Scanning :host for orphaned vhosts …',
+            'completed' => 'Orphaned vhosts pruned.',
+            'failed' => 'Orphan vhost prune failed.',
+            'stale' => 'Orphan vhost prune did not finish.',
+        ],
         'error_reference_lookup' => [
             'running' => 'Searching :host logs for the reference …',
             'completed' => 'Reference resolved.',
@@ -292,6 +304,24 @@ return [
             'failed' => 'Worker stats collection failed.',
             'stale' => 'Worker stats collection did not finish.',
         ],
+        // On-demand database export (Overview "Run database backup now" + a
+        // schedule's "Run now"). The export job streams dump/ship phases; the
+        // banner mounts on the server's Backups tab. Scheduled runs are silent
+        // (no run id → no row).
+        'backup_database' => [
+            'running' => 'Backing up the database on :host …',
+            'completed' => 'Database backup complete.',
+            'failed' => 'Database backup failed.',
+            'stale' => 'Database backup did not finish.',
+        ],
+        // On-demand site-files export (Overview "Run files backup now" + a
+        // schedule's "Run now"). Streams archive/ship phases.
+        'backup_site_files' => [
+            'running' => 'Backing up site files on :host …',
+            'completed' => 'Site files backup complete.',
+            'failed' => 'Site files backup failed.',
+            'stale' => 'Site files backup did not finish.',
+        ],
     ],
 
     /*
@@ -334,8 +364,15 @@ return [
         'wordpress' => ['webserver_config'],
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
-        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test'],
-        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test'],
+        // `site_remediate`/`site_test`/`binding_validate` are included so the
+        // standalone Environment page's top-level static banner surfaces the
+        // suggested-fix (runRemediation) run. Those fixes also stream into the
+        // SSH console drawer, but that drawer is feature-gated off by default —
+        // without these kinds the run has nowhere to show on this page (the
+        // in-partial console-banner suppresses itself when section ===
+        // 'environment'). Keep in sync with the in-partial $envConsoleRun set.
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate'],
     ],
 
     /*

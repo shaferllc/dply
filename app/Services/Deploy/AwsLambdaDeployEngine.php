@@ -12,6 +12,8 @@ final class AwsLambdaDeployEngine implements DeployEngine
         private readonly AwsLambdaFunctionDeployer $functionDeployer,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function run(DeployContext $context): array
     {
         $result = $this->functionDeployer->deploy($context->site());

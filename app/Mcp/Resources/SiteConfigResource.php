@@ -51,7 +51,7 @@ class SiteConfigResource extends Resource implements HasUriTemplate
                 'document_root' => $site->document_root,
                 'git_repository_url' => $site->git_repository_url,
                 'git_branch' => $site->git_branch,
-                'ssl_status' => $site->ssl,
+                'ssl_status' => $site->ssl_status,
                 'last_deploy_at' => $site->last_deploy_at?->toIso8601String(),
             ],
         ]);

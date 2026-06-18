@@ -7,10 +7,10 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Services\Deploy\LocalDockerKubernetesRuntimeManager;
 use App\Services\Deploy\LocalDockerRuntimeManager;
-use App\Services\RemoteCli\Artisan as ArtisanService;
-use App\Services\RemoteCli\Kind;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\Artisan as ArtisanService;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Services\SshConnection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -70,9 +70,13 @@ final class LaravelConsoleExecutor
     /**
      * @return list<string>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
     public function customCommands(Site $site): array
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $raw = data_get($meta, 'laravel_console.custom_commands');
 
         if (! is_array($raw)) {
@@ -204,6 +208,9 @@ final class LaravelConsoleExecutor
         return array_values(array_slice($parts, 1));
     }
 
+    /**
+     * @param  array<string, mixed> $args
+     */
     private function recordRun(Site $site, string $command, array $args, RiskLevel $risk, int $exitCode, string $output, Carbon $startedAt): void
     {
         $finishedAt = now();
@@ -255,6 +262,7 @@ final class LaravelConsoleExecutor
     /**
      * @return array{ok: bool, commands?: list<array{name: string, description?: string}>, raw?: string, error?: string|null}
      */
+    /** @return array<string, mixed> */
     public function listArtisanCommands(Site $site, bool $forceRefresh = false): array
     {
         if (! $this->isLaravelSite($site)) {
@@ -391,7 +399,7 @@ final class LaravelConsoleExecutor
      */
     private function argvTailToPhpArgv(string $argvTail): array
     {
-        return array_values(array_filter(preg_split('/\s+/', trim($argvTail)) ?: [], fn ($t) => is_string($t) && $t !== ''));
+        return array_values(array_filter(preg_split('/\s+/', trim($argvTail)) ?: [], fn ($t) => ($t) && $t !== ''));
     }
 
     private function captureArtisanLocalK8sArgv(Site $site, string $argvTail, int $timeoutSeconds): string

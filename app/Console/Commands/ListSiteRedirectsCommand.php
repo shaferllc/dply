@@ -30,7 +30,7 @@ class ListSiteRedirectsCommand extends Command
             ->get(['id', 'kind', 'from_path', 'to_url', 'status_code', 'comment'])
             ->map(fn ($r) => [
                 'id' => $r->id,
-                'kind' => $r->kind instanceof SiteRedirectKind ? $r->kind->value : (string) $r->kind,
+                'kind' => $r->kind->value,
                 'from' => $r->from_path,
                 'to' => $r->to_url,
                 'code' => (int) $r->status_code,

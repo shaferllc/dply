@@ -25,6 +25,7 @@ final class ServerBlueprintCapture
      *     supervisor_programs: list<array<string, mixed>>,
      * }
      */
+    /** @return array<string, mixed> */
     public function fromServer(Server $server): array
     {
         $server->loadMissing(['firewallRules', 'supervisorPrograms']);
@@ -42,7 +43,7 @@ final class ServerBlueprintCapture
             $runtimeDefaults = [];
         }
 
-        /** @var array<string, string> $normalizedRuntimes */
+        /** @var array $normalizedRuntimes */
         $normalizedRuntimes = [];
         foreach ($runtimeDefaults as $runtime => $version) {
             if (is_string($runtime) && is_string($version) && $version !== '') {

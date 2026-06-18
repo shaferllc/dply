@@ -50,6 +50,10 @@ class DeployPhaseRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<array{step_id: string, step_type: string, command: ?string, ok: bool, output: string, duration_ms: int}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function runBuild(Site $site, string $releaseDir, ?Closure $shellFactory = null): array
     {
         return $this->runPhase($site, SiteDeployStep::PHASE_BUILD, $releaseDir, $shellFactory);
@@ -65,7 +69,11 @@ class DeployPhaseRunner
      * same shape.
      *
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
-     * @return list<array{step_id: string, step_type: string, command: string, ok: bool, output: string, duration_ms: int}>
+     * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<int, array<string, mixed>>
      */
     public function runSwap(Site $site, string $releaseDir, ?Closure $shellFactory = null): array
     {
@@ -86,7 +94,11 @@ class DeployPhaseRunner
 
     /**
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
-     * @return list<array{step_id: string, step_type: string, command: ?string, ok: bool, output: string, duration_ms: int}>
+     * @return array<int, array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
      */
     public function runRelease(Site $site, string $releaseDir, ?Closure $shellFactory = null): array
     {
@@ -115,7 +127,11 @@ class DeployPhaseRunner
      * runPhase's stop-on-first-failure semantics.
      *
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
-     * @return list<array{step_id: string, step_type: string, command: ?string, ok: bool, output: string, duration_ms: int}>
+     * @return list<array<string, mixed>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
      */
     public function runRestart(Site $site, ?Closure $shellFactory = null): array
     {
@@ -232,6 +248,7 @@ class DeployPhaseRunner
 
     /**
      * @return array{ok: bool, output: string, duration_ms: int}
+     * @param  array<string, mixed> $env
      */
     private function execAt(RemoteShell $shell, string $cwd, string $command, int $timeout, array $env = []): array
     {

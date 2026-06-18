@@ -9,17 +9,17 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesReleaseHygieneLogViewer;
 use App\Livewire\Servers\Concerns\ManagesReleaseHygieneNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan;
 use App\Models\Server;
 use App\Services\Servers\ServerReleaseHygiene;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Release & disk hygiene — atomic release pressure, log sizes, failed jobs,
@@ -33,13 +33,13 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceReleaseHygiene extends Component
 {
-    use RendersWorkspacePlaceholder;
+    use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesReleaseHygieneLogViewer;
+    use ManagesReleaseHygieneNotifications;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use RunsServerReleaseHygieneScan;
-    use CreatesNotificationChannelInline;
-    use ManagesReleaseHygieneNotifications;
 
     protected string $requiredFeature = 'workspace.release_hygiene';
 

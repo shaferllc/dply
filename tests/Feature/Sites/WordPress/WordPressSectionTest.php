@@ -13,7 +13,7 @@ use App\Models\Site;
 use App\Models\Snapshot;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
-use App\Services\RemoteCli\Kind;
+use App\Modules\RemoteCli\Services\Kind;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;

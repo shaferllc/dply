@@ -45,6 +45,10 @@ class NginxAccessLogParser
      *
      * @return array<int, array<string, mixed>>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function parse(string $raw): array
     {
         $rows = [];
@@ -63,8 +67,9 @@ class NginxAccessLogParser
     /**
      * Parse a single line. Never throws — falls back to a raw row.
      *
-     * @return array<string, mixed>
+     * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function parseLine(string $line): array
     {
         if (! preg_match(self::COMBINED, trim($line), $m)) {
@@ -76,15 +81,15 @@ class NginxAccessLogParser
         return [
             'parsed' => true,
             'raw' => $line,
-            'ip' => $this->dashToNull($m['ip'] ?? null),
-            'user' => $this->dashToNull($m['user'] ?? null),
+            'ip' => $this->dashToNull($m['ip']),
+            'user' => $this->dashToNull($m['user']),
             'time' => $this->parseTime($m['time'] ?? ''),
-            'time_raw' => $m['time'] ?? null,
+            'time_raw' => $m['time'],
             'method' => $method,
             'path' => $path,
             'protocol' => $protocol,
             'status' => isset($m['status']) ? (int) $m['status'] : null,
-            'bytes' => $this->parseBytes($m['bytes'] ?? null),
+            'bytes' => $this->parseBytes($m['bytes']),
             'referer' => $this->dashToNull($m['referer'] ?? null),
             'user_agent' => $this->dashToNull($m['agent'] ?? null),
         ];
@@ -125,6 +130,7 @@ class NginxAccessLogParser
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function summarize(array $rows): array
     {
         $parsed = array_filter($rows, fn ($r) => ($r['parsed'] ?? false) === true);
@@ -157,6 +163,7 @@ class NginxAccessLogParser
     }
 
     /**
+     * @param  array<string, mixed> $rows
      * Bucket an HTTP status into a class key used for colour-coding.
      */
     public function statusClass(?int $status): string

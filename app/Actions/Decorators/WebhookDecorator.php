@@ -12,12 +12,12 @@ class WebhookDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->action->handle(...$arguments);
 
@@ -26,12 +26,15 @@ class WebhookDecorator
         return $result;
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
 
-    protected function sendWebhook($result, array $arguments): void
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    protected function sendWebhook(mixed $result, array $arguments): void
     {
         $url = $this->getWebhookUrl();
 
@@ -71,7 +74,11 @@ class WebhookDecorator
         return $this->fromActionMethodOrProperty('getWebhookUrl', 'webhookUrl');
     }
 
-    protected function getWebhookPayload($result, array $arguments): array
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @return array<string, mixed>
+     */
+    protected function getWebhookPayload(mixed $result, array $arguments): array
     {
         return $this->fromActionMethod('getWebhookPayload', [$result, $arguments], [
             'action' => get_class($this->action),
@@ -80,6 +87,9 @@ class WebhookDecorator
         ]);
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getWebhookHeaders(): array
     {
         // Check for attribute first
@@ -107,6 +117,9 @@ class WebhookDecorator
         return $this->fromActionMethod('getWebhookMethod', [], 'post');
     }
 
+    /**
+     * @return string|array<string, string>|null
+     */
     protected function getAttributeValue(string $attributeClass): string|array|null
     {
         // Unwrap decorators to get the original action
@@ -135,7 +148,7 @@ class WebhookDecorator
         return null;
     }
 
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 

@@ -55,7 +55,7 @@ class ProvisionStripeBillingCommand extends Command
         $this->info('Provisioning Stripe billing objects… (idempotent, safe to re-run)');
 
         try {
-            $provisioner = new StripeBillingProvisioner($stripe instanceof StripeClient ? $stripe : new StripeClient($secret));
+            $provisioner = new StripeBillingProvisioner($stripe);
             $result = $provisioner->provision();
         } catch (ApiErrorException $e) {
             $this->error('Stripe API error: '.$e->getMessage());

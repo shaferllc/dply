@@ -1,0 +1,7 @@
+{
+  "assets": [
+    ".env",
+    ".env.prod",
+    ".env.worker"
+  ]
+}

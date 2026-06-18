@@ -46,8 +46,10 @@ allowlists, and reports any **shared** key missing on web or on a worker.
 DEPLOY_STRICT_ENV=1 ./deploy/check-env-drift.sh   # exit 1 on drift
 ```
 
-It runs automatically as a `deploy.sh` preflight (warn-only unless
-`DEPLOY_STRICT_ENV=1`).
+Run it before a deploy — by hand or as a pre-deploy gate (warn-only unless
+`DEPLOY_STRICT_ENV=1`). It was previously a `deploy.sh` preflight; that shell
+deployer is retired (now `commit.sh`, commit-only), so this check is operator-run
+until it's wired into the deploy engine.
 
 ## Reconciling drift (operator-run, secrets stay on the boxes)
 
@@ -96,7 +98,7 @@ Rules:
   identically to every box — never `key:generate`d per-box.
 - After ANY `APP_KEY` change, rebuild **both** `config:cache` **and**
   `route:cache` on each box (and reload php-fpm on web / restart Horizon on
-  workers). `deploy.sh`'s `deploy_release` already runs `route:cache`, so a
+  workers). `AtomicSiteDeployer` runs `route:cache` on every release, so a
   normal deploy is safe; the hazard is out-of-band edits.
 
 ## Maintaining the allowlists

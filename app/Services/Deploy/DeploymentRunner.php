@@ -42,6 +42,7 @@ class DeploymentRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory  test seam
      * @return array{ok: bool, phases: array<string, list<array<string, mixed>>>, total_duration_ms: int}
      */
+    /** @return array<string, mixed> */
     public function run(SiteDeployment $deployment, string $releaseDir, ?Closure $shellFactory = null): array
     {
         $site = $deployment->site;
@@ -93,7 +94,7 @@ class DeploymentRunner
     }
 
     /**
-     * @param  list<array<string, mixed>>  $steps
+     * @param  array<string, mixed> $steps
      */
     private function phaseOk(array $steps): bool
     {
@@ -110,7 +111,7 @@ class DeploymentRunner
     }
 
     /**
-     * @param  array{ok: bool, phases: array<string, list<array<string, mixed>>>, total_duration_ms: int}  $aggregate
+     * @param  array<string, mixed> $aggregate
      * @return array{ok: bool, phases: array<string, list<array<string, mixed>>>, total_duration_ms: int}
      */
     private function finalize(SiteDeployment $deployment, array $aggregate, bool $ok): array

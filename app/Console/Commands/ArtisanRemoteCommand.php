@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Models\Site;
 use App\Models\User;
-use App\Services\RemoteCli\Artisan as ArtisanService;
-use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\Artisan as ArtisanService;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
 use Illuminate\Console\Command;
 
 /**

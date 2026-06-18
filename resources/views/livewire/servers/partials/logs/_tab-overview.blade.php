@@ -55,7 +55,7 @@
             </div>
         </div>
         <a
-            href="{{ route('servers.activity', $server) }}?category=background"
+            href="{{ route('servers.logs', ['server' => $server, 'tab' => 'activity', 'cat' => 'background']) }}"
             wire:navigate
             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
         >

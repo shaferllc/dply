@@ -59,7 +59,7 @@ trait ManagesServerlessRuntime
             'serverless_concurrency' => __('concurrency'),
         ]);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta = $this->site->meta;
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $serverless['limits'] = [
             'memory' => $this->serverless_memory,

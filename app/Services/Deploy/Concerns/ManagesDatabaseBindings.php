@@ -71,7 +71,7 @@ trait ManagesDatabaseBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachDatabase(Site $site, array $params): SiteBinding
     {
@@ -190,7 +190,7 @@ trait ManagesDatabaseBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function provisionDatabase(Site $site, array $params): SiteBinding
     {
@@ -284,7 +284,7 @@ trait ManagesDatabaseBindings
      *   schema, sslmode (Postgres)
      *   timezone (all)
      *
-     * @param  array<string, string|null>  $options
+     * @param  array<string, mixed> $options
      * @return array<string, string>
      */
     private function databaseEnv(ServerDatabase $db, Site $site, array $options = []): array

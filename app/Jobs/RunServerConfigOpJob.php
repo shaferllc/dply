@@ -54,7 +54,7 @@ class RunServerConfigOpJob implements ShouldQueue
         RemoteWebserverConfigService $webserverService,
         RemoteServerConfigService $genericService,
     ): void {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->markConsole(ConsoleAction::STATUS_FAILED, error: 'Server not found.');
 
@@ -107,7 +107,7 @@ class RunServerConfigOpJob implements ShouldQueue
                 $server,
                 $this->path,
                 $this->contents,
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 $this->revisionSummary,
                 $this->engine,
             );
@@ -192,11 +192,6 @@ class RunServerConfigOpJob implements ShouldQueue
         }
 
         return app(ServerConfigFileCatalog::class)->webserverEngineForPath($this->path);
-    }
-
-    private function isWebserverPath(): bool
-    {
-        return $this->resolvedWebserverEngine() !== null;
     }
 
     private function markConsole(string $status, bool $started = false, ?string $error = null): void

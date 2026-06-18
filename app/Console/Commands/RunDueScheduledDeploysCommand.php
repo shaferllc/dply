@@ -67,7 +67,7 @@ class RunDueScheduledDeploysCommand extends Command
             Log::info('Delayed deploy dispatched', [
                 'site_id' => $site->id,
                 'scheduled_deploy_id' => $scheduled->id,
-                'run_at' => $scheduled->run_at?->toIso8601String(),
+                'run_at' => $scheduled->run_at->toIso8601String(),
             ]);
         }
 

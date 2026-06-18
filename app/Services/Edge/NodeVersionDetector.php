@@ -38,6 +38,7 @@ final class NodeVersionDetector
      *   detected: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function detect(string $checkoutDir): array
     {
         $checkoutDir = rtrim($checkoutDir, '/');

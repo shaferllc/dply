@@ -61,7 +61,7 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
         $envVars = WorkerPoolHorizonConfig::envVarsFor($pool);
 
         foreach ($pool->servers as $member) {
-            if (! $member instanceof Server || ! $member->isReady()) {
+            if (! $member->isReady()) {
                 continue;
             }
             // Box-authoritative: in seed mode, leave already-configured members
@@ -87,7 +87,7 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
      */
     private function markApplied(Server $member): void
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $meta['horizon_config_applied_at'] = now()->toIso8601String();
         $member->forceFill(['meta' => $meta])->save();
     }

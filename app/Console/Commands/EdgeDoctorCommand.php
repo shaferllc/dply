@@ -56,7 +56,7 @@ class EdgeDoctorCommand extends Command
 
         if (FakeEdgeProvision::enabled()) {
             $checks = EdgeLocalDevDiagnostics::checks();
-            $failed = array_values(array_filter($checks, fn (array $check): bool => ($check['ok'] ?? false) === false));
+            $failed = array_filter($checks, static fn (array $check): bool => ! $check['ok']);
 
             return [
                 'ok' => true,

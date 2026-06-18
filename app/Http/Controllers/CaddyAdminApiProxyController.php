@@ -40,17 +40,17 @@ class CaddyAdminApiProxyController extends Controller
             abort(503, $e->getMessage());
         }
 
-        $status = (int) ($result['status'] ?? 502);
+        $status = (int) $result['status'];
         if ($status < 100 || $status > 599) {
             $status = 502;
         }
 
         return response(
-            (string) ($result['body'] ?? ''),
+            (string) $result['body'],
             $status,
             [
-                'Content-Type' => (string) ($result['content_type'] ?? 'application/json'),
-                'X-Dply-Caddy-Admin-Target' => (string) ($result['admin_url'] ?? ''),
+                'Content-Type' => (string) $result['content_type'],
+                'X-Dply-Caddy-Admin-Target' => (string) $result['admin_url'],
                 'Cache-Control' => 'no-store, private',
             ],
         );

@@ -4,18 +4,20 @@ namespace App\Services\Sites;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
+use App\Services\Deploy\DeployPhaseRunner;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
  *
  * Each phase method returns a structured result so callers can both append
  * the human-readable log AND record per-step status/timing onto the
- * {@see \App\Models\SiteDeployment} (powering the live phase timeline):
+ * {@see SiteDeployment} (powering the live phase timeline):
  *
  *   ['log' => string, 'steps' => list<step>, 'ok' => bool]
  *
- * where each step matches the shape {@see \App\Services\Deploy\DeployPhaseRunner}
+ * where each step matches the shape {@see DeployPhaseRunner}
  * records: {step_id, step_type, command, ok, output, duration_ms, skipped}.
  * The runner does NOT throw on a failed step — it sets ok=false and stops the
  * phase so the caller can record the partial results before failing the deploy.
@@ -29,6 +31,7 @@ class SiteDeployPipelineRunner
     /**
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function run(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         $build = $this->runBuild($ssh, $site, $workingDirectory);
@@ -43,11 +46,12 @@ class SiteDeployPipelineRunner
 
     /**
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress  Fired
-     *   before each step with the full ordered step list (completed steps carry
-     *   their output; the current one is flagged `running`; the rest `pending`),
-     *   so the caller can persist live progress for the phase timeline.
+     *                                                                   before each step with the full ordered step list (completed steps carry
+     *                                                                   their output; the current one is flagged `running`; the rest `pending`),
+     *                                                                   so the caller can persist live progress for the phase timeline.
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function runBuild(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_BUILD, $onProgress);
@@ -57,6 +61,7 @@ class SiteDeployPipelineRunner
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function runRelease(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RELEASE, $onProgress);
@@ -69,6 +74,7 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function runRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RESTART);
@@ -86,6 +92,7 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
+    /** @return array<string, mixed> */
     public function runManagedRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         if ($site->isCustom() || $site->runtimeKey() === 'static') {
@@ -111,9 +118,32 @@ class SiteDeployPipelineRunner
         }
 
         if ($site->resolvedLaravelPackageFlag('horizon')) {
-            // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
-            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
-                .'&& { echo "[dply] horizon:terminate"; php artisan horizon:terminate 2>&1 || echo "[dply] horizon:terminate skipped/failed (continuing)"; }; } || true';
+            // A SELF-deploy is one whose target IS the box running this deploy
+            // job, so `horizon:terminate` would bounce the Horizon executing it.
+            // Matched purely by local-IP identity ({@see Server::isLocalDeployHost()})
+            // — exact, so a customer's remote server can never trip it.
+            $server = $site->server;
+            $isSelfDeploy = $server !== null && $server->isLocalDeployHost();
+
+            if ($isSelfDeploy) {
+                // SELF-deploy: terminating Horizon inline would SIGKILL this very
+                // deploy job (and any concurrent one) — it runs on the Horizon we'd
+                // bounce. Hand the restart to a DETACHED drain-aware command that
+                // waits for in-flight deploys to finish first, then terminates.
+                // Falls back to the inline terminate only if the command isn't on
+                // the box yet (the deploy that first ships it still runs old code).
+                $parts[] = 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then '
+                    .'echo "[dply] self-deploy: deferring Horizon restart until in-flight deploys drain"; '
+                    .'setsid nohup php artisan dply:self-horizon-restart >> /tmp/dply-self-horizon-restart.log 2>&1 </dev/null & '
+                    .'elif [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
+                    .'echo "[dply] self-deploy: drain command unavailable — inline horizon:terminate (legacy)"; '
+                    .'php artisan horizon:terminate 2>&1 || true; '
+                    .'fi';
+            } else {
+                // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
+                $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
+                    .'&& { echo "[dply] horizon:terminate"; php artisan horizon:terminate 2>&1 || echo "[dply] horizon:terminate skipped/failed (continuing)"; }; } || true';
+            }
             $labels[] = 'Horizon';
         }
 
@@ -152,7 +182,9 @@ class SiteDeployPipelineRunner
      */
     /**
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress
+     * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase, ?callable $onProgress = null): array
     {
         $site->loadMissing('deploySteps');
@@ -370,8 +402,17 @@ class SiteDeployPipelineRunner
             // early (composer install must still run), so we guard with an if.
             if (! $usesComposer) {
                 $prefix .= '[ -f package.json ] || { echo "[dply] no package.json — skipping frontend build"; exit 0; }; ';
+                // Opt-out: a package.json with {"dply": {"build": false}} skips
+                // both the npm install and the asset build. Read without node
+                // (which may not be installed yet) by flattening whitespace and
+                // matching the dply block — keeps the opt-out honored even on a
+                // box that has no Node toolchain at all.
+                $prefix .= 'if [ -f package.json ] && tr -d " \\t\\n\\r" < package.json 2>/dev/null | grep -q \'"dply":{[^{}]*"build":false\'; then '
+                    .'echo "[dply] package.json opts out of the build (dply.build=false) — skipping install & build"; exit 0; '
+                    .'fi; ';
             }
             $prefix .= 'if [ -f package.json ]; then '
+                // 1) Try mise (present on dply-provisioned boxes) to get node@lts.
                 .'command -v npm >/dev/null 2>&1 || { '
                 .'echo "[dply] node/npm not found — installing node@lts via mise…"; '
                 .'if command -v mise >/dev/null 2>&1; then '
@@ -379,8 +420,25 @@ class SiteDeployPipelineRunner
                 .'eval "$(mise env -s bash 2>/dev/null)" 2>/dev/null || true; '
                 .'export PATH="$HOME/.local/share/mise/shims:$PATH"; '
                 .'fi; }; '
-                .'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable — install Node on the server, then redeploy."; exit 1; }; '
-                .'fi; ';
+                // 2) Still missing (BYO box without mise) — install Node LTS from
+                //    NodeSource, mirroring the on-demand composer install above.
+                .'command -v npm >/dev/null 2>&1 || { '
+                .'echo "[dply] installing Node LTS via NodeSource…"; '
+                .'if [ "$(id -u)" = 0 ]; then '
+                .'curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1 && apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
+                .'elif command -v sudo >/dev/null 2>&1; then '
+                .'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - >/dev/null 2>&1 && sudo apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
+                .'fi; }; ';
+            // 3) Still no npm. For a Node-only step (npm_ci / npm_run) warn and
+            //    SKIP the build rather than failing the whole deploy — the app
+            //    ships without rebuilt assets and the operator can install Node
+            //    and redeploy. For a combined composer+node custom step we must
+            //    NOT exit here (that would skip composer too); let the command
+            //    run and surface the npm failure on its own.
+            if (! $usesComposer) {
+                $prefix .= 'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable and auto-install failed — skipping frontend build (install Node on the server and redeploy to build assets)."; exit 0; }; ';
+            }
+            $prefix .= 'fi; ';
         }
 
         return $prefix.'} && ';

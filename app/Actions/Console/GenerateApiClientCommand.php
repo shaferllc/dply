@@ -6,6 +6,7 @@ namespace App\Actions\Console;
 
 use App\Actions\ActionRegistry;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class GenerateApiClientCommand extends Command
@@ -59,7 +60,10 @@ class GenerateApiClientCommand extends Command
         return Command::SUCCESS;
     }
 
-    protected function generateTypeScriptClient($actions): string
+    /**
+     * @param  Collection<int, string>  $actions
+     */
+    protected function generateTypeScriptClient(Collection $actions): string
     {
         $code = "// Auto-generated TypeScript client for Actions\n";
         $code .= '// Generated: '.now()->toDateTimeString()."\n\n";
@@ -84,7 +88,10 @@ class GenerateApiClientCommand extends Command
         return $code;
     }
 
-    protected function generateJavaScriptClient($actions): string
+    /**
+     * @param  Collection<int, string>  $actions
+     */
+    protected function generateJavaScriptClient(Collection $actions): string
     {
         $code = "// Auto-generated JavaScript client for Actions\n";
         $code .= '// Generated: '.now()->toDateTimeString()."\n\n";
@@ -112,7 +119,10 @@ class GenerateApiClientCommand extends Command
         return $code;
     }
 
-    protected function generatePhpClient($actions): string
+    /**
+     * @param  Collection<int, string>  $actions
+     */
+    protected function generatePhpClient(Collection $actions): string
     {
         $code = "<?php\n\n";
         $code .= "declare(strict_types=1);\n\n";

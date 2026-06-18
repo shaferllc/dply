@@ -65,14 +65,14 @@ class EdgeEnsureHybridOriginsCommand extends Command
 
         foreach ($results as $row) {
             $health = $row['healthcheck'];
-            $status = ($health['ok'] ?? false) ? 'OK' : 'FAIL';
+            $status = $health['ok'] ? 'OK' : 'FAIL';
             $suffix = $row['updated'] ? ' (metadata updated)' : '';
             $this->line(sprintf(
                 '%s%s — healthcheck %s: %s',
                 $row['slug'],
                 $suffix,
                 $status,
-                $health['message'] ?? '',
+                $health['message'],
             ));
         }
 

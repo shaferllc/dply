@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Jobs\ApplyRemediationHandlerAllowListTest;
 
-use App\Jobs\ApplyRemediationJob;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
@@ -21,7 +21,6 @@ uses(RefreshDatabase::class);
  * run — only the allow-list `in_array()` check stops it. If that check is
  * removed, `apply()` runs and this test fails.
  */
-
 test('it does not run a handler outside the catalog allow-list', function () {
     RogueHandler::$applied = false;
 

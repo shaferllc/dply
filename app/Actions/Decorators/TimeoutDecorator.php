@@ -49,7 +49,7 @@ class TimeoutDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -92,12 +92,7 @@ class TimeoutDecorator
     }
 
     /**
-     * Execute with PCNTL alarm for precise timeout enforcement.
-     *
-     * @param  int  $timeout  Timeout in seconds
-     * @param  array  $arguments  Action arguments
-     *
-     * @throws \RuntimeException If execution exceeds timeout
+     * @param  array<int, mixed>  $arguments
      */
     protected function handleWithPcntl(int $timeout, array $arguments): mixed
     {
@@ -122,12 +117,7 @@ class TimeoutDecorator
     }
 
     /**
-     * Execute with timer-based timeout (fallback when PCNTL unavailable).
-     *
-     * @param  int  $timeout  Timeout in seconds
-     * @param  array  $arguments  Action arguments
-     *
-     * @throws \RuntimeException If execution exceeds timeout
+     * @param  array<int, mixed>  $arguments
      */
     protected function handleWithTimer(int $timeout, array $arguments): mixed
     {

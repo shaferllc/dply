@@ -19,40 +19,34 @@
                 :contextual-doc-slug="$contextualDocSlug"
             />
 
-            <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
-            </div>
-
-            @if ($headerRoleLabel !== null)
-                <div class="mt-3 flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                          title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                        @if ($headerIsDeployer)
-                            <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                        @elseif ($headerCanUpdateSite)
-                            <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                        @else
-                            <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                        @endif
-                        {{ $headerRoleLabel }}
-                    </span>
-                </div>
-            @endif
-
-            <x-page-header
+            <x-hero-card
+                :eyebrow="$workspaceTitle"
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
-                :show-documentation="false"
-                toolbar
-                flush
-                class="mt-3"
+                class="mt-5"
             >
-                <x-slot name="leading">
+                <x-slot:leading>
                     <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                         @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
                     </span>
-                </x-slot>
-            </x-page-header>
+                </x-slot:leading>
+
+                @if ($headerRoleLabel !== null)
+                    <x-slot:topAction>
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                            @if ($headerIsDeployer)
+                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                            @elseif ($headerCanUpdateSite)
+                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                            @else
+                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                            @endif
+                            {{ $headerRoleLabel }}
+                        </span>
+                    </x-slot:topAction>
+                @endif
+            </x-hero-card>
 
             <main class="min-w-0 space-y-6 mt-8">
 @else

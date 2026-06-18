@@ -69,8 +69,8 @@ final class StaticRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $detectedFiles
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed> $reasons
      */
     private function detectFramework(string $root, array &$detectedFiles, array &$reasons): ?string
     {
@@ -113,7 +113,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $reasons
      */
     private function detectBuildCommand(?string $framework, array &$reasons): ?string
     {
@@ -139,7 +139,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  list<string>  $reasons
+     * @param  array<string, mixed> $reasons
      */
     private function detectOutputDirectory(string $root, ?string $framework, array &$reasons): ?string
     {

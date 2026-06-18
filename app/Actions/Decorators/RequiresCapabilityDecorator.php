@@ -26,7 +26,7 @@ class RequiresCapabilityDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -83,7 +83,7 @@ class RequiresCapabilityDecorator
     }
 
     /**
-     * Get the team from arguments or current team.
+     * @param  array<int, mixed>  $arguments
      */
     protected function getTeam(array $arguments): ?Team
     {
@@ -102,7 +102,8 @@ class RequiresCapabilityDecorator
     }
 
     /**
-     * Get required capabilities from action.
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, string>
      */
     protected function getRequiredCapabilities(array $arguments): array
     {
@@ -124,7 +125,7 @@ class RequiresCapabilityDecorator
     }
 
     /**
-     * Check if user has required capability(ies).
+     * @param  array<int, string>  $requiredCapabilities
      */
     protected function userHasRequiredCapabilities(User $user, Team $team, array $requiredCapabilities, bool $requireAll): bool
     {

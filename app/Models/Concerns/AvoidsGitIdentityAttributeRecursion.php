@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Models\Concerns;
 
 /**
- * GitIdentity models expose id(), provider(), and accessToken() methods that
- * collide with Eloquent attribute / relationship resolution — reading $model->id
- * or booting HasUlids can recurse until max_execution_time. Route column reads
- * through attributes[] instead.
+ * @property string $id
+ *                      GitIdentity models expose id(), provider(), and accessToken() methods that
+ *                      collide with Eloquent attribute / relationship resolution — reading $model->id
+ *                      or booting HasUlids can recurse until max_execution_time. Route column reads
+ *                      through attributes[] instead.
  */
 trait AvoidsGitIdentityAttributeRecursion
 {

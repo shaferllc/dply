@@ -23,7 +23,7 @@ class CheckSiteUrlHealthJob implements ShouldQueue
             return;
         }
 
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site || ! $site->isReadyForTraffic()) {
             return;
         }

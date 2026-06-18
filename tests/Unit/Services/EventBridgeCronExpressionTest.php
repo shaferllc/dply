@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\EventBridgeCronExpressionTest;
 
-use App\Services\Serverless\Aws\EventBridgeCronExpression;
+use App\Modules\Serverless\Services\Aws\EventBridgeCronExpression;
 use InvalidArgumentException;
 
 test('an every day schedule gets a question mark day of week', function () {

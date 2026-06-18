@@ -11,7 +11,7 @@ final class UnlinkSocialAccount
      */
     public static function allowed(User $user): bool
     {
-        if ($user->password !== null) {
+        if (filled($user->getRawOriginal('password'))) {
             return true;
         }
 

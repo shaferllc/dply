@@ -24,6 +24,7 @@ class BetaInvitationNotification extends Notification implements ShouldQueue
         public BetaInvitation $invitation
     ) {}
 
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
         return ['mail'];

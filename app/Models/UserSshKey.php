@@ -4,12 +4,25 @@ namespace App\Models;
 
 use App\Models\Concerns\SyncsServerAuthorizedKeysOnManagedKeyDelete;
 use Database\Factories\UserSshKeyFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $user_id
+ * @property string $name
+ * @property string $public_key
+ * @property bool $provision_on_new_servers
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property-read User $user
+ * @property-read Collection<int, ServerAuthorizedKey> $serverAuthorizedKeys
+ */
 class UserSshKey extends Model
 {
     /** @use HasFactory<UserSshKeyFactory> */
@@ -24,6 +37,7 @@ class UserSshKey extends Model
         'provision_on_new_servers',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -31,11 +45,13 @@ class UserSshKey extends Model
         ];
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return MorphMany<ServerAuthorizedKey, $this> */
     public function serverAuthorizedKeys(): MorphMany
     {
         return $this->morphMany(ServerAuthorizedKey::class, 'managed_key');

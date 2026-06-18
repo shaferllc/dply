@@ -7,7 +7,7 @@ namespace Tests\Feature\Jobs\ApplyRemediationHandlerAllowListTest;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Remediations\RemediationActionInterface;
+use App\Modules\Remediations\Services\RemediationActionInterface;
 
 /** A handler that *passes* the interface check but is NOT in the allow-list. */
 class RogueHandler implements RemediationActionInterface

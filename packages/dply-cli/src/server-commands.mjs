@@ -557,7 +557,7 @@ async function sharedHostExplain(args, flags) {
     info('');
     info(c.bold('AI summary'));
     info(String(data.ai_narrative));
-  } elseif (data.briefing && data.briefing !== data.summary) {
+  } else if (data.briefing && data.briefing !== data.summary) {
     info('');
     info(String(data.briefing));
   }

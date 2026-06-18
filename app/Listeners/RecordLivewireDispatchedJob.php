@@ -50,7 +50,7 @@ class RecordLivewireDispatchedJob
             return;
         }
 
-        $jobInstance = $event->job ?? null;
+        $jobInstance = is_object($event->job) ? $event->job : null;
         $jobClass = is_object($jobInstance) ? $jobInstance::class : null;
         if ($jobClass === null || in_array($jobClass, self::SKIP_CLASSES, true)) {
             return;
@@ -95,7 +95,7 @@ class RecordLivewireDispatchedJob
         // No global "is this a livewire dispatch span?" hook exists in v3,
         // so this URL probe is the simplest reliable signal.
         try {
-            return request()?->is('livewire/update') === true;
+            return request()->is('livewire/update') === true;
         } catch (\Throwable) {
             return false;
         }

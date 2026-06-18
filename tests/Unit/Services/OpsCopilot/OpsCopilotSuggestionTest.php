@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\OpsCopilot;
 
-use App\Services\OpsCopilot\OpsCopilotSuggestion;
+use App\Modules\OpsCopilot\Services\OpsCopilotSuggestion;
 
 test('llm suggestion includes source and actions', function () {
     $suggestion = OpsCopilotSuggestion::fromLlm(0, [

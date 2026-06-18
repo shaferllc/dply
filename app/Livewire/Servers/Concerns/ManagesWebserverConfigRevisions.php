@@ -7,8 +7,8 @@ namespace App\Livewire\Servers\Concerns;
 use App\Jobs\RunWebserverConfigOpJob;
 use App\Models\ConfigRevision;
 use App\Models\ConsoleAction;
-use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
-use App\Services\ConfigRevisions\Diff\PhpFileDiffRenderer;
+use App\Modules\ConfigRevisions\Services\Diff\ConfigRevisionDiffRegistry;
+use App\Modules\ConfigRevisions\Services\Diff\PhpFileDiffRenderer;
 use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -114,7 +114,7 @@ trait ManagesWebserverConfigRevisions
             return;
         }
 
-        $snapshot = is_array($rev->snapshot) ? $rev->snapshot : [];
+        $snapshot = $rev->snapshot;
         $this->config_contents = is_string($snapshot['content'] ?? null) ? $snapshot['content'] : '';
         $this->webserverConfigDiffRevisionId = null;
         $this->toastSuccess(__('Revision loaded into editor.'));
@@ -138,7 +138,7 @@ trait ManagesWebserverConfigRevisions
             return;
         }
 
-        $snapshot = is_array($rev->snapshot) ? $rev->snapshot : [];
+        $snapshot = $rev->snapshot;
         $content = is_string($snapshot['content'] ?? null) ? $snapshot['content'] : '';
 
         $consoleId = $this->seedManageConsoleAction(
@@ -309,7 +309,7 @@ trait ManagesWebserverConfigRevisions
             if ($rev !== null) {
                 return [
                     $registry->rendererFor(ServerWebserverConfigEditor::KIND)->render(
-                        is_array($rev->snapshot) ? $rev->snapshot : [],
+                        $rev->snapshot,
                         $editor->snapshotFor($this->workspace_tab, (string) $this->config_selected_path, $this->config_contents),
                     ),
                     (string) __('Revision :time vs editor buffer', [

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Logs;
 
+use App\Console\Commands\SyncLogStoreSchemaCommand;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
 /**
  * Thin client over ClickHouse's HTTP interface (port 8123) for the dply Logs
  * store. Laravel uses this ONLY for reads (the log explorer) and the one-time
- * DDL ({@see \App\Console\Commands\SyncLogStoreSchemaCommand}) — the high-volume
+ * DDL ({@see SyncLogStoreSchemaCommand}) — the high-volume
  * ingest path is the Vector aggregator inserting directly, never PHP.
  *
  * Reads bind parameters server-side via ClickHouse's `{name:Type}` placeholders
@@ -23,9 +24,10 @@ class ClickHouseClient
      * Run a SELECT and return the decoded rows. The query should NOT include a
      * FORMAT clause — we append `FORMAT JSON` and unwrap `.data`.
      *
-     * @param  array<string, scalar>  $params  Bound as ClickHouse {name:Type} params.
+     * @param  array<string, mixed> $params  Bound as ClickHouse {name:Type} params.
      * @return list<array<string, mixed>>
      */
+    /** @return array<string, mixed> */
     public function select(string $sql, array $params = []): array
     {
         $boundQuery = [];
@@ -48,7 +50,7 @@ class ClickHouseClient
      * Run a single scalar SELECT (e.g. count). Returns the first column of the
      * first row, or null.
      *
-     * @param  array<string, scalar>  $params
+     * @param  array<string, mixed> $params
      */
     public function scalar(string $sql, array $params = []): mixed
     {
@@ -132,7 +134,7 @@ class ClickHouseClient
      * Build a configured HTTP request. `$database` null = no `database` query arg
      * (ClickHouse uses its default), required for DDL that creates the database.
      *
-     * @param  array<string, scalar>  $extraQuery
+     * @param  array<string, mixed> $extraQuery
      */
     protected function http(?string $database, array $extraQuery = []): PendingRequest
     {

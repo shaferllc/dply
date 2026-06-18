@@ -7,6 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * @property string $id
+ * @property string $action
+ * @property string $ip_address
+ * @property array<string, mixed> $new_values
+ * @property array<string, mixed> $old_values
+ * @property ?string $organization_id
+ * @property ?string $subject_id
+ * @property string $subject_type
+ * @property ?string $user_id
+ * @property-read ?Organization $organization
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class AuditLog extends Model
 {
     use HasUlids;
@@ -22,6 +37,7 @@ class AuditLog extends Model
         'ip_address',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -30,16 +46,19 @@ class AuditLog extends Model
         ];
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return MorphTo<Model, $this> */
     public function subject(): MorphTo
     {
         return $this->morphTo();
@@ -47,6 +66,9 @@ class AuditLog extends Model
 
     /**
      * Create an audit log entry.
+     *
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
      */
     public static function log(
         Organization $organization,
@@ -82,13 +104,13 @@ class AuditLog extends Model
     {
         $subject = $this->subject_type && $this->subject_id ? $this->subject : null;
         $name = $subject
-            ? match ($this->subject_type) {
-                Server::class => $subject->name,
-                Team::class => $subject->name,
-                OrganizationInvitation::class => $subject->email,
-                Site::class => $subject->name,
-                SiteDeployment::class => 'deployment #'.$subject->getKey(),
-                Workspace::class => $subject->name,
+            ? match (true) {
+                $subject instanceof Server => $subject->name,
+                $subject instanceof Team => $subject->name,
+                $subject instanceof OrganizationInvitation => $subject->email,
+                $subject instanceof Site => $subject->name,
+                $subject instanceof SiteDeployment => 'deployment #'.$subject->getKey(),
+                $subject instanceof Workspace => $subject->name,
                 default => null,
             }
         : ($this->old_values['name'] ?? $this->new_values['name'] ?? null);

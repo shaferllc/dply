@@ -6,6 +6,7 @@ use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
+use App\Support\Servers\BootHeadStartScript;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -90,8 +91,8 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                     // head-start (apt warmup at boot) when enabled. No-op when off.
                     'user_data' => (isset($doOpts['user_data']) && is_string($doOpts['user_data']) && $doOpts['user_data'] !== '')
                         ? $doOpts['user_data']
-                        : (\App\Support\Servers\BootHeadStartScript::enabled()
-                            ? \App\Support\Servers\BootHeadStartScript::cloudInitUserData()
+                        : (BootHeadStartScript::enabled()
+                            ? BootHeadStartScript::cloudInitUserData()
                             : ''),
                 ],
             );

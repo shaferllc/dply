@@ -17,19 +17,16 @@ class Lexer
     /**
      * Generates tokens from an nginx config file.
      *
-     * @param string $filename
      *
      * @throws NgxParserException
-     *
-     * @return \Generator
      */
     public function lex(string $filename): \Generator
     {
-        if (!file_exists($filename)) {
+        if (! file_exists($filename)) {
             throw new NgxParserIOException(sprintf("File '%s' not found", $filename), $filename);
         }
 
-        if (!is_file($filename)) {
+        if (! is_file($filename)) {
             throw new NgxParserIOException(sprintf("'%s' is not file", $filename), $filename);
         }
 
@@ -54,8 +51,7 @@ class Lexer
     /**
      * Generates token tuples from an nginx config file object.
      *
-     * @param resource $fp
-     *
+     * @param  resource  $fp
      * @return \Generator Yields 3-tuples like (token, lineno, quoted)
      */
     private function lexFileObject($fp): ?\Generator
@@ -101,8 +97,8 @@ class Lexer
             }
 
             // if starting comment
-            if (!$token && $char === '#') {
-                while ($char !== null && !str_ends_with($char, "\n")) {
+            if (! $token && $char === '#') {
+                while ($char !== null && ! str_ends_with($char, "\n")) {
                     $token .= $char;
                     $it->next();
                     [$char] = $it->current();
@@ -113,14 +109,14 @@ class Lexer
                 continue;
             }
 
-            if (!$token) {
+            if (! $token) {
                 $tokenLine = $line;
             }
 
             // handle parameter expansion syntax (ex: "${var[@]}")
             if ($token !== '' && $token[-1] === '$' && $char === '{') {
                 $nextTokenIsDirective = false;
-                while ($token[-1] !== '}' && !StringUtil::isSpace($char)) {
+                while ($token[-1] !== '}' && ! StringUtil::isSpace($char)) {
                     $token .= $char;
                     $it->next();
                     [$char, $line] = $it->current();
@@ -140,7 +136,7 @@ class Lexer
                 $it->next();
                 [$char] = $it->current();
                 while ($char !== $quote) {
-                    $token .= $char === '\\' . $quote ? $quote : $char;
+                    $token .= $char === '\\'.$quote ? $quote : $char;
                     $it->next();
                     [$char] = $it->current();
                 }
@@ -183,9 +179,7 @@ class Lexer
     }
 
     /**
-     * @param resource $fp
-     *
-     * @return \Generator|null
+     * @param  resource  $fp
      */
     private function iterateFileContents($fp): ?\Generator
     {
@@ -233,21 +227,18 @@ class Lexer
     /**
      * Raises syntax errors if braces aren't balanced.
      *
-     * @param array  $tokens
-     * @param string $filename
+     * @param  array  $tokens
      *
      * @throws NgxParserSyntaxException
-     *
-     * @return \Generator
      */
     private function balanceBraces(iterable $tokens, string $filename): \Generator
     {
         $depth = 0;
 
         foreach ($tokens as [$token, $line, $quoted]) {
-            if ($token === '}' && !$quoted) {
+            if ($token === '}' && ! $quoted) {
                 $depth--;
-            } elseif ($token === '{' && !$quoted) {
+            } elseif ($token === '{' && ! $quoted) {
                 $depth++;
             }
 

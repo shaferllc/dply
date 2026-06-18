@@ -32,10 +32,10 @@ final readonly class RepositoryRuntimePlan
     public const SOURCE_DEFAULT = 'default';
 
     /**
-     * @param  array<string, string>  $sources  field => one of the SOURCE_* constants
-     * @param  list<DetectedProcess>  $processes  merged worker/scheduler suggestions (excludes the `web` process)
-     * @param  list<string>  $reasons  combined reasons from manifest+detection, in the order they were produced
-     * @param  list<string>  $warnings  manifest parse warnings (forward-compat unknown keys, etc.)
+     * @param  array<string, mixed> $sources  field => one of the SOURCE_* constants
+     * @param  array<string, mixed> $processes  merged worker/scheduler suggestions (excludes the `web` process)
+     * @param  array<string, mixed> $reasons  combined reasons from manifest+detection, in the order they were produced
+     * @param  array<string, mixed> $warnings  manifest parse warnings (forward-compat unknown keys, etc.)
      */
     public function __construct(
         public string $runtime,

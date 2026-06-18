@@ -46,8 +46,8 @@ class ProvisionStepEtaService
                 ->first();
 
             return [
-                'seconds' => (int) round((float) ($row?->avg_seconds ?? 0)),
-                'samples' => (int) ($row?->sample_count ?? 0),
+                'seconds' => (int) round((float) ($row->avg_seconds ?? 0)),
+                'samples' => (int) ($row->sample_count ?? 0),
             ];
         });
 
@@ -66,7 +66,7 @@ class ProvisionStepEtaService
      * the journey UI calls this once for the whole "Up next" list so
      * each pending row gets an ETA chip without N+1 trips.
      *
-     * @param  list<string>  $labelHashes
+     * @param  array<string, mixed> $labelHashes
      * @return array<string, array{seconds: int, samples: int}> keyed by label_hash; missing keys = below threshold
      */
     public function averagesForLabels(array $labelHashes, ?Organization $organization): array

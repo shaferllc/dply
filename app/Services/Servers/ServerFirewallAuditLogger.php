@@ -9,6 +9,9 @@ use App\Models\User;
 
 class ServerFirewallAuditLogger
 {
+    /**
+     * @param  array<string, mixed> $meta
+     */
     public function record(
         Server $server,
         string $event,

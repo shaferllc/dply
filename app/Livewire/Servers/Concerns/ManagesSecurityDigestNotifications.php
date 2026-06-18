@@ -5,7 +5,8 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Services\Servers\ServerSecurityDigestScanner;
 use App\Support\ServerSecurityDigestNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Gate;
  * notification channels to this server's server.security_digest.* events without
  * leaving the page.
  *
- * Security-digest events fire from {@see \App\Services\Servers\ServerSecurityDigestScanner}
+ * Security-digest events fire from {@see ServerSecurityDigestScanner}
  * (manual refresh + daily sweep), so this trait is subscription management only.
  * Mirrors {@see ManagesCertInventoryNotifications}.
  */

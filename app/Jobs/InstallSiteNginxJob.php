@@ -23,10 +23,11 @@ class InstallSiteNginxJob implements ShouldQueue
 
     public function handle(SiteWebserverConfigApplier $applier): void
     {
-        $this->site = $this->site->fresh();
-        if (! $this->site) {
+        $fresh = $this->site->fresh();
+        if ($fresh === null) {
             return;
         }
+        $this->site = $fresh;
 
         try {
             $applier->apply($this->site);

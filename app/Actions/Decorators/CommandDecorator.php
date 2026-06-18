@@ -11,7 +11,7 @@ class CommandDecorator extends Command
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
 
@@ -28,7 +28,7 @@ class CommandDecorator extends Command
         parent::__construct();
     }
 
-    public function handle()
+    public function handle(): mixed
     {
         if ($this->hasMethod('asCommand')) {
             return $this->resolveAndCallMethod('asCommand', ['command' => $this]);
@@ -37,6 +37,8 @@ class CommandDecorator extends Command
         if ($this->hasMethod('handle')) {
             return $this->resolveAndCallMethod('handle', ['command' => $this]);
         }
+
+        return null;
     }
 
     public function getComponents(): Factory

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy\ServerlessProviders\DigitalOcean;
 
-use App\Contracts\ServerlessFunctionProvisioner;
+use App\Modules\Serverless\Contracts\ServerlessFunctionProvisioner;
 use App\Services\Deploy\Support\ArtifactZipPathPrefix;
 use App\Services\Deploy\Support\ProvisionerConfigReport;
 use Illuminate\Support\Facades\Http;
@@ -23,6 +23,8 @@ final class DigitalOceanOpenWhiskActionProvisioner implements ServerlessFunction
         private readonly string $defaultPackage,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function deployFunction(string $name, string $runtime, string $artifactPath, array $config = []): array
     {
         $ctx = $this->resolveContext($config);
@@ -80,7 +82,7 @@ final class DigitalOceanOpenWhiskActionProvisioner implements ServerlessFunction
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed> $config
      * @return array{api_host: string, namespace: string, access_key: string, package: string, action_kind: string, action_main: string}
      */
     private function resolveContext(array $config): array

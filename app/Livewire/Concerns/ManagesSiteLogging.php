@@ -3,6 +3,7 @@
 namespace App\Livewire\Concerns;
 
 use App\Jobs\SendSiteLogTestJob;
+use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\Deploy\SiteBindingManager;
 use App\Services\Logging\LoggingChannelCatalog;
@@ -10,6 +11,7 @@ use App\Services\Logging\LoggingConfigGenerator;
 use App\Services\Logging\LoggingSpec;
 use App\Services\Logging\LoggingSpecValidator;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Component;
 
 /**
  * The Phase 3 logging editor: drives the Logs-tab card where the operator
@@ -19,10 +21,17 @@ use Illuminate\Support\Facades\Gate;
  * {@see $loggingSecrets} (never hydrated back from storage) and handed to
  * {@see SiteBindingManager::saveLoggingSpec()} on save.
  *
- * @property \App\Models\Site $site
+ * @phpstan-require-extends Component
+ *
+ * @property Site $site
+ *
+ * @method \App\Models\ConsoleAction seedQueuedConsoleAction(string $kind, ?string $label = null)
  */
 trait ManagesSiteLogging
 {
+    use DispatchesToastNotifications;
+    use WatchesConsoleActionOutcomes;
+
     /** @var array<string, mixed> The working logging spec. */
     public array $loggingSpec = [];
 
@@ -47,7 +56,7 @@ trait ManagesSiteLogging
         }
 
         $binding = $this->site->bindings->firstWhere('type', 'logging');
-        $config = ($binding && is_array($binding->config)) ? $binding->config : [];
+        $config = $binding ? $binding->config : [];
 
         if (LoggingSpec::isV2($config)) {
             unset($config['provider']); // drop the transitional legacy key
@@ -169,9 +178,7 @@ trait ManagesSiteLogging
         $this->loggingSpecLoaded = false; // force re-hydrate from the saved binding
         $this->site->load('bindings');
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Logging configuration saved. It takes effect on the next deploy.'));
-        }
+        $this->toastSuccess(__('Logging configuration saved. It takes effect on the next deploy.'));
     }
 
     /**
@@ -192,17 +199,11 @@ trait ManagesSiteLogging
         }
 
         $savedNames = array_column(
-            is_array($binding->config) ? ($binding->config['channels'] ?? []) : [],
+            $binding->config['channels'] ?? [],
             'name',
         );
         if (! in_array($name, $savedNames, true)) {
             $this->dispatchLoggingError(__('Save this channel (and deploy) before testing it.'));
-
-            return;
-        }
-
-        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
-            $this->dispatchLoggingError(__('Testing a channel is available from the deploy hub.'));
 
             return;
         }
@@ -334,11 +335,6 @@ trait ManagesSiteLogging
 
     private function dispatchLoggingError(string $message): void
     {
-        if (method_exists($this, 'toastError')) {
-            $this->toastError($message);
-
-            return;
-        }
-        $this->addError('loggingSpec', $message);
+        $this->toastError($message);
     }
 }

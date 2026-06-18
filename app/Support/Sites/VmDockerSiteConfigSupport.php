@@ -20,7 +20,7 @@ final class VmDockerSiteConfigSupport
             return (int) $publicationPort;
         }
 
-        if ($site->internal_port !== null && $site->internal_port > 0) {
+        if ($site->internal_port > 0) {
             return (int) $site->internal_port;
         }
 

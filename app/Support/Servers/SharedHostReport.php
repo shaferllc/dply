@@ -35,8 +35,8 @@ final class SharedHostReport
 
         return [
             'overall' => $overall,
-            'solo_tenant' => (bool) ($attribution['solo_tenant'] ?? true),
-            'site_count' => (int) ($attribution['site_count'] ?? 0),
+            'solo_tenant' => (bool) ($attribution['solo_tenant']),
+            'site_count' => (int) ($attribution['site_count']),
             'attribution' => $attribution,
             'attribution_range' => $attributionRange,
             'shared_map' => $sharedMap,
@@ -45,7 +45,7 @@ final class SharedHostReport
             'budgets' => $budgetSettings,
             'budget_breaches' => $this->budgetEvaluator->breaches(
                 $server,
-                is_array($attribution['rows'] ?? null) ? $attribution['rows'] : [],
+                ($attribution['rows'] ),
                 usePeakShares: $attributionRange !== 'current',
             ),
             'history' => [
@@ -55,7 +55,7 @@ final class SharedHostReport
             'promote_enabled' => Feature::active('workspace.site_promote'),
             'cost_enabled' => Feature::active('workspace.server_cost'),
             'summary' => [
-                'shared_resource_count' => count($sharedMap['shared_resources'] ?? []),
+                'shared_resource_count' => count($sharedMap['shared_resources']),
                 'dominant_site' => $this->dominantSite($attribution),
                 'latest_event_at' => $events[0]['occurred_at'] ?? null,
             ],
@@ -110,9 +110,9 @@ final class SharedHostReport
     }
 
     /**
-     * @param  array<string, mixed>  $attribution
+     * @param  array<string, mixed> $attribution
      * @param  list<array<string, mixed>>  $events
-     * @param  array<string, mixed>  $sharedMap
+     * @param  array<string, mixed> $sharedMap
      */
     private function resolveOverall(array $attribution, array $events, array $sharedMap): string
     {
@@ -138,7 +138,7 @@ final class SharedHostReport
     }
 
     /**
-     * @param  array<string, mixed>  $attribution
+     * @param  array<string, mixed> $attribution
      * @return array{slug: string, name: string, cpu_share_pct: ?float, mem_share_pct: ?float}|null
      */
     private function dominantSite(array $attribution): ?array

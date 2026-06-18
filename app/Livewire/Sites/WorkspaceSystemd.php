@@ -8,7 +8,7 @@ use App\Livewire\Sites\Concerns\ManagesSiteSystemdProcesses;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdUnitBuilder;
-use App\Support\Docs\ContextualDocResolver;
+use App\Modules\Docs\Support\ContextualDocResolver;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;

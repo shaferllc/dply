@@ -17,6 +17,9 @@ final class ServerStateUpdated implements ShouldBroadcast, ShouldQueue
 {
     use Dispatchable, InteractsWithSockets;
 
+    /**
+     * @param  ?array<string, mixed>  $server
+     */
     public function __construct(
         public readonly string $organizationId,
         public readonly string $serverId,

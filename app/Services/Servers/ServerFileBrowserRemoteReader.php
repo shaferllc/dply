@@ -267,8 +267,8 @@ class ServerFileBrowserRemoteReader
      * pass (`ls -lAH`, dereferences) so a symlink to a directory shows
      * type=link with linkTargetIsDir=true.
      *
-     * @param  array<string, array{type: string, size: int, mtime: int, mode: string, owner: string, group: string, link_target: ?string}>  $resolved
-     * @param  array<string, array{type: string, size: int, mtime: int, mode: string, owner: string, group: string, link_target: ?string}>  $linkInfo
+     * @param  array<string, mixed> $resolved
+     * @param  array<string, mixed> $linkInfo
      * @return list<FileBrowserEntry>
      */
     protected function mergeListings(array $resolved, array $linkInfo): array

@@ -24,6 +24,7 @@ final class EdgeAnalyticsEngineRollup
     /**
      * @return array{hours: int, rows: int}
      */
+    /** @return array<string, mixed> */
     public function rollupRecentHours(int $hours = 2): array
     {
         $dataset = trim((string) config('edge.cloudflare.analytics_dataset', ''));

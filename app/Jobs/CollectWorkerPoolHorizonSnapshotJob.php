@@ -82,7 +82,7 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
         $now = now()->toIso8601String();
         $snapshot['collected_at'] = $now;
         $snapshot['last_attempt_at'] = $now;
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $meta['horizon'] = $snapshot;
         $pool->forceFill(['meta' => $meta])->save();
     }
@@ -95,7 +95,7 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
      */
     private function recordError(WorkerPool $pool, string $message): void
     {
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $hz = is_array($meta['horizon'] ?? null) ? $meta['horizon'] : [];
         $hz['last_attempt_at'] = now()->toIso8601String();
         $hz['error'] = mb_substr($message, 0, 600);

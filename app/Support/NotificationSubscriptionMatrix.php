@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -30,8 +31,8 @@ final class NotificationSubscriptionMatrix
      * Build channelId => list<eventKey> for the subject, limited to managed keys
      * and the assignable channels.
      *
-     * @param  list<string>  $managedKeys
-     * @param  Collection<int, \App\Models\NotificationChannel>  $assignableChannels
+     * @param  array<string, mixed> $managedKeys
+     * @param  Collection<int, NotificationChannel>  $assignableChannels
      * @return array<string, list<string>>
      */
     public static function load(string $subjectType, string $subjectId, array $managedKeys, Collection $assignableChannels): array
@@ -67,9 +68,9 @@ final class NotificationSubscriptionMatrix
      * a partial submit can't wipe channels it didn't include). Each channel must be
      * in $assignableChannels; unknown channels are skipped.
      *
-     * @param  list<string>  $managedKeys
-     * @param  Collection<int, \App\Models\NotificationChannel>  $assignableChannels
-     * @param  array<string, mixed>  $selections  channelId => list<eventKey>
+     * @param  array<string, mixed> $managedKeys
+     * @param  Collection<int, NotificationChannel>  $assignableChannels
+     * @param  array<string, mixed> $selections  channelId => list<eventKey>
      * @return array{changed: int, added: int, removed: int}
      */
     public static function save(string $subjectType, string $subjectId, array $managedKeys, Collection $assignableChannels, array $selections): array

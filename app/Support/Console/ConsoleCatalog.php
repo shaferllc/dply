@@ -108,8 +108,8 @@ class ConsoleCatalog
     }
 
     /**
-     * @param  list<string>  $required
-     * @param  array<string, true>  $installed
+     * @param  array<string, mixed> $required
+     * @param  array<string, mixed> $installed
      */
     protected static function tagsMatch(array $required, array $installed): bool
     {
@@ -119,7 +119,7 @@ class ConsoleCatalog
             return true;
         }
         foreach ($required as $tag) {
-            if (is_string($tag) && array_key_exists($tag, $installed)) {
+            if (($tag) && array_key_exists($tag, $installed)) {
                 return true;
             }
         }

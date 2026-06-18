@@ -58,7 +58,7 @@ class ServerResourceCostCalculator
      * Look up a raw provider rate for a size slug, falling back to the cheapest
      * known size so an unrecognized slug never bills $0.
      *
-     * @param  array<string, int|string>  $rates
+     * @param  array<string, mixed> $rates
      */
     private function rate(array $rates, string $size): int
     {

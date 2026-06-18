@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Jobs\RelocateSiteFilesJob;
 use App\Models\Site;
 use Illuminate\Console\Command;
-use Illuminate\Support\Collection;
 
 class RelocateSiteCommand extends Command
 {

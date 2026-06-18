@@ -28,7 +28,7 @@ trait ManagesOauthBindings
     public const OAUTH_PROVIDERS = ['github', 'google', 'facebook', 'gitlab', 'linkedin'];
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachOauth(Site $site, array $params): SiteBinding
     {
@@ -62,7 +62,7 @@ trait ManagesOauthBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolveOauthCredentials(Site $site, string $provider, array $params): array
@@ -79,7 +79,7 @@ trait ManagesOauthBindings
                 throw new InvalidArgumentException(__('That saved OAuth credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return array_filter([
@@ -110,7 +110,7 @@ trait ManagesOauthBindings
     }
 
     /**
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function oauthEnv(string $provider, array $creds): array
@@ -156,8 +156,8 @@ trait ManagesOauthBindings
     }
 
     /**
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSaveOauthCredential(Site $site, string $provider, array $params, array $creds): void
     {

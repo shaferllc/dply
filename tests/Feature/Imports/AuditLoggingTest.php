@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\AuditLoggingTest;
 
-use App\Livewire\Imports\Ploi\MigrationProgress;
+use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
 use App\Livewire\Servers\Create\StepReview;
 use App\Models\AuditLog;
 use App\Models\ImportMigrationStep;

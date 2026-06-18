@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
-use App\Models\ConsoleAction;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
 use App\Services\Servers\DatabaseEngineAuditLogger;

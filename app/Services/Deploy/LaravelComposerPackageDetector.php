@@ -30,7 +30,9 @@ final class LaravelComposerPackageDetector
 
     /**
      * @return LaravelPackageFlags
+     * @param  array<string, mixed> $composerJson
      */
+    /** @return array<string, mixed> */
     public function flags(?array $composerJson): array
     {
         $out = [
@@ -52,7 +54,7 @@ final class LaravelComposerPackageDetector
     }
 
     /**
-     * @param  array<string, mixed>  $composerJson
+     * @param  array<string, mixed> $composerJson
      */
     private function composerRequiresPackage(array $composerJson, string $package): bool
     {

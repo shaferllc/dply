@@ -6,8 +6,10 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\HetznerService;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SshConnectionFactory;
+use App\Support\Servers\HetznerCloudFirewallRules;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -41,7 +43,7 @@ class InstallServerWebserverJob implements ShouldQueue
 
     public function handle(SshConnectionFactory $sshFactory, SiteProvisioner $siteProvisioner): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -70,8 +72,8 @@ class InstallServerWebserverJob implements ShouldQueue
                 'set -e',
                 'export DEBIAN_FRONTEND=noninteractive',
                 'install -d /usr/share/keyrings',
-                "curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg",
-                "curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list",
+                'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg',
+                'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list',
                 'apt-get update -y',
                 'apt-get install -y --no-install-recommends caddy',
                 'ufw allow 80/tcp || true',
@@ -81,7 +83,7 @@ class InstallServerWebserverJob implements ShouldQueue
 
             $log = $shell->exec("sudo bash -lc '{$script}' 2>&1", 540);
 
-            $check = trim($shell->exec("systemctl is-active caddy 2>&1 || true", 30));
+            $check = trim($shell->exec('systemctl is-active caddy 2>&1 || true', 30));
             if ($check !== 'active') {
                 Log::warning('InstallServerWebserverJob: caddy not active after install.', [
                     'server_id' => $server->id,
@@ -92,14 +94,14 @@ class InstallServerWebserverJob implements ShouldQueue
             }
         } catch (\Throwable $e) {
             // Clear the UI pending flag so the operator can retry.
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             unset($meta['webserver_install_pending']);
             $meta['webserver_install_error'] = $e->getMessage();
             $server->forceFill(['meta' => $meta])->save();
             throw $e;
         }
 
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $meta['webserver'] = 'caddy';
         $installedStack = is_array($meta['installed_stack'] ?? null) ? $meta['installed_stack'] : [];
         $installedStack['webserver'] = 'caddy';
@@ -143,7 +145,7 @@ class InstallServerWebserverJob implements ShouldQueue
      * firewall id stamped in meta — other providers rely on default-open
      * cloud networking and only need the on-box UFW lines.
      */
-    private function syncHetznerCloudFirewall(\App\Models\Server $server): void
+    private function syncHetznerCloudFirewall(Server $server): void
     {
         if ($server->provider->value !== 'hetzner') {
             return;
@@ -168,8 +170,8 @@ class InstallServerWebserverJob implements ShouldQueue
         }
 
         try {
-            $hetzner = new \App\Services\HetznerService($credential);
-            $rules = \App\Support\Servers\HetznerCloudFirewallRules::forServer($server);
+            $hetzner = new HetznerService($credential);
+            $rules = HetznerCloudFirewallRules::forServer($server);
             $hetzner->setFirewallRules($firewallId, $rules);
             Log::info('InstallServerWebserverJob: Hetzner cloud firewall re-synced.', [
                 'server_id' => $server->id,

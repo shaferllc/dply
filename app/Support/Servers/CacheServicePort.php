@@ -74,7 +74,7 @@ class CacheServicePort
         // metacharacters off the command line.
         $authProlog = '';
         $authFlag = '';
-        if ($row->auth_password !== null && $row->auth_password !== '') {
+        if (filled($row->auth_password)) {
             $b64 = base64_encode($row->auth_password);
             $authProlog = "PASS_B64={$b64}\nPASS=\$(printf %s \"\$PASS_B64\" | base64 -d)\n";
             $authFlag = ' -a "$PASS"';

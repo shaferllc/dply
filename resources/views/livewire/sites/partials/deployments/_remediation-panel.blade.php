@@ -9,7 +9,10 @@
     $run = $this->deploymentRemediationRun;
     $succeeded = $run && $run->status === 'completed';
 @endphp
-@if ($remediation)
+{{-- "Guided" remediations (e.g. database_connection_failed) aren't one-click
+     scripts — they render their own inline panel under the failed step, so skip
+     them here rather than show empty action buttons. --}}
+@if ($remediation && empty($remediation['guided']))
     <section @class([
         'mb-6 overflow-hidden rounded-2xl border',
         'border-emerald-200 bg-emerald-50/60' => $succeeded,

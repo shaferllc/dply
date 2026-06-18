@@ -2,11 +2,11 @@
 
 namespace App\Services\Sites;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Site;
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Support\GitRemoteRepositoryRef;
-use App\Support\SourceControl\GitHubWebhookFailure;
+use App\Modules\SourceControl\Support\GitHubWebhookFailure;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -36,6 +36,7 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string}
      */
+    /** @return array<string, mixed> */
     public function enable(Site $site, GitIdentity $account): array
     {
         if (! $this->canRegisterProviderHook($site)) {
@@ -331,7 +332,7 @@ class RepositoryWebhookProvisioner
             return;
         }
 
-        if ($provider === 'github' && $ref?->owner && $ref?->repo && $hookId !== null) {
+        if ($provider === 'github' && $ref->owner && $ref->repo && $hookId !== null) {
             Http::withToken($token)
                 ->patch($account->apiBaseUrl().'/repos/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$hookId, [
                     'config' => [

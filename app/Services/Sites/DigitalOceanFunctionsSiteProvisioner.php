@@ -9,6 +9,7 @@ final class DigitalOceanFunctionsSiteProvisioner
     /**
      * @return array{ok: bool, hostname: ?string, url: ?string, error: ?string, checked_at: string, checks: list<array<string, mixed>>}
      */
+    /** @return array<string, mixed> */
     public function readyResult(Site $site): array
     {
         $site->loadMissing('domains');

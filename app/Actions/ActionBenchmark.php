@@ -43,7 +43,7 @@ class ActionBenchmark
      * Run benchmark for an action.
      *
      * @param  string  $actionClass  Action class name
-     * @param  array  $arguments  Arguments to pass to action
+     * @param  array<int, mixed>  $arguments  Arguments to pass to action
      * @param  int  $iterations  Number of iterations
      * @return array<string, mixed> Benchmark results
      */
@@ -103,7 +103,7 @@ class ActionBenchmark
      *
      * @param  string  $action1  First action class name
      * @param  string  $action2  Second action class name
-     * @param  array  $arguments  Arguments to pass to actions
+     * @param  array<int, mixed>  $arguments  Arguments to pass to actions
      * @param  int  $iterations  Number of iterations
      * @return array<string, mixed> Comparison results
      */
@@ -165,22 +165,28 @@ class ActionBenchmark
      * Get benchmark history for an action.
      *
      * @param  string  $actionClass  Action class name
-     * @return Collection<array> Benchmark history
+     * @return Collection<int, array<string, mixed>> Benchmark history
      */
     public static function getHistory(string $actionClass): Collection
     {
         $key = "benchmark_history:{$actionClass}";
+        /** @var list<array<string, mixed>> $history */
+        $history = cache()->get($key, []);
 
-        return collect(cache()->get($key, []));
+        return collect($history);
     }
 
     /**
      * Store benchmark result.
+     *
+     * @param  array<string, mixed>  $result
      */
     protected static function storeBenchmark(string $actionClass, array $result): void
     {
         $key = "benchmark_history:{$actionClass}";
-        $history = collect(cache()->get($key, []));
+        /** @var list<array<string, mixed>> $cachedHistory */
+        $cachedHistory = cache()->get($key, []);
+        $history = collect($cachedHistory);
         $history->prepend($result);
         $history = $history->take(50); // Keep last 50 benchmarks
         cache()->put($key, $history->toArray(), 86400 * 30); // Store for 30 days

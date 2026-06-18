@@ -14,7 +14,7 @@ use InvalidArgumentException;
 trait ManagesQueueBindings
 {
     /**
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachQueue(Site $site, array $params): SiteBinding
     {

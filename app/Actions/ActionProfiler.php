@@ -56,15 +56,17 @@ namespace App\Actions;
  */
 class ActionProfiler
 {
+    /** @var array<string, array<string, mixed>> */
     protected static array $profiles = [];
 
+    /** @var array<string, array<string, mixed>> */
     protected static array $activeProfiles = [];
 
     /**
      * Start profiling an action.
      *
      * @param  string  $actionClass  Action class name
-     * @param  array  $arguments  Arguments being passed
+     * @param  array<int, mixed>  $arguments  Arguments being passed
      * @return string Profile ID
      */
     public static function start(string $actionClass, array $arguments = []): string
@@ -135,7 +137,7 @@ class ActionProfiler
     /**
      * Get all profiles.
      *
-     * @return array<string, array> All profile data
+     * @return array<string, array<string, mixed>> All profile data
      */
     public static function getAllProfiles(): array
     {
@@ -146,11 +148,11 @@ class ActionProfiler
      * Get profiles for a specific action.
      *
      * @param  string  $actionClass  Action class name
-     * @return array<array> Profile data for the action
+     * @return array<int, array<string, mixed>> Profile data for the action
      */
     public static function getProfilesForAction(string $actionClass): array
     {
-        return array_filter(static::$profiles, fn ($profile) => $profile['action'] === $actionClass);
+        return array_values(array_filter(static::$profiles, fn ($profile) => $profile['action'] === $actionClass));
     }
 
     /**

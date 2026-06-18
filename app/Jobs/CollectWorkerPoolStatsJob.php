@@ -43,7 +43,10 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
             return $this->resolvedSubject;
         }
         $pool = WorkerPool::query()->with('servers')->find($this->poolId);
-        $server = $pool?->primaryServer ?? $pool?->sourceServer;
+        if ($pool === null) {
+            return $this->resolvedSubject = new Server;
+        }
+        $server = $pool->primaryServer ?? $pool->sourceServer;
 
         return $this->resolvedSubject = ($server instanceof Server ? $server : new Server);
     }
@@ -94,7 +97,7 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
                 $emit($redis === 'PONG' ? sprintf('%s — Redis OK', $member->name) : sprintf('%s — Redis %s', $member->name, $redis ?: 'unknown'),
                     $redis === 'PONG' ? 'success' : 'warn', 'stats');
 
-                $meta = is_array($member->meta) ? $member->meta : [];
+                $meta = $member->meta;
                 $meta['pool'] = array_merge($meta['pool'] ?? [], ['stats' => $stats]);
                 $member->forceFill(['meta' => $meta])->save();
             }

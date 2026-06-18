@@ -25,7 +25,7 @@ class DetachCloudDomainJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null) {
             return;
         }
@@ -37,7 +37,7 @@ class DetachCloudDomainJob implements ShouldQueue
 
         $backend->detachDomain($site, $credential, $this->hostname);
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         if (isset($meta['container']['domains'][$this->hostname])) {
             unset($meta['container']['domains'][$this->hostname]);
             $site->update(['meta' => $meta]);

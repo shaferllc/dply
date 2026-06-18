@@ -87,17 +87,17 @@ use Throwable;
  *
  * @method void configureJob(JobDecorator|UniqueJobDecorator $job)
  *
- * @property-read int|array $jobBackoff
+ * @property-read int|array<int, int> $jobBackoff
  *
- * @method int|array getJobBackoff()
+ * @method int|array<int, int> getJobBackoff()
  *
  * @property-read \DateTime|int $jobRetryUntil
  *
  * @method \DateTime|int getJobRetryUntil()
- * @method array getJobMiddleware()
+ * @method array<int, mixed> getJobMiddleware()
  * @method void jobFailed(Throwable $e)
  * @method string getJobDisplayName()
- * @method array getJobTags()
+ * @method array<int, string> getJobTags()
  *
  * @property-read int $jobUniqueFor
  *
@@ -900,11 +900,17 @@ trait AsJob
         return new PendingDispatch(static::makeJob(...$arguments));
     }
 
+    /**
+     * @return PendingDispatch|Fluent<string, mixed>
+     */
     public static function dispatchIf(bool $boolean, mixed ...$arguments): PendingDispatch|Fluent
     {
         return $boolean ? static::dispatch(...$arguments) : new Fluent;
     }
 
+    /**
+     * @return PendingDispatch|Fluent<string, mixed>
+     */
     public static function dispatchUnless(bool $boolean, mixed ...$arguments): PendingDispatch|Fluent
     {
         return static::dispatchIf(! $boolean, ...$arguments);
@@ -925,6 +931,9 @@ trait AsJob
         static::dispatch(...$arguments)->afterResponse();
     }
 
+    /**
+     * @param  array<int, mixed>  $chain
+     */
     public static function withChain(array $chain): ActionPendingChain
     {
         return new ActionPendingChain(static::class, $chain);
@@ -995,6 +1004,9 @@ trait AsJob
         });
     }
 
+    /**
+     * @param  Closure|array<int, mixed>  $callback
+     */
     public static function assertPushedWith(Closure|array $callback, ?string $queue = null): void
     {
         if (is_array($callback)) {
@@ -1006,6 +1018,9 @@ trait AsJob
         );
     }
 
+    /**
+     * @param  Closure|array<int, mixed>  $callback
+     */
     public static function assertNotPushedWith(Closure|array $callback): void
     {
         if (is_array($callback)) {

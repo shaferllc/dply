@@ -60,6 +60,26 @@ return [
             'report' => false,
         ],
 
+        /*
+         | Private operator-only store for global feedback/bug-report screenshots
+         | and attachments. Local disk in dev; point FEEDBACK_DISK_DRIVER at s3 with
+         | an operator-owned bucket in production. Never public — admins read
+         | through the authorized screenshot proxy route.
+         */
+        'feedback' => [
+            'driver' => env('FEEDBACK_DISK_DRIVER', 'local'),
+            'root' => storage_path('app/feedback'),
+            'key' => env('FEEDBACK_S3_KEY'),
+            'secret' => env('FEEDBACK_S3_SECRET'),
+            'region' => env('FEEDBACK_S3_REGION'),
+            'bucket' => env('FEEDBACK_S3_BUCKET'),
+            'endpoint' => env('FEEDBACK_S3_ENDPOINT'),
+            'use_path_style_endpoint' => env('FEEDBACK_S3_USE_PATH_STYLE', false),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

@@ -6,8 +6,8 @@ use App\Models\Server;
 use App\Models\User;
 use App\Models\WorkerPool;
 use App\Notifications\WorkerPoolScaleNotification;
-use App\Services\Notifications\NotificationPublisher;
-use App\Services\Notifications\ResourceNotificationContextResolver;
+use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Modules\Notifications\Services\ResourceNotificationContextResolver;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 
 /**
@@ -68,7 +68,7 @@ class WorkerPoolNotifier
     }
 
     /**
-     * @param  array<string, mixed>  $metadata
+     * @param  array<string, mixed> $metadata
      */
     private function emit(
         WorkerPool $pool,

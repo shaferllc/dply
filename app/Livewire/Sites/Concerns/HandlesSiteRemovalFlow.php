@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Models\Site;
 use Carbon\Carbon;
 
 /**
- * Mirrors {@see \App\Livewire\Servers\Concerns\HandlesServerRemovalFlow} for
+ * Mirrors {@see HandlesServerRemovalFlow} for
  * sites. Three timing modes (Now / In 30 min / Schedule), type-to-confirm
  * guard, and an audit + persist path. The 30-minute and scheduled modes
  * both stamp {@see Site::$scheduled_deletion_at}; the every-minute

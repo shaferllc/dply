@@ -20,7 +20,7 @@ class ListSites extends AbstractDplyTool
     protected string $ability = 'sites.read';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {
@@ -54,7 +54,7 @@ class ListSites extends AbstractDplyTool
                 'deploy_strategy' => $s->deploy_strategy,
                 'document_root' => $s->document_root,
                 'last_deploy_at' => $s->last_deploy_at?->toIso8601String(),
-                'created_at' => $s->created_at?->toIso8601String(),
+                'created_at' => $s->created_at->toIso8601String(),
             ])->all(),
         ]);
     }

@@ -13,8 +13,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Component;
 
 /**
+ * @phpstan-require-extends Component
+ *
  * @property-read Collection<int, NotificationChannel> $channels Livewire computed (access as $this->channels; do not invoke $this->channels()).
  */
 trait ManagesNotificationChannels
@@ -92,7 +95,10 @@ trait ManagesNotificationChannels
 
     public ?string $testing_id = null;
 
-    abstract protected function owner(): User|Organization|Team;
+    /**
+     * @return User|Organization|Team
+     */
+    abstract protected function owner(): Model;
 
     abstract protected function notificationChannelsViewData(): array;
 
@@ -116,8 +122,11 @@ trait ManagesNotificationChannels
         unset($this->channels);
     }
 
+    /**
+     * @return Collection<int, NotificationChannel>
+     */
     #[Computed]
-    public function channels()
+    public function channels(): Collection
     {
         $q = $this->owner()->notificationChannels()->withCount('subscriptions')->orderBy('label');
         $s = trim($this->search);
@@ -199,7 +208,7 @@ trait ManagesNotificationChannels
         $this->new_webhook_url = '';
     }
 
-    public function startEdit(int $id): void
+    public function startEdit(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
         Gate::authorize('update', $channel);
@@ -323,7 +332,7 @@ trait ManagesNotificationChannels
             'type' => $channel->type,
             'label' => $channel->label,
             'result' => $result['ok'] ? 'success' : 'failed',
-            'message' => isset($result['message']) ? (string) $result['message'] : null,
+            'message' => (string) $result['message'],
         ]);
 
         if ($result['ok']) {
@@ -338,17 +347,19 @@ trait ManagesNotificationChannels
      * dispatch the log. Channels owned directly by an Organization or Team
      * route to that org; user-owned (personal) channels route to the user's
      * current org so the action surfaces alongside their other audit events.
+     *
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
      */
-    protected function recordChannelAudit(string $action, ?Model $subject, ?array $oldValues, ?array $newValues): void
+    protected function recordChannelAudit(string $action, ?NotificationChannel $subject, ?array $oldValues, ?array $newValues): void
     {
         $owner = $this->owner();
         $org = match (true) {
             $owner instanceof Organization => $owner,
             $owner instanceof Team => $owner->organization,
-            $owner instanceof User => Auth::user()?->currentOrganization(),
-            default => null,
+            default => Auth::user()?->currentOrganization(),
         };
-        if ($org === null) {
+        if (! $org instanceof Organization) {
             return;
         }
         audit_log($org, Auth::user(), $action, $subject, $oldValues, $newValues);
@@ -430,6 +441,9 @@ trait ManagesNotificationChannels
         };
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function configFromInput(string $type, string $prefix): array
     {
         return match ($type) {

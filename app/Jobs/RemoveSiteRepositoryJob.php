@@ -23,7 +23,7 @@ class RemoveSiteRepositoryJob implements ShouldQueue
 
     public function handle(SshConnectionFactory $sshFactory): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

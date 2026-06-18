@@ -9,7 +9,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Scaffold\PlaceholderDnsManager;
+use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

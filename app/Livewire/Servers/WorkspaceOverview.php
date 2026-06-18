@@ -11,6 +11,7 @@ use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
@@ -35,9 +36,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 /**
  * Server workspace landing page — at-a-glance dashboard.
@@ -54,10 +54,10 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceOverview extends Component
 {
-    use RendersWorkspacePlaceholder;
     use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
 
     public function mount(Server $server): mixed
     {
@@ -247,7 +247,13 @@ class WorkspaceOverview extends Component
         // "last deploy: 3m ago". Cap at 5 — the dedicated Sites tab owns the
         // full list.
         $sitesPreview = $this->server->sites()
-            ->select(['id', 'name', 'status', 'server_id', 'updated_at'])
+            ->select([
+                'id', 'name', 'status', 'type', 'runtime', 'runtime_version',
+                'ssl_status', 'server_id', 'updated_at', 'last_deploy_at',
+            ])
+            // Eager-load domains so each row can resolve primaryDomain()/a visit
+            // link without an N+1 (primaryDomain() reads the in-memory collection).
+            ->with('domains:id,site_id,hostname,is_primary')
             ->orderByDesc('updated_at')
             ->limit(5)
             ->get();
@@ -255,7 +261,7 @@ class WorkspaceOverview extends Component
             ? collect()
             : SiteDeployment::query()
                 ->whereIn('site_id', $sitesPreview->pluck('id'))
-                ->select(['id', 'site_id', 'status', 'created_at', 'finished_at'])
+                ->select(['id', 'site_id', 'status', 'trigger', 'git_sha', 'created_at', 'started_at', 'finished_at'])
                 ->orderByDesc('created_at')
                 ->get()
                 ->groupBy('site_id')
@@ -487,8 +493,19 @@ class WorkspaceOverview extends Component
             ];
         }
 
+        // Pinned operator notes surface here so runbook/context lives where the
+        // operator lands, not buried in Settings → Notes. Cap at 3 — the notes
+        // tab owns the full list.
+        $pinnedNotes = $this->server->notes()
+            ->where('pinned', true)
+            ->with('creator:id,name')
+            ->orderByDesc('updated_at')
+            ->limit(3)
+            ->get();
+
         return view('livewire.servers.workspace-overview', [
             'siteCount' => $sites->count(),
+            'pinnedNotes' => $pinnedNotes,
             'deployingCount' => $deployingCount,
             'latestDeployment' => $latestDeployment,
             'databaseSummary' => $databaseSummary,

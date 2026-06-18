@@ -106,17 +106,20 @@ class ActionRetry
      * Get actions with high retry rates.
      *
      * @param  int  $limit  Number of actions to return
-     * @return Collection<array> Actions with high retry rates
+     * @return Collection<int, array<string, mixed>> Actions with high retry rates
      */
     public static function getHighRetryRate(int $limit = 10): Collection
     {
         $actions = ActionRegistry::getByTrait(AsRetry::class);
 
-        return collect($actions)
+        /** @var Collection<int, array<string, mixed>> $highRetry */
+        $highRetry = collect($actions)
             ->map(fn ($action) => static::getStats($action))
             ->filter(fn ($stats) => $stats['avg_retries'] > 0.5)
             ->sortByDesc('avg_retries')
             ->take($limit);
+
+        return $highRetry;
     }
 
     /**

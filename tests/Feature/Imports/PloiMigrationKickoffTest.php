@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiMigrationKickoffTest;
 
-use App\Jobs\Imports\RunMigrationStepJob;
+use App\Modules\Imports\Jobs\RunMigrationStepJob;
 use App\Livewire\Servers\Create\StepReview;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;

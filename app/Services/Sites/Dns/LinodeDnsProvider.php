@@ -10,6 +10,8 @@ class LinodeDnsProvider implements DnsProvider
         private readonly LinodeService $service,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         $record = $this->service->upsertDomainRecord($zone, $type, $name, $value);

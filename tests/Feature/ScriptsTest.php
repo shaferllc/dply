@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\ScriptsTest;
 
-use App\Livewire\Scripts\Create;
-use App\Livewire\Scripts\Index;
-use App\Livewire\Scripts\Marketplace;
+use App\Modules\Marketplace\Livewire\Scripts\Create;
+use App\Modules\Marketplace\Livewire\Scripts\Index;
+use App\Modules\Marketplace\Livewire\Scripts\Marketplace;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;

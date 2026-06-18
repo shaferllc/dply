@@ -14,6 +14,7 @@ class ServerProvisionSshKeyMaterial
      *     operational_public_key: string
      * }
      */
+    /** @return array<string, mixed> */
     public function generate(): array
     {
         $recovery = RSA::createKey(2048);

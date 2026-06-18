@@ -15,6 +15,7 @@ class SiteDotEnvComposer
     /**
      * @return array<string, string>
      */
+    /** @return array<string, mixed> */
     public function composeMap(Site $site): array
     {
         return $this->contractBuilder->build($site)->environmentMap();

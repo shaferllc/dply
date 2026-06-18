@@ -43,7 +43,7 @@ test('task model uses persisted remote output path when present', function () {
                 host: '127.0.0.1',
                 port: 22,
                 username: 'root',
-                privateKey: file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+                privateKey: file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
                 scriptPath: '/root/.dply-task-runner',
                 proxyJump: null,
             );
@@ -55,7 +55,7 @@ test('task model uses persisted remote output path when present', function () {
                 host: '127.0.0.1',
                 port: 22,
                 username: 'deploy',
-                privateKey: file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+                privateKey: file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
                 scriptPath: '/home/deploy/.dply-task-runner',
                 proxyJump: null,
             );
@@ -83,7 +83,7 @@ test('run on connection persists remote script and output paths on task model', 
             host: '127.0.0.1',
             port: 22,
             username: 'root',
-            privateKey: file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+            privateKey: file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
             scriptPath: '/root/.dply-task-runner',
             proxyJump: null,
         ))
@@ -146,7 +146,7 @@ test('run on connection uploads tracking wrapper for remote tracked tasks', func
             host: '127.0.0.1',
             port: 22,
             username: 'root',
-            privateKey: file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+            privateKey: file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
             scriptPath: '/root/.dply-task-runner',
             proxyJump: null,
         ))
@@ -199,7 +199,7 @@ test('remote process runner background command does not require local remote fil
         host: '127.0.0.1',
         port: 22,
         username: 'root',
-        privateKey: file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+        privateKey: file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
         scriptPath: '/root/.dply-task-runner',
         proxyJump: null,
     );
@@ -227,7 +227,7 @@ test('run in background with model persists remote paths for tracked remote task
         'ip_address' => '203.0.113.10',
         'ssh_port' => 22,
         'ssh_user' => 'root',
-        'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
     ]);
 
     $taskModel = TaskModel::query()->create([
@@ -272,7 +272,7 @@ test('run in background with model does not start output polling for tracked rem
         'ip_address' => '203.0.113.10',
         'ssh_port' => 22,
         'ssh_user' => 'root',
-        'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
     ]);
 
     $taskModel = TaskModel::query()->create([
@@ -310,7 +310,7 @@ test('run in background with model uses remote dispatch path for tracked remote 
         'ip_address' => '203.0.113.10',
         'ssh_port' => 22,
         'ssh_user' => 'root',
-        'ssh_private_key' => file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem')),
+        'ssh_private_key' => file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
     ]);
 
     $taskModel = TaskModel::query()->create([

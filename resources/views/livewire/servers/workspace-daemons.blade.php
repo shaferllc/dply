@@ -41,7 +41,7 @@
             'site' => $site,
             'currentLabel' => __('Workers'),
             'currentIcon' => 'server-stack',
-            'contextualDocSlug' => app(\App\Support\Docs\ContextualDocResolver::class)->resolveForSiteSection($site, 'daemons'),
+            'contextualDocSlug' => app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolveForSiteSection($site, 'daemons'),
         ])
 
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">

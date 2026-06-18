@@ -40,7 +40,7 @@ final class CaddyAdminUrl
     }
 
     /**
-     * @param  array<string, mixed>  $config  Decoded GET /config/ JSON
+     * @param  array<string, mixed> $config  Decoded GET /config/ JSON
      */
     public static function fromLoadedConfig(array $config): ?string
     {

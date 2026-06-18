@@ -171,7 +171,7 @@ class PredeployCommand extends Command
             ."                    'title'   => '".$this->phpEscape($title)."',\n"
             ."                    'summary' => '".$this->phpEscape($entry)."',\n"
             ."                    'items'   => [],\n"
-            ."                ],";
+            .'                ],';
 
         $blade = (string) file_get_contents($path);
         $marker = '$entries = [';
@@ -266,13 +266,13 @@ class PredeployCommand extends Command
 
     private function phpEscape(string $s): string
     {
-        return str_replace(["\\", "'"], ["\\\\", "\\'"], trim($s));
+        return str_replace(['\\', "'"], ['\\\\', "\\'"], trim($s));
     }
 
     /** Run `claude -p <prompt>` with a hard wall-clock cap; null on failure/timeout. */
     private function runClaude(string $prompt): ?string
     {
-        $timeout = (int) env('DPLY_CHANGELOG_TIMEOUT', 90);
+        $timeout = (int) config('dply.changelog_timeout', 90);
         $process = new Process(['claude', '-p', $prompt], base_path(), null, null, (float) $timeout);
         try {
             $process->run();
@@ -290,7 +290,7 @@ class PredeployCommand extends Command
         return (new ExecutableFinder)->find($bin);
     }
 
-    /** Run a git command, returning trimmed stdout (or null on failure). */
+    /** @param  array<int, string>  $args */
     private function git(array $args): ?string
     {
         $process = new Process(array_merge(['git'], $args), base_path());
@@ -299,6 +299,7 @@ class PredeployCommand extends Command
         return $process->isSuccessful() ? rtrim($process->getOutput()) : null;
     }
 
+    /** @param  array<int, string>  $args */
     private function gitSucceeds(array $args): bool
     {
         $process = new Process(array_merge(['git'], $args), base_path());

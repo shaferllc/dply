@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Console\Commands\RunDueScheduledDeploysCommand;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
  * A single-shot delayed deploy: a deploy queued to fire at {@see $run_at}. The
- * control-plane {@see \App\Console\Commands\RunDueScheduledDeploysCommand} tick
+ * control-plane {@see RunDueScheduledDeploysCommand} tick
  * dispatches it once due, then marks it dispatched. Cancelable while pending.
  *
  * @property string $id
@@ -23,10 +23,14 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property ?Carbon $dispatched_at
  * @property ?Carbon $canceled_at
+ * @property-read ?Site $site
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ScheduledDeploy extends Model
 {
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const STATUS_PENDING = 'pending';
 
@@ -43,6 +47,7 @@ class ScheduledDeploy extends Model
         'canceled_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -52,11 +57,13 @@ class ScheduledDeploy extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

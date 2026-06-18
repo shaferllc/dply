@@ -130,6 +130,7 @@ class OpenLiteSpeedCacheModuleConfig
      *
      * @return array{values: array<string, string>, exists: bool, raw: string}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = array_map(fn (array $meta): string => (string) $meta['default'], self::PARAMS);
@@ -171,7 +172,7 @@ class OpenLiteSpeedCacheModuleConfig
      * Render the cache-module block for the given form values. Public so
      * tests can assert the formatter output without going through SSH.
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      */
     public function renderBlock(array $values): string
     {
@@ -208,7 +209,7 @@ class OpenLiteSpeedCacheModuleConfig
      * line so the operator sees the work progress in the ConsoleAction
      * banner instead of staring at a spinner.
      *
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException when validate or reload fails
      */

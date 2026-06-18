@@ -80,7 +80,7 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
 
         $emit->success('reload OK', 'caddy');
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['caddy_last_output'] = $out;
 
         $site->update([
@@ -112,7 +112,7 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
             throw new \RuntimeException('Caddy config cleanup failed. Output: '.Str::limit($out, 2000));
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['caddy_cleanup_output'] = $out;
 
         $site->update(['meta' => $meta]);
@@ -132,6 +132,10 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         return $this->readRemoteFile($server, $ssh, $configFile);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingConfig): array
     {
         $server = $this->ensureServerReady($site);

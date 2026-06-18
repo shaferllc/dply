@@ -92,9 +92,22 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         // so it must exist (and php-fpm reloaded) before nginx reloads onto it.
         $this->ensurePhpFpmPool($site, $ssh, $emit);
 
+        // Read the on-box vhost once: the guard uses it to spot foreign edits,
+        // and the TLS preflight uses it to salvage a still-valid certificate.
+        $currentVhost = $this->readRemoteFile($server, $ssh, $confFile);
+
+        // TLS preflight: never write a vhost that points ssl_certificate at a
+        // file that isn't on the box. nginx -t hard-fails on a missing cert, and
+        // because the apply symlinks before testing, that would leave the box
+        // unable to reload at all. When the generated paths are missing but the
+        // cert nginx is currently serving exists (e.g. a shared *.zone wildcard
+        // a testing hostname rides), carry those working paths forward instead
+        // of swapping a working cert for a per-host path certbot never created.
+        $config = $this->reconcileTlsCertPaths($site, $server, $ssh, $config, $currentVhost, $emit);
+
         // Read-back guard: parse what's on the box and warn (or abort, per
         // config) before an overwrite silently discards manual vhost edits.
-        $this->guardAgainstForeignOverwrite($server, $ssh, $confFile, $config, $emit);
+        $this->guardAgainstForeignOverwrite($server, $ssh, $confFile, $config, $emit, $currentVhost);
 
         // Vhost write only emits when content actually changed; an apply that
         // didn't touch anything the vhost references (e.g. a sync that found
@@ -128,7 +141,44 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         }
 
         if (! preg_match('/DPLY_NGINX_EXIT:0\s*$/', $out)) {
+            // Atomic apply: a failed nginx -t must not leave the broken vhost
+            // enabled, or every future reload on this box fails too. Restore the
+            // previous vhost (or drop the file + symlink for a brand-new site)
+            // and reload back onto the known-good config before surfacing the
+            // error.
+            $this->rollbackVhost($server, $ssh, $confFile, $linkFile, $currentVhost, $emit);
+
             throw new \RuntimeException('Nginx test or reload failed. Output: '.Str::limit($out, 2000));
+        }
+
+        // nginx -t passed and reloaded, but a clean exit is NOT proof this site
+        // is actually being served. When two enabled vhosts declare the same
+        // server_name, nginx keeps the one that loads first (sites-enabled is
+        // globbed in sorted order) and logs the rest as "conflicting server name
+        // ... ignored" — a *warning*, not an error, so the exit code is still 0.
+        // If the ignored block is ours, every request for that host is served by
+        // the other vhost and the config we just wrote is dead on arrival.
+        // Reporting "reload OK" here is how a stale duplicate vhost turned into an
+        // invisible, hours-long outage (see the tracely.cloud orphan). Detect it.
+        $ourBasename = basename((string) $confFile);
+        $shadowed = $this->shadowedServerNames($out, $config, $server, $ssh, $ourBasename);
+        if ($shadowed !== []) {
+            // Self-heal: when the vhost(s) loading ahead of ours are ORPHANED dply
+            // files (their owning site is gone — exactly the tracely.cloud case),
+            // remove them and re-check before failing. A real conflict with another
+            // *live* site is left to the operator.
+            $shadowed = $this->healShadowingOrphans($server, $ssh, $shadowed, $ourBasename, $emit);
+        }
+        if ($shadowed !== []) {
+            $names = implode(', ', $shadowed);
+            $emit->error('nginx reloaded but is IGNORING this vhost: '.$names
+                .' is already served by another enabled server block that loads first. '
+                .'The config was written but serves nothing until the conflicting vhost is removed.', 'nginx');
+
+            // Deliberately no rollback: our vhost is correct — the stale/duplicate
+            // one is the problem. Rolling back would only discard the right config.
+            throw new \RuntimeException('nginx is ignoring this site\'s vhost — conflicting server_name(s) served by another enabled vhost: '.$names
+                .'. Remove the duplicate vhost in /etc/nginx/sites-enabled and re-apply.');
         }
 
         $emit->success('reload OK', 'nginx');
@@ -142,6 +192,133 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     }
 
     /**
+     * Given the nginx -t/reload output and the vhost we just wrote, return the
+     * server_names that nginx reported as conflicting AND that resolve to a
+     * *different* enabled vhost loading ahead of ours — i.e. the hostnames this
+     * site declares but no longer actually serves. Empty when there is no
+     * conflict, or when the conflict exists but ours is the winning block (a
+     * fragile-but-currently-working duplicate, surfaced as a warning by the
+     * caller's normal output streaming rather than a hard failure).
+     *
+     * Read-only: the sites-enabled files are world-readable, so this needs no
+     * privileged shell.
+     *
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<string>
+     */
+    protected function shadowedServerNames(string $out, string $config, Server $server, SshConnection $ssh, string $ourBasename): array
+    {
+        if (! preg_match_all('/conflicting server name "([^"]+)"/i', $out, $m)) {
+            return [];
+        }
+        $conflicted = array_values(array_unique(array_map('strtolower', $m[1])));
+
+        // Restrict to names THIS vhost declares — a conflict on some unrelated
+        // host on the box is not this apply's problem.
+        $ours = [];
+        if (preg_match_all('/^\s*server_name\s+([^;]+);/mi', $config, $sm)) {
+            foreach ($sm[1] as $list) {
+                foreach (preg_split('/\s+/', trim($list)) ?: [] as $name) {
+                    if ($name !== '' && $name !== '_') {
+                        $ours[strtolower($name)] = true;
+                    }
+                }
+            }
+        }
+        $conflicted = array_values(array_filter($conflicted, static fn (string $n): bool => isset($ours[$n])));
+        if ($conflicted === []) {
+            return [];
+        }
+
+        // For each conflicted name, find which enabled vhost loads first (nginx
+        // includes sites-enabled/*.conf in sorted order, so first-sorted wins).
+        // If the winner isn't our file, this site is shadowed for that name.
+        $shadowed = [];
+        foreach ($conflicted as $name) {
+            $winner = $this->firstEnabledVhostFor($server, $ssh, $name);
+            if ($winner !== null && $winner !== $ourBasename) {
+                $shadowed[] = $name;
+            }
+        }
+
+        return $shadowed;
+    }
+
+    /**
+     * Basename of the first (sorted) file in sites-enabled whose server_name
+     * directive lists $name — i.e. the vhost nginx actually serves it from.
+     * Null when none matched (parsing differences, edge layouts).
+     */
+    protected function firstEnabledVhostFor(Server $server, SshConnection $ssh, string $name): ?string
+    {
+        $script = 'for f in $(ls -1 /etc/nginx/sites-enabled/ 2>/dev/null | sort); do '
+            .'if grep -Eiq "server_name[^;]*([[:space:]]|;|^)'.preg_replace('/[^a-z0-9.\-]/i', '', $name).'([[:space:].]|;|$)" '
+            ."/etc/nginx/sites-enabled/\"\$f\" 2>/dev/null; then echo \"\$f\"; break; fi; done";
+
+        $out = trim($ssh->exec($script, 30));
+        $first = trim((string) (preg_split('/\r\n|\r|\n/', $out)[0] ?? ''));
+
+        return $first !== '' ? $first : null;
+    }
+
+    /**
+     * Given the server_names nginx is serving from a vhost OTHER than ours,
+     * remove the ones whose winning vhost is an orphaned dply file (no live
+     * owning site), reload, and return the server_names STILL shadowed after
+     * the heal. An empty return means the conflict cleared and this apply can
+     * proceed; a non-empty return means a real conflict with a live site
+     * remains and the caller should fail loudly.
+     *
+     * @param  array<string, mixed> $shadowedNames
+     * @return list<string>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     * @param  array<string, mixed> $shadowedNames
+     */
+    protected function healShadowingOrphans(Server $server, SshConnection $ssh, array $shadowedNames, string $ourBasename, ConsoleEmitter $emit): array
+    {
+        $winners = [];
+        foreach ($shadowedNames as $name) {
+            $winner = $this->firstEnabledVhostFor($server, $ssh, $name);
+            if ($winner !== null && $winner !== $ourBasename) {
+                $winners[$winner] = true;
+            }
+        }
+        if ($winners === []) {
+            return $shadowedNames;
+        }
+
+        $emit->step('nginx', 'this vhost is shadowed — checking whether the conflicting vhost(s) are orphans');
+
+        $result = (new NginxOrphanVhostPruner)->pruneShadowing($server, $ssh, array_keys($winners), $emit);
+        if ($result['removed'] === []) {
+            // The shadowing vhost(s) belong to live sites — a genuine conflict we
+            // must not auto-resolve. Leave every name shadowed for the caller.
+            return $shadowedNames;
+        }
+
+        // Re-check which names are still served by someone other than us.
+        $stillShadowed = [];
+        foreach ($shadowedNames as $name) {
+            $winner = $this->firstEnabledVhostFor($server, $ssh, $name);
+            if ($winner !== null && $winner !== $ourBasename) {
+                $stillShadowed[] = $name;
+            }
+        }
+
+        if ($stillShadowed === []) {
+            $emit->success('removed orphan vhost(s) that were shadowing this site — now serving correctly', 'nginx');
+        }
+
+        return $stillShadowed;
+    }
+
+    /**
      * Read the current on-box vhost and, if overwriting it with $incoming would
      * delete directives a human added by hand, either warn the deploy console
      * (default) or abort the write (when DPLY_NGINX_OVERWRITE_GUARD=abort).
@@ -150,15 +327,16 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * treated as "nothing to protect" — `nginx -t` below remains the real syntax
      * gate, and this never blocks a deploy in the default warn mode.
      *
+     * @param  array<string, mixed> $shadowedNames
      * @param  Server  $server
      */
-    protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit): void
+    protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit, ?string $current = null): void
     {
         if ($this->guard->mode() === NginxConfigGuard::MODE_OFF) {
             return;
         }
 
-        $current = $this->readRemoteFile($server, $ssh, $confFile);
+        $current ??= $this->readRemoteFile($server, $ssh, $confFile);
         $foreign = $this->guard->foreignDirectives($current, $incoming);
         if ($foreign === []) {
             return;
@@ -181,6 +359,196 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
                 $emit->warn($line, 'nginx');
             }
         }
+    }
+
+    /**
+     * Roll back a failed apply so the box is never left with a broken vhost
+     * enabled (which would make every later reload on this box fail too).
+     * Restores the previous file content, or removes the file + its sites-enabled
+     * symlink when the site had no prior vhost, then best-effort reloads nginx
+     * back onto the known-good config.
+     */
+    protected function rollbackVhost(Server $server, SshConnection $ssh, string $confFile, string $linkFile, ?string $previousVhost, ConsoleEmitter $emit): void
+    {
+        $emit->warn('nginx -t failed — rolling back to the previous working vhost', 'nginx');
+
+        if ($previousVhost !== null) {
+            $this->writeSystemFile($ssh, $confFile, $previousVhost);
+        } else {
+            $ssh->exec($this->privilegedCommand($server, sprintf(
+                'rm -f %s %s',
+                escapeshellarg($linkFile),
+                escapeshellarg($confFile),
+            )), 30);
+        }
+
+        // Re-sync on-disk state: reload onto the restored config. Best-effort —
+        // the running nginx never picked up the bad config (the test failed), so
+        // this just brings the file/symlink state back in line.
+        $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_NGINX_RB_EXIT:%%s" "$?"',
+            $this->privilegedCommand($server, NginxServiceScript::testAndReloadOrStartScript()),
+        ), 60);
+    }
+
+    /**
+     * If the generated vhost references ssl_certificate material that is not on
+     * the box, but the live vhost points at cert files that ARE present, rewrite
+     * the generated config to reuse those present paths. Prevents an overwrite
+     * from swapping a working (often shared-wildcard) cert for a per-host path
+     * certbot never created. Throws if no usable cert exists either way, leaving
+     * the current vhost untouched rather than writing one nginx will reject.
+     *
+     * Pure-builder TLS path selection can't see the disk; this is the one place
+     * with both the generated config and an SSH connection, so the on-disk truth
+     * check lives here.
+     */
+    protected function reconcileTlsCertPaths(Site $site, Server $server, SshConnection $ssh, string $incoming, ?string $current, ConsoleEmitter $emit): string
+    {
+        $incomingPair = $this->extractCertPair($incoming);
+        if ($incomingPair === null) {
+            return $incoming; // no TLS block — nothing to reconcile
+        }
+
+        $present = $this->filesPresentOnBox($server, $ssh, [$incomingPair['cert'], $incomingPair['key']]);
+        if (($present[$incomingPair['cert']] ?? false) && ($present[$incomingPair['key']] ?? false)) {
+            return $incoming; // generated cert paths exist on disk — all good
+        }
+
+        // Salvage 1: the cert the live vhost is already serving (re-applies).
+        $currentPair = $this->extractCertPair((string) $current);
+        if ($currentPair !== null) {
+            $curPresent = $this->filesPresentOnBox($server, $ssh, [$currentPair['cert'], $currentPair['key']]);
+            if (($curPresent[$currentPair['cert']] ?? false) && ($curPresent[$currentPair['key']] ?? false)) {
+                $emit->warn(sprintf(
+                    'generated cert %s is not on the server; reusing the live cert %s',
+                    $incomingPair['cert'],
+                    $currentPair['cert'],
+                ), 'nginx');
+
+                return $this->swapCertPair($incoming, $currentPair);
+            }
+        }
+
+        // Salvage 2: the covering per-server wildcard cert on disk (first apply
+        // of a testing-hostname site, where there's no live vhost to copy from
+        // but the shared *.zone cert is already installed).
+        $wildcardPair = $this->coveringWildcardCertPair($site);
+        if ($wildcardPair !== null) {
+            $wcPresent = $this->filesPresentOnBox($server, $ssh, [$wildcardPair['cert'], $wildcardPair['key']]);
+            if (($wcPresent[$wildcardPair['cert']] ?? false) && ($wcPresent[$wildcardPair['key']] ?? false)) {
+                $emit->warn(sprintf(
+                    'generated cert %s is not on the server; reusing the covering wildcard cert %s',
+                    $incomingPair['cert'],
+                    $wildcardPair['cert'],
+                ), 'nginx');
+
+                return $this->swapCertPair($incoming, $wildcardPair);
+            }
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Refusing to write the vhost: ssl_certificate %s is not on the server and no valid certificate was found to substitute. The existing vhost was left untouched — install the certificate (or the covering wildcard), then re-apply.',
+            $incomingPair['cert'],
+        ));
+    }
+
+    /**
+     * Extract the ssl_certificate / ssl_certificate_key paths from a vhost.
+     * `ssl_certificate\s+` never matches the `ssl_certificate_key` line (no
+     * whitespace after "ssl_certificate" there), so the two stay distinct.
+     *
+     * @return array{cert: string, key: string}|null
+     */
+    protected function extractCertPair(string $config): ?array
+    {
+        if (! preg_match('/^\s*ssl_certificate\s+(\S+?);/m', $config, $c)) {
+            return null;
+        }
+        if (! preg_match('/^\s*ssl_certificate_key\s+(\S+?);/m', $config, $k)) {
+            return null;
+        }
+
+        return ['cert' => $c[1], 'key' => $k[1]];
+    }
+
+    /**
+     * Replace every ssl_certificate(_key) value in $config with the given pair.
+     * Cert paths live under /etc/letsencrypt and contain no regex/replacement
+     * metacharacters, so a literal preg_replace is safe.
+     *
+     * @param  array{cert: string, key: string}  $pair
+     */
+    protected function swapCertPair(string $config, array $pair): string
+    {
+        $config = (string) preg_replace('/^(\s*ssl_certificate)\s+\S+?;/m', '$1 '.$pair['cert'].';', $config);
+
+        return (string) preg_replace('/^(\s*ssl_certificate_key)\s+\S+?;/m', '$1 '.$pair['key'].';', $config);
+    }
+
+    /**
+     * Stat a set of paths on the box in one round trip.
+     *
+     * @param  array<string, mixed> $paths
+     * @return array<string, bool>
+     */
+    /** @return array<string, mixed> */
+    protected function filesPresentOnBox(Server $server, SshConnection $ssh, array $paths): array
+    {
+        $paths = array_values(array_unique(array_filter($paths)));
+        if ($paths === []) {
+            return [];
+        }
+
+        // The OK/NO marker must echo the RAW path, not the escapeshellarg'd
+        // (single-quoted) form used for `test -f`. The presence regex below
+        // matches `^NO <raw-path>$`; emitting `NO '<path>'` with literal quotes
+        // never matches, so every path would fail open to "present" and silently
+        // disable the TLS cert salvage (the missing cert then only surfaces at
+        // nginx -t, which hard-fails and rolls the whole apply back).
+        $checks = implode("\n", array_map(
+            fn (string $p): string => sprintf('test -f %1$s && echo "OK %2$s" || echo "NO %2$s"', escapeshellarg($p), $p),
+            $paths,
+        ));
+        $out = $ssh->exec($this->privilegedCommand($server, $checks), 30);
+
+        // Fail open: a path is "missing" only when the box EXPLICITLY reports
+        // `NO <path>`. Unrecognized output (a mocked/fake shell, a transport
+        // hiccup) is treated as present so this preflight never aborts a deploy
+        // on ambiguity — nginx -t and the rollback stay the real safety gates.
+        $present = [];
+        foreach ($paths as $p) {
+            $present[$p] = ! (bool) preg_match('/^NO '.preg_quote($p, '/').'$/m', $out);
+        }
+
+        return $present;
+    }
+
+    /**
+     * The on-disk cert/key pair for the per-server wildcard that covers this
+     * site's testing hostname, or null when the site isn't wildcard-covered.
+     * Mirrors {@see OpenLiteSpeedTlsPaths::letsEncryptDirectoryName}'s wildcard
+     * branch: certbot stores the shared cert under /etc/letsencrypt/live/<zone>/.
+     *
+     * @param  array<string, mixed> $paths
+     * @return array{cert: string, key: string}|null
+     */
+    protected function coveringWildcardCertPair(Site $site): ?array
+    {
+        $wildcard = $site->coveringServerWildcard();
+        if ($wildcard === null) {
+            return null;
+        }
+
+        $dir = strtolower(trim((string) ($wildcard->live_directory ?: $site->testingZone())));
+        if ($dir === '') {
+            return null;
+        }
+
+        return [
+            'cert' => '/etc/letsencrypt/live/'.$dir.'/fullchain.pem',
+            'key' => '/etc/letsencrypt/live/'.$dir.'/privkey.pem',
+        ];
     }
 
     /**
@@ -211,6 +579,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return array{main: ?string, before: ?string, after: ?string}
      */
+    /** @return array<string, mixed> */
     public function readEditorStateFromServer(Site $site): array
     {
         $server = $this->ensureServerReady($site);
@@ -334,6 +703,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         return implode("\n", $out);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingMainConfig, SiteWebserverConfigProfile $profile): array
     {
         $server = $this->ensureServerReady($site);
@@ -516,7 +889,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             throw new \RuntimeException('Nginx config cleanup failed. Output: '.Str::limit($out, 2000));
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $meta['nginx_cleanup_output'] = $out;
 
         $site->update(['meta' => $meta]);

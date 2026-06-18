@@ -39,7 +39,7 @@ class RunSharedHostLlmAnalysisJob implements ShouldQueue
         }
 
         $organization = Organization::query()->find($this->organizationId);
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($organization === null || $server === null) {
             $recorder->fail($run, 'Organization or server not found.');
 

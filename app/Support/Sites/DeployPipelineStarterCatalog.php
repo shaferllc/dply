@@ -70,6 +70,9 @@ final class DeployPipelineStarterCatalog
         return $meta;
     }
 
+    /**
+     * @param  array<string, mixed> $meta
+     */
     public function visibleForSite(Site $site, ?array $meta = null, ?string $key = null): bool
     {
         if ($meta === null && $key !== null) {
@@ -104,20 +107,23 @@ final class DeployPipelineStarterCatalog
         $strategy = (string) ($meta['strategy'] ?? 'simple');
 
         if (isset($meta['steps']) && is_array($meta['steps'])) {
-            return $this->normalizeSteps($meta['steps']);
+            /** @var list<array<string, mixed>> $configuredSteps */
+            $configuredSteps = array_values($meta['steps']);
+
+            return $this->normalizeSteps($configuredSteps);
         }
 
         if (($meta['steps_from'] ?? '') === 'runtime') {
-            $steps = $this->runtimeDefaults->defaultsFor(
+            $runtimeSteps = $this->runtimeDefaults->defaultsFor(
                 $site->runtimeKey(),
                 $this->runtimeFrameworkForStarterSteps($site),
             );
 
             if ($strategy === 'simple') {
-                return $this->moveReleaseStepsToBuild($steps);
+                return $this->moveReleaseStepsToBuild($runtimeSteps);
             }
 
-            return $this->normalizeSteps($steps);
+            return $this->normalizeSteps($runtimeSteps);
         }
 
         return [];
@@ -178,23 +184,27 @@ final class DeployPipelineStarterCatalog
         $strategy = $this->strategyFor($key);
 
         if ($strategy === 'atomic') {
-            $path = $site->isLaravelFrameworkDetected() ? '/up' : '/';
-
             return [
                 'deploy_strategy' => 'atomic',
                 'releases_to_keep' => 5,
                 'deploy_health_enabled' => true,
                 'deploy_health_auto_rollback' => true,
-                'deploy_health_path' => $path,
+                // Probe the homepage, not /up: a bare health route 200s while the
+                // real, Vite-rendering pages 500 (the checker always probes '/'
+                // anyway). Keep a real route so the app's layout/assets are exercised.
+                'deploy_health_path' => '/',
             ];
         }
 
+        // Simple/flat deploys are HTTP-smoke-tested too — a flat overwrite can
+        // 500 just as easily; it can't auto-rollback (no previous release symlink),
+        // so the gate detects + fails the deploy rather than silently going green.
         return [
             'deploy_strategy' => 'simple',
             'releases_to_keep' => null,
-            'deploy_health_enabled' => false,
+            'deploy_health_enabled' => true,
             'deploy_health_auto_rollback' => false,
-            'deploy_health_path' => '/up',
+            'deploy_health_path' => '/',
         ];
     }
 
@@ -206,7 +216,7 @@ final class DeployPipelineStarterCatalog
     {
         $normalized = [];
         foreach ($steps as $step) {
-            if (! is_array($step) || ! isset($step['step_type'])) {
+            if (! isset($step['step_type'])) {
                 continue;
             }
             $row = [

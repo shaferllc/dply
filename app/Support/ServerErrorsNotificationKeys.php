@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\ErrorEvent;
+use App\Support\Errors\ErrorEventSyncer;
+
 /**
  * Notification event keys for the server error stream, surfaced on the
  * /servers/{server}/errors workspace. The `server.` prefix maps these to the
@@ -9,8 +12,8 @@ namespace App\Support;
  * they are listed under the "errors" category in config/notification_events.php.
  *
  * Unlike the posture-rollup dispatchers (health / security digest), errors are
- * discrete: one notification per newly-captured {@see \App\Models\ErrorEvent}
- * row, fired from {@see \App\Support\Errors\ErrorEventSyncer} as the per-minute
+ * discrete: one notification per newly-captured {@see ErrorEvent}
+ * row, fired from {@see ErrorEventSyncer} as the per-minute
  * sweep promotes a failed ConsoleAction / SiteDeployment into the stream. The
  * sweep only records each source once, so each error notifies at most once.
  *

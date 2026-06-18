@@ -3,7 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
-use App\Services\Certificates\CertificateRequestService;
+use App\Modules\Certificates\Services\CertificateRequestService;
 
 class SiteSslProvisioner
 {

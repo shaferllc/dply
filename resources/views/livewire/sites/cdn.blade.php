@@ -54,13 +54,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
+            <x-hero-card
                 :eyebrow="__('CDN / Edge')"
                 :title="__('Edge cache & proxy')"
                 :description="__('Put a CDN / edge network in front of this site\'s origin. Manages the proxied DNS record, cache aggressiveness, and one-click hostname purges.')"
-                :show-documentation="false"
-                flush
-                compact
+                icon="globe-alt"
             />
 
             @if (empty($credentials))

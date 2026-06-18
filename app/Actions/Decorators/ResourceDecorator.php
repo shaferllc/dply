@@ -3,6 +3,7 @@
 namespace App\Actions\Decorators;
 
 use App\Actions\Concerns\DecorateActions;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -20,15 +21,18 @@ class ResourceDecorator extends JsonResource
 {
     use DecorateActions;
 
-    protected $actionInstance;
+    protected mixed $actionInstance;
 
-    public function __construct($action, $resource = null)
+    public function __construct(mixed $action, mixed $resource = null)
     {
         $this->actionInstance = is_string($action) ? app($action) : $action;
         $this->setAction($this->actionInstance);
         parent::__construct($resource ?? $this->actionInstance);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray($request): array
     {
         // Call toArray on the action if it exists
@@ -47,7 +51,10 @@ class ResourceDecorator extends JsonResource
         return parent::toArray($request);
     }
 
-    public static function collection($resource)
+    /**
+     * @param  mixed  $resource
+     */
+    public static function collection($resource): AnonymousResourceCollection
     {
         // Use parent collection method if available
         if (method_exists(parent::class, 'collection')) {
@@ -58,8 +65,11 @@ class ResourceDecorator extends JsonResource
         $actionClass = static::class;
         $actionInstance = app($actionClass);
 
-        return collect($resource)->map(function ($item) use ($actionClass, $actionInstance) {
-            return new $actionClass($actionInstance, $item);
-        });
+        $items = [];
+        foreach (is_iterable($resource) ? $resource : [$resource] as $item) {
+            $items[] = new $actionClass($actionInstance, $item);
+        }
+
+        return new AnonymousResourceCollection($items, static::class);
     }
 }

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\CheckServerHealthJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerHealthNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerHealthNotificationDispatcher;
 use App\Support\ServerHealthNotificationKeys;
 
 /**
@@ -17,7 +18,7 @@ use App\Support\ServerHealthNotificationKeys;
  *
  * The cockpit is a pure DB rollup (guest metrics, releases, deploys, certs,
  * daemons) — no SSH — so this is cheap to run on the fleet health cadence. Hooked
- * into {@see \App\Jobs\CheckServerHealthJob}. Mirrors the notify half of
+ * into {@see CheckServerHealthJob}. Mirrors the notify half of
  * {@see ServerSecurityDigestScanner}.
  */
 final class ServerHealthNotifier
@@ -85,7 +86,7 @@ final class ServerHealthNotifier
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array

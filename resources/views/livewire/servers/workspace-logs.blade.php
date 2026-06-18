@@ -24,11 +24,6 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer>
-        <p>{{ __('Logs from systemd, nginx/caddy, PHP-FPM, and dply\'s own activity stream — read live from the server over SSH. Use the Viewer tab to tail lines; Overview and Sources summarize what is available on this host.') }}</p>
-        <p>{{ __('Time ranges are server-side filters: "Last 5 minutes" reads only the recent slice of each file; broader ranges page through more of the file. Sources that rotate (e.g. nginx access.log) honor the rotation — older entries roll off naturally.') }}</p>
-    </x-explainer>
-
     <div
         id="dply-server-log-broadcast-context"
         class="hidden"
@@ -55,7 +50,7 @@
             </section>
         @endif
 
-        @if (! $opsReady && $sshRequiredForActive)
+        @if (! $opsReady && $sshRequiredForActive && $logsTab !== 'activity')
             @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
         @endif
 
@@ -99,6 +94,14 @@
                 @endif
             </x-server-workspace-tab>
             <x-server-workspace-tab
+                id="logs-tab-activity"
+                icon="heroicon-o-clipboard-document-list"
+                :active="$logsTab === 'activity'"
+                wire:click="setLogsWorkspaceTab('activity')"
+            >
+                {{ __('Activity') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab
                 id="logs-tab-related"
                 icon="heroicon-o-link"
                 :active="$logsTab === 'related'"
@@ -134,6 +137,13 @@
                 'agent' => $server->logAgent,
                 'logExplorer' => $logExplorer,
             ])
+        @endif
+
+        {{-- Activity is the server audit timeline (DB-backed, no SSH). Rendered only
+             while its tab is active so the AuditLog/trends queries stay deferred on
+             ordinary Logs hits; the nested component owns its own filter URL state. --}}
+        @if ($logsTab === 'activity')
+            <livewire:servers.workspace-activity :server="$server" :key="'logs-activity-'.$server->id" />
         @endif
 
         @if ($logsTab === 'related')

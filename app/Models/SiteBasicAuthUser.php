@@ -2,14 +2,30 @@
 
 namespace App\Models;
 
+use Database\Factories\SiteBasicAuthUserFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $password_hash
+ * @property string $path
+ * @property ?Carbon $pending_removal_at
+ * @property ?string $site_id
+ * @property string $sort_order
+ * @property ?string $source_file_path
+ * @property string $username
+ * @property-read ?Site $site
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class SiteBasicAuthUser extends Model
 {
+    /** @use HasFactory<SiteBasicAuthUserFactory> */
     use HasFactory, HasUlids;
 
     protected $table = 'site_basic_auth_users';
@@ -28,6 +44,7 @@ class SiteBasicAuthUser extends Model
         'password_hash',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -35,6 +52,7 @@ class SiteBasicAuthUser extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
@@ -43,6 +61,10 @@ class SiteBasicAuthUser extends Model
     /**
      * @param  Builder<SiteBasicAuthUser>  $query
      * @return Builder<SiteBasicAuthUser>
+     */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeNotPendingRemoval(Builder $query): Builder
     {
@@ -87,7 +109,7 @@ class SiteBasicAuthUser extends Model
      */
     public function isDiscoveredFromServer(): bool
     {
-        return $this->source_file_path !== null && $this->source_file_path !== '';
+        return filled($this->source_file_path);
     }
 
     /**

@@ -5,7 +5,9 @@ namespace App\Jobs;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
+use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Modules\Notifications\Services\ServerPatchNotificationDispatcher;
 use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
@@ -83,13 +85,13 @@ class ServerManageRemoteSshJob implements ShouldQueue
         if ($this->logId !== null) {
             $userId = ServerManageAction::query()->whereKey($this->logId)->value('user_id');
             if ($userId) {
-                $actor = \App\Models\User::query()->find($userId);
+                $actor = User::find($userId);
             }
         }
 
         $details = (! $success && $error) ? [__('Error: :error', ['error' => $error])] : [];
 
-        app(\App\Services\Notifications\ServerPatchNotificationDispatcher::class)->notify(
+        app(ServerPatchNotificationDispatcher::class)->notify(
             $server,
             $kind,
             $details,
@@ -139,7 +141,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
 
     public function handle(ServerManageSshExecutor $executor): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->failCache(__('Server not found.'));
 
@@ -284,7 +286,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
             $this->maybeNotifyPatchAction($server, true, null);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
-                $server = Server::query()->find($this->serverId);
+                $server = Server::find($this->serverId);
                 if ($server !== null) {
                     app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
                 }

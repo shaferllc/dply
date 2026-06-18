@@ -41,6 +41,9 @@ class ScanSiteEnvRequirementsJob implements ShouldBeUnique, ShouldQueue
         public ?string $seededConsoleRunId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'console-action:env_scan:'.$this->siteId;
@@ -48,7 +51,7 @@ class ScanSiteEnvRequirementsJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -84,7 +87,7 @@ class ScanSiteEnvRequirementsJob implements ShouldBeUnique, ShouldQueue
         try {
             $result = $scanner->scan($site);
 
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['env_requirements'] = $result;
             $site->forceFill(['meta' => $meta])->save();
 

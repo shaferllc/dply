@@ -209,7 +209,7 @@ final class EdgeRepoConfigYamlGenerator
         return implode("\n", $lines);
     }
 
-    /** @param list<string> $allowedHosts */
+    /** @param  array<string, mixed> $allowedHosts */
     private function renderImages(array $allowedHosts): string
     {
         $lines = ['images:', '  allowed_hosts:'];
@@ -238,7 +238,7 @@ final class EdgeRepoConfigYamlGenerator
         if ($secret !== []) {
             $lines[] = '  secret:';
             foreach ($secret as $name) {
-                if (is_string($name) && $name !== '') {
+                if (($name) && $name !== '') {
                     $lines[] = '    - '.$this->quote($name);
                 }
             }
@@ -247,7 +247,7 @@ final class EdgeRepoConfigYamlGenerator
         return implode("\n", $lines);
     }
 
-    /** @param array<string, mixed> $previews */
+    /** @param  array<string, mixed> $previews */
     private function renderPreviews(array $previews): string
     {
         $lines = ['previews:'];
@@ -287,7 +287,7 @@ final class EdgeRepoConfigYamlGenerator
         return implode("\n", $lines);
     }
 
-    /** @param list<string> $domains */
+    /** @param  array<string, mixed> $domains */
     private function renderDomains(array $domains): string
     {
         $lines = ['domains:'];

@@ -9,8 +9,10 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\LaravelQueueWorkCommandBuilder;
+use App\Services\Servers\ServerSshConnectionRunner;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
+use App\Support\Sites\SiteDaemonAdvisor;
 use App\Support\SupervisorEnvFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
@@ -563,7 +565,7 @@ trait ManagesSupervisorPrograms
         $dir = trim((string) ($attrs['directory'] ?? ''));
         if ($dir !== '' && $this->server->isReady() && ! empty($this->server->ssh_private_key)) {
             try {
-                $result = app(\App\Services\Servers\ServerSshConnectionRunner::class)->run(
+                $result = app(ServerSshConnectionRunner::class)->run(
                     $this->server->fresh(),
                     fn ($ssh): string => trim((string) $ssh->exec(
                         'if test -d '.escapeshellarg($dir).' ; then echo ok; elif test -e '.escapeshellarg($dir).' ; then echo notdir; else echo missing; fi',
@@ -574,10 +576,12 @@ trait ManagesSupervisorPrograms
                 );
                 if ($result === 'missing') {
                     $this->addError('new_sv_directory', __('Directory does not exist on the server: :path', ['path' => $dir]));
+
                     return;
                 }
                 if ($result === 'notdir') {
                     $this->addError('new_sv_directory', __('Path exists but is not a directory: :path', ['path' => $dir]));
+
                     return;
                 }
             } catch (\Throwable) {
@@ -731,7 +735,7 @@ trait ManagesSupervisorPrograms
 
     /**
      * Open the create-daemon modal pre-filled from a preset — the one-click
-     * target for {@see \App\Support\Sites\SiteDaemonAdvisor} suggestions. We
+     * target for {@see SiteDaemonAdvisor} suggestions. We
      * pin new_sv_site_id to the page's context site first so the preset is
      * allowed (allowedSupervisorPresetKeys() is site-derived) and the command
      * picks up the site's directory/user.
@@ -788,6 +792,7 @@ trait ManagesSupervisorPrograms
         if (! $preflight['ok']) {
             $warnings = array_map(fn (string $m): string => '⚠ '.$m, $preflight['messages']);
             $this->emitPanelEvent(__('Directory check failed — fix paths before syncing.'), $warnings, 'failed');
+
             return;
         }
 

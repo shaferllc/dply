@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\StatusPageFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,8 +11,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ * @property ?string $description
+ * @property bool $is_public
+ * @property string $name
+ * @property ?string $organization_id
+ * @property string $slug
+ * @property ?string $user_id
+ * @property-read ?Organization $organization
+ * @property-read ?User $user
+ * @property-read Collection<int, StatusPageMonitor> $monitors
+ * @property-read Collection<int, Incident> $incidents
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class StatusPage extends Model
 {
+    /** @use HasFactory<StatusPageFactory> */
     use HasFactory, HasUlids;
 
     protected $fillable = [
@@ -22,6 +40,7 @@ class StatusPage extends Model
         'is_public',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -50,28 +69,35 @@ class StatusPage extends Model
         return 'slug';
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return HasMany<StatusPageMonitor, $this> */
     public function monitors(): HasMany
     {
         return $this->hasMany(StatusPageMonitor::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    /** @return HasMany<Incident, $this> */
     public function incidents(): HasMany
     {
         return $this->hasMany(Incident::class)->orderByDesc('started_at');
     }
 
+    /** @return HasMany<Incident, $this> */
     public function openIncidents(): HasMany
     {
-        return $this->incidents()->whereNull('resolved_at');
+        return $this->hasMany(Incident::class)
+            ->whereNull('resolved_at')
+            ->orderByDesc('started_at');
     }
 }

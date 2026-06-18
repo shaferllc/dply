@@ -38,7 +38,7 @@ return [
      * Optional dedicated queue for cache-service install / uninstall jobs. Horizon must list this
      * queue (see config/horizon.php) for the workers to pick it up; default queue is used when unset.
      */
-    'install_queue' => env('SERVER_CACHE_INSTALL_QUEUE'),
+    'install_queue' => env('SERVER_CACHE_INSTALL_QUEUE', 'dply'),
 
     /**
      * Pinned Dragonfly release tag installed by the bootstrap script. Dragonfly publishes only

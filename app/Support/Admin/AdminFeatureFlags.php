@@ -120,7 +120,7 @@ final class AdminFeatureFlags
     }
 
     /**
-     * @return array<string, array<string, string>>
+     * @return array<string, array{title?: string, description?: string, emergency?: array<string, string>, groups?: array<string, array<string, string>>}>
      */
     public static function productLines(): array
     {
@@ -134,7 +134,7 @@ final class AdminFeatureFlags
     {
         $groups = [];
         foreach (self::productLines() as $line) {
-            if (! is_array($line['groups'] ?? null)) {
+            if (! isset($line['groups'])) {
                 continue;
             }
             foreach ($line['groups'] as $title => $flags) {
@@ -163,7 +163,7 @@ final class AdminFeatureFlags
     {
         $keys = [];
         foreach (self::productLines() as $line) {
-            if (! is_array($line['groups'] ?? null)) {
+            if (! isset($line['groups'])) {
                 continue;
             }
             foreach ($line['groups'] as $flags) {
@@ -191,12 +191,12 @@ final class AdminFeatureFlags
         }
 
         foreach (self::productLines() as $line) {
-            if (is_array($line['emergency'] ?? null)) {
+            if (isset($line['emergency'])) {
                 foreach (array_keys($line['emergency']) as $key) {
                     $keys[] = $key;
                 }
             }
-            if (is_array($line['groups'] ?? null)) {
+            if (isset($line['groups'])) {
                 foreach ($line['groups'] as $flags) {
                     foreach (array_keys($flags) as $key) {
                         if (self::isGlobalNamespace($key)) {
@@ -284,7 +284,7 @@ final class AdminFeatureFlags
         }
 
         foreach (self::productLines() as $line) {
-            if (is_array($line['emergency'] ?? null) && isset($line['emergency'][$key])) {
+            if (isset($line['emergency'][$key])) {
                 return $line['emergency'][$key];
             }
         }
@@ -301,10 +301,10 @@ final class AdminFeatureFlags
         }
 
         foreach (self::productLines() as $line) {
-            if (is_array($line['emergency'] ?? null) && isset($line['emergency'][$key])) {
+            if (isset($line['emergency'][$key])) {
                 return $line['emergency'][$key];
             }
-            if (is_array($line['groups'] ?? null)) {
+            if (isset($line['groups'])) {
                 foreach ($line['groups'] as $flags) {
                     if (isset($flags[$key])) {
                         return $flags[$key];

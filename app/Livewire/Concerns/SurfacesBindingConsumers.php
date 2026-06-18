@@ -30,7 +30,7 @@ trait SurfacesBindingConsumers
      * each consumer can be flagged local (same server) or remote.
      *
      * @param  array<int, int|string>  $resourceIds
-     * @return array<string, array<int, array<string, mixed>>>  keyed by resource id
+     * @return array<string, array<int, array<string, mixed>>> keyed by resource id
      */
     protected function buildBindingConsumers(string $targetType, array $resourceIds, int|string $backendServerId): array
     {
@@ -52,7 +52,7 @@ trait SurfacesBindingConsumers
                 continue;
             }
 
-            $conn = is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
+            $conn = $binding->config['connectivity'] ?? null;
             $reachable = is_array($conn) && array_key_exists('ok', $conn) ? (bool) $conn['ok'] : null;
 
             $out[(string) $binding->target_id][] = [
@@ -116,7 +116,7 @@ trait SurfacesBindingConsumers
             }
 
             $site = $binding->site;
-            $conn = is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
+            $conn = $binding->config['connectivity'] ?? null;
             $reachable = is_array($conn) && array_key_exists('ok', $conn) ? (bool) $conn['ok'] : null;
 
             $out[] = [

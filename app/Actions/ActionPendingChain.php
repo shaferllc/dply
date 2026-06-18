@@ -18,6 +18,9 @@ class ActionPendingChain extends PendingChain
         return parent::dispatch();
     }
 
+    /**
+     * @param  mixed  $job
+     */
     public function usesAsJobTrait($job): bool
     {
         return is_string($job)

@@ -293,9 +293,10 @@ SH;
      * Parse the probe output and merge the extracted state into a fresh meta array.
      * Caller passes existing meta; returns the new meta to persist.
      *
-     * @param  array<string, mixed>  $existingMeta
+     * @param  array<string, mixed> $existingMeta
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function parse(string $out, array $existingMeta, int $maxPreviewBytes, int $maxExtBytes): array
     {
         $meta = $existingMeta;
@@ -625,6 +626,7 @@ SH;
      * — leaves any pre-existing meta intact). Returns an empty per-runtime stub
      * when mise itself isn't present (handlers can render an empty state).
      *
+     * @param  array<string, mixed> $existingMeta
      * @return array<string, array{versions: list<string>, active: ?string}>|null
      */
     private function parseMiseRuntimesBlock(string $out): ?array
@@ -684,7 +686,7 @@ SH;
      * flat-list-of-records ([{name, version, …}, …]) variants mise has emitted
      * across releases.
      *
-     * @param  array<int|string, mixed>  $decoded
+     * @param  array<string, mixed> $decoded
      * @param  array<string, array{versions: list<string>, active: ?string}>  $shape
      */
     private function ingestMiseLsJson(array $decoded, array &$shape): void

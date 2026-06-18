@@ -76,7 +76,7 @@ final class HetznerCloudFirewallRules
                 ->where('engine', $engineName)
                 ->first();
 
-            $port = $engineRow?->port ?? ServerDatabaseEngine::defaultPortFor($engineName);
+            $port = $engineRow->port ?? ServerDatabaseEngine::defaultPortFor($engineName);
 
             // Collect the unique CIDRs from the exposed databases.
             $cidrs = $dbs->pluck('allowed_from')->filter()->unique()->values()->all();
@@ -91,7 +91,7 @@ final class HetznerCloudFirewallRules
     }
 
     /**
-     * @param  list<string>  $sourceIps
+     * @param  list<string> $sourceIps
      * @return array<string,mixed>
      */
     private static function tcp(string $port, array $sourceIps): array

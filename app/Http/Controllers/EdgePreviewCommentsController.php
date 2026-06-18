@@ -110,7 +110,7 @@ class EdgePreviewCommentsController extends Controller
             'selector' => $c->selector,
             'viewport_width' => $c->viewport_width,
             'resolved' => $c->resolved_at !== null,
-            'created_at' => $c->created_at?->toIso8601String(),
+            'created_at' => $c->created_at->toIso8601String(),
         ];
     }
 

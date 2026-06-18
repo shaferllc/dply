@@ -7,7 +7,7 @@ use App\Livewire\Auth\Register;
 use App\Models\Organization;
 use App\Models\ReferralReward;
 use App\Models\User;
-use App\Services\Referrals\ReferralConversionService;
+use App\Modules\Referrals\Services\ReferralConversionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Cashier\Events\WebhookReceived;
 use Livewire\Livewire;

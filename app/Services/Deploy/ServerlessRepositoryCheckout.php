@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Models\User;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 
@@ -157,7 +157,7 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  list<string>  $command
+     * @param  array<string, mixed> $command
      */
     private function run(array $command, string $workingDirectory): string
     {
@@ -173,7 +173,7 @@ final class ServerlessRepositoryCheckout
     }
 
     /**
-     * @param  list<string>  $log
+     * @param  array<string, mixed> $log
      */
     private function fetchBranch(
         string $repositoryPath,

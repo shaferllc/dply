@@ -21,12 +21,15 @@ class PolicyDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function __call($method, $arguments)
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
+    public function __call(string $method, array $arguments): bool
     {
         // Policy methods are called dynamically (e.g., $policy->update($user, $post))
         if ($this->hasMethod($method)) {
@@ -52,7 +55,7 @@ class PolicyDecorator
         return false;
     }
 
-    public function before(?Authorizable $user, string $ability, ...$arguments): ?bool
+    public function before(?Authorizable $user, string $ability, mixed ...$arguments): ?bool
     {
         if ($this->hasMethod('before')) {
             $result = $this->callMethod('before', array_merge([$user, $ability], $arguments));
@@ -63,7 +66,7 @@ class PolicyDecorator
         return null;
     }
 
-    public function after(?Authorizable $user, string $ability, $result, ...$arguments): ?bool
+    public function after(?Authorizable $user, string $ability, mixed $result, mixed ...$arguments): ?bool
     {
         if ($this->hasMethod('after')) {
             $result = $this->callMethod('after', array_merge([$user, $ability, $result], $arguments));

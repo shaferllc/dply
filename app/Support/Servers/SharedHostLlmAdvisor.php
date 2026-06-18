@@ -56,15 +56,15 @@ final class SharedHostLlmAdvisor
     /**
      * Heuristic briefing for notifications when LLM is unavailable.
      *
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      */
     public function heuristicBriefing(Server $server, array $report): string
     {
         $advisor = $this->fairnessAdvisor->advise($server, $report);
-        $lines = [trim((string) ($advisor['summary'] ?? ''))];
+        $lines = [trim($advisor['summary'])];
 
         foreach (array_slice($advisor['recommendations'], 0, 2) as $recommendation) {
-            $lines[] = '• '.trim((string) ($recommendation['title'] ?? '')).' — '.trim((string) ($recommendation['summary'] ?? ''));
+            $lines[] = '• '.trim($recommendation['title']).' — '.trim($recommendation['summary']);
         }
 
         return trim(implode("\n", array_filter($lines)));
@@ -73,7 +73,7 @@ final class SharedHostLlmAdvisor
     /**
      * Prefer cached LLM narrative; fall back to heuristic briefing.
      *
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      */
     public function notificationBriefing(Server $server, array $report): string
     {

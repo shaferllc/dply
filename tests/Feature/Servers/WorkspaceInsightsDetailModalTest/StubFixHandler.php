@@ -7,8 +7,8 @@ namespace Tests\Feature\Servers\WorkspaceInsightsDetailModalTest;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Insights\Contracts\InsightFixActionInterface;
-use App\Services\Insights\FixResult;
+use App\Modules\Insights\Services\Contracts\InsightFixActionInterface;
+use App\Modules\Insights\Services\FixResult;
 
 /**
  * Minimal stand-in so config('insights.insights.[key].fix.handler') resolves

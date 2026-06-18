@@ -23,18 +23,12 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Site')"
                 :title="__('Logs')"
                 :description="__('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.')"
-                :show-documentation="false"
-                flush
-                compact
+                icon="document-text"
             />
-
-            <x-explainer>
-                <p>{{ __('This site\'s vhost access &amp; error logs, application log, queue workers, and dply\'s own activity stream — read live from the server over SSH. Use the Viewer tab to tail lines; Overview and Sources summarize what is available for this site.') }}</p>
-                <p>{{ __('Time ranges are server-side filters: "Last 5 minutes" reads only the recent slice of each file; broader ranges page through more of the file. Need machine-wide logs (syslog, PHP-FPM, fleet activity)? Open the server logs workspace below.') }}</p>
-            </x-explainer>
 
             <div
                 id="dply-server-log-broadcast-context"

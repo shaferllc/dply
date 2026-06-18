@@ -44,7 +44,7 @@ class ActionRateLimiterDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }

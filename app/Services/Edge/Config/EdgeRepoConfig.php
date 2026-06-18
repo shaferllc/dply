@@ -100,7 +100,7 @@ final class EdgeRepoConfig
     public function cronSchedules(): array
     {
         return array_values(array_filter(array_map(
-            static fn (array $entry): ?string => is_string($entry['schedule'] ?? null) && $entry['schedule'] !== ''
+            static fn (array $entry): ?string => is_string($entry['schedule']) && $entry['schedule'] !== ''
                 ? $entry['schedule']
                 : null,
             $this->crons,

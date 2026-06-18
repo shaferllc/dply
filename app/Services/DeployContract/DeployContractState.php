@@ -45,7 +45,7 @@ final class DeployContractState
     }
 
     /**
-     * @return array{
+     * @return array{enabled: bool, require_run: bool, allow_waivers: bool, ready_to_promote: bool, has_run: bool, run_current: bool, status: string|null, passed_count: int, ...}
      *   enabled: bool,
      *   require_run: bool,
      *   allow_waivers: bool,
@@ -100,7 +100,7 @@ final class DeployContractState
     }
 
     /**
-     * @param  array<string, mixed>  $contract
+     * @param  array<string, mixed> $contract
      */
     public function promoteBlockedMessage(array $contract): ?string
     {
@@ -128,7 +128,7 @@ final class DeployContractState
     }
 
     /**
-     * @param  array<string, mixed>  $contract
+     * @param  array<string, mixed> $contract
      * @return list<array{label: string, value: string, mono?: bool}>
      */
     public function confirmModalRows(array $contract): array

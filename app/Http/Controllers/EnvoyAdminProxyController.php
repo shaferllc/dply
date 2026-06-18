@@ -49,17 +49,17 @@ class EnvoyAdminProxyController extends Controller
             ], 503);
         }
 
-        $status = (int) ($result['status'] ?? 502);
+        $status = (int) $result['status'];
         if ($status < 100 || $status > 599) {
             $status = 502;
         }
 
         return response(
-            (string) ($result['body'] ?? ''),
+            (string) $result['body'],
             $status,
             [
-                'Content-Type' => (string) ($result['content_type'] ?? 'text/html; charset=utf-8'),
-                'X-Dply-Envoy-Admin-Target' => (string) ($result['target_url'] ?? ''),
+                'Content-Type' => (string) $result['content_type'],
+                'X-Dply-Envoy-Admin-Target' => (string) $result['target_url'],
                 'Cache-Control' => 'no-store, private',
                 'X-Frame-Options' => 'SAMEORIGIN',
             ],

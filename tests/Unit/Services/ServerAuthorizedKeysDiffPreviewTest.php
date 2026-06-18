@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 
 function validPrivateKey(): string
 {
-    return file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem'));
+    return file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem'));
 }
 
 it('reports added and removed lines per user', function () {

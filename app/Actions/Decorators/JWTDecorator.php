@@ -36,7 +36,7 @@ class JWTDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -83,7 +83,7 @@ class JWTDecorator
      */
     protected function getTokenFromRequest(): ?string
     {
-        return $this->fromActionMethod('getTokenFromRequest', $this->getDefaultToken());
+        return $this->fromActionMethod('getTokenFromRequest', [], $this->getDefaultToken());
     }
 
     /**

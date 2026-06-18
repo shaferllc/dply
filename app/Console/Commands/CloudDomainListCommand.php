@@ -34,13 +34,13 @@ class CloudDomainListCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $domains = is_array($meta['container']['domains'] ?? null) ? $meta['container']['domains'] : [];
 
         $rows = [];

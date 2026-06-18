@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiInventoryPageTest;
 
-use App\Jobs\Imports\SyncPloiInventoryJob;
+use App\Modules\Imports\Jobs\SyncPloiInventoryJob;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\PloiServer;

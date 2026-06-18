@@ -9,7 +9,9 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
-use App\Services\RemoteCli\RiskLevel;
+use App\Models\User;
+use App\Modules\Notifications\Services\ServerWebserverNotificationDispatcher;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\SshConnection;
 use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Bus\Queueable;
@@ -75,7 +77,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -88,14 +90,14 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
+    public function handle(ServerWebserverNotificationDispatcher $notifications): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
+        $actor = $this->userId !== null ? User::find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $ssh = new SshConnection($server);
@@ -116,7 +118,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         // the SwitchServerWebserverJob persists meta only after cutover succeeds).
         // Defensive though: if meta points at the half-installed target, snap it
         // back to `from` so the rest of the UI doesn't lie.
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         if (strtolower((string) ($meta['webserver'] ?? '')) === strtolower($this->target)) {
             $meta['webserver'] = $this->from;
             $server->update(['meta' => $meta]);
@@ -145,7 +147,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         // rationale.
         app(UniqueLock::class)->release($this);
 
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
@@ -181,9 +183,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
             ->where('server_id', $server->id)
             ->get()
             ->map(function (Site $site): string {
-                $basename = method_exists($site, 'webserverConfigBasename')
-                    ? (string) $site->webserverConfigBasename()
-                    : (string) $site->slug;
+                $basename = (string) $site->webserverConfigBasename();
 
                 return '/etc/caddy/sites-enabled/'.$basename.'.caddy';
             })

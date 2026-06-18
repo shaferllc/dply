@@ -22,7 +22,7 @@ class GetOperationStatus extends AbstractDplyTool
     protected string $ability = 'sites.read';
 
     /**
-     * @return array<string, JsonSchema>
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
      */
     public function schema(JsonSchema $schema): array
     {
@@ -41,10 +41,14 @@ class GetOperationStatus extends AbstractDplyTool
 
         $action = ConsoleAction::query()->with('subject')->find($operationId);
 
+        if (! $action instanceof ConsoleAction) {
+            throw new DplyMcpException("Operation \"{$operationId}\" was not found in this organization.");
+        }
+
         // Org-scope: PR1 async ops are all site-subject. Reject anything we
         // can't tie to a site the token's organization owns.
-        $subject = $action?->subject;
-        if (! $action || ! $subject instanceof Site || $subject->server?->organization_id !== $organization->id) {
+        $subject = $action->subject;
+        if (! $subject instanceof Site || $subject->server?->organization_id !== $organization->id) {
             throw new DplyMcpException("Operation \"{$operationId}\" was not found in this organization.");
         }
 

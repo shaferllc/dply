@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property string $serverless_backend
+ * @property string $name
  */
 trait ManagesServerless
 {
@@ -46,7 +50,7 @@ trait ManagesServerless
      */
     public function serverlessConfig(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $config = $meta['serverless'] ?? $meta['digitalocean_functions'] ?? [];
 
         return is_array($config) ? $config : [];
@@ -104,8 +108,11 @@ trait ManagesServerless
             $slug = $base.'-'.Str::lower(Str::random(4));
         }
 
-        $meta = is_array($this->meta) ? $this->meta : [];
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $meta = $this->meta ?? [];
+        $serverless = $meta['serverless'] ?? [];
+        if (! is_array($serverless)) {
+            $serverless = [];
+        }
         $serverless['proxy_slug'] = $slug;
         $meta['serverless'] = $serverless;
         $this->forceFill(['meta' => $meta])->save();
@@ -131,8 +138,11 @@ trait ManagesServerless
 
         $secret = Str::random(48);
 
-        $meta = is_array($this->meta) ? $this->meta : [];
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $meta = $this->meta ?? [];
+        $serverless = $meta['serverless'] ?? [];
+        if (! is_array($serverless)) {
+            $serverless = [];
+        }
         $serverless['command_secret'] = $secret;
         $meta['serverless'] = $serverless;
         $this->forceFill(['meta' => $meta])->save();

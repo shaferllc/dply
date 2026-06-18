@@ -21,25 +21,27 @@
         </ol>
     </nav>
 
-    <div class="mb-6 flex items-center justify-between gap-3 border-b border-brand-ink/10 pb-6">
-        <div>
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Resources') }}</h1>
-            <p class="mt-1 text-sm text-brand-moss">
-                {{ $isContainer
-                    ? __('Every backing service attached to this app. Attach more in one click; detach in place.')
-                    : __('Background workers that keep this site\'s queue and Horizon running — on this server and any worker server on the same network.') }}
-            </p>
-        </div>
-        @if ($isContainer)
-            <x-primary-button size="sm" type="button" wire:click="openAttach('attach')">
-                + {{ __('Attach resource') }}
-            </x-primary-button>
-        @else
-            <x-primary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate>
-                {{ __('Manage workers') }}
-            </x-primary-button>
-        @endif
-    </div>
+    <x-hero-card
+        :eyebrow="__('Site')"
+        :title="__('Resources')"
+        :description="$isContainer
+            ? __('Every backing service attached to this app. Attach more in one click; detach in place.')
+            : __('Background workers that keep this site\'s queue and Horizon running — on this server and any worker server on the same network.')"
+        icon="squares-2x2"
+        class="mb-6"
+    >
+        <x-slot:topAction>
+            @if ($isContainer)
+                <x-primary-button size="sm" type="button" wire:click="openAttach('attach')">
+                    + {{ __('Attach resource') }}
+                </x-primary-button>
+            @else
+                <x-primary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate>
+                    {{ __('Manage workers') }}
+                </x-primary-button>
+            @endif
+        </x-slot:topAction>
+    </x-hero-card>
 
 @if (! $isContainer)
     {{-- Worker SERVER pools attached to this site's workspace — the scalable

@@ -7,39 +7,16 @@
     />
 
     <div class="mb-6 flex flex-wrap items-center gap-2">
-        <button
-            type="button"
-            wire:click="setTab('items')"
-            @class([
-                'rounded-lg px-3 py-2 text-sm font-medium transition',
-                $tab === 'items' ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm' : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent',
-            ])
-        >
-            {{ __('Items') }}
-        </button>
-        <button
-            type="button"
-            wire:click="setTab('releases')"
-            @class([
-                'rounded-lg px-3 py-2 text-sm font-medium transition',
-                $tab === 'releases' ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm' : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent',
-            ])
-        >
-            {{ __('Release trains') }}
-        </button>
-        <button
-            type="button"
-            wire:click="setTab('suggestions')"
-            @class([
-                'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-                $tab === 'suggestions' ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm' : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent',
-            ])
-        >
-            {{ __('Suggestions') }}
-            @if ($newSuggestionCount > 0)
-                <span class="rounded-full bg-brand-rust/15 px-2 py-0.5 text-xs font-semibold text-brand-rust">{{ $newSuggestionCount }}</span>
-            @endif
-        </button>
+        <x-server-workspace-tablist :aria-label="__('Roadmap sections')">
+            <x-server-workspace-tab :active="$tab === 'items'" icon="heroicon-o-rectangle-stack" wire:click="setTab('items')">{{ __('Items') }}</x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'releases'" icon="heroicon-o-truck" wire:click="setTab('releases')">{{ __('Release trains') }}</x-server-workspace-tab>
+            <x-server-workspace-tab :active="$tab === 'suggestions'" icon="heroicon-o-light-bulb" wire:click="setTab('suggestions')">
+                {{ __('Suggestions') }}
+                @if ($newSuggestionCount > 0)
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $newSuggestionCount }}</span>
+                @endif
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
         @if ($tab === 'items')
             <button type="button" wire:click="openCreateItemModal" class="ms-auto inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90">
                 <x-heroicon-o-plus class="h-4 w-4" />

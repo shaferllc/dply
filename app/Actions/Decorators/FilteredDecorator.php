@@ -4,6 +4,7 @@ namespace App\Actions\Decorators;
 
 use App\Actions\Concerns\DecorateActions;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Filtered Decorator
@@ -39,7 +40,7 @@ class FilteredDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -50,7 +51,7 @@ class FilteredDecorator
      * @param  mixed  ...$arguments
      * @return mixed
      */
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->action->handle(...$arguments);
 
@@ -67,13 +68,16 @@ class FilteredDecorator
      * @param  mixed  ...$arguments
      * @return mixed
      */
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
 
     /**
      * Apply filters to the query.
+     *
+     * @param  Builder<Model>  $query
+     * @return Builder<Model>
      */
     protected function applyFilters(Builder $query): Builder
     {
@@ -107,6 +111,8 @@ class FilteredDecorator
 
     /**
      * Get filterable columns.
+     *
+     * @return array<int, string>
      */
     protected function getFilterableColumns(): array
     {
@@ -125,6 +131,8 @@ class FilteredDecorator
 
     /**
      * Get filter operators mapping.
+     *
+     * @return array<string, string>
      */
     protected function getFilterOperators(): array
     {

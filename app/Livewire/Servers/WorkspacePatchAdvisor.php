@@ -9,6 +9,7 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesPatchNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Models\ConsoleAction;
@@ -16,11 +17,10 @@ use App\Models\Server;
 use App\Services\Servers\ServerPatchAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * OS patch workspace — inventory probe rollup plus apt actions, unattended-upgrades
@@ -30,11 +30,11 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspacePatchAdvisor extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesPatchNotifications;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use RunsAllowlistedManageAction;
     use RunsServerInventoryProbe;

@@ -17,6 +17,7 @@ final class EdgeSiteR2StorageEstimator
      * @param  Collection<int, Site>  $sites
      * @return array<string, int> site_id => bytes
      */
+    /** @return array<string, mixed> */
     public function storageBytesBySite(Collection $sites): array
     {
         if ($sites->isEmpty()) {
@@ -31,11 +32,11 @@ final class EdgeSiteR2StorageEstimator
             ->whereNotNull('storage_prefix')
             ->get(['site_id', 'meta']);
 
-        /** @var array<string, int> $totals */
+        /** @var array $totals */
         $totals = [];
 
         foreach ($deployments as $deployment) {
-            $meta = is_array($deployment->meta) ? $deployment->meta : [];
+            $meta = ($deployment->meta );
             $bytes = (int) ($meta['artifact_bytes'] ?? 0);
             if ($bytes <= 0) {
                 continue;

@@ -42,7 +42,7 @@ trait ManagesMailBindings
      * secret/connection comes from a saved {@see MailCredential} or the typed
      * form; the from-address/name are always per-site and entered each time.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachMail(Site $site, array $params): SiteBinding
     {
@@ -95,7 +95,7 @@ trait ManagesMailBindings
      * leg ORDER is shown to the operator as a config/mail.php snippet — it's the
      * one piece we can't inject.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      */
     private function attachFailoverMail(Site $site, string $transport, array $params): SiteBinding
     {
@@ -173,7 +173,7 @@ trait ManagesMailBindings
      * Resolve transport credentials: from a saved MailCredential when
      * $params['credential_id'] is set, otherwise from the typed form fields.
      *
-     * @param  array<string, mixed>  $params
+     * @param  array<string, mixed> $params
      * @return array<string, string>
      */
     private function resolveMailCredentials(Site $site, string $provider, array $params): array
@@ -190,7 +190,7 @@ trait ManagesMailBindings
                 throw new InvalidArgumentException(__('That saved mail credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return ($cred->credentials );
         }
 
         return match ($provider) {
@@ -228,7 +228,7 @@ trait ManagesMailBindings
         };
     }
 
-    /** @param  array<string, string>  $creds */
+    /** @param  array<string, mixed> $creds */
     private function validateMailCredentials(string $provider, array $creds): void
     {
         match ($provider) {
@@ -267,7 +267,7 @@ trait ManagesMailBindings
      * and S3 storage must point both at the same AWS account (surfaced in the
      * modal copy rather than namespaced here).
      *
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $creds
      * @return array<string, string>
      */
     private function mailEnv(string $provider, array $creds, string $fromAddress, string $fromName): array
@@ -334,7 +334,7 @@ trait ManagesMailBindings
         return [...$transport, ...$shared];
     }
 
-    /** @param  array<string, string>  $creds */
+    /** @param  array<string, mixed> $creds */
     private function mailLabel(string $provider, array $creds): string
     {
         return match ($provider) {
@@ -355,8 +355,8 @@ trait ManagesMailBindings
      * ticked "save for reuse". No-op when reusing a saved credential or for the
      * `log` provider (no credentials to store).
      *
-     * @param  array<string, mixed>  $params
-     * @param  array<string, string>  $creds
+     * @param  array<string, mixed> $params
+     * @param  array<string, mixed> $creds
      */
     private function maybeSaveMailCredential(Site $site, string $provider, array $params, array $creds): void
     {

@@ -25,6 +25,10 @@ class EdgeHybridOriginEnsurer
     /**
      * @return list<array{slug: string, updated: bool, healthcheck: array{ok: bool, status: int, message: string}}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, array<string, mixed>|bool|string>>
+     */
     public function ensureAllHybridSites(): array
     {
         $results = [];
@@ -108,7 +112,7 @@ class EdgeHybridOriginEnsurer
     }
 
     /**
-     * @param  array<string, mixed>  $origin
+     * @param  array<string, mixed> $origin
      * @return array<string, mixed>
      */
     private function normalizeOrigin(array $origin): array

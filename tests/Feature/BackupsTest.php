@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\BackupsTest;
 
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Backups\Databases;
 use App\Livewire\Backups\Files;
 use App\Models\BackupConfiguration;

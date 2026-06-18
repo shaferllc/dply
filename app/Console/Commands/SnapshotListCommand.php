@@ -52,7 +52,7 @@ class SnapshotListCommand extends Command
                 'engine' => $s->engine,
                 'reason' => $s->reason,
                 'expires_at' => $s->expires_at?->toISOString(),
-                'created_at' => $s->created_at?->toISOString(),
+                'created_at' => $s->created_at->toISOString(),
             ])->values()->toJson(JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
             return self::SUCCESS;
@@ -72,7 +72,7 @@ class SnapshotListCommand extends Command
                 $s->reason,
                 number_format(($s->bytes ?? 0) / 1024, 1).' KB',
                 $s->engine,
-                $s->created_at?->diffForHumans() ?? '—',
+                $s->created_at->diffForHumans(),
                 $s->expires_at?->diffForHumans() ?? 'never',
             ])->all(),
         );

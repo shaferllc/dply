@@ -27,12 +27,12 @@ class PurgeSiteCdnJob implements ShouldQueue
 
     public function handle(): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null) {
             return;
         }
 
-        $cfg = is_array($site->meta) ? ($site->meta['cdn'] ?? []) : [];
+        $cfg = $site->meta['cdn'] ?? [];
         if (! is_array($cfg) || empty($cfg['enabled']) || ($cfg['provider'] ?? null) !== 'cloudflare') {
             return;
         }
@@ -51,8 +51,8 @@ class PurgeSiteCdnJob implements ShouldQueue
         try {
             (new CloudflareCdnService($credential))->purgeHostname($zoneId, $hostname);
 
-            $meta = is_array($site->meta) ? $site->meta : [];
-            $meta['cdn'] = array_merge(is_array($meta['cdn'] ?? null) ? $meta['cdn'] : [], [
+            $meta = $site->meta;
+            $meta['cdn'] = array_merge((array) ($meta['cdn'] ?? []), [
                 'last_purge_at' => now()->toIso8601String(),
             ]);
             $site->meta = $meta;

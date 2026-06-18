@@ -24,6 +24,7 @@ class TraefikProvidersConfig
      *     unreadable: bool
      * }
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $defaults = $this->defaults();
@@ -90,7 +91,7 @@ class TraefikProvidersConfig
     }
 
     /**
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
      */
@@ -164,8 +165,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $providers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $providers
+     * @param  array<string, mixed> $values
      */
     private function applyDocker(array &$providers, array $values): void
     {
@@ -182,8 +183,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $providers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $providers
+     * @param  array<string, mixed> $values
      */
     private function applyKubernetes(array &$providers, array $values): void
     {
@@ -204,8 +205,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed>  $providers
-     * @param  array<string, string>  $values
+     * @param  array<string, mixed> $providers
+     * @param  array<string, mixed> $values
      */
     private function applyConsul(array &$providers, array $values): void
     {

@@ -579,7 +579,21 @@ trait ManagesSiteDeploySteps
             return false;
         }
 
-        return trim($this->new_deploy_step_command) !== '' ? trim($this->new_deploy_step_command) : null;
+        $command = trim($this->new_deploy_step_command);
+
+        // Guard against two commands mashed into one step with no separator —
+        // e.g. "php artisan pennant:clear php artisan storage:link". A step runs a
+        // SINGLE command, so the second invocation is silently passed as arguments
+        // to the first and never runs. Legit chains (&&, ||, ;, |, newline) pass.
+        if ($command !== ''
+            && preg_match_all('/\bphp\s+artisan\b/i', $command) >= 2
+            && preg_match('/&&|\|\||;|\||\R/', $command) !== 1) {
+            $this->addError('new_deploy_step_command', __('This looks like two commands run as one (e.g. “php artisan a php artisan b”). A step runs a single command — chain them with “&&” or add separate steps.'));
+
+            return false;
+        }
+
+        return $command !== '' ? $command : null;
     }
 
     protected function findPipelineStep(string $id): ?SiteDeployStep

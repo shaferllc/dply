@@ -4,18 +4,44 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Livewire\Servers\WorkspaceErrors;
+use App\Livewire\Sites\Errors;
+use App\Modules\Remediations\Services\RemediationCatalog;
+use App\Support\Errors\ErrorEventRecorder;
 use App\Support\Errors\ErrorRetryRegistry;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
- * One row in the dedicated error stream surfaced on the site/server "Errors"
- * views. Written by {@see \App\Support\Errors\ErrorEventRecorder} from failed
- * ConsoleActions and SiteDeployments. Append-only; triage is a shared
- * {@see $dismissed_at}.
+ * @property string $id
+ *                      One row in the dedicated error stream surfaced on the site/server "Errors"
+ *                      views. Written by {@see ErrorEventRecorder} from failed
+ *                      ConsoleActions and SiteDeployments. Append-only; triage is a shared
+ *                      {@see $dismissed_at}.
+ * @property string $category
+ * @property string $detail
+ * @property ?Carbon $dismissed_at
+ * @property ?string $dismissed_by
+ * @property ?string $link_url
+ * @property ?Carbon $occurred_at
+ * @property ?string $organization_id
+ * @property string $reference
+ * @property string $remediation_code
+ * @property ?string $server_id
+ * @property ?string $site_id
+ * @property ?string $source_id
+ * @property string $source_type
+ * @property string $title
+ * @property-read ?Organization $organization
+ * @property-read ?Server $server
+ * @property-read ?Site $site
+ * @property-read ?User $dismisser
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class ErrorEvent extends Model
 {
@@ -29,6 +55,7 @@ class ErrorEvent extends Model
         'source_id',
         'category',
         'remediation_code',
+        'reference',
         'title',
         'detail',
         'link_url',
@@ -37,6 +64,7 @@ class ErrorEvent extends Model
         'dismissed_by',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,41 +73,58 @@ class ErrorEvent extends Model
         ];
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<Server, $this> */
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return MorphTo<Model, $this> */
     public function source(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /** @return BelongsTo<User, $this> */
     public function dismisser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'dismissed_by');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeForServer(Builder $query, string $serverId): Builder
     {
         return $query->where('server_id', $serverId);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeForSite(Builder $query, string $siteId): Builder
     {
         return $query->where('site_id', $siteId);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeUndismissed(Builder $query): Builder
     {
         return $query->whereNull('dismissed_at');
@@ -90,7 +135,7 @@ class ErrorEvent extends Model
      * workspace nav badge ({@see server-workspace-shell}) and the Errors stream
      * both want this count; sharing it here keeps the same `count(*)` from
      * running twice on a page render. Primed by the stream's paginator when it's
-     * unfiltered (see {@see \App\Livewire\Servers\WorkspaceErrors::shareStreamTotal});
+     * unfiltered (see {@see WorkspaceErrors::shareStreamTotal});
      * otherwise computed on first read. Keyed per server, reset each request.
      *
      * @var array<string, int>
@@ -116,7 +161,7 @@ class ErrorEvent extends Model
      * mirror of {@see $undismissedServerCountMemo}. The site settings sidebar
      * "Errors" badge and the Errors stream both want this; sharing it keeps the
      * same `count(*)` from running twice on a render. Primed by the stream's
-     * paginator when unfiltered (see {@see \App\Livewire\Sites\Errors::shareStreamTotal}).
+     * paginator when unfiltered (see {@see Errors::shareStreamTotal}).
      *
      * @var array<string, int>
      */
@@ -155,7 +200,7 @@ class ErrorEvent extends Model
     public function remediation(): ?array
     {
         return $this->remediation_code
-            ? app(\App\Services\Remediations\RemediationCatalog::class)->find((string) $this->remediation_code)
+            ? app(RemediationCatalog::class)->find((string) $this->remediation_code)
             : null;
     }
 }

@@ -69,14 +69,16 @@ class ActionRetryCommand extends Command
         if (! empty($dashboard['actions'])) {
             $this->line('');
             $this->info('Retry Statistics:');
+            /** @var list<array<string, mixed>> $actions */
+            $actions = $dashboard['actions'];
             $this->table(
                 ['Action', 'Total Attempts', 'Avg Retries', 'Success Rate'],
-                collect($dashboard['actions'])->map(fn ($a) => [
+                array_map(fn (array $a): array => [
                     class_basename($a['action']),
                     number_format($a['total_attempts']),
                     number_format($a['avg_retries'], 2),
                     number_format($a['success_rate'] * 100, 2).'%',
-                ])->toArray()
+                ], $actions)
             );
         }
     }

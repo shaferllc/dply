@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Sites;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SiteGitCommitsFetcher;
-use App\Services\SourceControl\SourceControlRepositoryReader;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
+use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -25,6 +26,8 @@ use Livewire\Component;
  */
 trait PicksRepositoryRef
 {
+    use DispatchesToastNotifications;
+
     public string $repo_ref_selected_sha = '';
 
     public ?string $repo_ref_selected_label = null;
@@ -139,9 +142,7 @@ trait PicksRepositoryRef
     {
         $sha = strtolower(trim($sha));
         if (preg_match('/^[a-f0-9]{7,40}$/', $sha) !== 1) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Enter a valid commit SHA (7–40 hex characters).'));
-            }
+            $this->toastError(__('Enter a valid commit SHA (7–40 hex characters).'));
 
             return;
         }

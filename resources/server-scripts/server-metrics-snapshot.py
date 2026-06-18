@@ -277,7 +277,15 @@ def _post_metrics_callback(payload: dict) -> None:
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        # Identify with a named User-Agent: dply.io sits behind Cloudflare, which
+        # 403s the default "Python-urllib/x.y" agent (error 1010) — so the bare
+        # default silently dropped every metrics push. Must be a recognizable,
+        # non-script UA (matches the version check below).
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "dply-metrics/1",
+        },
         method="POST",
     )
     try:

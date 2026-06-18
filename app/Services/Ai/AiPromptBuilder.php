@@ -7,7 +7,7 @@ namespace App\Services\Ai;
 final class AiPromptBuilder
 {
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      */
     public function opsCopilotSystem(array $context): string
     {
@@ -23,7 +23,7 @@ final class AiPromptBuilder
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      */
     public function sharedHostSystem(array $report): string
     {
@@ -45,7 +45,7 @@ final class AiPromptBuilder
      * and the allowed area/status/release vocabularies. The model returns a
      * strict plan the updater applies verbatim.
      *
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed> $context
      */
     public function roadmapUpdateSystem(array $context): string
     {

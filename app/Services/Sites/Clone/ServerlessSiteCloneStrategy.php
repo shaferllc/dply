@@ -38,7 +38,7 @@ final class ServerlessSiteCloneStrategy
 
             SiteCloneDeployRowsReplicator::replicate($source, $newSite);
 
-            $meta = is_array($newSite->meta) ? $newSite->meta : [];
+            $meta = ($newSite->meta );
             $meta['clone'] = [
                 'source_site_id' => $source->id,
                 'status' => 'completed',

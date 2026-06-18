@@ -7,7 +7,7 @@ namespace Tests\Feature\Notifications\CredentialsEmailTest;
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\InstallMetricsAgentJob;
-use App\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Organization;

@@ -49,7 +49,7 @@ final class ListExistingProviderServers
     public function rolesByProvider(?Organization $org): array
     {
         return $this->aggregateByProvider($org, function (array &$bucket, Server $server): void {
-            $meta = is_array($server->meta) ? $server->meta : [];
+            $meta = $server->meta;
             $roleId = (string) ($meta['server_role'] ?? 'application');
             $bucket[$roleId] = ($bucket[$roleId] ?? 0) + 1;
         }, fn (array $roles): array => $this->formatRoleRows($roles));
@@ -158,7 +158,7 @@ final class ListExistingProviderServers
      */
     private function mapServer(Server $server): array
     {
-        $meta = is_array($server->meta) ? $server->meta : [];
+        $meta = $server->meta;
         $roleId = (string) ($meta['server_role'] ?? 'application');
 
         return [
@@ -217,7 +217,9 @@ final class ListExistingProviderServers
     {
         static $labels = null;
         if ($labels === null) {
-            $labels = collect(config('server_provision_options.server_roles', []))
+            /** @var list<array{id: string, label?: string}> $serverRoles */
+            $serverRoles = config('server_provision_options.server_roles', []);
+            $labels = collect($serverRoles)
                 ->keyBy('id')
                 ->map(fn (array $role): string => (string) ($role['label'] ?? $role['id']))
                 ->all();

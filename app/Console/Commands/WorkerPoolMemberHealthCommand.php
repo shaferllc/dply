@@ -93,14 +93,14 @@ class WorkerPoolMemberHealthCommand extends Command
 
     private function stampProbedAt(Server $member): void
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $meta['pool'] = array_merge($meta['pool'] ?? [], ['existence_checked_at' => now()->toIso8601String()]);
         $member->forceFill(['meta' => $meta])->save();
     }
 
     private function markErrored(Server $member): void
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $meta['pool'] = array_merge($meta['pool'] ?? [], [
             'state' => WorkerPool::MEMBER_ERRORED,
             'state_since' => now()->toIso8601String(),

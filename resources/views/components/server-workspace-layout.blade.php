@@ -12,6 +12,8 @@
     /** Match fleet-style headers (Servers / Sites): icon + title left, docs + actions right on large screens. */
     'pageHeaderToolbar' => false,
     'pageHeaderCompact' => false,
+    /** Suppress the generic hero-card header when the page renders its own identity card (e.g. the Overview identity-hero). */
+    'hideHero' => false,
 ])
 
 <x-server-workspace-shell :server="$server" :active="$active" :show-navigation="$showNavigation">
@@ -65,17 +67,23 @@
                 'label' => $server->name,
                 'href' => route('servers.overview', $server),
                 'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
             ];
             $workspaceBreadcrumbs[] = [
                 'label' => $contextSite->name,
                 'href' => $activePageItem ? route('sites.show', ['server' => $server, 'site' => $contextSite]) : null,
                 'icon' => 'globe-alt',
+                'avatar' => $contextSite->name ?: (string) $contextSite->id,
+                'avatar_image' => $contextSite->logoUrl(),
             ];
         } else {
             $workspaceBreadcrumbs[] = [
                 'label' => $server->name,
                 'href' => $activePageItem ? route('servers.overview', $server) : null,
                 'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
             ];
         }
 
@@ -83,7 +91,7 @@
             $workspaceBreadcrumbs[] = $activePageItem;
         }
 
-        $contextualDocSlug = app(\App\Support\Docs\ContextualDocResolver::class)
+        $contextualDocSlug = app(\App\Modules\Docs\Support\ContextualDocResolver::class)
             ->resolveForServerWorkspace(is_string($active) ? $active : null);
     @endphp
     {{-- Full-width breadcrumb at the very top of the workspace (above the sidebar
@@ -111,22 +119,62 @@
         </x-breadcrumb-trail>
     </x-slot:breadcrumb>
 
-    <x-page-header
-        :title="$contextSite ? $title.' — '.$contextSite->name : $title"
-        :description="$description"
-        :show-documentation="false"
-        :toolbar="(bool) $pageHeaderToolbar"
-        :compact="(bool) $pageHeaderCompact"
-        flush
-    >
-        @isset($headerLeading)
-            <x-slot name="leading">
-                {{ $headerLeading }}
-            </x-slot>
-        @endisset
-    </x-page-header>
+    @unless ($hideHero)
+        <x-hero-card
+            :title="$contextSite ? $title.' — '.$contextSite->name : $title"
+            :description="$description"
+            icon="server-stack"
+        >
+            @isset($headerLeading)
+                <x-slot:leading>
+                    {{ $headerLeading }}
+                </x-slot:leading>
+            @endisset
+        </x-hero-card>
+    @endunless
 
-    <div class="mt-6 space-y-8 sm:mt-8">
+    @php
+        // When the active page belongs to a collapsed cluster (Access, Network,
+        // Backups, Scheduled tasks), surface the cluster's member pages as a
+        // secondary tab strip. Derived from the same role-aware nav the sidebar
+        // uses, so feature/structural gating is already applied.
+        $clusterTabs = null;
+        if (filled($active)) {
+            foreach (server_workspace_nav_for_server($server) as $navItem) {
+                if (is_array($navItem)
+                    && ! empty($navItem['tabs'])
+                    && in_array($active, (array) ($navItem['match_keys'] ?? []), true)
+                ) {
+                    $clusterTabs = $navItem['tabs'];
+                    break;
+                }
+            }
+        }
+    @endphp
+
+    <div @class(['space-y-8', 'mt-6 sm:mt-8' => ! $hideHero])>
+        @if ($clusterTabs && count($clusterTabs) > 1)
+            <x-server-workspace-tablist :aria-label="__('Section tabs')" scroll>
+                @foreach ($clusterTabs as $tab)
+                    <x-server-workspace-tab
+                        as="a"
+                        href="{{ $tab['url'] }}"
+                        wire:navigate
+                        :icon="$tab['icon'] ?? null"
+                        :active="$active === $tab['key']"
+                    >
+                        {{ $tab['label'] }}
+                        @if (! empty($tab['preview_only']) || ! empty($tab['soon_badge']))
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                        @endif
+                        @if (! empty($tab['needs_setup']))
+                            <span class="h-1.5 w-1.5 rounded-full bg-amber-500" role="img" aria-label="{{ __('Setup required') }}"></span>
+                        @endif
+                    </x-server-workspace-tab>
+                @endforeach
+            </x-server-workspace-tablist>
+        @endif
+
         {{ $slot }}
     </div>
 

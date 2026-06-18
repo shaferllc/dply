@@ -27,6 +27,9 @@ class IssueSiteSslJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 900;
+
     public function uniqueId(): string
     {
         return 'console-action:ssl:'.$this->siteId;
@@ -34,7 +37,7 @@ class IssueSiteSslJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -49,7 +52,7 @@ class IssueSiteSslJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(SiteSslProvisioner $provisioner): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }

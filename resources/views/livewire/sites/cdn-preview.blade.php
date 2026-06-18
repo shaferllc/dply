@@ -4,7 +4,7 @@
         'site' => $site,
         'currentLabel' => __('CDN / Edge'),
         'currentIcon' => 'cloud',
-        'contextualDocSlug' => app(\App\Support\Docs\ContextualDocResolver::class)->resolveForSiteSection($site, 'cdn'),
+        'contextualDocSlug' => app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolveForSiteSection($site, 'cdn'),
     ])
 
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">

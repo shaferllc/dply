@@ -12,7 +12,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -84,7 +84,7 @@ class ErrorEventRecorder
             : null;
 
         return $this->upsert($deployment, [
-            'organization_id' => $site?->organization_id ?? $server?->organization_id,
+            'organization_id' => $site->organization_id ?? $server->organization_id,
             'server_id' => $server?->id,
             'site_id' => $site?->id,
             'category' => 'deploy',
@@ -94,6 +94,60 @@ class ErrorEventRecorder
             'link_url' => $link,
             'occurred_at' => $deployment->finished_at ?? $deployment->updated_at ?? now(),
         ]);
+    }
+
+    /**
+     * Record one HTTP 5xx hit swept from a site's PHP-FPM access log (Tier-2 of
+     * the server-error-reference feature). Idempotent on the reference: a later
+     * sweep that re-sees the same 5xx line refreshes the row rather than
+     * duplicating, so an overlapping lookback window is safe.
+     *
+     * No remediation is matched here — the access log carries the request, not
+     * the exception text. The row's link deep-links into the Tier-1 reference
+     * resolver, where the operator pulls the actual trace on demand.
+     *
+     * @param  array{reference: string, status: int, method: string, uri: string, occurred_at: \DateTimeInterface}  $hit
+     */
+    public function recordHttp5xx(Site $site, array $hit): ?ErrorEvent
+    {
+        $reference = trim((string) $hit['reference']);
+        if ($reference === '' || $site->server_id === null) {
+            return null;
+        }
+
+        $status = (int) $hit['status'];
+        $request = trim($hit['method'].' '.$hit['uri']);
+        $link = route('sites.errors', [
+            'server' => $site->server_id,
+            'site' => $site->id,
+            'reference' => $reference,
+        ]);
+
+        return ErrorEvent::query()->updateOrCreate(
+            [
+                'site_id' => $site->id,
+                'category' => 'http_5xx',
+                'reference' => $reference,
+            ],
+            [
+                // http_5xx rows have no Eloquent source model (they're swept from
+                // the access log), but source_type/source_id are NOT NULL and
+                // carry a unique index. Key them on the globally-unique reference
+                // so the insert satisfies the constraint and stays idempotent.
+                'source_type' => 'http_5xx',
+                'source_id' => $reference,
+                'organization_id' => $site->organization_id,
+                'server_id' => $site->server_id,
+                'title' => __('HTTP :status — :request', ['status' => $status, 'request' => Str::limit($request, 120, '')]),
+                'detail' => __(':request returned HTTP :status. Reference :ref — resolve it for the trace.', [
+                    'request' => Str::limit($request, 300, ''),
+                    'status' => $status,
+                    'ref' => $reference,
+                ]),
+                'link_url' => $link,
+                'occurred_at' => $hit['occurred_at'],
+            ],
+        );
     }
 
     /**
@@ -144,7 +198,7 @@ class ErrorEventRecorder
     }
 
     /**
-     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed> $attributes
      */
     private function upsert(Model $source, array $attributes): ErrorEvent
     {
@@ -184,10 +238,10 @@ class ErrorEventRecorder
     /** Newest error-level line from a ConsoleAction's output, if any. */
     private function lastErrorLine(ConsoleAction $action): string
     {
-        $lines = method_exists($action, 'lines') ? $action->lines() : [];
-        foreach (array_reverse(is_array($lines) ? $lines : []) as $line) {
-            if (($line['level'] ?? null) === ConsoleAction::LEVEL_ERROR && trim((string) ($line['line'] ?? '')) !== '') {
-                return trim((string) $line['line']);
+        $lines = $action->lines();
+        foreach (array_reverse($lines) as $line) {
+            if (($line['level']) === ConsoleAction::LEVEL_ERROR && trim($line['line']) !== '') {
+                return trim($line['line']);
             }
         }
 
@@ -214,7 +268,7 @@ class ErrorEventRecorder
         $tail = trim((string) ($deployment->log_output ?? ''));
         $tail = $tail === '' ? '' : trim((string) mb_substr($tail, -1000));
 
-        $prefix = $exit !== null ? sprintf('Exited %d. ', (int) $exit) : '';
+        $prefix = sprintf('Exited %d. ', (int) $exit);
 
         return trim($prefix.$tail);
     }

@@ -34,6 +34,7 @@ class DplyCliStateWriter
      *
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function build(Server $server): array
     {
         $phpVersion = ServerInstalledServices::phpVersionFor($server);
@@ -126,7 +127,7 @@ class DplyCliStateWriter
                 'webserver_unit' => isset($tags['nginx']) ? 'nginx' : (isset($tags['apache']) ? 'apache2' : (isset($tags['caddy']) ? 'caddy' : null)),
                 'db_unit' => isset($tags['mysql']) ? 'mysql' : (isset($tags['postgres']) ? 'postgresql' : null),
                 'cache_unit' => isset($tags['redis']) ? 'redis-server' : (isset($tags['memcached']) ? 'memcached' : null),
-                'units' => array_values($units),
+                'units' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($units)))))))))))))))))))))))))))))))),
                 'log_paths' => $logPaths,
             ],
             'sites' => $sites,

@@ -7,6 +7,7 @@ namespace App\Actions\Servers;
 use App\Jobs\PersonalizeClaimedServerJob;
 use App\Models\Server;
 use App\Models\ServerPoolMember;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -35,10 +36,10 @@ class ClaimWarmServer
             return false;
         }
 
-        $provider = $server->provider?->value ?? '';
+        $provider = $server->provider->value;
         $region = (string) $server->region;
         $size = (string) $server->size;
-        if ($provider === '' || $region === '' || $size === '') {
+        if ($region === '' || $size === '') {
             return false;
         }
 
@@ -125,16 +126,16 @@ class ClaimWarmServer
         }
 
         return DB::transaction(function () use ($pool, $server, $member): bool {
-            $meta = is_array($server->meta) ? $server->meta : [];
-            $poolMeta = is_array($pool->meta) ? $pool->meta : [];
+            $meta = $server->meta;
+            $poolMeta = $pool->meta;
             // Carry the reconciled installed-stack snapshot (overwritten when the
             // personalize re-provision emits a fresh one). Do NOT carry
             // provision_step_snapshots — the journey reads those as step-completion
             // and would render the (not-yet-personalized) server as ~100% done
             // before authorized_keys are rewritten to the customer. (Mirrors the
             // unset in RunSetupScriptJob::tryScheduleAutoRetry.)
-            if (isset($poolMeta[\App\Support\Servers\InstalledStack::META_KEY])) {
-                $meta[\App\Support\Servers\InstalledStack::META_KEY] = $poolMeta[\App\Support\Servers\InstalledStack::META_KEY];
+            if (isset($poolMeta[InstalledStack::META_KEY])) {
+                $meta[InstalledStack::META_KEY] = $poolMeta[InstalledStack::META_KEY];
             }
             unset($meta['provision_step_snapshots']);
 

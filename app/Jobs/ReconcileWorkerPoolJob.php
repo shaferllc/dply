@@ -3,10 +3,12 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\WorkerPools\WorkerMemberProviderProbe;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Services\WorkerPools\WorkerPoolNotifier;
@@ -32,7 +34,7 @@ use Illuminate\Support\Facades\Log;
  * Best-effort: a member that fails to provision is left for retry/inspection
  * and never causes healthy members to be torn down.
  *
- * Every tick streams its work into ONE {@see \App\Models\ConsoleAction} run
+ * Every tick streams its work into ONE {@see ConsoleAction} run
  * (kind `worker_pool_scale`) that spans the whole converge loop — the run id is
  * threaded through each self-redispatch — so the operator watches scaling live
  * on the pool primary's workspace. The run only goes terminal (completed /
@@ -104,7 +106,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         WorkerPool $pool,
         WorkerPoolManager $manager,
         WorkerWorkloadReplayer $replayer,
-        \App\Services\ConsoleActions\ConsoleEmitter $emit,
+        ConsoleEmitter $emit,
     ): void {
         $source = $this->resolvedSubject;
 
@@ -142,7 +144,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             $surplus = -$deficit;
             $victims = $pool->servers
                 ->filter(fn (Server $s): bool => ! $s->isPoolPrimary() && $s->poolMemberState() !== WorkerPool::MEMBER_DRAINING)
-                ->sortByDesc(fn (Server $s) => $s->created_at?->getTimestamp() ?? 0)
+                ->sortByDesc(fn (Server $s) => $s->created_at->getTimestamp())
                 ->take($surplus);
             foreach ($victims as $victim) {
                 try {
@@ -285,9 +287,9 @@ class ReconcileWorkerPoolJob implements ShouldQueue
      * sites remain pending (all deploys dispatched), false while some are still
      * provisioning. Idempotent: dispatched sites are removed from the list.
      */
-    private function dispatchReadyDeploys(Server $member, \App\Services\ConsoleActions\ConsoleEmitter $emit): bool
+    private function dispatchReadyDeploys(Server $member, ConsoleEmitter $emit): bool
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $pending = $meta['pool']['pending_deploys'] ?? [];
         if (! is_array($pending) || $pending === []) {
             return true;
@@ -295,7 +297,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
         $remaining = [];
         foreach ($pending as $siteId) {
-            $site = Site::query()->find($siteId);
+            $site = Site::find($siteId);
             if (! $site instanceof Site) {
                 continue; // site gone — drop it
             }
@@ -324,7 +326,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
     private function markState(Server $member, string $state): void
     {
-        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta = $member->meta;
         $prev = $meta['pool']['state'] ?? null;
         $meta['pool'] = array_merge($meta['pool'] ?? [], ['state' => $state]);
         // Stamp when we ENTERED this state so guardWedgedMember can measure how
@@ -344,9 +346,9 @@ class ReconcileWorkerPoolJob implements ShouldQueue
      *
      * @return bool true when the member was marked errored (caller should skip it)
      */
-    private function guardWedgedMember(Server $member, WorkerPool $pool, \App\Services\ConsoleActions\ConsoleEmitter $emit): bool
+    private function guardWedgedMember(Server $member, WorkerPool $pool, ConsoleEmitter $emit): bool
     {
-        $sinceRaw = $member->meta['pool']['state_since'] ?? $member->created_at?->toIso8601String();
+        $sinceRaw = $member->meta['pool']['state_since'] ?? $member->created_at->toIso8601String();
         $since = is_string($sinceRaw) ? CarbonImmutable::parse($sinceRaw) : null;
         if ($since === null || $since->gt(now()->subMinutes(self::STUCK_MINUTES))) {
             return false; // not stuck long enough yet
@@ -395,7 +397,10 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         }
 
         $pool = WorkerPool::query()->with('servers')->find($this->poolId);
-        $server = $pool?->primaryServer ?? $pool?->sourceServer;
+        if ($pool === null) {
+            return $this->resolvedSubject = new Server;
+        }
+        $server = $pool->primaryServer ?? $pool->sourceServer;
 
         return $this->resolvedSubject = ($server instanceof Server ? $server : new Server);
     }

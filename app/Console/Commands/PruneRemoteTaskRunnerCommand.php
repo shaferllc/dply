@@ -145,7 +145,7 @@ class PruneRemoteTaskRunnerCommand extends Command
         $last = end($lines) ?: '0 0';
 
         if (! preg_match('/^(\d+)\s+(\d+)$/', $last, $m)) {
-            throw new \RuntimeException('unexpected output: '.($last === '' ? '(empty)' : $last));
+            throw new \RuntimeException('unexpected output: '.$last);
         }
 
         return [(int) $m[1], (int) $m[2]];

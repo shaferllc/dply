@@ -8,13 +8,14 @@ use App\Enums\ServerProvider;
 use App\Exceptions\ProtectedServerDeletionException;
 use App\Models\Server;
 use App\Models\User;
+use App\Models\WorkerPool;
 use App\Notifications\ServerRemovalExecutedNotification;
 use App\Services\AwsEc2ServiceFactory;
 use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Services\OracleComputeService;
 use App\Services\OvhService;
 use App\Services\UpCloudService;
@@ -63,7 +64,7 @@ final class DeleteServerAction
         // removals carry reason `worker_pool_scale_down` and are skipped here.
         $reason = is_string($auditExtras['reason'] ?? null) ? $auditExtras['reason'] : null;
         if (! empty($server->worker_pool_id) && $reason !== 'worker_pool_scale_down' && ! $server->isPoolPrimary()) {
-            $pool = \App\Models\WorkerPool::query()->find($server->worker_pool_id);
+            $pool = WorkerPool::query()->find($server->worker_pool_id);
             if ($pool !== null) {
                 $pool->forceFill(['desired_count' => max(1, $pool->desired_count - 1)])->save();
             }

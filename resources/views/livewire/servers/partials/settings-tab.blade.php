@@ -46,12 +46,6 @@
     @case ('keys')
         @include('livewire.servers.partials.settings.group-keys', $settingsShare)
         @break
-    @case ('alerts')
-        @include('livewire.servers.partials.settings.group-operations', $settingsShare + [
-            'serverNotifSubscriptions' => $serverNotifSubscriptions ?? collect(),
-            'assignableChannels' => $assignableChannels ?? collect(),
-        ])
-        @break
     @case ('inventory')
         @include('livewire.servers.partials.settings.group-inventory', $settingsShare)
         @break
@@ -62,9 +56,6 @@
         @break
     @case ('notes')
         @include('livewire.servers.partials.settings.group-reference', $settingsShare)
-        @break
-    @case ('webhook')
-        @include('livewire.servers.partials.settings.group-webhook', $settingsShare + ['webhookDeliveries' => $webhookDeliveries ?? collect()])
         @break
     @case ('export')
         @include('livewire.servers.partials.settings.group-export', $settingsShare)

@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Support\Servers\ServerImageProvider;
+
 enum ServerProvider: string
 {
     case DigitalOcean = 'digitalocean';
@@ -261,7 +263,7 @@ enum ServerProvider: string
      * Rates (verified 2026-06): DigitalOcean snapshots $0.06/GiB/mo; Hetzner
      * snapshots €0.0119/GB/mo; Vultr snapshots $0.05/GB/mo; Linode custom images
      * $0.10/GB/mo. Vultr bills the *compressed* snapshot size —
-     * {@see \App\Support\Servers\ServerImageProvider} stores `compressed_size` as
+     * {@see ServerImageProvider} stores `compressed_size` as
      * the image's bytes so this estimate lines up with the actual bill.
      *
      * @return array{rate: float, currency: string}|null
@@ -300,17 +302,21 @@ enum ServerProvider: string
 
     /**
      * Providers that accept credentials only (no create/destroy yet).
+     *
+     * @return list<self>
      */
     public static function credentialOnly(): array
     {
-        return array_filter(
+        return array_values(array_filter(
             self::cases(),
             fn (self $p) => ! $p->hasFullSupport() && $p !== self::Custom
-        );
+        ));
     }
 
     /**
      * All provider values (for validation, etc.).
+     *
+     * @return list<string>
      */
     public static function values(): array
     {
@@ -319,6 +325,8 @@ enum ServerProvider: string
 
     /**
      * Provider values allowed for provider_credentials (excludes Custom).
+     *
+     * @return list<string>
      */
     public static function valuesForCredentials(): array
     {

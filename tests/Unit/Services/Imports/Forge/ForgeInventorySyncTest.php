@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Imports\Forge\ForgeInventorySyncTest;
 
 use App\Models\ProviderCredential;
-use App\Services\Imports\Forge\ForgeInventorySync;
+use App\Modules\Imports\Services\Forge\ForgeInventorySync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

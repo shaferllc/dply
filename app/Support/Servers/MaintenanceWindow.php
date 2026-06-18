@@ -11,9 +11,9 @@ use Carbon\CarbonTimeZone;
  * the server is currently inside the window. All evaluation happens in the user's
  * preferred timezone (`meta.timezone`, default UTC) — not the server OS clock.
  *
- * `meta.maintenance_weekdays` — list of three-letter day keys (mon..sun)
- * `meta.maintenance_start`     — "HH:MM" local-time string, optional
- * `meta.maintenance_end`       — "HH:MM" local-time string, optional
+ * `meta.maintenance_days`  — list of three-letter day keys (mon..sun)
+ * `meta.maintenance_start` — "HH:MM" local-time string, optional
+ * `meta.maintenance_end`   — "HH:MM" local-time string, optional
  *
  * The window is treated as configured only when *all three* are present (any day,
  * a start, and an end). A missing field means "unconfigured", and `enabled()`
@@ -45,7 +45,12 @@ class MaintenanceWindow
             $tz = new CarbonTimeZone('UTC');
         }
 
-        $rawDays = is_array($meta['maintenance_weekdays'] ?? null) ? $meta['maintenance_weekdays'] : [];
+        // The settings form (ManagesExtendedServerSettings::saveMaintenanceWindow)
+        // persists the chosen days under `maintenance_days`; keep reading the legacy
+        // `maintenance_weekdays` key as a fallback in case any old meta blob used it.
+        $rawDays = is_array($meta['maintenance_days'] ?? null)
+            ? $meta['maintenance_days']
+            : (is_array($meta['maintenance_weekdays'] ?? null) ? $meta['maintenance_weekdays'] : []);
         $days = array_values(array_filter(array_map(
             fn ($d) => is_string($d) ? strtolower($d) : '',
             $rawDays

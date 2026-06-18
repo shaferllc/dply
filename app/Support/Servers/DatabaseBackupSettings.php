@@ -92,6 +92,9 @@ final class DatabaseBackupSettings
         return (int) config('server_database.remote_backup_max_bytes_per_server', 10 * 1024 * 1024 * 1024);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toMetaArray(): array
     {
         return array_filter([

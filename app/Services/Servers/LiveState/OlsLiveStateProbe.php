@@ -271,7 +271,7 @@ BASH;
      * like "/usr/local/lsws/lsphp83/bin/lsphp". Returns null when no
      * lsphpXX path is present.
      *
-     * @param  list<array{name: string, type: ?string, path: ?string}>  $extprocessors
+     * @param  array<string, mixed> $extprocessors
      */
     private function derivePhpVersionFromExtProcessors(array $extprocessors): ?string
     {
@@ -455,7 +455,7 @@ BASH;
      * to derive the ExtApps sub-tab rows.
      *
      * @param  array<string, array<string, mixed>>  $vhconfs
-     * @param  list<string>  $lsphpVersions
+     * @param  array<string, mixed> $lsphpVersions
      * @return list<array<string, mixed>>
      */
     private function buildExtAppUnits(array $vhconfs, array $lsphpVersions): array

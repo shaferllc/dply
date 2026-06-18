@@ -9,7 +9,7 @@ use App\Models\Script;
 use App\Models\Server;
 use App\Models\ServerRecipe;
 use App\Models\User;
-use App\Services\Scripts\ApplyOrganizationScriptToServer;
+use App\Modules\Marketplace\Scripts\ApplyOrganizationScriptToServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

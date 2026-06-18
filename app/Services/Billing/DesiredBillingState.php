@@ -29,8 +29,8 @@ use App\Enums\ServerTier;
 class DesiredBillingState
 {
     /**
-     * @param  array<string, int>  $tierQuantities  Display-only size breakdown (xs/s/m/l/xl).
-     * @param  array<string, mixed>  $edgeUsageEstimate
+     * @param  array<string, mixed> $tierQuantities  Display-only size breakdown (xs/s/m/l/xl).
+     * @param  array<string, mixed> $edgeUsageEstimate
      */
     private function __construct(
         public readonly string $planKey,
@@ -61,14 +61,20 @@ class DesiredBillingState
         public readonly int $baseCents = 0,
         public readonly int $serverSubtotalCents = 0,
         public readonly int $appliedCreditCents = 0,
+        // dply Logs ingest overage — metered pass-through on top, not
+        // plan-eligible. 0 until billing is enabled + a plan carries a rate (PR C).
+        public readonly int $serverLogUsageSubtotalCents = 0,
+        /** @var array<string, mixed> */
+        public readonly array $serverLogUsageEstimate = [],
     ) {}
 
     /**
      * Build a state from a resolved plan plus managed-product usage.
      *
      * @param  array{key: string, label: string, price_cents: int, max_servers: ?int}  $plan
-     * @param  array<string, int>  $tierQuantities  Display-only size breakdown.
-     * @param  array<string, mixed>  $edgeUsageEstimate
+     * @param  array<string, mixed> $tierQuantities  Display-only size breakdown.
+     * @param  array<string, mixed> $edgeUsageEstimate
+     * @param  array<string, mixed> $realtimeTierQuantities
      */
     public static function fromPlanAndUsage(
         array $plan,
@@ -90,13 +96,15 @@ class DesiredBillingState
         int $realtimeCount = 0,
         int $realtimeUnitCents = 0,
         array $realtimeTierQuantities = [],
+        int $serverLogUsageSubtotalCents = 0,
+        array $serverLogUsageEstimate = [],
     ): self {
         $normalized = [];
         foreach (ServerTier::ordered() as $tier) {
             $normalized[$tier->value] = max(0, (int) ($tierQuantities[$tier->value] ?? 0));
         }
 
-        $planPriceCents = max(0, (int) ($plan['price_cents'] ?? 0));
+        $planPriceCents = max(0, (int) ($plan['price_cents']));
 
         $serverlessCount = max(0, $serverlessCount);
         $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);
@@ -113,6 +121,8 @@ class DesiredBillingState
         $edgeSubtotal = $edgeCount * max(0, $edgeUnitCents);
 
         $edgeUsageSubtotalCents = max(0, $edgeUsageSubtotalCents);
+
+        $serverLogUsageSubtotalCents = max(0, $serverLogUsageSubtotalCents);
 
         // Realtime: prefer per-tier quantities priced from config('realtime.tiers');
         // fall back to the legacy flat count×unit for any caller not yet migrated
@@ -146,11 +156,12 @@ class DesiredBillingState
             + $cloudResourceSubtotalCents
             + $edgeSubtotal
             + $edgeUsageSubtotalCents
+            + $serverLogUsageSubtotalCents
             + $realtimeSubtotal;
 
         return new self(
-            planKey: (string) ($plan['key'] ?? 'free'),
-            planLabel: (string) ($plan['label'] ?? 'Free'),
+            planKey: $plan['key'],
+            planLabel: $plan['label'],
             planPriceCents: $planPriceCents,
             tierQuantities: $normalized,
             serverlessCount: $serverlessCount,
@@ -172,6 +183,8 @@ class DesiredBillingState
             baseCents: 0,
             serverSubtotalCents: $planPriceCents,
             appliedCreditCents: 0,
+            serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
+            serverLogUsageEstimate: $serverLogUsageEstimate,
         );
     }
 
@@ -215,6 +228,7 @@ class DesiredBillingState
     /**
      * @return array<string, mixed>
      */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [
@@ -235,6 +249,8 @@ class DesiredBillingState
             'edge_subtotal_cents' => $this->edgeSubtotalCents,
             'edge_usage_subtotal_cents' => $this->edgeUsageSubtotalCents,
             'edge_usage_estimate' => $this->edgeUsageEstimate,
+            'server_log_usage_subtotal_cents' => $this->serverLogUsageSubtotalCents,
+            'server_log_usage_estimate' => $this->serverLogUsageEstimate,
             'realtime_count' => $this->realtimeCount,
             'realtime_subtotal_cents' => $this->realtimeSubtotalCents,
             'realtime_tier_quantities' => $this->realtimeTierQuantities,

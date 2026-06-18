@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Services\RemoteCli\RemoteCli;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\Snapshots\SnapshotService;
+use App\Modules\RemoteCli\Services\RemoteCli;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\Snapshots\Services\SnapshotService;
 use Database\Factories\SiteAuditEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
 
 /**
  * Append-only audit row for a mutating action against a Site.
- *
  * Written by the {@see RemoteCli} services (PR 2),
  * the {@see SnapshotService} (PR 10), the
  * scaffold pipeline (PR 5/6), and the WordPress hardening surface (PR 10).
@@ -32,9 +31,15 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $payload
  * @property string $result_status 'success' | 'failure'
  * @property Carbon $created_at
+ * @property string $result_status
+ * @property string $transport
+ * @property-read ?Site $site
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SiteAuditEvent extends Model
 {
+    /** @use HasFactory<SiteAuditEventFactory> */
     use HasFactory;
 
     protected $table = 'site_audit_events';
@@ -63,6 +68,7 @@ class SiteAuditEvent extends Model
 
     public const RESULT_FAILURE = 'failure';
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -71,11 +77,13 @@ class SiteAuditEvent extends Model
         ];
     }
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

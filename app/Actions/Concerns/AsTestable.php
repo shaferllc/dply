@@ -108,6 +108,9 @@ trait AsTestable
      * - success: Whether the call succeeded
      * - exception: Exception class if call failed
      */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public static function getCallHistory(): array
     {
         $key = 'testable:history:'.static::class;
@@ -132,7 +135,7 @@ trait AsTestable
     /**
      * Assert action was called with specific arguments.
      *
-     * @param  array|null  $arguments  Expected arguments (optional)
+     * @param  array<int, mixed>|null  $arguments  Expected arguments (optional)
      */
     public static function assertCalled(?array $arguments = null): void
     {

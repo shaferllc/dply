@@ -34,7 +34,7 @@ class Crossplane
     public function __construct()
     {
         foreach (self::DEFAULT_ENABLED_EXTENSION as $extensionClass) {
-            $this->registerExtension(new $extensionClass());
+            $this->registerExtension(new $extensionClass);
         }
     }
 
@@ -50,7 +50,7 @@ class Crossplane
     public function lexer(): Lexer
     {
         if ($this->lexer === null) {
-            $this->lexer = new Lexer();
+            $this->lexer = new Lexer;
         }
 
         return $this->lexer;
@@ -59,7 +59,7 @@ class Crossplane
     public function builder(): Builder
     {
         if ($this->builder === null) {
-            $this->builder = new Builder();
+            $this->builder = new Builder;
         }
 
         return $this->builder;
@@ -68,7 +68,7 @@ class Crossplane
     public function analyzer(): Analyzer
     {
         if ($this->analyzer === null) {
-            $this->analyzer = new Analyzer();
+            $this->analyzer = new Analyzer;
         }
 
         return $this->analyzer;

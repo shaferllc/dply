@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Services\Snapshots\SnapshotDestinationFactoryTest;
 
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Snapshots\LocalDiskDestination;
-use App\Services\Snapshots\S3Destination;
-use App\Services\Snapshots\SnapshotDestinationFactory;
+use App\Modules\Snapshots\Services\LocalDiskDestination;
+use App\Modules\Snapshots\Services\S3Destination;
+use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
 use Mockery;
 
 afterEach(function () {

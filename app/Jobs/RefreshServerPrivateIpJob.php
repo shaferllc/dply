@@ -38,13 +38,13 @@ class RefreshServerPrivateIpJob implements ShouldQueue
 
     public function handle(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             return;
         }
 
         $provider = $server->provider;
-        if (! $provider instanceof ServerProvider || ! $provider->supportsPrivateIpLookup()) {
+        if (! $provider->supportsPrivateIpLookup()) {
             return;
         }
 

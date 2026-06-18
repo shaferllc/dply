@@ -102,7 +102,7 @@ class CloudRouter
      */
     public static function credentialFor(Site $site): ?ProviderCredential
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $explicit = $meta['container']['credential_id'] ?? null;
         if (is_string($explicit) && $explicit !== '') {
             $cred = ProviderCredential::query()->find($explicit);

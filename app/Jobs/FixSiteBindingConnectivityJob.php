@@ -283,7 +283,7 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
     /**
      * Enable remote access on the backend resource + open the firewall /32.
      *
-     * @return array{0: int, 1: string}  [port, human label]
+     * @return array{0: int, 1: string} [port, human label]
      */
     private function exposeBackend(
         ServerDatabase|ServerCacheService $target,
@@ -314,7 +314,7 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
         $script = DatabaseEngineInstallScripts::enableRemoteAccessScript((string) $target->engine, '0.0.0.0/0');
         $output = $exec->runInlineBash($backend, 'binding-fix:db-expose:'.$target->engine, $script, timeoutSeconds: 120, asRoot: true);
         // runInlineBash never throws on a non-zero exit, so surface it ourselves.
-        $tail = trim((string) ($output->buffer ?? ''));
+        $tail = trim($output->buffer);
         $tail = $tail === '' ? '(no output)' : mb_substr($tail, -400);
         if ((int) ($output->exitCode ?? 0) !== 0) {
             $emit->warn(sprintf('Remote-access script exited %d on %s. Output tail: %s', (int) $output->exitCode, $backend->name, $tail), 'fix');

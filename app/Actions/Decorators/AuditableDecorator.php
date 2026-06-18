@@ -18,7 +18,7 @@ class AuditableDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -53,6 +53,10 @@ class AuditableDecorator
         }
     }
 
+    /**
+     * @param  mixed  ...$arguments
+     * @return mixed
+     */
     public function handle(...$arguments)
     {
         $beforeState = $this->captureBeforeState($arguments);
@@ -72,6 +76,10 @@ class AuditableDecorator
         }
     }
 
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @return array<string, mixed>|null
+     */
     protected function captureBeforeState(array $arguments): ?array
     {
         if ($this->hasMethod('getBeforeState')) {
@@ -86,7 +94,11 @@ class AuditableDecorator
         return null;
     }
 
-    protected function captureAfterState($result, array $arguments): ?array
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @return array<string, mixed>|null
+     */
+    protected function captureAfterState(mixed $result, array $arguments): ?array
     {
         if ($this->hasMethod('getAfterState')) {
             return $this->callMethod('getAfterState', [$result, $arguments]);
@@ -99,7 +111,12 @@ class AuditableDecorator
         return null;
     }
 
-    protected function recordAudit(array $arguments, $result, ?array $beforeState, ?array $afterState, ?\Throwable $exception = null): void
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @param  array<string, mixed>|null  $beforeState
+     * @param  array<string, mixed>|null  $afterState
+     */
+    protected function recordAudit(array $arguments, mixed $result, ?array $beforeState, ?array $afterState, ?\Throwable $exception = null): void
     {
         $auditData = [
             'user_id' => Auth::id(),
@@ -123,6 +140,9 @@ class AuditableDecorator
         $this->storeAudit($auditData);
     }
 
+    /**
+     * @param  array<string, mixed>  $auditData
+     */
     protected function storeAudit(array $auditData): void
     {
         if ($this->hasMethod('storeAuditRecord')) {
@@ -137,6 +157,10 @@ class AuditableDecorator
         }
     }
 
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @return array<int, mixed>
+     */
     protected function sanitizeAuditArguments(array $arguments): array
     {
         $sensitive = ['password', 'token', 'secret', 'api_key', 'ssn'];
@@ -158,7 +182,7 @@ class AuditableDecorator
         }, $arguments);
     }
 
-    protected function sanitizeAuditResult($result): mixed
+    protected function sanitizeAuditResult(mixed $result): mixed
     {
         if (is_object($result)) {
             return get_class($result).' (id: '.($result->id ?? 'N/A').')';

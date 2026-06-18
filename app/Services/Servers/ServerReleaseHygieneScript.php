@@ -10,7 +10,7 @@ namespace App\Services\Servers;
 final class ServerReleaseHygieneScript
 {
     /**
-     * @param  list<array{slug: string, path: string, keep: int, atomic: bool}>  $sites
+     * @param  array<string, mixed> $sites
      */
     public function build(array $sites): string
     {
@@ -83,6 +83,7 @@ SH;
      *     sites: list<array<string, mixed>>,
      *     system: array<string, mixed>,
      * }
+     * @param  array<string, mixed> $existingMeta
      */
     public function parse(string $output, array $existingMeta = []): array
     {

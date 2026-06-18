@@ -779,6 +779,7 @@ trait AsHydratable
     /**
      * Fill the action with attributes from an array.
      *
+     * @param  array<string, mixed>  $attributes
      * @return $this
      */
     public function fill(array $attributes): self
@@ -818,6 +819,8 @@ trait AsHydratable
 
     /**
      * Get the fillable properties.
+     *
+     * @return array<int, string>
      */
     protected function getFillable(): array
     {

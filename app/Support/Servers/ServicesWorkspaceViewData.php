@@ -123,7 +123,7 @@ final class ServicesWorkspaceViewData
             $syncBannerSubtitle = match (true) {
                 $syncStatus === 'failed' && $syncError !== '' => $syncError,
                 $syncStatus === 'success' && $syncDurationMs !== null && $syncRel !== null => __('Finished :time · in :ms ms', ['time' => $syncRel, 'ms' => (int) $syncDurationMs]),
-                $syncStatus === 'success' && $syncRel !== null => __('Finished :time', ['time' => $syncRel]),
+                $syncStatus === 'success' => __('Finished :time', ['time' => $syncRel]),
                 $syncStatus === 'failed' && $syncRel !== null => __('Failed :time', ['time' => $syncRel]),
                 default => null,
             };
@@ -141,12 +141,12 @@ final class ServicesWorkspaceViewData
         }
 
         if ($includeInventoryContext) {
-            $manageableSystemdCount = collect($component->systemdInventory ?? [])
-                ->filter(fn ($r) => ! empty($r['may_mutate']))
+            $manageableSystemdCount = collect($component->systemdInventory)
+                ->filter(fn (array $r): bool => $r['can_manage'])
                 ->count();
             $managedTiles = self::managedServiceTiles($server);
             $systemHiddenCount = $component->systemdHiddenSystemCount();
-            $selectedCount = count($component->systemdSelectedList ?? []);
+            $selectedCount = count($component->systemdSelectedList);
             $syncInFlight = $component->systemdActionBannerKind === 'inventory-sync'
                 && in_array($component->systemdActionBannerStatus, ['queued', 'running'], true);
 
@@ -267,55 +267,67 @@ final class ServicesWorkspaceViewData
             default => __('No instances yet'),
         };
 
-        return collect([
+        $tiles = [
             [
                 'key' => 'webserver',
-                'label' => __('Webserver'),
+                'label' => (string) __('Webserver'),
                 'icon' => 'heroicon-o-globe-alt',
                 'href' => route('servers.webserver', $server),
-                'detail' => ucfirst($webserverActive).' — '.__('switch + service actions'),
+                'detail' => ucfirst($webserverActive).' — '.(string) __('switch + service actions'),
                 'shown' => true,
             ],
             [
                 'key' => 'php',
-                'label' => __('PHP'),
+                'label' => (string) __('PHP'),
                 'icon' => 'heroicon-o-command-line',
                 'href' => route('servers.php', $server),
-                'detail' => $phpDetail,
+                'detail' => (string) $phpDetail,
                 'shown' => $phpInstalled,
             ],
             [
                 'key' => 'caches',
-                'label' => __('Caches'),
+                'label' => (string) __('Caches'),
                 'icon' => 'heroicon-o-bolt',
                 'href' => route('servers.caches', $server),
-                'detail' => $cachesDetail,
+                'detail' => (string) $cachesDetail,
                 'shown' => true,
             ],
             [
                 'key' => 'databases',
-                'label' => __('Databases'),
+                'label' => (string) __('Databases'),
                 'icon' => 'heroicon-o-circle-stack',
                 'href' => route('servers.databases', $server),
-                'detail' => $databasesDetail,
+                'detail' => (string) $databasesDetail,
                 'shown' => $databasesShown,
             ],
             [
                 'key' => 'workers',
-                'label' => __('Workers'),
+                'label' => (string) __('Workers'),
                 'icon' => 'heroicon-o-server-stack',
                 'href' => route('servers.workers', $server),
-                'detail' => __('Supervisor-managed processes'),
+                'detail' => (string) __('Supervisor-managed processes'),
                 'shown' => array_key_exists('supervisor', $installedTags),
             ],
             [
                 'key' => 'cron',
-                'label' => __('Cron jobs'),
+                'label' => (string) __('Cron jobs'),
                 'icon' => 'heroicon-o-clock',
                 'href' => route('servers.cron', $server),
-                'detail' => __('Scheduled tasks'),
+                'detail' => (string) __('Scheduled tasks'),
                 'shown' => true,
             ],
-        ])->filter(fn ($t) => $t['shown'])->values();
+        ];
+
+        return collect($tiles)
+            ->filter(fn (array $tile): bool => $tile['shown'])
+            ->map(fn (array $tile): array => [
+                'key' => $tile['key'],
+                'label' => $tile['label'],
+                'icon' => $tile['icon'],
+                'href' => $tile['href'],
+                'detail' => $tile['detail'],
+                'shown' => true,
+            ])
+            ->values();
     }
 }

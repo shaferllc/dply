@@ -34,7 +34,7 @@ class SiteUptimeCheckUrlResolver
         $site->loadMissing('domains', 'previewDomains');
 
         $primary = $site->primaryDomain();
-        if ($primary && is_string($primary->hostname) && trim($primary->hostname) !== '') {
+        if ($primary && ($primary->hostname) && trim($primary->hostname) !== '') {
             $host = strtolower(trim($primary->hostname));
 
             return 'https://'.$host;

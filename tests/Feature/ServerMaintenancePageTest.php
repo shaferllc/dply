@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\ServerMaintenancePageTest;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
 use App\Livewire\Servers\WorkspaceMaintenance;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -88,6 +91,51 @@ test('org owner can enable maintenance from livewire', function (): void {
     expect($server->fresh()->meta['maintenance']['active'] ?? false)->toBeTrue();
 });
 
+test('a past end time is rejected before the confirm modal opens', function (): void {
+    [$user, $server] = maintenanceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceMaintenance::class, ['server' => $server])
+        ->set('maintenance_timezone', 'UTC')
+        ->set('maintenance_until_local', '2020-01-01T00:00')
+        ->call('openEnableModal')
+        ->assertHasErrors(['maintenance_until_local'])
+        ->assertNotDispatched('open-modal');
+
+    expect($server->fresh()->meta['maintenance']['active'] ?? false)->toBeFalse();
+});
+
+test('the end time is interpreted in the operator browser timezone and stored as UTC', function (): void {
+    [$user, $server] = maintenanceUserWithServer();
+
+    // 12:00 on 2999-12-31 in New York is EST (UTC-5) → 17:00 UTC.
+    Livewire::actingAs($user)
+        ->test(WorkspaceMaintenance::class, ['server' => $server])
+        ->set('maintenance_timezone', 'America/New_York')
+        ->set('maintenance_until_local', '2999-12-31T12:00')
+        ->call('enableMaintenance')
+        ->assertHasNoErrors();
+
+    $until = Carbon::parse($server->fresh()->meta['maintenance']['until'])->utc();
+    expect($until->format('Y-m-d H:i'))->toBe('2999-12-31 17:00');
+});
+
+test('an invalid browser timezone falls back to the app timezone', function (): void {
+    config(['app.timezone' => 'UTC']);
+
+    [$user, $server] = maintenanceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceMaintenance::class, ['server' => $server])
+        ->set('maintenance_timezone', 'Not/AReal_Zone')
+        ->set('maintenance_until_local', '2999-12-31T12:00')
+        ->call('enableMaintenance')
+        ->assertHasNoErrors();
+
+    $until = Carbon::parse($server->fresh()->meta['maintenance']['until'])->utc();
+    expect($until->format('Y-m-d H:i'))->toBe('2999-12-31 12:00');
+});
+
 test('running an allowlisted operation queues the manage job and logs activity', function (): void {
     Bus::fake();
 
@@ -95,16 +143,23 @@ test('running an allowlisted operation queues the manage job and logs activity',
 
     Livewire::actingAs($user)
         ->test(WorkspaceMaintenance::class, ['server' => $server])
-        ->call('runMaintenanceAction', 'apt_clean')
-        ->assertSet('remote_error', null)
-        ->assertSet('maintenanceActionLabel', config('server_manage.service_actions.apt_clean.label'));
+        ->call('runMaintenanceAction', 'apt_clean');
 
+    // The job carries the ConsoleAction id so it can mirror live output into the
+    // row the shared console-action banner renders (same system as every other
+    // workspace op — no bespoke per-page output box).
     Bus::assertDispatched(ServerManageRemoteSshJob::class, function (ServerManageRemoteSshJob $job): bool {
-        return $job->taskName === 'manage-action:apt_clean';
+        return $job->taskName === 'manage-action:apt_clean'
+            && $job->consoleActionId !== null;
     });
 
     expect(ServerManageAction::where('server_id', $server->id)
         ->where('task_name', 'manage-action:apt_clean')
+        ->exists())->toBeTrue();
+
+    expect(ConsoleAction::where('subject_type', $server->getMorphClass())
+        ->where('subject_id', $server->getKey())
+        ->where('kind', RunsServerMaintenanceActions::OP_CONSOLE_KIND)
         ->exists())->toBeTrue();
 });
 
@@ -118,7 +173,7 @@ test('an action outside the maintenance allowlist is rejected', function (): voi
     Livewire::actingAs($user)
         ->test(WorkspaceMaintenance::class, ['server' => $server])
         ->call('runMaintenanceAction', 'restart_nginx')
-        ->assertSet('remote_error', __('Unknown action.'));
+        ->assertDispatched('notify', type: 'error', message: __('Unknown action.'));
 
     Bus::assertNotDispatched(ServerManageRemoteSshJob::class);
 });

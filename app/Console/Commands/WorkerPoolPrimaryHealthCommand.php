@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Server;
 use App\Models\WorkerPool;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -80,7 +80,7 @@ class WorkerPoolPrimaryHealthCommand extends Command
                 recipientUsers: $recipients,
             );
 
-            $meta = is_array($pool->meta) ? $pool->meta : [];
+            $meta = $pool->meta;
             $meta['primary_alert'] = ['last_at' => now()->toIso8601String()];
             $pool->forceFill(['meta' => $meta])->save();
             $alerted++;

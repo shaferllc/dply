@@ -52,7 +52,7 @@ class MetricsDecorator
 
     protected ?int $metricsStartMemory = null;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
@@ -98,7 +98,7 @@ class MetricsDecorator
     }
 
     /**
-     * Record successful execution metrics.
+     * @param  array<int, mixed>  $arguments
      */
     protected function recordSuccess(array $arguments): void
     {
@@ -127,7 +127,7 @@ class MetricsDecorator
     }
 
     /**
-     * Record failed execution metrics.
+     * @param  array<int, mixed>  $arguments
      */
     protected function recordFailure(array $arguments): void
     {

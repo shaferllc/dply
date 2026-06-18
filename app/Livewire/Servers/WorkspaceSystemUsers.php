@@ -13,6 +13,7 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesSystemUserNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -21,10 +22,9 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
@@ -71,7 +71,7 @@ class WorkspaceSystemUsers extends Component
      */
     public array $pending_remove_usernames = [];
 
-    /** @var list<array{username: string, site_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}> */
+    /** @var list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}> */
     public array $remote_rows = [];
 
     public ?string $list_error = null;
@@ -328,7 +328,11 @@ class WorkspaceSystemUsers extends Component
     private function currentOrphanUsernames(): array
     {
         return collect($this->remote_rows)
-            ->filter(static fn (array $r): bool => ! empty($r['is_orphan']) && empty($r['is_protected']) && (int) ($r['site_count'] ?? 0) === 0)
+            ->filter(static fn (array $r): bool => ! empty($r['is_orphan'])
+                && empty($r['is_protected'])
+                && (int) ($r['site_count'] ?? 0) === 0
+                && (int) ($r['worker_count'] ?? 0) === 0
+                && (int) ($r['cron_count'] ?? 0) === 0)
             ->pluck('username')
             ->filter()
             ->values()

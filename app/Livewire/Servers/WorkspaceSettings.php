@@ -2,38 +2,33 @@
 
 namespace App\Livewire\Servers;
 
-use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
+use App\Livewire\Servers\Concerns\ManagesServerNotes;
 use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
-use App\Models\NotificationSubscription;
-use App\Models\OutboundWebhookDelivery;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthProbe;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\On;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSettings extends Component
 {
-    use RendersWorkspacePlaceholder;
-    use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesExtendedServerSettings;
+    use ManagesServerNotes;
     use ManagesWorkspaceSettingsForm;
+    use RendersWorkspacePlaceholder;
 
     /** @var string Settings sub-page slug (see config server_settings.workspace_tabs). */
     public string $section = 'connection';
@@ -55,6 +50,15 @@ class WorkspaceSettings extends Component
             return;
         }
 
+        // The per-server outbound webhook moved to the Notifications page so all
+        // of a server's event delivery lives in one place. Redirect the old
+        // Settings → Webhook URL (and any bookmarks) to its new home.
+        if ($section === 'webhook') {
+            $this->redirect(route('servers.notifications', ['server' => $server, 'tab' => 'webhooks']), navigate: true);
+
+            return;
+        }
+
         $allowed = array_keys($this->settingsWorkspaceTabs());
         if (! in_array($section, $allowed, true)) {
             abort(404);
@@ -71,19 +75,6 @@ class WorkspaceSettings extends Component
     public function canEditServerSettings(): bool
     {
         return ! (bool) auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user());
-    }
-
-    /**
-     * After the inline modal creates a channel, render() naturally re-pulls
-     * AssignableNotificationChannels on the next request — but we also pre-fill
-     * the subscription form's channel select with the new channel so the
-     * operator's next click is `Add subscription` and they're done. The event
-     * payload is `['channelId' => '...']`; see CreatesNotificationChannelInline.
-     */
-    #[On('notification-channel-created')]
-    public function onNotificationChannelCreated(string $channelId): void
-    {
-        $this->notifAddChannelId = $channelId;
     }
 
     public function checkHealth(ServerHealthProbe $probe): void
@@ -118,70 +109,6 @@ class WorkspaceSettings extends Component
         $this->server->refresh();
     }
 
-    public function sendTestWebhook(OutboundWebhookDispatcher $dispatcher): void
-    {
-        $this->authorize('update', $this->server);
-
-        $delivery = $dispatcher->dispatchForServer(
-            'webhook.test',
-            $this->server,
-            [
-                'message' => 'This is a test event from the Dply server settings UI.',
-                'fired_by_user_id' => auth()->id(),
-            ],
-            'Manual test webhook'
-        );
-
-        if ($this->server->organization) {
-            audit_log($this->server->organization, auth()->user(), 'server.webhook.test_dispatched', $this->server, null, [
-                'delivery_id' => (string) $delivery->id,
-                'status' => $delivery->status,
-            ]);
-        }
-
-        if ($delivery->status === OutboundWebhookDelivery::STATUS_WOULD_SEND) {
-            $this->toastSuccess(__('No URL configured — recorded as “would send”. Check the deliveries log below.'));
-
-            return;
-        }
-
-        $this->toastSuccess(__('Test webhook queued. Refresh the deliveries log in a moment to see the result.'));
-    }
-
-    public function resendWebhookDelivery(string $deliveryId, OutboundWebhookDispatcher $dispatcher): void
-    {
-        $this->authorize('update', $this->server);
-
-        $delivery = OutboundWebhookDelivery::query()
-            ->where('server_id', $this->server->id)
-            ->whereKey($deliveryId)
-            ->first();
-
-        if ($delivery === null) {
-            $this->toastError(__('Delivery not found.'));
-
-            return;
-        }
-
-        if ($delivery->url === null || $delivery->url === '') {
-            $this->toastError(__('Cannot resend: this delivery has no URL (would-send placeholder).'));
-
-            return;
-        }
-
-        $dispatcher->resend($delivery);
-
-        if ($this->server->organization) {
-            audit_log($this->server->organization, auth()->user(), 'server.webhook.delivery_resent', $this->server, null, [
-                'delivery_id' => (string) $delivery->id,
-                'original_status' => $delivery->status,
-                'event' => $delivery->event ?? null,
-            ]);
-        }
-
-        $this->toastSuccess(__('Delivery requeued.'));
-    }
-
     /**
      * Override the trait placeholder so the Settings sub-tab strip stays
      * visible (with the destination section highlighted) while the body
@@ -214,27 +141,6 @@ class WorkspaceSettings extends Component
             'providerCredential',
         ]);
 
-        $webhookDeliveries = $this->section === 'webhook'
-            ? OutboundWebhookDelivery::query()
-                ->where('server_id', $this->server->id)
-                ->orderByDesc('created_at')
-                ->limit(30)
-                ->get()
-            : collect();
-
-        $serverNotifSubscriptions = collect();
-        $assignableChannels = collect();
-        if ($this->section === 'alerts') {
-            $serverNotifSubscriptions = NotificationSubscription::query()
-                ->where('subscribable_type', Server::class)
-                ->where('subscribable_id', $this->server->id)
-                ->with('channel')
-                ->get();
-            $assignableChannels = AssignableNotificationChannels::forUser(auth()->user(), auth()->user()?->currentOrganization())
-                ->sortBy('label')
-                ->values();
-        }
-
         $costReport = null;
         if ($this->section === 'governance'
             && Feature::active('workspace.server_cost')
@@ -250,9 +156,6 @@ class WorkspaceSettings extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            'webhookDeliveries' => $webhookDeliveries,
-            'serverNotifSubscriptions' => $serverNotifSubscriptions,
-            'assignableChannels' => $assignableChannels,
             'costReport' => $costReport,
         ]);
     }

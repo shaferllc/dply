@@ -17,7 +17,7 @@ class CachedResultDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -31,7 +31,7 @@ class CachedResultDecorator
         }
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $cacheKey = $this->getCacheKey(...$arguments);
         $ttl = $this->getCacheTtl();
@@ -44,7 +44,7 @@ class CachedResultDecorator
     /**
      * Get the cache key for the given arguments.
      */
-    protected function getCacheKey(...$arguments): string
+    protected function getCacheKey(mixed ...$arguments): string
     {
         if ($this->hasMethod('getCacheKey')) {
             return $this->callMethod('getCacheKey', $arguments);
@@ -69,7 +69,7 @@ class CachedResultDecorator
     /**
      * Forget cached result for specific arguments.
      */
-    public function forgetCache(...$arguments): void
+    public function forgetCache(mixed ...$arguments): void
     {
         $cacheKey = $this->getCacheKey(...$arguments);
         Cache::forget($cacheKey);

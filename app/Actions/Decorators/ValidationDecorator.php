@@ -13,12 +13,12 @@ class ValidationDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         // Validate arguments before executing action
         $this->validateArguments($arguments);
@@ -27,11 +27,14 @@ class ValidationDecorator
         return $this->action->handle(...$arguments);
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
 
+    /**
+     * @param  array<int, mixed>  $arguments
+     */
     protected function validateArguments(array $arguments): void
     {
         $rules = $this->getValidationRules();
@@ -60,6 +63,9 @@ class ValidationDecorator
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getValidationRules(): array
     {
         // Check for attribute first
@@ -72,6 +78,9 @@ class ValidationDecorator
         return $this->fromActionMethod('rules', [], []);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     protected function getAttributeValue(string $attributeClass): ?array
     {
         // Unwrap decorators to get the original action
@@ -100,7 +109,7 @@ class ValidationDecorator
         return null;
     }
 
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 
@@ -119,6 +128,9 @@ class ValidationDecorator
         return $action;
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getValidationMessages(): array
     {
         // Check for attribute first
@@ -131,6 +143,9 @@ class ValidationDecorator
         return $this->fromActionMethod('messages', [], []);
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getValidationAttributes(): array
     {
         // Check for attribute first
@@ -143,6 +158,11 @@ class ValidationDecorator
         return $this->fromActionMethod('attributes', [], []);
     }
 
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @param  array<string, mixed>  $rules
+     * @return array<string, mixed>
+     */
     protected function mapArgumentsToData(array $arguments, array $rules): array
     {
         $data = [];

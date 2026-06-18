@@ -86,6 +86,11 @@
                                 <x-heroicon-o-arrow-up-tray class="h-4 w-4 text-brand-forest" /> {{ __('Push to server') }}
                             </button>
                         @endif
+                        @if ($supportsEnvPush && method_exists($this, 'applyEnvToWorkers') && $this->hasWorkerReplicas())
+                            <button type="button" wire:click="openConfirmActionModal('applyEnvToWorkers', [], @js(__('Sync these variables to workers?')), @js(__('Each worker-pool replica gets this site\'s variables, keeping its own queue, HORIZON_*, and worker-role keys. Replicas whose values already match are skipped; the rest are pushed and their worker units restarted.')), @js(__('Sync to workers')), false)" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Propagate these variables to every worker replica cloned from this site.') }}">
+                                <x-heroicon-o-arrows-right-left class="h-4 w-4 text-brand-forest" /> {{ __('Sync to workers') }}
+                            </button>
+                        @endif
                         @if ($supportsEnvPush)
                             <button type="button" wire:click="openConfirmActionModal('syncEnvFromServer', [], @js(__('Sync from server?')), @js(__('This replaces the cached variables with the live .env on the server. Any local edits here that haven\'t been pushed — and connection variables injected by attached resources (managed databases, caches) — will be overwritten with the server copy.')), @js(__('Overwrite with server copy')), true)" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-arrow-down-tray class="h-4 w-4 text-brand-moss" /> {{ __('Sync from server') }}

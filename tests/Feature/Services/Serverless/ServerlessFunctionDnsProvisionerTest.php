@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Services\Serverless\ServerlessFunctionDnsProvisionerTest;
 
 use App\Models\Site;
-use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
+use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

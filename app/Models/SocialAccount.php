@@ -2,12 +2,25 @@
 
 namespace App\Models;
 
-use App\Contracts\SourceControl\GitIdentity;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Models\Concerns\AvoidsGitIdentityAttributeRecursion;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $access_token
+ * @property string $label
+ * @property string $nickname
+ * @property string $provider
+ * @property ?string $provider_id
+ * @property string $refresh_token
+ * @property ?string $user_id
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class SocialAccount extends Model implements GitIdentity
 {
     use AvoidsGitIdentityAttributeRecursion;
@@ -28,6 +41,7 @@ class SocialAccount extends Model implements GitIdentity
         'refresh_token',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

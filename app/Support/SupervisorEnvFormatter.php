@@ -30,6 +30,7 @@ final class SupervisorEnvFormatter
 
     /**
      * Supervisor INI fragment: environment=KEY="val",KEY2="val2"
+     * @param  array<string, mixed> $env
      */
     public static function toIniFragment(array $env): string
     {

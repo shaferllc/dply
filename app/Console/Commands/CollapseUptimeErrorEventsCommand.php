@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ErrorEvent;
+use App\Support\Errors\ErrorEventSyncer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
  * One-off backfill: collapse the pre-fold uptime backlog. Before the syncer
- * learned to fold uptime checks (see {@see \App\Support\Errors\ErrorEventSyncer}),
+ * learned to fold uptime checks (see {@see ErrorEventSyncer}),
  * every failed probe minted its own ErrorEvent, so a single stuck site could
  * accumulate hundreds. This keeps the newest un-dismissed uptime event per site
  * and dismisses the rest, leaving the same one-open-per-site shape the syncer
@@ -48,14 +49,14 @@ class CollapseUptimeErrorEventsCommand extends Command
         $count = (clone $stale)->count();
 
         if ($dryRun) {
-            $this->info("Would dismiss {$count} legacy uptime error event(s); keeping ".count($keepIds)." open.");
+            $this->info("Would dismiss {$count} legacy uptime error event(s); keeping ".count($keepIds).' open.');
 
             return self::SUCCESS;
         }
 
         $stale->update(['dismissed_at' => now(), 'dismissed_by' => null]);
 
-        $this->info("Dismissed {$count} legacy uptime error event(s); kept ".count($keepIds)." open (one per site).");
+        $this->info("Dismissed {$count} legacy uptime error event(s); kept ".count($keepIds).' open (one per site).');
 
         return self::SUCCESS;
     }

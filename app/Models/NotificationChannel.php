@@ -2,17 +2,32 @@
 
 namespace App\Models;
 
+use App\Jobs\SendNotificationChannelTestEmailJob;
 use App\Mail\NotificationChannelMail;
 use Database\Factories\NotificationChannelFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
+/**
+ * @property string $id
+ * @property string $owner_type
+ * @property string $owner_id
+ * @property string $type
+ * @property string $label
+ * @property array<string, mixed> $config
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property-read Model $owner
+ * @property-read Collection<int, NotificationSubscription> $subscriptions
+ */
 class NotificationChannel extends Model
 {
     /** @use HasFactory<NotificationChannelFactory> */
@@ -111,6 +126,7 @@ class NotificationChannel extends Model
         'config',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -118,11 +134,13 @@ class NotificationChannel extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function owner(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /** @return HasMany<NotificationSubscription, $this> */
     public function subscriptions(): HasMany
     {
         return $this->hasMany(NotificationSubscription::class);
@@ -133,7 +151,7 @@ class NotificationChannel extends Model
      */
     public function sendTest(?User $actor = null): array
     {
-        $actorLabel = $actor?->name ?? config('app.name');
+        $actorLabel = $actor !== null ? $actor->name : config('app.name');
 
         return match ($this->type) {
             self::TYPE_SLACK => $this->sendSlackTest($actorLabel),
@@ -227,17 +245,12 @@ class NotificationChannel extends Model
             return ['ok' => false, 'message' => __('Valid email address is required.')];
         }
 
-        $subject = __('[:app] Notification channel test', ['app' => config('app.name')]);
-
+        // Dispatch rather than Mail::to(...)->queue(): the facade resolves the
+        // default mailer eagerly (building its transport) even when only queueing,
+        // so a misconfigured mailer would crash this web request. The job defers
+        // all mailer resolution to the worker. See SendNotificationChannelTestEmailJob.
         try {
-            Mail::to($to)->queue(new NotificationChannelMail(
-                heading: __('Notification channel test'),
-                bodyLines: [
-                    __('This confirms the “:label” channel can receive :app alerts.', ['label' => $this->label, 'app' => config('app.name')]),
-                    __('Triggered by :actor.', ['actor' => $actorLabel]),
-                ],
-                subjectLine: $subject,
-            ));
+            SendNotificationChannelTestEmailJob::dispatch($to, (string) $this->label, $actorLabel);
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }

@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Auth;
 
 class SupervisorDaemonAudit
 {
+    /**
+     * @param  array<string, mixed> $properties
+     */
     public static function log(Server $server, ?SupervisorProgram $program, string $action, ?array $properties = null): void
     {
         if (! $server->organization_id) {

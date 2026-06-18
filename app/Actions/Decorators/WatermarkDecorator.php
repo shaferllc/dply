@@ -11,12 +11,12 @@ class WatermarkDecorator
 {
     use DecorateActions;
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $result = $this->action->handle(...$arguments);
 
@@ -28,7 +28,7 @@ class WatermarkDecorator
         return $this->applyWatermark($result);
     }
 
-    public function __invoke(...$arguments)
+    public function __invoke(mixed ...$arguments): mixed
     {
         return $this->handle(...$arguments);
     }
@@ -115,6 +115,9 @@ class WatermarkDecorator
         return $this->fromActionMethod('shouldApplyWatermark', [], true);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getWatermarkData(): array
     {
         // Get the original action class (unwrap decorators)
@@ -162,7 +165,7 @@ class WatermarkDecorator
         return null;
     }
 
-    protected function getOriginalAction()
+    protected function getOriginalAction(): mixed
     {
         $action = $this->action;
 

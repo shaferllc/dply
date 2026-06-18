@@ -6,11 +6,19 @@ import {
 } from './lazy-load.js';
 import { registerDplyThemeListeners } from './theme.js';
 import { registerDeployPipelineWorkspace } from './deploy-pipeline-dnd.js';
+import {
+    installFeedbackConsoleBuffer,
+    registerFeedbackSidebar,
+} from './feedback.js';
 
 window.dplyEnsureDocsProseStyles = dplyEnsureDocsProseStyles;
 
 registerDplyLazyAssetListeners();
 registerDplyThemeListeners();
+
+// Install the console-error ring buffer immediately so the global feedback
+// sidebar can attach the errors that preceded a bug report.
+installFeedbackConsoleBuffer();
 
 /**
  * Livewire 3 ships Alpine; do not import `alpinejs` or call `Alpine.start()` here
@@ -61,6 +69,7 @@ document.addEventListener('alpine:init', () => {
     });
 
     registerDeployPipelineWorkspace(window.Alpine);
+    registerFeedbackSidebar(window.Alpine);
 });
 
 const plotlyCdnUrl = 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.4.0/plotly.min.js';

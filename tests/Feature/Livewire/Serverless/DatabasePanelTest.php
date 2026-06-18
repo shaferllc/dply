@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Livewire\Serverless\DatabasePanelTest;
 
-use App\Jobs\ProvisionServerlessDatabaseJob;
-use App\Livewire\Serverless\DatabasePanel;
+use App\Modules\Serverless\Jobs\ProvisionServerlessDatabaseJob;
+use App\Modules\Serverless\Livewire\DatabasePanel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

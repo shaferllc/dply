@@ -180,6 +180,7 @@ APACHE;
     /**
      * @return array{directory: string, locations: string, rewrite: string}
      */
+    /** @return array<string, mixed> */
     protected function apacheDirectoryAndPrefixLocations(Site $site, string $documentRoot): array
     {
         if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {

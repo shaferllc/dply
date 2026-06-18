@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy\RuntimeDetection;
 
-use App\Services\SourceControl\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
 use Throwable;

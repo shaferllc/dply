@@ -10,6 +10,8 @@ class HetznerDnsProvider implements DnsProvider
         private readonly HetznerService $service,
     ) {}
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         // Auto-create the zone if it isn't registered on this Hetzner

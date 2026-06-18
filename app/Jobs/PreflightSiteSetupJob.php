@@ -9,8 +9,8 @@ use App\Models\User;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteEnvRequirementScanner;
-use App\Services\SourceControl\GitIdentityResolver;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Sites\BootCriticalEnv;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -64,6 +64,9 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         public string $siteId,
         public ?string $userId = null,
     ) {}
+
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 600;
 
     public function uniqueId(): string
     {
@@ -139,21 +142,21 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
                 $this->scanLog($site, 'Looking for .env.example, .env.local.example, or .env.dist…');
 
                 $requirements = $scanner->scanLocalPath($checkout);
-                $allKeys = $requirements['keys'] ?? [];
+                $allKeys = $requirements['keys'];
 
                 $examplePath = $requirements['example_path'] ?? null;
                 if ($examplePath !== null) {
                     $exampleFile = basename($examplePath);
-                    $exampleCount = count(array_filter($allKeys, fn ($k) => in_array('example', $k['sources'] ?? [], true)));
+                    $exampleCount = count(array_filter($allKeys, fn ($k) => in_array('example', $k['sources'], true)));
                     $this->scanLog($site, "Found {$exampleFile} ({$exampleCount} declared key(s)).");
                 } else {
                     $this->scanLog($site, 'No .env.example found — inferring required keys from code and config.');
                 }
 
-                $requiredCount = count(array_filter($allKeys, fn ($k) => (bool) ($k['required'] ?? false)));
+                $requiredCount = count(array_filter($allKeys, fn ($k) => (bool) $k['required']));
                 $optionalCount = count($allKeys) - $requiredCount;
-                $codeCount = count(array_filter($allKeys, fn ($k) => in_array('code', $k['sources'] ?? [], true)));
-                $configCount = count(array_filter($allKeys, fn ($k) => in_array('config', $k['sources'] ?? [], true)));
+                $codeCount = count(array_filter($allKeys, fn ($k) => in_array('code', $k['sources'], true)));
+                $configCount = count(array_filter($allKeys, fn ($k) => in_array('config', $k['sources'], true)));
                 $this->scanLog($site, sprintf(
                     'Scanned %d key(s) total: %d required, %d optional (%d from code, %d from config).',
                     count($allKeys), $requiredCount, $optionalCount, $codeCount, $configCount,
@@ -212,7 +215,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
 
             $this->scanLog($site, 'Setup wizard ready — configure resources and environment, then deploy.');
 
-            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta = $site->meta;
             $meta['env_requirements'] = $requirements;
             $meta['setup'] = [
                 'state' => 'needs_setup',
@@ -240,7 +243,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     public function failed(\Throwable $e): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if ($site === null) {
             return;
         }
@@ -265,7 +268,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
             return $repoUrl;
         }
 
-        $user = User::query()->find($this->userId);
+        $user = User::find($this->userId);
         $identity = $user !== null ? $resolver->forId($user, $accountId) : null;
         if ($identity === null) {
             return $repoUrl;
@@ -300,7 +303,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      * (everything in .env.example or a no-default env() call); holding the
      * deploy on all of them is unusable, so optional integrations never block —
      * they're surfaced in the wizard as advanced/optional instead.
-     * See {@see \App\Support\Sites\BootCriticalEnv}.
+     * See {@see BootCriticalEnv}.
      *
      * @param  array{keys: list<array{key: string, example: ?string, sources: list<string>, required: bool}>}  $requirements
      * @return list<string>
@@ -355,7 +358,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function markScanStep(Site $site, string $step): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $setup = is_array($meta['setup'] ?? null) ? $meta['setup'] : [];
         $setup['state'] = 'scanning';
         $setup['scan_step'] = $step;
@@ -374,7 +377,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function resetScanConsole(Site $site): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['setup_console'] = [];
         $site->forceFill(['meta' => $meta])->save();
     }
@@ -386,16 +389,19 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      */
     private function scanLog(Site $site, string $line): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $log = is_array($meta['setup_console'] ?? null) ? array_values($meta['setup_console']) : [];
         $log[] = ['at' => now()->toIso8601String(), 'line' => $line];
         $meta['setup_console'] = array_slice($log, -self::SCAN_CONSOLE_MAX);
         $site->forceFill(['meta' => $meta])->save();
     }
 
+    /**
+     * @param  array<string, mixed>  $extra
+     */
     private function writeSetup(Site $site, string $state, array $extra = []): void
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['setup'] = array_merge([
             'state' => $state,
             'scanned_at' => now()->toIso8601String(),

@@ -20,17 +20,17 @@ class StringUtil
 
     public static function enquote(string $arg): string
     {
-        if (!self::needsQuotes($arg)) {
+        if (! self::needsQuotes($arg)) {
             return $arg;
         }
 
         return "'"
-            . str_replace(
+            .str_replace(
                 ['\\', "\n", "\r", "\t", "\v", "\e", "\f", "'", '\\\\'],
                 ['\\\\', '\n', '\r', '\t', '\v', '\e', '\f', "\\'", '\\'],
                 $arg
             )
-            . "'";
+            ."'";
     }
 
     private static function escape(string $string): \Generator
@@ -39,7 +39,7 @@ class StringUtil
         $char = '';
         $chars = mb_str_split($string, 1, 'UTF-8');
         foreach ($chars as $char) {
-            if ($prev === '\\' || $prev . $char === '${') {
+            if ($prev === '\\' || $prev.$char === '${') {
                 $prev .= $char;
                 yield $prev;
 
@@ -87,7 +87,7 @@ class StringUtil
             }
 
             if ($char === ($expanding ? '}' : '${')) {
-                $expanding = !$expanding;
+                $expanding = ! $expanding;
             }
             $chars->next();
         }

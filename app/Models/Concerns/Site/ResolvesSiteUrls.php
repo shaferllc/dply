@@ -12,6 +12,13 @@ use Illuminate\Support\Facades\URL;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
+ *
+ * @property array<string, mixed> $meta
+ * @property string $dns_zone
+ * @property string $logo_path
+ * @property string $git_repository_url
+ * @property string $ssl_status
+ * @property string $edge_backend
  */
 trait ResolvesSiteUrls
 {
@@ -75,7 +82,7 @@ trait ResolvesSiteUrls
      */
     public function gitRefKind(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $value = $meta['git_ref_kind'] ?? null;
 
         return in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
@@ -93,12 +100,43 @@ trait ResolvesSiteUrls
 
         $hostname = $this->testingHostname();
         if ($hostname !== '') {
-            return 'http://'.$hostname;
+            return $this->urlSchemeForHostname($hostname).'://'.$hostname;
         }
 
-        return ($this->primaryDomain()?->hostname)
-            ? 'http://'.$this->primaryDomain()->hostname
+        $primary = $this->primaryDomain()?->hostname;
+
+        return $primary
+            ? $this->urlSchemeForHostname($primary).'://'.$primary
             : null;
+    }
+
+    /**
+     * Scheme to advertise for a public site hostname. dply provisions SSL for
+     * every managed hostname and forces an HTTP→HTTPS redirect, so a provisioned
+     * site's canonical URL is https. Hardcoding http:// made "visit"/preview
+     * links land on the redirect — and an http:// preview opened from the https
+     * console reads as broken (mixed-content block / bare nginx error). Fall back
+     * to http only while SSL isn't active yet.
+     */
+    protected function urlSchemeForHostname(?string $hostname): string
+    {
+        $hostname = strtolower(trim((string) $hostname));
+        if ($hostname === '') {
+            return 'http';
+        }
+
+        // Managed preview hostname (e.g. *.on-dply.cc) — the preview-domain row
+        // tracks SSL + redirect state for that exact host.
+        $preview = $this->primaryPreviewDomain();
+        if ($preview !== null && strtolower((string) $preview->hostname) === $hostname) {
+            return ((bool) $preview->https_redirect || (string) $preview->ssl_status === 'active')
+                ? 'https'
+                : 'http';
+        }
+
+        // Custom domain — SSL is tracked at the site level (site_domains rows
+        // carry no per-host cert state).
+        return (string) $this->ssl_status === 'active' ? 'https' : 'http';
     }
 
     /**
@@ -109,7 +147,7 @@ trait ResolvesSiteUrls
     public function logoUrl(): ?string
     {
         $path = $this->logo_path;
-        if (! is_string($path) || $path === '') {
+        if (blank($path)) {
             return null;
         }
 
@@ -118,7 +156,7 @@ trait ResolvesSiteUrls
 
     public function hasLogo(): bool
     {
-        return is_string($this->logo_path) && $this->logo_path !== '';
+        return filled($this->logo_path);
     }
 
     /**
@@ -165,7 +203,7 @@ trait ResolvesSiteUrls
         // git@host:owner/repo(.git) → host + owner/repo
         if (preg_match('#^[\w.-]+@([^:]+):(.+?)(?:\.git)?/?$#', $remote, $m) === 1) {
             [$host, $path] = [$m[1], $m[2]];
-        // scheme://[user@]host/owner/repo(.git)
+            // scheme://[user@]host/owner/repo(.git)
         } elseif (preg_match('#^[a-z]+://(?:[^@/]+@)?([^/]+)/(.+?)(?:\.git)?/?$#i', $remote, $m) === 1) {
             [$host, $path] = [$m[1], $m[2]];
         } else {
@@ -218,7 +256,7 @@ trait ResolvesSiteUrls
      */
     public function repositoryMeta(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
     }
@@ -228,7 +266,7 @@ trait ResolvesSiteUrls
      */
     public function mergeRepositoryMeta(array $patch): void
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $current = is_array($meta['repository'] ?? null) ? $meta['repository'] : [];
         $meta['repository'] = array_merge($current, $patch);
         $this->meta = $meta;

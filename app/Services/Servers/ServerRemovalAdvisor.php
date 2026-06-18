@@ -54,8 +54,8 @@ final class ServerRemovalAdvisor
             'authorized_keys' => (int) $server->authorized_keys_count,
             'recipes' => (int) $server->recipes_count,
             'running_deployments' => $runningDeployments,
-            'provider_label' => $provider instanceof \BackedEnum ? $provider->label() : (string) $provider,
-            'provider_value' => $provider instanceof \BackedEnum ? $provider->value : (string) $provider,
+            'provider_label' => true ? $provider->label() : (string) $provider,
+            'provider_value' => true ? $provider->value : (string) $provider,
             'will_destroy_cloud' => self::willDestroyCloudResource($server),
             'organization_name' => $server->organization?->name,
         ];

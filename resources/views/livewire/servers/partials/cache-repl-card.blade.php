@@ -51,23 +51,6 @@
     </div>
 
     <div class="px-6 py-6 sm:px-7">
-    <x-explainer class="mt-4">
-        <p>{{ __('A direct line into this engine. Each command runs as a single SSH round-trip via the engine\'s native cli (e.g. redis-cli, valkey-cli) on the server itself, then the response is rendered here.') }}</p>
-        <p>
-            {{ __('Read-only commands run anytime: ') }}
-            <code>INFO</code>, <code>PING</code>, <code>GET</code>, <code>KEYS</code>, <code>SCAN</code>, <code>MEMORY USAGE</code>, <code>SLOWLOG GET</code>, <code>CLIENT LIST</code>, <code>CONFIG GET</code>.
-        </p>
-        <p>
-            {{ __('Mutating commands require the unlock toggle: ') }}
-            <code>SET</code>, <code>DEL</code>, <code>FLUSHALL</code>, <code>CONFIG SET</code>, <code>EXPIRE</code>.
-            {{ __('Every command — read-only, mutating, denied, blocked — is recorded in the audit log with the verb only (never arguments).') }}
-        </p>
-        <p>
-            {{ __('A handful of disruptive commands are blocked outright and do not run even when unlocked: ') }}
-            <code>SHUTDOWN</code>, <code>MIGRATE</code>, <code>REPLICAOF</code>, <code>DEBUG SLEEP</code>, <code>BGREWRITEAOF</code>.
-            {{ __('Use the engine controls (Restart, Stop, Start) for those.') }}
-        </p>
-    </x-explainer>
 
     <div class="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
         <label class="inline-flex cursor-pointer items-center gap-2 text-sm">

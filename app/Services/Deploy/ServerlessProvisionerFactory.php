@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Contracts\AwsLambdaGateway;
-use App\Contracts\ServerlessFunctionProvisioner;
+use App\Modules\Serverless\Contracts\ServerlessFunctionProvisioner;
 use App\Services\Deploy\ServerlessProviders\Aws\AwsLambdaSdkProvisioner;
 use App\Services\Deploy\ServerlessProviders\Aws\AwsSdkLambdaGateway;
 use App\Services\Deploy\ServerlessProviders\Cloudflare\CloudflareWorkersProvisioner;

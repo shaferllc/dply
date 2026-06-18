@@ -36,6 +36,9 @@ class SyncBasicAuthFromServerJob implements ShouldBeUnique, ShouldQueue
         public ?string $seededConsoleRunId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'console-action:basic_auth_sync:'.$this->siteId;
@@ -43,7 +46,7 @@ class SyncBasicAuthFromServerJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Site::query()->findOrFail($this->siteId);
+        return Site::findOrFail($this->siteId);
     }
 
     protected function consoleKind(): string
@@ -58,7 +61,7 @@ class SyncBasicAuthFromServerJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(SiteBasicAuthDiscovery $discovery): void
     {
-        $site = Site::query()->find($this->siteId);
+        $site = Site::find($this->siteId);
         if (! $site) {
             return;
         }
@@ -105,7 +108,7 @@ class SyncBasicAuthFromServerJob implements ShouldBeUnique, ShouldQueue
                     'site_id' => $site->id,
                     'username' => $username,
                     'password_hash' => $hash,
-                    'path' => SiteBasicAuthUser::normalizePath($row['path'] ?? '/'),
+                    'path' => SiteBasicAuthUser::normalizePath($row['path']),
                     'source_file_path' => $row['source_file_path'] ?? null,
                     'sort_order' => ++$sortBase,
                 ]);
@@ -122,7 +125,7 @@ class SyncBasicAuthFromServerJob implements ShouldBeUnique, ShouldQueue
                     'already in sync — %d credential(s) on disk match the database',
                     $skipped,
                 ));
-            } elseif ($created === 0 && $skipped === 0) {
+            } elseif ($created === 0) {
                 $emit->success('no new credentials found');
             } else {
                 $emit->success(sprintf(

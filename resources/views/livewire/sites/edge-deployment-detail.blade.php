@@ -13,10 +13,17 @@
                 ['label' => __('Deployment'), 'icon' => 'code-bracket-square'],
             ]" />
 
-            <header class="mt-5 flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 pb-5">
+            <x-hero-card
+                :eyebrow="__('Deployments')"
+                :title="__('Edge deployment')"
+                :description="__('Inspect a single Edge build — its status, commit, stable aliases, and build log.')"
+                icon="rocket-launch"
+                class="mt-5"
+            />
+
+            <header class="mt-6 flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 pb-5">
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Edge deployment') }}</p>
-                    <h1 class="mt-1 font-mono text-lg font-semibold text-brand-ink break-all">{{ $deployment->id }}</h1>
+                    <h1 class="font-mono text-lg font-semibold text-brand-ink break-all">{{ $deployment->id }}</h1>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                         @php
                             $depBadge = match ($deployment->status) {

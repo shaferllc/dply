@@ -17,9 +17,10 @@ class CostTrackingDecorator
 {
     use DecorateActions;
 
+    /** @var array<string, float> */
     protected array $costs = [];
 
-    public function __construct($action)
+    public function __construct(mixed $action)
     {
         $this->setAction($action);
         // Inject decorator reference into action so trait methods can access it
@@ -33,7 +34,7 @@ class CostTrackingDecorator
         }
     }
 
-    public function handle(...$arguments)
+    public function handle(mixed ...$arguments): mixed
     {
         $this->costs = [];
 

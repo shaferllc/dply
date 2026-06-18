@@ -8,8 +8,6 @@ use Throwable;
 
 /**
  * Collects non-blocking VAT insights (format + EU VIES) for profile billing fields.
- *
- * @return list<string>
  */
 class VatInsightService
 {

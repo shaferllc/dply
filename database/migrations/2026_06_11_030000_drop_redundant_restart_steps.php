@@ -25,7 +25,7 @@ return new class extends Migration
             ->with('site:id,meta')
             ->get()
             ->each(function (SiteDeployStep $step): void {
-                $skipsManagedRestart = (bool) data_get($step->site?->meta, 'deploy.skip_managed_restart', false);
+                $skipsManagedRestart = (bool) data_get($step->site->meta, 'deploy.skip_managed_restart', false);
                 if (! $skipsManagedRestart) {
                     $step->delete();
                 }

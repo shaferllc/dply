@@ -63,7 +63,7 @@ final class SiteCreateAccess
             $server->loadMissing('organization');
 
             return __('This server belongs to :org. Switch to that organization to create a site here.', [
-                'org' => $server->organization?->name ?? __('another organization'),
+                'org' => $server->organization->name ?? __('another organization'),
             ]);
         }
 

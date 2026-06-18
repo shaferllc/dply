@@ -6,8 +6,12 @@ use App\Enums\ServerProvider;
 use App\Enums\ServerTier;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Services\Billing\ServerTierClassifier;
+use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerTags;
+use Database\Factories\ServerFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,11 +20,78 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 
+/**
+ * @property string $id
+ * @property ?Carbon $comped_until
+ * @property string $health_status
+ * @property ?string $hetzner_network_id
+ * @property string $hosting_backend
+ * @property string $ip_address
+ * @property ?Carbon $last_health_check_at
+ * @property string $logo_path
+ * @property ?array<string, mixed> $meta
+ * @property string $name
+ * @property ?string $organization_id
+ * @property ?string $pool_role
+ * @property string $private_ip_address
+ * @property ?string $private_network_id
+ * @property ServerProvider $provider
+ * @property ?string $provider_credential_id
+ * @property ?string $provider_id
+ * @property string $region
+ * @property ?Carbon $scheduled_deletion_at
+ * @property string $setup_script_key
+ * @property string $setup_status
+ * @property string $size
+ * @property ?string $ssh_operational_private_key
+ * @property string $ssh_port
+ * @property ?string $ssh_private_key
+ * @property ?string $ssh_recovery_private_key
+ * @property string $ssh_user
+ * @property string $status
+ * @property string $supervisor_package_status
+ * @property ?string $team_id
+ * @property ?string $user_id
+ * @property ?string $worker_pool_id
+ * @property ?string $workspace_id
+ * @property-read ?User $user
+ * @property-read ?Organization $organization
+ * @property-read ?Workspace $workspace
+ * @property-read ?Team $team
+ * @property-read ?ProviderCredential $providerCredential
+ * @property-read Collection<int, Site> $sites
+ * @property-read Collection<int, ServerDatabase> $serverDatabases
+ * @property-read ?ServerDatabaseAdminCredential $databaseAdminCredential
+ * @property-read Collection<int, ServerDatabaseAuditEvent> $databaseAuditEvents
+ * @property-read Collection<int, ServerCronJob> $cronJobs
+ * @property-read Collection<int, SupervisorProgram> $supervisorPrograms
+ * @property-read Collection<int, ServerFirewallRule> $firewallRules
+ * @property-read Collection<int, ServerFirewallSnapshot> $firewallSnapshots
+ * @property-read Collection<int, ServerFirewallAuditEvent> $firewallAuditEvents
+ * @property-read Collection<int, ServerFirewallApplyLog> $firewallApplyLogs
+ * @property-read Collection<int, ServerMetricSnapshot> $metricSnapshots
+ * @property-read Collection<int, ServerSystemdServiceState> $systemdServiceStates
+ * @property-read Collection<int, ServerSystemdServiceAuditEvent> $systemdServiceAuditEvents
+ * @property-read ?InsightSetting $insightSetting
+ * @property-read Collection<int, InsightFinding> $insightFindings
+ * @property-read Collection<int, ServerAuthorizedKey> $authorizedKeys
+ * @property-read Collection<int, ServerSystemUser> $systemUsers
+ * @property-read Collection<int, ServerSshKeyAuditEvent> $sshKeyAuditEvents
+ * @property-read Collection<int, ServerRecipe> $recipes
+ * @property-read Collection<int, ServerProvisionRun> $provisionRuns
+ * @property-read Collection<int, NotificationSubscription> $notificationSubscriptions
+ * @property-read ?PrivateNetwork $privateNetwork
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class Server extends Model
 {
+    /** @use HasFactory<ServerFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_PENDING = 'pending';
@@ -89,6 +160,7 @@ class Server extends Model
         'pool_role',
         'provider_credential_id',
         'name',
+        'logo_path',
         'provider',
         'hosting_backend',
         'provider_id',
@@ -113,6 +185,7 @@ class Server extends Model
         'scheduled_deletion_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -127,21 +200,44 @@ class Server extends Model
         ];
     }
 
+    /**
+     * Public URL of the server's custom logo, or null when none is set —
+     * callers fall back to the generated gradient + initials avatar. Stored on
+     * the `public` disk. Mirrors {@see Site::logoUrl()}.
+     */
+    public function logoUrl(): ?string
+    {
+        if (blank($this->logo_path)) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->logo_path);
+    }
+
+    public function hasLogo(): bool
+    {
+        return filled($this->logo_path);
+    }
+
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<Workspace, $this> */
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
     }
 
+    /** @return BelongsTo<Team, $this> */
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
@@ -154,7 +250,7 @@ class Server extends Model
      */
     public function isRedisServer(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return ($meta['server_role'] ?? null) === 'redis'
             && ($meta['install_profile'] ?? null) === 'redis_server';
@@ -167,7 +263,7 @@ class Server extends Model
      */
     public function isWorkerHost(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return ($meta['server_role'] ?? null) === 'worker';
     }
@@ -187,19 +283,81 @@ class Server extends Model
      */
     public function isDeletionProtected(): bool
     {
-        if (\App\Support\Servers\ServerTags::hasTag($this, self::PROTECTED_TAG)) {
+        if (ServerTags::hasTag($this, self::PROTECTED_TAG)) {
             return true;
         }
 
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return ($meta['self_managed'] ?? false) === true;
     }
 
     /**
-     * The worker pool this server belongs to (clones + their source), if any.
-     * See {@see WorkerPool}.
+     * True when THIS server is the very machine the current process is running
+     * on — i.e. a deploy targeting it would SSH back into localhost. Matched by
+     * comparing the server's public/private IPs against the box's own network
+     * interfaces (exact match, so a customer's remote server can never trip it).
+     *
+     * Used to make a control-plane SELF-deploy safe: the deploy's
+     * `horizon:terminate` runs on the target box, so when the target IS the box
+     * running the deploy queue, an inline restart bounces the Horizon executing
+     * this (and every concurrent) deploy job. {@see App\Services\Sites\SiteDeployPipelineRunner}
      */
+    public function isLocalDeployHost(): bool
+    {
+        $targets = array_values(array_filter([
+            $this->ip_address,
+            $this->private_ip_address,
+        ]));
+        if ($targets === []) {
+            return false;
+        }
+
+        return (bool) array_intersect($targets, self::localIpAddresses());
+    }
+
+    /**
+     * IPv4/IPv6 addresses bound to this box's network interfaces. Cached for the
+     * process lifetime (a host's addresses don't change under a running worker).
+     *
+     * @return list<string>
+     */
+    private static function localIpAddresses(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $ips = [];
+        if (function_exists('net_get_interfaces')) {
+            $interfaces = @net_get_interfaces();
+            if (is_array($interfaces)) {
+                foreach ($interfaces as $interface) {
+                    foreach (($interface['unicast'] ?? []) as $unicast) {
+                        if (! empty($unicast['address'])) {
+                            $ips[] = (string) $unicast['address'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $resolved = @gethostbynamel((string) gethostname());
+        if (is_array($resolved)) {
+            $ips = array_merge($ips, $resolved);
+        }
+
+        return $cached = array_values(array_unique(array_filter($ips)));
+    }
+
+    /**
+     * The worker pool this server belongs to (clones + their source), if any.
+     * See {@see WorkerPool}. *
+     *
+     * @return BelongsTo<WorkerPool, $this>
+     */
+    /** @return BelongsTo<WorkerPool, $this> */
     public function workerPool(): BelongsTo
     {
         return $this->belongsTo(WorkerPool::class);
@@ -218,24 +376,28 @@ class Server extends Model
      */
     public function isWorkerServer(): bool
     {
-        return $this->isWorkerHost()
-            || $this->pool_role !== null
-            || $this->worker_pool_id !== null;
+        if ($this->isWorkerHost()) {
+            return true;
+        }
+
+        return $this->worker_pool_id !== null || filled($this->pool_role);
     }
 
     /** Per-member reconciler sub-state (servers.meta['pool']['state']). */
     public function poolMemberState(): ?string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
 
         return $meta['pool']['state'] ?? null;
     }
 
+    /** @return BelongsTo<ProviderCredential, $this> */
     public function providerCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class);
     }
 
+    /** @return HasMany<Site, $this> */
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
@@ -244,8 +406,11 @@ class Server extends Model
     /**
      * Per-zone wildcard TLS certificates (e.g. *.on-dply.com) installed on this
      * server, shared by every testing-hostname site on the matching zone. See
-     * {@see \App\Services\Certificates\WildcardCertificateIssuer}.
+     * {@see WildcardCertificateIssuer}. *
+     *
+     * @return HasMany<ServerWildcardCertificate, $this>
      */
+    /** @return HasMany<ServerWildcardCertificate, $this> */
     public function wildcardCertificates(): HasMany
     {
         return $this->hasMany(ServerWildcardCertificate::class);
@@ -254,8 +419,11 @@ class Server extends Model
     /**
      * Multi-backend serving points hosted on this server (this server acting as a
      * backend for one or more sites' backend groups). See
-     * docs/MULTI_BACKEND_SITES.md.
+     * docs/MULTI_BACKEND_SITES.md. *
+     *
+     * @return HasMany<SiteBackend, $this>
      */
+    /** @return HasMany<SiteBackend, $this> */
     public function siteBackends(): HasMany
     {
         return $this->hasMany(SiteBackend::class);
@@ -291,6 +459,7 @@ class Server extends Model
         $this->cachedSitesCount = null;
     }
 
+    /** @return HasMany<ServerDatabase, $this> */
     public function serverDatabases(): HasMany
     {
         return $this->hasMany(ServerDatabase::class);
@@ -299,11 +468,27 @@ class Server extends Model
     /**
      * Database engines installed on this server (multi-engine support).
      * Distinct from {@see serverDatabases} which lists user-created
-     * named DBs on top of an engine. See ServerDatabaseEngine docblock.
+     * named DBs on top of an engine. See ServerDatabaseEngine docblock. *
+     *
+     * @return HasMany<ServerDatabaseEngine, $this>
      */
+    /** @return HasMany<ServerDatabaseEngine, $this> */
     public function databaseEngines(): HasMany
     {
         return $this->hasMany(ServerDatabaseEngine::class);
+    }
+
+    /**
+     * Cache services (Redis/Valkey/Memcached) installed on this server.
+     * Companion to {@see databaseEngines}; together they make up the
+     * engine inventory surfaced in the fleet "Services" disclosure. *
+     *
+     * @return HasMany<ServerCacheService, $this>
+     */
+    /** @return HasMany<ServerCacheService, $this> */
+    public function cacheServices(): HasMany
+    {
+        return $this->hasMany(ServerCacheService::class);
     }
 
     /**
@@ -340,7 +525,7 @@ class Server extends Model
      */
     public function edgeProxy(): ?string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $proxy = $meta['edge_proxy'] ?? null;
 
         return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true) ? $proxy : null;
@@ -351,9 +536,10 @@ class Server extends Model
         return $this->edgeProxy() !== null;
     }
 
+    /** @return list<string> */
     public function installedRuntimeKeys(): array
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $defaults = $meta['runtime_defaults'] ?? null;
         if (! is_array($defaults)) {
             return [];
@@ -361,7 +547,7 @@ class Server extends Model
 
         $keys = [];
         foreach (array_keys($defaults) as $key) {
-            if (is_string($key) && $key !== '') {
+            if ($key !== '') {
                 $keys[] = $key;
             }
         }
@@ -374,6 +560,7 @@ class Server extends Model
         return in_array($runtime, $this->installedRuntimeKeys(), true);
     }
 
+    /** @return HasOne<ServerDatabaseAdminCredential, $this> */
     public function databaseAdminCredential(): HasOne
     {
         return $this->hasOne(ServerDatabaseAdminCredential::class);
@@ -381,48 +568,59 @@ class Server extends Model
 
     /**
      * The dply Logs add-on agent for this server (at most one — the add-on is a
-     * per-server resource). See {@see ServerLogAgent}.
+     * per-server resource). See {@see ServerLogAgent}. *
+     *
+     * @return HasOne<ServerLogAgent, $this>
      */
+    /** @return HasOne<ServerLogAgent, $this> */
     public function logAgent(): HasOne
     {
         return $this->hasOne(ServerLogAgent::class);
     }
 
+    /** @return HasMany<ServerDatabaseAuditEvent, $this> */
     public function databaseAuditEvents(): HasMany
     {
         return $this->hasMany(ServerDatabaseAuditEvent::class)->orderByDesc('created_at');
     }
 
+    /** @return HasMany<ServerCronJob, $this> */
     public function cronJobs(): HasMany
     {
         return $this->hasMany(ServerCronJob::class);
     }
 
+    /** @return HasMany<SupervisorProgram, $this> */
     public function supervisorPrograms(): HasMany
     {
         return $this->hasMany(SupervisorProgram::class);
     }
 
+    /** @return HasMany<ServerFirewallRule, $this> */
     public function firewallRules(): HasMany
     {
         return $this->hasMany(ServerFirewallRule::class)->orderBy('sort_order');
     }
 
+    /** @return HasMany<ServerFirewallSnapshot, $this> */
     public function firewallSnapshots(): HasMany
     {
         return $this->hasMany(ServerFirewallSnapshot::class)->orderByDesc('created_at');
     }
 
+    /** @return HasMany<ServerFirewallAuditEvent, $this> */
     public function firewallAuditEvents(): HasMany
     {
         return $this->hasMany(ServerFirewallAuditEvent::class)->orderByDesc('created_at');
     }
 
+    /** @return HasMany<ServerFirewallApplyLog, $this> */
     public function firewallApplyLogs(): HasMany
     {
         return $this->hasMany(ServerFirewallApplyLog::class)->orderByDesc('created_at');
     }
 
+    /** @return HasMany<ServerMetricSnapshot, $this> */
     public function metricSnapshots(): HasMany
     {
         return $this->hasMany(ServerMetricSnapshot::class)->orderByDesc('captured_at');
@@ -433,8 +631,11 @@ class Server extends Model
      * single-row lookup on the instance. The overview render fans the same
      * server out to the cost card, health cockpit, and billing tier — each
      * of which used to run its own "latest snapshot" query. Routing them all
-     * through this relation collapses those into one query per request.
+     * through this relation collapses those into one query per request. *
+     *
+     * @return HasOne<ServerMetricSnapshot, $this>
      */
+    /** @return HasOne<ServerMetricSnapshot, $this> */
     public function latestMetricSnapshot(): HasOne
     {
         return $this->hasOne(ServerMetricSnapshot::class)->latestOfMany('captured_at');
@@ -462,51 +663,75 @@ class Server extends Model
         return app(ServerTierClassifier::class)->classify($cpuCount, $memMb);
     }
 
+    /** @return HasMany<ServerSystemdServiceState, $this> */
     public function systemdServiceStates(): HasMany
     {
         return $this->hasMany(ServerSystemdServiceState::class)->orderBy('label');
     }
 
+    /** @return HasMany<ServerSystemdServiceAuditEvent, $this> */
     public function systemdServiceAuditEvents(): HasMany
     {
         return $this->hasMany(ServerSystemdServiceAuditEvent::class)->orderByDesc('occurred_at');
     }
 
+    /** @return MorphOne<InsightSetting, $this> */
     public function insightSetting(): MorphOne
     {
         return $this->morphOne(InsightSetting::class, 'settingsable');
     }
 
+    /** @return HasMany<InsightFinding, $this> */
     public function insightFindings(): HasMany
     {
         return $this->hasMany(InsightFinding::class)->orderByDesc('detected_at');
     }
 
+    /** @return HasMany<ServerAuthorizedKey, $this> */
     public function authorizedKeys(): HasMany
     {
         return $this->hasMany(ServerAuthorizedKey::class);
     }
 
+    /** @return HasMany<ServerSystemUser, $this> */
     public function systemUsers(): HasMany
     {
         return $this->hasMany(ServerSystemUser::class)->orderBy('username');
     }
 
+    /**
+     * Free-form operator notes (runbooks, customer IDs, context). Pinned first,
+     * then most-recently-touched. Pinned notes surface on the server overview. *
+     *
+     * @return HasMany<ServerNote, $this>
+     */
+    /** @return HasMany<ServerNote, $this> */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(ServerNote::class)
+            ->orderByDesc('pinned')
+            ->orderByDesc('updated_at');
+    }
+
+    /** @return HasMany<ServerSshKeyAuditEvent, $this> */
     public function sshKeyAuditEvents(): HasMany
     {
         return $this->hasMany(ServerSshKeyAuditEvent::class)->orderByDesc('created_at');
     }
 
+    /** @return HasMany<ServerRecipe, $this> */
     public function recipes(): HasMany
     {
         return $this->hasMany(ServerRecipe::class);
     }
 
+    /** @return HasMany<ServerProvisionRun, $this> */
     public function provisionRuns(): HasMany
     {
         return $this->hasMany(ServerProvisionRun::class)->orderByDesc('created_at');
     }
 
+    /** @return MorphMany<NotificationSubscription, $this> */
     public function notificationSubscriptions(): MorphMany
     {
         return $this->morphMany(NotificationSubscription::class, 'subscribable');
@@ -530,6 +755,7 @@ class Server extends Model
             && $this->setup_status === self::SETUP_STATUS_DONE;
     }
 
+    /** @return BelongsTo<PrivateNetwork, $this> */
     public function privateNetwork(): BelongsTo
     {
         return $this->belongsTo(PrivateNetwork::class, 'private_network_id');
@@ -543,7 +769,7 @@ class Server extends Model
 
     public function hostKind(): string
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $hostKind = $meta['host_kind'] ?? self::HOST_KIND_VM;
 
         return in_array($hostKind, [
@@ -679,7 +905,7 @@ class Server extends Model
 
     public function dockerEnginePresent(): bool
     {
-        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta = $this->meta ?? [];
         $manageDocker = is_array($meta['manage_docker'] ?? null) ? $meta['manage_docker'] : [];
         if (! empty($manageDocker['present'])) {
             return true;
@@ -714,7 +940,7 @@ class Server extends Model
             return 'Kubernetes';
         }
 
-        return $this->provider?->label() ?? 'Custom';
+        return $this->provider->label();
     }
 
     /**
@@ -744,13 +970,13 @@ class Server extends Model
 
         $key = $this->ssh_operational_private_key;
 
-        if (is_string($key) && trim($key) !== '') {
+        if (trim((string) $key) !== '') {
             return $key;
         }
 
         $legacy = $this->ssh_private_key;
 
-        return is_string($legacy) && trim($legacy) !== '' ? $legacy : null;
+        return $legacy !== null && trim($legacy) !== '' ? $legacy : null;
     }
 
     public function recoverySshPrivateKey(): ?string
@@ -762,13 +988,13 @@ class Server extends Model
 
         $key = $this->ssh_recovery_private_key;
 
-        if (is_string($key) && trim($key) !== '') {
+        if (trim((string) $key) !== '') {
             return $key;
         }
 
         $legacy = $this->ssh_private_key;
 
-        return is_string($legacy) && trim($legacy) !== '' ? $legacy : null;
+        return $legacy !== null && trim($legacy) !== '' ? $legacy : null;
     }
 
     public function hasAnySshPrivateKey(): bool
@@ -793,8 +1019,8 @@ class Server extends Model
         $managedKeyIds = $userKeys->pluck('id');
         $publicKeys = $userKeys
             ->pluck('public_key')
-            ->filter(fn ($key): bool => is_string($key) && trim($key) !== '')
-            ->map(fn ($key): string => trim($key));
+            ->filter(fn (string $key): bool => trim($key) !== '')
+            ->map(fn (string $key): string => trim($key));
 
         return $this->authorizedKeys()
             ->where(function ($query) use ($managedKeyIds, $publicKeys): void {
@@ -814,12 +1040,12 @@ class Server extends Model
     {
         $key = $this->ssh_operational_private_key;
 
-        return is_string($key) && trim($key) !== '';
+        return trim((string) $key) !== '';
     }
 
     protected function openSshPublicKeyFromKey(?string $priv): ?string
     {
-        if (! is_string($priv) || trim($priv) === '') {
+        if ($priv === null || trim($priv) === '') {
             return null;
         }
 
@@ -888,9 +1114,9 @@ class Server extends Model
 
         $connection = [
             'host' => $host,
-            'port' => (int) ($this->ssh_port ?: 22),
+            'port' => (string) ((int) ($this->ssh_port ?: 22)),
             'username' => $username,
-            'private_key' => $key,
+            'private_key' => (string) $key,
         ];
 
         if (FakeCloudProvision::isFakeServer($this)) {
@@ -900,6 +1126,7 @@ class Server extends Model
             }
         }
 
+        /** @var array<string, string> $connection */
         return TaskRunnerConnection::fromArray($connection);
     }
 }

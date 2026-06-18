@@ -31,6 +31,10 @@ final class UnifiedPreviewCatalog
      *     parent_name: string|null,
      * }>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string|null>>
+     */
     public function forOrganization(Organization $organization): array
     {
         $rows = [];
@@ -59,7 +63,7 @@ final class UnifiedPreviewCatalog
                 site: $site,
                 product: 'byo',
                 kind: ($domain->is_primary ?? false) ? 'primary' : 'preview',
-                apex: is_string($domain->zone) && $domain->zone !== '' ? $domain->zone : ($this->hostnames->apexFromHostname($hostname) ?? ''),
+                apex: ($domain->zone) && $domain->zone !== '' ? $domain->zone : ($this->hostnames->apexFromHostname($hostname) ?? ''),
                 parentName: null,
             );
         }
@@ -114,7 +118,7 @@ final class UnifiedPreviewCatalog
     }
 
     /**
-     * @return array{hostname: string, site_id: string, site_name: string, product: string, kind: string, apex: string, href: string|null, parent_name: string|null}
+     * @return list<array<string, string|null>>
      */
     private function row(
         string $hostname,

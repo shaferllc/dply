@@ -12,8 +12,8 @@ use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Services\DigitalOceanService;
 use App\Services\GcpDnsService;
 use App\Services\HetznerService;
-use App\Services\Imports\Forge\ForgeImportDriver;
-use App\Services\Imports\Ploi\PloiImportDriver;
+use App\Modules\Imports\Services\Forge\ForgeImportDriver;
+use App\Modules\Imports\Services\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
 use App\Services\OracleComputeService;
 use App\Services\OvhService;
@@ -794,12 +794,10 @@ trait ManagesProviderCredentials
             return false;
         }
 
-        if ($org) {
-            audit_log($org, auth()->user(), 'credential.created', $credential, null, [
-                'provider' => $provider,
-                'name' => $credential->name,
-            ]);
-        }
+        audit_log($org, auth()->user(), 'credential.created', $credential, null, [
+            'provider' => $provider,
+            'name' => $credential->name,
+        ]);
 
         $this->toastSuccess('Provider connected.');
         $this->notifyProviderCredentialStored($provider);
@@ -809,9 +807,12 @@ trait ManagesProviderCredentials
 
     protected function notifyProviderCredentialStored(string $provider): void
     {
-        if (method_exists($this, 'afterProviderCredentialStored')) {
-            $this->afterProviderCredentialStored($provider);
-        }
+        $this->afterProviderCredentialStored($provider);
+    }
+
+    protected function afterProviderCredentialStored(string $provider): void
+    {
+        //
     }
 
     public function canVerifyCredentialProvider(string $provider): bool

@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
+use App\Jobs\InstallLogAgentJob;
 use App\Models\ServerLogAgent;
+use App\Support\Servers\Concerns\InstallsVectorBinary;
 
 /**
  * Builds the bash that installs/uninstalls the dply Logs edge agent (Vector) on a
  * managed box, plus the rendered vector.toml. Mirrors the shape of
  * {@see HttpCacheDaemonInstallScripts} / {@see CacheServiceInstallScripts}: pure
- * string builders, no SSH — {@see \App\Jobs\InstallLogAgentJob} runs the output.
+ * string builders, no SSH — {@see InstallLogAgentJob} runs the output.
  *
  * Install strategy: Vector ships a single static binary, so we fetch the pinned
  * release tarball, verify its SHA-256, and drop the binary at /usr/local/bin/
@@ -23,6 +25,8 @@ use App\Models\ServerLogAgent;
  */
 class VectorLogAgentInstallScripts
 {
+    use InstallsVectorBinary;
+
     public const BINARY_PATH = '/usr/local/bin/dply-vector';
 
     public const CONFIG_DIR = '/etc/dply-logship';
@@ -42,54 +46,12 @@ class VectorLogAgentInstallScripts
      */
     public function installScript(ServerLogAgent $agent): string
     {
-        $version = (string) config('server_logs.vector_version', '0.48.0');
-        $sha = trim((string) config('server_logs.vector_sha256', ''));
-        $url = $this->tarballUrl($version);
-
         $configB64 = base64_encode($this->renderVectorToml($agent));
         $unitB64 = base64_encode($this->renderSystemdUnit());
 
-        $shaCheck = $sha !== ''
-            ? <<<BASH
-            echo "{$sha}  \$TMP_TGZ" | sha256sum -c - || { echo "vector tarball sha mismatch"; exit 1; }
-            BASH
-            : 'echo "WARN: vector sha256 not pinned — skipping integrity check (dev only)"';
-
         return <<<BASH
-        export DEBIAN_FRONTEND=noninteractive
-
-        # --- prerequisites -------------------------------------------------------
-        if ! command -v curl >/dev/null 2>&1; then
-          apt-get update -y >/dev/null 2>&1 || true
-          apt-get install -y curl ca-certificates >/dev/null 2>&1 || true
-        fi
-
-        ARCH="\$(uname -m)"
-        case "\$ARCH" in
-          x86_64|amd64) VEC_ARCH="x86_64-unknown-linux-musl" ;;
-          aarch64|arm64) VEC_ARCH="aarch64-unknown-linux-musl" ;;
-          *) echo "unsupported arch: \$ARCH"; exit 1 ;;
-        esac
-
         # --- fetch + verify Vector ----------------------------------------------
-        NEED_INSTALL=1
-        if [ -x "{$this->binaryPath()}" ]; then
-          CUR="\$({$this->binaryPath()} --version 2>/dev/null | awk '{print \$2}' || true)"
-          [ "\$CUR" = "{$version}" ] && NEED_INSTALL=0
-        fi
-
-        if [ "\$NEED_INSTALL" = "1" ]; then
-          TMP_TGZ="\$(mktemp)"
-          URL="\$(echo "{$url}" | sed "s/__ARCH__/\$VEC_ARCH/")"
-          curl -fsSL --retry 3 -o "\$TMP_TGZ" "\$URL" || { echo "vector download failed: \$URL"; rm -f "\$TMP_TGZ"; exit 1; }
-          {$shaCheck}
-          TMP_DIR="\$(mktemp -d)"
-          tar -xzf "\$TMP_TGZ" -C "\$TMP_DIR" || { echo "vector extract failed"; rm -rf "\$TMP_TGZ" "\$TMP_DIR"; exit 1; }
-          VEC_BIN="\$(find "\$TMP_DIR" -type f -name vector -perm -u+x | head -n1)"
-          [ -n "\$VEC_BIN" ] || { echo "vector binary not found in tarball"; rm -rf "\$TMP_TGZ" "\$TMP_DIR"; exit 1; }
-          install -m 0755 "\$VEC_BIN" "{$this->binaryPath()}"
-          rm -rf "\$TMP_TGZ" "\$TMP_DIR"
-        fi
+        {$this->vectorBinaryInstallFragment($this->binaryPath())}
 
         # --- directories ---------------------------------------------------------
         install -d -m 0750 "{$this->configDir()}"
@@ -101,6 +63,9 @@ class VectorLogAgentInstallScripts
         # --- config --------------------------------------------------------------
         echo "{$configB64}" | base64 -d > "{$this->configPath()}"
         chmod 0640 "{$this->configPath()}"
+
+        # --- aggregator address: prefer the private (VPC) endpoint when reachable -
+        {$this->aggregatorAddressSelectFragment()}
 
         # Validate config before we (re)start so a bad render fails loudly here
         # instead of crash-looping the unit.
@@ -146,14 +111,15 @@ class VectorLogAgentInstallScripts
      */
     protected function certDeployFragment(): string
     {
-        $endpoint = trim((string) config('server_logs.aggregator_endpoint', ''));
+        $target = $this->resolveAggregatorTarget();
+        $endpoint = $target['endpoint'];
         if ($endpoint === '') {
             return ': # no aggregator endpoint configured — edge ships to blackhole, no certs needed';
         }
 
-        $ca = trim((string) config('server_logs.mtls.ca_cert_b64', ''));
-        $crt = trim((string) config('server_logs.mtls.client_cert_b64', ''));
-        $key = trim((string) config('server_logs.mtls.client_key_b64', ''));
+        $ca = $target['ca'];
+        $crt = $target['crt'];
+        $key = $target['key'];
 
         if ($ca === '' || $crt === '' || $key === '') {
             return 'echo "dply Logs: aggregator endpoint set but mTLS material (SERVER_LOGS_*_B64) is missing"; exit 1';
@@ -168,6 +134,41 @@ class VectorLogAgentInstallScripts
         chmod 0640 "{$dir}/ca.crt" "{$dir}/client.crt" "{$dir}/client.key"
         test -s "{$dir}/client.key" || { echo "dply Logs: client.key empty after deploy"; exit 1; }
         BASH;
+    }
+
+    /**
+     * Resolve where the edge ships + which mTLS material it presents. Prefers a
+     * live, codified aggregator ({@see ServerLogAggregator}) whose installer
+     * generated + captured the edge certs — so edges auto-configure with no manual
+     * env. Falls back to the SERVER_LOGS_* config env (the legacy/manual path).
+     *
+     * @return array{endpoint:string,private_endpoint:string,ca:string,crt:string,key:string}
+     */
+    protected function resolveAggregatorTarget(): array
+    {
+        $aggregator = \App\Models\ServerLogAggregator::query()
+            ->where('status', \App\Models\ServerLogAggregator::STATUS_RUNNING)
+            ->whereNotNull('endpoint')
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($aggregator !== null && trim((string) $aggregator->endpoint) !== '' && $aggregator->hasEdgeMaterial()) {
+            return [
+                'endpoint' => trim((string) $aggregator->endpoint),
+                'private_endpoint' => trim((string) $aggregator->private_endpoint),
+                'ca' => trim((string) $aggregator->edge_ca_cert_b64),
+                'crt' => trim((string) $aggregator->edge_client_cert_b64),
+                'key' => trim((string) $aggregator->edge_client_key_b64),
+            ];
+        }
+
+        return [
+            'endpoint' => trim((string) config('server_logs.aggregator_endpoint', '')),
+            'private_endpoint' => '',
+            'ca' => trim((string) config('server_logs.mtls.ca_cert_b64', '')),
+            'crt' => trim((string) config('server_logs.mtls.client_cert_b64', '')),
+            'key' => trim((string) config('server_logs.mtls.client_key_b64', '')),
+        ];
     }
 
     /**
@@ -196,30 +197,35 @@ class VectorLogAgentInstallScripts
             '',
         ];
 
-        $sourceNames = [];
+        // Each source flows through a tiny tag transform that stamps `.source` with
+        // its key (web/auth/journald/…) — Vector doesn't carry the component name as
+        // a field, so without this the aggregator has no way to populate the column.
+        $enrichInputs = [];
         foreach ($active as $key) {
             $fragment = $this->sourceFragment($key);
             if ($fragment === null) {
                 continue;
             }
             [$name, $toml] = $fragment;
-            $sourceNames[] = $name;
             $blocks[] = $toml;
             $blocks[] = '';
+            $blocks[] = $this->sourceTagTransform($name);
+            $blocks[] = '';
+            $enrichInputs[] = 'tag_'.$name;
         }
 
         // Nothing enabled → a minimal valid config that ships nothing. Keeps the
         // unit healthy rather than crash-looping on an empty pipeline.
-        if ($sourceNames === []) {
+        if ($enrichInputs === []) {
             $blocks[] = "[sources.heartbeat]\ntype = \"internal_metrics\"";
             $blocks[] = '';
-            $sourceNames[] = 'heartbeat';
+            $enrichInputs[] = 'heartbeat';
         }
 
         // --- enrich: always stamp tenant identity (dply renders these server-side,
         //     so they're trusted-ish) + optional edge redaction ------------------
-        $orgId = (string) ($agent->server?->organization_id ?? '');
-        $blocks[] = $this->enrichTransform($sourceNames, $serverId, $orgId);
+        $orgId = (string) ($agent->server->organization_id ?? '');
+        $blocks[] = $this->enrichTransform($enrichInputs, $serverId, $orgId);
         $blocks[] = '';
         $sinkInput = ['enrich'];
 
@@ -270,20 +276,20 @@ class VectorLogAgentInstallScripts
         $siteRoot = '/home/'.$deployUser;
 
         return match ($key) {
-            'journald' => ['journald', <<<TOML
+            'journald' => ['journald', <<<'TOML'
             [sources.journald]
             type = "journald"
             current_boot_only = false
             TOML],
 
-            'web' => ['web', <<<TOML
+            'web' => ['web', <<<'TOML'
             [sources.web]
             type = "file"
             include = ["/var/log/nginx/*.log", "/var/log/caddy/*.log"]
             ignore_older_secs = 600
             TOML],
 
-            'php_fpm' => ['php_fpm', <<<TOML
+            'php_fpm' => ['php_fpm', <<<'TOML'
             [sources.php_fpm]
             type = "file"
             include = ["/var/log/php*-fpm.log", "/var/log/php/*.log"]
@@ -297,7 +303,7 @@ class VectorLogAgentInstallScripts
             ignore_older_secs = 600
             TOML],
 
-            'auth' => ['auth', <<<TOML
+            'auth' => ['auth', <<<'TOML'
             [sources.auth]
             type = "file"
             include = ["/var/log/auth.log"]
@@ -306,6 +312,21 @@ class VectorLogAgentInstallScripts
 
             default => null,
         };
+    }
+
+    /**
+     * One-line remap that stamps `.source` with the source key so the aggregator can
+     * populate the ClickHouse `source` column (Vector carries no component-name field
+     * on events). Input is the source of the same name; output id is `tag_<name>`.
+     */
+    protected function sourceTagTransform(string $name): string
+    {
+        return <<<TOML
+        [transforms.tag_{$name}]
+        type = "remap"
+        inputs = ["{$name}"]
+        source = '.source = "{$name}"'
+        TOML;
     }
 
     /**
@@ -368,7 +389,7 @@ class VectorLogAgentInstallScripts
     protected function sinkBlock(array $inputs): string
     {
         $inputsToml = $this->tomlStringArray($inputs);
-        $endpoint = trim((string) config('server_logs.aggregator_endpoint', ''));
+        $endpoint = $this->resolveAggregatorTarget()['endpoint'];
         $bufferBytes = (int) config('server_logs.limits.disk_buffer_max_bytes', 512 * 1024 * 1024);
 
         if ($endpoint === '') {
@@ -380,6 +401,11 @@ class VectorLogAgentInstallScripts
             TOML;
         }
 
+        // The address is a placeholder the install script fills on-box, picking the
+        // private (VPC) endpoint when reachable and the public one otherwise — see
+        // aggregatorAddressSelectFragment(). The mTLS server cert SANs both IPs, so
+        // verification holds either way.
+        //
         // Vector's disk buffer is bounded at max_size; it has no "drop_oldest", so
         // we use drop_newest — disk stays capped (the goal: never fill the customer's
         // disk during a dply outage); only which events drop differs.
@@ -387,7 +413,7 @@ class VectorLogAgentInstallScripts
         [sinks.dply]
         type = "vector"
         inputs = {$inputsToml}
-        address = "{$endpoint}"
+        address = "__DPLY_AGG_ADDR__"
 
         [sinks.dply.tls]
         enabled = true
@@ -400,6 +426,59 @@ class VectorLogAgentInstallScripts
         max_size = {$bufferBytes}
         when_full = "drop_newest"
         TOML;
+    }
+
+    /**
+     * Bash that resolves the `__DPLY_AGG_ADDR__` placeholder in the rendered config.
+     * When the aggregator advertises a private (VPC) endpoint, the edge probes it
+     * (a short /dev/tcp connect) and ships there if reachable — keeping log traffic
+     * on the private network and clear of any provider cloud-firewall on the public
+     * listen port — otherwise it falls back to the public endpoint. A no-op for the
+     * blackhole sink (no endpoint → no placeholder in the config).
+     */
+    protected function aggregatorAddressSelectFragment(): string
+    {
+        $target = $this->resolveAggregatorTarget();
+        $public = $target['endpoint'];
+        if ($public === '') {
+            return ': # blackhole sink — no aggregator address to resolve';
+        }
+
+        $private = $target['private_endpoint'];
+        $config = $this->configPath();
+
+        if ($private === '' || $private === $public) {
+            return <<<BASH
+            sed -i "s|__DPLY_AGG_ADDR__|{$public}|g" "{$config}"
+            BASH;
+        }
+
+        [$privHost, $privPort] = $this->splitHostPort($private);
+
+        return <<<BASH
+        DPLY_AGG_ADDR="{$public}"
+        if timeout 3 bash -c "echo > /dev/tcp/{$privHost}/{$privPort}" 2>/dev/null; then
+          DPLY_AGG_ADDR="{$private}"
+        fi
+        echo "dply Logs: shipping to \${DPLY_AGG_ADDR}"
+        sed -i "s|__DPLY_AGG_ADDR__|\${DPLY_AGG_ADDR}|g" "{$config}"
+        BASH;
+    }
+
+    /**
+     * Split a "host:port" endpoint on the last colon (IPv4 / hostname). Falls back to
+     * the default listen port when no colon is present.
+     *
+     * @return array{0:string,1:string}
+     */
+    protected function splitHostPort(string $endpoint): array
+    {
+        $pos = strrpos($endpoint, ':');
+        if ($pos === false) {
+            return [$endpoint, '6000'];
+        }
+
+        return [substr($endpoint, 0, $pos), substr($endpoint, $pos + 1)];
     }
 
     /**

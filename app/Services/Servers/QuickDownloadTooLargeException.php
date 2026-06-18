@@ -7,8 +7,9 @@ namespace App\Services\Servers;
 use Illuminate\Support\Number;
 
 /**
- * Thrown when a staged quick-download artifact exceeds the live-stream cap.
- * The operator should fall back to the scheduled backup -> destination flow.
+ * Thrown when a built quick-download artifact exceeds the size cap (caught before
+ * anything is uploaded). The operator should fall back to the scheduled
+ * backup -> destination flow, which streams without the cap.
  */
 final class QuickDownloadTooLargeException extends \RuntimeException
 {
@@ -16,7 +17,7 @@ final class QuickDownloadTooLargeException extends \RuntimeException
         public readonly int $bytes,
         public readonly int $cap,
     ) {
-        parent::__construct(__(':size is over the :cap live-download limit — use a scheduled backup to a destination instead.', [
+        parent::__construct(__(':size is over the :cap quick-download limit — use a scheduled backup to a destination instead.', [
             'size' => Number::fileSize($bytes),
             'cap' => Number::fileSize($cap),
         ]));

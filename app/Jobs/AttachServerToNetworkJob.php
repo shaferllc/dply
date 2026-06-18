@@ -33,7 +33,7 @@ class AttachServerToNetworkJob implements ShouldQueue
 
     public function handle(): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server || $server->provider->value !== 'hetzner') {
             return;
         }

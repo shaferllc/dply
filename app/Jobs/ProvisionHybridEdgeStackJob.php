@@ -35,12 +35,12 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
 
     public function handle(): void
     {
-        $cloudSite = Site::query()->find($this->cloudSiteId);
+        $cloudSite = Site::find($this->cloudSiteId);
         if ($cloudSite === null || ! $cloudSite->usesContainerRuntime()) {
             return;
         }
 
-        $meta = is_array($cloudSite->meta) ? $cloudSite->meta : [];
+        $meta = $cloudSite->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $stack = is_array($container['hybrid_edge_stack'] ?? null) ? $container['hybrid_edge_stack'] : [];
 
@@ -95,7 +95,7 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
             return;
         }
 
-        $user = User::query()->find($cloudSite->user_id);
+        $user = User::find($cloudSite->user_id);
         $organization = $cloudSite->organization;
         if ($user === null || $organization === null) {
             $this->markFailed($cloudSite, 'Could not resolve stack owner for Edge site creation.');
@@ -137,7 +137,7 @@ class ProvisionHybridEdgeStackJob implements ShouldQueue
      */
     private function updateStackMeta(Site $cloudSite, array $changes): void
     {
-        $meta = is_array($cloudSite->meta) ? $cloudSite->meta : [];
+        $meta = $cloudSite->meta;
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $stack = is_array($container['hybrid_edge_stack'] ?? null) ? $container['hybrid_edge_stack'] : [];
         $container['hybrid_edge_stack'] = array_merge($stack, $changes);

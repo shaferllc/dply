@@ -32,6 +32,7 @@ final class PrimaryHostnameRenamePlanner
      *   manual: list<string>,
      * }
      */
+    /** @return array<string, mixed> */
     public function plan(Site $site, string $newHostname): array
     {
         $old = strtolower(trim((string) optional($site->primaryDomain())->hostname));
@@ -161,7 +162,7 @@ final class PrimaryHostnameRenamePlanner
 
     private function isLaravelScaffold(Site $site): bool
     {
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = ($site->meta );
         $framework = $meta['scaffold']['framework'] ?? null;
 
         return is_string($framework) && strtolower($framework) === 'laravel';

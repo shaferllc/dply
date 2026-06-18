@@ -13,6 +13,8 @@ use Livewire\Attributes\On;
 
 trait ManagesEdgeSiteProvisioning
 {
+    use DispatchesToastNotifications;
+
     #[On('site-provisioning-updated')]
     public function refreshProvisioningStatus(string $siteId): void
     {
@@ -136,8 +138,6 @@ trait ManagesEdgeSiteProvisioning
             'status' => Site::STATUS_EDGE_ACTIVE,
         ]);
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Build cancelled. The previous deployment is still serving.'));
-        }
+        $this->toastSuccess(__('Build cancelled. The previous deployment is still serving.'));
     }
 }

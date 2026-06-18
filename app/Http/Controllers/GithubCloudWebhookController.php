@@ -47,9 +47,6 @@ class GithubCloudWebhookController extends Controller
 
         $event = (string) $request->header('X-GitHub-Event', '');
         $payload = $request->json()->all();
-        if (! is_array($payload)) {
-            return response()->json(['ok' => false, 'reason' => 'no_payload'], 200);
-        }
 
         return match ($event) {
             'pull_request' => $this->handlePullRequest($site, $payload),
@@ -133,7 +130,7 @@ class GithubCloudWebhookController extends Controller
 
     private function verifySignature(Request $request, Site $site, string $signatureHeader): bool
     {
-        if ($signatureHeader === '' || ! is_string($site->webhook_secret) || $site->webhook_secret === '') {
+        if ($signatureHeader === '' || $site->webhook_secret === '') {
             return false;
         }
         $expectedPrefix = 'sha256=';

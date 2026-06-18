@@ -1,9 +1,15 @@
 # dply self-manages dply — operational runbook
 
 dply manages its own prod control-plane: off-box secret escrow, DB backups, and
-(eventually) self-deploy run through dply's own features. `deploy.sh` is kept as
-**dormant break-glass** — the only non-circular way back in if a self-deploy
-bricks the box. See the plan: `~/.claude/plans/we-need-a-env-iridescent-marble.md`.
+(eventually) self-deploy run through dply's own features. See the plan:
+`~/.claude/plans/we-need-a-env-iridescent-marble.md`.
+
+> **Break-glass note:** `deploy.sh` used to double as a self-contained recovery
+> deployer. It has been reduced to `commit.sh` (commit + push only), so there is
+> **no longer a one-command break-glass deploy**. If a self-deploy bricks the box,
+> recovery is the manual on-box atomic-release procedure in W4 below (or restoring
+> `shared/.env` + the DB from the W1 escrow). Reintroducing a minimal standalone
+> recovery deployer is an open item — see the gap called out in W4.
 
 > Why this exists: the box's SSH keys, DB admin creds, and every secret are
 > encrypted in the Postgres **on that box**, under `APP_KEY` which lives in
@@ -66,22 +72,53 @@ for the control-plane Postgres. Record the resulting server IDs into
 
 ---
 
-## W4 — Self-deploy (deploy.sh stays as break-glass)
+## W4 — Self-deploy (no shell-deploy break-glass)
 - Onboard dply as a VM **Site** on the prod Server: repo + branch + deploy key,
   `deploy_strategy=atomic`, `env_file_path` = **external** `shared/.env` (never
   per-release), health check `/up` + `deploy_health_auto_rollback=true`.
-- Deploy steps cover the deploy.sh parity gaps: `composer install`, `npm ci` +
-  `npm run build`, `migrate`, `config:cache`/`route:cache`/`event:cache`/`view:cache`,
-  `pennant:clear`; shared `storage/` symlinked across releases.
+- Deploy steps cover the parity gaps the old shell deployer handled:
+  `composer install`, `npm ci` + `npm run build`, `migrate`,
+  `config:cache`/`route:cache`/`event:cache`/`view:cache`, `pennant:clear`; shared
+  `storage/` symlinked across releases.
 - Pre-deploy `secrets:check-drift` must pass (hard-fail on APP_KEY value drift).
 - Workers: their own Site(s); deploy web first, then workers.
 - **Always validate on a staging Site/box first**, then cut prod over.
 
-### Break-glass: a self-deploy bricked prod
+> **Gap:** the engine self-deploy is the *only* deploy path now that `deploy.sh`
+> is commit-only. If the control plane itself can't run the engine (it's down /
+> the box is bricked), there is no one-command fallback. Until a minimal
+> standalone recovery deployer is reintroduced, recovery is the manual procedure
+> below. Keep it tested.
+
+### Break-glass: a self-deploy bricked prod (manual atomic-release recovery)
 1. SSH in with the recovery key (from `critical-keys` escrow if needed).
-2. `git -C <ROOT>/repo fetch` and run `./deploy.sh "break-glass"` — the dormant
-   atomic-release path still works and is independent of the app being healthy.
-3. If `APP_KEY`/.env is the problem, restore `shared/.env` from W1 escrow.
+2. If `APP_KEY`/.env is the problem, restore `shared/.env` from W1 escrow first —
+   an empty/wrong env is the usual cause and nothing else will boot until it's right.
+3. If `current` points at a bad release, **roll back** to the previous good one
+   (instant, no rebuild):
+   ```bash
+   cd <ROOT>
+   ls -1dt releases/*/                                  # pick the previous good <ts>
+   ln -sfn releases/<ts> current.tmp && mv -Tf current.tmp current
+   sudo systemctl reload php8.5-fpm; sudo systemctl reload nginx   # web
+   sudo systemctl restart dply-site-*-horizon.service             # worker
+   ```
+4. If you must build a fresh release on the box by hand (engine unavailable),
+   reproduce the atomic-release steps manually:
+   ```bash
+   cd <ROOT>
+   TS=$(date +%Y%m%d%H%M%S); NEW="releases/$TS"
+   git --git-dir=repo fetch origin main --prune
+   mkdir -p "$NEW"
+   git --git-dir=repo archive "$(git --git-dir=repo rev-parse origin/main)" | tar -x -C "$NEW"
+   ln -sfn "$PWD/shared/.env" "$NEW/.env"; rm -rf "$NEW/storage"; ln -sfn "$PWD/shared/storage" "$NEW/storage"
+   ( cd "$NEW" && composer install --no-dev --optimize-autoloader \
+       && npm ci && npm run build \
+       && for c in config:cache route:cache event:cache view:cache; do php artisan $c; done \
+       && php artisan migrate --force )
+   ln -sfn "$PWD/$NEW" current.tmp && mv -Tf current.tmp current
+   sudo systemctl reload php8.5-fpm; sudo systemctl reload nginx   # web (workers: restart horizon)
+   ```
 
 ---
 

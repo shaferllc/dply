@@ -7,7 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Notifications\CronJobAlertNotification;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Str;
 
 final class CronJobAlertDispatcher
@@ -28,7 +28,7 @@ final class CronJobAlertDispatcher
             && $result->exitCode !== 0;
 
         $patternHit = false;
-        if ($job->alert_on_pattern_match && is_string($job->alert_pattern) && $job->alert_pattern !== '') {
+        if ($job->alert_on_pattern_match && ($job->alert_pattern) && $job->alert_pattern !== '') {
             set_error_handler(static fn () => true);
             $patternHit = @preg_match($job->alert_pattern, $result->output) === 1;
             restore_error_handler();

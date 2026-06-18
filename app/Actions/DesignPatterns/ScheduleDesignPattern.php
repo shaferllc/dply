@@ -50,7 +50,7 @@ class ScheduleDesignPattern extends DesignPattern
             || $frame->matches(Schedule::class, 'command');
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(ScheduleDecorator::class, ['action' => $instance]);
     }

@@ -24,6 +24,7 @@ final class DockerSiteDeployer
     /**
      * @return array{output: string, sha: ?string, compose_yaml: string, dockerfile: string}
      */
+    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $server = $site->server;
@@ -95,7 +96,7 @@ final class DockerSiteDeployer
             $log .= $ssh->exec(sprintf('cd %s && %s', $pathEsc, $post), 900);
         }
 
-        $customActivate = trim((string) ($site->activeDeployPipeline?->activate_script ?? ''));
+        $customActivate = trim((string) ($site->activeDeployPipeline->activate_script ?? ''));
         if ($customActivate !== '') {
             $log .= $this->anchorRunner->runActivate($ssh, $site, $path, $gitSsh, $repo, $branch);
             $this->hookRunner->assertHooksSucceeded($log, 'activate');

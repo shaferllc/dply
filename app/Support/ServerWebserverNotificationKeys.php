@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use App\Jobs\RevertServerWebserverSwitchJob;
+use App\Jobs\RunWebserverConfigOpJob;
+use App\Jobs\SwitchServerWebserverJob;
+
 /**
  * Notification event keys for server-scoped webserver changes, surfaced on the
  * /servers/{server}/webserver workspace (engine switch, rollback, config-file
@@ -10,8 +14,8 @@ namespace App\Support;
  * under the "webserver" category in config/notification_events.php.
  *
  * Scoped to the headline mutations that flow through the queued-job chokepoints
- * ({@see \App\Jobs\SwitchServerWebserverJob}, {@see \App\Jobs\RevertServerWebserverSwitchJob},
- * {@see \App\Jobs\RunWebserverConfigOpJob}). Mirrors {@see ServerFirewallNotificationKeys}.
+ * ({@see SwitchServerWebserverJob}, {@see RevertServerWebserverSwitchJob},
+ * {@see RunWebserverConfigOpJob}). Mirrors {@see ServerFirewallNotificationKeys}.
  */
 final class ServerWebserverNotificationKeys
 {

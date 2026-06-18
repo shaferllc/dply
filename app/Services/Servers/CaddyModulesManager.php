@@ -28,6 +28,7 @@ class CaddyModulesManager
      *     unreadable: bool,
      * }
      */
+    /** @return array<string, mixed> */
     public function read(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
@@ -75,6 +76,10 @@ class CaddyModulesManager
     /**
      * @return list<array{path: string, version: string, label: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function manifestPlugins(Server $server): array
     {
         $raw = data_get($server->meta, 'caddy_modules.plugins', []);
@@ -104,8 +109,8 @@ class CaddyModulesManager
     }
 
     /**
-     * @param  list<array{id: string, namespace: string, kind: string}>  $installedModules
-     * @return list<array{
+     * @param  array<string, mixed> $installedModules
+     * @return list<array<string, string>>
      *     path: string,
      *     version: string,
      *     label: string,
@@ -115,6 +120,11 @@ class CaddyModulesManager
      *     module_ids: list<string>,
      *     compiled: bool,
      * }>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, mixed>>
+     * @param  array<string, mixed> $installedModules
      */
     public function enrichedManifestPlugins(Server $server, array $installedModules = []): array
     {
@@ -157,8 +167,9 @@ class CaddyModulesManager
     }
 
     /**
-     * @param  list<string>  $moduleIds
-     * @param  list<string>  $installedModuleIds
+     * @param  array<string, mixed> $moduleIds
+     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed> $installedModuleIds
      */
     public function isPluginCompiled(string $path, array $moduleIds, array $installedModuleIds): bool
     {
@@ -334,6 +345,10 @@ BASH;
     /**
      * @return list<array{id: string, namespace: string, kind: string}>
      */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string>>
+     */
     public function parseModuleIds(string $output): array
     {
         $rows = [];
@@ -364,9 +379,15 @@ BASH;
     }
 
     /**
-     * @param  list<array{path: string, version: string, label: string}>  $manifestPlugins
-     * @param  list<array{id: string, namespace: string, kind: string}>  $installedModules
-     * @return list<string>
+     * @param  array<string, mixed> $manifestPlugins
+     * @param  array<string, mixed> $installedModules
+     * @return list<array<string, string>>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
+     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed> $manifestPlugins
      */
     public function satisfiedPluginPaths(array $manifestPlugins, array $installedModules): array
     {
@@ -390,10 +411,11 @@ BASH;
     }
 
     /**
-     * @param  list<array{path: string, version: string, label: string}>  $manifestPlugins
-     * @param  list<array{id: string, namespace: string, kind: string}>  $installedModules
-     * @return array<string, array{label: string, description: string}>
+     * @param  array<string, mixed> $manifestPlugins
+     * @param  array<string, mixed> $installedModules
+     * @return list<mixed>
      */
+    /** @return array<string, mixed> */
     public function availableCatalog(array $manifestPlugins, array $installedModules): array
     {
         $satisfied = array_flip($this->satisfiedPluginPaths($manifestPlugins, $installedModules));
@@ -407,8 +429,8 @@ BASH;
     }
 
     /**
-     * @param  list<array{path: string, version: string, label: string}>  $manifestPlugins
-     * @param  list<array{id: string, namespace: string, kind: string}>  $installedModules
+     * @param  array<string, mixed> $manifestPlugins
+     * @param  array<string, mixed> $installedModules
      * @return list<array{
      *     path: string,
      *     repo: string,
@@ -416,6 +438,12 @@ BASH;
      *     description: string,
      *     module_ids: list<string>,
      * }>
+     */
+    /** @return array<string, mixed> */
+    /**
+     * @return list<mixed>
+     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed> $manifestPlugins
      */
     public function browsePackages(array $manifestPlugins, array $installedModules, string $search = ''): array
     {
@@ -449,15 +477,18 @@ BASH;
     }
 
     /**
-     * @return array{
+     * @return list<mixed>
      *     path: string,
      *     repo: string,
      *     label: string,
      *     description: string,
      *     module_ids: list<string>,
      *     docs_url: string,
+     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed> $manifestPlugins
      * }
      */
+    /** @return array<string, mixed> */
     public function packageInfoForInstall(string $path): array
     {
         $path = trim($path);
@@ -508,7 +539,7 @@ BASH;
     }
 
     /**
-     * @param  list<array{path: string, version: string, label: string}>  $plugins
+     * @param  array<string, mixed> $plugins
      */
     private function persistManifest(Server $server, array $plugins, ?bool $customBinary = null): Server
     {

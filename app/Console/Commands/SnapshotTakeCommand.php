@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
 use App\Models\Snapshot;
-use App\Services\Snapshots\SnapshotDestinationFactory;
-use App\Services\Snapshots\SnapshotService;
+use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
+use App\Modules\Snapshots\Services\SnapshotService;
 use Illuminate\Console\Command;
 
 /**

@@ -45,6 +45,8 @@ class NetlifyImporter implements EdgeImporter
         return 'Netlify';
     }
 
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
     public function probe(): array
     {
         $response = $this->http()->get(self::BASE.'/user');
@@ -64,6 +66,10 @@ class NetlifyImporter implements EdgeImporter
         ];
     }
 
+    /** @return array<string, mixed> */
+    /**
+     * @return list<array<string, string|null>>
+     */
     public function listProjects(): array
     {
         $response = $this->http()->get(self::BASE.'/sites', [
@@ -127,8 +133,8 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $site
-     * @return array<string, string>
+     * @param  array<string, mixed> $site
+     * @return list<array<string, string|null>>
      */
     private function fetchEnvVars(array $site): array
     {
@@ -193,7 +199,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $site
+     * @param  array<string, mixed> $site
      * @return list<string>
      */
     private function customDomainsFromSite(array $site): array
@@ -213,7 +219,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $site
+     * @param  array<string, mixed> $site
      */
     private function repoFromSite(array $site): ?string
     {
@@ -230,7 +236,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $site
+     * @param  array<string, mixed> $site
      */
     private function frameworkFromSite(array $site): ?string
     {
@@ -249,7 +255,7 @@ class NetlifyImporter implements EdgeImporter
     }
 
     /**
-     * @param  array<string, mixed>  $build
+     * @param  array<string, mixed> $build
      */
     private function branchFromBuildSettings(array $build): ?string
     {

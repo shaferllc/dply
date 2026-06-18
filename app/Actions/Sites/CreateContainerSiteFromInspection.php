@@ -63,7 +63,7 @@ class CreateContainerSiteFromInspection
             'www_redirect' => false,
         ]);
 
-        $serverMeta = is_array($server->meta) ? $server->meta : [];
+        $serverMeta = $server->meta;
         $serverMeta['container_launch'] = array_merge(is_array($serverMeta['container_launch'] ?? null) ? $serverMeta['container_launch'] : [], [
             'site_id' => (string) $site->id,
             'target_family' => $targetFamily,

@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\RedisSnapshot;
 use App\Models\ServerCacheServiceAuditEvent;
+use App\Models\User;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\RedisSnapshotExporter;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -48,15 +49,16 @@ class ExportRedisSnapshotJob implements ShouldQueue
             $exporter->export($snapshot);
 
             $user = $snapshot->user;
-            if ($user) {
+            if ($user instanceof User) {
+                $fresh = $snapshot->fresh();
                 $auditLogger->record(
                     $server,
                     ServerCacheServiceAuditEvent::EVENT_BGSAVE,
                     [
                         'snapshot_id' => $snapshot->id,
-                        'engine' => $snapshot->cacheService?->engine,
-                        'bytes' => $snapshot->fresh()?->bytes,
-                        'storage_kind' => $snapshot->fresh()?->storage_kind,
+                        'engine' => $snapshot->cacheService->engine,
+                        'bytes' => $fresh?->bytes,
+                        'storage_kind' => $fresh?->storage_kind,
                     ],
                     $user,
                 );

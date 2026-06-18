@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
 use App\Models\User;
+use App\Services\Deploy\Manifest\DplyManifest;
 use App\Services\Deploy\Manifest\DplyManifestParser;
 use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,7 +39,7 @@ function sync(): SiteManifestCodeShapeSync
     return app(SiteManifestCodeShapeSync::class);
 }
 
-function manifest(string $yaml): \App\Services\Deploy\Manifest\DplyManifest
+function manifest(string $yaml): DplyManifest
 {
     return (new DplyManifestParser)->parseYaml($yaml);
 }

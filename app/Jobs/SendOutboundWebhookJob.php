@@ -26,6 +26,7 @@ class SendOutboundWebhookJob implements ShouldQueue
     public int $tries = 3;
 
     /** Backoff between attempts (seconds). */
+    /** @return list<int> */
     public function backoff(): array
     {
         return [10, 30, 120];
@@ -37,7 +38,7 @@ class SendOutboundWebhookJob implements ShouldQueue
     {
         /** @var OutboundWebhookDelivery|null $delivery */
         $delivery = OutboundWebhookDelivery::query()->find($this->deliveryId);
-        if ($delivery === null || $delivery->url === null || $delivery->url === '') {
+        if ($delivery === null || $delivery->url === '') {
             return;
         }
         if ($delivery->status === OutboundWebhookDelivery::STATUS_SENT) {
@@ -137,7 +138,7 @@ class SendOutboundWebhookJob implements ShouldQueue
 
     private function resolveSecret(OutboundWebhookDelivery $delivery): ?string
     {
-        $server = $delivery->server_id !== null ? Server::query()->find($delivery->server_id) : null;
+        $server = $delivery->server_id !== null ? Server::find($delivery->server_id) : null;
         if ($server === null) {
             return null;
         }

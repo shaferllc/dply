@@ -6,7 +6,7 @@ use App\Http\Controllers\CliInstallController;
 use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
-use App\Http\Controllers\DocsController;
+use App\Modules\Docs\Http\Controllers\DocsController;
 use App\Http\Controllers\Edge\EdgeAuditLogExportController;
 use App\Http\Controllers\Edge\EdgeLogCsvDownloadController;
 use App\Http\Controllers\Edge\EdgeRepoConfigYamlDownloadController;
@@ -22,11 +22,11 @@ use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\OrganizationComplianceExportController;
+use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\ServerCredentialShareController;
-use App\Http\Controllers\ServerlessFunctionProxyController;
+use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
-use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
@@ -36,13 +36,14 @@ use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
 use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
+use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
 use App\Livewire\Admin\Operations as AdminOperations;
 use App\Livewire\Admin\Organizations\Index as AdminOrganizationsIndex;
 use App\Livewire\Admin\Organizations\Show as AdminOrganizationsShow;
 use App\Livewire\Admin\Overview as AdminOverview;
-use App\Livewire\Admin\Roadmap\Index as AdminRoadmapIndex;
+use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
@@ -69,48 +70,48 @@ use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Fleet\Intelligence as FleetIntelligence;
-use App\Livewire\Fleet\OpsCopilot as FleetOpsCopilot;
+use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
 use App\Livewire\Fleet\Overview as FleetOverview;
 use App\Livewire\Fleet\Previews as FleetPreviews;
-use App\Livewire\Imports\Forge\Inventory;
-use App\Livewire\Imports\Parity as ImportParity;
-use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
-use App\Livewire\Imports\Ploi\MigrationProgress;
+use App\Modules\Imports\Livewire\Forge\Inventory;
+use App\Modules\Imports\Livewire\Parity as ImportParity;
+use App\Modules\Imports\Livewire\Ploi\Inventory as PloiInventory;
+use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
 use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
-use App\Livewire\Launches\Create as LaunchesCreate;
-use App\Livewire\Launches\FullStack as LaunchesFullStack;
-use App\Livewire\Launches\Path as LaunchesPath;
-use App\Livewire\Launches\StandbyBlueprint as LaunchesStandbyBlueprint;
+use App\Modules\Launch\Livewire\Create as LaunchesCreate;
+use App\Modules\Launch\Livewire\FullStack as LaunchesFullStack;
+use App\Modules\Launch\Livewire\Path as LaunchesPath;
+use App\Modules\Launch\Livewire\StandbyBlueprint as LaunchesStandbyBlueprint;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
-use App\Livewire\Marketplace\Index as MarketplaceIndex;
+use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Activity as OrganizationsActivity;
 use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
-use App\Livewire\Organizations\Settings as OrganizationsSettings;
-use App\Livewire\Organizations\Secrets as OrganizationsSecrets;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
-use App\Livewire\Organizations\Realtime as OrganizationsRealtime;
-use App\Livewire\Organizations\RealtimeAppShow as OrganizationsRealtimeShow;
+use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
+use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
+use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
+use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Livewire\Organizations\Show as OrganizationsShow;
 use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\OrgNetworking;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
-use App\Livewire\Profile\Referrals as ProfileReferrals;
-use App\Livewire\Projects\Index as ProjectsIndex;
-use App\Livewire\Projects\Show as ProjectsShow;
-use App\Livewire\Roadmap\Index as RoadmapIndex;
-use App\Livewire\Scripts\Create as ScriptsCreate;
-use App\Livewire\Scripts\Edit as ScriptsEdit;
-use App\Livewire\Scripts\Index as ScriptsIndex;
-use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
-use App\Livewire\Serverless\Create as ServerlessCreate;
-use App\Livewire\Serverless\Glue as ServerlessGlue;
-use App\Livewire\Serverless\Index as ServerlessIndex;
-use App\Livewire\Serverless\Journey as ServerlessJourney;
+use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
+use App\Modules\Projects\Livewire\Index as ProjectsIndex;
+use App\Modules\Projects\Livewire\Show as ProjectsShow;
+use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
+use App\Modules\Marketplace\Livewire\Scripts\Create as ScriptsCreate;
+use App\Modules\Marketplace\Livewire\Scripts\Edit as ScriptsEdit;
+use App\Modules\Marketplace\Livewire\Scripts\Index as ScriptsIndex;
+use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
+use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
+use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
+use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
+use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
@@ -120,7 +121,6 @@ use App\Livewire\Servers\Deploys as ServerDeploys;
 use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
-use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceBackupsPreview;
 use App\Livewire\Servers\WorkspaceBlueprint;
@@ -138,8 +138,6 @@ use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDaemonSlo;
 use App\Livewire\Servers\WorkspaceDatabases;
-use App\Livewire\Servers\WorkspaceDeployPolicy;
-use App\Livewire\Servers\WorkspaceDeployPolicyPreview;
 use App\Livewire\Servers\WorkspaceDocker;
 use App\Livewire\Servers\WorkspaceDockerPreview;
 use App\Livewire\Servers\WorkspaceEdgeProxy;
@@ -155,13 +153,12 @@ use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Livewire\Servers\WorkspaceMaintenancePreview;
 use App\Livewire\Servers\WorkspaceManage;
-use App\Livewire\Servers\WorkspaceNotifications;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceNetworking;
+use App\Livewire\Servers\WorkspaceNotifications;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
-use App\Livewire\Servers\WorkspaceSnapshots;
 use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Livewire\Servers\WorkspaceReleaseHygienePreview;
 use App\Livewire\Servers\WorkspaceRun;
@@ -172,8 +169,10 @@ use App\Livewire\Servers\WorkspaceSecurityDigestPreview;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSharedHost;
+use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceSharedHostPreview;
 use App\Livewire\Servers\WorkspaceSites;
+use App\Livewire\Servers\WorkspaceSnapshots;
 use App\Livewire\Servers\WorkspaceSshAccessGraph;
 use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
 use App\Livewire\Servers\WorkspaceSshKeys;
@@ -433,6 +432,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/operations', AdminOperations::class)->name('operations');
             Route::livewire('/audit', AdminAuditLog::class)->name('audit');
             Route::livewire('/roadmap', AdminRoadmapIndex::class)->name('roadmap.index');
+            Route::livewire('/feedback', AdminFeedbackIndex::class)->name('feedback.index');
+            Route::get('/feedback/{report}/screenshot', \App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController::class)->name('feedback.screenshot');
+            Route::livewire('/users', \App\Livewire\Admin\Users\Index::class)->name('users.index');
+            Route::post('/impersonate/{user}', [\App\Http\Controllers\Admin\ImpersonationController::class, 'start'])->name('impersonate.start');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');
@@ -758,9 +761,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/database', SitesDatabase::class)->name('sites.database');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
-    Route::get('servers/{server}/sites/{site}/quick-download/{artifact}', [QuickDownloadController::class, 'siteArtifact'])->name('sites.quick-download');
-    Route::get('servers/{server}/databases/{database}/quick-dump', [QuickDownloadController::class, 'databaseDump'])->name('servers.databases.quick-dump');
-    Route::get('servers/{server}/quick-dump', [QuickDownloadController::class, 'adhocDatabaseDump'])->name('servers.quick-dump');
+    // Quick downloads now queue + stage to the download bucket; this signed,
+    // login-gated route streams the staged artifact once then deletes it.
+    Route::get('quick-downloads/{quickDownload}/fetch', [QuickDownloadController::class, 'fetch'])
+        ->middleware('signed')
+        ->name('quick-download.fetch');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to
@@ -849,11 +854,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.cert_inventory')->group(function (): void {
         Route::livewire('servers/{server}/cert-inventory', WorkspaceCertInventory::class)->name('servers.cert-inventory');
     });
-    // No feature middleware: the component renders the full workspace when
-    // workspace.deploy_windows is on, or the coming-soon teaser when it is
-    // off but workspace.deploy_windows_preview is on (else 404).
-    Route::livewire('servers/{server}/deploy-policy', WorkspaceDeployPolicy::class)->name('servers.deploy-policy');
-    Route::livewire('servers/{server}/deploy-policy-preview', WorkspaceDeployPolicyPreview::class)->name('servers.deploy-policy-preview');
+    // Deploy windows are GA and now live as tabs on the unified Deploys page
+    // (servers.deploys?tab=deploy-windows) — see App\Livewire\Servers\Deploys.
     // No feature middleware: the component renders the full workspace when
     // workspace.ssh_access_graph is on, or the coming-soon teaser when it is
     // off but workspace.ssh_access_graph_preview is on (else 404).
@@ -874,9 +876,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
-    Route::middleware('feature:workspace.activity')->group(function (): void {
-        Route::livewire('servers/{server}/activity', WorkspaceActivity::class)->name('servers.activity');
-    });
+    // Activity was merged into the Logs page (servers.logs?tab=activity); the
+    // standalone route and its workspace.activity gate were retired.
     Route::middleware('feature:workspace.services')->group(function (): void {
         Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     });
@@ -959,6 +960,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
     });
     Route::livewire('servers/{server}/cli-preview', WorkspaceCliPreview::class)->name('servers.cli-preview');
+    // Tools — promoted from the dissolved Manage > Tools sub-tab to its own
+    // peer workspace. servers.manage stays registered below purely as a
+    // back-compat redirector for old /manage deep links + bookmarks.
+    Route::livewire('servers/{server}/tools', WorkspaceTools::class)->name('servers.tools');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 

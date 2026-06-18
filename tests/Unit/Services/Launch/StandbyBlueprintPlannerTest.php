@@ -10,7 +10,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\User;
-use App\Services\Launch\StandbyBlueprintPlanner;
+use App\Modules\Launch\Services\StandbyBlueprintPlanner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

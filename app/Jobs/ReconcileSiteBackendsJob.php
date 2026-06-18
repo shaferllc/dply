@@ -106,11 +106,6 @@ class ReconcileSiteBackendsJob implements ShouldQueue
     private function advance(Site $site, SiteBackend $backend, SiteBackendReplicator $replicator): bool
     {
         $server = $backend->server;
-        if ($server === null) {
-            $this->markState($backend, SiteBackend::STATE_ERRORED);
-
-            return true;
-        }
 
         return match ($backend->state) {
             SiteBackend::STATE_PROVISIONING => $this->onProvisioning($site, $backend, $replicator),
@@ -125,7 +120,7 @@ class ReconcileSiteBackendsJob implements ShouldQueue
      */
     private function onProvisioning(Site $site, SiteBackend $backend, SiteBackendReplicator $replicator): bool
     {
-        if (! $backend->server?->isProvisioningComplete()) {
+        if (! $backend->server->isProvisioningComplete()) {
             return false;
         }
 
@@ -173,7 +168,7 @@ class ReconcileSiteBackendsJob implements ShouldQueue
 
     private function markState(SiteBackend $backend, string $state): void
     {
-        $meta = is_array($backend->meta) ? $backend->meta : [];
+        $meta = $backend->meta;
         if (($backend->state ?? null) !== $state) {
             $meta['state_since'] = now()->toIso8601String();
         }

@@ -15,7 +15,7 @@ use App\Services\Edge\EdgeSsrBundleUploader;
 use App\Services\Edge\EdgeTestingHostnameProvisioner;
 use App\Services\Edge\EnsureEdgeRepoDomains;
 use App\Services\Edge\OriginHealthcheckRunner;
-use App\Services\Notifications\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -58,7 +58,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             return;
         }
 
-        $site = Site::query()->find($deployment->site_id);
+        $site = Site::find($deployment->site_id);
         if ($site === null) {
             return;
         }
@@ -140,7 +140,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             $site->update([
                 'status' => Site::STATUS_EDGE_ACTIVE,
                 'edge_backend_id' => (string) ($site->edge_backend_id ?: $deployment->id),
-                'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+                'meta' => array_merge($site->meta, ['edge' => $meta]),
             ]);
 
             try {
@@ -239,7 +239,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
         $meta['last_error_at'] = now()->toIso8601String();
         $site->update([
             'status' => Site::STATUS_EDGE_FAILED,
-            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+            'meta' => array_merge($site->meta, ['edge' => $meta]),
         ]);
         $deployment->update([
             'status' => EdgeDeployment::STATUS_FAILED,

@@ -12,9 +12,6 @@ class EmplaceIterator implements \Iterator
     /** @var array */
     private $ret = [];
 
-    /**
-     * @param \Iterator $iterator
-     */
     public function __construct(\Iterator $iterator)
     {
         $this->iterator = $iterator;
@@ -25,7 +22,7 @@ class EmplaceIterator implements \Iterator
      */
     public function current()
     {
-        if (!empty($this->ret)) {
+        if (! empty($this->ret)) {
             return array_pop($this->ret);
         }
 
@@ -34,7 +31,7 @@ class EmplaceIterator implements \Iterator
 
     public function next(): void
     {
-        if (!empty($this->ret)) {
+        if (! empty($this->ret)) {
             return;
         }
         $this->iterator->next();
@@ -48,9 +45,6 @@ class EmplaceIterator implements \Iterator
         return $this->iterator->key();
     }
 
-    /**
-     * @return bool
-     */
     public function valid(): bool
     {
         return $this->iterator->valid();

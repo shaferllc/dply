@@ -13,9 +13,12 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
-            </div>
+            <x-hero-card
+                :eyebrow="$workspaceTitle"
+                :title="__('Environment')"
+                :description="__('Manage the environment variables and secrets used by this site at runtime.')"
+                icon="key"
+            />
 
             @if ($headerRoleLabel !== null)
                 <div class="mt-3 flex items-center gap-2">
@@ -33,43 +36,15 @@
                 </div>
             @endif
 
-            <x-page-header
-                :title="$sectionHeader['title']"
-                :description="$sectionDescription"
-                :show-documentation="false"
-                toolbar
-                flush
-                class="mt-3"
-            >
-                <x-slot name="leading">
-                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                        @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
-                    </span>
-                </x-slot>
-            </x-page-header>
-
             <main class="min-w-0 space-y-6 mt-8">
                 @if ($watchedConsoleRunId)
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
                 @endif
 
-                @if ($sectionConsoleActionKinds !== [])
-                    <div
-                        id="site-console-action-banner"
-                        x-data="{}"
-                        x-on:dply-console-action-focus.window="$nextTick(() => {
-                            const el = document.getElementById('site-console-action-banner');
-                            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-                        })"
-                    >
-                        @include('livewire.partials.console-action-banner-static', [
-                            'run' => $sectionConsoleActionRun,
-                            'kindLabels' => (array) config('console_actions.kinds', []),
-                        ])
-                    </div>
-                @endif
-
-                @include('livewire.sites.settings.partials.environment')
+                {{-- The console-run banner is rendered inside the env partial's
+                     consolidated "Needs attention" panel (consoleRunInline), so
+                     it's no longer a separate top-level card here. --}}
+                @include('livewire.sites.settings.partials.environment', ['consoleRunInline' => true])
             </main>
         </div>
     </div>

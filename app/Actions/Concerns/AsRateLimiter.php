@@ -405,6 +405,10 @@ use Illuminate\Http\Exceptions\ThrottleRequestsException;
  */
 trait AsRateLimiter
 {
+    // Property/method introspection (hasProperty, getProperty, ...) resolves
+    // against the action this trait is mixed into.
+    use DecorateActions;
+
     // This trait is now just a marker trait.
     // The actual rate limiting logic is handled by ActionRateLimiterDecorator
     // which is automatically applied via ActionRateLimiterDesignPattern.

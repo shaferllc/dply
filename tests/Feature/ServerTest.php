@@ -4,7 +4,7 @@ namespace Tests\Feature\ServerTest;
 
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Enums\SiteType;
-use App\Jobs\FinalizeContainerCloudLaunchJob;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;

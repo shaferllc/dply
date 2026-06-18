@@ -54,7 +54,7 @@ class PushWorkerPoolAgentConfigJob implements ShouldQueue
         $envVars = $this->agentEnvVars($pool);
 
         foreach ($pool->servers as $member) {
-            if (! $member instanceof Server || ! $member->isReady()) {
+            if (! $member->isReady()) {
                 continue;
             }
             $site = $this->appSite($member);
@@ -73,7 +73,7 @@ class PushWorkerPoolAgentConfigJob implements ShouldQueue
      */
     private function agentEnvVars(WorkerPool $pool): array
     {
-        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta = $pool->meta;
         $token = (string) ($meta['event_token'] ?? '');
         if ($token === '') {
             $token = bin2hex(random_bytes(24));
@@ -81,7 +81,7 @@ class PushWorkerPoolAgentConfigJob implements ShouldQueue
             $pool->forceFill(['meta' => $meta])->save();
         }
 
-        $base = rtrim((string) (env('DPLY_POOL_EVENT_INGEST_BASE') ?: config('app.url')), '/');
+        $base = rtrim((string) (config('dply.worker_pool_event_ingest_base') ?: config('app.url')), '/');
 
         return [
             'DPLY_POOL_EVENT_URL' => $base.'/api/worker-pools/'.$pool->id.'/job-events',

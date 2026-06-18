@@ -40,6 +40,7 @@ class CaddySnippetsConfig
      *
      * @return array{snippets: list<array{name: string, body: string, raw: string}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
@@ -79,7 +80,7 @@ class CaddySnippetsConfig
      * snippet name → new body text. Snippets not in the update map are
      * left untouched.
      *
-     * @param  array<string, string>  $updates
+     * @param  array<string, mixed> $updates
      *
      * @throws \RuntimeException
      */

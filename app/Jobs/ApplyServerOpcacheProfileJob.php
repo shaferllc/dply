@@ -27,7 +27,6 @@ class ApplyServerOpcacheProfileJob implements ShouldQueue
 
     public function handle(ServerOpcacheConfigEditor $editor): void
     {
-        /** @var ServerPhpOpcacheProfile|null $profile */
         $profile = ServerPhpOpcacheProfile::query()->with('server')->find($this->profileId);
         if ($profile === null || $profile->server === null) {
             return;

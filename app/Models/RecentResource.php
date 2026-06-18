@@ -7,16 +7,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
- * A user's recently-visited resource, recorded by the command palette when the
- * operator drills into a site or server. Powers the palette's empty-query
- * "Recently visited" group. One row per (user, resource_type, resource_id); a
- * re-visit bumps {@see $visited_at} rather than inserting a duplicate.
- *
- * This is a lightweight history record, not a source of truth — labels and URLs
- * are always re-resolved from the live resource at render time, so renamed or
- * deleted resources never show stale.
+ * @property string $id
+ *                      A user's recently-visited resource, recorded by the command palette when the
+ *                      operator drills into a site or server. Powers the palette's empty-query
+ *                      "Recently visited" group. One row per (user, resource_type, resource_id); a
+ *                      re-visit bumps {@see $visited_at} rather than inserting a duplicate.
+ *                      This is a lightweight history record, not a source of truth — labels and URLs
+ *                      are always re-resolved from the live resource at render time, so renamed or
+ *                      deleted resources never show stale.
+ * @property ?string $resource_id
+ * @property string $resource_type
+ * @property ?string $user_id
+ * @property ?Carbon $visited_at
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class RecentResource extends Model
 {
@@ -34,6 +42,7 @@ class RecentResource extends Model
         'visited_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -41,6 +50,7 @@ class RecentResource extends Model
         ];
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

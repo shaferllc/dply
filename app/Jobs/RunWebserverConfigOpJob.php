@@ -8,6 +8,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Modules\Notifications\Services\ServerWebserverNotificationDispatcher;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Bus\Queueable;
@@ -53,9 +54,9 @@ class RunWebserverConfigOpJob implements ShouldQueue
         public ?string $revisionSummary = null,
     ) {}
 
-    public function handle(RemoteWebserverConfigService $service, \App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
+    public function handle(RemoteWebserverConfigService $service, ServerWebserverNotificationDispatcher $notifications): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if ($server === null) {
             $this->markConsole(ConsoleAction::STATUS_FAILED, error: 'Server not found.');
 
@@ -107,7 +108,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
                 $this->engine,
                 $this->path,
                 $this->contents,
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 $this->revisionSummary,
             );
 
@@ -133,7 +134,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
                 $server,
                 'config_saved',
                 [__(':engine config: :path', ['engine' => $this->engine, 'path' => $this->path])],
-                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::find($this->userId) : null,
                 ['engine' => $this->engine, 'path' => $this->path, 'op' => $this->op],
             );
         }

@@ -7,8 +7,8 @@ namespace App\Console\Commands;
 use App\Jobs\ApplySiteCdnJob;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Services\RemoteCli\RiskLevel;
-use App\Services\RemoteCli\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use Illuminate\Console\Command;
 
 class CdnDisableCommand extends Command
@@ -38,7 +38,7 @@ class CdnDisableCommand extends Command
             return self::SUCCESS;
         }
 
-        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta = $site->meta;
         $meta['cdn'] = array_merge($cfg, ['enabled' => false]);
         $site->meta = $meta;
         $site->save();
@@ -50,7 +50,7 @@ class CdnDisableCommand extends Command
             risk: RiskLevel::MutatingRecoverable,
             transport: SiteAuditEvent::TRANSPORT_CLI,
             summary: 'Edge disabled for '.($cfg['hostname'] ?? $site->name),
-            payload: ['provider' => $cfg['provider'] ?? null, 'hostname' => $cfg['hostname'] ?? null],
+            payload: ['provider' => $cfg['provider'], 'hostname' => $cfg['hostname'] ?? null],
         );
 
         if ($this->option('sync')) {

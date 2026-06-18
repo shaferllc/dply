@@ -125,7 +125,7 @@ class FindFleetDomainCommand extends Command
             array_map(fn (array $m) => [
                 $m['hostname'],
                 $m['site_name'],
-                $m['site_runtime'] ?? '—',
+                $m['site_runtime'],
                 $m['server_name'] ?? '—',
                 $m['is_primary'] ? '★' : '',
             ], $matches),

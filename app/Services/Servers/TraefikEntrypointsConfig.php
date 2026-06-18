@@ -22,6 +22,7 @@ class TraefikEntrypointsConfig
     /**
      * @return array{entrypoints: list<array{name: string, address: string, locked: bool}>, unreadable: bool}
      */
+    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -110,7 +111,7 @@ class TraefikEntrypointsConfig
     }
 
     /**
-     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed> $parsed
      */
     private function persist(Server $server, array $parsed, ?ConsoleEmitter $emitter, string $label): void
     {

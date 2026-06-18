@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\RunServerSecurityDigestScanJob;
+use App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Notifications\ServerSecurityDigestNotificationDispatcher;
+use App\Modules\Notifications\Services\ServerSecurityDigestNotificationDispatcher;
 use App\Services\SshConnection;
 use RuntimeException;
 
@@ -16,8 +18,8 @@ use RuntimeException;
  * worsens into a warning / critical state or recovers to healthy.
  *
  * Shared by the interactive "Refresh digest" button
- * ({@see \App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan}) and the daily
- * fleet sweep ({@see \App\Jobs\RunServerSecurityDigestScanJob}) so both run one code path.
+ * ({@see RunsServerSecurityDigestScan}) and the daily
+ * fleet sweep ({@see RunServerSecurityDigestScanJob}) so both run one code path.
  */
 final class ServerSecurityDigestScanner
 {
@@ -100,7 +102,7 @@ final class ServerSecurityDigestScanner
         }
 
         throw new RuntimeException(
-            $lastError?->getMessage() ?: __('SSH connection failed for security digest.'),
+            $lastError->getMessage() ?: __('SSH connection failed for security digest.'),
             0,
             $lastError,
         );
@@ -137,7 +139,7 @@ final class ServerSecurityDigestScanner
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array<string, mixed> $report
      * @return list<string>
      */
     private function detailLines(string $kind, array $report): array

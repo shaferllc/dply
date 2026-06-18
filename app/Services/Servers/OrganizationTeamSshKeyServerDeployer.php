@@ -18,6 +18,10 @@ class OrganizationTeamSshKeyServerDeployer
         protected ServerAuthorizedKeysAuditLogger $auditLogger,
     ) {}
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function deployOrganizationKey(User $actor, OrganizationSshKey $key, Server $server, string $targetLinuxUserStored): array
     {
         if ($key->organization_id !== $server->organization_id) {
@@ -58,6 +62,10 @@ class OrganizationTeamSshKeyServerDeployer
         return ['ok' => true, 'message' => __('Organization key linked and synced.')];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    /** @return array<string, mixed> */
     public function deployTeamKey(User $actor, TeamSshKey $key, Server $server, string $targetLinuxUserStored): array
     {
         if ((string) $key->team_id !== (string) $server->team_id) {

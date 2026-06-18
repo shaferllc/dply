@@ -45,7 +45,7 @@ class CloudLogsCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if ($site->container_backend === '') {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;
@@ -112,26 +112,26 @@ class CloudLogsCommand extends Command
             return self::FAILURE;
         }
 
-        $logLines = is_array($result['lines'] ?? null) ? $result['lines'] : [];
+        $logLines = $result['lines'];
         if ($logLines !== []) {
             foreach ($logLines as $line) {
                 $this->line((string) $line);
             }
         }
 
-        if (! ($result['available'] ?? false)) {
-            if (is_string($result['note'] ?? null) && $result['note'] !== '') {
+        if (! $result['available']) {
+            if (isset($result['note']) && $result['note'] !== '') {
                 $this->line($result['note']);
             }
         } elseif ($logLines === []) {
-            if (is_string($result['note'] ?? null) && $result['note'] !== '') {
+            if (isset($result['note']) && $result['note'] !== '') {
                 $this->line('<fg=gray>'.$result['note'].'</>');
             } else {
                 $this->line('<fg=gray>No runtime log lines returned by backend.</>');
             }
         }
 
-        if (is_string($result['url'] ?? null) && $result['url'] !== '') {
+        if (isset($result['url']) && $result['url'] !== '') {
             $this->newLine();
             $this->line('Runtime logs / console:');
             $this->line($result['url']);

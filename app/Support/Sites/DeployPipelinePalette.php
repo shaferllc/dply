@@ -7,6 +7,7 @@ namespace App\Support\Sites;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Sites\SiteDeployPipelineCommands;
+use Illuminate\Support\Collection;
 
 /**
  * Filters and resolves deploy pipeline palette entries for a site.
@@ -47,14 +48,14 @@ final class DeployPipelinePalette
         $grouped = [];
         foreach (self::allPaletteEntries() as $index => $entry) {
             $groupId = self::catalogGroupId($entry);
-            $type = (string) ($entry['type'] ?? SiteDeployStep::TYPE_CUSTOM);
+            $type = $entry['type'];
             $custom = isset($entry['custom_command']) ? (string) $entry['custom_command'] : null;
 
             $grouped[$groupId][] = [
                 'type' => $type,
-                'label' => (string) ($entry['label'] ?? $type),
-                'icon' => (string) ($entry['icon'] ?? 'heroicon-o-plus'),
-                'phase' => (string) ($entry['phase'] ?? SiteDeployStep::PHASE_BUILD),
+                'label' => $entry['label'],
+                'icon' => $entry['icon'],
+                'phase' => $entry['phase'],
                 'custom_command' => $custom,
                 'requires' => $entry['requires'] ?? null,
                 'requires_label' => self::requiresLabel($entry['requires'] ?? null),
@@ -131,7 +132,9 @@ final class DeployPipelinePalette
      */
     public static function hookCatalogFor(Site $site): array
     {
-        $presets = collect(config('site_deploy_pipeline.hook_presets', []))
+        /** @var list<array{kind?: string, label?: string, icon?: string, anchor?: string, script?: string, requires?: string}> $hookPresetsRaw */
+        $hookPresetsRaw = config('site_deploy_pipeline.hook_presets', []);
+        $presets = (new Collection($hookPresetsRaw))
             ->map(fn (array $entry): array => [
                 'kind' => (string) ($entry['kind'] ?? 'shell'),
                 'label' => (string) ($entry['label'] ?? ''),
@@ -195,10 +198,10 @@ final class DeployPipelinePalette
      */
     public static function stepsFor(Site $site): array
     {
-        return collect(config('site_deploy_pipeline.palette', []))
-            ->filter(fn (array $entry): bool => self::entryVisible($site, $entry))
-            ->values()
-            ->all();
+        return array_values(array_filter(
+            self::allPaletteEntries(),
+            fn (array $entry): bool => self::entryVisible($site, $entry),
+        ));
     }
 
     /**
@@ -206,10 +209,13 @@ final class DeployPipelinePalette
      */
     public static function hookPresetsFor(Site $site): array
     {
-        return collect(config('site_deploy_pipeline.hook_presets', []))
-            ->filter(fn (array $entry): bool => self::entryVisible($site, $entry))
-            ->values()
-            ->all();
+        /** @var list<array{kind?: string, label?: string, icon?: string, anchor?: string, script?: string, requires?: string}> $hookPresetsRaw */
+        $hookPresetsRaw = config('site_deploy_pipeline.hook_presets', []);
+
+        return array_values(array_filter(
+            $hookPresetsRaw,
+            fn (array $entry): bool => self::entryVisible($site, $entry),
+        ));
     }
 
     /**

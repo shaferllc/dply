@@ -5,30 +5,43 @@ namespace App\Models;
 use App\Jobs\Concerns\WritesConsoleAction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
+ * @property string $id
+ * @property string $subject_type
+ * @property string $subject_id
+ * @property string $kind
+ * @property string $status
+ * @property ?Carbon $started_at
+ * @property ?Carbon $finished_at
+ * @property ?Carbon $dismissed_at
+ * @property ?string $error
+ * @property ?string $label
+ * @property ?array<string, mixed> $output
+ * @property ?string $user_id
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property-read Model $subject
+ * @property-read ?User $user
  * One row per backgrounded action whose progress we want to surface in the
  * page-top console banner. Polymorphic so anything (Site, Server, Deploy, …)
  * can have console-able runs without per-model schema gymnastics.
- *
  * Lifecycle (driven by {@see WritesConsoleAction}):
  *   queued  → seedQueuedRun()   — row exists before the worker picks it up
  *   running → beginConsoleRun() — worker started, started_at stamped
  *   completed | failed          — terminal; finished_at + (optional) error set
- *
  * Output is a versioned JSON wrapper:
  *   { v: 1, lines: [{ t: epochMs, level: "info|step|warn|error|success", source: "nginx", line: "..." }, ...] }
- *
  * Append trims to config('console_actions.max_lines') so a chatty run can't
  * grow the row unboundedly.
  */
 class ConsoleAction extends Model
 {
-    use HasFactory, HasUlids;
+    use HasUlids;
 
     public const STATUS_QUEUED = 'queued';
 
@@ -73,6 +86,7 @@ class ConsoleAction extends Model
         'user_id',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -83,11 +97,13 @@ class ConsoleAction extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function subject(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -96,6 +112,10 @@ class ConsoleAction extends Model
     /**
      * Latest non-dismissed row for a subject. Pages call this to drive the banner.
      */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeForSubject(Builder $query, Model $subject): Builder
     {
         return $query
@@ -103,16 +123,28 @@ class ConsoleAction extends Model
             ->where('subject_id', $subject->getKey());
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeNotDismissed(Builder $query): Builder
     {
         return $query->whereNull('dismissed_at');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOfKind(Builder $query, string $kind): Builder
     {
         return $query->where('kind', $kind);
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeInFlight(Builder $query): Builder
     {
         return $query->whereIn('status', [self::STATUS_QUEUED, self::STATUS_RUNNING]);
@@ -130,7 +162,7 @@ class ConsoleAction extends Model
 
     public function isQueuedStalled(): bool
     {
-        if ($this->status !== self::STATUS_QUEUED || $this->created_at === null) {
+        if ($this->status !== self::STATUS_QUEUED) {
             return false;
         }
 
@@ -183,9 +215,8 @@ class ConsoleAction extends Model
             return [];
         }
 
-        // v1: { v: 1, lines: [...] }; tolerate "raw list" shape too in case
-        // something writes [{...}, ...] directly.
-        $lines = $output['lines'] ?? (array_is_list($output) ? $output : []);
+        // v1: { v: 1, lines: [...] }
+        $lines = $output['lines'] ?? [];
         if (! is_array($lines)) {
             return [];
         }

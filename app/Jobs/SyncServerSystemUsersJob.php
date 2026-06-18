@@ -40,6 +40,9 @@ class SyncServerSystemUsersJob implements ShouldBeUnique, ShouldQueue
      * yields a stale snapshot, and the operator only cares about the latest
      * action anyway.
      */
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'console-action:system_user:server:'.$this->serverId;
@@ -47,7 +50,7 @@ class SyncServerSystemUsersJob implements ShouldBeUnique, ShouldQueue
 
     protected function consoleSubject(): Model
     {
-        return Server::query()->findOrFail($this->serverId);
+        return Server::findOrFail($this->serverId);
     }
 
     protected function consoleKind(): string
@@ -62,7 +65,7 @@ class SyncServerSystemUsersJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(ServerSystemUserService $service, ServerPasswdUserLister $lister): void
     {
-        $server = Server::query()->find($this->serverId);
+        $server = Server::find($this->serverId);
         if (! $server) {
             return;
         }

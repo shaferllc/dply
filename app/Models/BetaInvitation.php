@@ -9,14 +9,27 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * A closed-beta invitation, bound to a single email address. Admin-issued (one
- * by one, in bulk, or pulled from the coming-soon waitlist); a valid unredeemed
- * token lets that email register while public signups are closed, and flags the
- * resulting org as a beta participant. See Livewire\Auth\Register and
- * Livewire\Admin\BetaInvites.
+ * @property string $id
+ *                      A closed-beta invitation, bound to a single email address. Admin-issued (one
+ *                      by one, in bulk, or pulled from the coming-soon waitlist); a valid unredeemed
+ *                      token lets that email register while public signups are closed, and flags the
+ *                      resulting org as a beta participant. See Livewire\Auth\Register and
+ *                      Livewire\Admin\BetaInvites.
+ * @property string $email
+ * @property ?Carbon $expires_at
+ * @property ?Carbon $redeemed_at
+ * @property ?Carbon $revoked_at
+ * @property string $source
+ * @property string $token
+ * @property-read ?User $inviter
+ * @property-read ?User $redeemer
+ * @property-read ?Organization $organization
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class BetaInvitation extends Model
 {
@@ -40,6 +53,7 @@ class BetaInvitation extends Model
         'revoked_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -54,16 +68,19 @@ class BetaInvitation extends Model
         return 'token';
     }
 
+    /** @return BelongsTo<User, $this> */
     public function inviter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function redeemer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'redeemed_by_user_id');
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
@@ -71,7 +88,7 @@ class BetaInvitation extends Model
 
     public function isExpired(): bool
     {
-        return $this->expires_at->isPast();
+        return $this->expires_at !== null && $this->expires_at->isPast();
     }
 
     public function isRedeemed(): bool
@@ -93,6 +110,10 @@ class BetaInvitation extends Model
         return ! $this->isRedeemed() && ! $this->isRevoked() && ! $this->isExpired();
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeRedeemable(Builder $query): Builder
     {
         return $query->whereNull('redeemed_at')

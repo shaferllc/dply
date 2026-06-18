@@ -12,15 +12,17 @@ use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\DeployResumePlan;
-use App\Services\Secrets\EphemeralSecretIdentityContext;
 use App\Services\Deploy\EphemeralDeployCredentialManager;
-use App\Services\Notifications\DeployDigestBuffer;
-use App\Services\Notifications\NotificationPublisher;
-use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
+use App\Modules\Notifications\Services\DeployDigestBuffer;
+use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
+use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\Servers\ServerDeployPolicyGuard;
+use App\Services\Sites\AtomicDeployHealthChecker;
 use App\Services\Sites\Backends\CanarySiteDeployer;
 use App\Services\Sites\Backends\RollingSiteDeployer;
 use App\Services\Sites\RequiredEnvEvaluator;
+use App\Services\SshConnection;
 use App\Support\DeployLogRedactor;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
@@ -33,7 +35,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 
 class RunSiteDeploymentJob implements ShouldQueue
 {
@@ -63,12 +64,13 @@ class RunSiteDeploymentJob implements ShouldQueue
         NotificationPublisher $notificationPublisher,
         EphemeralDeployCredentialManager $ephemeralCredentials,
     ): void {
-        $this->site = $this->site->fresh();
-        if (! $this->site) {
+        $freshSite = $this->site->fresh();
+        if ($freshSite === null) {
             $this->clearIdempotencyInflight();
 
             return;
         }
+        $this->site = $freshSite;
 
         $this->site->loadMissing('project');
         if ($this->site->project === null) {
@@ -87,6 +89,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_PLATFORM_DISABLED,
                 'exit_code' => null,
                 'log_output' => 'VM deploys are temporarily disabled by platform administrators.',
                 'started_at' => now(),
@@ -100,11 +103,24 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         if ($organization !== null && ! $organization->canDeploy()) {
+            // Interactive clicks are pre-gated in the UI with a billing prompt,
+            // so don't persist a phantom "skipped" row that reads as a stuck
+            // deploy. Machine triggers (webhook/API/schedule/sync) still leave an
+            // audited, clearly-labelled record so there's a trail of "a deploy
+            // was requested while paused".
+            if ($this->isInteractiveTrigger()) {
+                Cache::forget('site-deploy-active:'.$this->site->id);
+                $this->clearIdempotencyInflight();
+
+                return;
+            }
+
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_BILLING_PAUSED,
                 'exit_code' => null,
                 'log_output' => 'Deploys are paused while this organization\'s trial is expired. Add a payment method on the billing page to resume.',
                 'started_at' => now(),
@@ -118,27 +134,30 @@ class RunSiteDeploymentJob implements ShouldQueue
             return;
         }
 
-        if (Feature::active('workspace.deploy_windows')) {
-            $policyDecision = app(ServerDeployPolicyGuard::class)->evaluate($this->site);
-            if (! $policyDecision['allowed']) {
-                $deployment = SiteDeployment::query()->create([
-                    'site_id' => $this->site->id,
-                    'project_id' => $this->site->project_id,
-                    'trigger' => $this->trigger,
-                    'status' => SiteDeployment::STATUS_SKIPPED,
-                    'exit_code' => null,
-                    'log_output' => (string) ($policyDecision['reason'] ?? 'Deploy blocked by server deploy window policy.'),
-                    'started_at' => now(),
-                    'finished_at' => now(),
-                    'idempotency_key' => $this->apiIdempotencyHash,
-                ]);
-                $this->auditDeploy($deployment);
-                $this->clearIdempotencyInflight();
-                $this->notifyStakeholders($deployment, $notificationPublisher);
-                $this->notifyDeployWindowBlocked($policyDecision);
+        // Deploy windows are GA — always evaluate. The guard returns allowed=true
+        // when the server has no policy or enforcement is disabled, so this is a
+        // no-op for servers that never configured deny windows.
+        $policyDecision = app(ServerDeployPolicyGuard::class)->evaluate($this->site);
+        if (! $policyDecision['allowed']) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_DEPLOY_WINDOW,
+                'skip_rule_summary' => $policyDecision['rule_summary'] ?? null,
+                'exit_code' => null,
+                'log_output' => (string) ($policyDecision['reason'] ?? 'Deploy blocked by server deploy window policy.'),
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+            $this->notifyStakeholders($deployment, $notificationPublisher);
+            $this->notifyDeployWindowBlocked($policyDecision);
 
-                return;
-            }
+            return;
         }
 
         $lock = Cache::lock('site-deploy:'.$this->site->id, $this->timeout);
@@ -150,6 +169,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_ALREADY_RUNNING,
                 'exit_code' => null,
                 'log_output' => 'Another deployment is already running for this site.',
                 'started_at' => now(),
@@ -201,7 +221,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $fingerprint = 'SHA256:'.(string) $ephemeralCredential->public_key_fingerprint;
                 $ephemeralLog[] = '── Ephemeral deploy credentials ──';
                 $ephemeralLog[] = 'Issued a one-time ed25519 deploy key ('.$fingerprint.').';
-                $ephemeralLog[] = 'Installed on '.($this->site->server?->name ?? 'the server')
+                $ephemeralLog[] = 'Installed on '.($this->site->server->name ?? 'the server')
                     .' via the operational SSH key; this deploy authenticates with it.';
             }
 
@@ -240,6 +260,47 @@ class RunSiteDeploymentJob implements ShouldQueue
                     ));
                 }
                 $redacted = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($result['output']));
+
+                // UNIVERSAL post-cutover HTTP health gate. The atomic deployer
+                // already smoke-tests inline (with auto-rollback) and records the
+                // 'health' phase; every OTHER VM path (simple/flat) otherwise
+                // reaches success WITHOUT one — so a render-time 500 went green.
+                // Run the same gate here for those paths before the deploy can be
+                // called a success. A flat deploy can't roll back (no previous
+                // release symlink), so this DETECTS and fails the deploy rather
+                // than silently succeeding. The checker honors
+                // meta.deploy_health_enabled and self-skips when there's no
+                // hostname, so this is a safe no-op where it shouldn't run.
+                if ($this->site->server->isVmHost()
+                    && filled($this->site->server->ssh_private_key)
+                    && ! $deployment->hasPhase('health')) {
+                    $healthStart = microtime(true);
+                    try {
+                        $healthLog = app(AtomicDeployHealthChecker::class)
+                            ->verify($this->site, new SshConnection($this->site->server));
+                        if (trim($healthLog) !== '') {
+                            $deployment->recordPhaseResults('health', [[
+                                'label' => __('HTTP health check'),
+                                'ok' => true,
+                                'skipped' => str_contains($healthLog, 'skipped:'),
+                                'output' => trim($healthLog),
+                                'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+                            ]]);
+                            $redacted .= "\n".DeployLogRedactor::redact($healthLog);
+                        }
+                    } catch (\Throwable $healthError) {
+                        $deployment->recordPhaseResults('health', [[
+                            'label' => __('HTTP health check'),
+                            'ok' => false,
+                            'output' => $healthError->getMessage(),
+                            'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+                        ]]);
+                        // Re-throw → the catch below marks the deployment FAILED
+                        // with the diagnostic and does NOT advance last_deploy_at.
+                        throw $healthError;
+                    }
+                }
+
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,
                     'git_sha' => $result['sha'],
@@ -363,7 +424,10 @@ class RunSiteDeploymentJob implements ShouldQueue
      */
     private function pullEphemeralIdentity(): ?string
     {
-        if ($this->ephemeralIdentityToken === null) {
+        // isset() (not === null) so a stale queue payload serialized before this
+        // property existed — which leaves the typed property uninitialized on
+        // unserialize, not null — degrades gracefully instead of fatally.
+        if (! isset($this->ephemeralIdentityToken)) {
             return null;
         }
 
@@ -432,7 +496,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         // deployment's timeline shows the whole pipeline. The atomic deployer
         // skips those phases on disk; these records keep them visible.
         $carried = [];
-        $originPhases = is_array($origin->phase_results) ? $origin->phase_results : [];
+        $originPhases = $origin->phase_results;
         foreach (DeployResumePlan::PHASE_ORDER as $phase) {
             if ($phase === $startPhase) {
                 break;
@@ -458,6 +522,21 @@ class RunSiteDeploymentJob implements ShouldQueue
         if ($this->apiIdempotencyHash) {
             Cache::forget('api-deploy-inflight:'.$this->apiIdempotencyHash);
         }
+    }
+
+    /**
+     * True when a human kicked off this deploy from the UI (manual click or a
+     * resume click) — as opposed to a webhook/API/schedule/sync trigger with no
+     * human watching. Interactive deploys that hit the billing pause are dropped
+     * silently (the UI already prompts for payment) rather than leaving a
+     * phantom "skipped" row; machine triggers leave an audited record.
+     */
+    protected function isInteractiveTrigger(): bool
+    {
+        return in_array($this->trigger, [
+            SiteDeployment::TRIGGER_MANUAL,
+            SiteDeployment::TRIGGER_RESUME,
+        ], true);
     }
 
     protected function cacheIdempotencySuccess(SiteDeployment $deployment): void
@@ -499,7 +578,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $org) {
             return;
         }
-        $user = $this->auditUserId ? User::query()->find($this->auditUserId) : null;
+        $user = $this->auditUserId ? User::find($this->auditUserId) : null;
         $action = match ($deployment->status) {
             SiteDeployment::STATUS_SUCCESS => 'site.deploy.success',
             SiteDeployment::STATUS_FAILED => 'site.deploy.failed',
@@ -632,7 +711,7 @@ class RunSiteDeploymentJob implements ShouldQueue
      * subscribed on the deploy-window workspace. Best-effort: never let a
      * notification failure derail the (already-skipped) deploy.
      *
-     * @param  array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}  $policyDecision
+     * @param  array{allowed: bool, reason: ?string, rule_summary: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}  $policyDecision
      */
     protected function notifyDeployWindowBlocked(array $policyDecision): void
     {
@@ -656,7 +735,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $server,
                 'deploy_blocked',
                 $details,
-                $this->auditUserId ? User::query()->find($this->auditUserId) : null,
+                $this->auditUserId ? User::find($this->auditUserId) : null,
                 [
                     'site_id' => (string) $this->site->id,
                     'site_name' => $this->site->name,
@@ -688,11 +767,20 @@ class RunSiteDeploymentJob implements ShouldQueue
             ->first();
 
         if ($deployment !== null) {
+            // $exception is null when the worker was killed outright (OOM,
+            // SIGKILL, a self-deploy restarting this very queue) rather than
+            // throwing — guard against a blank reason so the deploy never reads
+            // as "failed with no output" in the UI.
+            $reason = trim((string) ($exception?->getMessage() ?? ''));
+            if ($reason === '') {
+                $reason = 'The deploy worker was terminated mid-deploy before it could record an error (e.g. restart, timeout, or out-of-memory). Trigger the deploy again.';
+            }
+
             $deployment->update([
                 'status' => SiteDeployment::STATUS_FAILED,
                 'exit_code' => $deployment->exit_code ?? 1,
                 'log_output' => trim(($deployment->log_output ? $deployment->log_output."\n\n" : '')
-                    .'Deployment failed: '.($exception?->getMessage() ?? 'job terminated')),
+                    .'Deployment failed: '.$reason),
                 'finished_at' => now(),
             ]);
         }

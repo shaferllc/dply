@@ -8,6 +8,18 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property ?string $note
+ * @property ?string $organization_id
+ * @property ?string $site_id
+ * @property ?string $user_id
+ * @property-read ?Site $site
+ * @property-read ?Organization $organization
+ * @property-read ?User $user
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class EdgePreviewReviewApproval extends Model
 {
     use HasUlids;
@@ -19,16 +31,19 @@ class EdgePreviewReviewApproval extends Model
         'note',
     ];
 
+    /** @return BelongsTo<Site, $this> */
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
     }
 
+    /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

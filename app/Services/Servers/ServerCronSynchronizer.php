@@ -113,7 +113,7 @@ class ServerCronSynchronizer
 
         $block = $markerBegin."\n";
         if ($maintenanceUntil !== null && now()->lt($maintenanceUntil)) {
-            $note = trim((string) $server->organization?->cron_maintenance_note);
+            $note = trim((string) $server->organization->cron_maintenance_note);
             $block .= '# DPLY: cron jobs paused until '.$maintenanceUntil->toIso8601String()
                 .($note !== '' ? ' — '.$note : '')."\n";
         } else {

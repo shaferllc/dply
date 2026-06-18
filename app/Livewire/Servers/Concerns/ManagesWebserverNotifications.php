@@ -5,7 +5,8 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\ServerWebserverNotificationDispatcher;
 use App\Support\ServerWebserverNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Gate;
  *
  * Webserver mutations fire from queued jobs (switch/revert/config-op), so unlike
  * the other notification traits this one provides no inline dispatch helper — the
- * jobs call {@see \App\Services\Notifications\ServerWebserverNotificationDispatcher}
+ * jobs call {@see ServerWebserverNotificationDispatcher}
  * directly. Reuses the host's existing `$workspace_tab` state. Mirrors
  * {@see ManagesFirewallNotifications}.
  */
@@ -123,7 +124,7 @@ trait ManagesWebserverNotifications
         }
 
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
+        if ($channel !== null) {
             Gate::authorize('manageNotificationChannels', $channel->owner);
         }
 

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Jobs\OptimizeSitePipelineJob;
+use App\Jobs\VerifySiteOctaneJob;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
+use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\Sites\OctaneRuntimeVerifier;
 use App\Support\Sites\SitePipelineAdvisor;
 use Livewire\Component;
 
@@ -20,34 +23,60 @@ use Livewire\Component;
  * component doesn't carry the full pipeline-editing trait.
  *
  * Requires the host component to expose `$this->site`, `authorize()`,
- * `seedQueuedConsoleAction()` and (optionally) `watchConsoleAction()`.
+ * `seedQueuedConsoleAction()`, and {@see WatchesConsoleActionOutcomes}.
  *
  * @phpstan-require-extends Component
+ *
+ * @property Site $site
  */
 trait OptimizesPipeline
 {
+    use DispatchesToastNotifications;
+    use WatchesConsoleActionOutcomes;
+
+    /**
+     * Deferred (wire:init) trigger that confirms Octane is actually installed
+     * and serving this site before the "Reload Octane workers" suggestion is
+     * allowed to show. The advisor can't SSH from the render path, so it gates
+     * on a cached verdict; this queues the probe that writes it — but only when
+     * Octane is plausibly relevant (Laravel + laravel/octane in composer, VM
+     * host) and the last verdict is missing or stale, so we don't SSH on every
+     * page load.
+     */
+    public function ensureOctaneVerificationProbe(): void
+    {
+        $site = $this->site;
+        $server = $site->server;
+        if ($server === null || ! $server->isVmHost() || ! $site->isLaravelFrameworkDetected()) {
+            return;
+        }
+
+        $detection = $site->resolvedRuntimeAppDetection() ?? [];
+        if (empty($detection['laravel_octane'])) {
+            return;
+        }
+
+        if (! OctaneRuntimeVerifier::isStale($site)) {
+            return;
+        }
+
+        VerifySiteOctaneJob::dispatch((string) $site->id);
+    }
+
     public function optimizePipeline(): void
     {
         $this->authorize('update', $this->site);
-
-        if (! method_exists($this, 'seedQueuedConsoleAction')) {
-            return;
-        }
 
         $run = $this->seedQueuedConsoleAction('pipeline_optimize', __('Optimizing pipeline'));
         OptimizeSitePipelineJob::dispatch((string) $run->id, (string) $this->site->id);
 
         $this->dispatch('dply-console-action-focus');
-        if (method_exists($this, 'watchConsoleAction')) {
-            $this->watchConsoleAction(
-                $run,
-                __('Scan complete — review the proposed changes before applying.'),
-                __('Pipeline optimize did not finish — see the output.'),
-            );
-        }
-        if (method_exists($this, 'toastConsoleActionQueued')) {
-            $this->toastConsoleActionQueued();
-        }
+        $this->watchConsoleAction(
+            $run,
+            __('Scan complete — review the proposed changes before applying.'),
+            __('Pipeline optimize did not finish — see the output.'),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -109,18 +138,11 @@ trait OptimizesPipeline
         // its own, so this unset is what actually makes its card disappear.
         $this->site->unsetRelation('deploySteps');
 
-        if (method_exists($this, 'syncEditingPipelineBranches')) {
-            // Pipeline editor: refresh so the new steps render immediately.
-            $this->site->refresh();
-        }
-
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(trans_choice(
-                '{0} No new steps to add.|{1} Added :count step to the pipeline.|[2,*] Added :count steps to the pipeline.',
-                $added,
-                ['count' => $added],
-            ));
-        }
+        $this->toastSuccess(trans_choice(
+            '{0} No new steps to add.|{1} Added :count step to the pipeline.|[2,*] Added :count steps to the pipeline.',
+            $added,
+            ['count' => $added],
+        ));
     }
 
     /**
@@ -164,15 +186,10 @@ trait OptimizesPipeline
         // Recompute the advisor against the just-added step so the suggestion
         // clears on re-render (see applyPipelineOptimization for the why).
         $this->site->unsetRelation('deploySteps');
-        if (method_exists($this, 'syncEditingPipelineBranches')) {
-            $this->site->refresh();
-        }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess($already
-                ? __('That step is already in the pipeline.')
-                : __(':label added to the :phase phase.', ['label' => $suggestion['label'], 'phase' => $suggestion['phase']]));
-        }
+        $this->toastSuccess($already
+            ? __('That step is already in the pipeline.')
+            : __(':label added to the :phase phase.', ['label' => $suggestion['label'], 'phase' => $suggestion['phase']]));
     }
 
     /**
@@ -183,16 +200,14 @@ trait OptimizesPipeline
     {
         $this->authorize('update', $this->site);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta = $this->site->meta;
         $meta[SitePipelineAdvisor::DISMISSED_META_KEY] = array_values(array_unique(array_merge(
             (array) ($meta[SitePipelineAdvisor::DISMISSED_META_KEY] ?? []),
             [$key],
         )));
         $this->site->forceFill(['meta' => $meta])->save();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Suggestion dismissed.'));
-        }
+        $this->toastSuccess(__('Suggestion dismissed.'));
     }
 
     /**
@@ -202,13 +217,11 @@ trait OptimizesPipeline
     {
         $this->authorize('update', $this->site);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta = $this->site->meta;
         unset($meta[SitePipelineAdvisor::DISMISSED_META_KEY]);
         $this->site->forceFill(['meta' => $meta])->save();
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Dismissed suggestions restored.'));
-        }
+        $this->toastSuccess(__('Dismissed suggestions restored.'));
     }
 
     /**
@@ -223,7 +236,7 @@ trait OptimizesPipeline
 
     private function clearPipelineOptimizePreview(): void
     {
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta = $this->site->meta;
         unset($meta['pipeline_optimize_preview']);
         $this->site->forceFill(['meta' => $meta])->save();
     }

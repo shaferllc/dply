@@ -44,7 +44,17 @@
         <span class="block truncate text-xs text-brand-moss">{{ $item['sublabel'] }}</span>
     @endif
 </span>
-@if ($isNest)
+@if (! empty($isToggle))
+    {{-- Multi-select tick box. Server-rendered from $item['selected'] so it flips
+         on the toggle round-trip; no Alpine state to keep in sync. --}}
+    <span @class([
+        'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors',
+        'border-brand-forest bg-brand-forest text-white' => ! empty($item['selected']),
+        'border-brand-ink/25 text-transparent' => empty($item['selected']),
+    ])>
+        <x-heroicon-m-check class="h-3.5 w-3.5" />
+    </span>
+@elseif ($isNest)
     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" />
 @elseif (! empty($isAction))
     {{-- Action rows: a bolt affordance normally; when armed for confirmation

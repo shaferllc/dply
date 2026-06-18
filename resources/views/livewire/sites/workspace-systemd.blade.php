@@ -11,13 +11,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
+            <x-hero-card
                 :eyebrow="__('Background')"
                 :title="__('Services')"
-                :description="__('Systemd units for this site — web upstream and worker/scheduler processes as dply-site-:id-:name.service files.', ['id' => $site->id, 'name' => '{name}'])"
-                :show-documentation="false"
-                flush
-                compact
+                :description="__('Manage the systemd units for this site — the web upstream and worker or scheduler processes.')"
+                icon="cpu-chip"
             />
 
             @if (! $supportsSystemd)

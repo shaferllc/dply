@@ -7,10 +7,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
- * One recorded scheduler run's captured output. Rolling history, count-capped
- * per heartbeat (pruned inline on write). See [[project_schedule_mirrors_workers]].
+ * @property string $id
+ *                      One recorded scheduler run's captured output. Rolling history, count-capped
+ *                      per heartbeat (pruned inline on write). See [[project_schedule_mirrors_workers]].
+ * @property int $duration_ms
+ * @property int $exit_code
+ * @property ?Carbon $ran_at
+ * @property ?string $server_scheduler_heartbeat_id
+ * @property string $stderr_excerpt
+ * @property string $stdout_excerpt
+ * @property string $trigger
+ * @property-read ?ServerSchedulerHeartbeat $heartbeat
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
  */
 class SchedulerTickOutput extends Model
 {
@@ -36,6 +48,7 @@ class SchedulerTickOutput extends Model
         'ran_at',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,6 +58,7 @@ class SchedulerTickOutput extends Model
         ];
     }
 
+    /** @return BelongsTo<ServerSchedulerHeartbeat, $this> */
     public function heartbeat(): BelongsTo
     {
         return $this->belongsTo(ServerSchedulerHeartbeat::class, 'server_scheduler_heartbeat_id');

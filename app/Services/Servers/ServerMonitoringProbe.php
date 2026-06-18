@@ -19,6 +19,7 @@ class ServerMonitoringProbe
      *
      * @return array{reachable: bool, python_installed: ?bool, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function probeAndStore(Server $server): array
     {
         $server = $server->fresh();
@@ -31,6 +32,7 @@ class ServerMonitoringProbe
     /**
      * @return array{reachable: bool, python_installed: ?bool, error: ?string}
      */
+    /** @return array<string, mixed> */
     public function probe(Server $server): array
     {
         $inline = <<<'BASH'

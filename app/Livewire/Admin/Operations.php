@@ -53,7 +53,7 @@ class Operations extends Component
 
     protected function appendConsole(string $label, string $command, string $output, int $exit): void
     {
-        $header = sprintf("$ %s   [%s · exit %d]", $command, $label, $exit);
+        $header = sprintf('$ %s   [%s · exit %d]', $command, $label, $exit);
         $body = $output !== '' ? $output : '(no output)';
         $this->consoleOutput = trim($header."\n".$body."\n\n".$this->consoleOutput);
         // Cap so the property stays small across many runs.

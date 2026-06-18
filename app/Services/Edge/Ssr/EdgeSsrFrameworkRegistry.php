@@ -91,7 +91,7 @@ class EdgeSsrFrameworkRegistry
      * Pick the first profile whose `detectDependencies` overlaps
      * with the package.json passed in. Returns null when none match.
      *
-     * @param  array<string, mixed>  $packageJson
+     * @param  array<string, mixed> $packageJson
      */
     public static function detectInProject(array $packageJson): ?EdgeSsrFrameworkProfile
     {
@@ -112,7 +112,7 @@ class EdgeSsrFrameworkRegistry
     }
 
     /**
-     * @param  array<string, mixed>  $packageJson
+     * @param  array<string, mixed> $packageJson
      */
     public static function adapterInstalled(EdgeSsrFrameworkProfile $profile, array $packageJson): bool
     {
@@ -124,7 +124,7 @@ class EdgeSsrFrameworkRegistry
     }
 
     /**
-     * @param  array<string, mixed>  $packageJson
+     * @param  array<string, mixed> $packageJson
      * @return list<string>
      */
     private static function declaredDependencyNames(array $packageJson): array

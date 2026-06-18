@@ -249,7 +249,7 @@ class WebserverConfigDocLinks
     {
         foreach (self::RULES[$engine] ?? [] as $rule) {
             if ($this->ruleMatches($rule, $path)) {
-                return $rule['description'] ?? null;
+                return $rule['description'];
             }
         }
 

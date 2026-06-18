@@ -48,7 +48,7 @@ final class LoggingConfigGenerator
 TXT;
 
     /**
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      */
     public function generate(array $spec): string
     {
@@ -77,7 +77,7 @@ TXT;
      * baseline `null` + `emergency` channels (the framework falls back to
      * `emergency`, and `deprecations` defaults to `null`).
      *
-     * @param  array<string, mixed>  $spec
+     * @param  array<string, mixed> $spec
      * @return array<string, mixed>
      */
     private function channelDefs(array $spec): array
@@ -111,7 +111,7 @@ TXT;
     }
 
     /**
-     * @param  array<string, mixed>  $c
+     * @param  array<string, mixed> $c
      * @return array<string, mixed>
      */
     private function renderChannel(array $c): array
@@ -180,7 +180,7 @@ TXT;
      * PsrLogMessageProcessor so `{placeholder}` interpolation works (Q7), and
      * a JsonFormatter when the caller asked for JSON output.
      *
-     * @param  array<string, mixed>  $handlerWith
+     * @param  array<string, mixed> $handlerWith
      * @return array<string, mixed>
      */
     private function monolog(string $handlerClass, array $handlerWith, string $level, bool $json = false): array
@@ -281,7 +281,7 @@ TXT;
      * names. dply cannot verify these exist — the deploy resolution probe (Q9)
      * is what catches a bad class before the symlink flips.
      *
-     * @param  array<string, mixed>  $c
+     * @param  array<string, mixed> $c
      * @return array<string, mixed>
      */
     private function custom(array $c, string $level): array
@@ -326,7 +326,7 @@ TXT;
         return $def;
     }
 
-    /** @param  array<string, mixed>  $c */
+    /** @param  array<string, mixed> $c */
     private function level(array $c): string
     {
         $level = strtolower(trim((string) ($c['level'] ?? 'debug')));
@@ -334,7 +334,7 @@ TXT;
         return in_array($level, LoggingChannelCatalog::LEVELS, true) ? $level : 'debug';
     }
 
-    /** @param  array<string, mixed>  $env */
+    /** @param  array<string, mixed> $env */
     private function envKey(array $env, string $field): string
     {
         $key = strtoupper(trim((string) ($env[$field] ?? '')));
@@ -426,7 +426,7 @@ TXT;
         return $this->str((string) $value);
     }
 
-    /** @param  array<mixed>  $arr */
+    /** @param  array<string, mixed> $arr */
     private function exportArray(array $arr, int $depth): string
     {
         if ($arr === []) {

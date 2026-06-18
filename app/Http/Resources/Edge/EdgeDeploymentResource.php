@@ -21,7 +21,7 @@ final class EdgeDeploymentResource extends JsonResource
     public function toArray(Request $request): array
     {
         $deployment = $this->resource;
-        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : null;
+        $repoConfig = $deployment->repo_config;
 
         return [
             'id' => (string) $deployment->id,
@@ -33,7 +33,7 @@ final class EdgeDeploymentResource extends JsonResource
             'pruned' => $deployment->pruned_at !== null,
             'cf_kv_version' => $deployment->cf_kv_version,
             'aliases' => $deployment->aliasHostnames(),
-            'repo_config' => $repoConfig === null ? null : [
+            'repo_config' => [
                 'source_path' => $repoConfig['source_path'] ?? null,
                 'build_overrides' => $repoConfig['build'] ?? [],
                 'redirect_count' => count((array) ($repoConfig['redirects'] ?? [])),
@@ -44,7 +44,7 @@ final class EdgeDeploymentResource extends JsonResource
             'failure_reason' => $deployment->failure_reason,
             'published_at' => $deployment->published_at?->toIso8601String(),
             'failed_at' => $deployment->failed_at?->toIso8601String(),
-            'created_at' => $deployment->created_at?->toIso8601String(),
+            'created_at' => $deployment->created_at->toIso8601String(),
         ];
     }
 }

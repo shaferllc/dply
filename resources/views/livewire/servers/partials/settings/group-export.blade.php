@@ -7,7 +7,7 @@
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Export') }}</p>
                 <h3 id="settings-group-export-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manifest') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Download a JSON summary for runbooks or handoffs. Account-to-account server transfer is not available yet.') }}</p>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Download a JSON summary for runbooks or handoffs — server details, sites, and your notes. Secrets are never included. Account-to-account server transfer is not available yet.') }}</p>
             </div>
         </div>
         <div class="px-6 py-6 sm:px-7">

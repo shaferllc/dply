@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ForgeMigrationWizardTest;
 
-use App\Jobs\Imports\RunMigrationStepJob;
+use App\Modules\Imports\Jobs\RunMigrationStepJob;
 use App\Livewire\Servers\Create\StepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Models\ForgeServer;

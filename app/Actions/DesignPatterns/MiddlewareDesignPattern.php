@@ -23,7 +23,7 @@ class MiddlewareDesignPattern extends DesignPattern
             || $frame->instanceOf(Kernel::class);
     }
 
-    public function decorate($instance, BacktraceFrame $frame)
+    public function decorate(mixed $instance, BacktraceFrame $frame): mixed
     {
         return app(MiddlewareDecorator::class, ['action' => $instance]);
     }

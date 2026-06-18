@@ -190,7 +190,7 @@ class SendSiteLogTestJob implements ShouldQueue
      */
     private function channelType(SiteBinding $binding, string $channel): string
     {
-        $config = is_array($binding->config) ? $binding->config : [];
+        $config = $binding->config;
         foreach ((array) ($config['channels'] ?? []) as $c) {
             if (is_array($c) && ($c['name'] ?? null) === $channel) {
                 return (string) ($c['type'] ?? '');

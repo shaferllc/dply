@@ -2,17 +2,17 @@
 
 namespace App\Livewire\Backups;
 
-use App\Jobs\ExportServerDatabaseBackupJob;
-use App\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Models\BackupConfiguration;
+use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
-use App\Services\Servers\DatabaseBackupExporter;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
@@ -24,6 +24,7 @@ use Livewire\Component;
 class Databases extends Component
 {
     use DispatchesToastNotifications;
+    use QueuesQuickDownloads;
 
     public function render(): View
     {
@@ -91,18 +92,18 @@ class Databases extends Component
 
         return view('livewire.backups.databases', [
             'featureActive' => true,
-            'organization'  => $org,
-            'databases'     => $databases,
-            'metrics'       => [
-                'completed7d'       => $completed7d,
-                'failed7d'          => $failed7d,
-                'storage'           => Number::fileSize((int) $storageBytes),
-                'activeSchedules'   => $activeSchedules,
-                'unprotectedServers'=> $unprotectedServers,
+            'organization' => $org,
+            'databases' => $databases,
+            'metrics' => [
+                'completed7d' => $completed7d,
+                'failed7d' => $failed7d,
+                'storage' => Number::fileSize((int) $storageBytes),
+                'activeSchedules' => $activeSchedules,
+                'unprotectedServers' => $unprotectedServers,
             ],
-            'schedules'     => $schedules,
-            'recentRuns'    => $recentRuns,
-            'destinations'  => $destinations,
+            'schedules' => $schedules,
+            'recentRuns' => $recentRuns,
+            'destinations' => $destinations,
         ]);
     }
 
@@ -127,7 +128,7 @@ class Databases extends Component
         Gate::authorize('update', $schedule->server);
 
         match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE   => $this->dispatchDatabase($schedule),
+            ServerBackupSchedule::TARGET_DATABASE => $this->dispatchDatabase($schedule),
             ServerBackupSchedule::TARGET_SITE_FILES => $this->dispatchSiteFiles($schedule),
             default => $this->toastError(__('Unknown backup target type.')),
         };
@@ -147,8 +148,8 @@ class Databases extends Component
 
         $backup = ServerDatabaseBackup::create([
             'server_database_id' => $database->id,
-            'user_id'            => auth()->id(),
-            'status'             => ServerDatabaseBackup::STATUS_PENDING,
+            'user_id' => auth()->id(),
+            'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
 
         app(DatabaseBackupExporter::class)->prepareBackupRow(
@@ -176,7 +177,7 @@ class Databases extends Component
         $backup = SiteFileBackup::create([
             'site_id' => $site->id,
             'user_id' => auth()->id(),
-            'status'  => SiteFileBackup::STATUS_PENDING,
+            'status' => SiteFileBackup::STATUS_PENDING,
         ]);
 
         ExportSiteFileBackupJob::dispatch($backup->id);

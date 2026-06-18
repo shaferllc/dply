@@ -20,11 +20,6 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer tone="info">
-        <p>{{ __('Each row is a Linux user the server already has in /etc/passwd. The site count shows how many Dply-managed sites are currently set to run as that user — those sites must be reassigned before you can remove the account.') }}</p>
-        <p>{{ __('root, dply, and the configured deploy user are protected — Dply refuses to remove them. UID below 1000 (system accounts) is also blocked.') }}</p>
-    </x-explainer>
-
     @if (! $opsReady)
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
@@ -42,23 +37,14 @@
         {{-- In-page sub-tabs: the /etc/passwd account list vs. notification routing
              for this server's system_user.* events. Keeps "set up alerts" one click
              away instead of bouncing the operator out to global settings. --}}
-        <div class="mb-6 border-b border-brand-ink/10">
-            <nav class="-mb-px flex gap-6" aria-label="{{ __('System users sections') }}">
-                @php
-                    $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
-                    $tabOn = 'border-brand-forest text-brand-ink';
-                    $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
-                @endphp
-                <button type="button" wire:click="$set('activeTab', 'accounts')" @class([$tabBase, $activeTab === 'accounts' ? $tabOn : $tabOff])>
-                    <x-heroicon-o-users class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Accounts') }}
-                </button>
-                <button type="button" wire:click="$set('activeTab', 'notifications')" @class([$tabBase, $activeTab === 'notifications' ? $tabOn : $tabOff])>
-                    <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Notifications') }}
-                </button>
-            </nav>
-        </div>
+        <x-server-workspace-tablist :aria-label="__('System users sections')">
+            <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="$set('activeTab', 'accounts')">
+                {{ __('Accounts') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab icon="heroicon-o-bell" :active="$activeTab === 'notifications'" wire:click="$set('activeTab', 'notifications')">
+                {{ __('Notifications') }}
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
 
         <div @class(['space-y-6', 'hidden' => $activeTab !== 'accounts'])>
             {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
@@ -127,7 +113,7 @@
                         <div class="min-w-0">
                             <p class="font-semibold">{{ trans_choice('{1} :count orphan account|[2,*] :count orphan accounts', $orphanRows->count(), ['count' => $orphanRows->count()]) }}</p>
                             <p class="mt-0.5 text-xs text-amber-900/80">
-                                {{ __('Not protected and not assigned to any site:') }}
+                                {{ __('Not protected and not used by any site, worker, or cron job:') }}
                                 <span class="font-mono">{{ $orphanRows->pluck('username')->join(', ') }}</span>
                                 — {{ __('expand a row to inspect, or remove them all in one go.') }}
                             </p>
@@ -170,6 +156,9 @@
                                 $home = (string) ($row['home'] ?? '');
                                 $shell = (string) ($row['shell'] ?? '');
                                 $isRemoving = in_array($row['username'], $pending_remove_usernames, true);
+                                $workerCount = (int) ($row['worker_count'] ?? 0);
+                                $cronCount = (int) ($row['cron_count'] ?? 0);
+                                $inUse = ($row['site_count'] ?? 0) > 0 || $workerCount > 0 || $cronCount > 0;
                             @endphp
                             <li class="px-6 py-4 sm:px-8" wire:key="su-{{ $row['username'] }}">
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -206,6 +195,14 @@
 
                                         <p class="mt-0.5 text-[11px] text-brand-mist">
                                             {{ trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $row['site_count'], ['count' => $row['site_count']]) }}
+                                            @if ($workerCount > 0)
+                                                <span class="text-brand-mist/60">·</span>
+                                                {{ trans_choice('{1} :count worker|[2,*] :count workers', $workerCount, ['count' => $workerCount]) }}
+                                            @endif
+                                            @if ($cronCount > 0)
+                                                <span class="text-brand-mist/60">·</span>
+                                                {{ trans_choice('{1} :count cron job|[2,*] :count cron jobs', $cronCount, ['count' => $cronCount]) }}
+                                            @endif
                                             @if ($shell !== '')
                                                 <span class="text-brand-mist/60">·</span>
                                                 <span class="font-mono">{{ $shell }}</span>
@@ -267,6 +264,26 @@
                                                             @endif
                                                         </dd>
                                                     </div>
+                                                    @if ($workerCount > 0 || $cronCount > 0)
+                                                        <div class="sm:col-span-2">
+                                                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Also used by') }}</dt>
+                                                            <dd class="mt-1 flex flex-wrap gap-1.5">
+                                                                @if ($workerCount > 0)
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                                        <x-heroicon-m-cog-6-tooth class="h-3 w-3" />
+                                                                        {{ trans_choice('{1} :count worker process|[2,*] :count worker processes', $workerCount, ['count' => $workerCount]) }}
+                                                                    </span>
+                                                                @endif
+                                                                @if ($cronCount > 0)
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                                        <x-heroicon-m-clock class="h-3 w-3" />
+                                                                        {{ trans_choice('{1} :count cron job|[2,*] :count cron jobs', $cronCount, ['count' => $cronCount]) }}
+                                                                    </span>
+                                                                @endif
+                                                            </dd>
+                                                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Removing this account would orphan these — reassign or remove them first.') }}</p>
+                                                        </div>
+                                                    @endif
                                                 </dl>
                                             </div>
                                         </div>
@@ -276,9 +293,9 @@
                                         <button
                                             type="button"
                                             wire:click="openRemoveModal('{{ $row['username'] }}')"
-                                            @disabled($isRemoving || ($row['site_count'] ?? 0) > 0 || ! empty($row['is_protected']))
+                                            @disabled($isRemoving || $inUse || ! empty($row['is_protected']))
                                             class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                            title="{{ $isRemoving ? __('Removal in progress…') : (! empty($row['is_protected']) ? __('Protected accounts cannot be removed') : (($row['site_count'] ?? 0) > 0 ? __('Reassign all sites first') : __('Remove this account'))) }}"
+                                            title="{{ $isRemoving ? __('Removal in progress…') : (! empty($row['is_protected']) ? __('Protected accounts cannot be removed') : ($inUse ? __('Reassign its sites, workers, and cron jobs first') : __('Remove this account'))) }}"
                                         >
                                             @if ($isRemoving)
                                                 <x-spinner variant="forest" size="sm" />
