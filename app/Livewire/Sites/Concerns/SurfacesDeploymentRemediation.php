@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Jobs\ApplyRemediationJob;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Models\ConsoleAction;
 use App\Models\SiteDeployment;
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;

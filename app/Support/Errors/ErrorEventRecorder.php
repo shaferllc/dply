@@ -12,7 +12,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 

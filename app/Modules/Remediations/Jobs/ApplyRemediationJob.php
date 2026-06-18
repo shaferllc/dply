@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Remediations\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\ErrorEvent;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Remediations\RemediationActionInterface;
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationActionInterface;
+use App\Modules\Remediations\Services\RemediationCatalog;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;

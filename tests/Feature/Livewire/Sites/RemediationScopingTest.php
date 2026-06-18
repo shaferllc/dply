@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Sites\RemediationScopingTest;
 
-use App\Jobs\ApplyRemediationJob;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Livewire\Sites\DeploymentDetail;
 use App\Livewire\Sites\Errors;
 use App\Models\ErrorEvent;

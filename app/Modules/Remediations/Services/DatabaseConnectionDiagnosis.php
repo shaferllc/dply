@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Remediations;
+namespace App\Modules\Remediations\Services;
 
 /**
  * The result of a Level-A (no-SSH) diagnosis of a database-connection deploy

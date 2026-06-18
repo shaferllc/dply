@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Remediations\Actions;
+namespace App\Modules\Remediations\Services\Actions;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\Remediations\RemediationActionInterface;
+use App\Modules\Remediations\Services\RemediationActionInterface;
 
 /**
  * Re-apply a site's nginx vhost — the fix for "the deploy succeeds but the site

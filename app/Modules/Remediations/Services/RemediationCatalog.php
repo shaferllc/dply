@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Remediations;
+namespace App\Modules\Remediations\Services;
 
-use App\Jobs\ApplyRemediationJob;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 
 /**
  * Matches failure text against the {@see config('remediations')} catalog and

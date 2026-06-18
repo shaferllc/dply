@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Jobs\ApplyRemediationJob;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Models\ErrorEvent;
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationCatalog;
 use App\Support\Errors\ErrorRetryRegistry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;

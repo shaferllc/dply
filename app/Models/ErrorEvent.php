@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Livewire\Servers\WorkspaceErrors;
 use App\Livewire\Sites\Errors;
-use App\Services\Remediations\RemediationCatalog;
+use App\Modules\Remediations\Services\RemediationCatalog;
 use App\Support\Errors\ErrorEventRecorder;
 use App\Support\Errors\ErrorRetryRegistry;
 use Illuminate\Database\Eloquent\Builder;
