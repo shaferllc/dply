@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Launch;
+namespace App\Modules\Launch\Services;
 
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
@@ -11,8 +11,8 @@ use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\Edge\EdgeMonorepoDetector;
 use App\Services\Edge\Frameworks\EdgeFrameworkPresetRegistry;
 use App\Support\Edge\EdgeSsrDetection;
-use App\Support\Launch\FullStackLaunchPlan;
-use App\Support\Launch\FullStackLayer;
+use App\Modules\Launch\Support\FullStackLaunchPlan;
+use App\Modules\Launch\Support\FullStackLayer;
 use Illuminate\Support\Str;
 use Throwable;
 

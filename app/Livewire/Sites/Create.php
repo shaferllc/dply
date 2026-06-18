@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\FinalizeContainerCloudLaunchJob;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;

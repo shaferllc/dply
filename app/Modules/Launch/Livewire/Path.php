@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Launches;
+namespace App\Modules\Launch\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;

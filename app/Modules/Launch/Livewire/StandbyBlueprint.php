@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Launches;
+namespace App\Modules\Launch\Livewire;
 
-use App\Services\Launch\StandbyBlueprintPlanner;
+use App\Modules\Launch\Services\StandbyBlueprintPlanner;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Jobs\FinalizeContainerCloudLaunchJob;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Server;
 use App\Models\Site;

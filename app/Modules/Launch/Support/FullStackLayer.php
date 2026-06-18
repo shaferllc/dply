@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Launch;
+namespace App\Modules\Launch\Support;
 
 /**
  * Recommended layer in a multi-engine full-stack deployment plan.

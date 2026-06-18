@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Launch;
+namespace App\Modules\Launch\Support;
 
 /**
  * Personalized standby failover playbook for one org + blueprint.

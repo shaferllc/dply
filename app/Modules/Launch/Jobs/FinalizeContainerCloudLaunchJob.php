@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Modules\Launch\Jobs;
 
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Models\Organization;

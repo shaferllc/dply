@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Launch;
 
-use App\Services\Launch\FullStackArchitecturePlanner;
+use App\Modules\Launch\Services\FullStackArchitecturePlanner;
 use Illuminate\Support\Facades\File;
 
 test('full stack planner recommends edge and cloud for ssr node repo', function (): void {

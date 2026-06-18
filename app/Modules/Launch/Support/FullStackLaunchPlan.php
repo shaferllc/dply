@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Launch;
+namespace App\Modules\Launch\Support;
 
 /**
  * Multi-engine architecture recommendation for a single Git repository.

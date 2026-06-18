@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Launches;
+namespace App\Modules\Launch\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Launch\FullStackArchitecturePlanner;
+use App\Modules\Launch\Services\FullStackArchitecturePlanner;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;

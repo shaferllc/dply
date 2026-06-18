@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Launch;
+namespace App\Modules\Launch\Services;
 
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
-use App\Support\Launch\StandbyPlaybook;
+use App\Modules\Launch\Support\StandbyPlaybook;
 use Laravel\Pennant\Feature;
 
 /**
