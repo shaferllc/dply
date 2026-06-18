@@ -847,7 +847,7 @@ test('bump fpm workers fix action backs up substitutes and writes via editor', f
             ];
         }
 
-        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null, ?callable $afterLockAcquired = null): array
         {
             $this->state['saved_content'] = $content;
             $this->state['saved_target'] = $target;
@@ -959,7 +959,7 @@ test('bump fpm workers revert restores backup via editor and clears backup path'
             $this->state = &$state;
         }
 
-        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null, ?callable $afterLockAcquired = null): array
         {
             $this->state['saved_content'] = $content;
 
@@ -1288,7 +1288,7 @@ test('bump fpm workers fix action aborts when pattern not found', function () {
             ];
         }
 
-        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null, ?callable $afterLockAcquired = null): array
         {
             throw new \RuntimeException('saveTarget should not be called when substitution is a no-op');
         }
