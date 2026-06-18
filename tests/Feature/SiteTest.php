@@ -368,8 +368,8 @@ test('php site creation prefills the valid server new site default', function ()
     Livewire::actingAs($user)
         ->test(SitesCreate::class, ['server' => $server])
         ->assertSet('form.type', 'php')
-        ->assertSet('form.document_root', '/var/www/app/public')
-        ->assertSet('form.repository_path', '/var/www/app')
+        ->assertSet('form.document_root', '/home/dply/app/public')
+        ->assertSet('form.repository_path', '/home/dply/app')
         ->assertSet('form.php_version', '8.4');
 });
 
@@ -393,15 +393,15 @@ test('site creation reconfigures paths when stack changes', function () {
     Livewire::actingAs($user)
         ->test(SitesCreate::class, ['server' => $server])
         ->set('form.primary_hostname', 'app.example.com')
-        ->assertSet('form.document_root', '/var/www/app-example-com/public')
-        ->assertSet('form.repository_path', '/var/www/app-example-com')
+        ->assertSet('form.document_root', '/home/dply/app.example.com/public')
+        ->assertSet('form.repository_path', '/home/dply/app.example.com')
         ->set('form.type', 'node')
-        ->assertSet('form.document_root', '/var/www/app-example-com')
-        ->assertSet('form.repository_path', '/var/www/app-example-com')
+        ->assertSet('form.document_root', '/home/dply/app.example.com')
+        ->assertSet('form.repository_path', '/home/dply/app.example.com')
         ->assertSet('form.app_port', 3000)
         ->set('form.type', 'php')
-        ->assertSet('form.document_root', '/var/www/app-example-com/public')
-        ->assertSet('form.repository_path', '/var/www/app-example-com');
+        ->assertSet('form.document_root', '/home/dply/app.example.com/public')
+        ->assertSet('form.repository_path', '/home/dply/app.example.com');
 });
 
 test('site creation keeps auto paths hidden until customized', function () {
@@ -425,7 +425,7 @@ test('site creation keeps auto paths hidden until customized', function () {
         ->test(SitesCreate::class, ['server' => $server])
         ->assertSet('form.customize_paths', false)
         ->set('form.primary_hostname', 'api.example.com')
-        ->assertSet('form.document_root', '/var/www/api-example-com/public')
+        ->assertSet('form.document_root', '/home/dply/api.example.com/public')
         ->set('form.customize_paths', true)
         ->set('form.document_root', '/srv/custom/public')
         ->set('form.repository_path', '/srv/custom')
@@ -433,8 +433,8 @@ test('site creation keeps auto paths hidden until customized', function () {
         ->assertSet('form.document_root', '/srv/custom/public')
         ->assertSet('form.repository_path', '/srv/custom')
         ->set('form.customize_paths', false)
-        ->assertSet('form.document_root', '/var/www/changed-example-com/public')
-        ->assertSet('form.repository_path', '/var/www/changed-example-com');
+        ->assertSet('form.document_root', '/home/dply/changed.example.com/public')
+        ->assertSet('form.repository_path', '/home/dply/changed.example.com');
 });
 
 test('php site creation requires explicit selection when saved default is not installed', function () {
