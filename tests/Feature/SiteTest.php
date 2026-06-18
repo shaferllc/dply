@@ -751,9 +751,8 @@ test('functions host site settings deploy hides server only controls', function 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
         // Positive: confirm we're on the functions-flavored deploy config tab.
         // The "Deploy command" label and "Repository subdirectory" field
         // only render when the site is a functions host.
@@ -800,9 +799,8 @@ test('aws lambda site settings deploy renders recipe only', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
         ->assertSee('Deploy command')
         ->assertSee('Repository subdirectory')
         // Invocation metadata moved to Overview — must not leak back here.
