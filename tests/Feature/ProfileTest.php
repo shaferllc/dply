@@ -3,7 +3,9 @@
 namespace Tests\Feature\ProfileTest;
 
 use App\Livewire\Profile\DeleteAccount;
-use App\Livewire\Profile\Edit;
+use App\Livewire\Settings\Hub as SettingsHub;
+use App\Modules\Billing\Livewire\Show as BillingShow;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -16,7 +18,7 @@ test('profile page is displayed', function () {
 
     $response = $this
         ->actingAs($user)
-        ->get('/profile');
+        ->get('/settings/profile');
 
     $response->assertOk();
 });
@@ -25,7 +27,7 @@ test('profile edit shows dashboard profile breadcrumb', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->get(route('profile.edit'))
+        ->get(route('settings.profile'))
         ->assertOk()
         ->assertSeeText('Dashboard')
         ->assertSeeText('Profile')
@@ -45,7 +47,7 @@ test('profile information can be updated', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
-        ->test(Edit::class)
+        ->test(SettingsHub::class)
         ->set('profileForm.name', 'Test User')
         ->set('profileForm.email', 'test@example.com')
         ->call('updateProfile')
@@ -63,7 +65,7 @@ test('email verification status is unchanged when the email address is unchanged
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
-        ->test(Edit::class)
+        ->test(SettingsHub::class)
         ->set('profileForm.name', 'Test User')
         ->set('profileForm.email', $user->email)
         ->call('updateProfile')
@@ -83,35 +85,40 @@ test('billing details can be updated', function () {
     ]);
 
     $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
+    // Billing details are now organization-scoped (Billing module's Show page).
     Livewire::actingAs($user)
-        ->test(Edit::class)
-        ->set('billingForm.invoice_email', 'billing@example.com')
-        ->set('billingForm.vat_number', 'NL123456789B01')
-        ->set('billingForm.billing_currency', 'EUR')
-        ->set('billingForm.billing_details', "Acme Co.\n123 Main St")
-        ->call('updateBilling')
+        ->test(BillingShow::class, ['organization' => $org])
+        ->set('invoice_email', 'billing@example.com')
+        ->set('vat_number', 'NL123456789B01')
+        ->set('billing_currency', 'EUR')
+        ->set('billing_details', "Acme Co.\n123 Main St")
+        ->call('saveBillingDetails')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: __('Billing details saved.'), type: 'success');
 
-    $user->refresh();
+    $org->refresh();
 
-    expect($user->invoice_email)->toBe('billing@example.com');
-    expect($user->vat_number)->toBe('NL123456789B01');
-    expect($user->billing_currency)->toBe('EUR');
-    expect($user->billing_details)->toBe("Acme Co.\n123 Main St");
+    expect($org->invoice_email)->toBe('billing@example.com');
+    expect($org->vat_number)->toBe('NL123456789B01');
+    expect($org->billing_currency)->toBe('EUR');
+    expect($org->billing_details)->toBe("Acme Co.\n123 Main St");
 });
 
 test('billing vat number must match supported format', function () {
     $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
     Livewire::actingAs($user)
-        ->test(Edit::class)
-        ->set('billingForm.vat_number', 'weewrewerwrewrweew')
-        ->call('updateBilling')
-        ->assertHasErrors(['billingForm.vat_number']);
+        ->test(BillingShow::class, ['organization' => $org])
+        ->set('vat_number', 'weewrewerwrewrweew')
+        ->call('saveBillingDetails')
+        ->assertHasErrors(['vat_number']);
 
-    expect($user->refresh()->vat_number)->toBeNull();
+    expect($org->refresh()->vat_number)->toBeNull();
 });
 
 test('delete account page is displayed for authenticated user', function () {
