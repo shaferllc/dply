@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Logs\Services;
 
-use App\Console\Commands\SyncLogStoreSchemaCommand;
+use App\Modules\Logs\Console\SyncLogStoreSchemaCommand;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 

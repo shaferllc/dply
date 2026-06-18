@@ -35,6 +35,10 @@ class DeployServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
+                Console\DetectRuntimeCommand::class,
+                Console\ListFrameworksCommand::class,
+                Console\ManifestValidateCommand::class,
+                Console\RunSitePhaseCommand::class,
                 AbortSiteDeployCommand::class,
                 DeploySiteCommand::class,
                 EnableSiteQuickDeployCommand::class,

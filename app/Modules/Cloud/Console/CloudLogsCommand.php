@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Cloud\Console;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;

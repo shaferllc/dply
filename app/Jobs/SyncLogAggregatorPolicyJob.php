@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  * running dply Logs aggregator and reloads Vector so it rereads the enrichment
  * table. Idempotent on the box — the bash only swaps + restarts when the file
  * actually changed. Dispatched per running aggregator by
- * {@see \App\Console\Commands\SyncLogAggregatorPolicyCommand} on a schedule.
+ * {@see \App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand} on a schedule.
  *
  * See docs/SERVER_LOGS_BILLING.md §3.2 (PR B2 / C2).
  */

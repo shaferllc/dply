@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Cloud\Console;
 
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;

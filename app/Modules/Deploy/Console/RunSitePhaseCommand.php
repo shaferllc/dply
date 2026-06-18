@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Deploy\Console;
 
 use App\Models\Site;
 use App\Models\SiteDeployStep;
