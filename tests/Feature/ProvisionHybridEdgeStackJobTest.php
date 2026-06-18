@@ -6,9 +6,9 @@ namespace Tests\Feature\ProvisionHybridEdgeStackJobTest;
 
 use App\Actions\Edge\CreateHybridEdgeStack;
 use App\Enums\SiteType;
-use App\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Jobs\ProvisionCloudSiteJob;
-use App\Jobs\ProvisionHybridEdgeStackJob;
+use App\Modules\Edge\Jobs\ProvisionHybridEdgeStackJob;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;

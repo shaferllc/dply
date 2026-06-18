@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers;
 
-use App\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerRemoteAccessEvent;

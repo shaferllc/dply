@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Edge\Jobs;
 
 use App\Models\EdgeDeployReplay;
 use App\Modules\Edge\Services\EdgeDeployReplayRunner;

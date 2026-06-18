@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Edge;
 
 use App\Actions\Edge\CreateEdgePreviewSite;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use Livewire\Component;

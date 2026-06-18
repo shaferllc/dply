@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Edge;
 
-use App\Jobs\RunEdgeDeployReplayJob;
+use App\Modules\Edge\Jobs\RunEdgeDeployReplayJob;
 use App\Models\EdgeDeployment;
 use App\Models\EdgeDeployReplay;
 use App\Models\Site;

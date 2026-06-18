@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Jobs\AddEdgeProxyJob;
-use App\Jobs\ApplyEdgeBackendConfigsJob;
-use App\Jobs\RemoveEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\ApplyEdgeBackendConfigsJob;
+use App\Modules\Edge\Jobs\RemoveEdgeProxyJob;
 use App\Models\ConsoleAction;
 use App\Support\Servers\EdgeProxyWorkspaceViewData;
 use App\Support\Servers\ServerConsoleActionLookup;

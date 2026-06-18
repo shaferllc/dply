@@ -1,0 +1,56 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Edge;
+
+use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
+use App\Modules\Edge\Console\CollectEdgeUsageCommand;
+use App\Modules\Edge\Console\EdgeDoctorCommand;
+use App\Modules\Edge\Console\EdgeEnsureDeliveryFeaturesCommand;
+use App\Modules\Edge\Console\EdgeEnsureGithubPreviewsCommand;
+use App\Modules\Edge\Console\EdgeEnsureHybridOriginsCommand;
+use App\Modules\Edge\Console\EdgeInfraBootstrapCommand;
+use App\Modules\Edge\Console\EdgeInfraBootstrapOrgCommand;
+use App\Modules\Edge\Console\EdgeWorkerDeployCommand;
+use App\Modules\Edge\Console\EnsureEdgeLogpushCommand;
+use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
+use App\Modules\Edge\Console\MigrateEdgeHostnamesCommand;
+use App\Modules\Edge\Console\PruneEdgeAnalyticsCommand;
+use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
+use Illuminate\Support\ServiceProvider;
+
+/**
+ * Edge module wiring (docs/adr/modular-monolith-structure.md).
+ *
+ * The dply Edge product line, extracted in phases. Re-registers the edge commands
+ * here (several are scheduled in DplySchedule via repointed refs). Edge jobs
+ * dispatch by class. Full-page/embedded Livewire/Edge components are registered in
+ * boot() (phase 2b). Edge controllers/middleware are referenced by ::class in
+ * routes/bootstrap (phase 2c). Edge models stay in app/Models; Sites/Edge workspace
+ * tabs + edge-support in Sites/Servers namespaces stay in the shell.
+ */
+class EdgeServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                CheckEdgeRumAlertsCommand::class,
+                CollectEdgeUsageCommand::class,
+                EdgeDoctorCommand::class,
+                EdgeEnsureDeliveryFeaturesCommand::class,
+                EdgeEnsureGithubPreviewsCommand::class,
+                EdgeEnsureHybridOriginsCommand::class,
+                EdgeInfraBootstrapCommand::class,
+                EdgeInfraBootstrapOrgCommand::class,
+                EdgeWorkerDeployCommand::class,
+                EnsureEdgeLogpushCommand::class,
+                EvaluateEdgeGuardrailsCommand::class,
+                MigrateEdgeHostnamesCommand::class,
+                PruneEdgeAnalyticsCommand::class,
+                RollupEdgeAnalyticsEngineCommand::class,
+            ]);
+        }
+    }
+}

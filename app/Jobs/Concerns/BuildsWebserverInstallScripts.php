@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Concerns;
 
-use App\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
@@ -79,7 +79,7 @@ trait BuildsWebserverInstallScripts
             // 500 with "extprocessor not found" the moment cutover finishes.
             'openlitespeed' => $this->openLiteSpeedInstallScript($server),
             // Note: 'traefik' and 'haproxy' used to live here. They moved
-            // to App\Jobs\AddEdgeProxyJob since they're L7 edge proxies in
+            // to App\Modules\Edge\Jobs\AddEdgeProxyJob since they're L7 edge proxies in
             // front of a webserver, not webservers themselves. The
             // caddyInstallScript() / traefikInstallScript() helpers below
             // stayed put because the edge proxy job calls them.

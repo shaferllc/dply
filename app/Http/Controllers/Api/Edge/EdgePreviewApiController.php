@@ -8,7 +8,7 @@ use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Actions\Edge\PromoteEdgePreview;
 use App\Http\Resources\Edge\EdgeDeploymentResource;
 use App\Http\Resources\Edge\EdgeSiteResource;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

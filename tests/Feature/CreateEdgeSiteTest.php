@@ -6,7 +6,7 @@ namespace Tests\Feature\CreateEdgeSiteTest;
 
 use App\Actions\Edge\CreateEdgeSite;
 use App\Enums\SiteType;
-use App\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

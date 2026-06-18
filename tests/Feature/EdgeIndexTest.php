@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeIndexTest;
 
 use App\Enums\SiteType;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Models\Organization;
 use App\Models\Server;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Edge\Console;
 
 use App\Modules\Edge\Services\EdgeDeliveryFeaturesEnsurer;
 use App\Modules\Edge\Support\EdgePlatformCredentials;

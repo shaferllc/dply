@@ -521,7 +521,7 @@ class Server extends Model
      *
      * When this is non-null, dply runs Caddy as the per-site backend on
      * ephemeral high ports and the edge proxy on :80 — see
-     * `App\Jobs\AddEdgeProxyJob` for the install flow.
+     * `App\Modules\Edge\Jobs\AddEdgeProxyJob` for the install flow.
      */
     public function edgeProxy(): ?string
     {

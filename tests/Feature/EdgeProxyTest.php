@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\EdgeProxyTest;
 
-use App\Jobs\AddEdgeProxyJob;
-use App\Jobs\ApplyEdgeBackendConfigsJob;
-use App\Jobs\RemoveEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\ApplyEdgeBackendConfigsJob;
+use App\Modules\Edge\Jobs\RemoveEdgeProxyJob;
 use App\Livewire\Servers\WorkspaceEdgeProxy;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Models\ConsoleAction;

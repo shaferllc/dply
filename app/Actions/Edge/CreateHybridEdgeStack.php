@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Edge;
 
 use App\Actions\Cloud\CreateCloudSiteFromSource;
-use App\Jobs\ProvisionHybridEdgeStackJob;
+use App\Modules\Edge\Jobs\ProvisionHybridEdgeStackJob;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;

@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Actions\Edge\RedeployEdgeSite;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgePreviewPolicy;
 use App\Modules\Edge\Support\EdgeRepoRoot;

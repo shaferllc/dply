@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers\LiveState;
 
-use App\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Services\Servers\TraefikAdminApiResolver;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Edge\Console;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;

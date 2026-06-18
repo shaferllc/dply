@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Edge\Jobs;
+
+use App\Jobs\PollCloudStatusJob;
 
 use App\Actions\Edge\CreateEdgeSite;
 use App\Models\Site;

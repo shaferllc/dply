@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Modules\Edge\Console;
 
 use App\Modules\Edge\Services\EdgeCloudflareClient;
 use App\Modules\Edge\Support\EdgeTestingDomains;

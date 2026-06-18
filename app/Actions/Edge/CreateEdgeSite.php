@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Edge;
 
 use App\Enums\SiteType;
-use App\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

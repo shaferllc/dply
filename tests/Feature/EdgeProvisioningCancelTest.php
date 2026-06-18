@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeProvisioningCancelTest;
 
 use App\Enums\SiteType;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;

@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Jobs;
+namespace App\Modules\Edge\Jobs;
+
+use App\Jobs\SwitchServerWebserverJob;
+use App\Jobs\SyncServerSystemdServicesJob;
 
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Jobs\Concerns\WritesConsoleAction;
