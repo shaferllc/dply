@@ -7,7 +7,7 @@ namespace App\Actions\Cloud;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use InvalidArgumentException;
 use RuntimeException;
 

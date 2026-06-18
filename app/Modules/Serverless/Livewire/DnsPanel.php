@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Serverless\Services\ServerlessFunctionDnsProvisioner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;

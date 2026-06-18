@@ -3,7 +3,7 @@
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

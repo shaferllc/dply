@@ -7,7 +7,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
-use App\Services\OracleComputeService;
+use App\Modules\Cloud\Services\OracleComputeService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

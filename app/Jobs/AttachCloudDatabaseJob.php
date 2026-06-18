@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\CloudDatabase;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

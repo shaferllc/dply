@@ -5,7 +5,7 @@ namespace App\Modules\Serverless\Jobs;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;

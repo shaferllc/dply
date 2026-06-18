@@ -6,7 +6,7 @@ namespace App\Livewire\Edge\Concerns;
 
 use App\Actions\Edge\CreateHybridEdgeStack;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use App\Support\Edge\EdgeSsrDetection;
 use App\Support\Edge\HybridEdgeOriginMatcher;
 use App\Support\Servers\FakeCloudProvision;

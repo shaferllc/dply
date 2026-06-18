@@ -6,10 +6,10 @@ namespace App\Jobs;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
-use App\Services\LinodeService;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Cloud\Services\VultrService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;

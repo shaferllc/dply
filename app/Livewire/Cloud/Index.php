@@ -7,7 +7,7 @@ namespace App\Livewire\Cloud;
 use App\Enums\SiteType;
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;

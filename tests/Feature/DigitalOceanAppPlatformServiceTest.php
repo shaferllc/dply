@@ -7,7 +7,7 @@ namespace Tests\Feature\DigitalOceanAppPlatformServiceTest;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\DigitalOceanAppPlatformService;
+use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;

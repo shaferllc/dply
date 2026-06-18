@@ -5,8 +5,8 @@ namespace App\Jobs;
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
-use App\Services\AwsEc2Service;
-use App\Services\AwsEc2ServiceFactory;
+use App\Modules\Cloud\Services\AwsEc2Service;
+use App\Modules\Cloud\Services\AwsEc2ServiceFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

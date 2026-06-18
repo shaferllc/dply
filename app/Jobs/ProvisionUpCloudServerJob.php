@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
-use App\Services\UpCloudService;
+use App\Modules\Cloud\Services\UpCloudService;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

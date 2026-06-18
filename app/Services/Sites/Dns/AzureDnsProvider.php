@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\AzureDnsService;
+use App\Modules\Cloud\Services\AzureDnsService;
 
 class AzureDnsProvider implements DnsProvider
 {

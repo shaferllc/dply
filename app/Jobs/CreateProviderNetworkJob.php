@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\PrivateNetwork;
 use App\Models\Server;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;

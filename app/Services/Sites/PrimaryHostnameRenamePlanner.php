@@ -6,7 +6,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 
 /**
  * Pure read-only previewer for the cascade triggered when an operator

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ProviderCredential;
-use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
+use App\Modules\Cloud\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Services\Edge\EdgeDeliveryFeaturesEnsurer;
 use App\Services\Edge\EdgeOrgInfraBootstrapper;
 use App\Support\Edge\EdgeOrgCredentialConfig;

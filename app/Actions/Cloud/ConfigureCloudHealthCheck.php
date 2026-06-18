@@ -6,8 +6,8 @@ namespace App\Actions\Cloud;
 
 use App\Jobs\SyncCloudScalingJob;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\CloudScalingConfig;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\CloudScalingConfig;
 use InvalidArgumentException;
 use RuntimeException;
 

@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Jobs\RedeployCloudSiteJob;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\CloudScalingConfig;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\CloudScalingConfig;
 use Illuminate\Console\Command;
 
 /**

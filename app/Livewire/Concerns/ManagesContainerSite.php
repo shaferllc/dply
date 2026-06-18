@@ -17,9 +17,9 @@ use App\Models\CloudDatabase;
 use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\CloudScalingConfig;
-use App\Services\Cloud\ResolvesMetricWindows;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\CloudScalingConfig;
+use App\Modules\Cloud\Backends\ResolvesMetricWindows;
 use Livewire\Component;
 
 /**

@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\AzureComputeServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Services\AzureComputeService;
+use App\Modules\Cloud\Services\AzureComputeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

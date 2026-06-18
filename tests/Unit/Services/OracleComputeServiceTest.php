@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\OracleComputeServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Services\OracleComputeService;
+use App\Modules\Cloud\Services\OracleComputeService;
 use Illuminate\Support\Facades\Http;
 
 test('constructor throws when required credentials are missing', function () {

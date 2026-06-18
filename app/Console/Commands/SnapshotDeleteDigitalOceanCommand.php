@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use Illuminate\Console\Command;
 
 class SnapshotDeleteDigitalOceanCommand extends Command

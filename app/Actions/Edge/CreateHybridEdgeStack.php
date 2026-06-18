@@ -9,7 +9,7 @@ use App\Jobs\ProvisionHybridEdgeStackJob;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use App\Support\Edge\EdgeSsrDetection;
 use App\Support\Edge\HybridEdgeOriginMatcher;
 use Laravel\Pennant\Feature;

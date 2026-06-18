@@ -7,7 +7,7 @@ namespace Tests\Feature\AwsAppRunnerServiceTest;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\AwsAppRunnerService;
+use App\Modules\Cloud\Services\AwsAppRunnerService;
 use Aws\AppRunner\AppRunnerClient;
 use Aws\Result;
 use Illuminate\Foundation\Testing\RefreshDatabase;

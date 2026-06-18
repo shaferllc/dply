@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\ResolvesMetricWindows;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\ResolvesMetricWindows;
 use Illuminate\Console\Command;
 
 /**

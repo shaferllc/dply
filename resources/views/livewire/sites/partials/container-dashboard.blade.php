@@ -566,7 +566,7 @@
 
             return $out;
         };
-        $metricsWindows = \App\Services\Cloud\ResolvesMetricWindows::metricWindows();
+        $metricsWindows = \App\Modules\Cloud\Backends\ResolvesMetricWindows::metricWindows();
         $metricsResult = is_array($container_metrics_result) ? $container_metrics_result : null;
         $metricsSeries = is_array($metricsResult['series'] ?? null) ? $metricsResult['series'] : [];
         $metricsAvailable = (bool) ($metricsResult['available'] ?? false);

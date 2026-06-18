@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\RedeployCloudSiteJob;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Console\Command;
 
 /**

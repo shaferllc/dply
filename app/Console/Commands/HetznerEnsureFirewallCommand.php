@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Server;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use App\Support\Servers\HetznerCloudFirewallRules;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Console\Command;

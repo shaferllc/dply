@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\BootHeadStartScript;
 use App\Support\Servers\FakeCloudProvision;

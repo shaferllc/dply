@@ -8,7 +8,7 @@ use App\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Models\EdgeDeployment;
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Services\Cloudflare\CloudflareDnsService;
+use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;

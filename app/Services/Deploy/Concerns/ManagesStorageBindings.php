@@ -8,7 +8,7 @@ use App\Models\ObjectStorageCredential;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Illuminate\Support\Str;
 use InvalidArgumentException;

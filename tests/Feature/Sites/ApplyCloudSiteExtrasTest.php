@@ -12,8 +12,8 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\CloudScalingConfig;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\CloudScalingConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 

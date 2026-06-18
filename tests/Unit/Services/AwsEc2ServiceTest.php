@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\AwsEc2ServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Services\AwsEc2Service;
+use App\Modules\Cloud\Services\AwsEc2Service;
 use Aws\Ec2\Ec2Client;
 use Aws\Result;
 use Aws\Ssm\SsmClient;

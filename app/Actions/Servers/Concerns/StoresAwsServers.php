@@ -12,7 +12,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\AwsEksService;
+use App\Modules\Cloud\Services\AwsEksService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 

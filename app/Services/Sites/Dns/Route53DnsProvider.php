@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\Route53Service;
+use App\Modules\Cloud\Services\Route53Service;
 
 class Route53DnsProvider implements DnsProvider
 {

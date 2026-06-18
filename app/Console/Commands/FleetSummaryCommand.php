@@ -8,7 +8,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Console\Command;
 
 /**

@@ -12,7 +12,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
+use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

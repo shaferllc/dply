@@ -15,7 +15,7 @@ use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;

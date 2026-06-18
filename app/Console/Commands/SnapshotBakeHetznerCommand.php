@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use App\Support\Servers\SnapshotBakeScript;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;

@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Services\LinodeService;
+use App\Modules\Cloud\Services\LinodeService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerImageCatalog;
