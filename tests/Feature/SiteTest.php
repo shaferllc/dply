@@ -2630,7 +2630,7 @@ test('site settings aliases section can add alias', function () {
         ->set('new_alias_label', 'Marketing alias')
         ->call('addAlias')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Alias added. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $this->assertDatabaseHas('site_domain_aliases', [
         'site_id' => $site->id,
@@ -2665,7 +2665,7 @@ test('site settings tenants section can add tenant domain', function () {
         ->set('new_tenant_comment', 'App resolver uses the hostname.')
         ->call('addTenantDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Tenant domain added. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $this->assertDatabaseHas('site_tenant_domains', [
         'site_id' => $site->id,
@@ -2826,7 +2826,7 @@ test('site settings can save web directory and primary hostname from dedicated s
         ->set('settings_document_root', '/srv/new/public')
         ->call('saveWebDirectory')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Web directory saved. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     Livewire::actingAs($user)
         ->withQueryParams(['tab' => 'domains'])
@@ -2835,7 +2835,7 @@ test('site settings can save web directory and primary hostname from dedicated s
         ->set('editing_domain_hostname', 'new.example.com')
         ->call('saveEditedDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Primary hostname renamed. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $site->refresh();
     $domain->refresh();
@@ -3036,7 +3036,7 @@ test('site settings preview section can save primary preview domain', function (
         ->set('preview_https_redirect', true)
         ->call('savePreviewSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Preview settings saved. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $site->refresh();
     $previewDomain = SitePreviewDomain::query()->where('site_id', $site->id)->first();
