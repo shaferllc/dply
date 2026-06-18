@@ -6,7 +6,7 @@ namespace Tests\Feature\EdgeIndexTest;
 
 use App\Enums\SiteType;
 use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
-use App\Livewire\Edge\Index as EdgeIndex;
+use App\Modules\Edge\Livewire\Index as EdgeIndex;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

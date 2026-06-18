@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge;
+namespace App\Modules\Edge\Livewire;
 
 use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;

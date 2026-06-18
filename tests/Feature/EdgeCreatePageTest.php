@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeCreatePageTest;
 
 use App\Enums\SiteType;
-use App\Livewire\Edge\Create;
+use App\Modules\Edge\Livewire\Create;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SocialAccount;

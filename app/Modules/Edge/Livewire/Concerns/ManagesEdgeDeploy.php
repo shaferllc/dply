@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge\Concerns;
+namespace App\Modules\Edge\Livewire\Concerns;
 
 use App\Actions\Edge\CreateEdgeSite;
 use App\Models\EdgeSiteEnvVar;

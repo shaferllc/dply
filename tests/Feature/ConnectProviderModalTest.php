@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ConnectProviderModalTest;
 
-use App\Livewire\Edge\Create;
+use App\Modules\Edge\Livewire\Create;
 use App\Livewire\Settings\ConnectProviderModal;
 use App\Models\GitProviderToken;
 use App\Models\User;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge\Concerns;
+namespace App\Modules\Edge\Livewire\Concerns;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.

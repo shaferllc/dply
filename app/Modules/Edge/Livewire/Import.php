@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge;
+namespace App\Modules\Edge\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Modules\Edge\Services\Importers\CloudflarePagesImporter;

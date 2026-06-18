@@ -19,6 +19,7 @@ use App\Modules\Edge\Console\MigrateEdgeHostnamesCommand;
 use App\Modules\Edge\Console\PruneEdgeAnalyticsCommand;
 use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 /**
  * Edge module wiring (docs/adr/modular-monolith-structure.md).
@@ -52,5 +53,16 @@ class EdgeServiceProvider extends ServiceProvider
                 RollupEdgeAnalyticsEngineCommand::class,
             ]);
         }
+    }
+
+    public function boot(): void
+    {
+        Livewire::component('edge.index', \App\Modules\Edge\Livewire\Index::class);
+        Livewire::component('edge.create', \App\Modules\Edge\Livewire\Create::class);
+        Livewire::component('edge.import', \App\Modules\Edge\Livewire\Import::class);
+        Livewire::component('edge.templates', \App\Modules\Edge\Livewire\Templates::class);
+        Livewire::component('edge.usage', \App\Modules\Edge\Livewire\Usage::class);
+        Livewire::component('edge.build-journey', \App\Modules\Edge\Livewire\BuildJourney::class);
+        Livewire::component('edge.build-log-stream', \App\Modules\Edge\Livewire\BuildLogStream::class);
     }
 }

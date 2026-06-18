@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge;
+namespace App\Modules\Edge\Livewire;
 
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Site;

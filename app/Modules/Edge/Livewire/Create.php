@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge;
+namespace App\Modules\Edge\Livewire;
 
 use App\Jobs\DetectRepositoryRuntimeJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
-use App\Livewire\Edge\Concerns\ManagesEdgeDeploy;
-use App\Livewire\Edge\Concerns\ManagesEdgeFormPrefills;
-use App\Livewire\Edge\Concerns\ManagesEdgeHybridOrigin;
-use App\Livewire\Edge\Concerns\ManagesEdgeRefPicker;
-use App\Livewire\Edge\Concerns\ManagesEdgeRepoDetection;
+use App\Modules\Edge\Livewire\Concerns\ManagesEdgeDeploy;
+use App\Modules\Edge\Livewire\Concerns\ManagesEdgeFormPrefills;
+use App\Modules\Edge\Livewire\Concerns\ManagesEdgeHybridOrigin;
+use App\Modules\Edge\Livewire\Concerns\ManagesEdgeRefPicker;
+use App\Modules\Edge\Livewire\Concerns\ManagesEdgeRepoDetection;
 use App\Livewire\Forms\EdgeCreateForm;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\ProviderCredential;

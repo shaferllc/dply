@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge\Concerns;
+namespace App\Modules\Edge\Livewire\Concerns;
 
 use App\Jobs\DetectRepositoryRuntimeJob;
 use App\Livewire\Forms\EdgeCreateForm;

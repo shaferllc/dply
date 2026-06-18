@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Edge;
+namespace App\Modules\Edge\Livewire;
 
 use App\Actions\Edge\CancelStuckEdgeDeployment;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
