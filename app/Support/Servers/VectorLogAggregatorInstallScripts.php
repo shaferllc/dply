@@ -256,7 +256,29 @@ class VectorLogAggregatorInstallScripts
         host = string(.host) ?? string(.hostname) ?? ""
         lvl = string(.level) ?? string(.PRIORITY) ?? ""
         msg = string(.message) ?? ""
+        # Source: prefer the edge-stamped .source, but DERIVE it here when absent so
+        # the column populates even for edges installed before source tagging — one
+        # aggregator re-sync fixes every server, no per-edge re-sync needed. File
+        # sources carry .file (the path); journald carries _SYSTEMD_UNIT/PRIORITY.
         src = string(.source) ?? ""
+        if src == "" {
+            fpath = string(.file) ?? ""
+            if fpath != "" {
+                if contains(fpath, "nginx") || contains(fpath, "caddy") {
+                    src = "web"
+                } else if contains(fpath, "php") {
+                    src = "php_fpm"
+                } else if contains(fpath, "auth.log") {
+                    src = "auth"
+                } else if contains(fpath, "/storage/logs/") {
+                    src = "site_app"
+                } else {
+                    src = "file"
+                }
+            } else if exists(._SYSTEMD_UNIT) || exists(.PRIORITY) || exists(.__REALTIME_TIMESTAMP) {
+                src = "journald"
+            }
+        }
         ts = .timestamp
         . = {}
         .org_id = org
