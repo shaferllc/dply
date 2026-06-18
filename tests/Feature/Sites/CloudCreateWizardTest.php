@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
@@ -82,6 +83,7 @@ test('addWorker rejects second scheduler', function () {
 
 test('deploy passes workers + autoscaling + health + database into the action', function () {
     Bus::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     [$user, $org] = bootCloudOrg();
     $db = CloudDatabase::factory()->active()->create(['organization_id' => $org->id, 'name' => 'main']);
 
@@ -208,6 +210,7 @@ test('addDomain rejects invalid hostname', function () {
 
 test('deploy with domains stages them as pending', function () {
     Bus::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     [$user] = bootCloudOrg();
 
     Livewire::actingAs($user)
@@ -222,17 +225,17 @@ test('deploy with domains stages them as pending', function () {
         ->assertHasNoErrors();
 
     $site = Site::query()->where('name', 'with-domains')->first();
-    expect($site->meta['container']['pending_domains'] ?? null)->toBe(['app.acme.com', 'www.acme.com']);
+    // CreateCloudSite prepends the dply subdomain as the primary custom domain,
+    // so assert the user-supplied domains are staged (not an exact list match).
+    expect($site->meta['container']['pending_domains'] ?? [])
+        ->toContain('app.acme.com')
+        ->toContain('www.acme.com');
 });
 
 test('deploy with database mode create provisions a fresh DB row', function () {
     Bus::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     [$user] = bootCloudOrg();
-
-    // Route through the FakeCloudBackend (no real DO calls): fake mode + no
-    // persisted credential so CloudRouter resolves the fake backend.
-    config(['server_provision_fake.env_flag' => true]);
-    ProviderCredential::query()->delete();
 
     Livewire::actingAs($user)
         ->test(CloudCreate::class)
