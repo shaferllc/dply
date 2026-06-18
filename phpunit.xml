@@ -377,6 +377,7 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="DPLY_FAKE_EDGE" value="true"/>
+        <env name="DPLY_CHOOSE_APP_ENABLED" value="false"/>
         <ini name="max_execution_time" value="0"/>
         <ini name="memory_limit" value="1G"/>
     </php>
