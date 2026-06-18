@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Marketplace;
+namespace App\Modules\Marketplace\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
@@ -8,7 +8,7 @@ use App\Models\MarketplaceItem;
 use App\Models\Server;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Marketplace\MarketplaceImportService;
+use App\Modules\Marketplace\Services\MarketplaceImportService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;

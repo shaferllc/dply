@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Marketplace;
+namespace App\Modules\Marketplace\Services;
 
 use App\Models\MarketplaceItem;
 use App\Models\Organization;

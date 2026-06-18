@@ -2,7 +2,7 @@
      wire:id boundary must wrap a stable element (see the conditional-root
      trap). The <x-modal> itself teleports to <body>. --}}
 <div>
-    <x-modal name="{{ \App\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}" max-width="2xl" focusable>
+    <x-modal name="{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}" max-width="2xl" focusable>
         <div class="flex flex-col" style="max-height: 80vh;">
             {{-- Header --}}
             <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
@@ -21,7 +21,7 @@
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Clone a starter into your organization’s scripts, then run it from Scripts or Server commands.') }}</p>
                     </div>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
+                <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -76,7 +76,7 @@
                 <a href="{{ route('scripts.marketplace', $webserver !== '' ? ['webserver' => $webserver] : []) }}" wire:navigate class="text-xs font-medium text-brand-forest hover:underline">
                     {{ __('Open full marketplace →') }}
                 </a>
-                <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
                     {{ __('Done') }}
                 </button>
             </div>

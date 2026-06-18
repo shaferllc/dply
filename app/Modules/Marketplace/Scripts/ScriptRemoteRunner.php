@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Scripts;
+namespace App\Modules\Marketplace\Scripts;
 
 use App\Models\Script;
 use App\Models\Server;

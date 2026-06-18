@@ -6,6 +6,7 @@ use App\Modules\Feedback\FeedbackServiceProvider;
 use App\Modules\Imports\ImportsServiceProvider;
 use App\Modules\Insights\InsightsServiceProvider;
 use App\Modules\Launch\LaunchServiceProvider;
+use App\Modules\Marketplace\MarketplaceServiceProvider;
 use App\Modules\OpsCopilot\OpsCopilotServiceProvider;
 use App\Modules\Projects\ProjectsServiceProvider;
 use App\Modules\Realtime\RealtimeServiceProvider;
@@ -26,6 +27,7 @@ return [
     ImportsServiceProvider::class,
     InsightsServiceProvider::class,
     LaunchServiceProvider::class,
+    MarketplaceServiceProvider::class,
     OpsCopilotServiceProvider::class,
     ProjectsServiceProvider::class,
     RealtimeServiceProvider::class,

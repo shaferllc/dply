@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Livewire\Scripts;
+namespace App\Modules\Marketplace\Livewire\Scripts;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Script;
 use App\Models\Server;
-use App\Services\Scripts\ApplyOrganizationScriptToServer;
+use App\Modules\Marketplace\Scripts\ApplyOrganizationScriptToServer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;

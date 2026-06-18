@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Scripts;
+namespace App\Modules\Marketplace\Scripts;
 
 use App\Models\Organization;
 use App\Models\Script;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Scripts;
+namespace App\Modules\Marketplace\Livewire\Scripts;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Script;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Scripts;
+namespace App\Modules\Marketplace\Livewire\Scripts;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Script;
