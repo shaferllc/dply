@@ -145,6 +145,7 @@
                 'agent' => $server->logAgent,
                 'logExplorer' => $logExplorer,
                 'logHistogram' => $logHistogram,
+                'logCorrelationEnabled' => $logCorrelationEnabled,
             ])
         @endif
 

@@ -48,6 +48,9 @@
                         ])>{{ $label }}</button>
                 @endforeach
             </div>
+            <button type="button" wire:click="toggleLogCorrelation" title="{{ __('Hide graph') }}" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/30">
+                <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Hide') }}
+            </button>
         </div>
     </div>
 

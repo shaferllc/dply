@@ -10,7 +10,9 @@ use App\Models\SiteUptimeIncident;
 use App\Modules\Logs\Services\LogExplorerQuery;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 
 /**
@@ -51,6 +53,19 @@ trait ManagesServerLogExplorer
     {
         $max = $this->isLogExplorerWindowed() ? 2000 : 1000;
         $this->logExplorerLimit = min($max, $this->logExplorerLimit + 200);
+    }
+
+    /**
+     * Whether the "events vs logs" correlation graph is shown. When off, the
+     * histogram + event queries are skipped entirely (saves the ClickHouse
+     * aggregation + the deploy/error/incident lookups). URL-persisted.
+     */
+    #[Url(as: 'corr', except: true)]
+    public bool $logCorrelationEnabled = true;
+
+    public function toggleLogCorrelation(): void
+    {
+        $this->logCorrelationEnabled = ! $this->logCorrelationEnabled;
     }
 
     /**
@@ -214,13 +229,33 @@ trait ManagesServerLogExplorer
     }
 
     /**
+     * Cached wrapper around {@see computeLogTimelineEvents()}: the overlay adds
+     * three Postgres lookups (deploys/errors/incidents) per render, so memoize for
+     * 30s. The key rounds the window to 30s so a rolling (now-moving) window still
+     * hits the cache instead of churning a fresh key every second.
+     *
+     * @return list<array{type:string,label:string,time:string,x_pct:float}>
+     */
+    private function loadLogTimelineEvents(CarbonInterface $from, CarbonInterface $to, int $startEpoch, int $endEpoch): array
+    {
+        $key = sprintf(
+            'srvlog:events:%s:%d:%d',
+            $this->server->id,
+            intdiv($from->getTimestamp(), 30) * 30,
+            intdiv($to->getTimestamp(), 30) * 30,
+        );
+
+        return Cache::remember($key, 30, fn (): array => $this->computeLogTimelineEvents($from, $to, $startEpoch, $endEpoch));
+    }
+
+    /**
      * Deploys, error events and uptime incidents within the histogram window,
      * each positioned by time as an x-percentage across the axis — the "events"
      * half of "events vs logs". Capped so a noisy window can't flood the overlay.
      *
      * @return list<array{type:string,label:string,time:string,x_pct:float}>
      */
-    private function loadLogTimelineEvents(CarbonInterface $from, CarbonInterface $to, int $startEpoch, int $endEpoch): array
+    private function computeLogTimelineEvents(CarbonInterface $from, CarbonInterface $to, int $startEpoch, int $endEpoch): array
     {
         $totalSpan = max(1, $endEpoch - $startEpoch);
         $pos = static function (?CarbonInterface $at) use ($startEpoch, $totalSpan): ?float {
@@ -298,7 +333,7 @@ trait ManagesServerLogExplorer
             }
             $events[] = [
                 'type' => 'error',
-                'label' => __('Error · :title', ['title' => \Illuminate\Support\Str::limit((string) $error->title, 60)]),
+                'label' => __('Error · :title', ['title' => Str::limit((string) $error->title, 60)]),
                 'time' => $error->occurred_at->utc()->toIso8601String(),
                 'x_pct' => $x,
             ];

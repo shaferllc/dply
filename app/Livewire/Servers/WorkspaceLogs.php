@@ -155,7 +155,7 @@ class WorkspaceLogs extends Component
                 : null,
             // Only query ClickHouse when the Shipping tab is actually open.
             'logExplorer' => $this->logsTab === 'shipping' ? $this->loadLogExplorer() : null,
-            'logHistogram' => $this->logsTab === 'shipping' ? $this->loadLogHistogram() : null,
+            'logHistogram' => $this->logsTab === 'shipping' && $this->logCorrelationEnabled ? $this->loadLogHistogram() : null,
             // Alert rules + entitlement, only while the Alerts tab is open.
             'logAlertRules' => $this->logsTab === 'alerts' ? $this->loadLogAlertRules() : collect(),
             'logAlertingAvailable' => $this->logAlertingAvailable,

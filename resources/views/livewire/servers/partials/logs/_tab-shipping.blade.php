@@ -234,8 +234,21 @@
     </section>
 
     {{-- Correlation histogram: log volume over time + deploy/error/incident overlay --}}
-    @if (($logHistogram ?? null) !== null && ($agent?->isRunning()))
-        <x-logs-correlation-chart :histogram="$logHistogram" />
+    @if ($agent?->isRunning())
+        @if (($logCorrelationEnabled ?? true) && ($logHistogram ?? null) !== null)
+            <x-logs-correlation-chart :histogram="$logHistogram" />
+        @elseif (! ($logCorrelationEnabled ?? true))
+            <div class="dply-card flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-7">
+                <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
+                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Events vs logs graph is hidden.') }}
+                </span>
+                <button type="button" wire:click="toggleLogCorrelation" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
+                    <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Show graph') }}
+                </button>
+            </div>
+        @endif
     @endif
 
     {{-- Shipped logs explorer (reads ClickHouse, org + server scoped) --}}
