@@ -393,9 +393,9 @@
                                 </div>
                             </a>
                             @if ($siteDeployable)
-                                {{-- Deploy / Sync sit outside the row link so they
-                                     fire the deploy console instead of navigating.
-                                     Same handlers + slide-over as the fleet page. --}}
+                                {{-- Per-site Deploy sits outside the row link so it fires
+                                     the deploy console instead of navigating. Sync is gone —
+                                     the host Deploy modal's multi-select covers syncing peers. --}}
                                 <div class="flex shrink-0 items-center gap-1 border-l border-brand-ink/10 px-3 sm:px-4">
                                     <button
                                         type="button"
@@ -410,20 +410,6 @@
                                             <x-spinner variant="cream" size="sm" />
                                         </span>
                                         {{ __('Deploy') }}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        wire:click="deploySyncedSites('{{ $s->id }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="deploySyncedSites('{{ $s->id }}')"
-                                        class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                                        title="{{ __('Deploy this site and any sharing its repository') }}"
-                                    >
-                                        <x-heroicon-m-arrow-path wire:loading.remove wire:target="deploySyncedSites('{{ $s->id }}')" class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
-                                        <span wire:loading wire:target="deploySyncedSites('{{ $s->id }}')" class="inline-flex h-3.5 w-3.5 items-center justify-center">
-                                            <x-spinner variant="forest" size="sm" />
-                                        </span>
-                                        {{ __('Sync') }}
                                     </button>
                                 </div>
                             @endif
@@ -505,6 +491,8 @@
             </div>
         </div>
     </div>
+
+    @include('livewire.servers.partials.deploy-sites-modal')
 
     <x-slot name="modals">
         @include('livewire.servers.partials.remove-server-modal', [

@@ -64,6 +64,23 @@ class HardenSshConfigFixAction implements InsightFixActionInterface, RevertableI
      */
     public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
+        $result = $this->harden($server, $onOutput);
+        if ($result->ok) {
+            $this->stampBackup($finding, self::SNIPPET_PATH);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Apply the hardening snippet to a server WITHOUT an InsightFinding — the
+     * same managed snippet + `sshd -t` validate + reload that {@see apply()}
+     * runs, but callable directly so the dply:servers:harden-ssh fleet command
+     * can reuse the exact script instead of duplicating a security-critical bash
+     * block (which would inevitably drift).
+     */
+    public function harden(Server $server, ?callable $onOutput = null): FixResult
+    {
         $snippet = $this->buildSnippet();
         $snippetEscaped = escapeshellarg($snippet);
         $pathEscaped = escapeshellarg(self::SNIPPET_PATH);
@@ -148,8 +165,6 @@ BASH;
         if (! str_contains($buffer, 'DPLY_OK:')) {
             return FixResult::failure(__('Apply finished without the expected success marker — refusing to claim success.')."\n".mb_substr(trim($buffer), 0, 1500));
         }
-
-        $this->stampBackup($finding, self::SNIPPET_PATH);
 
         return FixResult::success(mb_substr(trim($buffer), 0, 2000));
     }

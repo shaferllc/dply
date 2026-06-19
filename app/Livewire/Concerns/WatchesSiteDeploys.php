@@ -29,6 +29,141 @@ trait WatchesSiteDeploys
     /** Site ids launched from this surface, driving the deploy console. */
     public array $watchedSiteIds = [];
 
+    /** Server-deploy modal: pick which attached sites to include before launching. */
+    public bool $deployModalOpen = false;
+
+    public ?string $deployModalServerId = null;
+
+    /** @var list<string> Selected site ids in the modal (checkbox-bound). */
+    public array $deployModalSiteIds = [];
+
+    /**
+     * Click "Deploy" on a server. With ≥2 deployable sites, open the pick-sites
+     * modal (all pre-selected). With exactly one, there's nothing to choose —
+     * deploy it straight away. With none, nothing to do. Either way the console is
+     * cleared first so it opens fresh, ready for the worker.
+     */
+    public function openServerDeploy(string $serverId): void
+    {
+        $server = Server::query()->with('sites')->find($serverId);
+        if ($server === null) {
+            return;
+        }
+
+        $deployable = $this->deployableSitesFor($server);
+        if ($deployable->isEmpty()) {
+            $this->toastError(__('No deployable sites on this host.'));
+
+            return;
+        }
+
+        $this->clearDeployConsole();
+
+        if ($deployable->count() === 1) {
+            if ($this->blockedByDeployPause($deployable->first())) {
+                return;
+            }
+            $this->launchDeploys($deployable);
+
+            return;
+        }
+
+        $this->deployModalServerId = (string) $server->id;
+        $this->deployModalSiteIds = $deployable->map(fn (Site $s): string => (string) $s->id)->values()->all();
+        $this->deployModalOpen = true;
+    }
+
+    /** Launch the sites selected in the modal. */
+    public function confirmServerDeploy(): void
+    {
+        $server = Server::query()->with('sites')->find($this->deployModalServerId);
+        if ($server === null) {
+            $this->closeDeployModal();
+
+            return;
+        }
+
+        $selected = $this->deployableSitesFor($server)
+            ->filter(fn (Site $s): bool => in_array((string) $s->id, $this->deployModalSiteIds, true))
+            ->values();
+
+        if ($selected->isEmpty()) {
+            $this->toastError(__('Select at least one site to deploy.'));
+
+            return;
+        }
+        if ($this->blockedByDeployPause($selected->first())) {
+            return;
+        }
+
+        $this->launchDeploys($selected);
+        $this->closeDeployModal();
+    }
+
+    public function closeDeployModal(): void
+    {
+        $this->deployModalOpen = false;
+        $this->deployModalServerId = null;
+        $this->deployModalSiteIds = [];
+    }
+
+    /**
+     * Deployable sites for the modal's server, with display data.
+     *
+     * @return list<array{id:string,name:string}>
+     */
+    #[Computed]
+    public function deployModalSites(): array
+    {
+        if ($this->deployModalServerId === null) {
+            return [];
+        }
+        $server = Server::query()->with('sites')->find($this->deployModalServerId);
+        if ($server === null) {
+            return [];
+        }
+
+        return $this->deployableSitesFor($server)
+            ->map(fn (Site $s): array => ['id' => (string) $s->id, 'name' => (string) $s->name])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The deployable sites on a server, server relation pre-attached so
+     * {@see siteIsDeployable()} doesn't re-query per site.
+     *
+     * @return Collection<int, Site>
+     */
+    protected function deployableSitesFor(Server $server): Collection
+    {
+        return $server->sites->filter(function (Site $site) use ($server): bool {
+            $site->setRelation('server', $server);
+
+            return $this->siteIsDeployable($site);
+        })->values();
+    }
+
+    /**
+     * Queue + watch + report a set of sites — the shared tail of every deploy
+     * entry point (modal confirm, deploy-all, synced peers).
+     *
+     * @param  Collection<int, Site>  $sites
+     */
+    protected function launchDeploys(Collection $sites): void
+    {
+        [$queuedIds, $skipped] = $this->queueDeploys($sites);
+        $this->watchDeploys($queuedIds);
+        $this->reportBatchDeploy(count($queuedIds), $skipped);
+    }
+
+    /** Empty the deploy console so it opens fresh, ready for the next run. */
+    protected function clearDeployConsole(): void
+    {
+        $this->watchedSiteIds = [];
+        unset($this->watchedRows, $this->watchedInProgress);
+    }
+
     /**
      * Deploy a single site — the fleet twin of the deploy sidebar's "Deploy"
      * button. Seeds the same optimistic deploy lock and dispatches the same job
@@ -79,11 +214,7 @@ trait WatchesSiteDeploys
             return;
         }
 
-        $deployable = $server->sites->filter(function (Site $site) use ($server): bool {
-            $site->setRelation('server', $server);
-
-            return $this->siteIsDeployable($site);
-        });
+        $deployable = $this->deployableSitesFor($server);
         if ($deployable->isEmpty()) {
             return;
         }
@@ -91,9 +222,8 @@ trait WatchesSiteDeploys
             return;
         }
 
-        [$queuedIds, $skipped] = $this->queueDeploys($deployable);
-        $this->watchDeploys($queuedIds);
-        $this->reportBatchDeploy(count($queuedIds), $skipped);
+        $this->clearDeployConsole();
+        $this->launchDeploys($deployable);
     }
 
     /**

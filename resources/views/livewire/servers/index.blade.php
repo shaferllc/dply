@@ -632,6 +632,8 @@
         </div>
     </div>
 
+    @include('livewire.servers.partials.deploy-sites-modal')
+
     @include('livewire.servers.partials.remove-server-modal', [
         'open' => $deleteModalServerId !== null && $deleteModalServer,
         'serverName' => $deleteModalServer?->name ?? '',

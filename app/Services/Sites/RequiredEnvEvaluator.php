@@ -61,6 +61,21 @@ final class RequiredEnvEvaluator
         // MAIL_PASSWORD / REDIS_PASSWORD / SESSION_DOMAIN.)
         $present = array_map(static fn ($key): string => (string) $key, array_keys($parsed['variables']));
 
+        // Also count keys the THIS deploy will push from the canonical store
+        // (sites.env_file_content). The deploy writes the release .env from this
+        // content before the app boots, so a key present here can't be "missing"
+        // at runtime — and blocking on it dead-locks the first deploy after a
+        // flat↔atomic switch, where effectiveEnvFilePath() flips to a path that
+        // doesn't exist yet (e.g. <root>/current/.env) so the live read is empty
+        // even though the env is fully known. The gate's precondition already
+        // requires a host that supports env push (checked above), so this is the
+        // env the deploy is guaranteed to lay down.
+        $pending = array_map(
+            static fn ($key): string => (string) $key,
+            array_keys($this->parser->parse($site->effectiveEnvFileContent())['variables']),
+        );
+        $present = array_values(array_unique(array_merge($present, $pending)));
+
         $inherited = $site->workspace?->variables->pluck('env_key')->map(fn ($k) => (string) $k)->all() ?? [];
 
         // Strict gate: only no-default env() references (source 'code'). Keys

@@ -428,15 +428,29 @@ class SiteDeployPipelineRunner
                 .'curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1 && apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
                 .'elif command -v sudo >/dev/null 2>&1; then '
                 .'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - >/dev/null 2>&1 && sudo apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
+                .'fi; }; '
+                // 3) Still missing, but snap is available (stock Ubuntu) — install a
+                //    current Node via snap. This is the path that actually works on
+                //    BYO boxes with no mise where the NodeSource apt path failed, and
+                //    it gives Node 20+/22 — Vite 7 / Tailwind 4 (oxide) reject the
+                //    distro `nodejs` 18, so an old apt Node still can't build.
+                .'command -v npm >/dev/null 2>&1 || { '
+                .'if command -v snap >/dev/null 2>&1; then '
+                .'echo "[dply] installing Node via snap…"; '
+                .'if [ "$(id -u)" = 0 ]; then snap install node --classic --channel=lts/stable >/dev/null 2>&1 || snap install node --classic >/dev/null 2>&1 || true; '
+                .'elif command -v sudo >/dev/null 2>&1; then sudo snap install node --classic --channel=lts/stable >/dev/null 2>&1 || sudo snap install node --classic >/dev/null 2>&1 || true; fi; '
+                .'export PATH="/snap/bin:$PATH"; '
                 .'fi; }; ';
-            // 3) Still no npm. For a Node-only step (npm_ci / npm_run) warn and
-            //    SKIP the build rather than failing the whole deploy — the app
-            //    ships without rebuilt assets and the operator can install Node
-            //    and redeploy. For a combined composer+node custom step we must
-            //    NOT exit here (that would skip composer too); let the command
-            //    run and surface the npm failure on its own.
+            // 4) Still no npm. The app has a package.json and did NOT opt out
+            //    (checked above), so it genuinely needs an asset build — without
+            //    one it 500s on a missing public/build/manifest.json. FAIL the
+            //    deploy loudly rather than shipping a green deploy over a broken
+            //    site (the old behaviour silently exit 0'd and we shipped sites
+            //    with no manifest). Operator fixes Node or sets the opt-out.
+            //    Combined composer+node steps don't exit here — that would skip
+            //    composer too; let the command run and surface npm's own failure.
             if (! $usesComposer) {
-                $prefix .= 'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable and auto-install failed — skipping frontend build (install Node on the server and redeploy to build assets)."; exit 0; }; ';
+                $prefix .= 'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable and auto-install (mise/NodeSource/snap) all failed — failing the deploy so a missing public/build/manifest.json can not ship silently. Install Node on the server, or set {\"dply\":{\"build\":false}} in package.json to opt out, then redeploy."; exit 1; }; ';
             }
             $prefix .= 'fi; ';
         }

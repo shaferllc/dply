@@ -43,6 +43,17 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
         public string $siteId,
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
+        /**
+         * Read this absolute path instead of the site's current
+         * effectiveEnvFilePath() — used by a deploy-layout switch to capture the
+         * PRE-switch .env after the effective path has already moved.
+         */
+        public ?string $envPathOverride = null,
+        /**
+         * Skip the import when env_file_content is already non-blank, so a
+         * layout-switch capture never clobbers a UI-managed canonical env.
+         */
+        public bool $onlyIfEmpty = false,
     ) {}
 
     /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
@@ -75,14 +86,23 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        // Layout-switch capture: never overwrite an env the operator already
+        // manages in the UI. Only import when the canonical store is blank.
+        if ($this->onlyIfEmpty && trim((string) ($site->env_file_content ?? '')) !== '') {
+            return;
+        }
+
         $this->bindConsoleRunId($this->seededConsoleRunId);
         $emit = $this->beginConsoleAction();
 
         try {
+            $readPath = $this->envPathOverride !== null && trim($this->envPathOverride) !== ''
+                ? $this->envPathOverride
+                : $site->effectiveEnvFilePath();
             $emit->step('sync', __('Resolving server connection'));
-            $emit->step('sync', __('Reading .env from :path', ['path' => $site->effectiveEnvFilePath()]));
+            $emit->step('sync', __('Reading .env from :path', ['path' => $readPath]));
 
-            $raw = $reader->read($site);
+            $raw = $reader->read($site, $this->envPathOverride);
             $parsed = $parser->parse($raw);
 
             foreach ($parsed['errors'] as $error) {
