@@ -17,6 +17,28 @@
         <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
     @endif
 
+    @php $sub = $shippingSubTab ?? 'logs'; @endphp
+
+    {{-- Sub-tabs — Logs first so the stream is visible without scrolling past setup --}}
+    <div class="flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1">
+        @foreach ([
+            'logs' => [__('Logs'), 'heroicon-m-bars-3-bottom-left'],
+            'settings' => [__('Settings'), 'heroicon-m-cog-6-tooth'],
+            'activity' => [__('Activity'), 'heroicon-m-clipboard-document-list'],
+        ] as $key => $meta)
+            <button type="button" wire:click="setShippingSubTab('{{ $key }}')"
+                @class([
+                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition',
+                    'bg-brand-forest text-white shadow-sm' => $sub === $key,
+                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $sub !== $key,
+                ])>
+                <x-dynamic-component :component="$meta[1]" class="h-4 w-4" aria-hidden="true" />
+                {{ $meta[0] }}
+            </button>
+        @endforeach
+    </div>
+
+    @if ($sub === 'settings')
     {{-- Aggregator role: this box is the dply Logs ingest tier. Prompt a re-sync
          when it's running an older rendered config than this build of dply ships. --}}
     @php
@@ -218,20 +240,66 @@
                 @endif
             </div>
 
-            {{-- Streaming install output --}}
-            @if ($agent && trim((string) $agent->install_output) !== '')
-                <div x-data="{ open: {{ $busy ? 'true' : 'false' }} }" class="rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02]">
-                    <button type="button" x-on:click="open = !open" class="flex w-full items-center justify-between px-4 py-2.5 text-xs font-semibold text-brand-moss">
-                        {{ __('Install output') }}
-                        <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
-                    </button>
-                    <div x-show="open" x-collapse>
-                        <pre class="max-h-72 overflow-auto border-t border-brand-ink/10 px-4 py-3 text-[11px] leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
-                    </div>
-                </div>
-            @endif
         </div>
     </section>
+    @endif {{-- /settings --}}
+
+    {{-- Activity sub-tab: streaming install output + agent metadata --}}
+    @if ($sub === 'activity')
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Agent activity') }}</h3>
+                    <p class="text-xs text-brand-moss">{{ __('Install output and the current state of the shipping agent on this server.') }}</p>
+                </div>
+            </div>
+            <div class="space-y-5 px-6 py-5 sm:px-7">
+                @if ($agent)
+                    <dl class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                        <div><dt class="text-xs text-brand-moss">{{ __('Status') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $statusMeta['label'] }}</dd></div>
+                        <div><dt class="text-xs text-brand-moss">{{ __('Vector version') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->version ? 'v'.$agent->version : '—' }}</dd></div>
+                        <div><dt class="text-xs text-brand-moss">{{ __('Last seen') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->last_seen_at?->diffForHumans() ?? __('never') }}</dd></div>
+                        <div class="min-w-0"><dt class="text-xs text-brand-moss">{{ __('Client cert') }}</dt><dd class="mt-0.5 truncate font-mono text-xs text-brand-ink" title="{{ $agent->client_cert_fingerprint }}">{{ $agent->client_cert_fingerprint ? \Illuminate\Support\Str::limit($agent->client_cert_fingerprint, 18) : '—' }}</dd></div>
+                    </dl>
+
+                    @if ($agent->error_message)
+                        <div class="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-inset ring-rose-200">
+                            <p class="font-semibold">{{ __('Last error') }}</p>
+                            <p class="mt-0.5 break-words">{{ $agent->error_message }}</p>
+                        </div>
+                    @endif
+
+                    @if (trim((string) $agent->install_output) !== '')
+                        <div>
+                            <p class="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Install output') }}</p>
+                            <pre class="max-h-96 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02] px-4 py-3 text-[11px] leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
+                        </div>
+                    @else
+                        <p class="text-sm text-brand-moss">{{ __('No install output recorded yet.') }}</p>
+                    @endif
+                @else
+                    <p class="text-sm text-brand-moss">{{ __('The agent is not installed on this server yet — enable it under Settings.') }}</p>
+                @endif
+            </div>
+        </section>
+    @endif {{-- /activity --}}
+
+    @if ($sub === 'logs')
+    {{-- Shipping isn't running: nudge to Settings rather than show an empty stream --}}
+    @unless ($agent?->isRunning())
+        <div class="dply-card flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
+            <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
+                <x-heroicon-o-paper-airplane class="h-4 w-4" aria-hidden="true" />
+                {{ __('Log shipping is not running on this server, so there are no persisted logs yet.') }}
+            </span>
+            <button type="button" wire:click="setShippingSubTab('settings')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-forest/90">
+                <x-heroicon-o-cog-6-tooth class="h-4 w-4" aria-hidden="true" /> {{ __('Set up shipping') }}
+            </button>
+        </div>
+    @endunless
 
     {{-- Correlation histogram: log volume over time + deploy/error/incident overlay --}}
     @if ($agent?->isRunning())
@@ -440,4 +508,5 @@
             @endif
         </section>
     @endif
+    @endif {{-- /logs --}}
 </div>

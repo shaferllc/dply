@@ -206,6 +206,16 @@ return [
 
     'install_fail2ban' => true,
 
+    // Lock SSH down to key-only auth at the end of provisioning: disable
+    // password authentication and reduce root to prohibit-password (key login
+    // only). dply always connects as root via an SSH key, and the deploy user
+    // is key + NOPASSWD-sudo, so this never affects dply — it just shuts the
+    // door on the constant root-password brute force every public box gets.
+    // Writes a managed snippet under /etc/ssh/sshd_config.d/ (the same file the
+    // Insights ssh_security_posture fix owns), validated with `sshd -t` before
+    // reload. Toggle off via DPLY_HARDEN_SSH=false if you rely on passwords.
+    'harden_ssh' => (bool) env('DPLY_HARDEN_SSH', true),
+
     // Configure and enable OS-native automatic security updates
     // (unattended-upgrades) at the end of provisioning. The base bootstrap
     // preempts cloud-init's copy to avoid apt-lock contention during install;

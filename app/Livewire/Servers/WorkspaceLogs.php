@@ -39,6 +39,22 @@ class WorkspaceLogs extends Component
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';
 
+    /** @var list<string> */
+    public const SHIPPING_SUBTABS = ['logs', 'settings', 'activity'];
+
+    /**
+     * Sub-tab within the dply Logs tab. Defaults to 'logs' so the stream is the
+     * first thing shown — agent setup lives under 'settings', install output under
+     * 'activity' — no scrolling past the add-on card to reach the logs.
+     */
+    #[Url(as: 'sub', except: 'logs')]
+    public string $shippingSubTab = 'logs';
+
+    public function setShippingSubTab(string $tab): void
+    {
+        $this->shippingSubTab = in_array($tab, self::SHIPPING_SUBTABS, true) ? $tab : 'logs';
+    }
+
     public bool $logOptionsMenuOpen = false;
 
     public bool $logSourceMenuOpen = false;
@@ -153,9 +169,9 @@ class WorkspaceLogs extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            // Only query ClickHouse when the Shipping tab is actually open.
-            'logExplorer' => $this->logsTab === 'shipping' ? $this->loadLogExplorer() : null,
-            'logHistogram' => $this->logsTab === 'shipping' && $this->logCorrelationEnabled ? $this->loadLogHistogram() : null,
+            // Only query ClickHouse when the Shipping tab's Logs sub-tab is open.
+            'logExplorer' => $this->logsTab === 'shipping' && $this->shippingSubTab === 'logs' ? $this->loadLogExplorer() : null,
+            'logHistogram' => $this->logsTab === 'shipping' && $this->shippingSubTab === 'logs' && $this->logCorrelationEnabled ? $this->loadLogHistogram() : null,
             // Alert rules + entitlement, only while the Alerts tab is open.
             'logAlertRules' => $this->logsTab === 'alerts' ? $this->loadLogAlertRules() : collect(),
             'logAlertingAvailable' => $this->logAlertingAvailable,

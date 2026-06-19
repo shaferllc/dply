@@ -146,6 +146,7 @@
                 'logExplorer' => $logExplorer,
                 'logHistogram' => $logHistogram,
                 'logCorrelationEnabled' => $logCorrelationEnabled,
+                'shippingSubTab' => $shippingSubTab,
             ])
         @endif
 

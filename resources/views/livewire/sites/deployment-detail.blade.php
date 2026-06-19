@@ -1,15 +1,17 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <x-breadcrumb-trail
+        :items="$settingsBreadcrumbs"
+        :site="$site"
+        doc-contextual
+        :contextual-doc-slug="$contextualDocSlug ?? null"
+        class="mb-6"
+    />
+
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
-            <x-breadcrumb-trail
-                :items="$settingsBreadcrumbs"
-                doc-contextual
-                :contextual-doc-slug="$contextualDocSlug ?? null"
-            />
-
-            <main class="min-w-0 space-y-6 mt-6">
+            <main class="min-w-0 space-y-6">
             <x-hero-card
                 :eyebrow="__('Deployments')"
                 :title="__('Deployment detail')"

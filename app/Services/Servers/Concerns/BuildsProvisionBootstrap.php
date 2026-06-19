@@ -481,6 +481,8 @@ trait BuildsProvisionBootstrap
     {
         $lines = [];
 
+        $lines = array_merge($lines, $this->sshHardening());
+
         if (config('server_provision.install_fail2ban', true)) {
             $lines[] = $this->stepMarker('Installing Fail2ban');
             $lines = array_merge($lines, $this->ensurePackagesInstalled(
@@ -520,6 +522,63 @@ trait BuildsProvisionBootstrap
         $lines[] = 'echo "[dply] provision finished"';
 
         return $lines;
+    }
+
+    /**
+     * Lock SSH to key-only auth at the end of provisioning. Drops a managed
+     * snippet under /etc/ssh/sshd_config.d/ (the same path the Insights
+     * ssh_security_posture fix owns, so the two never fight) disabling password
+     * auth and reducing root to prohibit-password. dply connects as root via an
+     * SSH key and the deploy user is key + NOPASSWD-sudo, so this is invisible
+     * to dply — it just ends the root-password brute force every public box
+     * gets. Validated with `sshd -t` before reload; on a box too old to Include
+     * sshd_config.d (pre-OpenSSH 7.3) it skips rather than write an unread file.
+     *
+     * @return list<string>
+     */
+    private function sshHardening(): array
+    {
+        if (! (bool) config('server_provision.harden_ssh', true)) {
+            return [];
+        }
+
+        $path = '/etc/ssh/sshd_config.d/99-dply-hardening.conf';
+        $pathArg = escapeshellarg($path);
+
+        // Keep these directives byte-identical to HardenSshConfigFixAction so a
+        // later Insights re-apply is a true no-op and the posture check passes.
+        $snippet = <<<'CFG'
+# Managed by Dply (server SSH hardening). Edits here are overwritten on the
+# next provision/fix re-apply. Remove this file and reload ssh to revert.
+PasswordAuthentication no
+PermitRootLogin prohibit-password
+PermitEmptyPasswords no
+X11Forwarding no
+
+CFG;
+
+        return $this->withStep('Hardening SSH (key-only auth)', [
+            // Only write the snippet if the main config sources sshd_config.d —
+            // modern OpenSSH (>=7.3) does by default. Skip on the rare old build
+            // that doesn't rather than write a snippet sshd would never read.
+            'if grep -Eq \'^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\\.d/\\*\\.conf\' /etc/ssh/sshd_config 2>/dev/null; then',
+            '  install -d -m 0755 /etc/ssh/sshd_config.d',
+            '  '.$this->writeFileWithRollback($path, $snippet),
+            '  chmod 0644 '.$pathArg,
+            // Validate the COMBINED config before reloading; if our snippet is
+            // somehow rejected, remove it so sshd is never broken on a fresh box.
+            '  if sshd -t 2>/dev/null; then',
+            '    if systemctl cat ssh.service >/dev/null 2>&1; then svc=ssh; else svc=sshd; fi',
+            '    systemctl reload "$svc" 2>/dev/null || systemctl restart "$svc" 2>/dev/null || true',
+            '    echo "[dply] SSH hardened: password auth disabled, root login key-only."',
+            '  else',
+            '    rm -f '.$pathArg,
+            '    echo "[dply] WARNING: sshd -t rejected hardening snippet — SSH config left unchanged." >&2',
+            '  fi',
+            'else',
+            '  echo "[dply] SSH hardening skipped: sshd_config does not Include sshd_config.d/*.conf." >&2',
+            'fi',
+        ]);
     }
 
     /**
