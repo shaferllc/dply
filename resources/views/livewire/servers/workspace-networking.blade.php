@@ -70,7 +70,7 @@
                 @endif
             </div>
 
-            <div class="divide-y divide-brand-ink/5">
+            <div class="divide-y divide-brand-ink/8">
                 @foreach ($allServers as $s)
                     @php
                         $isCurrent = $s->id === $server->id;
@@ -78,33 +78,65 @@
                         $sDbs = $databasesByServer->get($s->id, collect());
                         $sCaches = $cacheServicesByServer->get($s->id, collect());
                         $hasServices = $sEngines->isNotEmpty() || $sCaches->isNotEmpty();
+                        $exposedDbs = $sDbs->where('remote_access', true);
+
+                        // SSH tunnel helper commands, one per database/cache port.
+                        $tunnelCmds = [];
+                        if ($s->private_ip_address) {
+                            $localPort = 15400;
+                            $sshUser = trim((string) $s->ssh_user) !== '' ? trim((string) $s->ssh_user) : 'deploy';
+                            foreach ($sEngines as $eng) {
+                                $tunnelCmds[] = [
+                                    'label' => ($eng->engine === 'postgres' ? 'PostgreSQL' : ucfirst($eng->engine)).' '.$eng->port.' → localhost:'.$localPort,
+                                    'command' => "ssh -L {$localPort}:{$s->private_ip_address}:{$eng->port} {$sshUser}@{$s->ip_address}",
+                                ];
+                                $localPort += 100;
+                            }
+                            foreach ($sCaches as $cache) {
+                                $tunnelCmds[] = [
+                                    'label' => ucfirst($cache->engine).' '.$cache->port.' → localhost:'.$localPort,
+                                    'command' => "ssh -L {$localPort}:{$s->private_ip_address}:{$cache->port} {$sshUser}@{$s->ip_address}",
+                                ];
+                                $localPort += 100;
+                            }
+                        }
                     @endphp
-                    <div class="px-6 py-4 sm:px-7 {{ $isCurrent ? 'bg-brand-sage/5' : '' }}">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            {{-- Server identity --}}
-                            <div class="flex min-w-0 items-center gap-3">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl {{ $isCurrent ? 'bg-brand-sage text-white ring-brand-sage/30' : 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' }} ring-1">
+                    <div @class([
+                        'relative px-6 py-5 sm:px-7',
+                        'bg-brand-sage/[0.05]' => $isCurrent,
+                    ])>
+                        @if ($isCurrent)
+                            <span class="absolute inset-y-0 left-0 w-[3px] bg-brand-sage" aria-hidden="true"></span>
+                        @endif
+
+                        {{-- Header: identity (with IP chips) on the left, service badges on the right --}}
+                        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $isCurrent ? 'bg-brand-sage text-white ring-brand-sage/30' : 'bg-brand-sage/12 text-brand-forest ring-brand-sage/25' }}">
                                     <x-heroicon-o-server class="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $s->name }}</p>
                                         @if ($isCurrent)
-                                            <span class="rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-forest">{{ __('this server') }}</span>
+                                            <span class="rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('this server') }}</span>
                                         @endif
                                     </div>
-                                    <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-brand-mist">
+                                    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                                         @if ($s->private_ip_address)
-                                            <span class="flex items-center gap-1">
-                                                <x-heroicon-m-lock-closed class="h-2.5 w-2.5 text-emerald-500" aria-hidden="true" />
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-mono text-[11px] text-emerald-700 ring-1 ring-emerald-200" title="{{ __('Private IP') }}">
+                                                <x-heroicon-m-lock-closed class="h-2.5 w-2.5" aria-hidden="true" />
                                                 {{ $s->private_ip_address }}
                                             </span>
                                         @endif
                                         @if ($s->ip_address)
-                                            <span>{{ $s->ip_address }}</span>
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[11px] text-brand-moss ring-1 ring-brand-ink/5" title="{{ __('Public IP') }}">
+                                                <x-heroicon-m-globe-alt class="h-2.5 w-2.5 text-brand-mist" aria-hidden="true" />
+                                                {{ $s->ip_address }}
+                                            </span>
                                         @endif
                                         @if ($s->region)
-                                            <span class="font-sans text-[10px]">{{ $s->region }}</span>
+                                            <span class="inline-flex items-center rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-mist ring-1 ring-brand-ink/5">{{ $s->region }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -112,7 +144,7 @@
 
                             {{-- Service badges --}}
                             @if ($hasServices)
-                                <div class="flex flex-wrap items-center gap-1.5">
+                                <div class="flex flex-wrap items-center justify-end gap-1.5">
                                     @foreach ($sEngines as $eng)
                                         @php
                                             $engDbs = $sDbs->where('engine', $eng->engine);
@@ -142,22 +174,31 @@
                                     @endforeach
                                 </div>
                             @else
-                                <span class="text-[11px] text-brand-mist">{{ __('No tracked services') }}</span>
+                                <span class="text-[11px] italic text-brand-mist">{{ __('No tracked services') }}</span>
                             @endif
                         </div>
 
                         {{-- Connection strings for exposed databases --}}
-                        @if ($sDbs->where('remote_access', true)->isNotEmpty())
-                            <div class="mt-3 space-y-1.5">
-                                @foreach ($sDbs->where('remote_access', true) as $db)
+                        @if ($exposedDbs->isNotEmpty())
+                            <div class="mt-4 space-y-1.5 pl-12">
+                                @foreach ($exposedDbs as $db)
                                     @php
                                         $connHost = $s->private_ip_address ?? $s->ip_address ?? 'unknown';
                                         $connPort = $sEngines->firstWhere('engine', $db->engine)?->port ?? \App\Models\ServerDatabaseEngine::defaultPortFor($db->engine);
                                         $connStr = "host={$connHost} port={$connPort} dbname={$db->name} user={$db->username}";
                                     @endphp
-                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
+                                    <div x-data="{ copied: false }" class="group flex items-center gap-2 rounded-lg border border-brand-ink/8 bg-brand-sand/15 px-3 py-2">
                                         <x-heroicon-o-link class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                                         <code class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-ink">{{ $connStr }}</code>
+                                        <button
+                                            type="button"
+                                            class="shrink-0 rounded p-1 text-brand-mist opacity-0 transition hover:bg-white hover:text-brand-ink group-hover:opacity-100"
+                                            title="{{ __('Copy connection string') }}"
+                                            @click="navigator.clipboard.writeText(@js($connStr)); copied = true; setTimeout(() => copied = false, 1500)"
+                                        >
+                                            <x-heroicon-o-clipboard class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                        <span x-show="copied" x-cloak class="shrink-0 text-[10px] font-medium text-emerald-700">{{ __('Copied') }}</span>
                                         <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
                                             {{ $db->allowed_from ?: __('no source set') }}
                                         </span>
@@ -166,86 +207,83 @@
                             </div>
                         @endif
 
-                        @if ($s->private_ip_address)
-                            {{-- SSH tunnel helper (#8) --}}
-                            @php
-                                $tunnelCmds = [];
-                                $localPort = 15400;
-                                $sshUser = trim((string) $s->ssh_user) !== '' ? trim((string) $s->ssh_user) : 'deploy';
-                                foreach ($databaseEnginesByServer->get($s->id, collect()) as $eng) {
-                                    $tunnelCmds[] = [
-                                        'label' => ($eng->engine === 'postgres' ? 'PostgreSQL' : ucfirst($eng->engine)).' '.$eng->port.' → localhost:'.$localPort,
-                                        'command' => "ssh -L {$localPort}:{$s->private_ip_address}:{$eng->port} {$sshUser}@{$s->ip_address}",
-                                    ];
-                                    $localPort += 100;
-                                }
-                                foreach ($cacheServicesByServer->get($s->id, collect()) as $cache) {
-                                    $tunnelCmds[] = [
-                                        'label' => ucfirst($cache->engine).' '.$cache->port.' → localhost:'.$localPort,
-                                        'command' => "ssh -L {$localPort}:{$s->private_ip_address}:{$cache->port} {$sshUser}@{$s->ip_address}",
-                                    ];
-                                    $localPort += 100;
-                                }
-                            @endphp
-                            @if (! empty($tunnelCmds))
-                                <x-cli-snippet
-                                    :commands="$tunnelCmds"
-                                    tone="details"
-                                    :summary="__('SSH tunnel commands')"
-                                    :intro="__('Run one of these from your machine, then point your client at localhost on the listed port. Tunnels through this server\'s own SSH — for a database scoped to a different host, use the jump-host access below.')"
-                                    size="10"
-                                    class="mt-3"
-                                />
-                            @endif
-                            @if ($s->provider->value === 'hetzner' && $s->hetzner_network_id)
-                                <div class="mt-2 flex items-center gap-2">
+                        {{-- SSH tunnel helper (#8) --}}
+                        @if (! empty($tunnelCmds))
+                            <x-cli-snippet
+                                :commands="$tunnelCmds"
+                                tone="details"
+                                :summary="__('SSH tunnel commands')"
+                                :intro="__('Run one of these from your machine, then point your client at localhost on the listed port. Tunnels through this server\'s own SSH — for a database scoped to a different host, use the jump-host access below.')"
+                                size="10"
+                                class="mt-4 ml-12"
+                            />
+                        @endif
+
+                        {{-- Network status + management actions: a single muted footer line --}}
+                        @php
+                            $networkActionable = ($s->private_ip_address && $s->provider->value === 'hetzner' && $s->hetzner_network_id)
+                                || ($s->provider->value === 'hetzner')
+                                || in_array($s->provider->value, ['digitalocean', 'vultr', 'linode'], true);
+                        @endphp
+                        @if ($s->private_ip_address || $networkActionable)
+                            <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/8 pt-3 pl-12">
+                                @if ($s->private_ip_address)
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+                                        <x-heroicon-m-shield-check class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('On private network') }}
+                                    </span>
+                                    @if ($s->provider->value === 'hetzner' && $s->hetzner_network_id)
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('detachFromNetwork', ['{{ $s->id }}'], @js(__('Detach :name from network?', ['name' => $s->name])), @js(__('The private IP will be removed. Services using it will lose connectivity.')), @js(__('Detach')), true)"
+                                            class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-mist transition hover:text-rose-600"
+                                        >
+                                            <x-heroicon-m-link-slash class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Detach from network') }}
+                                        </button>
+                                    @endif
+                                @elseif ($s->provider->value === 'hetzner' && $s->hetzner_network_id)
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-sage" wire:poll.5s>
+                                        <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                        </svg>
+                                        {{ __('Assigning private IP on network :id…', ['id' => $s->hetzner_network_id]) }}
+                                    </span>
+                                @elseif ($s->provider->value === 'hetzner')
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-mist">
+                                        <x-heroicon-m-globe-alt class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('No private network') }}
+                                    </span>
+                                    <span class="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            x-on:click="$dispatch('open-modal', 'create-network-modal')"
+                                            class="text-[11px] font-medium text-brand-sage hover:underline"
+                                        >{{ __('Create network') }}</button>
+                                        <button
+                                            type="button"
+                                            x-data
+                                            x-on:click="$dispatch('open-modal', 'attach-network-modal-{{ $s->id }}'); $wire.loadHetznerNetworks()"
+                                            class="text-[11px] font-medium text-brand-sage hover:underline"
+                                        >{{ __('Attach to existing') }}</button>
+                                    </span>
+                                @elseif (in_array($s->provider->value, ['digitalocean', 'vultr', 'linode'], true))
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-mist">
+                                        <x-heroicon-m-globe-alt class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('No private IP — enable private networking') }}
+                                    </span>
                                     <button
                                         type="button"
-                                        wire:click="openConfirmActionModal('detachFromNetwork', ['{{ $s->id }}'], @js(__('Detach :name from network?', ['name' => $s->name])), @js(__('The private IP will be removed. Services using it will lose connectivity.')), @js(__('Detach')), true)"
-                                        class="text-[11px] font-medium text-rose-600 hover:underline"
-                                    >{{ __('Detach from network') }}</button>
-                                </div>
-                            @endif
-                        @elseif ($s->provider->value === 'hetzner')
-                            @if ($s->hetzner_network_id && ! $s->private_ip_address)
-                                <div class="mt-3 flex items-center gap-2" wire:poll.5s>
-                                    <svg class="h-3.5 w-3.5 animate-spin text-brand-sage" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                    </svg>
-                                    <span class="text-[11px] text-brand-sage">{{ __('Assigning private IP on network :id…', ['id' => $s->hetzner_network_id]) }}</span>
-                                </div>
-                            @else
-                                <div class="mt-3 flex flex-wrap items-center gap-2">
-                                    <span class="text-[11px] text-brand-mist">{{ __('No private network') }}</span>
-                                    <span class="text-[11px] text-brand-mist">·</span>
-                                    <button
-                                        type="button"
-                                        x-on:click="$dispatch('open-modal', 'create-network-modal')"
-                                        class="text-[11px] font-medium text-brand-sage hover:underline"
-                                    >{{ __('Create network') }}</button>
-                                    <span class="text-[11px] text-brand-mist">·</span>
-                                    <button
-                                        type="button"
-                                        x-data
-                                        x-on:click="$dispatch('open-modal', 'attach-network-modal-{{ $s->id }}'); $wire.loadHetznerNetworks()"
-                                        class="text-[11px] font-medium text-brand-sage hover:underline"
-                                    >{{ __('Attach to existing') }}</button>
-                                </div>
-                            @endif
-                        @elseif (in_array($s->provider->value, ['digitalocean', 'vultr', 'linode'], true))
-                            <div class="mt-2 flex flex-wrap items-center gap-2">
-                                <p class="text-[11px] text-brand-mist">{{ __('No private IP — must have private networking enabled.') }}</p>
-                                <button
-                                    type="button"
-                                    wire:click="syncPrivateIp('{{ $s->id }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="syncPrivateIp('{{ $s->id }}')"
-                                    class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
-                                >
-                                    <span wire:loading.remove wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Sync from :provider', ['provider' => $s->provider->label()]) }}</span>
-                                    <span wire:loading wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Syncing…') }}</span>
-                                </button>
+                                        wire:click="syncPrivateIp('{{ $s->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncPrivateIp('{{ $s->id }}')"
+                                        class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                    >
+                                        <span wire:loading.remove wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Sync from :provider', ['provider' => $s->provider->label()]) }}</span>
+                                        <span wire:loading wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Syncing…') }}</span>
+                                    </button>
+                                @endif
                             </div>
                         @endif
                     </div>

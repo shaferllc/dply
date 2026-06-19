@@ -19,35 +19,6 @@
     };
 @endphp
 
-{{-- Top intro card + standalone tab strip, mirroring the SSH keys workspace:
-     a dply-card heading with icon pill, then the shared underlined tablist
-     between the intro and the per-tab content cards. --}}
-<section class="{{ $card }}">
-    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Inbound + outbound traffic') : __('Domains, DNS, aliases & redirects') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    @if ($site->usesDockerRuntime())
-                        {{ __('Manage published hostnames, custom domains, redirects, and preview endpoints from one networking workspace.') }}
-                    @else
-                        {{ __('Manage customer domains, DNS automation, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
-                    @endif
-                </p>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                    <span class="inline-flex items-center gap-1">
-                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                        {{ __('Routing changes auto-apply the active webserver config — no manual save needed.') }}
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
 <x-server-workspace-tablist :aria-label="__('Routing sections')" class="mt-6">
     @foreach ($routingTabs as $tab)

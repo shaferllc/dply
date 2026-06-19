@@ -150,7 +150,13 @@ trait ManagesSiteBindingActions
             $this->toastSuccess(__('Connected :name.', ['name' => $name]));
         }
 
-        $this->validateBindingConnectivity($binding);
+        // A freshly provisioned database is still being CREATEd on the host by a
+        // queued job, so its endpoint isn't up yet — skip the connectivity probe
+        // now (it would race and report "unreachable"); it gets validated once
+        // the provision job flips the binding to configured.
+        if ($binding->status !== SiteBinding::STATUS_PROVISIONING) {
+            $this->validateBindingConnectivity($binding);
+        }
 
         // Connecting Redis must "just work": the app now dials phpredis (and may
         // use redis for cache/sessions/queue), so guarantee the PHP redis client

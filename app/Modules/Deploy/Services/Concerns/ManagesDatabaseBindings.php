@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services\Concerns;
 
+use App\Jobs\CreateSiteDatabaseJob;
 use App\Jobs\EnsureSitePhpDatabaseDriverJob;
 use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -209,12 +211,17 @@ trait ManagesDatabaseBindings
             throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
         }
 
-        // Don't create a row for an engine that isn't installed + TCP-listening —
-        // otherwise the binding is born unreachable. (This path previously had no
-        // engine check at all.)
-        $readiness = app(DatabaseEngineReadinessGuard::class)->check($server, $engine);
-        if (! $readiness['ok']) {
-            throw new RuntimeException((string) $readiness['reason']);
+        // Fast, NON-SSH pre-check: the engine must be installed on this server
+        // (a ServerDatabaseEngine row exists). The actual CREATE DATABASE — and
+        // any "installed but not TCP-listening" failure — is handled by the
+        // queued CreateSiteDatabaseJob below, so nothing in this request path
+        // touches SSH (the no-render-path-SSH rule; inline SSH here is exactly
+        // what made "Provision" hang past the 30s limit).
+        if ($engine !== 'sqlite'
+            && ! ServerDatabaseEngine::query()->where('server_id', $server->id)->where('engine', $engine)->exists()) {
+            throw new RuntimeException(__(':engine is not installed on this server — install it from the Databases tab first.', [
+                'engine' => DatabaseWorkspaceEngines::label($engine),
+            ]));
         }
 
         $isSqlite = $engine === 'sqlite';
@@ -241,28 +248,13 @@ trait ManagesDatabaseBindings
             'description' => 'Provisioned from site binding ('.$site->slug.')',
         ]);
 
-        try {
-            $this->databaseProvisioner->createOnServer($db);
-        } catch (\Throwable $e) {
-            // Keep the row + binding so the operator can retry/inspect, but
-            // surface the failure on the binding rather than silently 500ing.
-            $binding = $this->persist($site, 'database', [
-                'mode' => 'provision_new',
-                'status' => SiteBinding::STATUS_ERROR,
-                'name' => $db->name,
-                'target_type' => 'server_database',
-                'target_id' => (string) $db->id,
-                'injected_env' => $this->databaseEnv($db, $site),
-                'config' => ['engine' => $db->engine],
-                'last_error' => Str::limit($e->getMessage(), 1000),
-            ]);
-
-            throw new RuntimeException(__('Database row created but server provisioning failed: :err', ['err' => $e->getMessage()]), 0, $e);
-        }
-
-        return $this->persist($site, 'database', [
+        // Record the binding as PROVISIONING with its connection variables
+        // already resolved — credentials are generated above in PHP, so the
+        // injected DB_* are correct immediately even though the database itself
+        // is created asynchronously.
+        $binding = $this->persist($site, 'database', [
             'mode' => 'provision_new',
-            'status' => SiteBinding::STATUS_CONFIGURED,
+            'status' => SiteBinding::STATUS_PROVISIONING,
             'name' => $db->name,
             'target_type' => 'server_database',
             'target_id' => (string) $db->id,
@@ -270,6 +262,22 @@ trait ManagesDatabaseBindings
             'config' => ['engine' => $db->engine],
             'last_error' => null,
         ]);
+
+        // Hand the slow, SSH-bound CREATE DATABASE to the queued job (the same
+        // one the Database tab uses). It flips this binding to configured — or
+        // error, with the message — when it finishes. writeEnv is off because the
+        // binding already owns the .env injection.
+        CreateSiteDatabaseJob::dispatch(
+            (string) $db->id,
+            (string) $site->id,
+            writeEnv: false,
+            pushEnv: false,
+            userId: auth()->id(),
+            seededConsoleRunId: null,
+            siteBindingId: (string) $binding->id,
+        );
+
+        return $binding;
     }
 
     /**

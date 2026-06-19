@@ -151,10 +151,11 @@
         </div>
 
         <div class="space-y-4 px-6 py-6">
-            @if ($bindingModalType === 'storage')
-                {{-- One entry, two modes: attach an existing bucket or have dply
-                     provision a new one. Switching re-seeds the form server-side
-                     (see setBindingMode). --}}
+            @if (in_array($bindingModalType, ['storage', 'database'], true))
+                {{-- One entry, two modes: attach an existing resource or have dply
+                     provision a fresh one. Switching re-seeds the form server-side
+                     (see setBindingMode). Shown for both storage and database since
+                     each supports an attach-existing and a provision-new path. --}}
                 <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
                     <button type="button" wire:click="setBindingMode('attach')" class="rounded-md px-3 py-1.5 transition-colors {{ $bindingModalMode !== 'provision' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
                         {{ __('Attach existing') }}

@@ -12,6 +12,7 @@ use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
@@ -234,8 +235,9 @@ class SiteSetup extends Component
 
         $present = array_flip($this->presentNonEmptyEnvKeys());
         $bindingTypes = $this->site->bindings->pluck('type')->map(fn ($t): string => (string) $t)->all();
+        $bindingManager = app(SiteBindingManager::class);
 
-        return array_map(function (array $s) use ($present, $bindingTypes): array {
+        return array_map(function (array $s) use ($present, $bindingTypes, $bindingManager): array {
             $hasBinding = array_intersect($s['satisfying_types'], $bindingTypes) !== [];
             $keysSatisfied = $s['matched_keys'] !== []
                 && ! collect($s['matched_keys'])->contains(fn ($k): bool => ! isset($present[$k]));
@@ -243,6 +245,16 @@ class SiteSetup extends Component
             $s['has_binding'] = $hasBinding;
             $s['keys_satisfied'] = $keysSatisfied;
             $s['satisfied'] = $hasBinding || $keysSatisfied;
+
+            // AUTO-FIND: how many existing resources of this type already live on
+            // the site's server and could just be linked (existing databases,
+            // installed Redis, a realtime app), so the wizard can offer
+            // "use the one on this server" instead of always provisioning.
+            // attachableTargets returns [] for types with no server-local
+            // resource (storage/mail), so this is a cheap no-op for those.
+            $s['attachable_count'] = $hasBinding
+                ? 0
+                : count($bindingManager->attachableTargets($this->site, (string) $s['type']));
 
             return $s;
         }, $suggestions);

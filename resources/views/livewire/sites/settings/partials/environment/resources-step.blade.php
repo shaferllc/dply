@@ -20,7 +20,10 @@
 
         <ul class="mt-6 space-y-3">
             @foreach ($suggestions as $s)
-                @php $satisfied = (bool) ($s['satisfied'] ?? false); @endphp
+                @php
+                    $satisfied = (bool) ($s['satisfied'] ?? false);
+                    $attachable = (int) ($s['attachable_count'] ?? 0);
+                @endphp
                 <li @class([
                     'flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between',
                     'border-brand-sage/40 bg-brand-sage/[0.06]' => $satisfied,
@@ -42,6 +45,13 @@
                                         <x-heroicon-s-check class="h-3 w-3" />
                                         {{ ($s['has_binding'] ?? false) ? __('Connected') : __('Set via variables') }}
                                     </span>
+                                @elseif ($attachable > 0)
+                                    {{-- Auto-found: an existing resource of this type is already on
+                                         the server and can be linked rather than provisioned anew. --}}
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-medium text-brand-forest" title="{{ __('Found on this server') }}">
+                                        <x-heroicon-s-sparkles class="h-3 w-3" />
+                                        {{ trans_choice('{1} :count found on this server|[2,*] :count found on this server', $attachable, ['count' => $attachable]) }}
+                                    </span>
                                 @endif
                             </div>
                             <p class="mt-0.5 text-xs text-brand-moss">{{ $s['description'] }}</p>
@@ -54,12 +64,27 @@
                         </div>
                     </div>
 
-                    <div class="shrink-0 sm:pl-4">
+                    <div class="flex shrink-0 items-center gap-2 sm:pl-4">
                         @if ($satisfied)
                             <button type="button" wire:click="connectSuggestedResource('{{ $s['type'] }}')"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink">
                                 {{ ($s['has_binding'] ?? false) ? __('Reconfigure') : __('Connect anyway') }}
                             </button>
+                        @elseif ($attachable > 0)
+                            {{-- Lead with linking the resource already on the server; keep
+                                 provisioning a fresh one as the secondary path. --}}
+                            <button type="button" wire:click="openBindingModal('{{ $s['type'] }}', 'attach')"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-medium text-brand-cream transition-colors hover:bg-brand-forest">
+                                <x-heroicon-o-link class="h-4 w-4" />
+                                {{ __('Use existing') }}
+                            </button>
+                            @if ($s['default_mode'] === 'provision')
+                                <button type="button" wire:click="openBindingModal('{{ $s['type'] }}', 'provision')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink">
+                                    <x-heroicon-o-plus class="h-4 w-4" />
+                                    {{ __('New') }}
+                                </button>
+                            @endif
                         @else
                             <button type="button" wire:click="connectSuggestedResource('{{ $s['type'] }}')"
                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-medium text-brand-cream transition-colors hover:bg-brand-forest">

@@ -15,9 +15,25 @@ trait MountsSiteWorkspace
             abort(404);
         }
 
-        $currentOrganization = request()->user()?->currentOrganization();
+        $user = request()->user();
+        $currentOrganization = $user?->currentOrganization();
         if ($server->organization_id !== $currentOrganization?->id) {
-            abort(404);
+            // The active org doesn't match the server's — but a member
+            // deep-linking into another of their orgs' resources should switch
+            // context, not hit a dead 404. This also self-heals a session whose
+            // current org went stale (e.g. after an org-id reseed, where the
+            // session points at an org id that no longer resolves). Only a
+            // genuine non-member is denied; the authorize('view') below still
+            // enforces the real access policy.
+            $target = $user?->organizations()->whereKey($server->organization_id)->first();
+            if ($target === null) {
+                abort(404);
+            }
+
+            session(['current_organization_id' => $target->id]);
+            $user->flushCurrentOrganizationCache();
+            $user->rememberCurrentOrganization($target);
+            $currentOrganization = $target;
         }
 
         $site->setRelation('server', $server);
