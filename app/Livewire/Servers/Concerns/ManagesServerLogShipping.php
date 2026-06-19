@@ -8,6 +8,8 @@ use App\Actions\Servers\ManageServerLogShipping;
 use App\Exceptions\LogShippingException;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ServerLogAgent;
+use App\Models\ServerLogAggregator;
+use App\Modules\Logs\Jobs\InstallLogAggregatorJob;
 
 /**
  * Drives the "Shipping" section of the Logs workspace — the dply Logs add-on:
@@ -137,6 +139,41 @@ trait ManagesServerLogShipping
      */
     public function pollLogShipping(): void
     {
-        $this->server->load('logAgent');
+        $this->server->load(['logAgent', 'logAggregator']);
+    }
+
+    /**
+     * The Vector aggregator running ON this server, if it's the ingest box. Drives
+     * the "config update available" prompt on the Logs tab.
+     */
+    public function getLogAggregatorProperty(): ?ServerLogAggregator
+    {
+        return $this->server->logAggregator;
+    }
+
+    /**
+     * Re-render + reinstall the aggregator config on this box (idempotent) so it
+     * picks up the current rendered config version. Surfaced as the "Update" button
+     * when {@see ServerLogAggregator::isConfigStale()} reports a stale config.
+     */
+    public function resyncLogAggregator(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $aggregator = $this->server->logAggregator;
+        if ($aggregator === null || $aggregator->isBusy()) {
+            return;
+        }
+
+        $aggregator->update([
+            'status' => ServerLogAggregator::STATUS_INSTALLING,
+            'error_message' => null,
+            'install_output' => '',
+        ]);
+
+        InstallLogAggregatorJob::dispatch($aggregator->id);
+
+        $this->server->load('logAggregator');
+        $this->toastSuccess(__('Updating the log aggregator to the latest config — progress will stream below.'));
     }
 }

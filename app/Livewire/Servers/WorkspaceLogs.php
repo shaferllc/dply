@@ -114,7 +114,7 @@ class WorkspaceLogs extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
-        $this->server->loadMissing(['organization', 'sites', 'logAgent']);
+        $this->server->loadMissing(['organization', 'sites', 'logAgent', 'logAggregator']);
         $this->bootServerLogs();
         $this->bootLogShipping();
         $this->logsTab = in_array($this->logsTab, self::LOGS_TABS, true) ? $this->logsTab : 'viewer';
@@ -132,7 +132,7 @@ class WorkspaceLogs extends Component
     {
         $logSources = $this->availableLogSources();
         $this->server->loadMissing('organization');
-        $this->server->load('logAgent');
+        $this->server->load(['logAgent', 'logAggregator']);
 
         return view('livewire.servers.workspace-logs', [
             'logSources' => $logSources,

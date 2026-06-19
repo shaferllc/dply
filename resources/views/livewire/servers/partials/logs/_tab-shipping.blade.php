@@ -17,6 +17,58 @@
         <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
     @endif
 
+    {{-- Aggregator role: this box is the dply Logs ingest tier. Prompt a re-sync
+         when it's running an older rendered config than this build of dply ships. --}}
+    @php($aggregator = $this->logAggregator)
+    @if ($aggregator !== null)
+        @php
+            $aggCurrent = \App\Models\ServerLogAggregator::currentConfigVersion();
+            $aggInstalled = $aggregator->installedConfigVersion();
+            $aggStale = $aggregator->isConfigStale();
+            $aggBusy = $aggregator->isBusy();
+        @endphp
+        @if ($aggBusy)
+            <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
+        @endif
+        <section class="dply-card overflow-hidden">
+            <div class="flex flex-wrap items-center gap-3 px-6 py-4 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-inbox-arrow-down class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Log aggregator') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                        {{ __('This server is the dply Logs ingest tier') }}
+                    </h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        {{ __('Edges across the fleet ship here over mTLS; it writes to ClickHouse.') }}
+                        <span class="font-medium text-brand-ink">
+                            {{ __('Config') }} {{ $aggInstalled ? 'v'.$aggInstalled : __('unknown') }}
+                            @if (! $aggStale && $aggregator->isRunning())
+                                <span class="text-brand-sage">· {{ __('up to date') }}</span>
+                            @else
+                                <span class="opacity-70">→ v{{ $aggCurrent }}</span>
+                            @endif
+                        </span>
+                    </p>
+                </div>
+                @if ($aggStale)
+                    <button type="button" wire:click="resyncLogAggregator" wire:loading.attr="disabled"
+                        @disabled($aggBusy)
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
+                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                        {{ $aggBusy ? __('Updating…') : __('Update aggregator') }}
+                    </button>
+                @endif
+            </div>
+            @if ($aggStale)
+                <div class="border-t border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900 sm:px-7">
+                    {{ __('A newer aggregator config is available (v:current). Re-sync to apply it — existing log rows are unaffected; new logs use the updated pipeline.', ['current' => $aggCurrent]) }}
+                </div>
+            @endif
+        </section>
+    @endif
+
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
