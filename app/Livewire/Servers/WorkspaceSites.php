@@ -23,6 +23,7 @@ use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteCreateAccess;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -143,6 +144,38 @@ class WorkspaceSites extends Component
     {
         $this->dispatch('close-modal', 'add-site-modal');
         $this->showAddSiteModal = false;
+    }
+
+    /**
+     * Sync-peer count per site on this server, keyed by site id — drives the
+     * per-row "Sync N / deploy both" button. Counts are derived from ONE
+     * org-wide pass grouped by canonical repo identity (the same identity
+     * {@see SiteSyncPeers} matches on), so a single-site server still shows a
+     * peer count when its repo is deployed on other servers too, and we never
+     * N+1 a per-row peer query. A site with no repo (server-mate sync only)
+     * reports 1 — its peers are all on this server, already covered by deploying
+     * the rows here, so no cross-server "deploy both" affordance is offered.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function syncPeerCounts(): array
+    {
+        $repoCounts = Site::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->whereNotNull('git_repository_url')
+            ->where('git_repository_url', '!=', '')
+            ->pluck('git_repository_url')
+            ->groupBy(fn (string $repo): string => SiteSyncPeers::canonicalRepo($repo))
+            ->map->count();
+
+        $counts = [];
+        foreach ($this->server->sites as $site) {
+            $repo = SiteSyncPeers::canonicalRepo((string) $site->git_repository_url);
+            $counts[(string) $site->id] = $repo !== '' ? (int) ($repoCounts[$repo] ?? 1) : 1;
+        }
+
+        return $counts;
     }
 
     public function selectAllSites(): void

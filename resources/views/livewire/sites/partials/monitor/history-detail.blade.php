@@ -73,6 +73,14 @@
                                     <p class="mt-0.5 text-xs text-brand-mist truncate" title="{{ $incident->cause }}">{{ $incident->cause }}</p>
                                 @endif
                             </div>
+                            @if ($this->showWindowLogCorrelation)
+                                <button type="button" wire:click="openLogsForIncident('{{ $incident->id }}')"
+                                    class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                                    title="{{ __('Host logs around this incident') }}">
+                                    <x-heroicon-m-bars-3-bottom-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Logs') }}
+                                </button>
+                            @endif
                         </li>
                     @endforeach
                 </ul>

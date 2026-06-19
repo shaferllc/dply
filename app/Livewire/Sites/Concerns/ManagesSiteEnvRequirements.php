@@ -193,7 +193,12 @@ trait ManagesSiteEnvRequirements
 
         $seed = [];
         foreach ($this->site->missingRequiredEnvKeys($present, $inherited) as $entry) {
-            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+            $key = (string) $entry['key'];
+            // Pre-fill domain-derived keys (SESSION_DOMAIN, APP_URL, …) from the
+            // site's own hostname so the operator just confirms; example sample
+            // for everything else.
+            $seed[$key] = \App\Support\Sites\DomainDerivedEnvDefaults::for($this->site, $key)
+                ?? (string) ($entry['example'] ?? '');
         }
         $this->missing_env_values = $seed;
 

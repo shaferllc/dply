@@ -26,6 +26,7 @@ use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteDeployCoordinator;
+use App\Support\Sites\DomainDerivedEnvDefaults;
 use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\Sites\SiteSyncPeers;
@@ -385,11 +386,59 @@ class DeploymentsList extends Component
 
         $seed = [];
         foreach ($this->deployBlockedEnvKeys() as $entry) {
-            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+            $key = (string) $entry['key'];
+            // Pre-fill keys dply can derive from the site's own domain
+            // (SESSION_DOMAIN, APP_URL, …) so the operator just confirms instead
+            // of hunting for a value we already know. Falls back to the
+            // .env.example sample for everything else.
+            $seed[$key] = DomainDerivedEnvDefaults::for($this->site, $key)
+                ?? (string) ($entry['example'] ?? '');
         }
         $this->blocked_env_values = $seed;
 
         $this->dispatch('open-modal', 'deploy-missing-env-modal');
+    }
+
+    /**
+     * One-click fix for the deploy-gate banner: fill every blocked key dply can
+     * derive from the site's domain (primary domain, or the testing hostname
+     * when no primary is set yet), write them, and push — no typing, no modal.
+     */
+    public function autofillBlockedEnvFromDomain(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $keys = array_map(static fn ($e): string => (string) ($e['key'] ?? ''), $this->deployBlockedEnvKeys());
+        $derived = DomainDerivedEnvDefaults::resolve($this->site, $keys);
+
+        if ($derived === []) {
+            $this->toastError(__('Nothing to auto-fill yet — add a domain (or testing hostname) to this site first.'));
+
+            return;
+        }
+
+        // Reuse the writer/push/clear-block path so the banner clears and the
+        // values land on the server exactly as a manual add would.
+        $this->blocked_env_values = array_merge($this->blocked_env_values, $derived);
+        $this->addBlockedEnvVars($parser, $writer);
+    }
+
+    /**
+     * Fill a single blocked input from the site's domain — the per-key sibling
+     * of generateBlockedAppKey(), shown next to derivable keys in the modal.
+     */
+    public function fillBlockedEnvFromDomain(string $key): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $value = DomainDerivedEnvDefaults::for($this->site, $key);
+        if ($value === null) {
+            $this->toastError(__('Add a domain (or testing hostname) to this site first.'));
+
+            return;
+        }
+
+        $this->blocked_env_values[$key] = $value;
     }
 
     /**

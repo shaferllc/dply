@@ -18,6 +18,7 @@ use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisioningDigest;
 use App\Support\Servers\ServerTags;
+use App\Support\Sites\SiteSyncPeers;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -282,7 +283,10 @@ class Index extends Component
         }
 
         // Org-wide repo → count, so a single-site server still shows "Sync N"
-        // when its repository is deployed on other servers too.
+        // when its repository is deployed on other servers too. Grouped by
+        // CANONICAL repo identity (same as SiteSyncPeers) so the badge count
+        // can't disagree with the peer set that actually deploys — a repo
+        // registered as git@… on one box and https://… on another counts once.
         $repoCounts = collect();
         if ($org) {
             $repoCounts = Site::query()
@@ -290,7 +294,7 @@ class Index extends Component
                 ->whereNotNull('git_repository_url')
                 ->where('git_repository_url', '!=', '')
                 ->pluck('git_repository_url')
-                ->groupBy(fn (string $repo): string => trim($repo))
+                ->groupBy(fn (string $repo): string => SiteSyncPeers::canonicalRepo($repo))
                 ->map->count();
         }
 
@@ -309,7 +313,7 @@ class Index extends Component
             }
 
             $anchor = $deployable->first();
-            $repo = trim((string) $anchor->git_repository_url);
+            $repo = SiteSyncPeers::canonicalRepo((string) $anchor->git_repository_url);
             $syncCount = $repo !== ''
                 ? (int) ($repoCounts[$repo] ?? 1)
                 : (int) $server->sites->count();

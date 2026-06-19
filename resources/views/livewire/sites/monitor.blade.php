@@ -472,4 +472,5 @@
 
     @include('livewire.partials.confirm-action-modal')
     @include('livewire.partials.create-notification-channel-modal')
+    @include('livewire.partials.window-logs-drawer')
 </div>

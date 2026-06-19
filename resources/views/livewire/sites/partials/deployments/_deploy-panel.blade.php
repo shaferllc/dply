@@ -145,11 +145,35 @@
 
             {{-- Single action bar: fix-it actions on the left, sync / bypass on
                  the right. Wraps cleanly instead of a floating centered column. --}}
+            @php
+                $envAutofillable = \App\Support\Sites\DomainDerivedEnvDefaults::resolve(
+                    $site,
+                    array_map(static fn ($e) => (string) $e['key'], $blockedEnv),
+                );
+            @endphp
             <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-rose-200/70 pt-3">
+                @if ($envAutofillable !== [])
+                    <button
+                        type="button"
+                        wire:click="autofillBlockedEnvFromDomain"
+                        wire:loading.attr="disabled"
+                        wire:target="autofillBlockedEnvFromDomain"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800 disabled:opacity-60"
+                        title="{{ __('Fill :keys from this site\'s domain and push.', ['keys' => implode(', ', array_keys($envAutofillable))]) }}"
+                    >
+                        <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="autofillBlockedEnvFromDomain" />
+                        <span wire:loading wire:target="autofillBlockedEnvFromDomain" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                        {{ trans_choice('{1} Auto-fix from domain|[2,*] Auto-fix :count from domain', count($envAutofillable), ['count' => count($envAutofillable)]) }}
+                    </button>
+                @endif
                 <button
                     type="button"
                     wire:click="openBlockedEnvModal"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
+                    @class([
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors',
+                        'bg-rose-700 text-white hover:bg-rose-800' => $envAutofillable === [],
+                        'border border-rose-300 bg-white text-rose-900 hover:bg-rose-100' => $envAutofillable !== [],
+                    ])
                 >
                     <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add variables') }}
@@ -244,6 +268,11 @@
                                     <button type="button" wire:click="generateBlockedAppKey" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
                                         <x-heroicon-o-sparkles class="h-3 w-3" />
                                         {{ __('Generate a key') }}
+                                    </button>
+                                @elseif (\App\Support\Sites\DomainDerivedEnvDefaults::isDerivable($entry['key']))
+                                    <button type="button" wire:click="fillBlockedEnvFromDomain('{{ $entry['key'] }}')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
+                                        <x-heroicon-o-sparkles class="h-3 w-3" />
+                                        {{ __('Fill from domain') }}
                                     </button>
                                 @endif
                                 <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="text-[11px] font-semibold text-brand-mist hover:text-rose-700 hover:underline" title="{{ __('Mark this variable as intentionally unset.') }}">{{ __('Ignore this') }}</button>

@@ -394,8 +394,13 @@
                             </a>
                             @if ($siteDeployable)
                                 {{-- Per-site Deploy sits outside the row link so it fires
-                                     the deploy console instead of navigating. Sync is gone —
-                                     the host Deploy modal's multi-select covers syncing peers. --}}
+                                     the deploy console instead of navigating. When the site's
+                                     repo is deployed on OTHER servers too, a "Sync N" button
+                                     ships this site and its cross-server peers together
+                                     (deploySyncedSites → SiteSyncPeers), so two linked sites on
+                                     two servers can be deployed in one click without opening
+                                     each workspace. --}}
+                                @php $syncCount = (int) ($this->syncPeerCounts[(string) $s->id] ?? 1); @endphp
                                 <div class="flex shrink-0 items-center gap-1 border-l border-brand-ink/10 px-3 sm:px-4">
                                     <button
                                         type="button"
@@ -411,6 +416,22 @@
                                         </span>
                                         {{ __('Deploy') }}
                                     </button>
+                                    @if ($syncCount > 1)
+                                        <button
+                                            type="button"
+                                            wire:click="deploySyncedSites('{{ $s->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="deploySyncedSites('{{ $s->id }}')"
+                                            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                            title="{{ __('Deploy this site and its :n linked sites across servers together.', ['n' => $syncCount - 1]) }}"
+                                        >
+                                            <x-heroicon-m-arrows-right-left wire:loading.remove wire:target="deploySyncedSites('{{ $s->id }}')" class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                                            <span wire:loading wire:target="deploySyncedSites('{{ $s->id }}')" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-spinner size="sm" />
+                                            </span>
+                                            {{ __('Sync :n', ['n' => $syncCount]) }}
+                                        </button>
+                                    @endif
                                 </div>
                             @endif
                         </li>
