@@ -122,6 +122,7 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
             $aggregator->update([
                 'status' => ServerLogAggregator::STATUS_RUNNING,
                 'version' => $scripts->parseVersion($output->buffer),
+                'config_version' => $scripts->configVersion(),
                 'endpoint' => $this->resolveEndpoint($aggregator),
                 'private_endpoint' => $this->resolvePrivateEndpoint($aggregator),
                 'edge_ca_cert_b64' => $parsed['ca'] ?? $aggregator->edge_ca_cert_b64,

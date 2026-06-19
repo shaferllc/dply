@@ -578,6 +578,17 @@ class Server extends Model
         return $this->hasOne(ServerLogAgent::class);
     }
 
+    /**
+     * The dply Logs Vector AGGREGATOR running on this server, if this box is the
+     * designated ingest tier (at most one). See {@see ServerLogAggregator}.
+     *
+     * @return HasOne<ServerLogAggregator, $this>
+     */
+    public function logAggregator(): HasOne
+    {
+        return $this->hasOne(ServerLogAggregator::class);
+    }
+
     /** @return HasMany<ServerDatabaseAuditEvent, $this> */
     public function databaseAuditEvents(): HasMany
     {

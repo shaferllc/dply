@@ -94,6 +94,14 @@
                 @endif
             </x-server-workspace-tab>
             <x-server-workspace-tab
+                id="logs-tab-alerts"
+                icon="heroicon-o-bell-alert"
+                :active="$logsTab === 'alerts'"
+                wire:click="setLogsWorkspaceTab('alerts')"
+            >
+                {{ __('Alerts') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab
                 id="logs-tab-activity"
                 icon="heroicon-o-clipboard-document-list"
                 :active="$logsTab === 'activity'"
@@ -136,6 +144,14 @@
                 'server' => $server,
                 'agent' => $server->logAgent,
                 'logExplorer' => $logExplorer,
+            ])
+        @endif
+
+        @if ($logsTab === 'alerts')
+            @include('livewire.servers.partials.logs._tab-alerts', [
+                'server' => $server,
+                'rules' => $logAlertRules,
+                'alertingAvailable' => $logAlertingAvailable,
             ])
         @endif
 

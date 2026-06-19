@@ -32,6 +32,7 @@ class NotificationEventRegistry
                 // degraded, and SSL-expiry are likewise action-required.
                 'supports_email' => str_starts_with($eventKey, 'import.migration.')
                     || str_starts_with($eventKey, 'site.uptime.')
+                    || str_starts_with($eventKey, 'server.logs.')
                     || $eventKey === 'site.ssl.expiring',
                 'supports_webhook' => true,
             ];
@@ -70,6 +71,7 @@ class NotificationEventRegistry
             || str_contains($eventKey, 'uptime')
             || str_contains($eventKey, '.ssl.')
             || str_contains($eventKey, 'alerts')
+            || str_contains($eventKey, '.logs.alert')
             || str_ends_with($eventKey, 'step_failed')
             || str_ends_with($eventKey, 'cutover_ready')
             || str_ends_with($eventKey, 'aborted')

@@ -61,6 +61,7 @@ class InstallLogAggregatorCommand extends Command
                 return self::FAILURE;
             }
             $this->info("Aggregator running. Edge endpoint: {$fresh?->endpoint}");
+            $this->line("Config version: {$fresh?->config_version} (current).");
 
             return self::SUCCESS;
         }

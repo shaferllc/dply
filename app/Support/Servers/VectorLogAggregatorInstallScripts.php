@@ -27,6 +27,19 @@ class VectorLogAggregatorInstallScripts
 {
     use InstallsVectorBinary;
 
+    /**
+     * Version of the rendered aggregator CONFIG (the vector.toml pipeline) — NOT the
+     * Vector binary version ({@see parseVersion}). BUMP THIS whenever renderVectorToml()
+     * changes in a way that needs a re-sync to take effect on the box. The installer
+     * stamps it into the config header + persists it on the {@see ServerLogAggregator}
+     * row, so the platform can detect a box running a stale config and prompt to re-sync.
+     *
+     * History:
+     *   1 — initial aggregator pipeline (edges → normalize → clickhouse).
+     *   2 — copy/derive the `source` column; per-org policy + hard-cap quota gate.
+     */
+    public const CONFIG_VERSION = 2;
+
     public const BINARY_PATH = '/usr/local/bin/dply-vector';
 
     public const CONFIG_DIR = '/etc/dply-aggregator';
@@ -210,8 +223,9 @@ class VectorLogAggregatorInstallScripts
      */
     public function renderVectorToml(): string
     {
-        return <<<'TOML'
+        $toml = <<<'TOML'
         # Rendered by dply — do not edit by hand. Managed by the dply Logs aggregator installer.
+        # dply-config-version: __CONFIG_VERSION__
         data_dir = "/var/lib/dply-aggregator"
 
         [sources.edges]
@@ -331,6 +345,16 @@ class VectorLogAggregatorInstallScripts
         max_size = 1073741824
         when_full = "block"
         TOML;
+
+        return str_replace('__CONFIG_VERSION__', (string) self::CONFIG_VERSION, $toml);
+    }
+
+    /**
+     * The config version this code renders — what a freshly re-synced box runs.
+     */
+    public function configVersion(): int
+    {
+        return self::CONFIG_VERSION;
     }
 
     public function renderSystemdUnit(): string

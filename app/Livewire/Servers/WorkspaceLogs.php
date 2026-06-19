@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesServerLogAlerts;
 use App\Livewire\Servers\Concerns\ManagesServerLogExplorer;
 use App\Livewire\Servers\Concerns\ManagesServerLogShipping;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
@@ -26,13 +27,14 @@ class WorkspaceLogs extends Component
     use DispatchesToastNotifications;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesServerLogAlerts;
     use ManagesServerLogExplorer;
     use ManagesServerLogShipping;
     use ManagesServerSystemLogs;
     use RendersWorkspacePlaceholder;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'activity', 'related'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity', 'related'];
 
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';
@@ -153,6 +155,9 @@ class WorkspaceLogs extends Component
                 : null,
             // Only query ClickHouse when the Shipping tab is actually open.
             'logExplorer' => $this->logsTab === 'shipping' ? $this->loadLogExplorer() : null,
+            // Alert rules + entitlement, only while the Alerts tab is open.
+            'logAlertRules' => $this->logsTab === 'alerts' ? $this->loadLogAlertRules() : collect(),
+            'logAlertingAvailable' => $this->logAlertingAvailable,
         ]);
     }
 }

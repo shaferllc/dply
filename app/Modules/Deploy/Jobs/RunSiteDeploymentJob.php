@@ -317,11 +317,22 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $siteUpdates = [
                     'last_deploy_at' => now(),
                 ];
-                if ($this->site->server?->hostCapabilities()->supportsFunctionDeploy()) {
+                $caps = $this->site->server?->hostCapabilities();
+                if ($caps?->supportsFunctionDeploy() || $caps?->supportsClusterDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
-                }
-                if ($this->site->server?->hostCapabilities()->supportsClusterDeploy()) {
-                    $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
+                } elseif ($caps?->supportsEnvPushToHost()) {
+                    // Self-heal on a VM web host: a successful deploy proves the
+                    // site is live, so a stale or wrong status (e.g. a mis-seeded
+                    // edge_failed inherited from a DB seed, or a transient error)
+                    // should resolve to the correct webserver-active status.
+                    // Only rewrite when the status ISN'T already a healthy active
+                    // one — a correctly-provisioned site keeps its status and we
+                    // avoid churning the row on every deploy.
+                    $target = Site::activeStatusForWebserver($this->site->webserver());
+                    if ($this->site->status !== $target
+                        && ! in_array($this->site->status, Site::webserverActiveStatuses(), true)) {
+                        $siteUpdates['status'] = $target;
+                    }
                 }
                 $this->site->update($siteUpdates);
                 $this->cacheIdempotencySuccess($deployment);

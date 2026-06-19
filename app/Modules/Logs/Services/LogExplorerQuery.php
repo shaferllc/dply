@@ -110,6 +110,39 @@ class LogExplorerQuery
     }
 
     /**
+     * Number of log lines for a server within [$from, $to] matching the optional
+     * level/source/search facets — the aggregation primitive behind dply Logs
+     * alerting ("> N error lines in 5 min"). Same org+server scoping + bound
+     * params as window(); returns a single count, never rows.
+     *
+     * @param  array{search?:string,level?:string,source?:string}  $filters
+     */
+    public function countInWindow(Server $server, CarbonInterface $from, CarbonInterface $to, array $filters = []): int
+    {
+        $params = [
+            'org' => (string) $server->organization_id,
+            'server' => (string) $server->id,
+            'from' => $from->copy()->utc()->format('Y-m-d H:i:s'),
+            'to' => $to->copy()->utc()->format('Y-m-d H:i:s'),
+        ];
+
+        $where = [
+            'org_id = {org:String}',
+            'server_id = {server:String}',
+            'timestamp >= {from:DateTime}',
+            'timestamp <= {to:DateTime}',
+        ];
+
+        $this->applyFacetFilters($filters, $where, $params);
+
+        $sql = 'SELECT count() AS c FROM '
+            .$this->clickhouse->qualifiedTable()
+            .' WHERE '.implode(' AND ', $where);
+
+        return (int) ($this->clickhouse->scalar($sql, $params) ?? 0);
+    }
+
+    /**
      * Apply the optional level/source/search facets shared by recent() and
      * window(), as bound params (never interpolated).
      *

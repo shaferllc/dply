@@ -77,6 +77,12 @@ return [
                 'server.errors.operation_failed' => 'Server operation failed',
             ],
         ],
+        'logs' => [
+            'label' => 'dply Logs notifications',
+            'events' => [
+                'server.logs.alert_triggered' => 'Log alert triggered',
+            ],
+        ],
         'deploy_window' => [
             'label' => 'Deploy window notifications',
             'events' => [

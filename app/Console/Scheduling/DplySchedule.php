@@ -27,6 +27,7 @@ use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
 use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
+use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
 use App\Modules\Logs\Console\MeterServerLogUsageCommand;
 use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
@@ -180,6 +181,14 @@ final class DplySchedule
         $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday' => true])
             ->dailyAt('02:05')
             ->name('server-log-usage-finalize')
+            ->withoutOverlapping();
+
+        // dply Logs alerting (paid tier): evaluate enabled alert rules against the
+        // log store and notify on threshold breaches. Inert until a plan with
+        // alerting + a rule exists (the command three-way gates internally).
+        $schedule->command(EvaluateLogAlertsCommand::class)
+            ->everyFiveMinutes()
+            ->name('server-log-alerts-evaluate')
             ->withoutOverlapping();
 
         // Refresh per-org retention + hard-cap policy on the aggregator(s), after

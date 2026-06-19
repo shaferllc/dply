@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Modules\Logs\Jobs\InstallLogAggregatorJob;
 use App\Support\Servers\VectorLogAgentInstallScripts;
+use App\Support\Servers\VectorLogAggregatorInstallScripts;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $server_id
  * @property string $status
  * @property string $version
+ * @property ?int $config_version
  * @property-read ?Server $server
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
@@ -57,6 +59,7 @@ class ServerLogAggregator extends Model
         'server_id',
         'status',
         'version',
+        'config_version',
         'listen_port',
         'endpoint',
         'private_endpoint',
@@ -73,6 +76,7 @@ class ServerLogAggregator extends Model
     {
         return [
             'listen_port' => 'integer',
+            'config_version' => 'integer',
             'last_seen_at' => 'datetime',
             'edge_ca_cert_b64' => 'encrypted',
             'edge_client_cert_b64' => 'encrypted',
@@ -105,5 +109,35 @@ class ServerLogAggregator extends Model
         return filled($this->edge_ca_cert_b64)
             && filled($this->edge_client_cert_b64)
             && filled($this->edge_client_key_b64);
+    }
+
+    /**
+     * The config version this build of dply renders (the target a re-sync installs).
+     */
+    public static function currentConfigVersion(): int
+    {
+        return VectorLogAggregatorInstallScripts::CONFIG_VERSION;
+    }
+
+    /**
+     * The aggregator config the box is actually running, as last recorded by an
+     * install. Null = predates versioning / never re-synced since → treat as stale.
+     */
+    public function installedConfigVersion(): ?int
+    {
+        return $this->config_version;
+    }
+
+    /**
+     * True when the box is running an older config than this build renders — the
+     * operator should re-sync to pick it up. Only meaningful for a running box.
+     */
+    public function isConfigStale(): bool
+    {
+        if (! $this->isRunning()) {
+            return false;
+        }
+
+        return ($this->config_version ?? 0) < self::currentConfigVersion();
     }
 }
