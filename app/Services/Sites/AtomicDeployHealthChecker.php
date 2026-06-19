@@ -249,9 +249,18 @@ ls -la {$this->sh($repo)}/current/public/index.php 2>/dev/null || echo "  no cur
 echo "── nginx error log (recent) ──"
 (sudo -n tail -n 40 /var/log/nginx/error.log 2>/dev/null || tail -n 40 /var/log/nginx/error.log 2>/dev/null || echo "(no access to /var/log/nginx/error.log)") | grep -E {$this->sh($logFilter)} | tail -n 10
 
-echo "── site laravel.log (tail) ──"
+echo "── site laravel.log (last error, full trace) ──"
 for p in {$logCandidates}; do
-  if [ -f "\$p" ]; then echo "\$p:"; tail -n 25 "\$p"; break; fi
+  if [ -f "\$p" ]; then
+    echo "\$p:"
+    # Print the LAST complete log entry in full — from its [timestamp] header
+    # through every stack frame — so the exception class/message at the top is
+    # never lost to a fixed tail. Reset the buffer on each new entry header
+    # ([20xx-..]); emit whatever's buffered at EOF. Capped so a runaway trace
+    # can't flood the diagnostic.
+    awk '/^\[20[0-9][0-9]-/{buf=""} {buf=buf \$0 "\n"} END{printf "%s", buf}' "\$p" | head -n 500
+    break
+  fi
 done
 BASH;
 

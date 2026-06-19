@@ -69,7 +69,7 @@
             {{-- Error banner: pull the failed step + its output to the top. --}}
             @if ($rs === 'failed' && $failedStep)
                 @php
-                    $failOutput = trim((string) ($failedStep['output'] ?? '')));
+                    $failOutput = trim((string) ($failedStep['output'] ?? ''));
                     $failOutput = str_replace("\r\n", "\n", $failOutput);
                 @endphp
                 <div class="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">

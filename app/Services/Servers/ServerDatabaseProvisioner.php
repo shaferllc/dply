@@ -313,9 +313,12 @@ class ServerDatabaseProvisioner
                 "CREATE USER IF NOT EXISTS '{$user}'@'localhost' IDENTIFIED BY '{$passSql}'; ".
                 "GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'localhost'; FLUSH PRIVILEGES;";
 
-            [$out] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+            [$out, $exit] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException(Str::limit($out, 800));
+            }
 
-            return $out[0];
+            return $out;
         }
 
         throw new \InvalidArgumentException("Unsupported database engine for create: {$db->engine}");
