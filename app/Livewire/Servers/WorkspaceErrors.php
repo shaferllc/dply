@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CorrelatesErrorLogs;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\SurfacesErrorStream;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -12,7 +13,6 @@ use App\Livewire\Servers\Concerns\ManagesErrorsNotifications;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ErrorEvent;
 use App\Models\Server;
-use App\Modules\Logs\Services\ServerLogCorrelator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
@@ -34,6 +34,7 @@ use Livewire\WithPagination;
 class WorkspaceErrors extends Component
 {
     use ConfirmsActionWithModal;
+    use CorrelatesErrorLogs;
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesErrorsNotifications;
@@ -47,49 +48,16 @@ class WorkspaceErrors extends Component
     #[Url(as: 'tab', except: 'stream')]
     public string $errorsTab = 'stream';
 
-    /** True when this server ships logs — gates the per-error "Logs" correlation jump. */
-    public bool $showLogCorrelation = false;
-
-    /** Drawer state for the "logs around this error" slice (Tier-1 correlation). */
-    public bool $errorLogsOpen = false;
-
-    public ?string $errorLogsLabel = null;
-
-    /** @var array{instant:string,from:string,to:string,logs:list<array<string,mixed>>}|null */
-    public ?array $errorLogsResult = null;
-
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
         $this->showLogCorrelation = $server->logAgent()->exists();
     }
 
-    /**
-     * Open the "logs around this error" drawer: the host log slice surrounding
-     * when the error occurred, on this server. A ClickHouse READ (like the Logs
-     * explorer), not SSH — safe to run inline. Errors not on this server, or with
-     * no shipped logs in the window, simply show an empty drawer.
-     */
-    public function openLogsForError(string $errorId): void
+    /** Resolve a correlatable error within this server's scope (server + its sites). */
+    protected function findCorrelatableError(string $errorId): ?ErrorEvent
     {
-        $this->authorize('update', $this->server);
-
-        $error = ErrorEvent::query()->forServer((string) $this->server->id)->find($errorId);
-        if ($error === null) {
-            return;
-        }
-
-        $instant = $error->occurred_at ?? $error->created_at;
-        $this->errorLogsLabel = $instant?->toDayDateTimeString();
-        $this->errorLogsResult = app(ServerLogCorrelator::class)->forErrorEvent($error);
-        $this->errorLogsOpen = true;
-    }
-
-    public function closeLogsForError(): void
-    {
-        $this->errorLogsOpen = false;
-        $this->errorLogsResult = null;
-        $this->errorLogsLabel = null;
+        return ErrorEvent::query()->forServer((string) $this->server->id)->find($errorId);
     }
 
     public function setErrorsWorkspaceTab(string $tab): void

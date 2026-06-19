@@ -1,8 +1,9 @@
 {{--
     dply Logs correlation drawer — the host log slice surrounding an error
     (Tier-1: jump from the errors stream straight into the logs around it).
-    State + data come from WorkspaceErrors::openLogsForError(); $errorLogsResult
-    is {instant, from, to, logs[]} or null.
+    State + data come from the CorrelatesErrorLogs concern; $errorLogsResult is
+    {instant, from, to, logs[]} or null. Shared by the server + site Errors views;
+    $server (the owning server) is in scope on both.
 --}}
 @if ($errorLogsOpen)
     <div class="fixed inset-0 z-40" role="dialog" aria-modal="true" wire:key="error-logs-drawer">
@@ -21,9 +22,18 @@
                         @endif
                     </p>
                 </div>
-                <button type="button" wire:click="closeLogsForError" class="rounded-lg px-2 py-1 text-brand-mist hover:text-brand-ink" title="{{ __('Close') }}">
-                    <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
-                </button>
+                <div class="flex shrink-0 items-center gap-2">
+                    @if ($errorLogsResult)
+                        <a href="{{ route('servers.logs', ['server' => $server, 'tab' => 'shipping', 'from' => $errorLogsResult['from'], 'to' => $errorLogsResult['to']]) }}"
+                            wire:navigate
+                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40">
+                            {{ __('Open in dply Logs') }} <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                        </a>
+                    @endif
+                    <button type="button" wire:click="closeLogsForError" class="rounded-lg px-2 py-1 text-brand-mist hover:text-brand-ink" title="{{ __('Close') }}">
+                        <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
+                    </button>
+                </div>
             </div>
 
             <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">

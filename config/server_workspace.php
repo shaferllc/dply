@@ -235,7 +235,7 @@ return [
             'tab_labels' => ['settings' => 'General'],
         ],
         'automation' => [
-            'label' => 'Automation',
+            'label' => 'Blueprints',
             'icon' => 'document-duplicate',
             'members' => ['blueprint', 'cli'],
         ],

@@ -52,8 +52,6 @@ class WorkspaceNetworking extends Component
     use RendersWorkspacePlaceholder;
     use SurfacesBindingConsumers;
 
-    public Server $server;
-
     /** @var list<string> */
     public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes', 'notifications'];
 

@@ -6,7 +6,7 @@
     :server="$server"
     active="settings"
     :title="__('Settings')"
-    :description="__('Use the tabs to switch categories. Each area saves independently.')"
+    :description="__('Navigate through the tabs to manage different settings categories. Changes in each section are automatically saved.')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])

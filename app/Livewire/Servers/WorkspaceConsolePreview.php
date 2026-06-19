@@ -23,8 +23,6 @@ class WorkspaceConsolePreview extends Component
     use InteractsWithServerWorkspace;
     use RendersWorkspacePlaceholder;
 
-    public Server $server;
-
     public function mount(Server $server): void
     {
         abort_if(workspace_console_active(), 404);

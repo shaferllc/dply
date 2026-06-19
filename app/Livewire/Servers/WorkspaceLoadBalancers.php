@@ -35,8 +35,6 @@ class WorkspaceLoadBalancers extends Component
     use ManagesLoadBalancerNotifications;
     use RendersWorkspacePlaceholder;
 
-    public Server $server;
-
     // ── Create form ───────────────────────────────────────────────────────────
     public string $lb_name = '';
 

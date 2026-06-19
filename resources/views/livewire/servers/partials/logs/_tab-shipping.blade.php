@@ -184,6 +184,21 @@
                     <p class="mt-0.5">{{ __('Could not reach the dply Logs store.') }}</p>
                 </div>
             @else
+                {{-- Pinned-window banner (arrived via a correlation deep-link, e.g. error → logs) --}}
+                @if ($logExplorer['windowed'] ?? false)
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-sage/30 bg-brand-sage/10 px-6 py-2.5 text-sm sm:px-7">
+                        <span class="min-w-0 text-brand-ink">
+                            <x-heroicon-o-viewfinder-circle class="mr-1 inline h-4 w-4 -translate-y-0.5 text-brand-forest" aria-hidden="true" />
+                            {{ __('Pinned to a fixed window') }}
+                            <span class="text-brand-moss">· {{ $logExplorer['from'] }} → {{ $logExplorer['to'] }} ({{ __('UTC') }})</span>
+                        </span>
+                        <button type="button" wire:click="backToLiveLogs" class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Back to live') }}
+                        </button>
+                    </div>
+                @endif
+
                 {{-- Filters --}}
                 <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-6 py-3 sm:px-7">
                     <div class="relative min-w-0 flex-1">

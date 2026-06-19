@@ -1,4 +1,4 @@
-        <details class="{{ $card }} overflow-hidden" {{ $defaultPolicies !== [] ? 'open' : '' }}>
+        <details class="{{ $card }} overflow-hidden" open>
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
                     <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
