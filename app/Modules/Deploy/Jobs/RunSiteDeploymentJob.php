@@ -17,6 +17,8 @@ use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
+use App\Modules\Insights\Jobs\RunSiteInsightsJob;
 use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
