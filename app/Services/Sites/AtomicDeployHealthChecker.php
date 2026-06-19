@@ -258,7 +258,7 @@ for p in {$logCandidates}; do
     # never lost to a fixed tail. Reset the buffer on each new entry header
     # ([20xx-..]); emit whatever's buffered at EOF. Capped so a runaway trace
     # can't flood the diagnostic.
-    awk '/^\[20[0-9][0-9]-/{buf=""} {buf=buf \$0 "\n"} END{printf "%s", buf}' "\$p" | head -n 500
+    awk '/^\[20[0-9][0-9]-/{buf=""} {buf=buf \$0 ORS} END{printf "%s", buf}' "\$p" | head -n 500
     break
   fi
 done
