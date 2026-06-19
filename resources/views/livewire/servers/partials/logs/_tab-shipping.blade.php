@@ -244,11 +244,29 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Shipped logs') }}</h3>
                     <p class="text-xs text-brand-moss">{{ __('Searchable, persisted logs from this server (newest first).') }}</p>
                 </div>
-                <button type="button" wire:click="$refresh" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="$refresh" />
-                    {{ __('Refresh') }}
-                </button>
+                <div class="flex shrink-0 items-center gap-2">
+                    @unless ($logExplorer['windowed'] ?? false)
+                        <button type="button" wire:click="toggleLogExplorerLive"
+                            @class([
+                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
+                                'border-emerald-300 bg-emerald-50 text-emerald-800' => $logExplorerLive,
+                                'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/20' => ! $logExplorerLive,
+                            ])>
+                            <span @class(['inline-block h-2 w-2 rounded-full', 'animate-pulse bg-emerald-500' => $logExplorerLive, 'bg-brand-ink/30' => ! $logExplorerLive])></span>
+                            {{ $logExplorerLive ? __('Live') : __('Go live') }}
+                        </button>
+                    @endunless
+                    <button type="button" wire:click="$refresh" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="$refresh" />
+                        {{ __('Refresh') }}
+                    </button>
+                </div>
             </div>
+
+            {{-- Auto-refresh while Live (and not pinned to a correlation window). --}}
+            @if ($logExplorerLive && ! ($logExplorer['windowed'] ?? false))
+                <div wire:poll.10s class="hidden" aria-hidden="true"></div>
+            @endif
 
             @if (! ($logExplorer['available'] ?? false))
                 <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
@@ -306,9 +324,16 @@
                     @endif
                 </div>
 
-                {{-- Results --}}
-                @php $rows = $logExplorer['rows'] ?? []; @endphp
-                @if (count($rows) === 0)
+                {{-- Results — log lines interleaved with deploy markers (deploys
+                     overlapping the window shown inline, the reverse of deploy→logs) --}}
+                @php
+                    $rows = $logExplorer['rows'] ?? [];
+                    $entries = $logExplorer['entries'] ?? [];
+                    $deployCount = (int) ($logExplorer['deploy_count'] ?? 0);
+                    // journald ships syslog severities as numbers — name them.
+                    $syslogLevels = [0 => 'emerg', 1 => 'alert', 2 => 'crit', 3 => 'error', 4 => 'warning', 5 => 'notice', 6 => 'info', 7 => 'debug'];
+                @endphp
+                @if (count($entries) === 0)
                     <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-7">
                         <x-heroicon-o-inbox class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
                         <p class="mt-2">{{ __('No log lines match in this window.') }}</p>
@@ -317,8 +342,8 @@
                 @else
                     <div class="max-h-[28rem] overflow-auto">
                         <table class="min-w-full text-left text-xs">
-                            <thead class="sticky top-0 bg-brand-sand/40 text-[10px] uppercase tracking-wider text-brand-moss">
-                                <tr>
+                            <thead class="sticky top-0 z-10 bg-brand-sand text-[10px] uppercase tracking-wider text-brand-moss shadow-sm">
+                                <tr class="border-b border-brand-ink/10">
                                     <th class="whitespace-nowrap px-4 py-2 font-semibold">{{ __('Time') }}</th>
                                     <th class="px-3 py-2 font-semibold">{{ __('Level') }}</th>
                                     <th class="px-3 py-2 font-semibold">{{ __('Source') }}</th>
@@ -326,31 +351,62 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-brand-ink/5">
-                                @foreach ($rows as $row)
-                                    @php
-                                        $lvl = strtolower((string) ($row['level'] ?? ''));
-                                        $lvlTone = match (true) {
-                                            str_contains($lvl, 'err'), str_contains($lvl, 'crit'), str_contains($lvl, 'fatal') => 'bg-rose-50 text-rose-700 ring-rose-200',
-                                            str_contains($lvl, 'warn') => 'bg-amber-50 text-amber-800 ring-amber-200',
-                                            default => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10',
-                                        };
-                                    @endphp
-                                    <tr class="align-top hover:bg-brand-sand/10">
-                                        <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-moss">{{ $row['timestamp'] ?? '' }}</td>
-                                        <td class="px-3 py-1.5">
-                                            @if ($lvl !== '')
-                                                <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
-                                            @endif
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-1.5 text-brand-moss">{{ $row['source'] ?? '' }}</td>
-                                        <td class="px-4 py-1.5 font-mono text-[11px] leading-relaxed text-brand-ink/80">{{ $row['message'] ?? '' }}</td>
-                                    </tr>
+                                @foreach ($entries as $entry)
+                                    @if (($entry['kind'] ?? 'log') === 'deploy')
+                                        @php
+                                            $deployTone = match (strtolower($entry['status'] ?? '')) {
+                                                'success' => 'text-emerald-800',
+                                                'failed' => 'text-rose-800',
+                                                default => 'text-amber-900',
+                                            };
+                                        @endphp
+                                        <tr class="bg-brand-sage/[0.07]" wire:key="dep-{{ $entry['deployment_id'] }}">
+                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-forest">{{ $entry['timestamp'] }}</td>
+                                            <td colspan="3" class="px-3 py-1.5">
+                                                <span class="inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-brand-forest">
+                                                    <x-heroicon-m-rocket-launch class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    {{ $entry['running'] ? __('Deploy in progress') : __('Deployed') }} · {{ $entry['site_name'] }}
+                                                    <span class="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ring-1 ring-inset ring-brand-sage/30 {{ $deployTone }}">{{ $entry['status'] }}</span>
+                                                    @if ($entry['site'])
+                                                        <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $entry['site'], 'deployment' => $entry['deployment_id']]) }}"
+                                                            wire:navigate
+                                                            class="inline-flex items-center gap-0.5 font-normal text-brand-moss underline-offset-2 hover:underline">
+                                                            {{ __('view deploy') }} <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                                                        </a>
+                                                    @endif
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @else
+                                        @php
+                                            $rawLvl = trim((string) ($entry['level'] ?? ''));
+                                            $lvl = is_numeric($rawLvl) ? ($syslogLevels[(int) $rawLvl] ?? $rawLvl) : strtolower($rawLvl);
+                                            $lvlTone = match (true) {
+                                                str_contains($lvl, 'err'), str_contains($lvl, 'crit'), str_contains($lvl, 'fatal'), str_contains($lvl, 'alert'), str_contains($lvl, 'emerg') => 'bg-rose-50 text-rose-700 ring-rose-200',
+                                                str_contains($lvl, 'warn') => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                                default => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10',
+                                            };
+                                        @endphp
+                                        <tr class="align-top hover:bg-brand-sand/10">
+                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-moss">{{ $entry['timestamp'] ?? '' }}</td>
+                                            <td class="px-3 py-1.5">
+                                                @if ($lvl !== '')
+                                                    <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-brand-moss">{{ $entry['source'] ?? '' }}</td>
+                                            <td class="px-4 py-1.5 font-mono text-[11px] leading-relaxed text-brand-ink/80">{{ $entry['message'] ?? '' }}</td>
+                                        </tr>
+                                    @endif
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    <div class="border-t border-brand-ink/10 px-6 py-2 text-[11px] text-brand-moss sm:px-7">
-                        {{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif
+                    <div class="flex flex-wrap items-center gap-x-2 border-t border-brand-ink/10 px-6 py-2 text-[11px] text-brand-moss sm:px-7">
+                        <span>{{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif</span>
+                        @if ($deployCount > 0)
+                            <span class="inline-flex items-center gap-1 text-brand-forest">· <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" /> {{ trans_choice(':count deploy in view|:count deploys in view', $deployCount, ['count' => $deployCount]) }}</span>
+                        @endif
                     </div>
                 @endif
             @endif
