@@ -82,10 +82,13 @@ test('per site access and error log paths are included', function () {
     $this->assertStringContainsString('error_log /var/log/nginx/'.$basename.'-error.log;', $nginx);
 });
 
-test('static nginx config includes managed 500 error page directives', function () {
+test('static nginx config includes managed 500 error page directives when the branded page is enabled', function () {
+    // Branded interception is opt-in per site; the platform default lets the app
+    // render its own errors (see the "does not intercept by default" test below).
     $site = Site::factory()->create([
         'slug' => 'error-pages',
         'type' => SiteType::Static,
+        'meta' => ['expose_server_errors' => false],
     ]);
     SiteDomain::query()->create([
         'site_id' => $site->id,
@@ -100,6 +103,26 @@ test('static nginx config includes managed 500 error page directives', function 
     expect($nginx)
         ->toContain('error_page 500 502 503 504 /__dply__/errors/500.html;')
         ->toContain($site->managedErrorPagesRoot().'/500.html');
+});
+
+test('nginx config does not intercept 5xx by default — the app renders its own errors', function () {
+    $site = Site::factory()->create([
+        'slug' => 'app-errors',
+        'type' => SiteType::Static,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'app-errors.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+
+    $site->refresh()->load('domains', 'redirects');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    expect($nginx)
+        ->not->toContain('error_page 500 502 503 504 /__dply__/errors/500.html;')
+        ->not->toContain('/__dply__/errors/500.html');
 });
 
 test('webserver hostnames include aliases tenants and preview domains', function () {

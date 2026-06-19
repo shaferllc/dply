@@ -170,6 +170,8 @@
                             </span>
                         @endif
                     </div>
+
+                    <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="mt-2 text-[11px] leading-relaxed text-brand-mist" />
                 </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">

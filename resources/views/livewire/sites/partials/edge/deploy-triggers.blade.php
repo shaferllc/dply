@@ -137,6 +137,10 @@
                 </div>
             </div>
 
+            @unless ($edgeGithubWebhookConnected)
+                <x-quick-deploy-oauth-hint provider="github" class="text-[11px] leading-relaxed text-brand-mist" />
+            @endunless
+
             <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3 text-sm dark:border-brand-mist/20 dark:bg-zinc-900/40">
                 <summary class="cursor-pointer font-medium text-brand-ink">{{ __('Manual webhook setup') }}</summary>
                 <div class="mt-3 space-y-3" x-data="{ copiedHook: false, copiedSecret: false }">
