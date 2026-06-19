@@ -114,8 +114,12 @@
             $st = $phase['status'];
             $stepCount = count($phase['steps']);
             $durTxt = $phase['duration_ms'] > 0 ? number_format($phase['duration_ms'] / 1000, 1).'s' : null;
+            $hasSteps = $phase['steps'] !== [];
+            // Collapse finished/upcoming phases; keep the running or failed one
+            // open so a long success run reads as a short rail of phase headers.
+            $phaseAutoOpen = in_array($st, ['running', 'failed'], true);
         @endphp
-        <li class="relative pl-12">
+        <li class="relative pl-12" @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif>
             {{-- Rail segment beneath this node, tinted by this phase's outcome so
                  the line reads as "done" (green) up to the active node, then fades
                  to gray for what's still ahead. Hidden on the last phase. --}}
@@ -157,8 +161,11 @@
                     @endswitch
                 </span>
 
-                {{-- Phase header --}}
-                <div class="flex flex-wrap items-baseline gap-x-2">
+                {{-- Phase header — clickable to expand/collapse its steps. --}}
+                <div @if ($hasSteps) x-on:click="open = ! open" role="button" tabindex="0" x-on:keydown.enter.prevent="open = ! open" x-on:keydown.space.prevent="open = ! open" @endif @class([
+                    'flex flex-wrap items-baseline gap-x-2',
+                    'w-full cursor-pointer select-none' => $hasSteps,
+                ])>
                     <span @class([
                         'text-sm font-semibold',
                         'text-brand-ink' => $st !== 'pending' && $st !== 'skipped',
@@ -182,11 +189,12 @@
                                 {{ __('Not started') }}
                         @endswitch
                     </span>
+                    @if ($hasSteps)<span class="ml-auto self-center font-mono text-[10px] text-brand-mist" x-text="open ? '▾' : '▸'"></span>@endif
                 </div>
 
-                {{-- Steps --}}
-                @if ($phase['steps'] !== [])
-                    <ul class="mt-2 space-y-1.5">
+                {{-- Steps (collapsible) --}}
+                @if ($hasSteps)
+                    <ul x-show="open" x-cloak class="mt-2 space-y-1.5">
                         @foreach ($phase['steps'] as $step)
                             @include('livewire.sites.partials.deployments._phase-timeline-step', [
                                 'step' => $step,

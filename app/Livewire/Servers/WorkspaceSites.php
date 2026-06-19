@@ -6,6 +6,8 @@ use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\EnforcesSiteQuota;
+use App\Livewire\Concerns\GuardsBilledDeploys;
+use App\Livewire\Concerns\WatchesSiteDeploys;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -35,9 +37,11 @@ class WorkspaceSites extends Component
 {
     use DispatchesToastNotifications;
     use EnforcesSiteQuota;
+    use GuardsBilledDeploys;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RendersWorkspacePlaceholder;
+    use WatchesSiteDeploys;
 
     public SiteCreateForm $form;
 

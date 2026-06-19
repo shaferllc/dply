@@ -88,7 +88,7 @@
                 :active="$logsTab === 'shipping'"
                 wire:click="setLogsWorkspaceTab('shipping')"
             >
-                {{ __('Shipping') }}
+                {{ __('dply Logs') }}
                 @if ($server->logAgent?->isRunning())
                     <span class="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-500" title="{{ __('Log agent running') }}"></span>
                 @endif
