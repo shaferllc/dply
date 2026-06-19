@@ -17,7 +17,7 @@
 <x-server-workspace-layout
     :server="$server"
     active="logs"
-    :title="__('dply Logs')"
+    :title="__('Logs')"
     :description="__('Dply activity and system log tailing for this server — live SSH reads with Reverb streaming.')"
     :pageHeaderToolbar="true"
 >
@@ -144,6 +144,7 @@
                 'server' => $server,
                 'agent' => $server->logAgent,
                 'logExplorer' => $logExplorer,
+                'logHistogram' => $logHistogram,
             ])
         @endif
 

@@ -233,6 +233,11 @@
         </div>
     </section>
 
+    {{-- Correlation histogram: log volume over time + deploy/error/incident overlay --}}
+    @if (($logHistogram ?? null) !== null && ($agent?->isRunning()))
+        <x-logs-correlation-chart :histogram="$logHistogram" />
+    @endif
+
     {{-- Shipped logs explorer (reads ClickHouse, org + server scoped) --}}
     @if ($logExplorer !== null)
         <section class="dply-card overflow-hidden">
@@ -402,10 +407,20 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="flex flex-wrap items-center gap-x-2 border-t border-brand-ink/10 px-6 py-2 text-[11px] text-brand-moss sm:px-7">
-                        <span>{{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif</span>
-                        @if ($deployCount > 0)
-                            <span class="inline-flex items-center gap-1 text-brand-forest">· <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" /> {{ trans_choice(':count deploy in view|:count deploys in view', $deployCount, ['count' => $deployCount]) }}</span>
+                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-brand-ink/10 px-6 py-2 text-[11px] text-brand-moss sm:px-7">
+                        <span class="inline-flex flex-wrap items-center gap-x-2">
+                            <span>{{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif</span>
+                            @if ($deployCount > 0)
+                                <span class="inline-flex items-center gap-1 text-brand-forest">· <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" /> {{ trans_choice(':count deploy in view|:count deploys in view', $deployCount, ['count' => $deployCount]) }}</span>
+                            @endif
+                        </span>
+                        @php $loadMax = ($logExplorer['windowed'] ?? false) ? 2000 : 1000; @endphp
+                        @if (count($rows) >= $logExplorerLimit && $logExplorerLimit < $loadMax)
+                            <button type="button" wire:click="loadMoreLogExplorer" wire:loading.attr="disabled"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20 disabled:opacity-50">
+                                <x-heroicon-o-chevron-down class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="loadMoreLogExplorer" />
+                                {{ __('Load more') }}
+                            </button>
                         @endif
                     </div>
                 @endif

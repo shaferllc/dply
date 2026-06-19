@@ -15,7 +15,7 @@
     $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
     $newCardDescription = $isContainerHost
         ? __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.')
-        : __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.');
+        : __('Manage.');
     $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
     $listHeading = $isContainerHost ? __('Container apps') : __('Site directory');
     $listEyebrow = __('Library');
@@ -24,11 +24,13 @@
         ? __('Add one to deploy a Git repo onto this host.')
         : __('Add a site to manage web server config, SSL, Git deploys, and environment files.');
     $siteCount = $server->sites->count();
+    $siteType = $server->siteType();
 @endphp
 
 <x-server-workspace-layout
     :server="$server"
     active="sites"
+    :hideHero="true"
     :title="__('Sites')"
     :description="__('Manage sites, databases, automation, and deploy tools for this server.')"
 >
@@ -43,17 +45,50 @@
                 <div class="lg:col-span-7">
                     <div class="flex items-start gap-3">
                         <x-icon-badge size="md">
-                            @if ($isContainerHost)
-                                <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
-                            @else
-                                <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
-                            @endif
+                            @switch($siteType)
+                                @case('container')
+                                    <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
+                                    @break
+                                @case('php')
+                                    <x-heroicon-o-code-bracket class="h-6 w-6" aria-hidden="true" />
+                                    @break
+                                @case('static')
+                                    <x-heroicon-o-photo class="h-6 w-6" aria-hidden="true" />
+                                    @break
+                                @case('node')
+                                    <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
+                                    @break
+                                @default
+                                    <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
+                            @endswitch
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $newCardEyebrow }}</p>
-                            <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ $newCardHeading }}</h2>
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">
+                                {{ $newCardEyebrow }}
+                                <span class="ml-2 px-2 py-0.5 text-[10px] rounded bg-brand-sand/50 text-brand-moss font-normal lowercase">
+                                    {{ ucfirst($siteType) }}
+                                </span>
+                            </p>
+                            <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">
+                                {{ $newCardHeading }}
+                            </h2>
                             <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                {{ $newCardDescription }}
+                                @switch($siteType)
+                                    @case('container')
+                                        {{ __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.') }}
+                                        @break
+                                    @case('php')
+                                        {{ __('Deploy PHP/Laravel or similar webapps from Git, manage server and app config.') }}
+                                        @break
+                                    @case('static')
+                                        {{ __('Host static sites directly with zero-config builds. Just connect your repo!') }}
+                                        @break
+                                    @case('node')
+                                        {{ __('Deploy Node.js apps from Git, with build and NPM support.') }}
+                                        @break
+                                    @default
+                                        {{ __('Manage site deployment and config.') }}
+                                @endswitch
                             </p>
                             @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
                                 <div class="mt-3 inline-flex items-start gap-2 whitespace-nowrap rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-900">
@@ -90,7 +125,15 @@
                         'border-brand-sage/30 bg-brand-sage/8' => $siteCount > 0,
                         'border-brand-ink/10 bg-white' => $siteCount === 0,
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $isContainerHost ? __('Apps') : __('Sites') }}</dt>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            {{
+                                match($siteType) {
+                                    'container' => __('Apps'),
+                                    'php', 'static', 'node' => __('Sites'),
+                                    default => __('Sites')
+                                }
+                            }}
+                        </dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</span>
                             <span class="text-[11px] text-brand-moss">{{ trans_choice('on this host|on this host', $siteCount) }}</span>
@@ -100,13 +143,29 @@
                     <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                         <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</dt>
                         <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
-                            {{ $isContainerHost ? __('Container') : __('VM') }}
+                            @switch($siteType)
+                                @case('container')
+                                    {{ __('Container') }}
+                                    @break
+                                @case('php')
+                                    {{ __('VM (PHP)') }}
+                                    @break
+                                @case('static')
+                                    {{ __('VM (Static)') }}
+                                    @break
+                                @case('node')
+                                    {{ __('VM (Node)') }}
+                                    @break
+                                @default
+                                    {{ __('VM/Other') }}
+                            @endswitch
                         </dd>
                         <p class="mt-1 text-[11px] text-brand-mist">{{ ucfirst((string) $server->hostKind()) }}</p>
                     </div>
                 </dl>
             </div>
         </section>
+
 
         {{-- Sites list. --}}
         <section class="dply-card overflow-hidden">
@@ -471,10 +530,12 @@
                         </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                            @if($sites->count() > 0)
                             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
-                            <p class="mt-1 text-sm leading-6 text-brand-moss">
-                                {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
-                            </p>
+                                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                    {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
+                                </p>
+                            @endif
                         </div>
                     </div>
 

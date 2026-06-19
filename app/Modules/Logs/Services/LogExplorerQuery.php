@@ -143,6 +143,64 @@ class LogExplorerQuery
     }
 
     /**
+     * Time-bucketed log counts for a server across [$from, $to], one row per
+     * non-empty bucket, split into error / warn severity classes (the rest is
+     * derived as "other"). Powers the correlation histogram — log volume over
+     * time, against which deploys/errors/incidents are overlaid. `$bucketSeconds`
+     * sets the granularity (60 = minute, 3600 = hour, 86400 = day). Same
+     * org+server scoping + bound params as window(); optional facet filters apply.
+     *
+     * Levels arrive as either words (error/warn/notice) or numeric syslog
+     * severities (journald: 0–7) — both are classed: error = severity 0–3 or a
+     * name containing err/crit/fatal/alert/emerg; warn = severity 4–5 or warn/notice.
+     *
+     * @param  array{search?:string,level?:string,source?:string}  $filters
+     * @return list<array{bucket:string,total:int,errors:int,warns:int}>
+     */
+    public function histogram(Server $server, CarbonInterface $from, CarbonInterface $to, int $bucketSeconds, array $filters = []): array
+    {
+        $params = [
+            'org' => (string) $server->organization_id,
+            'server' => (string) $server->id,
+            'from' => $from->copy()->utc()->format('Y-m-d H:i:s'),
+            'to' => $to->copy()->utc()->format('Y-m-d H:i:s'),
+            'bucket' => max(1, $bucketSeconds),
+        ];
+
+        $where = [
+            'org_id = {org:String}',
+            'server_id = {server:String}',
+            'timestamp >= {from:DateTime}',
+            'timestamp <= {to:DateTime}',
+        ];
+
+        $this->applyFacetFilters($filters, $where, $params);
+
+        $errorClass = "(level IN ('0','1','2','3')"
+            ." OR positionCaseInsensitive(level,'err')>0 OR positionCaseInsensitive(level,'crit')>0"
+            ." OR positionCaseInsensitive(level,'fatal')>0 OR positionCaseInsensitive(level,'alert')>0"
+            ." OR positionCaseInsensitive(level,'emerg')>0)";
+        $warnClass = "(level IN ('4','5') OR positionCaseInsensitive(level,'warn')>0 OR positionCaseInsensitive(level,'notice')>0)";
+
+        $sql = 'SELECT toStartOfInterval(timestamp, INTERVAL {bucket:UInt32} SECOND) AS bucket, '
+            .'count() AS total, '
+            ."countIf({$errorClass}) AS errors, "
+            ."countIf({$warnClass}) AS warns "
+            .'FROM '.$this->clickhouse->qualifiedTable()
+            .' WHERE '.implode(' AND ', $where)
+            .' GROUP BY bucket ORDER BY bucket ASC';
+
+        $rows = $this->clickhouse->select($sql, $params);
+
+        return array_values(array_map(static fn (array $r): array => [
+            'bucket' => (string) ($r['bucket'] ?? ''),
+            'total' => (int) ($r['total'] ?? 0),
+            'errors' => (int) ($r['errors'] ?? 0),
+            'warns' => (int) ($r['warns'] ?? 0),
+        ], $rows));
+    }
+
+    /**
      * Apply the optional level/source/search facets shared by recent() and
      * window(), as bound params (never interpolated).
      *

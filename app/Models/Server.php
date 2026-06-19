@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ServerProvider;
 use App\Enums\ServerTier;
+use App\Enums\SiteType;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Modules\Billing\Services\ServerTierClassifier;
 use App\Modules\Certificates\Services\WildcardCertificateIssuer;
@@ -931,6 +932,42 @@ class Server extends Model
     public function isKubernetesCluster(): bool
     {
         return $this->hostKind() === self::HOST_KIND_KUBERNETES;
+    }
+
+    /**
+     * Primary site type for workspace UI — container hosts always report
+     * container; VM hosts infer from existing sites or default to PHP.
+     */
+    public function siteType(): string
+    {
+        if ($this->isDockerHost() || $this->isKubernetesCluster()) {
+            return SiteType::Container->value;
+        }
+
+        $sites = $this->relationLoaded('sites')
+            ? $this->sites
+            : $this->sites()->get(['type']);
+
+        if ($sites->isEmpty()) {
+            return SiteType::Php->value;
+        }
+
+        /** @var array<string, int> $counts */
+        $counts = [];
+
+        foreach ($sites as $site) {
+            $type = $site->type instanceof SiteType ? $site->type->value : (string) $site->type;
+            $counts[$type] = ($counts[$type] ?? 0) + 1;
+        }
+
+        arsort($counts);
+
+        return match (array_key_first($counts)) {
+            SiteType::Container->value => SiteType::Container->value,
+            SiteType::Static->value => SiteType::Static->value,
+            SiteType::Node->value => SiteType::Node->value,
+            default => SiteType::Php->value,
+        };
     }
 
     public function providerDisplayLabel(): string

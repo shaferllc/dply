@@ -119,7 +119,7 @@ BASH;
         $versionArg = escapeshellarg($version);
 
         $inner = match ($action) {
-            'install' => "DEBIAN_FRONTEND=noninteractive apt-get install -y php{$version}-cli php{$version}-fpm",
+            'install' => $this->installPhpScript($version),
             'set_cli_default' => $this->setCliDefaultScript($version),
             'set_new_site_default' => "printf %s {$versionArg} >/dev/null",
             'patch' => "DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y php{$version}-cli php{$version}-fpm",
@@ -136,6 +136,32 @@ BASH;
         }
 
         return 'sudo -n '.$script;
+    }
+
+    /**
+     * Install a PHP version *after* initial provisioning (the Manage → PHP UI).
+     *
+     * Mirrors the optional-extension set from first-boot provisioning
+     * (BuildsProvisionWebserverPhp::$optionalPkgs) so an added version isn't
+     * left with only cli+fpm — without phpredis a Laravel app on the new
+     * version hits `Class "Redis" not found`. Core is strict (fails the action
+     * if cli/fpm can't install); extensions are best-effort, filtered to what
+     * apt can actually see, so a single unavailable package (e.g. the bundled
+     * php8.5-opcache) can't abort the whole install.
+     */
+    protected function installPhpScript(string $version): string
+    {
+        return implode("\n", [
+            'set -e',
+            'export DEBIAN_FRONTEND=noninteractive',
+            "apt-get install -y php{$version}-cli php{$version}-fpm",
+            'for ext in common mysql pgsql curl mbstring xml redis gd sodium gmp apcu igbinary zip intl bcmath opcache; do',
+            "  pkg=\"php{$version}-\$ext\"",
+            '  if apt-cache show "$pkg" >/dev/null 2>&1; then',
+            '    apt-get install -y "$pkg" || true',
+            '  fi',
+            'done',
+        ]);
     }
 
     protected function setCliDefaultScript(string $version): string

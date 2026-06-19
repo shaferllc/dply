@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Models\ErrorEvent;
 use App\Models\SiteDeployment;
+use App\Models\SiteUptimeIncident;
 use App\Modules\Logs\Services\LogExplorerQuery;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -45,6 +47,266 @@ trait ManagesServerLogExplorer
         $this->logExplorerLive = ! $this->logExplorerLive;
     }
 
+    public function loadMoreLogExplorer(): void
+    {
+        $max = $this->isLogExplorerWindowed() ? 2000 : 1000;
+        $this->logExplorerLimit = min($max, $this->logExplorerLimit + 200);
+    }
+
+    /**
+     * Correlation-histogram granularity: 'day' | 'hour' | 'minute'. Each grain
+     * also fixes the rolling span (30 days / 24 hours / 60 minutes) and the next
+     * finer grain to drill into — day→hour→minute, and a minute bar pins the table.
+     */
+    #[Url(as: 'g', except: 'hour')]
+    public string $logHistogramGranularity = 'hour';
+
+    /**
+     * When drilling, the start of the focused region (ISO8601 UTC) — e.g. the day
+     * you clicked, now shown as 24 hourly bars. Empty = rolling window ending now.
+     */
+    #[Url(as: 'hf', except: '')]
+    public string $logHistogramFocusFrom = '';
+
+    public function setLogHistogramGranularity(string $granularity): void
+    {
+        $this->logHistogramGranularity = in_array($granularity, ['day', 'hour', 'minute'], true) ? $granularity : 'hour';
+        $this->logHistogramFocusFrom = '';
+    }
+
+    public function resetLogHistogram(): void
+    {
+        $this->logHistogramGranularity = 'hour';
+        $this->logHistogramFocusFrom = '';
+    }
+
+    /**
+     * Click a histogram bar. day → zoom to that day at hour grain; hour → zoom to
+     * that hour at minute grain; minute → pin the log table to that exact minute
+     * (the leaf — there's nothing finer to bucket, so jump to the lines).
+     */
+    public function drillLogHistogram(string $bucketStartIso): void
+    {
+        $start = $this->parseExplorerInstant($bucketStartIso);
+        if ($start === null) {
+            return;
+        }
+
+        switch ($this->logHistogramGranularity) {
+            case 'day':
+                $this->logHistogramGranularity = 'hour';
+                $this->logHistogramFocusFrom = $start->utc()->toIso8601String();
+                break;
+            case 'hour':
+                $this->logHistogramGranularity = 'minute';
+                $this->logHistogramFocusFrom = $start->utc()->toIso8601String();
+                break;
+            default: // minute — leaf: pin the table to this minute
+                $this->logExplorerFrom = $start->utc()->toIso8601String();
+                $this->logExplorerTo = $start->copy()->addMinute()->utc()->toIso8601String();
+                $this->logExplorerLive = false;
+                $this->logExplorerLimit = 200;
+        }
+    }
+
+    /**
+     * @return array{bucket:int,count:int,finer:?string,label:string}
+     */
+    private function histogramSpec(): array
+    {
+        return match ($this->logHistogramGranularity) {
+            'minute' => ['bucket' => 60, 'count' => 60, 'finer' => null, 'label' => 'H:i'],
+            'day' => ['bucket' => 86400, 'count' => 30, 'finer' => 'hour', 'label' => 'M j'],
+            default => ['bucket' => 3600, 'count' => 24, 'finer' => 'minute', 'label' => 'M j H:00'],
+        };
+    }
+
+    /**
+     * The correlation histogram + event overlay for the current granularity/focus.
+     * Gap-filled buckets (zero-count buckets included so the time axis is honest)
+     * with error/warn/other split, plus deploys, error events and uptime incidents
+     * positioned by time across the same window. Never throws.
+     *
+     * @return array{available:bool, buckets:list<array<string,mixed>>, events:list<array<string,mixed>>, granularity:string, can_drill:bool, focused:bool, from:string, to:string, max:int}
+     */
+    protected function loadLogHistogram(): array
+    {
+        $spec = $this->histogramSpec();
+        $bucket = $spec['bucket'];
+        $span = $bucket * $spec['count'];
+
+        $focus = $this->parseExplorerInstant($this->logHistogramFocusFrom);
+        $to = $focus !== null ? $focus->copy()->addSeconds($span) : CarbonImmutable::now();
+        $from = $focus !== null ? $focus : CarbonImmutable::now()->subSeconds($span);
+
+        $empty = [
+            'available' => false,
+            'buckets' => [],
+            'events' => [],
+            'granularity' => $this->logHistogramGranularity,
+            'can_drill' => $spec['finer'] !== null || $this->logHistogramGranularity === 'minute',
+            'focused' => $focus !== null,
+            'from' => $from->utc()->toIso8601String(),
+            'to' => $to->utc()->toIso8601String(),
+            'max' => 0,
+        ];
+
+        try {
+            $rows = app(LogExplorerQuery::class)->histogram($this->server, $from, $to, $bucket);
+        } catch (\Throwable $e) {
+            Log::warning('server_logs.histogram.query_failed', [
+                'server_id' => $this->server->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $empty;
+        }
+
+        // Index query rows by their bucket-start epoch for gap-filling.
+        $byEpoch = [];
+        foreach ($rows as $r) {
+            try {
+                $byEpoch[CarbonImmutable::parse($r['bucket'], 'UTC')->getTimestamp()] = $r;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        // Bucket boundaries align to epoch multiples (matching ClickHouse's
+        // toStartOfInterval), so floor the window start to a bucket edge.
+        $startEpoch = intdiv($from->getTimestamp(), $bucket) * $bucket;
+        $endEpoch = $to->getTimestamp();
+        $totalSpan = max(1, $endEpoch - $startEpoch);
+
+        $buckets = [];
+        $max = 1;
+        for ($epoch = $startEpoch; $epoch <= $endEpoch; $epoch += $bucket) {
+            $row = $byEpoch[$epoch] ?? null;
+            $total = (int) ($row['total'] ?? 0);
+            $errors = (int) ($row['errors'] ?? 0);
+            $warns = (int) ($row['warns'] ?? 0);
+            $others = max(0, $total - $errors - $warns);
+            $max = max($max, $total);
+
+            $at = CarbonImmutable::createFromTimestamp($epoch, 'UTC');
+            $buckets[] = [
+                'start' => $at->toIso8601String(),
+                'label' => $at->format($spec['label']),
+                'total' => $total,
+                'errors' => $errors,
+                'warns' => $warns,
+                'others' => $others,
+                'x_pct' => round((($epoch - $startEpoch) / $totalSpan) * 100, 3),
+            ];
+        }
+
+        return [
+            'available' => true,
+            'buckets' => $buckets,
+            'events' => $this->loadLogTimelineEvents($from, $to, $startEpoch, $endEpoch),
+            'granularity' => $this->logHistogramGranularity,
+            'can_drill' => $spec['finer'] !== null || $this->logHistogramGranularity === 'minute',
+            'focused' => $focus !== null,
+            'from' => $from->utc()->toIso8601String(),
+            'to' => $to->utc()->toIso8601String(),
+            'max' => $max,
+        ];
+    }
+
+    /**
+     * Deploys, error events and uptime incidents within the histogram window,
+     * each positioned by time as an x-percentage across the axis — the "events"
+     * half of "events vs logs". Capped so a noisy window can't flood the overlay.
+     *
+     * @return list<array{type:string,label:string,time:string,x_pct:float}>
+     */
+    private function loadLogTimelineEvents(CarbonInterface $from, CarbonInterface $to, int $startEpoch, int $endEpoch): array
+    {
+        $totalSpan = max(1, $endEpoch - $startEpoch);
+        $pos = static function (?CarbonInterface $at) use ($startEpoch, $totalSpan): ?float {
+            if ($at === null) {
+                return null;
+            }
+
+            return round(max(0.0, min(100.0, (($at->getTimestamp() - $startEpoch) / $totalSpan) * 100)), 3);
+        };
+
+        $events = [];
+        $siteIds = $this->server->sites->pluck('id')->all();
+
+        if ($siteIds !== []) {
+            $deploys = SiteDeployment::query()
+                ->whereIn('site_id', $siteIds)
+                ->where('started_at', '<=', $to)
+                ->where(function ($q) use ($from): void {
+                    $q->whereNull('finished_at')->orWhere('finished_at', '>=', $from);
+                })
+                ->with('site:id,name')
+                ->orderByDesc('started_at')
+                ->limit(40)
+                ->get();
+
+            foreach ($deploys as $deploy) {
+                $at = ($deploy->finished_at ?? $deploy->started_at)?->utc();
+                $x = $pos($at);
+                if ($x === null) {
+                    continue;
+                }
+                $events[] = [
+                    'type' => 'deploy',
+                    'label' => __('Deploy · :site (:status)', ['site' => $deploy->site?->name ?? $deploy->site_id, 'status' => $deploy->status]),
+                    'time' => $at->toIso8601String(),
+                    'x_pct' => $x,
+                ];
+            }
+
+            $incidents = SiteUptimeIncident::query()
+                ->whereIn('site_id', $siteIds)
+                ->where('started_at', '>=', $from)
+                ->where('started_at', '<=', $to)
+                ->orderByDesc('started_at')
+                ->limit(40)
+                ->get();
+
+            foreach ($incidents as $incident) {
+                $x = $pos($incident->started_at?->utc());
+                if ($x === null) {
+                    continue;
+                }
+                $events[] = [
+                    'type' => 'incident',
+                    'label' => __('Incident · :severity', ['severity' => $incident->severity]),
+                    'time' => $incident->started_at->utc()->toIso8601String(),
+                    'x_pct' => $x,
+                ];
+            }
+        }
+
+        $errors = ErrorEvent::query()
+            ->where('server_id', $this->server->id)
+            ->whereNotNull('occurred_at')
+            ->where('occurred_at', '>=', $from)
+            ->where('occurred_at', '<=', $to)
+            ->orderByDesc('occurred_at')
+            ->limit(40)
+            ->get();
+
+        foreach ($errors as $error) {
+            $x = $pos($error->occurred_at?->utc());
+            if ($x === null) {
+                continue;
+            }
+            $events[] = [
+                'type' => 'error',
+                'label' => __('Error · :title', ['title' => \Illuminate\Support\Str::limit((string) $error->title, 60)]),
+                'time' => $error->occurred_at->utc()->toIso8601String(),
+                'x_pct' => $x,
+            ];
+        }
+
+        return $events;
+    }
+
     /** @var list<int> */
     public array $logExplorerRangeOptions = [15, 60, 360, 1440];
 
@@ -80,6 +342,7 @@ trait ManagesServerLogExplorer
     {
         $this->logExplorerFrom = '';
         $this->logExplorerTo = '';
+        $this->logExplorerLimit = 100;
     }
 
     private function parseExplorerInstant(string $value): ?CarbonInterface
