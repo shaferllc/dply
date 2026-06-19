@@ -116,6 +116,7 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
             $agent->update([
                 'status' => ServerLogAgent::STATUS_RUNNING,
                 'version' => $scripts->parseVersion($output->buffer),
+                'config_version' => $scripts->configVersion(),
                 'error_message' => null,
             ]);
         } catch (\Throwable $e) {

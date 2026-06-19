@@ -19,6 +19,7 @@ class LogsServiceProvider extends ServiceProvider
                 Console\EvaluateLogAlertsCommand::class,
                 Console\InstallLogAggregatorCommand::class,
                 Console\AggregatorStatusCommand::class,
+                Console\AgentStatusCommand::class,
                 Console\LogDrainListen::class,
                 Console\PruneAppLogsCommand::class,
             ]);

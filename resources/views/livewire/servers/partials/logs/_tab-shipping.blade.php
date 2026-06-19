@@ -105,6 +105,25 @@
                 </div>
             @endif
 
+            {{-- Stale edge config: this build of dply renders a newer agent config than
+                 the box is running. Re-sync (same action as a source change) to apply it. --}}
+            @if ($agent?->isConfigStale())
+                <div class="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+                    <x-heroicon-o-arrow-path class="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <p class="min-w-0 flex-1">
+                        {{ __('A newer log agent config is available (v:installed → v:current). Re-sync to apply it on this server.', [
+                            'installed' => $agent->installedConfigVersion() ?? '—',
+                            'current' => \App\Models\ServerLogAgent::currentConfigVersion(),
+                        ]) }}
+                    </p>
+                    <button type="button" wire:click="resyncLogShipping" wire:loading.attr="disabled"
+                        @disabled($busy)
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
+                        {{ $busy ? __('Re-syncing…') : __('Re-sync agent') }}
+                    </button>
+                </div>
+            @endif
+
             {{-- Source toggles (collapsible) --}}
             @php
                 $sourcesTotal = count($this->logShippingSourceCatalog);
