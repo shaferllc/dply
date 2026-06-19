@@ -174,9 +174,7 @@ class ConsoleAction extends Model
     public function isStale(): bool
     {
         if ($this->status === self::STATUS_RUNNING && $this->started_at !== null) {
-            $threshold = (int) config('console_actions.stale_after_seconds', 600);
-
-            return $this->started_at->lt(now()->subSeconds($threshold));
+            return $this->started_at->lt(now()->subSeconds($this->staleThresholdSeconds()));
         }
 
         if ($this->status === self::STATUS_QUEUED) {
@@ -184,6 +182,23 @@ class ConsoleAction extends Model
         }
 
         return false;
+    }
+
+    /**
+     * How long a RUNNING action may go before the UI treats it as stalled.
+     * Per-kind override (config console_actions.kinds.<kind>.stale_seconds) so a
+     * legitimately long job — a multi-hour file backup, a clone, a DB-engine
+     * install — isn't flagged stale at the 10-minute global default and dropped
+     * from the "busy" set while it's still running. Falls back to the global.
+     */
+    public function staleThresholdSeconds(): int
+    {
+        $perKind = config('console_actions.kinds.'.$this->kind.'.stale_seconds');
+        if (is_int($perKind) && $perKind > 0) {
+            return $perKind;
+        }
+
+        return (int) config('console_actions.stale_after_seconds', 600);
     }
 
     public static function queueWorkerStalledMessage(): string
