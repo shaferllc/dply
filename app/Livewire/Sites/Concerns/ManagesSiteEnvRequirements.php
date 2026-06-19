@@ -265,14 +265,17 @@ trait ManagesSiteEnvRequirements
             ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
             ->update(['dismissed_at' => now()]);
 
-        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        // Per-kind-aware staleness (isStale honours per-kind overrides) so a
+        // legitimately long run — a multi-hour backup — isn't dismissed as a
+        // zombie when a new action is seeded.
         ConsoleAction::query()
             ->where('subject_type', $this->site->getMorphClass())
             ->where('subject_id', $this->site->id)
             ->whereNull('dismissed_at', 'and', false)
             ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
-            ->where('created_at', '<', now()->subSeconds($staleSeconds))
-            ->update(['dismissed_at' => now()]);
+            ->get()
+            ->filter(fn (ConsoleAction $row): bool => $row->isStale())
+            ->each(fn (ConsoleAction $row) => $row->forceFill(['dismissed_at' => now()])->save());
 
         return ConsoleAction::query()->create([
             'subject_type' => $this->site->getMorphClass(),

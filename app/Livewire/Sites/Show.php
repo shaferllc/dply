@@ -228,19 +228,21 @@ class Show extends Component
             ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
             ->update(['dismissed_at' => now()]);
 
-        // Also dismiss orphaned queued/running rows past the staleness threshold
-        // — they represent jobs whose workers never picked them up (queue down,
+        // Also dismiss orphaned queued/running rows past their staleness
+        // threshold — jobs whose workers never picked them up (queue down,
         // redis flushed) or that died mid-run. Without this, the new dispatch
         // would race against a zombie banner and the operator would be unsure
-        // which run is theirs.
-        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        // which run is theirs. isStale() honours per-kind overrides so a
+        // legitimately long run (a multi-hour backup) is never mistaken for a
+        // zombie just because it outlived the 10-minute global default.
         ConsoleAction::query()
             ->where('subject_type', $this->site->getMorphClass())
             ->where('subject_id', $this->site->id)
             ->whereNull('dismissed_at', 'and', false)
             ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
-            ->where('created_at', '<', now()->subSeconds($staleSeconds))
-            ->update(['dismissed_at' => now()]);
+            ->get()
+            ->filter(fn (ConsoleAction $row): bool => $row->isStale())
+            ->each(fn (ConsoleAction $row) => $row->forceFill(['dismissed_at' => now()])->save());
 
         return ConsoleAction::query()->create([
             'subject_type' => $this->site->getMorphClass(),

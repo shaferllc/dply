@@ -29,27 +29,41 @@ final class SiteManagedErrorPageSupport
     public const REFERENCE_HEADER = 'X-Dply-Ref';
 
     /**
-     * Site meta key for the operator-only "expose raw server errors" switch.
-     * Off by default. When set, the webserver no longer intercepts 5xx with the
-     * branded {@see SiteServerErrorPageBuilder} page — the
-     * real error passes through (framework debug page on an app 500, or the
-     * webserver's own 502/503/504 when the upstream is down). For debugging a
-     * failing app; visitors see the raw error while it's on.
+     * Site meta key for the per-site "expose raw server errors" switch. When the
+     * webserver does not intercept 5xx with the branded
+     * {@see SiteServerErrorPageBuilder} page, the real error passes through
+     * (framework debug page on an app 500, the app's own 500/503, or the
+     * webserver's own 502/504 when the upstream is down).
+     *
+     * Stored as an explicit bool so a site can be pinned either way regardless of
+     * the platform default ({@see serverErrorsExposed()}): `true` = pass the raw
+     * error through, `false` = force the branded page. Absent = follow the
+     * platform default.
      */
     public const META_EXPOSE_FLAG = 'expose_server_errors';
 
     /**
-     * True when the operator has opted this site into raw 5xx pass-through.
-     * Unlike {@see appDebugEnabled()} (which only frees app 500s and is driven
-     * by the deployed .env), this also drops the 502/503/504 interception, so a
-     * dead upstream surfaces the webserver's real Bad Gateway page instead of
-     * the branded splash.
+     * True when this site passes raw 5xx straight through instead of masking them
+     * with the branded page. A per-site choice
+     * (sites.meta.{@see META_EXPOSE_FLAG}) wins; otherwise the platform default
+     * applies — by default dply does NOT intercept, so the app renders its own
+     * error pages. Flip the platform default with `DPLY_INTERCEPT_5XX_PAGES=true`
+     * (config `server_error_codes.intercept_5xx_by_default`).
+     *
+     * Unlike {@see appDebugEnabled()} (which only frees app 500s and is driven by
+     * the deployed .env), this also drops the 502/503/504 interception, so a dead
+     * upstream surfaces the webserver's real Bad Gateway page instead of the
+     * branded splash.
      */
     public static function serverErrorsExposed(Site $site): bool
     {
-        $meta = ($site->meta );
+        $meta = $site->meta;
 
-        return (bool) ($meta[self::META_EXPOSE_FLAG] ?? false);
+        if (is_array($meta) && array_key_exists(self::META_EXPOSE_FLAG, $meta)) {
+            return (bool) $meta[self::META_EXPOSE_FLAG];
+        }
+
+        return ! (bool) config('server_error_codes.intercept_5xx_by_default', false);
     }
 
     public static function root(Site $site): string
@@ -144,8 +158,14 @@ NGINX;
 APACHE;
     }
 
-    public static function apacheProxyErrorOverride(): string
+    public static function apacheProxyErrorOverride(Site $site): string
     {
+        // Without this, Apache would still swallow a proxied 5xx and serve its own
+        // default error page instead of letting the app's response through.
+        if (self::serverErrorsExposed($site)) {
+            return '';
+        }
+
         return "    ProxyErrorOverride On\n";
     }
 

@@ -58,7 +58,7 @@ class ApacheSiteConfigBuilder
             $octBa = $this->apacheRootLocationBasicAuth($site);
             $formGate = SiteAccessGateConfigSupport::apacheBlocks($site);
             $managedErrors = SiteManagedErrorPageSupport::apacheVirtualHostBlock($site);
-            $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride();
+            $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride($site);
 
             return $this->applyListenPort(<<<APACHE
 # Managed by Dply — {$basename} (Laravel Octane)
@@ -83,7 +83,7 @@ APACHE, $listenPort);
         $formGateNode = SiteAccessGateConfigSupport::apacheBlocks($site);
         $dotfileDeny = $this->apacheDotfileDenyBlock();
         $managedErrors = SiteManagedErrorPageSupport::apacheVirtualHostBlock($site);
-        $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride();
+        $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride($site);
 
         $config = match ($site->type) {
             SiteType::Php => <<<APACHE
