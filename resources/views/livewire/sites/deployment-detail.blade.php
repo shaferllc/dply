@@ -41,15 +41,23 @@
                             </p>
                         </div>
                     </div>
-                    <button type="button" wire:click="toggleOutput" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                        @if ($showOutput)
-                            <x-heroicon-m-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Hide step output') }}
-                        @else
-                            <x-heroicon-m-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Show step output') }}
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($this->showWindowLogCorrelation)
+                            <button type="button" wire:click="openLogsForDeploy" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                                <x-heroicon-m-bars-3-bottom-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Logs around this deploy') }}
+                            </button>
                         @endif
-                    </button>
+                        <button type="button" wire:click="toggleOutput" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                            @if ($showOutput)
+                                <x-heroicon-m-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Hide step output') }}
+                            @else
+                                <x-heroicon-m-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Show step output') }}
+                            @endif
+                        </button>
+                    </div>
                 </div>
 
                 @php
@@ -156,4 +164,7 @@
             </main>
         </div>
     </div>
+
+    {{-- dply Logs correlation: host logs across this deployment's window --}}
+    @include('livewire.partials.window-logs-drawer')
 </div>

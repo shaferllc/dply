@@ -19,7 +19,9 @@
 
     {{-- Aggregator role: this box is the dply Logs ingest tier. Prompt a re-sync
          when it's running an older rendered config than this build of dply ships. --}}
-    @php($aggregator = $this->logAggregator)
+    @php
+        $aggregator = $this->logAggregator;
+    @endphp
     @if ($aggregator !== null)
         @php
             $aggCurrent = \App\Models\ServerLogAggregator::currentConfigVersion();
