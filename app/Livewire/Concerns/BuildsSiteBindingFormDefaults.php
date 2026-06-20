@@ -198,6 +198,10 @@ trait BuildsSiteBindingFormDefaults
             'region' => '',
             // Resend
             'key' => '',
+            // Cloudflare (account_id + sending key); cf_domain drives the
+            // guided "email on your domain" panel, defaulting to the primary.
+            'account_id' => '',
+            'cf_domain' => (string) ($this->site->primaryDomain()?->hostname ?? ''),
             // Saved-credential reuse + save-for-reuse.
             'credential_id' => '',
             'save_credential' => false,

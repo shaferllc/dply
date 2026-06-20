@@ -207,6 +207,35 @@ class CloudflareDnsService
     }
 
     /**
+     * List DNS records of a given type in the zone, optionally filtered by exact
+     * name. Returns the raw Cloudflare record rows (empty when the zone isn't in
+     * this account). Used to pre-flight mail auth records (SPF/DKIM/DMARC).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listDnsRecords(string $zoneName, string $type, ?string $name = null): array
+    {
+        $zoneId = $this->findZoneId($zoneName);
+        if ($zoneId === null) {
+            return [];
+        }
+
+        $query = ['type' => strtoupper($type), 'per_page' => 100];
+        if ($name !== null && $name !== '') {
+            $query['name'] = strtolower($name);
+        }
+
+        $response = $this->request('get', '/zones/'.$zoneId.'/dns_records', $query);
+        $this->assertApiSuccess($response, 'list Cloudflare DNS records');
+        $results = $response->json('result');
+        if (! is_array($results)) {
+            return [];
+        }
+
+        return array_values(array_filter($results, 'is_array'));
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function findARecord(string $zoneId, string $fqdn): ?array

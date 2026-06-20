@@ -42,6 +42,7 @@ trait ManagesSiteBindings
 {
     use BuildsSiteBindingFormDefaults;
     use ManagesSiteBindingActions;
+    use ManagesSiteBindingCloudflareEmail;
     use ManagesSiteBindingCredentials;
     use ManagesSiteBindingMail;
     use ManagesSiteBindingStorage;

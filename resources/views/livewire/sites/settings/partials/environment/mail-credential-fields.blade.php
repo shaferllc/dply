@@ -112,10 +112,85 @@
                 <x-text-input id="binding_mail_cfacct" wire:model="bindingForm.account_id" class="mt-1 block w-full font-mono text-sm" />
             </div>
             <div>
-                <x-input-label for="binding_mail_cfkey" :value="__('API key')" />
-                <x-text-input id="binding_mail_cfkey" type="password" wire:model="bindingForm.key" class="mt-1 block w-full font-mono text-sm" />
+                <x-input-label for="binding_mail_cfkey" :value="__('Email Sending token')" />
+                <x-text-input id="binding_mail_cfkey" type="password" wire:model="bindingForm.key" class="mt-1 block w-full font-mono text-sm" placeholder="Email Sending: Edit token" />
             </div>
         </div>
+
+        {{-- Guided + verified setup: dply walks the (dashboard-only) Cloudflare
+             onboarding, reads the zone through your connected DNS token to
+             pre-flight the records, then proves the whole chain with a real send
+             from the control plane (works even before the site is deployed). --}}
+        @php $cfGate = $this->cloudflareEmailGate(); @endphp
+        @if (! $cfGate->eligible)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                {{ $cfGate->reason }}
+            </div>
+        @else
+            <div class="space-y-4 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-4">
+                <div>
+                    <x-input-label for="binding_mail_cfdomain" :value="__('Send from domain')" />
+                    <select id="binding_mail_cfdomain" wire:model.live="bindingForm.cf_domain" class="dply-input mt-1">
+                        @foreach ($cfGate->domains as $cfDomain)
+                            <option value="{{ $cfDomain }}">{{ $cfDomain }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Your from-address must be on this verified domain.') }}</p>
+                </div>
+
+                <ol class="space-y-2">
+                    @foreach ($this->cloudflareEmailSteps() as $cfIndex => $cfStep)
+                        <li class="flex gap-2.5 text-xs text-brand-ink">
+                            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-forest text-[11px] font-semibold text-brand-cream">{{ $cfIndex + 1 }}</span>
+                            <span><span class="font-semibold">{{ $cfStep->title }}.</span> {{ $cfStep->body }}</span>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <div class="space-y-2">
+                    <button type="button" wire:click="pollCloudflareEmailRecords" wire:loading.attr="disabled" wire:target="pollCloudflareEmailRecords" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-magnifying-glass class="h-4 w-4" wire:loading.remove wire:target="pollCloudflareEmailRecords" />
+                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="pollCloudflareEmailRecords" />
+                        {{ __('Check DNS records') }}
+                    </button>
+                    @if ($cfEmailRecords !== [])
+                        <div class="flex flex-wrap gap-2 text-[11px] font-semibold">
+                            @foreach (['spf' => 'SPF', 'dkim' => 'DKIM', 'dmarc' => 'DMARC'] as $cfKey => $cfLabel)
+                                <span @class([
+                                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1',
+                                    'bg-emerald-50 text-emerald-700' => $cfEmailRecords[$cfKey] ?? false,
+                                    'bg-rose-50 text-rose-700' => ! ($cfEmailRecords[$cfKey] ?? false),
+                                ])>
+                                    @if ($cfEmailRecords[$cfKey] ?? false)
+                                        <x-heroicon-s-check-circle class="h-3.5 w-3.5" />
+                                    @else
+                                        <x-heroicon-s-x-circle class="h-3.5 w-3.5" />
+                                    @endif
+                                    {{ $cfLabel }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <div class="space-y-2 border-t border-brand-ink/10 pt-3">
+                    <x-input-label for="binding_mail_cfverify" :value="__('Verify by sending a test to')" />
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-text-input id="binding_mail_cfverify" type="email" wire:model="mailTestRecipient" class="block flex-1 text-sm" :placeholder="auth()->user()?->email" />
+                        <button type="button" wire:click="verifyCloudflareEmail" wire:loading.attr="disabled" wire:target="verifyCloudflareEmail" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                            <x-heroicon-o-paper-airplane class="h-4 w-4" wire:loading.remove wire:target="verifyCloudflareEmail" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="verifyCloudflareEmail" />
+                            {{ __('Verify') }}
+                        </button>
+                    </div>
+                    @if ($cfEmailVerified)
+                        <p class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700"><x-heroicon-s-check-circle class="h-3.5 w-3.5" /> {{ __('Verified — Cloudflare accepted a real send from this domain.') }}</p>
+                    @elseif ($cfEmailVerifyError !== null)
+                        <p class="text-[11px] font-semibold text-rose-700">{{ $cfEmailVerifyError }}</p>
+                    @endif
+                </div>
+            </div>
+        @endif
     @endif
 
     @if (in_array($mailProvider, ['sendgrid', 'cloudflare'], true))

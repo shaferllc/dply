@@ -322,12 +322,20 @@ trait ManagesSiteBindingActions
             // from the previous provider can't leak into the new one. The shared
             // from-address/name persist across the switch.
             if ($key === 'provider') {
-                foreach (['host', 'username', 'password', 'secret', 'domain', 'token', 'access_key_id', 'secret_access_key', 'region', 'key', 'credential_id'] as $f) {
+                foreach (['host', 'username', 'password', 'secret', 'domain', 'token', 'access_key_id', 'secret_access_key', 'region', 'key', 'account_id', 'credential_id'] as $f) {
                     $this->bindingForm[$f] = '';
                 }
                 $this->bindingForm['port'] = $value === 'smtp' ? '587' : '';
                 $this->bindingForm['encryption'] = 'tls';
                 $this->bindingForm['endpoint'] = $value === 'mailgun' ? 'api.mailgun.net' : '';
+
+                // Cloudflare is the one provider with a guided/verified panel;
+                // reset its transient state and default the sending domain to the
+                // site's primary when switching to it.
+                $this->resetCloudflareEmailGuidance();
+                if ($value === 'cloudflare') {
+                    $this->bindingForm['cf_domain'] = (string) ($this->site->primaryDomain()?->hostname ?? '');
+                }
 
                 // Entering a chain mode seeds two legs; leaving it drops them.
                 if (in_array($value, ['failover', 'roundrobin'], true)) {
