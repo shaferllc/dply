@@ -82,6 +82,23 @@ final class LetsEncryptCertbotCommandBuilder
     }
 
     /**
+     * True when issuance runs `certbot certonly` — certbot only OBTAINS the
+     * cert and dply must install it into the managed vhost itself (then reload).
+     * False for the --apache/--nginx installer plugins, which wire the cert in
+     * directly. Mirrors the certonly branches of certbotInvocation(): without
+     * this, a plain-nginx custom domain gets a real per-host cert on disk but
+     * its vhost is never re-pointed off the substitute (shared-wildcard) cert.
+     */
+    public static function usesCertonly(Site $site): bool
+    {
+        if (self::usesWebrootChallenge($site)) {
+            return true;
+        }
+
+        return in_array($site->webserver(), ['nginx', 'openlitespeed', 'traefik', 'caddy'], true);
+    }
+
+    /**
      * @param  list<string>  $domains
      */
     private static function certbotInvocation(Site $site, array $domains, string $email): string
