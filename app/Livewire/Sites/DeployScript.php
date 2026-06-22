@@ -63,6 +63,14 @@ class DeployScript extends Component
      */
     public bool $managed_restart_enabled = true;
 
+    // --- Inline editing of a locked builder/pinned step ---
+
+    /** The locked step currently being edited inline, or null. */
+    public ?string $editing_step_id = null;
+
+    /** The command being edited for {@see $editing_step_id}. */
+    public string $editing_step_command = '';
+
     // --- Shell deploy hook form (lean; shell-only, positional anchors) ---
 
     public bool $hook_form_open = false;
@@ -263,6 +271,92 @@ class DeployScript extends Component
 
         $this->loadFromSite();
         $this->toastSuccess(__('Deploy script saved.'));
+    }
+
+    // --- Locked builder/pinned steps: inline edit + remove ---
+
+    /** Resolve a step that belongs to this site, or null. */
+    private function ownStep(string $id): ?SiteDeployStep
+    {
+        return SiteDeployStep::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($id)
+            ->first();
+    }
+
+    /** Open inline editing for a locked step, seeding the field with its resolved command. */
+    public function editStep(string $id): void
+    {
+        Gate::authorize('update', $this->site);
+        $step = $this->ownStep($id);
+        if (! $step) {
+            return;
+        }
+
+        $this->editing_step_id = (string) $step->id;
+        $this->editing_step_command = (string) ($step->commandFor() ?? '');
+        $this->resetErrorBag();
+    }
+
+    public function cancelStepEdit(): void
+    {
+        $this->editing_step_id = null;
+        $this->editing_step_command = '';
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Persist an edit to a locked step. A typed builder step is converted to a
+     * TYPE_CUSTOM step IN PLACE (same sort_order / phase / pipeline) so the
+     * deploy runner uses the edited command verbatim and the step keeps its
+     * position relative to the other builder steps. A pinned custom step just
+     * has its command updated.
+     */
+    public function saveStep(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if ($this->editing_step_id === null) {
+            return;
+        }
+
+        $this->validate([
+            'editing_step_command' => 'required|string|max:16000',
+        ]);
+
+        $step = $this->ownStep($this->editing_step_id);
+        if (! $step) {
+            $this->cancelStepEdit();
+
+            return;
+        }
+
+        $step->update([
+            'step_type' => SiteDeployStep::TYPE_CUSTOM,
+            'custom_command' => trim($this->editing_step_command),
+        ]);
+
+        $this->cancelStepEdit();
+        $this->loadFromSite();
+        $this->toastSuccess(__('Step updated.'));
+    }
+
+    /** Remove a locked builder/pinned step from the pipeline. */
+    public function removeStep(string $id): void
+    {
+        Gate::authorize('update', $this->site);
+        $step = $this->ownStep($id);
+        if (! $step) {
+            return;
+        }
+
+        if ($this->editing_step_id === (string) $step->id) {
+            $this->cancelStepEdit();
+        }
+
+        $step->delete();
+        $this->loadFromSite();
+        $this->toastSuccess(__('Step removed.'));
     }
 
     // --- Deploy hooks (shell, positional anchors) ---

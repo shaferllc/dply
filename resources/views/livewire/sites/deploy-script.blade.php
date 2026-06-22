@@ -77,15 +77,43 @@
                         <div class="mt-3 space-y-1.5">
                             @foreach ($locked as $step)
                                 @php $pinnedCustom = $step->step_type === $customType; @endphp
-                                <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1.5">
-                                    <x-heroicon-m-lock-closed class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
-                                    <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
-                                    <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-brand-mist">{{ $step->commandFor() }}</span>
-                                    <span @class([
-                                        'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
-                                        'bg-brand-gold/20 text-brand-ink' => $pinnedCustom,
-                                        'bg-brand-ink/5 text-brand-moss' => ! $pinnedCustom,
-                                    ])>{{ $pinnedCustom ? __('Pinned') : __('Builder') }}</span>
+                                <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1.5" wire:key="locked-{{ $step->id }}">
+                                    @if ($editing_step_id === (string) $step->id)
+                                        {{-- Inline edit: a typed builder step becomes a custom command in place. --}}
+                                        <div class="flex items-center gap-2">
+                                            <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
+                                            <input type="text" wire:model="editing_step_command" spellcheck="false"
+                                                wire:keydown.enter.prevent="saveStep" wire:keydown.escape="cancelStepEdit"
+                                                class="min-w-0 flex-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-[11px] text-brand-ink focus:border-brand-forest focus:ring-brand-forest" autofocus>
+                                            <button type="button" wire:click="saveStep"
+                                                class="shrink-0 rounded-md bg-brand-forest px-2 py-1 text-[10px] font-semibold text-white hover:bg-brand-forest/90">{{ __('Save') }}</button>
+                                            <button type="button" wire:click="cancelStepEdit"
+                                                class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
+                                        </div>
+                                        @error('editing_step_command')
+                                            <p class="mt-1 text-[10px] font-medium text-rose-600">{{ $message }}</p>
+                                        @enderror
+                                    @else
+                                        <div class="flex items-center gap-2">
+                                            <x-heroicon-m-lock-closed class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
+                                            <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
+                                            <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-brand-mist">{{ $step->commandFor() }}</span>
+                                            <span @class([
+                                                'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                                                'bg-brand-gold/20 text-brand-ink' => $pinnedCustom,
+                                                'bg-brand-ink/5 text-brand-moss' => ! $pinnedCustom,
+                                            ])>{{ $pinnedCustom ? __('Pinned') : __('Builder') }}</span>
+                                            <button type="button" wire:click="editStep('{{ $step->id }}')" title="{{ __('Edit command') }}"
+                                                class="shrink-0 rounded-md p-1 text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink">
+                                                <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
+                                            </button>
+                                            <button type="button" wire:click="removeStep('{{ $step->id }}')"
+                                                wire:confirm="{{ __('Remove this step from the deploy pipeline?') }}" title="{{ __('Remove step') }}"
+                                                class="shrink-0 rounded-md p-1 text-brand-moss hover:bg-rose-50 hover:text-rose-600">
+                                                <x-heroicon-m-trash class="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                             <p class="text-[10px] text-brand-mist">{{ __('Your commands below run after these.') }}</p>
