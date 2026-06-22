@@ -293,7 +293,7 @@ trait ManagesSupervisorPrograms
                 ->where('server_id', $this->server->id)
                 ->find($this->new_sv_site_id);
             if ($site !== null) {
-                $dir = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+                $dir = $site->effectiveEnvDirectory();
                 $user = $site->effectiveSystemUser($this->server);
             }
         }
@@ -324,7 +324,7 @@ trait ManagesSupervisorPrograms
                 ->find($this->new_sv_site_id);
             if ($site !== null && $site->shouldShowOctaneRuntimeUi()) {
                 $command = $site->octaneSupervisorCommand();
-                $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+                $directory = $site->effectiveEnvDirectory();
             }
         }
 
@@ -343,7 +343,7 @@ trait ManagesSupervisorPrograms
         $this->new_sv_type = $type;
         $this->new_sv_command = $command;
         $this->new_sv_directory = $directory;
-        $this->new_sv_user = $this->defaultProgramUser();
+        $this->new_sv_user = $this->defaultAppUser();
         $this->new_sv_numprocs = 1;
         $this->resetExpertFormFields();
     }
@@ -397,12 +397,31 @@ trait ManagesSupervisorPrograms
 
     protected function defaultAppDirectory(): string
     {
+        // When the form is scoped to a site, daemons run out of that site's
+        // deployed tree — derive the real on-disk path (the atomic `current`
+        // symlink, or the flat checkout root) instead of guessing an
+        // `apps/<server>/current` layout the deployer never creates.
+        $site = $this->supervisorFormSite();
+        if ($site !== null) {
+            return $site->effectiveEnvDirectory();
+        }
+
         $user = $this->defaultProgramUser();
         $name = trim((string) ($this->server->name ?? '')) !== ''
             ? Str::slug($this->server->name)
             : 'app';
 
         return '/home/'.$user.'/apps/'.$name.'/current';
+    }
+
+    protected function defaultAppUser(): string
+    {
+        $site = $this->supervisorFormSite();
+        if ($site !== null) {
+            return $site->effectiveSystemUser($this->server);
+        }
+
+        return $this->defaultProgramUser();
     }
 
     /**
@@ -469,7 +488,7 @@ trait ManagesSupervisorPrograms
             maxTime: $this->quick_max_time,
         ))->build();
 
-        $this->new_sv_directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+        $this->new_sv_directory = $site->effectiveEnvDirectory();
         $this->new_sv_user = $site->effectiveSystemUser($this->server);
         $this->new_sv_site_id = $site->id;
 
@@ -665,7 +684,7 @@ trait ManagesSupervisorPrograms
         $this->new_sv_numprocs = 1;
         $this->new_sv_site_id = $this->context_site_id;
         if ($this->context_site_id !== null && ($ctx = Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first())) {
-            $this->new_sv_directory = rtrim($ctx->effectiveRepositoryPath(), '/').'/current';
+            $this->new_sv_directory = $ctx->effectiveEnvDirectory();
             $this->new_sv_user = $ctx->effectiveSystemUser($this->server);
         }
     }

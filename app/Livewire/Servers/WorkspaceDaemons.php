@@ -151,7 +151,7 @@ class WorkspaceDaemons extends Component
             $this->new_sv_site_id = $resolvedSiteId;
             $siteModel = Site::query()->where('server_id', $server->id)->whereKey($resolvedSiteId)->first();
             if ($siteModel !== null) {
-                $this->new_sv_directory = rtrim($siteModel->effectiveRepositoryPath(), '/').'/current';
+                $this->new_sv_directory = $siteModel->effectiveEnvDirectory();
                 $this->new_sv_user = $siteModel->effectiveSystemUser($server);
                 $this->siteContextUnavailable = ! $this->siteSupportsVmManagedDaemons($siteModel);
             }
