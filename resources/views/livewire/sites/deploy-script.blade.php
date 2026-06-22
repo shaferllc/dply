@@ -107,8 +107,8 @@
                                                 class="shrink-0 rounded-md p-1 text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink">
                                                 <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
                                             </button>
-                                            <button type="button" wire:click="removeStep('{{ $step->id }}')"
-                                                wire:confirm="{{ __('Remove this step from the deploy pipeline?') }}" title="{{ __('Remove step') }}"
+                                            <button type="button" title="{{ __('Remove step') }}"
+                                                x-on:click="$dispatch('confirm-remove-step', { id: '{{ $step->id }}', label: @js($step->pillLabel()) }); $dispatch('open-modal', 'deploy-step-remove-confirm')"
                                                 class="shrink-0 rounded-md p-1 text-brand-moss hover:bg-rose-50 hover:text-rose-600">
                                                 <x-heroicon-m-trash class="h-3.5 w-3.5" />
                                             </button>
@@ -242,6 +242,35 @@
             </div>
         </div>
     </div>
+
+    {{-- Remove-step confirmation — deletes a locked builder/pinned step from the pipeline. --}}
+    <x-modal name="deploy-step-remove-confirm" maxWidth="md" overlayClass="bg-brand-ink/40" focusable>
+        <div x-data="{ stepId: null, stepLabel: '' }"
+            x-on:confirm-remove-step.window="stepId = $event.detail.id; stepLabel = $event.detail.label">
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Remove step') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                            {{ __('Remove') }} <span x-text="stepLabel"></span>{{ __('?') }}
+                        </h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This deletes the step from the deploy pipeline immediately. You can re-add it later from “Insert command”.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <button type="button" x-on:click="$dispatch('close-modal', 'deploy-step-remove-confirm')"
+                    class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
+                <button type="button" x-on:click="$wire.removeStep(stepId); $dispatch('close-modal', 'deploy-step-remove-confirm')"
+                    class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">
+                    <x-heroicon-o-trash class="h-4 w-4" /> {{ __('Remove step') }}
+                </button>
+            </div>
+        </div>
+    </x-modal>
 
     {{-- Preset confirmation — replaces the loaded scripts in the editor (not persisted until Save). --}}
     <x-modal name="deploy-preset-confirm" maxWidth="md" overlayClass="bg-brand-ink/40" focusable>
