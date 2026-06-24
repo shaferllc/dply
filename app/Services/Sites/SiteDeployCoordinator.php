@@ -45,6 +45,29 @@ class SiteDeployCoordinator
     public const SYNC_SELECTION_KEY_PREFIX = 'site-sync-selection:';
 
     /**
+     * Request-scoped {@see status()} snapshots, keyed by site id. The Deploy tab
+     * renders the sidebar ({@see \App\Livewire\Sites\DeployControl}) and the
+     * Deploy page ({@see \App\Livewire\Sites\DeploymentsList}) in one request and
+     * each reads the snapshot, so without this the latest-deployment, in-flight
+     * fixer (console_actions), and sync-peer SELECTs ran twice. The coordinator
+     * is bound `scoped`, so the memo is reset per request/job; the write paths
+     * call {@see forget()} to drop a stale snapshot within the same request.
+     *
+     * @var array<string, DeployStatus>
+     */
+    private array $statusMemo = [];
+
+    /**
+     * Request-scoped in-flight fixer lookups, keyed by site id. {@see inFlightFixer()}
+     * is read directly by both surfaces' mount/refresh paths (not only via
+     * {@see status()}), so the console_actions SELECT ran once per call site
+     * without this. Reset per request/job; {@see forget()} drops it on write.
+     *
+     * @var array<string, ?ConsoleAction>
+     */
+    private array $fixerMemo = [];
+
+    /**
      * Seed the optimistic deploy marker and queue the deploy on a worker. SSH
      * must never block a Livewire/HTTP request, so the clone/build/release run
      * off-request. Refuses (returns false) when a deploy is already in progress
@@ -65,6 +88,7 @@ class SiteDeployCoordinator
             'started_at' => now()->toIso8601String(),
             'deployment_id' => null,
         ], 600);
+        $this->forget($site);
 
         RunSiteDeploymentJob::dispatch(
             $site->fresh() ?? $site,
@@ -112,6 +136,7 @@ class SiteDeployCoordinator
                 'ids' => $queued,
                 'started_at' => now()->toIso8601String(),
             ], 1800);
+            $this->forget($context);
         }
 
         return ['queued' => $queued, 'skipped' => $skipped];
@@ -121,6 +146,7 @@ class SiteDeployCoordinator
     public function clearSyncBatch(Site $context): void
     {
         Cache::forget(self::SYNC_BATCH_KEY_PREFIX.$context->id);
+        $this->forget($context);
     }
 
     /**
@@ -151,16 +177,22 @@ class SiteDeployCoordinator
         ]);
 
         RunSiteFixerJob::dispatch((string) $run->id, (string) $site->id, $key);
+        $this->forget($site);
 
         return $run;
     }
 
-    /** Assemble the one snapshot both surfaces render from. */
+    /** Assemble the one snapshot both surfaces render from (memoized per request). */
     public function status(Site $site): DeployStatus
     {
+        $key = (string) $site->id;
+        if (isset($this->statusMemo[$key])) {
+            return $this->statusMemo[$key];
+        }
+
         $latest = $this->latestDeployment($site);
 
-        return new DeployStatus(
+        return $this->statusMemo[$key] = new DeployStatus(
             latest: $latest,
             inProgress: $this->inProgress($site, $latest),
             lock: $this->deployLockInfo($site),
@@ -169,6 +201,18 @@ class SiteDeployCoordinator
             fixerInFlight: $this->inFlightFixer($site),
             completedFixerKeys: $this->completedFixerKeys($site, $latest),
         );
+    }
+
+    /**
+     * Drop the memoized {@see status()} snapshot for a site so a re-read in the
+     * same request reflects a write (deploy queued, fixer launched, selection
+     * changed). The coordinator is request-scoped, so this only ever clears
+     * within the current request/job.
+     */
+    public function forget(Site $site): void
+    {
+        $key = (string) $site->id;
+        unset($this->statusMemo[$key], $this->fixerMemo[$key]);
     }
 
     public function latestDeployment(Site $site): ?SiteDeployment
@@ -274,6 +318,7 @@ class SiteDeployCoordinator
         ));
 
         Cache::put(self::SYNC_SELECTION_KEY_PREFIX.$context->id, $selection, 1800);
+        $this->forget($context);
 
         return $selection;
     }
@@ -285,7 +330,12 @@ class SiteDeployCoordinator
      */
     public function inFlightFixer(Site $site): ?ConsoleAction
     {
-        return ConsoleAction::query()
+        $key = (string) $site->id;
+        if (array_key_exists($key, $this->fixerMemo)) {
+            return $this->fixerMemo[$key];
+        }
+
+        return $this->fixerMemo[$key] = ConsoleAction::query()
             ->where('subject_type', $site->getMorphClass())
             ->where('subject_id', $site->id)
             ->where('kind', 'site_remediate')

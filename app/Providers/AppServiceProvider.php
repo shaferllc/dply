@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Contracts\AwsLambdaGateway;
 use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
@@ -108,6 +109,7 @@ use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteApacheProvisioner;
 use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\Sites\SiteDeployCoordinator;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
@@ -134,6 +136,8 @@ use App\Modules\Edge\Support\EdgeFilesystemRegistrar;
 use App\Modules\Edge\Support\EdgePlatformCredentials;
 use App\Support\Servers\EnvoyAdminScript;
 use App\Support\Servers\ServerConsoleActionLookup;
+use App\Support\Sites\SiteSyncPeersResolver;
+use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -184,6 +188,30 @@ class AppServiceProvider extends ServiceProvider
         // shared, request-memoized loader collapses those into one query set.
         $this->app->scoped(ServerWebserverSitesProvider::class);
         $this->app->scoped(ServerConsoleActionLookup::class);
+
+        // Scoped: a Deploy-tab render resolves the same site's sync-peer set up to
+        // three times (the sidebar's syncPeers computed + the sidebar's and the
+        // Deploy page's status() snapshots), each firing the sites + servers
+        // SELECT pair. The resolver memoizes the peer set per site on the instance.
+        $this->app->scoped(SiteSyncPeersResolver::class);
+
+        // Scoped: the deploy sidebar and the Deploy page both render in one request
+        // and each reads status(), which fans out to latest-deployment, in-flight
+        // fixer (console_actions), and sync-peer SELECTs. The coordinator memoizes
+        // the snapshot per site so those run once; write paths forget() it.
+        $this->app->scoped(SiteDeployCoordinator::class);
+
+        // Scoped: SitePolicy::update() authorizes the same site as several
+        // distinct model instances in one render (page, deploy sidebar, sync
+        // peers, command palette), each lazy-loading $site->workspace and then
+        // $workspace->organization. Resolving through one shared Workspace
+        // instance per id collapses both PK lookups to a single query.
+        $this->app->scoped(WorkspaceRegistry::class);
+
+        // Scoped: the Deploy sidebar and the Deploy-tab panel both read
+        // pendingFor() on one render, each firing the scheduled_deploys SELECT.
+        // The action memoizes the lookup per site; write paths forget() it.
+        $this->app->scoped(ScheduleSiteDeploy::class);
 
         // Scoped: the contextual docs sidebar renders on EVERY authenticated page
         // and resolves a title/url per published doc (indexEntries), each of which

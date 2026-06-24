@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
+use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
@@ -307,6 +308,12 @@ trait ManagesDatabaseBindings
      */
     private function provisionManagedDatabase(Site $site, Server $server, string $placement, array $params): SiteBinding
     {
+        // BYO serverless vendors (Neon …) aren't co-located with the server —
+        // they take their own credential + region rather than the server's.
+        if (ServerlessDatabaseVendors::isServerless($placement)) {
+            return $this->provisionServerlessDatabase($site, $placement, $params);
+        }
+
         $router = app(DatabaseRouter::class);
         $backend = $router->colocatedBackendFor($server);
         if ($backend === null) {
@@ -405,6 +412,150 @@ trait ManagesDatabaseBindings
             ->where('provider', $provider)
             ->orderBy('created_at')
             ->first();
+    }
+
+    /**
+     * Provision a BYO serverless-vendor database (Neon …) and attach it.
+     * Region-agnostic: takes the vendor's own region + an API key (entered in
+     * the modal or an existing connected credential) rather than the server's.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function provisionServerlessDatabase(Site $site, string $placement, array $params): SiteBinding
+    {
+        $vendor = ServerlessDatabaseVendors::find($placement);
+        if ($vendor === null) {
+            throw new RuntimeException(__('Unknown serverless database vendor.'));
+        }
+
+        $backend = app(DatabaseRouter::class)->backend($placement);
+
+        $engine = strtolower(trim((string) ($params['engine'] ?? 'postgres')));
+        if (! in_array($engine, $backend->supportedEngines(), true)) {
+            throw new InvalidArgumentException(__('That engine is not available on :vendor.', ['vendor' => $vendor['label']]));
+        }
+
+        $name = trim((string) ($params['name'] ?? ''));
+        if ($name === '' || preg_match('/^[a-zA-Z0-9_]+$/', $name) !== 1) {
+            throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
+        }
+
+        $orgId = $site->organization_id;
+        if ($orgId === null) {
+            throw new RuntimeException(__('No organization for this site.'));
+        }
+
+        $region = trim((string) ($params['vendor_region'] ?? ''));
+        if ($region === '') {
+            $region = (string) ($vendor['regions'][0]['value'] ?? '');
+        }
+
+        if (($vendor['account_required'] ?? false) && trim((string) ($params['vendor_account'] ?? '')) === '') {
+            throw new InvalidArgumentException(__('Enter the :label for :vendor.', [
+                'label' => $vendor['account_label'] ?? __('account'),
+                'vendor' => $vendor['label'],
+            ]));
+        }
+
+        $credential = $this->resolveServerlessCredential(
+            $orgId,
+            $vendor['provider'],
+            trim((string) ($params['vendor_api_key'] ?? '')),
+            trim((string) ($params['vendor_account'] ?? '')),
+            $vendor['label'],
+        );
+
+        $database = CloudDatabase::query()->create([
+            'organization_id' => $orgId,
+            'name' => $name,
+            'engine' => $engine,
+            'version' => trim((string) ($params['version'] ?? '')),
+            'size' => 'small',
+            'region' => $region,
+            'backend' => $backend->key(),
+            'provider_credential_id' => $credential->id,
+            'status' => CloudDatabase::STATUS_PROVISIONING,
+            'meta' => ['provisioned_for_site_id' => (string) $site->id, 'serverless' => true],
+        ]);
+
+        $binding = $this->persist($site, 'database', [
+            'mode' => 'provision_new',
+            'status' => SiteBinding::STATUS_PROVISIONING,
+            'name' => $name,
+            'target_type' => 'cloud_database',
+            'target_id' => (string) $database->id,
+            'injected_env' => [],
+            'config' => [
+                'engine' => $engine,
+                'placement' => $placement,
+                'managed' => true,
+                'serverless' => true,
+                'vendor' => $vendor['label'],
+                'region' => $region,
+            ],
+            'last_error' => null,
+        ]);
+
+        ProvisionManagedDatabaseJob::dispatch(
+            (string) $database->id,
+            (string) $binding->id,
+            (string) ($site->server_id ?? ''),
+        );
+
+        return $binding;
+    }
+
+    /**
+     * The provider credential for a serverless vendor: a freshly-entered API
+     * key is saved as a new credential; otherwise reuse an existing connected
+     * one for this org+vendor.
+     */
+    private function resolveServerlessCredential(string $orgId, string $provider, string $apiKey, string $account, string $label): ProviderCredential
+    {
+        if ($apiKey !== '') {
+            return ProviderCredential::query()->create([
+                'organization_id' => $orgId,
+                'user_id' => auth()->id(),
+                'provider' => $provider,
+                'name' => $label,
+                'credentials' => array_filter([
+                    'api_token' => $apiKey,
+                    'account' => $account !== '' ? $account : null,
+                ]),
+            ]);
+        }
+
+        $existing = ProviderCredential::query()
+            ->where('organization_id', $orgId)
+            ->where('provider', $provider)
+            ->orderBy('created_at')
+            ->first();
+
+        if ($existing === null) {
+            throw new RuntimeException(__('Enter a :label API key to connect.', ['label' => $label]));
+        }
+
+        return $existing;
+    }
+
+    /**
+     * Wire a `database` binding to a now-ready ServerDatabase (used by the
+     * dedicated-DB-VM flow once its server finished provisioning). Reuses the
+     * host-aware {@see databaseEnv()} so a co-located DB box is dialed over the
+     * shared private network. Stamps connection_ready_at to drive the
+     * "redeploy to apply" prompt and flips the binding to configured.
+     */
+    public function wireServerDatabaseBinding(SiteBinding $binding, ServerDatabase $db, Site $site): void
+    {
+        $config = $binding->config;
+        $config['connection_ready_at'] = now()->toIso8601String();
+
+        $binding->forceFill([
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'injected_env' => $this->databaseEnv($db, $site),
+            'config' => $config,
+            'last_error' => null,
+        ])->save();
     }
 
     /**

@@ -2,9 +2,11 @@
 
 namespace App\Policies;
 
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Workspaces\WorkspaceRegistry;
 
 class SitePolicy
 {
@@ -37,12 +39,13 @@ class SitePolicy
 
     public function update(User $user, Site $site): bool
     {
-        if ($site->workspace_id && $site->workspace) {
-            if (! $site->workspace->userCanView($user)) {
+        $workspace = app(WorkspaceRegistry::class)->for($site);
+        if ($workspace !== null) {
+            if (! $workspace->userCanView($user)) {
                 return false;
             }
 
-            return $site->workspace->userCanUpdate($user);
+            return $workspace->userCanUpdate($user);
         }
 
         $server = $this->resolveServer($site);
@@ -63,7 +66,7 @@ class SitePolicy
         }
 
         if ($site->organization_id !== null) {
-            return $site->organization->hasAdminAccess($user);
+            return $this->resolveOrganization($user, $site)?->hasAdminAccess($user) ?? false;
         }
 
         return $site->user_id === $user->id;
@@ -82,7 +85,28 @@ class SitePolicy
         return $server !== null
             && $user->can('view', $server)
             && $site->organization_id !== null
-            && $site->organization->hasAdminAccess($user);
+            && ($this->resolveOrganization($user, $site)?->hasAdminAccess($user) ?? false);
+    }
+
+    /**
+     * Resolve a site's organization for an admin check, preferring the user's
+     * already-memoized {@see User::currentOrganization()} when it's the same org
+     * (the common case) so authorizing several site instances in one render
+     * doesn't reload the same `organizations` row each time. Falls back to the
+     * relation for the rare cross-org check.
+     */
+    private function resolveOrganization(User $user, Site $site): ?Organization
+    {
+        if ($site->organization_id === null) {
+            return null;
+        }
+
+        $current = $user->currentOrganization();
+        if ($current !== null && (string) $current->id === (string) $site->organization_id) {
+            return $current;
+        }
+
+        return $site->organization;
     }
 
     private function resolveServer(Site $site): ?Server

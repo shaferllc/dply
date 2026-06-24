@@ -17,43 +17,15 @@ use Illuminate\Support\Collection;
 class SiteSyncPeers
 {
     /**
+     * Resolved through the request-scoped {@see SiteSyncPeersResolver} so the
+     * sites + servers query pair runs once per request, no matter how many
+     * surfaces ask for the same site's peer set in a single render.
+     *
      * @return Collection<int, Site>
      */
     public static function forSite(Site $site): Collection
     {
-        $canonical = self::canonicalRepo((string) $site->git_repository_url);
-
-        return Site::query()
-            ->where('organization_id', $site->organization_id)
-            ->where(function ($w) use ($canonical, $site): void {
-                $w->where('id', $site->id);
-                if ($canonical !== '') {
-                    // Match repo peers by CANONICAL identity (host/owner/repo), so
-                    // the same repository registered under different URL shapes —
-                    // git@github.com:o/r.git vs https://github.com/o/r — still syncs
-                    // together. Two sites of one app split across servers (e.g. an
-                    // app box + a worker box) were silently NOT grouped whenever
-                    // their URLs differed by protocol or a trailing .git, which hid
-                    // the "Sync / deploy both" button. The DB narrows on the
-                    // owner/repo tail (case-insensitive); canonicalRepo() in the
-                    // filter below is the exact gate, so the LIKE only ever
-                    // over-includes (never drops a true peer).
-                    $tail = self::repoTail($canonical);
-                    if ($tail !== '') {
-                        $w->orWhereRaw('lower(git_repository_url) like ?', ['%'.$tail.'%']);
-                    }
-                } else {
-                    // No repo set → fall back to server-mates (legacy behaviour).
-                    $w->orWhere('server_id', $site->server_id);
-                }
-            })
-            ->with('server')
-            ->orderBy('name')
-            ->get()
-            ->filter(fn (Site $s): bool => $s->id === $site->id
-                || $canonical === ''
-                || self::canonicalRepo((string) $s->git_repository_url) === $canonical)
-            ->values();
+        return app(SiteSyncPeersResolver::class)->forSite($site);
     }
 
     /**
@@ -83,7 +55,7 @@ class SiteSyncPeers
     }
 
     /** Last two path segments (owner/repo) of a canonical repo, for a DB narrow. */
-    private static function repoTail(string $canonical): string
+    public static function repoTail(string $canonical): string
     {
         $parts = array_values(array_filter(explode('/', $canonical), static fn ($p): bool => $p !== ''));
         $count = count($parts);

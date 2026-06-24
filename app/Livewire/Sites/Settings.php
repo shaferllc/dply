@@ -311,7 +311,7 @@ class Settings extends Show
         $section = $this->section;
 
         $this->site->loadMissing($this->relationsForSettingsSection($section));
-        $this->server->loadMissing('workspace');
+        $this->hydrateServerWorkspace();
 
         $org = $this->site->organization;
         $needsDeploymentSurface = $this->sectionNeedsDeploymentSurface($section);

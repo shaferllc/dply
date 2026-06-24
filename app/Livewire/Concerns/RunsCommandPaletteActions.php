@@ -10,6 +10,7 @@ use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -136,29 +137,19 @@ trait RunsCommandPaletteActions
 
     /**
      * Sites that deploy *with* the given one — itself plus any peers sharing its
-     * git repository (or, for repo-less sites, its server). This is the same
-     * grouping the Deployments "Sync deploy" panel uses; filtered to peers the
+     * git repository (or, for repo-less sites, its server), filtered to peers the
      * operator may deploy so the palette never offers an unactionable row.
+     *
+     * Resolved through the shared {@see SiteSyncPeers} grouping the Deployments
+     * "Sync deploy" panel uses — one source of truth (canonical repo matching),
+     * and request-memoized so this shares the sidebar's peer + server lookups
+     * instead of re-querying them.
      *
      * @return Collection<int, Site>
      */
     private function deploySyncPeers(Site $site): Collection
     {
-        $repo = trim((string) $site->git_repository_url);
-
-        return Site::query()
-            ->where('organization_id', $site->organization_id)
-            ->where(function ($where) use ($repo, $site): void {
-                $where->where('id', $site->id);
-                if ($repo !== '') {
-                    $where->orWhere('git_repository_url', $repo);
-                } else {
-                    $where->orWhere('server_id', $site->server_id);
-                }
-            })
-            ->with('server')
-            ->orderBy('name')
-            ->get()
+        return SiteSyncPeers::forSite($site)
             ->filter(fn (Site $peer): bool => Gate::allows('update', $peer))
             ->values();
     }

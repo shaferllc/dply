@@ -137,9 +137,17 @@ class ProvisionManagedDatabaseJob implements ShouldQueue
     {
         $prefix = (string) (($binding->config['env_prefix'] ?? '') ?: $database->defaultEnvPrefix());
 
+        // Stamp when the connection became available so the resource map can
+        // tell whether the site has been deployed SINCE (binding env applies at
+        // deploy time) — drives the "redeploy to apply" prompt without nagging
+        // once a deploy has actually picked the vars up.
+        $config = $binding->config;
+        $config['connection_ready_at'] = now()->toIso8601String();
+
         $binding->forceFill([
             'status' => SiteBinding::STATUS_CONFIGURED,
             'injected_env' => $database->connectionEnvVars($prefix),
+            'config' => $config,
             'last_error' => null,
         ])->save();
 

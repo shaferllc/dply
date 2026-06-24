@@ -17,14 +17,35 @@ use Illuminate\Support\Carbon;
  */
 class ScheduleSiteDeploy
 {
+    /**
+     * Request-scoped pending-deploy lookups, keyed by site id. The Deploy sidebar
+     * and the Deploy-tab panel both read {@see pendingFor()} on one render, so the
+     * scheduled_deploys SELECT ran once per surface. Bound `scoped`, reset per
+     * request/job; the write paths {@see forget()} the memo.
+     *
+     * @var array<string, ?ScheduledDeploy>
+     */
+    private array $pendingMemo = [];
+
     /** The site's pending delayed deploy, if any. */
     public function pendingFor(Site $site): ?ScheduledDeploy
     {
-        return ScheduledDeploy::query()
+        $key = (string) $site->id;
+        if (array_key_exists($key, $this->pendingMemo)) {
+            return $this->pendingMemo[$key];
+        }
+
+        return $this->pendingMemo[$key] = ScheduledDeploy::query()
             ->where('site_id', $site->id)
             ->pending()
             ->orderByDesc('run_at')
             ->first();
+    }
+
+    /** Drop the memoized pending-deploy snapshot so a re-read reflects a write. */
+    public function forget(Site $site): void
+    {
+        unset($this->pendingMemo[(string) $site->id]);
     }
 
     /**
@@ -45,17 +66,21 @@ class ScheduleSiteDeploy
             ->pending()
             ->each(fn (ScheduledDeploy $d) => $d->cancel());
 
-        return ScheduledDeploy::create([
+        $created = ScheduledDeploy::create([
             'site_id' => $site->id,
             'user_id' => $userId,
             'run_at' => $runAt,
             'status' => ScheduledDeploy::STATUS_PENDING,
         ]);
+        $this->forget($site);
+
+        return $created;
     }
 
     public function cancelPending(Site $site): void
     {
         $this->pendingFor($site)?->cancel();
+        $this->forget($site);
     }
 
     /** Resolve a schedule request into an absolute future time, or null. */

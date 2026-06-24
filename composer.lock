@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "95cfcc6eb8c318d1c1f36380eb125d1e",
+    "content-hash": "ead14844d4442f1d5746da18a5afa6dd",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -1154,7 +1154,7 @@
         },
         {
             "name": "dply/log-parser",
-            "version": "dev-main",
+            "version": "dev-feat/unified-database-provisioning",
             "dist": {
                 "type": "path",
                 "url": "packages/log-parser",
@@ -1198,7 +1198,7 @@
         },
         {
             "name": "dply/nginx-config",
-            "version": "dev-main",
+            "version": "dev-feat/unified-database-provisioning",
             "dist": {
                 "type": "path",
                 "url": "packages/nginx-config",
@@ -3997,16 +3997,16 @@
         },
         {
             "name": "lookout/tracing",
-            "version": "1.3.1",
+            "version": "2.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/shaferllc/lookout-tracing.git",
-                "reference": "daa85b59e06b1783f0d134c91f19c5f7419d272d"
+                "reference": "774c40cdd7d170b51eb1d9e7dc12b034a78de87e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/shaferllc/lookout-tracing/zipball/daa85b59e06b1783f0d134c91f19c5f7419d272d",
-                "reference": "daa85b59e06b1783f0d134c91f19c5f7419d272d",
+                "url": "https://api.github.com/repos/shaferllc/lookout-tracing/zipball/774c40cdd7d170b51eb1d9e7dc12b034a78de87e",
+                "reference": "774c40cdd7d170b51eb1d9e7dc12b034a78de87e",
                 "shasum": ""
             },
             "require": {
@@ -4045,7 +4045,8 @@
                     "src/logging.php",
                     "src/metrics.php",
                     "src/profiling.php",
-                    "src/feedback.php"
+                    "src/feedback.php",
+                    "src/dumping.php"
                 ],
                 "psr-4": {
                     "Lookout\\Tracing\\": "src/"
@@ -4058,9 +4059,9 @@
             "description": "Distributed tracing, sampled performance spans (limits, Laravel collectors), optional browser RUM beacons, breadcrumbs, structured logs and custom metrics ingest, exception reporting with enrichment pipeline, cron check-ins, and profiling ingest for Lookout.",
             "support": {
                 "issues": "https://github.com/shaferllc/lookout-tracing/issues",
-                "source": "https://github.com/shaferllc/lookout-tracing/tree/v1.3.1"
+                "source": "https://github.com/shaferllc/lookout-tracing/tree/v2.5.0"
             },
-            "time": "2026-06-22T14:49:28+00:00"
+            "time": "2026-06-24T15:57:51+00:00"
         },
         {
             "name": "lorisleiva/cron-translator",

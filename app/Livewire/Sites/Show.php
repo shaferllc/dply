@@ -264,6 +264,28 @@ class Show extends Component
         return $this->site->shouldShowPhpOctaneRolloutSettings();
     }
 
+    /**
+     * Load the server's workspace (header/breadcrumb) but reuse the row the site
+     * just loaded when both share it — the common case — so the render doesn't
+     * fire a second identical `workspaces` PK lookup. Call only after the site's
+     * own `workspace` relation has been loaded.
+     */
+    protected function hydrateServerWorkspace(): void
+    {
+        if (
+            $this->server->workspace_id !== null
+            && $this->site->relationLoaded('workspace')
+            && $this->site->workspace !== null
+            && (string) $this->server->workspace_id === (string) $this->site->workspace_id
+        ) {
+            $this->server->setRelation('workspace', $this->site->workspace);
+
+            return;
+        }
+
+        $this->server->loadMissing('workspace');
+    }
+
     public function render(): View
     {
         $this->resolveWatchedConsoleAction();
@@ -295,7 +317,7 @@ class Show extends Component
         }
 
         $this->site->load($relations);
-        $this->server->loadMissing('workspace');
+        $this->hydrateServerWorkspace();
 
         $openSiteInsightsCount = InsightFinding::query()
             ->where('site_id', $this->site->id)
