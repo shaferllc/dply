@@ -373,21 +373,86 @@
 
                 </div>
             @elseif ($bindingModalType === 'database' && $bindingModalMode === 'provision')
-                <div class="grid gap-4 sm:grid-cols-2">
+                @php($dbPlacements = $this->databasePlacements())
+                @php($dbManagedAvailable = (bool) (collect($dbPlacements)->firstWhere('key', 'do_managed')['available'] ?? false))
+                <div
+                    x-data="{
+                        engine: $wire.entangle('bindingForm.engine'),
+                        placement: $wire.entangle('bindingForm.placement'),
+                        placements: @js(collect($dbPlacements)->mapWithKeys(fn ($p) => [$p['key'] => ['engines' => $p['engines'], 'available' => $p['available']]])),
+                        validFor(eng) {
+                            return Object.keys(this.placements).filter((k) => this.placements[k].engines.includes(eng) && this.placements[k].available);
+                        },
+                    }"
+                    x-effect="
+                        const valid = validFor(engine);
+                        if (valid.length && !valid.includes(placement)) { placement = valid[0]; }
+                    "
+                    class="space-y-4"
+                >
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-input-label for="binding_db_engine" :value="__('Engine')" />
+                            <select id="binding_db_engine" x-model="engine" class="dply-input">
+                                <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
+                                <option value="postgres">{{ __('PostgreSQL') }}</option>
+                                {{-- Redis as a `database` binding only makes sense on a managed
+                                     cluster; on-box Redis is attached via the Redis resource. Hide
+                                     it when no managed backend is available so there's no dead-end. --}}
+                                @if ($dbManagedAvailable)
+                                    <option value="redis">{{ __('Redis') }}</option>
+                                @endif
+                                <option value="sqlite">{{ __('SQLite') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <x-input-label for="binding_db_name" :value="__('Database name')" />
+                            <x-text-input id="binding_db_name" wire:model="bindingForm.name" class="mt-1 block w-full font-mono text-sm" placeholder="app_production" />
+                        </div>
+                    </div>
+
+                    {{-- Placement: where the database lives. Cards filter to the backends
+                         that support the chosen engine; an unavailable managed card (no
+                         connected provider credential) is shown disabled with a hint. --}}
                     <div>
-                        <x-input-label for="binding_db_engine" :value="__('Engine')" />
-                        <select id="binding_db_engine" wire:model="bindingForm.engine" class="dply-input">
-                            <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
-                            <option value="postgres">{{ __('PostgreSQL') }}</option>
-                            <option value="sqlite">{{ __('SQLite') }}</option>
+                        <x-input-label :value="__('Where should it live?')" />
+                        <div class="mt-2 space-y-2">
+                            @foreach ($dbPlacements as $p)
+                                <label
+                                    x-show="@js($p['engines']).includes(engine)"
+                                    @class([
+                                        'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
+                                        'border-brand-ink/15 hover:border-brand-ink/30' => $p['available'],
+                                        'cursor-not-allowed border-brand-ink/10 opacity-60' => ! $p['available'],
+                                    ])
+                                    :class="placement === '{{ $p['key'] }}' ? 'border-brand-ink ring-1 ring-brand-ink bg-brand-sand/30' : ''"
+                                >
+                                    <input type="radio" x-model="placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                        <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
+                                        @if ($p['note'])
+                                            <span class="mt-0.5 block text-xs font-medium text-amber-700">{{ $p['note'] }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Managed clusters are sized; on-box databases just share the host. --}}
+                    <div x-show="placement === 'do_managed'" x-cloak>
+                        <x-input-label for="binding_db_size" :value="__('Cluster size')" />
+                        <select id="binding_db_size" wire:model="bindingForm.size" class="dply-input">
+                            <option value="small">{{ __('Small — 1 vCPU / 1 GB · ~$15/mo') }}</option>
+                            <option value="medium">{{ __('Medium — 1 vCPU / 2 GB · ~$30/mo') }}</option>
+                            <option value="large">{{ __('Large — 2 vCPU / 4 GB · ~$60/mo') }}</option>
                         </select>
                     </div>
-                    <div>
-                        <x-input-label for="binding_db_name" :value="__('Database name')" />
-                        <x-text-input id="binding_db_name" wire:model="bindingForm.name" class="mt-1 block w-full font-mono text-sm" placeholder="app_production" />
-                    </div>
+
+                    <p class="text-xs text-brand-moss" x-show="placement !== 'do_managed'">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="placement === 'do_managed'" x-cloak>{{ __('Provisions an isolated managed cluster co-located with this server, locks it to your server\'s network, and injects the connection variables once it\'s online (a few minutes). Redeploy to apply.') }}</p>
                 </div>
-                <p class="text-xs text-brand-moss">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
             @elseif ($bindingModalType === 'queue')
                 <div>
                     <x-input-label for="binding_queue_driver" :value="__('Queue driver')" />

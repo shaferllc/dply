@@ -67,6 +67,9 @@ class DigitalOceanService
         if ($method === 'post') {
             return $request->post($url, $bodyOrQuery);
         }
+        if ($method === 'put') {
+            return $request->put($url, $bodyOrQuery);
+        }
         if ($method === 'delete') {
             return $request->delete($url);
         }

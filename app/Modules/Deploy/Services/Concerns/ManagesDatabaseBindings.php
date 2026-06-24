@@ -6,10 +6,15 @@ namespace App\Modules\Deploy\Services\Concerns;
 
 use App\Jobs\CreateSiteDatabaseJob;
 use App\Jobs\EnsureSitePhpDatabaseDriverJob;
+use App\Models\CloudDatabase;
+use App\Models\ProviderCredential;
+use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Database\Backends\DatabaseRouter;
+use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
@@ -201,6 +206,15 @@ trait ManagesDatabaseBindings
             throw new RuntimeException(__('This site has no server to provision a database on.'));
         }
 
+        // Placement decides where the database lives. `on_box` (default) creates
+        // it on the site's own server; `do_managed` (and future co-located
+        // backends) provision an isolated managed cluster and attach it. Both
+        // resolve to the same `database` SiteBinding — only the target differs.
+        $placement = strtolower(trim((string) ($params['placement'] ?? 'on_box')));
+        if ($placement !== '' && $placement !== 'on_box') {
+            return $this->provisionManagedDatabase($site, $server, $placement, $params);
+        }
+
         $engine = strtolower(trim((string) ($params['engine'] ?? 'mysql')));
         if (! in_array($engine, ['mysql', 'postgres', 'sqlite'], true)) {
             throw new InvalidArgumentException(__('Unsupported database engine.'));
@@ -278,6 +292,119 @@ trait ManagesDatabaseBindings
         );
 
         return $binding;
+    }
+
+    /**
+     * Provision a co-located managed-database cluster (DigitalOcean Managed
+     * Databases today) and attach it to the site via a `database` binding.
+     *
+     * The cluster takes minutes to come online, so we create the CloudDatabase
+     * row + a PROVISIONING binding now and hand the slow work to
+     * {@see ProvisionManagedDatabaseJob}, which fills in the connection vars and
+     * flips the binding to configured once the provider reports online.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function provisionManagedDatabase(Site $site, Server $server, string $placement, array $params): SiteBinding
+    {
+        $router = app(DatabaseRouter::class);
+        $backend = $router->colocatedBackendFor($server);
+        if ($backend === null) {
+            throw new RuntimeException(__('This server\'s provider has no managed database option.'));
+        }
+
+        $engine = strtolower(trim((string) ($params['engine'] ?? 'postgres')));
+        if (! in_array($engine, $backend->supportedEngines(), true)) {
+            throw new InvalidArgumentException(__('That engine is not available as a managed database here.'));
+        }
+
+        $name = trim((string) ($params['name'] ?? ''));
+        if ($name === '' || preg_match('/^[a-zA-Z0-9_]+$/', $name) !== 1) {
+            throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
+        }
+
+        $region = $backend->regionForServer($server);
+        if ($region === null) {
+            throw new RuntimeException(__('Could not determine a managed database region for this server.'));
+        }
+
+        $credential = $this->resolveManagedDatabaseCredential($site, $server);
+        if ($credential === null) {
+            throw new RuntimeException(__('No :provider credential is connected for this server.', [
+                'provider' => $server->provider->label(),
+            ]));
+        }
+
+        $size = strtolower(trim((string) ($params['size'] ?? 'small')));
+        if (! array_key_exists($size, CloudDatabase::SIZE_TIERS)) {
+            $size = 'small';
+        }
+
+        $database = CloudDatabase::query()->create([
+            'organization_id' => $site->organization_id,
+            'name' => $name,
+            'engine' => $engine,
+            'version' => trim((string) ($params['version'] ?? '')),
+            'size' => $size,
+            'region' => $region,
+            'backend' => $backend->key(),
+            'provider_credential_id' => $credential->id,
+            'status' => CloudDatabase::STATUS_PROVISIONING,
+            'meta' => ['provisioned_for_site_id' => (string) $site->id],
+        ]);
+
+        // The connection vars aren't known until the cluster is online, so the
+        // binding starts with an empty injected_env; the job fills it in.
+        $binding = $this->persist($site, 'database', [
+            'mode' => 'provision_new',
+            'status' => SiteBinding::STATUS_PROVISIONING,
+            'name' => $name,
+            'target_type' => 'cloud_database',
+            'target_id' => (string) $database->id,
+            'injected_env' => [],
+            'config' => array_filter([
+                'engine' => $engine,
+                'placement' => $placement,
+                'managed' => true,
+                'region' => $region,
+                'size' => $size,
+            ], fn ($v) => $v !== null),
+            'last_error' => null,
+        ]);
+
+        ProvisionManagedDatabaseJob::dispatch(
+            (string) $database->id,
+            (string) $binding->id,
+            (string) $server->id,
+        );
+
+        return $binding;
+    }
+
+    /**
+     * The provider credential a managed database for this server should bill
+     * to — mirroring how the server itself was created. A customer-connected
+     * server uses its own credential (the DB lands on their account); we fall
+     * back to any same-provider credential in the org.
+     */
+    private function resolveManagedDatabaseCredential(Site $site, Server $server): ?ProviderCredential
+    {
+        $server->loadMissing('providerCredential');
+        if ($server->providerCredential !== null) {
+            return $server->providerCredential;
+        }
+
+        $provider = $server->provider->value;
+        $orgId = $site->organization_id ?? $server->organization_id;
+        if ($orgId === null) {
+            return null;
+        }
+
+        return ProviderCredential::query()
+            ->where('organization_id', $orgId)
+            ->where('provider', $provider)
+            ->orderBy('created_at')
+            ->first();
     }
 
     /**
