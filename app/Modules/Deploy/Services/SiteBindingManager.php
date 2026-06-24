@@ -157,6 +157,10 @@ class SiteBindingManager
         $binding = match ($type) {
             'database' => $this->provisionDatabase($site, $params),
             'storage' => $this->provisionBucket($site, $params),
+            // Error tracking provisions only for Lookout (creates a project on
+            // uselookout.app); every other provider has nothing to spin up and
+            // falls back to attach inside provisionErrorTracking.
+            'error_tracking' => $this->provisionErrorTracking($site, $params),
             // Redis/queue/cache/scheduler/workers have no separate resource to
             // spin up beyond what attach already wires, so provision falls back
             // to the attach path for v1 (which already adopts).
@@ -293,6 +297,11 @@ class SiteBindingManager
             'error_tracking' => [
                 'SENTRY_LARAVEL_DSN', 'SENTRY_TRACES_SAMPLE_RATE',
                 'BUGSNAG_API_KEY', 'FLARE_KEY',
+                // Lookout owns its DSN + quick-start flag, plus the split-form
+                // keys the SDK also accepts, so switching providers clears them.
+                'LOOKOUT_DSN', 'LOOKOUT_LARAVEL',
+                'LOOKOUT_INGEST_URL', 'LOOKOUT_PROJECT_API_KEY',
+                'LOOKOUT_BASE_URI', 'LOOKOUT_API_KEY',
             ],
             // AI owns every provider's key namespace, so switching providers
             // clears the previous provider's loose key.

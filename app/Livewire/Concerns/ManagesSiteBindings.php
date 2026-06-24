@@ -83,5 +83,13 @@ trait ManagesSiteBindings
     /** Recipient for the mail binding's "send test email" action. */
     public string $mailTestRecipient = '';
 
+    /**
+     * Organizations resolved from a pasted Lookout API token, so the Lookout
+     * provision form can offer a picker instead of a raw ULID. Empty until the
+     * operator loads them (falls back to a free-text organization id).
+     *
+     * @var list<array{id: string, name: string}>
+     */
+    public array $lookoutOrganizations = [];
 
 }

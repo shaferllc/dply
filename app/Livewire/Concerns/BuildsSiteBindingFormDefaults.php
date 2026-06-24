@@ -378,6 +378,13 @@ trait BuildsSiteBindingFormDefaults
             'api_key' => '',
             // Flare
             'key' => '',
+            // Lookout: a sub-mode toggle inside the (single-mode) error-tracking
+            // form. 'provision' mints a project from a token + org; 'attach'
+            // pastes an existing DSN. project_name defaults to the site name.
+            'lookout_mode' => 'provision',
+            'lookout_token' => '',
+            'lookout_org' => '',
+            'project_name' => (string) ($this->site->name ?: $this->site->slug ?: ''),
             // Saved-credential reuse + save-for-reuse.
             'credential_id' => '',
             'save_credential' => false,

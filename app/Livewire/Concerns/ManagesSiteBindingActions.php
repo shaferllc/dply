@@ -307,8 +307,17 @@ trait ManagesSiteBindingActions
         // can update that row instead of rejecting it as a duplicate disk name.
         $params = $this->bindingForm + ['binding_id' => $this->bindingModalBindingId];
 
+        // Error tracking is a single-mode ("Configure") form, but Lookout offers
+        // an in-form toggle between minting a project (provision) and pasting a
+        // DSN (attach). Route on that sub-mode rather than the modal's mode.
+        $useProvision = $this->bindingModalMode === 'provision';
+        if ($this->bindingModalType === 'error_tracking'
+            && ($this->bindingForm['provider'] ?? '') === 'lookout') {
+            $useProvision = (($this->bindingForm['lookout_mode'] ?? 'provision') === 'provision');
+        }
+
         try {
-            $binding = $this->bindingModalMode === 'provision'
+            $binding = $useProvision
                 ? $manager->provisionNew($this->site, $this->bindingModalType, $params)
                 : $manager->attachExisting($this->site, $this->bindingModalType, $params);
         } catch (\Throwable $e) {
@@ -349,6 +358,16 @@ trait ManagesSiteBindingActions
         if ($binding->type === 'redis' && method_exists($this, 'ensurePhpRedisExtension')) {
             $this->ensurePhpRedisExtension($binding);
         }
+
+        // Connecting Lookout must "just work": the injected LOOKOUT_DSN only does
+        // anything if the app requires the lookout/tracing SDK. dply can't edit
+        // the app's composer.json, so add the dependency on the box now (no-op
+        // when already present) — the next deploy's composer install picks it up.
+        if ($binding->type === 'error_tracking'
+            && (((array) $binding->config)['provider'] ?? '') === 'lookout'
+            && method_exists($this, 'ensureComposerPackage')) {
+            $this->ensureComposerPackage($binding, 'lookout/tracing');
+        }
     }
 
     /**
@@ -386,6 +405,39 @@ trait ManagesSiteBindingActions
         $this->installCacheOnServer('redis');
 
         return true;
+    }
+
+    /**
+     * Resolve the Lookout organizations a pasted API token can create projects
+     * under, so the provision form can show a picker instead of a raw ULID.
+     * Best-effort: a bad token or older Lookout just leaves the list empty and
+     * the operator types the org id by hand. Preselects the only org when there
+     * is exactly one.
+     */
+    public function loadLookoutOrganizations(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $token = trim((string) ($this->bindingForm['lookout_token'] ?? ''));
+        if ($token === '') {
+            $this->lookoutOrganizations = [];
+            $this->toastError(__('Paste your Lookout API token first.'));
+
+            return;
+        }
+
+        $orgs = app(\App\Modules\Deploy\Services\LookoutProvisioner::class)->organizations($token);
+        $this->lookoutOrganizations = $orgs;
+
+        if ($orgs === []) {
+            $this->toastError(__('Could not load organizations — check the token, or enter the organization ID manually.'));
+
+            return;
+        }
+
+        if (count($orgs) === 1) {
+            $this->bindingForm['lookout_org'] = $orgs[0]['id'];
+        }
     }
 
     public function detachBinding(string $bindingId, SiteBindingManager $manager): void
@@ -686,9 +738,16 @@ trait ManagesSiteBindingActions
 
         if ($this->bindingModalType === 'error_tracking') {
             if ($key === 'provider') {
-                foreach (['credential_id', 'dsn', 'traces_sample_rate', 'api_key', 'key'] as $f) {
+                foreach (['credential_id', 'dsn', 'traces_sample_rate', 'api_key', 'key', 'lookout_token', 'lookout_org'] as $f) {
                     $this->bindingForm[$f] = '';
                 }
+                $this->lookoutOrganizations = [];
+            }
+
+            // A new token invalidates any orgs loaded for the previous one.
+            if ($key === 'lookout_token') {
+                $this->lookoutOrganizations = [];
+                $this->bindingForm['lookout_org'] = '';
             }
 
             if ($key === 'credential_id' && is_string($value) && $value !== '') {
@@ -705,6 +764,10 @@ trait ManagesSiteBindingActions
                     $this->bindingForm['traces_sample_rate'] = (string) ($credentials['traces_sample_rate'] ?? '');
                     $this->bindingForm['api_key'] = (string) ($credentials['api_key'] ?? '');
                     $this->bindingForm['key'] = (string) ($credentials['key'] ?? '');
+                    // A saved Lookout credential is the API token (+ its org), not
+                    // a DSN — reusing it lets a new site mint its own project.
+                    $this->bindingForm['lookout_token'] = (string) ($credentials['token'] ?? '');
+                    $this->bindingForm['lookout_org'] = (string) ($credentials['organization_id'] ?? '');
                 }
             }
 

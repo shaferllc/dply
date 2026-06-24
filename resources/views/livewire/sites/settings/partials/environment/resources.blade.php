@@ -768,11 +768,84 @@
                             <option value="sentry">{{ __('Sentry') }}</option>
                             <option value="bugsnag">{{ __('Bugsnag') }}</option>
                             <option value="flare">{{ __('Flare') }}</option>
+                            <option value="lookout">{{ __('Lookout') }}</option>
                         </select>
                     </div>
-                    @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
+
+                    @if ($etProvider === 'lookout')
+                        @php
+                            $lkMode = (string) ($bindingForm['lookout_mode'] ?? 'provision');
+                            $lkManaged = config('services.lookout.account_model') === 'managed';
+                        @endphp
+                        <div class="flex gap-2">
+                            <button type="button" wire:click="$set('bindingForm.lookout_mode', 'provision')"
+                                class="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition {{ $lkMode === 'provision' ? 'border-brand-sage bg-brand-sage/10 text-brand-pine' : 'border-brand-mist text-brand-moss hover:border-brand-sage/60' }}">
+                                {{ __('Create a project') }}
+                            </button>
+                            <button type="button" wire:click="$set('bindingForm.lookout_mode', 'attach')"
+                                class="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition {{ $lkMode === 'attach' ? 'border-brand-sage bg-brand-sage/10 text-brand-pine' : 'border-brand-mist text-brand-moss hover:border-brand-sage/60' }}">
+                                {{ __('Use an existing DSN') }}
+                            </button>
+                        </div>
+
+                        @if ($lkMode === 'provision')
+                            @if ($lkManaged)
+                                <div class="rounded-lg border border-brand-sage/40 bg-brand-sage/5 px-4 py-3 text-xs text-brand-pine">
+                                    {{ __('dply manages the Lookout account — just name the project and we create it for you.') }}
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_lk_name" :value="__('Project name')" />
+                                    <x-text-input id="binding_lk_name" wire:model="bindingForm.project_name" class="w-full" />
+                                </div>
+                            @else
+                                <div>
+                                    <x-input-label for="binding_lk_token" :value="__('Lookout API token')" />
+                                    <x-text-input id="binding_lk_token" type="password" wire:model="bindingForm.lookout_token" class="w-full" placeholder="lk_…" autocomplete="off" />
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('From uselookout.app → Settings → API tokens. Stored encrypted and reused across sites in this organization.') }}</p>
+                                </div>
+                                <div>
+                                    <div class="flex items-end justify-between gap-2">
+                                        <x-input-label for="binding_lk_org" :value="__('Lookout organization')" />
+                                        <button type="button" wire:click="loadLookoutOrganizations" wire:target="loadLookoutOrganizations" wire:loading.attr="disabled"
+                                            class="text-xs font-semibold text-brand-sage hover:text-brand-pine disabled:opacity-50">
+                                            <span wire:loading.remove wire:target="loadLookoutOrganizations">{{ __('Load my organizations') }}</span>
+                                            <span wire:loading wire:target="loadLookoutOrganizations">{{ __('Loading…') }}</span>
+                                        </button>
+                                    </div>
+                                    @if (count($lookoutOrganizations) > 0)
+                                        <select id="binding_lk_org" wire:model="bindingForm.lookout_org" class="dply-input">
+                                            <option value="">{{ __('Select an organization…') }}</option>
+                                            @foreach ($lookoutOrganizations as $lkOrg)
+                                                <option value="{{ $lkOrg['id'] }}">{{ $lkOrg['name'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <x-text-input id="binding_lk_org" wire:model="bindingForm.lookout_org" class="w-full" placeholder="01J…" autocomplete="off" />
+                                        <p class="mt-1 text-xs text-brand-moss">{{ __('Enter the organization ID, or load them from your token above.') }}</p>
+                                    @endif
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_lk_name" :value="__('Project name')" />
+                                    <x-text-input id="binding_lk_name" wire:model="bindingForm.project_name" class="w-full" />
+                                </div>
+                            @endif
+                        @else
+                            <div>
+                                <x-input-label for="binding_lk_dsn" :value="__('Lookout DSN')" />
+                                <x-text-input id="binding_lk_dsn" wire:model="bindingForm.dsn" class="w-full" placeholder="https://&lt;key&gt;&#64;uselookout.app" autocomplete="off" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Paste the ingest DSN from an existing Lookout project.') }}</p>
+                            </div>
+                        @endif
+                    @else
+                        @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
+                    @endif
+
                     @php $etPackage = \App\Modules\Deploy\Services\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
-                    @if ($etPackage)
+                    @if ($etProvider === 'lookout')
+                        <div class="rounded-lg border border-brand-sage/40 bg-brand-sage/5 px-4 py-3 text-xs text-brand-pine">
+                            {{ __('dply runs') }} <code class="font-mono font-semibold">composer require lookout/tracing</code> {{ __('on the server for you, then injects LOOKOUT_DSN at deploy.') }}
+                        </div>
+                    @elseif ($etPackage)
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                             {{ __('Requires the') }} <code class="font-mono font-semibold">{{ $etPackage }}</code> {{ __('package. Add it to your') }} <code class="font-mono font-semibold">composer.json</code> {{ __('before deploying.') }}
                         </div>
@@ -784,6 +857,8 @@
                             {{ __('Injects BUGSNAG_API_KEY at deploy.') }}
                         @elseif ($etProvider === 'flare')
                             {{ __('Injects FLARE_KEY at deploy. Flare ships with Laravel via spatie/laravel-ignition.') }}
+                        @elseif ($etProvider === 'lookout')
+                            {{ __('Injects LOOKOUT_DSN + LOOKOUT_LARAVEL=true so the app reports errors, traces and logs to Lookout.') }}
                         @endif
                     </p>
                 </div>

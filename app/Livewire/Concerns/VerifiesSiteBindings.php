@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Jobs\EnsureSiteComposerPackageJob;
 use App\Jobs\EnsureSitePhpRedisExtensionJob;
 use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\SwitchCacheServiceJob;
@@ -114,6 +115,35 @@ trait VerifiesSiteBindings
             $run,
             __('The PHP Redis extension is installed — Redis is ready to use.'),
             __('Could not install the PHP Redis extension — the app may fail with Class "Redis" not found.'),
+        );
+    }
+
+    /**
+     * After a binding whose SDK ships as a Composer package is connected, make
+     * sure the deployed app actually requires it — otherwise the injected env
+     * (e.g. LOOKOUT_DSN) sits inert because the SDK never loads. Runs as its own
+     * console-action so the operator sees the `composer require` in the page-top
+     * banner; SSH-capable hosts only. No-ops when the package is already present.
+     */
+    private function ensureComposerPackage(SiteBinding $binding, string $package): void
+    {
+        if ($this->site->server?->hostCapabilities()->supportsSsh() !== true) {
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('site_remediate', __('Installing :package', ['package' => $package]));
+
+        EnsureSiteComposerPackageJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            $package,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __(':package is installed — it ships on the next deploy.', ['package' => $package]),
+            __('Could not install :package — add it to the app manually so the SDK loads.', ['package' => $package]),
         );
     }
 

@@ -7,19 +7,25 @@ namespace App\Modules\Deploy\Services\Concerns;
 use App\Models\ErrorTrackingCredential;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Deploy\Services\LookoutProvisioner;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
- * Attach the `error_tracking` binding type (Sentry / Bugsnag / Flare). Like
- * logging this is a config binding (no provisioned resource): it injects the
- * provider's DSN/key env at deploy. The secret comes from a saved
- * {@see ErrorTrackingCredential} or the typed form.
+ * Attach the `error_tracking` binding type (Sentry / Bugsnag / Flare / Lookout).
+ * Like logging this is a config binding: it injects the provider's DSN/key env
+ * at deploy. The secret comes from a saved {@see ErrorTrackingCredential} or the
+ * typed form.
+ *
+ * Lookout is special: as well as "attach an existing DSN" it supports a
+ * one-click *provision* path ({@see provisionLookout()}) that creates the
+ * project on uselookout.app via {@see LookoutProvisioner} and injects the
+ * returned DSN — no DSN to paste.
  */
 trait ManagesErrorTrackingBindings
 {
     /** Supported error-tracking providers. */
-    public const ERROR_TRACKING_PROVIDERS = ['sentry', 'bugsnag', 'flare'];
+    public const ERROR_TRACKING_PROVIDERS = ['sentry', 'bugsnag', 'flare', 'lookout'];
 
     /**
      * Providers whose SDK ships as a separate Composer package the app must
@@ -34,6 +40,7 @@ trait ManagesErrorTrackingBindings
     public const ERROR_TRACKING_PACKAGES = [
         'sentry' => 'sentry/sentry-laravel',
         'bugsnag' => 'bugsnag/bugsnag-laravel',
+        'lookout' => 'lookout/tracing',
     ];
 
     /**
@@ -61,6 +68,88 @@ trait ManagesErrorTrackingBindings
         ]);
 
         $this->maybeSaveErrorTrackingCredential($site, $provider, $params, $creds);
+
+        return $binding;
+    }
+
+    /**
+     * Provision entry point for the error-tracking binding. Only Lookout has a
+     * real resource to create (a project on uselookout.app); every other
+     * provider has nothing to spin up, so "provision" is just attach.
+     *
+     * @param  array<string, mixed> $params
+     */
+    private function provisionErrorTracking(Site $site, array $params): SiteBinding
+    {
+        $provider = strtolower(trim((string) ($params['provider'] ?? '')));
+
+        return $provider === 'lookout'
+            ? $this->provisionLookout($site, $params)
+            : $this->attachErrorTracking($site, $params);
+    }
+
+    /**
+     * One-click Lookout: create the project on the customer's uselookout.app
+     * account via {@see LookoutProvisioner} (their Lookout API token + org), then
+     * persist the returned DSN as the binding's injected env. The DSN carries the
+     * ingest key, so this is all the app needs to start reporting once the
+     * `lookout/tracing` package is present (installed separately on the box).
+     *
+     * @param  array<string, mixed> $params
+     */
+    private function provisionLookout(Site $site, array $params): SiteBinding
+    {
+        $name = trim((string) ($params['project_name'] ?? ''));
+        if ($name === '') {
+            $name = (string) ($site->name ?: $site->slug ?: 'dply');
+        }
+
+        $managed = config('services.lookout.account_model') === 'managed';
+        $provisioner = app(LookoutProvisioner::class);
+
+        if ($managed) {
+            // dply-managed: no per-customer token; dply mints the project under
+            // its own org via the service token. The org is configured on dply
+            // (managed_organization_id) or resolved by Lookout.
+            $result = $provisioner->provisionManaged($name);
+            $token = '';
+            $org = (string) config('services.lookout.managed_organization_id', '');
+        } else {
+            $token = trim((string) ($params['lookout_token'] ?? ''));
+            $org = trim((string) ($params['lookout_org'] ?? ''));
+            if ($token === '') {
+                throw new InvalidArgumentException(__('Paste your Lookout API token to create a project.'));
+            }
+            if ($org === '') {
+                throw new InvalidArgumentException(__('Choose the Lookout organization to create the project in.'));
+            }
+
+            $result = $provisioner->provision($token, $org, $name);
+        }
+
+        $binding = $this->persist($site, 'error_tracking', [
+            'mode' => 'provision_new',
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'name' => 'Lookout · '.$result['project_name'],
+            'target_type' => 'error_tracking',
+            'target_id' => $result['project_id'],
+            'injected_env' => $this->errorTrackingEnv('lookout', ['dsn' => $result['dsn']]),
+            'config' => array_filter([
+                'provider' => 'lookout',
+                'project_id' => $result['project_id'],
+                'project_name' => $result['project_name'],
+                'organization_id' => $org,
+            ], fn ($v) => $v !== null && $v !== ''),
+            'last_error' => null,
+        ]);
+
+        // BYO model only: when the operator opts in (save_credential), persist
+        // the Lookout API token (not the per-project key) for reuse — it's the
+        // reusable secret, so the next site can mint its own project without
+        // re-pasting it. The managed model has no per-customer token to save.
+        if (! $managed && $token !== '') {
+            $this->maybeSaveErrorTrackingCredential($site, 'lookout', $params, ['token' => $token, 'organization_id' => $org]);
+        }
 
         return $binding;
     }
@@ -100,6 +189,11 @@ trait ManagesErrorTrackingBindings
             'flare' => [
                 'key' => trim((string) ($params['key'] ?? '')),
             ],
+            // Attach-existing Lookout: paste a DSN (the provision path mints one
+            // instead and never reaches here).
+            'lookout' => [
+                'dsn' => trim((string) ($params['dsn'] ?? '')),
+            ],
             default => [],
         };
     }
@@ -116,6 +210,9 @@ trait ManagesErrorTrackingBindings
                 : null,
             'flare' => ($creds['key'] ?? '') === ''
                 ? throw new InvalidArgumentException(__('Flare project key is required.'))
+                : null,
+            'lookout' => ($creds['dsn'] ?? '') === '' || ! str_starts_with(strtolower((string) ($creds['dsn'] ?? '')), 'http')
+                ? throw new InvalidArgumentException(__('A valid Lookout DSN (starting with http) is required — or use "Create a project" to generate one.'))
                 : null,
             default => null,
         };
@@ -140,6 +237,14 @@ trait ManagesErrorTrackingBindings
             'flare' => array_filter([
                 'FLARE_KEY' => ($creds['key'] ?? '') ?: null,
             ], fn ($v) => $v !== null),
+            // The lookout/tracing SDK reads LOOKOUT_DSN (it parses both the
+            // ingest key and base URI out of it). LOOKOUT_LARAVEL=true turns on
+            // the quick-start (errors + tracing + logs) so the app reports with
+            // zero extra config once the package is installed.
+            'lookout' => array_filter([
+                'LOOKOUT_DSN' => ($creds['dsn'] ?? '') ?: null,
+                'LOOKOUT_LARAVEL' => ($creds['dsn'] ?? '') !== '' ? 'true' : null,
+            ], fn ($v) => $v !== null),
             default => [],
         };
     }
@@ -151,6 +256,7 @@ trait ManagesErrorTrackingBindings
             'sentry' => 'Sentry',
             'bugsnag' => 'Bugsnag',
             'flare' => 'Flare',
+            'lookout' => 'Lookout',
             default => ucfirst($provider),
         };
     }
@@ -177,8 +283,9 @@ trait ManagesErrorTrackingBindings
 
         $name = trim((string) ($params['credential_name'] ?? ''));
         if ($name === '') {
-            $labels = ['sentry' => 'Sentry', 'bugsnag' => 'Bugsnag', 'flare' => 'Flare'];
-            $name = ($labels[$provider] ?? ucfirst($provider)).' '.__('project');
+            $labels = ['sentry' => 'Sentry', 'bugsnag' => 'Bugsnag', 'flare' => 'Flare', 'lookout' => 'Lookout'];
+            $suffix = $provider === 'lookout' ? __('API token') : __('project');
+            $name = ($labels[$provider] ?? ucfirst($provider)).' '.$suffix;
         }
 
         ErrorTrackingCredential::query()->create([
