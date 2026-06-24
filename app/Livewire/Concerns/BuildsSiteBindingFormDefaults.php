@@ -23,7 +23,7 @@ trait BuildsSiteBindingFormDefaults
     private function defaultBindingForm(string $type, string $mode): array
     {
         return match (true) {
-            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => '', 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'vm_size' => ''],
+            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => '', 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'vm_size' => '', 'vendor_api_key' => '', 'vendor_account' => '', 'vendor_region' => ''],
             $type === 'database' => $this->defaultDatabaseAttachBindingForm(),
             // use_for_drivers: also wire cache/sessions/queue at this Redis in one
             // step (default on — it's why you attach Redis). Existing driver

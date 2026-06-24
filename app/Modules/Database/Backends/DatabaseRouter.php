@@ -41,6 +41,10 @@ class DatabaseRouter
     private const BY_KEY = [
         CloudDatabase::BACKEND_DIGITALOCEAN => DoManagedBackend::class,
         CloudDatabase::BACKEND_VULTR => VultrManagedBackend::class,
+        CloudDatabase::BACKEND_NEON => NeonBackend::class,
+        CloudDatabase::BACKEND_PLANETSCALE => PlanetScaleBackend::class,
+        CloudDatabase::BACKEND_SUPABASE => SupabaseBackend::class,
+        CloudDatabase::BACKEND_UPSTASH => UpstashBackend::class,
     ];
 
     public function backend(string $key): DatabaseBackend

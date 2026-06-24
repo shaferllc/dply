@@ -22,6 +22,7 @@ use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Support\DedicatedDatabaseVm;
+use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
 
@@ -153,33 +154,34 @@ trait ManagesSiteBindingActions
             return $options;
         }
 
+        // Co-located managed cluster — only when the server's provider offers
+        // one (DO / Vultr). Hetzner & co. skip this card but still get the
+        // dedicated-VM and serverless options below.
         $backend = app(DatabaseRouter::class)->colocatedBackendFor($server);
-        if ($backend === null) {
-            return $options;
+        if ($backend !== null) {
+            $region = $backend->regionForServer($server);
+            $cost = $backend->estimatedMonthlyCost((string) ($this->bindingForm['size'] ?? 'small'));
+            $hasCredential = $server->provider_credential_id !== null
+                || ProviderCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', $server->provider->value)
+                    ->exists();
+
+            $sublabel = implode(' · ', array_filter([
+                $region,
+                $cost !== null ? '~$'.$cost.'/mo' : null,
+                __('isolated, billed by :provider', ['provider' => $server->provider->label()]),
+            ]));
+
+            $options[] = [
+                'key' => 'managed',
+                'label' => $server->provider->label().' '.__('Managed'),
+                'sublabel' => $sublabel,
+                'available' => $hasCredential && $region !== null,
+                'note' => $hasCredential ? null : __('Connect a :provider credential first', ['provider' => $server->provider->label()]),
+                'engines' => $backend->supportedEngines(),
+            ];
         }
-
-        $region = $backend->regionForServer($server);
-        $cost = $backend->estimatedMonthlyCost((string) ($this->bindingForm['size'] ?? 'small'));
-        $hasCredential = $server->provider_credential_id !== null
-            || ProviderCredential::query()
-                ->where('organization_id', $this->site->organization_id)
-                ->where('provider', $server->provider->value)
-                ->exists();
-
-        $sublabel = implode(' · ', array_filter([
-            $region,
-            $cost !== null ? '~$'.$cost.'/mo' : null,
-            __('isolated, billed by :provider', ['provider' => $server->provider->label()]),
-        ]));
-
-        $options[] = [
-            'key' => 'managed',
-            'label' => $server->provider->label().' '.__('Managed'),
-            'sublabel' => $sublabel,
-            'available' => $hasCredential && $region !== null,
-            'note' => $hasCredential ? null : __('Connect a :provider credential first', ['provider' => $server->provider->label()]),
-            'engines' => $backend->supportedEngines(),
-        ];
 
         // Dedicated DB VM: a brand-new server on the customer's provider whose
         // only job is this database. Needs a size list (loaded on modal open).
@@ -195,6 +197,20 @@ trait ManagesSiteBindingActions
                 'available' => $sizesReady,
                 'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
                 'engines' => DedicatedDatabaseVm::supportedEngines(),
+            ];
+        }
+
+        // BYO serverless vendors (Neon …): region-agnostic, always offered.
+        foreach (ServerlessDatabaseVendors::all() as $vendor) {
+            $options[] = [
+                'key' => $vendor['key'],
+                'label' => $vendor['label'],
+                'sublabel' => __('serverless · bring your own account'),
+                'available' => true,
+                'note' => null,
+                'engines' => $vendor['engines'],
+                'serverless' => true,
+                'regions' => $vendor['regions'],
             ];
         }
 
@@ -251,6 +267,14 @@ trait ManagesSiteBindingActions
         $this->bindingModalMode = $mode;
         $this->bindingForm = $this->defaultBindingForm($this->bindingModalType, $mode);
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $this->bindingModalType);
+
+        // Toggling into "Provision new" for a database must load the dedicated-VM
+        // size catalog too, or that placement card stays disabled.
+        $this->dedicatedVmSizes = [];
+        if ($this->bindingModalType === 'database' && $mode === 'provision') {
+            $this->loadDedicatedVmSizes();
+        }
+
         $this->resetErrorBag();
     }
 

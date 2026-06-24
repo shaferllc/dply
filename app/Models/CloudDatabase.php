@@ -59,6 +59,14 @@ class CloudDatabase extends Model
 
     public const BACKEND_VULTR = 'vultr_managed_database';
 
+    public const BACKEND_NEON = 'neon_serverless';
+
+    public const BACKEND_PLANETSCALE = 'planetscale_serverless';
+
+    public const BACKEND_SUPABASE = 'supabase_serverless';
+
+    public const BACKEND_UPSTASH = 'upstash_serverless';
+
     /**
      * Portable size tier → DO Managed Database size slug. Mirrors the
      * container size_tier mapping in DigitalOceanAppPlatformBackend.

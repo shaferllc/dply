@@ -373,8 +373,9 @@
 
                 </div>
             @elseif ($bindingModalType === 'database' && $bindingModalMode === 'provision')
-                @php($dbPlacements = $this->databasePlacements())
-                @php($dbManagedAvailable = (bool) (collect($dbPlacements)->firstWhere('key', 'managed')['available'] ?? false))
+                @php
+                    $dbPlacements = $this->databasePlacements();
+                @endphp
                 <div
                     x-data="{
                         engine: $wire.entangle('bindingForm.engine'),
@@ -396,12 +397,10 @@
                             <select id="binding_db_engine" x-model="engine" class="dply-input">
                                 <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
                                 <option value="postgres">{{ __('PostgreSQL') }}</option>
-                                {{-- Redis as a `database` binding only makes sense on a managed
-                                     cluster; on-box Redis is attached via the Redis resource. Hide
-                                     it when no managed backend is available so there's no dead-end. --}}
-                                @if ($dbManagedAvailable)
-                                    <option value="redis">{{ __('Redis') }}</option>
-                                @endif
+                                {{-- Redis here means a managed cluster or a serverless vendor
+                                     (Upstash) — on-box Redis is attached via the Redis resource.
+                                     The placement cards filter to redis-capable backends. --}}
+                                <option value="redis">{{ __('Redis') }}</option>
                                 <option value="sqlite">{{ __('SQLite') }}</option>
                             </select>
                         </div>
@@ -461,6 +460,31 @@
                             @endforelse
                         </select>
                     </div>
+
+                    {{-- BYO serverless vendors: pick a vendor region + connect an API key. --}}
+                    @foreach (collect($dbPlacements)->where('serverless', true) as $sv)
+                        <div x-show="placement === '{{ $sv['key'] }}'" x-cloak class="space-y-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                            <div>
+                                <x-input-label for="binding_db_vendor_region_{{ $sv['key'] }}" :value="__(':vendor region', ['vendor' => $sv['label']])" />
+                                <select id="binding_db_vendor_region_{{ $sv['key'] }}" wire:model="bindingForm.vendor_region" class="dply-input">
+                                    @foreach ($sv['regions'] as $r)
+                                        <option value="{{ $r['value'] }}">{{ $r['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @if (! empty($sv['account_label']))
+                                <div>
+                                    <x-input-label for="binding_db_vendor_account_{{ $sv['key'] }}" :value="$sv['account_label']" />
+                                    <x-text-input id="binding_db_vendor_account_{{ $sv['key'] }}" wire:model="bindingForm.vendor_account" class="mt-1 block w-full font-mono text-sm" placeholder="{{ $sv['account_label'] }}" />
+                                </div>
+                            @endif
+                            <div>
+                                <x-input-label for="binding_db_vendor_key_{{ $sv['key'] }}" :value="__(':vendor API key', ['vendor' => $sv['label']])" />
+                                <x-text-input type="password" id="binding_db_vendor_key_{{ $sv['key'] }}" wire:model="bindingForm.vendor_api_key" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('paste your :vendor API key', ['vendor' => $sv['label']]) }}" autocomplete="new-password" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Stored encrypted. Leave blank to reuse a key you\'ve already connected.') }}</p>
+                            </div>
+                        </div>
+                    @endforeach
 
                     <p class="text-xs text-brand-moss" x-show="placement === 'on_box'">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
                     <p class="text-xs text-brand-moss" x-show="placement === 'managed'" x-cloak>{{ __('Provisions an isolated managed cluster co-located with this server, locks it to your server\'s network, and injects the connection variables once it\'s online (a few minutes). Redeploy to apply.') }}</p>
