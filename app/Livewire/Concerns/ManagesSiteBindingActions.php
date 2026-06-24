@@ -18,7 +18,10 @@ use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
+use App\Actions\Servers\ResolveServerCreateCatalog;
+use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
 use App\Modules\Database\Backends\DatabaseRouter;
+use App\Modules\Database\Support\DedicatedDatabaseVm;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
 
@@ -52,7 +55,76 @@ trait ManagesSiteBindingActions
         }
 
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $type);
+
+        // A dedicated-DB-VM placement needs a size list (provider/region
+        // specific); fetch it up front so the modal can render the picker.
+        $this->dedicatedVmSizes = [];
+        if ($type === 'database' && $this->bindingModalMode === 'provision') {
+            $this->loadDedicatedVmSizes();
+        }
+
         $this->dispatch('open-modal', 'site-binding-modal');
+    }
+
+    /**
+     * Populate {@see $dedicatedVmSizes} from the customer-connected create
+     * catalog for the app server's provider + region. Best-effort: a provider
+     * API failure just leaves the list empty (the dedicated card shows
+     * unavailable) rather than breaking the modal.
+     */
+    private function loadDedicatedVmSizes(): void
+    {
+        $server = $this->site->server;
+        if ($server === null || ! DedicatedDatabaseVm::eligible($server) || $this->site->organization === null) {
+            return;
+        }
+
+        try {
+            $catalog = app(ResolveServerCreateCatalog::class)->handle(
+                $this->site->organization,
+                $server->provider->value,
+                (string) $server->provider_credential_id,
+                (string) $server->region,
+            );
+            $this->dedicatedVmSizes = collect($catalog['sizes'] ?? [])
+                ->map(fn ($s): array => [
+                    'value' => (string) ($s['value'] ?? ''),
+                    'label' => (string) ($s['label'] ?? ($s['value'] ?? '')),
+                ])
+                ->filter(fn (array $s): bool => $s['value'] !== '')
+                ->values()
+                ->all();
+
+            // Preselect the first size so the dedicated card has a valid value
+            // the moment it's chosen (the field is shared via bindingForm).
+            if ($this->dedicatedVmSizes !== [] && ($this->bindingForm['vm_size'] ?? '') === '') {
+                $this->bindingForm['vm_size'] = $this->dedicatedVmSizes[0]['value'];
+            }
+        } catch (\Throwable $e) {
+            $this->dedicatedVmSizes = [];
+        }
+    }
+
+    /**
+     * Provision a brand-new database server on the customer's connected
+     * provider and attach it. Runs in the component layer because the
+     * customer-connected create pipeline is driven by a Livewire Form object.
+     */
+    public function provisionDedicatedDatabaseVm(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        try {
+            app(CreateDedicatedDatabaseVm::class)->handle($this, $this->site, $this->bindingForm);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->toastSuccess(__('Provisioning a dedicated database server — this can take several minutes.'));
     }
 
     /**
@@ -101,13 +173,30 @@ trait ManagesSiteBindingActions
         ]));
 
         $options[] = [
-            'key' => 'do_managed',
+            'key' => 'managed',
             'label' => $server->provider->label().' '.__('Managed'),
             'sublabel' => $sublabel,
             'available' => $hasCredential && $region !== null,
             'note' => $hasCredential ? null : __('Connect a :provider credential first', ['provider' => $server->provider->label()]),
             'engines' => $backend->supportedEngines(),
         ];
+
+        // Dedicated DB VM: a brand-new server on the customer's provider whose
+        // only job is this database. Needs a size list (loaded on modal open).
+        if (DedicatedDatabaseVm::eligible($server)) {
+            $sizesReady = $this->dedicatedVmSizes !== [];
+            $options[] = [
+                'key' => 'dedicated_vm',
+                'label' => __('Dedicated database server'),
+                'sublabel' => implode(' · ', array_filter([
+                    (string) $server->region,
+                    __('new :provider VM · isolated host', ['provider' => $server->provider->label()]),
+                ])),
+                'available' => $sizesReady,
+                'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
+                'engines' => DedicatedDatabaseVm::supportedEngines(),
+            ];
+        }
 
         return $options;
     }
@@ -168,6 +257,17 @@ trait ManagesSiteBindingActions
     public function saveBinding(SiteBindingManager $manager): void
     {
         Gate::authorize('update', $this->site);
+
+        // The dedicated-DB-VM placement provisions a whole new server, which
+        // means driving the customer-connected create pipeline (a Livewire Form
+        // object) — handled in the component layer, not the binding manager.
+        if ($this->bindingModalType === 'database'
+            && $this->bindingModalMode === 'provision'
+            && ($this->bindingForm['placement'] ?? '') === 'dedicated_vm') {
+            $this->provisionDedicatedDatabaseVm();
+
+            return;
+        }
 
         // Auto-provision Redis on connect: when there's no Redis to attach AND
         // none is installed on the box, kick the install right from the connect

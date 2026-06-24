@@ -72,6 +72,14 @@ trait ManagesSiteBindings
     /** @var list<array{id: string, label: string}> */
     public array $bindingTargets = [];
 
+    /**
+     * Sizes available for a "dedicated database VM" placement, fetched per the
+     * app server's provider/region when the database-provision modal opens.
+     *
+     * @var list<array{value: string, label: string}>
+     */
+    public array $dedicatedVmSizes = [];
+
     /** Recipient for the mail binding's "send test email" action. */
     public string $mailTestRecipient = '';
 

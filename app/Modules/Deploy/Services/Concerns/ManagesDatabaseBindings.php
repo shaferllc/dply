@@ -408,6 +408,26 @@ trait ManagesDatabaseBindings
     }
 
     /**
+     * Wire a `database` binding to a now-ready ServerDatabase (used by the
+     * dedicated-DB-VM flow once its server finished provisioning). Reuses the
+     * host-aware {@see databaseEnv()} so a co-located DB box is dialed over the
+     * shared private network. Stamps connection_ready_at to drive the
+     * "redeploy to apply" prompt and flips the binding to configured.
+     */
+    public function wireServerDatabaseBinding(SiteBinding $binding, ServerDatabase $db, Site $site): void
+    {
+        $config = $binding->config;
+        $config['connection_ready_at'] = now()->toIso8601String();
+
+        $binding->forceFill([
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'injected_env' => $this->databaseEnv($db, $site),
+            'config' => $config,
+            'last_error' => null,
+        ])->save();
+    }
+
+    /**
      * Connection variables for a database as seen by $site. The host is
      * resolved relative to where the site runs: loopback when the DB is on the
      * site's own box, the source server's private IP when it's a peer in the

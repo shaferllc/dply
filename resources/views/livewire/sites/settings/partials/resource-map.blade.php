@@ -306,6 +306,17 @@
                             // Human-readable explanation of THIS tile's current state, surfaced as an
                             // HTML tooltip on the status dot + badge so a hover tells you what's wrong.
                             $cfg = $attached && is_array($binding->config) ? $binding->config : [];
+
+                            // Managed DBs inject their connection vars at provision-complete time,
+                            // but those only reach the running app at the next deploy. A managed
+                            // binding "needs redeploy" until last_deploy_at catches up to when the
+                            // connection became ready.
+                            $managedReadyAt = ($cfg['managed'] ?? false) && filled($cfg['connection_ready_at'] ?? null)
+                                ? \Illuminate\Support\Carbon::parse($cfg['connection_ready_at'])
+                                : null;
+                            $needsRedeploy = $managedReadyAt !== null
+                                && $attached && $binding->status === 'configured'
+                                && ($site->last_deploy_at === null || $site->last_deploy_at->lt($managedReadyAt));
                             $reasonMap = [
                                 'drivers_reference_redis_without_connection' => __('Cache, queue, or session is set to redis, but no Redis connection is configured yet — attach Redis.'),
                                 's3_disk_without_bucket' => __('The filesystem disk is S3-compatible, but AWS_BUCKET is not set.'),
@@ -322,7 +333,7 @@
                                 // minutes, then its connection vars land on the binding. They apply at
                                 // the next deploy, so a configured managed DB prompts a redeploy.
                                 $attached && ($cfg['managed'] ?? false) && $binding->status === 'provisioning' => __('Provisioning the managed cluster — this takes a few minutes.'),
-                                $attached && ($cfg['managed'] ?? false) && $binding->status === 'configured' => __('Connection ready — redeploy to apply the connection variables.'),
+                                $needsRedeploy => __('Connection ready — redeploy to apply the connection variables.'),
                                 $attached && $binding->status === 'configured' => __('Configured and ready.'),
                                 $attached && $binding->status === 'pending' => __('Attached, but not fully configured yet.'),
                                 $attached => \Illuminate\Support\Str::headline((string) $binding->status),
@@ -378,6 +389,13 @@
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
                                             <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
                                             <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                            @if ($needsRedeploy)
+                                                <a href="{{ $sectionUrl('deploy') }}" wire:navigate
+                                                    title="{{ __('The connection variables apply at the next deploy.') }}"
+                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200">
+                                                    <x-heroicon-o-arrow-path class="h-2.5 w-2.5" /> {{ __('Redeploy to apply') }}
+                                                </a>
+                                            @endif
                                         </div>
                                         @if ($conn !== null)
                                             @php

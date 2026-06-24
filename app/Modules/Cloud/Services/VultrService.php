@@ -583,6 +583,9 @@ class VultrService
         if (strtolower($method) === 'post') {
             return $request->post($url, $body);
         }
+        if (strtolower($method) === 'put') {
+            return $request->put($url, $body);
+        }
         if (strtolower($method) === 'patch') {
             return $request->patch($url, $body);
         }
@@ -603,5 +606,108 @@ class VultrService
         $message = is_string($error) ? $error : ($response->body() ?: $response->reason());
 
         throw new \RuntimeException("Vultr API failed to {$action}: {$message}");
+    }
+
+    // ---------------------------------------------------------------------
+    // Managed Databases (DBaaS)
+    //
+    // The provider-side counterpart to DigitalOcean's Managed Databases. A
+    // cluster returns immediately with status `configuring`; poll
+    // getDatabaseCluster() until `running`, then read the connection block.
+    // Engine slugs: pg | mysql | valkey | kafka (Valkey is the Redis-compatible
+    // engine). Plan ids look like `vultr-dbaas-hobbyist-cc-1-25-1`.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Create a Vultr Managed Database. Returns the normalized cluster
+     * (id + status + connection — connection is empty until `running`).
+     *
+     * @param  list<string>  $trustedIps
+     * @return array{id: string, status: string, connection: array<string, mixed>}
+     */
+    public function createDatabaseCluster(string $engine, string $version, string $plan, string $region, string $label, array $trustedIps = []): array
+    {
+        $body = [
+            'database_engine' => $engine,
+            'database_engine_version' => $version,
+            'plan' => $plan,
+            'region' => $region,
+            'label' => $label,
+        ];
+        if ($trustedIps !== []) {
+            $body['trusted_ips'] = array_values($trustedIps);
+        }
+
+        $response = $this->request('post', '/databases', $body);
+        $this->assertSuccess($response, 'create database cluster');
+
+        return $this->normalizeDatabaseCluster($response->json('database'));
+    }
+
+    /**
+     * @return array{id: string, status: string, connection: array<string, mixed>}
+     */
+    public function getDatabaseCluster(string $id): array
+    {
+        $response = $this->request('get', '/databases/'.$id);
+        $this->assertSuccess($response, 'get database cluster');
+
+        return $this->normalizeDatabaseCluster($response->json('database'));
+    }
+
+    /**
+     * Replace the cluster's trusted-IP allowlist (the Vultr equivalent of DO
+     * trusted sources). Passing the app server's IP closes the cluster to the
+     * public internet while keeping it reachable from the box that uses it.
+     *
+     * @param  list<string>  $trustedIps
+     */
+    public function setDatabaseTrustedSources(string $id, array $trustedIps): void
+    {
+        $response = $this->request('put', '/databases/'.$id, [
+            'trusted_ips' => array_values($trustedIps),
+        ]);
+        $this->assertSuccess($response, 'set database trusted ips');
+    }
+
+    /**
+     * Delete a managed database. Idempotent — a 404 means it's already gone.
+     */
+    public function deleteDatabaseCluster(string $id): bool
+    {
+        $response = $this->request('delete', '/databases/'.$id);
+        if ($response->status() === 404) {
+            return false;
+        }
+        $this->assertSuccess($response, 'delete database cluster');
+
+        return true;
+    }
+
+    /**
+     * Normalize Vultr's `database` object into the shape the provisioning job
+     * consumes (status + a host/port/user/password/database connection block,
+     * empty while the cluster is still configuring).
+     *
+     * @param  mixed  $database
+     * @return array{id: string, status: string, connection: array<string, mixed>}
+     */
+    private function normalizeDatabaseCluster(mixed $database): array
+    {
+        $database = is_array($database) ? $database : [];
+        $host = (string) ($database['host'] ?? '');
+
+        return [
+            'id' => (string) ($database['id'] ?? ''),
+            'status' => (string) ($database['status'] ?? ''),
+            'connection' => $host === '' ? [] : [
+                'host' => $host,
+                'port' => (string) ($database['port'] ?? ''),
+                'user' => (string) ($database['user'] ?? ''),
+                'password' => (string) ($database['password'] ?? ''),
+                'database' => (string) ($database['dbname'] ?? ''),
+                'ssl' => true,
+            ],
+        ];
     }
 }

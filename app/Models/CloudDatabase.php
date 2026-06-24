@@ -57,6 +57,8 @@ class CloudDatabase extends Model
 
     public const BACKEND_DIGITALOCEAN = 'digitalocean_managed_database';
 
+    public const BACKEND_VULTR = 'vultr_managed_database';
+
     /**
      * Portable size tier → DO Managed Database size slug. Mirrors the
      * container size_tier mapping in DigitalOceanAppPlatformBackend.

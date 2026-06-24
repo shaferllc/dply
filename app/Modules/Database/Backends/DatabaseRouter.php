@@ -29,7 +29,7 @@ class DatabaseRouter
      */
     private const COLOCATED = [
         ServerProvider::DigitalOcean->value => DoManagedBackend::class,
-        // ServerProvider::Vultr->value => VultrManagedBackend::class,   // Phase 2
+        ServerProvider::Vultr->value => VultrManagedBackend::class,
         // ServerProvider::Aws->value   => AwsRdsBackend::class,         // Phase 4
     ];
 
@@ -40,6 +40,7 @@ class DatabaseRouter
      */
     private const BY_KEY = [
         CloudDatabase::BACKEND_DIGITALOCEAN => DoManagedBackend::class,
+        CloudDatabase::BACKEND_VULTR => VultrManagedBackend::class,
     ];
 
     public function backend(string $key): DatabaseBackend
