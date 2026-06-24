@@ -148,6 +148,32 @@ modal hides the token/org fields and only asks for a project name.
 
 ---
 
+## Billing (managed model) — built, dark by default
+
+dply is the merchant of record: a managed customer has no Lookout login, so dply
+resells Lookout **cost-plus on the single dply invoice** — it's just another line
+item on the subscription they already pay (base + per-server fees). Mirrors the
+`RealtimeApp` per-tier billing 1:1.
+
+- **Pricing**: tiered per project — Starter (7d / 100k events) $15, Growth (30d /
+  1M) $49, Scale (90d / 10M) $149. Defined in `config/lookout.php`; Stripe price
+  IDs in `config/subscription.php` → `standard.stripe.lookout_tiers[_yearly]`.
+- **First project per org is free** (`lookout.free_projects_per_org`, default 1) —
+  the computer excludes the oldest active project before pricing the rest.
+- **Resource model**: `LookoutProject` (org/site/binding/tier/status). Created on
+  managed provision; **paused on detach** (before the binding delete, so the
+  nullOnDelete FK can't orphan an active billable row). BYO creates none.
+- **Pipeline**: `LookoutProjectBillingObserver` → `SyncOrganizationBillingJob` →
+  `OrganizationBillingStateComputer` (per-tier counts, first-free) →
+  `DesiredBillingState.lookoutTierQuantities` →
+  `StripeSubscriptionSyncer::reconcileLookoutTierLines()` (and
+  `StandardSubscriptionCreator` for a fresh subscription's initial lines).
+- **The gate**: `LOOKOUT_BILLING_ENABLED=false` by default → the computer adds no
+  Lookout line, so projects provision **free** until you calibrate rates + set the
+  Stripe price IDs, then flip it on (same dark-launch pattern as dply Logs).
+- Lookout side: `/api/provision` accepts `retention_days` so the chosen tier sets
+  the project's retention window on creation.
+
 ## Build order
 1. dply binding scaffolding (§1–2, §5–6) — invariant to the account model.
 2. `LookoutProvisioner` + `config/services.php` (§3) — Model A request shape.

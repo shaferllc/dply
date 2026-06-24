@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Deploy\Services\Concerns;
 
 use App\Models\ErrorTrackingCredential;
+use App\Models\LookoutProject;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Modules\Deploy\Services\LookoutProvisioner;
@@ -106,12 +107,22 @@ trait ManagesErrorTrackingBindings
 
         $managed = config('services.lookout.account_model') === 'managed';
         $provisioner = app(LookoutProvisioner::class);
+        $tier = null;
+        $retentionDays = null;
 
         if ($managed) {
             // dply-managed: no per-customer token; dply mints the project under
-            // its own org via the service token. The org is configured on dply
-            // (managed_organization_id) or resolved by Lookout.
-            $result = $provisioner->provisionManaged($name);
+            // its own org via the service token. The chosen tier sets the
+            // retention window the project is provisioned with, and is what the
+            // org is billed for (the first project per org is free).
+            $tier = strtolower(trim((string) ($params['lookout_tier'] ?? '')));
+            $tiers = (array) config('lookout.tiers', []);
+            if (! array_key_exists($tier, $tiers)) {
+                $tier = (string) config('lookout.default_tier', 'starter');
+            }
+            $retentionDays = (int) ($tiers[$tier]['retention_days'] ?? 0) ?: null;
+
+            $result = $provisioner->provisionManaged($name, $retentionDays);
             $token = '';
             $org = (string) config('services.lookout.managed_organization_id', '');
         } else {
@@ -142,6 +153,23 @@ trait ManagesErrorTrackingBindings
             ], fn ($v) => $v !== null && $v !== ''),
             'last_error' => null,
         ]);
+
+        // Managed model: record the billable resource. Its lifecycle (active →
+        // paused on detach) drives the per-tier Stripe line via
+        // LookoutProjectBillingObserver. BYO never bills here — the customer pays
+        // Lookout directly — so no row is created.
+        if ($managed) {
+            LookoutProject::create([
+                'organization_id' => $site->organization_id,
+                'site_id' => $site->id,
+                'site_binding_id' => $binding->id,
+                'lookout_project_id' => $result['project_id'],
+                'name' => $result['project_name'],
+                'tier' => (string) ($tier ?: config('lookout.default_tier', 'starter')),
+                'status' => LookoutProject::STATUS_ACTIVE,
+                'retention_days' => $retentionDays,
+            ]);
+        }
 
         // BYO model only: when the operator opts in (save_credential), persist
         // the Lookout API token (not the per-project key) for reuse — it's the

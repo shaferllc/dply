@@ -791,11 +791,35 @@
                         @if ($lkMode === 'provision')
                             @if ($lkManaged)
                                 <div class="rounded-lg border border-brand-sage/40 bg-brand-sage/5 px-4 py-3 text-xs text-brand-pine">
-                                    {{ __('dply manages the Lookout account — just name the project and we create it for you.') }}
+                                    {{ __('dply manages the Lookout account — pick a plan and name the project, and we create it for you.') }}
                                 </div>
                                 <div>
                                     <x-input-label for="binding_lk_name" :value="__('Project name')" />
                                     <x-text-input id="binding_lk_name" wire:model="bindingForm.project_name" class="w-full" />
+                                </div>
+                                <div>
+                                    <x-input-label :value="__('Plan')" />
+                                    @php
+                                        $lkTiers = (array) config('lookout.tiers', []);
+                                        $lkChosen = (string) ($bindingForm['lookout_tier'] ?? config('lookout.default_tier', 'starter'));
+                                        $lkBillingOn = (bool) config('lookout.billing_enabled', false);
+                                    @endphp
+                                    <div class="mt-1 grid gap-2 sm:grid-cols-3">
+                                        @foreach ($lkTiers as $slug => $tier)
+                                            <button type="button" wire:click="$set('bindingForm.lookout_tier', '{{ $slug }}')"
+                                                class="rounded-lg border px-3 py-2 text-left transition {{ $lkChosen === $slug ? 'border-brand-sage bg-brand-sage/10' : 'border-brand-mist hover:border-brand-sage/60' }}">
+                                                <span class="block text-sm font-semibold text-brand-pine">{{ $tier['label'] ?? ucfirst($slug) }}</span>
+                                                <span class="block text-xs text-brand-moss">{{ (int) ($tier['retention_days'] ?? 0) }}{{ __('d retention · ') }}{{ number_format((int) ($tier['monthly_events'] ?? 0)) }} {{ __('events/mo') }}</span>
+                                                <span class="mt-1 block text-xs font-semibold text-brand-pine">${{ number_format((int) ($tier['price_cents'] ?? 0) / 100, ((int) ($tier['price_cents'] ?? 0)) % 100 === 0 ? 0 : 2) }}/{{ __('mo') }}</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                    <p class="mt-2 text-xs text-brand-moss">
+                                        {{ __('Your first managed Lookout project is free; additional projects bill at the plan price on your dply invoice.') }}
+                                        @unless ($lkBillingOn)
+                                            <span class="text-brand-sage">{{ __('(Billing is not enabled yet — projects are free for now.)') }}</span>
+                                        @endunless
+                                    </p>
                                 </div>
                             @else
                                 <div>

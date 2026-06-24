@@ -384,6 +384,8 @@ trait BuildsSiteBindingFormDefaults
             'lookout_mode' => 'provision',
             'lookout_token' => '',
             'lookout_org' => '',
+            // Billing tier for the managed account model (config('lookout.tiers')).
+            'lookout_tier' => (string) config('lookout.default_tier', 'starter'),
             'project_name' => (string) ($this->site->name ?: $this->site->slug ?: ''),
             // Saved-credential reuse + save-for-reuse.
             'credential_id' => '',

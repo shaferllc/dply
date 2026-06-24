@@ -81,7 +81,7 @@ class LookoutProvisioner
      *
      * @throws RuntimeException when the provisioning endpoint is unconfigured or rejects the request
      */
-    public function provisionManaged(string $projectName): array
+    public function provisionManaged(string $projectName, ?int $retentionDays = null): array
     {
         $token = trim((string) config('services.lookout.provision_token', ''));
         if ($token === '') {
@@ -98,6 +98,7 @@ class LookoutProvisioner
             ->post($base.'/api/provision', array_filter([
                 'name' => $projectName,
                 'organization_id' => $org !== '' ? $org : null,
+                'retention_days' => $retentionDays !== null && $retentionDays > 0 ? $retentionDays : null,
             ], fn ($v) => $v !== null));
 
         if ($response->status() === 401 || $response->status() === 403) {

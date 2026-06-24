@@ -93,6 +93,17 @@ class StandardSubscriptionCreator
             }
         }
 
+        // Managed Lookout — one line per project tier in use.
+        foreach ($desired->lookoutTierQuantities as $tier => $quantity) {
+            if ($quantity <= 0) {
+                continue;
+            }
+            $lookoutPriceId = $this->lookoutTierPriceIdForInterval((string) $tier, $interval);
+            if ($lookoutPriceId !== '') {
+                $items[] = ['price' => $lookoutPriceId, 'quantity' => $quantity];
+            }
+        }
+
         if ($interval === self::INTERVAL_MONTH && $desired->cloudResourceSubtotalCents > 0) {
             $cloudUsagePriceId = $this->cloudUsagePriceId();
             if ($cloudUsagePriceId !== '') {
@@ -149,6 +160,17 @@ class StandardSubscriptionCreator
         $bucket = match ($interval) {
             self::INTERVAL_MONTH => 'realtime_tiers',
             self::INTERVAL_YEAR => 'realtime_tiers_yearly',
+            default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
+        };
+
+        return (string) (config('subscription.standard.stripe.'.$bucket.'.'.$tier) ?? '');
+    }
+
+    public function lookoutTierPriceIdForInterval(string $tier, string $interval): string
+    {
+        $bucket = match ($interval) {
+            self::INTERVAL_MONTH => 'lookout_tiers',
+            self::INTERVAL_YEAR => 'lookout_tiers_yearly',
             default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
         };
 

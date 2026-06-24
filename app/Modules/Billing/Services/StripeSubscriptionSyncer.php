@@ -56,6 +56,8 @@ class StripeSubscriptionSyncer
         // Managed Realtime — one line per connection-tier in use, plus removal of
         // any legacy flat realtime line left over from the pre-tier model.
         $this->reconcileRealtimeTierLines($subscription, $desired, $changes);
+        // Managed Lookout — one line per project tier in use.
+        $this->reconcileLookoutTierLines($subscription, $desired, $changes);
         $this->reconcileCloudResourceLine($subscription, $desired, $changes);
         $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
         $this->reconcileManagedServerLine($subscription, $desired, $changes);
@@ -266,6 +268,51 @@ class StripeSubscriptionSyncer
     private function allRealtimeTierPriceIds(Subscription $subscription): array
     {
         $bucket = $this->isYearly($subscription) ? 'realtime_tiers_yearly' : 'realtime_tiers';
+        $ids = [];
+        foreach ((array) config("subscription.standard.stripe.{$bucket}", []) as $tier => $priceId) {
+            $ids[(string) $tier] = (string) ($priceId ?? '');
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Reconcile managed-Lookout lines per project tier. Each configured tier
+     * price is driven to its desired billable project count (the computer has
+     * already excluded the org's free project and zeroed everything when billing
+     * is disabled), so attaching, tier-changing, or detaching a managed project
+     * settles to the right set of lines.
+     *
+     * @param  list<array<string, mixed>>  $changes
+     */
+    private function reconcileLookoutTierLines(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        foreach ($this->allLookoutTierPriceIds($subscription) as $tier => $priceId) {
+            if ($priceId === '') {
+                continue;
+            }
+
+            $desiredQty = max(0, $desired->lookoutTierQuantities[$tier] ?? 0);
+            $current = $this->currentQuantity($subscription, $priceId);
+            $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+            if ($change !== null) {
+                $changes[] = ['tier' => 'lookout:'.$tier] + $change;
+            }
+        }
+    }
+
+    /**
+     * Configured Stripe price IDs for every Lookout project tier at the
+     * subscription's interval, keyed by tier slug.
+     *
+     * @return array<string, string>
+     */
+    private function allLookoutTierPriceIds(Subscription $subscription): array
+    {
+        $bucket = $this->isYearly($subscription) ? 'lookout_tiers_yearly' : 'lookout_tiers';
         $ids = [];
         foreach ((array) config("subscription.standard.stripe.{$bucket}", []) as $tier => $priceId) {
             $ids[(string) $tier] = (string) ($priceId ?? '');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services;
 
+use App\Models\LookoutProject;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Modules\Deploy\Services\Concerns\ManagesAiBindings;
@@ -181,7 +182,33 @@ class SiteBindingManager
             $this->teardownBroadcasting($binding);
         }
 
+        // A managed Lookout project stops billing when its binding is detached.
+        // Must run BEFORE delete: the FK is nullOnDelete, so a deleted binding
+        // would otherwise orphan an ACTIVE project that keeps billing.
+        if ($binding->type === 'error_tracking') {
+            $this->teardownLookout($binding);
+        }
+
         $binding->delete();
+    }
+
+    /**
+     * Pause the managed Lookout project behind an error-tracking binding so it
+     * stops billing (the observer dispatches a billing sync). No-op for BYO
+     * Lookout / other providers, which create no LookoutProject. The remote
+     * project is left intact — error history isn't destroyed on detach.
+     */
+    private function teardownLookout(SiteBinding $binding): void
+    {
+        if ((((array) $binding->config)['provider'] ?? '') !== 'lookout') {
+            return;
+        }
+
+        LookoutProject::query()
+            ->where('site_binding_id', $binding->id)
+            ->where('status', '!=', LookoutProject::STATUS_PAUSED)
+            ->get()
+            ->each(fn (LookoutProject $project) => $project->update(['status' => LookoutProject::STATUS_PAUSED]));
     }
 
     // ---- .env adoption ----------------------------------------------------

@@ -217,6 +217,12 @@ class Organization extends Model
         return $this->hasMany(RealtimeApp::class);
     }
 
+    /** @return HasMany<LookoutProject, $this> */
+    public function lookoutProjects(): HasMany
+    {
+        return $this->hasMany(LookoutProject::class);
+    }
+
     /** @return HasMany<OrganizationBillingSnapshot, $this> */
     public function billingSnapshots(): HasMany
     {

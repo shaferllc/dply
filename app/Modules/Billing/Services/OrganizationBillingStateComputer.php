@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Services;
 
 use App\Enums\ServerTier;
 use App\Models\FunctionAction;
+use App\Models\LookoutProject;
 use App\Models\Organization;
 use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Server;
@@ -178,6 +179,29 @@ class OrganizationBillingStateComputer
                 $realtimeTierQuantities[$slug] = ($realtimeTierQuantities[$slug] ?? 0) + 1;
             });
 
+        // Managed Lookout error-tracking projects — billed per tier, the first
+        // project per org free (a loss-leader). Dark until LOOKOUT_BILLING_ENABLED
+        // so no line is added today. Projects are ordered oldest-first so the free
+        // allowance lands on the longest-standing project (stable across cycles).
+        $lookoutTierQuantities = [];
+        if ((bool) config('lookout.billing_enabled', false)) {
+            $freeRemaining = max(0, (int) config('lookout.free_projects_per_org', 1));
+            $organization->lookoutProjects()
+                ->where('status', LookoutProject::STATUS_ACTIVE)
+                ->where('created_at', '<=', $ageCutoff)
+                ->orderBy('created_at')
+                ->get(['tier', 'created_at'])
+                ->each(function (LookoutProject $project) use (&$lookoutTierQuantities, &$freeRemaining): void {
+                    if ($freeRemaining > 0) {
+                        $freeRemaining--;
+
+                        return;
+                    }
+                    $slug = $project->tierSlug();
+                    $lookoutTierQuantities[$slug] = ($lookoutTierQuantities[$slug] ?? 0) + 1;
+                });
+        }
+
         [$usagePeriodStart, $usagePeriodEnd] = $this->usageReader->currentMonthWindow();
         $usageTotals = $this->usageReader->totalsForOrganization($organization, $usagePeriodStart, $usagePeriodEnd);
         $edgeUsageEstimate = $this->usageCostCalculator->estimate($usageTotals, $edgeCount);
@@ -249,6 +273,7 @@ class OrganizationBillingStateComputer
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
             realtimeTierQuantities: $realtimeTierQuantities,
+            lookoutTierQuantities: $lookoutTierQuantities,
             serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
             serverLogUsageEstimate: $serverLogUsageEstimate,
         );

@@ -264,6 +264,19 @@ return [
                 'growth' => env('STRIPE_PRICE_STANDARD_REALTIME_GROWTH_YEARLY', ''),
                 'scale' => env('STRIPE_PRICE_STANDARD_REALTIME_SCALE_YEARLY', ''),
             ],
+            // Managed Lookout error-tracking — one metered line per project tier.
+            // Tier definitions/prices live in config('lookout.tiers'); these are
+            // the Stripe price IDs the syncer drives to the active project count.
+            'lookout_tiers' => [
+                'starter' => env('STRIPE_PRICE_STANDARD_LOOKOUT_STARTER', ''),
+                'growth' => env('STRIPE_PRICE_STANDARD_LOOKOUT_GROWTH', ''),
+                'scale' => env('STRIPE_PRICE_STANDARD_LOOKOUT_SCALE', ''),
+            ],
+            'lookout_tiers_yearly' => [
+                'starter' => env('STRIPE_PRICE_STANDARD_LOOKOUT_STARTER_YEARLY', ''),
+                'growth' => env('STRIPE_PRICE_STANDARD_LOOKOUT_GROWTH_YEARLY', ''),
+                'scale' => env('STRIPE_PRICE_STANDARD_LOOKOUT_SCALE_YEARLY', ''),
+            ],
             // --- Legacy size-tier Stripe prices (retired with the migration) ---
             'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
             'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),

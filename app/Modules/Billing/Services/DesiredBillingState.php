@@ -53,6 +53,10 @@ class DesiredBillingState
         public readonly int $realtimeSubtotalCents,
         /** @var array<string, int> Active managed-realtime app counts keyed by tier slug. */
         public readonly array $realtimeTierQuantities,
+        public readonly int $lookoutCount,
+        public readonly int $lookoutSubtotalCents,
+        /** @var array<string, int> Billable managed-Lookout project counts keyed by tier slug. */
+        public readonly array $lookoutTierQuantities,
         public readonly int $monthlyTotalCents,
         // --- Back-compat shims for consumers not yet migrated off the old
         // size-tier shape (billing dashboard, analytics, forecast, snapshot).
@@ -96,6 +100,7 @@ class DesiredBillingState
         int $realtimeCount = 0,
         int $realtimeUnitCents = 0,
         array $realtimeTierQuantities = [],
+        array $lookoutTierQuantities = [],
         int $serverLogUsageSubtotalCents = 0,
         array $serverLogUsageEstimate = [],
     ): self {
@@ -148,6 +153,22 @@ class DesiredBillingState
             }
         }
 
+        // Managed Lookout: one line per project tier, priced from
+        // config('lookout.tiers'). The computer already excludes the org's free
+        // project(s) and zeroes everything when billing is disabled.
+        $lookoutTiers = (array) config('lookout.tiers', []);
+        $lookoutTierNormalized = [];
+        $lookoutSubtotal = 0;
+        foreach ($lookoutTierQuantities as $slug => $qty) {
+            $qty = max(0, (int) $qty);
+            if ($qty === 0) {
+                continue;
+            }
+            $lookoutTierNormalized[(string) $slug] = $qty;
+            $lookoutSubtotal += $qty * (int) ($lookoutTiers[(string) $slug]['price_cents'] ?? 0);
+        }
+        $lookoutCount = array_sum($lookoutTierNormalized);
+
         $monthly = $planPriceCents
             + $serverlessSubtotal
             + $serverlessUsageSubtotalCents
@@ -157,7 +178,8 @@ class DesiredBillingState
             + $edgeSubtotal
             + $edgeUsageSubtotalCents
             + $serverLogUsageSubtotalCents
-            + $realtimeSubtotal;
+            + $realtimeSubtotal
+            + $lookoutSubtotal;
 
         return new self(
             planKey: $plan['key'],
@@ -179,6 +201,9 @@ class DesiredBillingState
             realtimeCount: $realtimeCount,
             realtimeSubtotalCents: $realtimeSubtotal,
             realtimeTierQuantities: $realtimeTierNormalized,
+            lookoutCount: $lookoutCount,
+            lookoutSubtotalCents: $lookoutSubtotal,
+            lookoutTierQuantities: $lookoutTierNormalized,
             monthlyTotalCents: $monthly,
             baseCents: 0,
             serverSubtotalCents: $planPriceCents,
@@ -212,7 +237,8 @@ class DesiredBillingState
             + $this->cloudSubtotalCents
             + $this->cloudResourceSubtotalCents
             + $this->edgeSubtotalCents
-            + $this->realtimeSubtotalCents;
+            + $this->realtimeSubtotalCents
+            + $this->lookoutSubtotalCents;
     }
 
     /**
@@ -254,6 +280,9 @@ class DesiredBillingState
             'realtime_count' => $this->realtimeCount,
             'realtime_subtotal_cents' => $this->realtimeSubtotalCents,
             'realtime_tier_quantities' => $this->realtimeTierQuantities,
+            'lookout_count' => $this->lookoutCount,
+            'lookout_subtotal_cents' => $this->lookoutSubtotalCents,
+            'lookout_tier_quantities' => $this->lookoutTierQuantities,
             'monthly_total_cents' => $this->monthlyTotalCents,
             // Back-compat keys (snapshots/forecast read these today).
             'base_cents' => $this->baseCents,
