@@ -318,6 +318,11 @@
                                 $isUnreachable => __('The server could not open a connection to this resource.'),
                                 filled($cfg['reason'] ?? null) && isset($reasonMap[$cfg['reason']]) => $reasonMap[$cfg['reason']],
                                 filled($cfg['reason'] ?? null) => \Illuminate\Support\Str::headline((string) $cfg['reason']),
+                                // Managed databases provision asynchronously: the cluster takes a few
+                                // minutes, then its connection vars land on the binding. They apply at
+                                // the next deploy, so a configured managed DB prompts a redeploy.
+                                $attached && ($cfg['managed'] ?? false) && $binding->status === 'provisioning' => __('Provisioning the managed cluster — this takes a few minutes.'),
+                                $attached && ($cfg['managed'] ?? false) && $binding->status === 'configured' => __('Connection ready — redeploy to apply the connection variables.'),
                                 $attached && $binding->status === 'configured' => __('Configured and ready.'),
                                 $attached && $binding->status === 'pending' => __('Attached, but not fully configured yet.'),
                                 $attached => \Illuminate\Support\Str::headline((string) $binding->status),

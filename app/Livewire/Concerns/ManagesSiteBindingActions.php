@@ -13,10 +13,12 @@ use App\Models\OauthCredential;
 use App\Models\ObjectStorageCredential;
 use App\Models\PaymentCredential;
 use App\Models\SearchCredential;
+use App\Models\ProviderCredential;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
+use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
 
@@ -51,6 +53,63 @@ trait ManagesSiteBindingActions
 
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $type);
         $this->dispatch('open-modal', 'site-binding-modal');
+    }
+
+    /**
+     * Placement options for the "Provision new database" modal: always
+     * on-box, plus a co-located managed cluster when the server's provider
+     * offers one (DigitalOcean today). Each option carries the engines it
+     * supports so the modal can filter as the operator picks an engine, and
+     * an `available` flag (false when the managed backend exists but no
+     * provider credential is connected). Region/cost are display-only.
+     *
+     * @return list<array{key: string, label: string, sublabel: string, available: bool, note: ?string, engines: list<string>}>
+     */
+    public function databasePlacements(): array
+    {
+        $options = [[
+            'key' => 'on_box',
+            'label' => __('On this server'),
+            'sublabel' => __('Free · shares the box'),
+            'available' => true,
+            'note' => null,
+            'engines' => ['mysql', 'postgres', 'sqlite'],
+        ]];
+
+        $server = $this->site->server;
+        if ($server === null) {
+            return $options;
+        }
+
+        $backend = app(DatabaseRouter::class)->colocatedBackendFor($server);
+        if ($backend === null) {
+            return $options;
+        }
+
+        $region = $backend->regionForServer($server);
+        $cost = $backend->estimatedMonthlyCost((string) ($this->bindingForm['size'] ?? 'small'));
+        $hasCredential = $server->provider_credential_id !== null
+            || ProviderCredential::query()
+                ->where('organization_id', $this->site->organization_id)
+                ->where('provider', $server->provider->value)
+                ->exists();
+
+        $sublabel = implode(' · ', array_filter([
+            $region,
+            $cost !== null ? '~$'.$cost.'/mo' : null,
+            __('isolated, billed by :provider', ['provider' => $server->provider->label()]),
+        ]));
+
+        $options[] = [
+            'key' => 'do_managed',
+            'label' => $server->provider->label().' '.__('Managed'),
+            'sublabel' => $sublabel,
+            'available' => $hasCredential && $region !== null,
+            'note' => $hasCredential ? null : __('Connect a :provider credential first', ['provider' => $server->provider->label()]),
+            'engines' => $backend->supportedEngines(),
+        ];
+
+        return $options;
     }
 
     /**
