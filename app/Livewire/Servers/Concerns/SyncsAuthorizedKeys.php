@@ -174,6 +174,9 @@ trait SyncsAuthorizedKeys
                 $meta[config('server_ssh_keys.meta_drift_started_at_key')],
                 $meta[config('server_ssh_keys.meta_drift_finished_at_key')],
                 $meta[config('server_ssh_keys.meta_drift_error_key')],
+                $meta[config('server_ssh_keys.meta_drift_has_changes_key')],
+                $meta[config('server_ssh_keys.meta_drift_added_count_key')],
+                $meta[config('server_ssh_keys.meta_drift_removed_count_key')],
             );
             $this->server->fresh()->update(['meta' => $meta]);
             $this->server->refresh();
@@ -221,6 +224,9 @@ trait SyncsAuthorizedKeys
             $meta[config('server_ssh_keys.meta_drift_started_at_key')],
             $meta[config('server_ssh_keys.meta_drift_finished_at_key')],
             $meta[config('server_ssh_keys.meta_drift_error_key')],
+            $meta[config('server_ssh_keys.meta_drift_has_changes_key')],
+            $meta[config('server_ssh_keys.meta_drift_added_count_key')],
+            $meta[config('server_ssh_keys.meta_drift_removed_count_key')],
         );
         $this->server->fresh()->update(['meta' => $meta]);
         $this->server->refresh();

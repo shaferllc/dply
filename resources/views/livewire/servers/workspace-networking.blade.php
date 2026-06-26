@@ -45,6 +45,15 @@
 
         {{-- ─── SERVERS: ALL SERVERS OVERVIEW ─────────────────────────────── --}}
         @if ($networking_tab === 'servers')
+        <x-node-graph
+            :map="$networkMap"
+            :eyebrow="__('Network map')"
+            :title="__('Servers, services, and what\'s exposed')"
+            :description="__('Each server in this workspace, the database and cache services it runs, and whether each is reachable off-box or bound to localhost. Hover a node to trace its connections.')"
+            :empty-title="__('No networked services to map yet.')"
+            :empty-text="__('Once a server runs a database or cache, it appears here with its exposure.')"
+        />
+
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>

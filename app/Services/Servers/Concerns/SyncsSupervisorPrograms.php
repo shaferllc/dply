@@ -84,7 +84,7 @@ trait SyncsSupervisorPrograms
                 $out = '';
 
                 foreach ($programs as $program) {
-                    $local = $this->buildIni($program);
+                    $local = trim($this->buildIni($program));
                     $path = $dir.'/dply-sv-'.$program->id.'.conf';
                     $remote = $ssh->exec('if test -f '.escapeshellarg($path).' ; then cat '.escapeshellarg($path).'; else echo __DPLY_MISSING__; fi', 60);
                     $remote = trim((string) $remote);
@@ -374,7 +374,7 @@ trait SyncsSupervisorPrograms
             $server,
             function ($ssh) use ($programs, $dir): bool {
                 foreach ($programs as $program) {
-                    $local = $this->buildIni($program);
+                    $local = trim($this->buildIni($program));
                     $path = $dir.'/dply-sv-'.$program->id.'.conf';
                     $remote = trim((string) $ssh->exec('if test -f '.escapeshellarg($path).' ; then cat '.escapeshellarg($path).'; else echo __DPLY_MISSING__; fi', 60));
                     if ($remote === '__DPLY_MISSING__' || $remote !== $local) {

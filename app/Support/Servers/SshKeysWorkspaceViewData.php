@@ -46,6 +46,9 @@ final class SshKeysWorkspaceViewData
         $driftFinishedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_finished_at_key'));
         $driftBusy = in_array($driftStatus, ['queued', 'running'], true);
         $driftShowBanner = $driftRunId !== '' && in_array($driftStatus, ['queued', 'running', 'completed', 'failed'], true);
+        $driftHasChanges = (bool) data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_has_changes_key'));
+        $driftAddedCount = (int) data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_added_count_key'));
+        $driftRemovedCount = (int) data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_removed_count_key'));
 
         $panelShowBanner = ! empty($component->panel_event_lines);
 
@@ -89,7 +92,9 @@ final class SshKeysWorkspaceViewData
             'drift' => match ($driftStatus) {
                 'queued' => __('Drift preview queued — waiting for a worker to pick it up…'),
                 'running' => __('Comparing authorized_keys against :host …', ['host' => $server->getSshConnectionString()]),
-                'completed' => __('Drift preview ready.'),
+                'completed' => $driftHasChanges
+                    ? __('Drift detected — :add to add, :remove to remove.', ['add' => $driftAddedCount, 'remove' => $driftRemovedCount])
+                    : __('No drift — the server already matches the panel.'),
                 'failed' => __('Drift preview failed.'),
                 default => '',
             },
@@ -107,7 +112,9 @@ final class SshKeysWorkspaceViewData
                 $bannerKind === 'sync' && $syncStatus === 'failed' && $syncError !== '' => $syncError,
                 $bannerKind === 'sync' && $syncStatus === 'completed' && $syncFinishedAt => __('Finished :time', ['time' => Carbon::parse($syncFinishedAt)->diffForHumans()]),
                 $bannerKind === 'drift' && $driftStatus === 'failed' && $driftError !== '' => $driftError,
-                $bannerKind === 'drift' && $driftStatus === 'completed' => __('Compared the panel’s desired keys against the server. See the Drift tab for the structured diff.'),
+                $bannerKind === 'drift' && $driftStatus === 'completed' => $driftHasChanges
+                    ? __('Compared the panel’s desired keys against the server. See the Drift tab for the structured diff.')
+                    : __('authorized_keys on the server already matches your desired keys — nothing to sync.'),
                 $bannerKind === 'panel' => __('The panel was updated. The server\'s authorized_keys file is unchanged until you Sync.'),
                 default => null,
             };
@@ -122,6 +129,7 @@ final class SshKeysWorkspaceViewData
             'driftStatus',
             'driftBusy',
             'driftShowBanner',
+            'driftHasChanges',
             'bannerKind',
             'bannerBusy',
             'bannerOutput',

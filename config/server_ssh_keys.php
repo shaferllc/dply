@@ -81,4 +81,17 @@ return [
     'meta_drift_error_key' => 'ssh_key_drift_error',
     'drift_output_cache_key_prefix' => 'ssh_key_drift_output:',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Server meta keys for the last drift-preview *outcome*
+    |--------------------------------------------------------------------------
+    | The structured diff lives in the (short-lived) cache payload, but the
+    | banner and the Drift tab's empty state need to reflect the result even
+    | after the cache lapses or the page reloads. We persist a tiny summary on
+    | completion so "No drift" vs "N to add / M to remove" survives a refresh.
+    */
+    'meta_drift_has_changes_key' => 'ssh_key_drift_has_changes',
+    'meta_drift_added_count_key' => 'ssh_key_drift_added_count',
+    'meta_drift_removed_count_key' => 'ssh_key_drift_removed_count',
+
 ];

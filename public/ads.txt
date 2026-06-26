@@ -1,0 +1,8 @@
+# ads.txt — Authorized Digital Sellers (IAB Tech Lab spec)
+# https://iabtechlab.com/ads-txt/
+#
+# dply (https://dply.io) is a SaaS product and does not sell advertising
+# inventory, so there are no authorized digital sellers to declare. This file
+# returns a definitive "no authorized sellers" record to crawlers instead of a
+# 404. If dply ever monetizes via ads, add one line per seller, e.g.:
+#   google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

@@ -56,7 +56,10 @@ trait ManagesAuthorizedKeys
             return;
         }
 
-        $this->saveAdvancedSettings();
+        // Method injection only fires when Livewire invokes this as a front-end
+        // action (the confirm-modal "Disable sync" path); on this direct call we
+        // must resolve the audit logger ourselves.
+        $this->saveAdvancedSettings(app(ServerAuthorizedKeysAuditLogger::class));
     }
 
     public function saveAdvancedSettings(ServerAuthorizedKeysAuditLogger $audit): void

@@ -22,6 +22,7 @@ use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Cloud\Services\HetznerService;
 use App\Modules\Cloud\Services\LinodeService;
 use App\Modules\Cloud\Services\VultrService;
+use App\Services\Servers\ServerNetworkMap;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
@@ -582,8 +583,20 @@ class WorkspaceNetworking extends Component
             }
         }
 
+        // Servers → services → exposure node-link graph for the Servers tab header.
+        // Fresh collection — Collection::prepend mutates in place, and the blade
+        // builds its own $allServers off the untouched $peerServers.
+        $networkMap = app(ServerNetworkMap::class)->build(
+            $this->server,
+            collect([$this->server])->merge($peerServers),
+            $databaseEnginesByServer,
+            $databasesByServer,
+            $cacheServicesByServer,
+        );
+
         return view('livewire.servers.workspace-networking', [
             'peerServers' => $peerServers,
+            'networkMap' => $networkMap,
             'databaseEnginesByServer' => $databaseEnginesByServer,
             'databasesByServer' => $databasesByServer,
             'cacheServicesByServer' => $cacheServicesByServer,

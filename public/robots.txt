@@ -1,2 +1,40 @@
+# dply — https://dply.io
+# Public marketing + docs pages are crawlable by default. The authenticated
+# app, admin console, and API surfaces are kept out of search results.
+
 User-agent: *
-Disallow:
+
+Disallow: /admin
+Disallow: /api
+Disallow: /dashboard
+Disallow: /servers
+Disallow: /sites
+Disallow: /cloud
+Disallow: /edge
+Disallow: /serverless
+Disallow: /fn
+Disallow: /fleet
+Disallow: /infrastructure
+Disallow: /networking
+Disallow: /backups
+Disallow: /imports
+Disallow: /launches
+Disallow: /scripts
+Disallow: /marketplace
+Disallow: /projects
+Disallow: /organizations
+Disallow: /notifications
+Disallow: /tasks
+Disallow: /credentials
+Disallow: /deploy
+Disallow: /migrate
+Disallow: /profile
+Disallow: /settings
+Disallow: /horizon
+Disallow: /pulse
+Disallow: /mcp
+Disallow: /impersonate
+Disallow: /coming-soon
+Disallow: /storage/
+
+Sitemap: https://dply.io/sitemap.xml

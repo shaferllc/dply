@@ -45,6 +45,12 @@
                         @if ($recentlySynced)
                             <p class="text-sm font-medium text-brand-ink">{{ __('Sync finished — drift preview cleared.') }}</p>
                             <p class="text-xs text-brand-moss">{{ __('Click “Refresh preview” to confirm the server now matches the panel.') }}</p>
+                        @elseif (($driftStatus ?? '') === 'completed' && ! ($driftHasChanges ?? false))
+                            {{-- Last preview completed with no drift, but the structured diff has
+                                 lapsed from the cache (or the page reloaded). Reflect the outcome
+                                 instead of pretending nothing has run. --}}
+                            <p class="text-sm font-medium text-brand-ink">{{ __('In sync — no drift.') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('authorized_keys on the server matches your desired keys. Click “Refresh preview” to re-check.') }}</p>
                         @else
                             <p class="text-sm font-medium text-brand-ink">{{ __('No comparison loaded yet.') }}</p>
                             <p class="text-xs text-brand-moss">{{ __('Click “Refresh preview” to compare the panel against authorized_keys on the server.') }}</p>
