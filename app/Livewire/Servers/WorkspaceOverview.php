@@ -8,6 +8,8 @@ use App\Jobs\PollDoksClusterStatusJob;
 use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Concerns\GuardsBilledDeploys;
+use App\Livewire\Concerns\WatchesSiteDeploys;
 use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -55,9 +57,11 @@ use Livewire\Component;
 class WorkspaceOverview extends Component
 {
     use BuildsContainerLaunchSummary;
+    use GuardsBilledDeploys;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RendersWorkspacePlaceholder;
+    use WatchesSiteDeploys;
 
     public function mount(Server $server): mixed
     {
@@ -540,6 +544,7 @@ class WorkspaceOverview extends Component
             'latestMetricSnapshot' => $latestMetricSnapshot,
             'sitesPreview' => $sitesPreview,
             'sitesPreviewLatestDeploys' => $sitesPreviewLatestDeploys,
+            'deployableSiteCount' => $this->deployableSitesFor($this->server->loadMissing('sites'))->count(),
             'onboardingSteps' => $onboardingSteps,
             'onboardingDone' => $onboardingDone,
             'onboardingTotal' => $onboardingTotal,

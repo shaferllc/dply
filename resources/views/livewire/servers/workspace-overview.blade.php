@@ -113,6 +113,10 @@
         @endif
 
         @include('livewire.servers.partials.overview._danger-zone')
+
+        {{-- Deploy plumbing for the Sites card's Deploy button (WatchesSiteDeploys). --}}
+        @include('livewire.servers.partials._deploy-console')
+        @include('livewire.servers.partials.deploy-sites-modal')
     </div>
 
     <x-slot name="modals">

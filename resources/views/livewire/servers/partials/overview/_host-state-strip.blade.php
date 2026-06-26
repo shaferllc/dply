@@ -123,12 +123,14 @@
             </div>
             <p class="text-xs text-brand-mist">{{ __('Updated :t', ['t' => \Illuminate\Support\Carbon::parse($checkedAt)->diffForHumans()]) }}</p>
         </div>
-        <div class="grid grid-cols-2 gap-3 p-6 sm:grid-cols-3 sm:p-7 xl:grid-cols-6">
+        <div class="grid grid-cols-2 gap-3 p-6 sm:grid-cols-3 sm:p-7">
             @foreach ($hostStateStats as $stat)
-                <div @class(['rounded-2xl border px-4 py-3 shadow-sm', $statCardTones[$stat['tone']]])>
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
-                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
-                    <p class="mt-1 truncate text-[11px] {{ $stat['subTone'] }}" title="{{ $stat['sub'] }}">{{ $stat['sub'] }}</p>
+                <div @class(['flex items-baseline justify-between gap-3 rounded-2xl border px-4 py-3 shadow-sm', $statCardTones[$stat['tone']]])>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
+                        <p class="mt-1 truncate text-[11px] {{ $stat['subTone'] }}" title="{{ $stat['sub'] }}">{{ $stat['sub'] }}</p>
+                    </div>
+                    <p class="shrink-0 whitespace-nowrap font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
                 </div>
             @endforeach
         </div>

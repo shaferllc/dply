@@ -45,24 +45,38 @@
         };
     @endphp
     <section class="dply-card overflow-hidden">
-        <div class="px-6 pt-5 pb-4 sm:px-7">
-            <div class="flex items-start gap-3">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
                     <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hosting') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Sites') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sites hosted on this server, each with its current status and most recent deploy.') }}</p>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Sites hosted on this server, each with its current status and most recent deploy.') }}</p>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
-                    @if ($siteCount > 0)
-                        <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
-                    @endif
-                    <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                        <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Open Sites') }}
-                    </a>
-                </div>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+                @if ($siteCount > 0)
+                    <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
+                @endif
+                @if (($deployableSiteCount ?? 0) > 0)
+                    {{-- Deploys the one deployable site immediately, or opens the
+                         pick-sites modal when there's more than one (WatchesSiteDeploys). --}}
+                    <x-spinner-button
+                        variant="primary"
+                        size="sm"
+                        wire:click="openServerDeploy('{{ $server->id }}')"
+                        target="openServerDeploy"
+                        icon="heroicon-o-rocket-launch"
+                        :label="__('Deploy')"
+                        :busy-label="__('Deploying…')"
+                    />
+                @endif
+                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                    <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Open Sites') }}
+                </a>
             </div>
         </div>
         <ul class="divide-y divide-brand-ink/10">
