@@ -9,6 +9,7 @@ use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Services\SshConnection;
 use App\Support\Sites\BindingReachability;
+use App\Support\Sites\SiteFixers;
 
 /**
  * Pre-cutover gate: verifies that every networked resource binding a site
@@ -131,6 +132,26 @@ final class DeployResourceVerifier
             ];
         }
 
+        // A redis binding points the app at phpredis (REDIS_CLIENT=phpredis, and
+        // often cache/session/queue → redis). If the box's PHP lacks the `redis`
+        // extension the live app boots straight into a 500 (`Class "Redis" not
+        // found`) — exactly the kind of "deploy succeeds, app is down" failure
+        // this gate exists to stop. So when a redis binding is present we verify
+        // (and idempotently install) the extension here over the already-open SSH
+        // connection, rather than as a standalone console-action banner. Cheap
+        // `php -m` no-op on a cleanly provisioned box; only touches apt when the
+        // extension is genuinely missing.
+        if ($site->bindings->contains(static fn (SiteBinding $b): bool => $b->type === 'redis')) {
+            [$step, $stepLog, $failure] = $this->verifyPhpRedisExtension($site, $ssh);
+            $log .= $stepLog;
+            if ($step !== null) {
+                $steps[] = $step;
+            }
+            if ($failure !== null) {
+                $criticalFailures[] = $failure;
+            }
+        }
+
         $deployment?->recordPhaseResults('resources', $steps);
 
         if ($criticalFailures !== []) {
@@ -146,6 +167,68 @@ final class DeployResourceVerifier
             count($targets) - $this->unreachableCount($steps), $this->unreachableCount($steps));
 
         return $log;
+    }
+
+    /**
+     * Guarantee the PHP `redis` client extension is present on the box when the
+     * site has a redis binding. One SSH round-trip that (1) skips silently when
+     * there's no server-side PHP (static/headless host), (2) no-ops when the
+     * extension is already loaded — the common case on a cleanly provisioned box,
+     * else (3) installs it via the audited {@see SiteFixers} `install_php_redis`
+     * command and re-checks. Verdict is driven by markers, not exit codes
+     * ({@see SshConnection::exec()} never throws on non-zero).
+     *
+     * @return array{0: array<string, mixed>|null, 1: string, 2: string|null}
+     *   [phase step (null when not applicable), log lines, critical-failure label]
+     */
+    private function verifyPhpRedisExtension(Site $site, SshConnection $ssh): array
+    {
+        $start = microtime(true);
+        $install = (string) SiteFixers::spec('install_php_redis')['command'];
+
+        $script = implode("\n", [
+            'if ! command -v php >/dev/null 2>&1; then echo DPLY_NO_PHP; exit 0; fi',
+            "if php -m 2>/dev/null | grep -qi '^redis$'; then echo DPLY_HAVE_REDIS; exit 0; fi",
+            'echo DPLY_INSTALLING',
+            $install,
+            "php -m 2>/dev/null | grep -qi '^redis$' && echo DPLY_REDIS_OK || echo DPLY_REDIS_MISSING",
+        ]);
+
+        // Long timeout: the install path may build from PECL behind an apt lock.
+        $out = (string) $ssh->exec('sudo -n bash -lc '.escapeshellarg($script), 600);
+        $durationMs = (int) round((microtime(true) - $start) * 1000);
+
+        // No server-side PHP (static/headless host) — the extension is moot.
+        if (str_contains($out, 'DPLY_NO_PHP')) {
+            return [null, "· PHP redis extension — no server-side PHP on this host; skipping\n", null];
+        }
+
+        $alreadyHad = str_contains($out, 'DPLY_HAVE_REDIS');
+        $installed = str_contains($out, 'DPLY_REDIS_OK');
+        $present = $alreadyHad || $installed;
+
+        $detail = match (true) {
+            $alreadyHad => 'The PHP redis extension is already installed.',
+            $installed => 'The PHP redis extension was missing and has been installed (PHP-FPM reloaded).',
+            default => 'The PHP redis extension is missing and could not be installed — the app will 500 with '
+                .'`Class "Redis" not found` once it dials phpredis. Blocking cutover so the previous release keeps serving.',
+        };
+
+        $log = $present
+            ? sprintf("✓ PHP redis extension — %s\n", $alreadyHad ? 'present' : 'installed')
+            : "✗ PHP redis extension — MISSING and install failed — blocking cutover\n";
+
+        $step = [
+            'step_id' => 'php_redis_ext',
+            'step_type' => 'resource',
+            'command' => 'PHP redis extension',
+            'ok' => $present,
+            'skipped' => false,
+            'output' => $detail,
+            'duration_ms' => $durationMs,
+        ];
+
+        return [$step, $log, $present ? null : 'PHP redis extension (missing, install failed)'];
     }
 
     /** Human-readable per-step detail for the timeline output drawer. */

@@ -142,7 +142,8 @@ trait ResolvesSiteUrls
     /**
      * Public URL of the site's custom logo (uploaded or pulled from its
      * favicon), or null when none is set — callers fall back to the generated
-     * gradient + initials avatar. Stored on the `public` disk.
+     * gradient + initials avatar. Stored on the durable `site_assets` disk so it
+     * survives a redeploy.
      */
     public function logoUrl(): ?string
     {
@@ -151,7 +152,7 @@ trait ResolvesSiteUrls
             return null;
         }
 
-        return Storage::disk('public')->url($path);
+        return Storage::disk('site_assets')->url($path);
     }
 
     public function hasLogo(): bool

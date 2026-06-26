@@ -204,7 +204,8 @@ class Server extends Model
     /**
      * Public URL of the server's custom logo, or null when none is set —
      * callers fall back to the generated gradient + initials avatar. Stored on
-     * the `public` disk. Mirrors {@see Site::logoUrl()}.
+     * the durable `site_assets` disk so it survives a redeploy. Mirrors
+     * {@see Site::logoUrl()}.
      */
     public function logoUrl(): ?string
     {
@@ -212,7 +213,7 @@ class Server extends Model
             return null;
         }
 
-        return Storage::disk('public')->url($this->logo_path);
+        return Storage::disk('site_assets')->url($this->logo_path);
     }
 
     public function hasLogo(): bool

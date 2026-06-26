@@ -37,7 +37,7 @@
         || $changelogActive
         || $pricingActive
         || $roadmapActive
-        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*')
+        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*', 'blog.*')
         || ($authed
             && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
             && ($req->routeIs('admin.*') || $req->is('horizon*', 'pulse*')));
@@ -349,6 +349,12 @@
                                                 <x-heroicon-o-book-open class="{{ $hi }}" />
                                             </x-slot>
                                             {{ __('Docs') }}
+                                        </x-dropdown-link>
+                                        <x-dropdown-link :href="route('blog.index')" :description="__('Build-in-public devlog')">
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-newspaper class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Blog') }}
                                         </x-dropdown-link>
                                         <x-dropdown-link :href="route('pricing')" :description="__('Plans & pricing')">
                                             <x-slot name="icon">
@@ -666,6 +672,12 @@
                         <x-heroicon-o-book-open class="{{ $hi }}" />
                     </x-slot>
                     {{ __('Docs') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('blog.index')" :active="request()->routeIs('blog.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-newspaper class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Blog') }}
                 </x-responsive-nav-link>
                 <div class="pt-4 mt-2 border-t border-brand-ink/10">
                     <p class="px-4 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ Auth::user()->name }}</p>

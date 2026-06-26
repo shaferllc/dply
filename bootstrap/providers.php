@@ -8,6 +8,7 @@ use App\Modules\Database\DatabaseServiceProvider;
 use App\Modules\Logs\LogsServiceProvider;
 use App\Modules\Snapshots\SnapshotsServiceProvider;
 use App\Modules\Deploy\DeployServiceProvider;
+use App\Modules\Blog\BlogServiceProvider;
 use App\Modules\Docs\DocsServiceProvider;
 use App\Modules\Edge\EdgeServiceProvider;
 use App\Modules\Feedback\FeedbackServiceProvider;
@@ -37,6 +38,7 @@ return [
     DeployServiceProvider::class,
     LogsServiceProvider::class,
     SnapshotsServiceProvider::class,
+    BlogServiceProvider::class,
     DocsServiceProvider::class,
     EdgeServiceProvider::class,
     FeedbackServiceProvider::class,

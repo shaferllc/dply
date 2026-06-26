@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * Pulls a site's favicon and stores it as the site logo on the `public` disk.
+ * Pulls a site's favicon and stores it as the site logo on the durable
+ * `site_assets` disk (release-independent, so it survives a redeploy — unlike the
+ * old `public` disk, which lived inside each atomic release and got wiped).
  *
  * Raster formats only (png/jpg/webp/gif/ico) — SVG is deliberately rejected so
  * a remote site can't deliver a script-bearing SVG that we'd then serve from
@@ -22,7 +24,7 @@ class SiteFaviconFetcher
 {
     private const MAX_BYTES = 1_048_576; // 1 MB
 
-    private const DISK = 'public';
+    private const DISK = 'site_assets';
 
     private const DIR = 'site-logos';
 
@@ -40,7 +42,8 @@ class SiteFaviconFetcher
 
     /**
      * Fetch + store the favicon, returning the new relative logo path on the
-     * public disk. Throws RuntimeException with a user-facing message on failure.
+     * durable site_assets disk. Throws RuntimeException with a user-facing
+     * message on failure.
      */
     public function fetch(Site $site): string
     {

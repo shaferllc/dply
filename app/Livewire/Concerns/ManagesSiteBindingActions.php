@@ -351,13 +351,15 @@ trait ManagesSiteBindingActions
         }
 
         // Connecting Redis must "just work": the app now dials phpredis (and may
-        // use redis for cache/sessions/queue), so guarantee the PHP redis client
-        // extension exists on the box rather than letting it 500 at runtime with
-        // `Class "Redis" not found`. Dispatched after the connectivity probe so
-        // it's the run the page-top banner surfaces; no-ops when already present.
-        if ($binding->type === 'redis' && method_exists($this, 'ensurePhpRedisExtension')) {
-            $this->ensurePhpRedisExtension($binding);
-        }
+        // use redis for cache/sessions/queue), so the box needs the PHP redis
+        // client extension or it 500s at runtime with `Class "Redis" not found`.
+        // That guarantee now lives in the deploy resource-verify gate
+        // ({@see \App\Services\Sites\DeployResourceVerifier}) — it checks and
+        // idempotently installs the extension pre-cutover whenever a redis binding
+        // is present, so it runs once per deploy alongside the reachability probes
+        // instead of as a standalone console-action banner that lingered on the
+        // deploy hub after every attach. The new env (REDIS_CLIENT=phpredis) only
+        // goes live on that same deploy/restart anyway, so the timing lines up.
 
         // Connecting Lookout must "just work": the injected LOOKOUT_DSN only does
         // anything if the app requires the lookout/tracing SDK. dply can't edit

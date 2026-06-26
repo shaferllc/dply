@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Jobs\EnsureSiteComposerPackageJob;
-use App\Jobs\EnsureSitePhpRedisExtensionJob;
 use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\SwitchCacheServiceJob;
 use App\Jobs\TestBroadcastingBindingJob;
@@ -81,40 +80,6 @@ trait VerifiesSiteBindings
             $run,
             __('Reachability check complete.'),
             __('Reachability check could not complete — see the console for details.'),
-        );
-    }
-
-    /**
-     * After a Redis binding is attached, make sure the site's server actually
-     * has the PHP `redis` client extension. Attaching Redis sets
-     * REDIS_CLIENT=phpredis (and may flip cache/session/queue drivers to redis),
-     * so a box missing the extension 500s at runtime with `Class "Redis" not
-     * found`. Provisioning installs it only best-effort, so we check-and-install
-     * here — the install is a cheap no-op when it's already present. Runs as its
-     * own console-action so the operator sees the guarantee (and any failure)
-     * in the page-top banner; SSH-capable hosts only (skips container/serverless).
-     */
-    private function ensurePhpRedisExtension(SiteBinding $binding): void
-    {
-        if ($binding->type !== 'redis') {
-            return;
-        }
-        if ($this->site->server?->hostCapabilities()->supportsSsh() !== true) {
-            return;
-        }
-
-        $run = $this->seedQueuedConsoleAction('site_remediate', __('Ensuring the PHP Redis extension'));
-
-        EnsureSitePhpRedisExtensionJob::dispatch(
-            (string) $run->id,
-            (string) $this->site->id,
-        );
-
-        $this->dispatch('dply-console-action-focus');
-        $this->watchConsoleAction(
-            $run,
-            __('The PHP Redis extension is installed — Redis is ready to use.'),
-            __('Could not install the PHP Redis extension — the app may fail with Class "Redis" not found.'),
         );
     }
 

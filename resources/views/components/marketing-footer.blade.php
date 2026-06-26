@@ -30,6 +30,7 @@
                         <li><a href="{{ route('pricing') }}" class="hover:text-brand-cream transition-colors">Pricing</a></li>
                         <li><a href="{{ route('migrate.index') }}" class="hover:text-brand-cream transition-colors">Migrate</a></li>
                         <li><a href="{{ route('docs.index') }}" class="hover:text-brand-cream transition-colors">Docs</a></li>
+                        <li><a href="{{ route('blog.index') }}" class="hover:text-brand-cream transition-colors">Blog</a></li>
                         @auth
                             <li><a href="{{ route('dashboard') }}" class="hover:text-brand-cream transition-colors">Dashboard</a></li>
                         @else
