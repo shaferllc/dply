@@ -8,11 +8,13 @@ use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use App\Exceptions\ServerCommandNotPermittedException;
 use App\Models\Script;
 use App\Models\Server;
+use App\Models\ServerCommandRun;
 use App\Models\ServerRecipe;
+use App\Services\Servers\ServerCommandRunner;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\SshConnection;
 use App\Support\Servers\DockerContainerShellSupport;
 use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Contracts\View\View;
@@ -87,6 +89,20 @@ class WorkspaceRun extends Component
     public ?string $command_output = null;
 
     public ?string $command_error = null;
+
+    /**
+     * Active queued run being streamed. While non-null and $isRunning is
+     * true the view polls pollActiveRun() to pull incremental output.
+     */
+    public ?string $activeRunId = null;
+
+    public bool $isRunning = false;
+
+    public ?string $activeRunStatus = null;
+
+    public ?int $activeRunExitCode = null;
+
+    public ?string $activeRunLabel = null;
 
     #[Url(as: 'container', except: '')]
     public string $container_scope_id = '';
@@ -261,70 +277,132 @@ class WorkspaceRun extends Component
 
     /**
      * Run a one-off shell command against the server. The command isn't
-     * persisted — output streams to the live SSH panel and is
-     * discarded after the request. Operators iterating on a script
-     * before saving it as a recipe live here.
+     * persisted as a recipe, but every run is recorded as a
+     * ServerCommandRun row and executed by a queued worker so output can
+     * stream back live (and survive past PHP's request timeout). Operators
+     * iterating on a script before saving it as a recipe live here.
      */
     public function runAdhocCommand(): void
     {
         $this->authorize('view', $this->server);
-        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
-            $this->command_error = 'Deployers cannot run arbitrary shell commands on servers.';
-
-            return;
-        }
         $this->validate(['adhoc_command' => 'required|string|max:4000']);
-        $this->command_output = null;
-        $this->command_error = null;
 
-        try {
-            $this->resetRemoteSshStreamTargets();
-            $remote = $this->remoteCommandForScope($this->adhoc_command);
-            $this->remoteSshStreamSetMeta(
-                $this->usesContainerScope() ? __('Ad-hoc command (container)') : __('Ad-hoc command'),
-                $this->commandScopeLabel().'  '.$this->adhoc_command
-            );
-            $ssh = new SshConnection($this->server);
-            $this->command_output = $ssh->execWithCallback(
-                $remote,
-                fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk),
-                300
-            );
+        $remote = $this->remoteCommandForScope($this->adhoc_command);
+        $label = ($this->usesContainerScope() ? __('Ad-hoc command (container)') : __('Ad-hoc command'))
+            .' — '.$this->commandScopeLabel();
+
+        $this->dispatchRun(
+            displayCommand: $this->adhoc_command,
+            remoteCommand: $remote,
+            source: ServerCommandRun::SOURCE_ADHOC,
+            label: $label,
+        );
+
+        if ($this->command_error === null) {
             $this->adhoc_command = '';
-        } catch (\Throwable $e) {
-            $this->command_error = $e->getMessage();
         }
     }
 
     public function runRecipe(string $id): void
     {
         $this->authorize('update', $this->server);
-        if (auth()->user()->currentOrganization()?->userIsDeployer(auth()->user())) {
-            $this->command_error = 'Deployers cannot run server saved commands or arbitrary shell commands.';
+
+        $recipe = ServerRecipe::query()->where('server_id', $this->server->id)->findOrFail($id);
+
+        // base64-wrap so arbitrary multi-line scripts survive transport.
+        $b64 = base64_encode($recipe->script);
+        $inner = 'echo '.escapeshellarg($b64).' | base64 -d | /usr/bin/env bash 2>&1';
+        $remoteCmd = $this->remoteCommandForScope($inner);
+
+        $label = ($this->usesContainerScope() ? __('Saved command (container)') : __('Saved command'))
+            .': '.$recipe->name;
+
+        $this->dispatchRun(
+            displayCommand: $recipe->name,
+            remoteCommand: $remoteCmd,
+            source: ServerCommandRun::SOURCE_RECIPE,
+            label: $label,
+            recipe: $recipe,
+        );
+    }
+
+    /**
+     * Queue a server command run and begin streaming it. Shared by the
+     * ad-hoc runner and saved-command runner.
+     */
+    protected function dispatchRun(
+        string $displayCommand,
+        string $remoteCommand,
+        string $source,
+        string $label,
+        ?ServerRecipe $recipe = null,
+    ): void {
+        $this->command_output = null;
+        $this->command_error = null;
+        $this->activeRunId = null;
+        $this->activeRunStatus = null;
+        $this->activeRunExitCode = null;
+        $this->isRunning = false;
+
+        try {
+            $run = app(ServerCommandRunner::class)->queue(
+                server: $this->server,
+                actor: auth()->user(),
+                displayCommand: $displayCommand,
+                remoteCommand: $remoteCommand,
+                source: $source,
+                recipe: $recipe,
+                containerId: $this->usesContainerScope() ? $this->container_scope_id : null,
+                containerName: $this->usesContainerScope() ? $this->container_scope_name : null,
+            );
+
+            $this->activeRunId = (string) $run->id;
+            $this->activeRunStatus = $run->status;
+            $this->activeRunLabel = $label;
+            $this->isRunning = true;
+        } catch (ServerCommandNotPermittedException $e) {
+            $this->command_error = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->command_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * Polled by the view (wire:poll) while a run is active. Pulls the
+     * latest streamed stdout/stderr off the run row and stops polling
+     * once the row settles.
+     */
+    public function pollActiveRun(): void
+    {
+        if ($this->activeRunId === null) {
+            $this->isRunning = false;
 
             return;
         }
-        $recipe = ServerRecipe::query()->where('server_id', $this->server->id)->findOrFail($id);
-        $this->command_output = null;
-        $this->command_error = null;
-        try {
-            $ssh = new SshConnection($this->server);
-            $b64 = base64_encode($recipe->script);
-            $inner = 'echo '.escapeshellarg($b64).' | base64 -d | /usr/bin/env bash 2>&1';
-            $remoteCmd = $this->remoteCommandForScope($inner);
-            $this->resetRemoteSshStreamTargets();
-            $this->remoteSshStreamSetMeta(
-                ($this->usesContainerScope() ? __('Saved command (container)') : __('Saved command')).': '.$recipe->name,
-                $this->commandScopeLabel().'  '.$remoteCmd
-            );
-            $this->command_output = $ssh->execWithCallback(
-                $remoteCmd,
-                fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk),
-                900
-            );
-            $this->toastSuccess('Saved command ran. See command output below if shown.');
-        } catch (\Throwable $e) {
-            $this->command_error = $e->getMessage();
+
+        $run = ServerCommandRun::query()
+            ->where('server_id', $this->server->id)
+            ->find($this->activeRunId);
+
+        if ($run === null) {
+            $this->isRunning = false;
+
+            return;
+        }
+
+        $this->command_output = $run->stdout;
+        $this->command_error = $run->stderr;
+        $this->activeRunStatus = $run->status;
+        $this->activeRunExitCode = $run->exit_code;
+
+        if ($run->isSettled()) {
+            $this->isRunning = false;
+
+            if ($run->status === ServerCommandRun::STATUS_COMPLETED) {
+                $this->toastSuccess(__('Command finished.'));
+            } else {
+                $this->toastError(__('Command failed.'));
+            }
         }
     }
 

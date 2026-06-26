@@ -211,8 +211,8 @@ return [
         'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
-        // exit: ship once remote-script execution surface is reviewed (security risk)
-        'run' => env('FEATURE_WORKSPACE_RUN', false),
+        // GA: queued + audited execution surface (ServerCommandRunner / RunServerCommandJob)
+        'run' => env('FEATURE_WORKSPACE_RUN', true),
         // exit: ship alongside run GA; teaser only when run is off
         'run_preview' => env('FEATURE_WORKSPACE_RUN_PREVIEW', true),
         // exit: ship once attribution validated on 3 OS stacks + 2+ site fixtures; security review on SSH ps script

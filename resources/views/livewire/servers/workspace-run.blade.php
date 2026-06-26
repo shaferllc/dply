@@ -9,7 +9,7 @@
     :title="__('Run')"
     :description="__('Run server-level commands. Saved commands, ad-hoc shell, and library presets all in one place. Site deploys live on each site’s page.')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
+    @include('livewire.servers.partials.run-output-panel')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($container_scope_id !== '')
@@ -141,6 +141,7 @@
                                         wire:click="runRecipe('{{ $rec->id }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="runRecipe('{{ $rec->id }}')"
+                                        @disabled($isRunning)
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
@@ -280,14 +281,11 @@
                 </div>
                 <div class="px-6 py-6 sm:px-7">
                 <form wire:submit="runAdhocCommand" class="space-y-3">
-                    <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="{{ $container_scope_id !== '' ? 'php artisan migrate --force' : 'uname -a' }}"></textarea>
+                    <textarea wire:model="adhoc_command" rows="4" @disabled($isRunning) class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm disabled:opacity-60" placeholder="{{ $container_scope_id !== '' ? 'php artisan migrate --force' : 'uname -a' }}"></textarea>
                     <div class="flex flex-wrap items-center gap-3">
-                        <x-primary-button type="submit" class="!py-2">
-                            {{ __('Run command') }}
+                        <x-primary-button type="submit" class="!py-2" :disabled="$isRunning">
+                            {{ $isRunning ? __('Running…') : __('Run command') }}
                         </x-primary-button>
-                        @if ($command_error)
-                            <p class="text-xs text-red-700">{{ $command_error }}</p>
-                        @endif
                     </div>
                 </form>
                 </div>
