@@ -11,7 +11,13 @@
             </div>
         </div>
         @if (($report['deployments']['failed_count'] ?? 0) === 0)
-            <p class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('No failed deploys in the lookback window.') }}</p>
+            <x-empty-state
+                borderless
+                tone="sage"
+                icon="heroicon-o-check-circle"
+                :title="__('No failed deploys')"
+                :description="__('Nothing failed in the last :days days.', ['days' => $report['deployments']['lookback_days'] ?? 7])"
+            />
         @else
             <ul class="divide-y divide-brand-ink/10">
                 @foreach ($report['deployments']['recent'] as $failure)
@@ -38,7 +44,13 @@
             </div>
         </div>
         @if (count($report['certificates']['items']) === 0)
-            <p class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('No expiring or failed certificates in the warning window.') }}</p>
+            <x-empty-state
+                borderless
+                tone="sage"
+                icon="heroicon-o-shield-check"
+                :title="__('Certificates healthy')"
+                :description="__('No expiring or failed certificates in the warning window.')"
+            />
         @else
             <ul class="divide-y divide-brand-ink/10">
                 @foreach ($report['certificates']['items'] as $cert)
@@ -75,7 +87,13 @@
         </div>
     </div>
     @if (($report['daemons']['inactive_count'] ?? 0) === 0)
-        <p class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('All :count configured programs are active.', ['count' => $report['daemons']['total'] ?? 0]) }}</p>
+        <x-empty-state
+            borderless
+            tone="sage"
+            icon="heroicon-o-check-circle"
+            :title="__('All workers active')"
+            :description="__('All :count configured programs are active.', ['count' => $report['daemons']['total'] ?? 0])"
+        />
     @else
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($report['daemons']['inactive'] as $daemon)

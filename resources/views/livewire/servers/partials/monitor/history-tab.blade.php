@@ -73,7 +73,13 @@
         </div>
 
         @if ($rangeSampleCount === 0)
-            <p class="mt-6 text-sm text-brand-mist">{{ __('No history in this range yet. Once samples come in, panels will populate automatically.') }}</p>
+            <x-empty-state
+                class="mt-6"
+                borderless
+                icon="heroicon-o-chart-bar"
+                :title="__('No history in this range yet')"
+                :description="__('Once the monitor agent reports samples, these panels populate automatically — try a wider window like 24H or 7D.')"
+            />
         @else
             <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {{-- CPU --}}

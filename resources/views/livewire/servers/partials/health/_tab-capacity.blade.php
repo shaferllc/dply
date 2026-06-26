@@ -29,16 +29,18 @@
 @endphp
 
 <section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Capacity') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Guest metrics snapshot') }}</h3>
-            @if ($report['capacity']['captured_at'])
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Sampled :ago', ['ago' => $report['capacity']['captured_at']->diffForHumans()]) }}</p>
-            @endif
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="flex min-w-0 items-start gap-3">
+            <x-icon-badge>
+                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Capacity') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Guest metrics snapshot') }}</h3>
+                @if ($report['capacity']['captured_at'])
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Sampled :ago', ['ago' => $report['capacity']['captured_at']->diffForHumans()]) }}</p>
+                @endif
+            </div>
         </div>
         <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex shrink-0 items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
             {{ __('Full metrics') }}
@@ -48,15 +50,24 @@
         @if (! ($report['capacity']['has_samples'] ?? false))
             <p class="text-sm text-brand-moss">{{ __('Install the monitor agent to populate capacity signals.') }}</p>
         @else
+            {{-- Every stat sits in the same boxed cell so the row reads as one
+                 uniform set — the three percentages carry a utilisation bar, Load
+                 is an absolute value with no bar. --}}
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {!! $metricRow(__('CPU'), $report['capacity']['metrics']['cpu_pct'] ?? null) !!}
-                {!! $metricRow(__('Memory'), $report['capacity']['metrics']['mem_pct'] ?? null) !!}
-                {!! $metricRow(__('Root disk'), $report['capacity']['metrics']['disk_pct'] ?? null) !!}
                 <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Load (1m)') }}</p>
-                    <p class="mt-1 text-lg font-semibold tabular-nums text-brand-ink">
-                        {{ isset($report['capacity']['metrics']['load_1m']) ? number_format((float) $report['capacity']['metrics']['load_1m'], 2) : '—' }}
-                    </p>
+                    {!! $metricRow(__('CPU'), $report['capacity']['metrics']['cpu_pct'] ?? null) !!}
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
+                    {!! $metricRow(__('Memory'), $report['capacity']['metrics']['mem_pct'] ?? null) !!}
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
+                    {!! $metricRow(__('Root disk'), $report['capacity']['metrics']['disk_pct'] ?? null) !!}
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
+                    <div class="flex items-baseline justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Load (1m)') }}</span>
+                        <span class="font-mono text-lg font-semibold tabular-nums text-brand-ink">{{ isset($report['capacity']['metrics']['load_1m']) ? number_format((float) $report['capacity']['metrics']['load_1m'], 2) : '—' }}</span>
+                    </div>
                 </div>
             </div>
         @endif

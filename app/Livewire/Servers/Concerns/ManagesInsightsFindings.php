@@ -364,6 +364,56 @@ trait ManagesInsightsFindings
     }
 
     /**
+     * Dismiss every open, unacknowledged critical *problem* finding for this
+     * server in one action — backs the condensed critical banner's "Dismiss all".
+     * Mirrors the banner's own selection (critical, server-scoped, problems only;
+     * NULL kind is treated as a problem). Acknowledgements are reversible from the
+     * Dismissed tab, and recurring issues resurface on the next scan.
+     */
+    public function acknowledgeCriticalFindings(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $user = auth()->user();
+        if ($user === null) {
+            return;
+        }
+
+        $findings = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->whereNull('acknowledged_at')
+            ->where('severity', InsightFinding::SEVERITY_CRITICAL)
+            ->where(function ($q): void {
+                $q->whereNull('kind')->orWhere('kind', '!=', InsightFinding::KIND_SUGGESTION);
+            })
+            ->get();
+
+        if ($findings->isEmpty()) {
+            return;
+        }
+
+        $org = $this->server->organization;
+        foreach ($findings as $finding) {
+            $finding->forceFill([
+                'acknowledged_at' => now(),
+                'acknowledged_by_user_id' => $user->id,
+            ])->save();
+
+            if ($org instanceof Organization) {
+                audit_log($org, $user, 'insight.acknowledged', $this->server, null, [
+                    'finding_id' => $finding->id,
+                    'insight_key' => $finding->insight_key,
+                    'severity' => $finding->severity,
+                ]);
+            }
+
+            $this->closeFindingDetailIfMatches($finding->id);
+        }
+    }
+
+    /**
      * Close the detail modal only when the action targeted the *currently
      * displayed* finding. Without this guard, a row-level action button
      * (e.g., the existing inline "Acknowledge" on the banner) would

@@ -170,67 +170,37 @@
         </x-server-workspace-tab>
     </x-server-workspace-tablist>
 
-    @if ($tab === 'overview' && $bannerFindings->isNotEmpty())
+    @if ($tab === 'overview' && $criticalCount > 0)
+        {{-- Compact summary only — the full findings (with Apply fix / View details)
+             render in the Open findings list below, so we don't repeat each one here. --}}
         <div role="alert" aria-live="polite" class="rounded-2xl border border-red-200 bg-red-50/70 shadow-sm">
-            <div class="flex items-start gap-3 px-5 py-4 border-b border-red-200/80">
-                <x-heroicon-s-exclamation-triangle class="h-5 w-5 shrink-0 text-red-700 mt-0.5" aria-hidden="true" />
-                <div class="min-w-0">
-                    <h2 class="text-sm font-semibold text-red-900">{{ __('Critical attention required') }}</h2>
-                    <p class="mt-0.5 text-xs text-red-900/80">{{ __('Acknowledge to clear from this banner. Recurring issues will resurface automatically.') }}</p>
+            <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <x-heroicon-s-exclamation-triangle class="h-5 w-5 shrink-0 text-red-700 mt-0.5" aria-hidden="true" />
+                    <div class="min-w-0">
+                        <h2 class="text-sm font-semibold text-red-900">{{ __('Critical attention required') }}</h2>
+                        <p class="mt-0.5 text-xs text-red-900/80">
+                            {{ trans_choice(':count critical finding needs attention.|:count critical findings need attention.', $criticalCount, ['count' => $criticalCount]) }}
+                            {{ __('Review them below, or dismiss to clear this banner — recurring issues resurface automatically.') }}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                    <a href="#insights-open-findings" class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100">
+                        {{ __('View findings') }}
+                        <x-heroicon-o-arrow-down class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    </a>
+                    <button type="button" wire:click="acknowledgeCriticalFindings" wire:loading.attr="disabled" wire:target="acknowledgeCriticalFindings" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ trans_choice('Dismiss|Dismiss all', $criticalCount) }}
+                    </button>
                 </div>
             </div>
-            <ul class="divide-y divide-red-200/70">
-                @foreach ($bannerFindings as $b)
-                    @php
-                        // Mirror the list-row fix-state derivation so banner items
-                        // show the queued / terminal pill from the same source of
-                        // truth (the finding's meta).
-                        $bMeta = is_array($b->meta) ? $b->meta : [];
-                        $bFixStatus = match (true) {
-                            isset($bMeta['fix_applied_at']) && is_string($bMeta['fix_applied_at']) && $bMeta['fix_applied_at'] !== '' => 'succeeded',
-                            isset($bMeta['fix_failed_at']) && is_string($bMeta['fix_failed_at']) && $bMeta['fix_failed_at'] !== '' => 'failed',
-                            isset($bMeta['fix_refused_at']) && is_string($bMeta['fix_refused_at']) && $bMeta['fix_refused_at'] !== '' => 'refused',
-                            isset($bMeta['fix_run_started_at']) && is_string($bMeta['fix_run_started_at']) && $bMeta['fix_run_started_at'] !== '' => 'queued',
-                            default => 'idle',
-                        };
-                    @endphp
-                    <li class="flex flex-wrap items-start justify-between gap-4 px-5 py-3">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-medium text-red-950 break-words [overflow-wrap:anywhere]">{{ $b->title }}</p>
-                                @if ($bFixStatus === 'queued')
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-300">
-                                        <x-heroicon-o-arrow-path class="h-3 w-3 shrink-0 animate-spin" aria-hidden="true" />
-                                        {{ __('Fix queued…') }}
-                                    </span>
-                                @elseif ($bFixStatus === 'failed')
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-300">
-                                        <x-heroicon-o-x-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                        {{ __('Fix failed') }}
-                                    </span>
-                                @elseif ($bFixStatus === 'refused')
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-300">
-                                        <x-heroicon-o-no-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                        {{ __('Fix refused') }}
-                                    </span>
-                                @endif
-                            </div>
-                            @if ($b->body)
-                                <p class="mt-1 text-sm leading-snug text-red-900/85 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $b->body }}</p>
-                            @endif
-                        </div>
-                        <button type="button" wire:click="acknowledgeFinding({{ $b->id }})" wire:loading.attr="disabled" wire:target="acknowledgeFinding({{ $b->id }})" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
-                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Dismiss') }}
-                        </button>
-                    </li>
-                @endforeach
-            </ul>
         </div>
     @endif
 
     @if ($tab === 'overview')
-        <div class="dply-card overflow-hidden">
+        <div class="dply-card overflow-hidden scroll-mt-6" id="insights-open-findings">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />

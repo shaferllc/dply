@@ -49,8 +49,15 @@ if [ -f "\$log_path" ]; then
   laravel_log_bytes=\$(stat -c%s "\$log_path" 2>/dev/null || wc -c < "\$log_path" 2>/dev/null || echo 0)
 fi
 if [ -f "\$base/current/artisan" ]; then
-  failed_jobs=\$(cd "\$base/current" && php artisan queue:failed 2>/dev/null | tail -n +2 | grep -c . || true)
-  failed_jobs=\${failed_jobs:-0}
+  # Count failed queue jobs with an O(1) DB count against the configured
+  # failed-jobs connection/table — run from the site's own current/ dir so it
+  # uses that site's .env. More reliable than scraping `queue:failed` table
+  # output (which miscounts table chrome, and lists every row on huge sets).
+  # A sentinel makes extraction robust to any tinker banner noise; if artisan
+  # can't boot or the table is absent, no sentinel is emitted and failed_jobs
+  # stays empty (parsed as "unknown") rather than a misleading 0.
+  fj_out=\$(cd "\$base/current" && php artisan tinker --execute='echo "DPLY_FJ:".(int) \Illuminate\Support\Facades\DB::connection(config("queue.failed.database"))->table(config("queue.failed.table","failed_jobs"))->count();' 2>/dev/null)
+  failed_jobs=\$(printf '%s' "\$fj_out" | grep -o 'DPLY_FJ:[0-9][0-9]*' | head -n1 | grep -o '[0-9][0-9]*')
 fi
 if [ -f "\$log_path" ]; then
   printf "laravel_log_path=%s\n" "\$log_path"

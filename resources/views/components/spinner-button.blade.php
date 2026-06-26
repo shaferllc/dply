@@ -45,7 +45,10 @@
     $busyText = $busyLabel ?? $label;
 
     // Merge the request-scoped loading attributes here — Blade can't compile a
-    // conditional (@if) inside a component opening tag's attribute list.
+    // conditional (@if) inside a component opening tag's attribute list, and a
+    // bare {{ $forward }} echo isn't forwarded by x-dynamic-component (it lands
+    // as a junk `forward` attribute and drops wire:click). The bag must be passed
+    // through the :attributes prop instead.
     $forward = $target
         ? $attributes->merge(['wire:loading.attr' => 'disabled', 'wire:target' => $target])
         : $attributes;
@@ -54,7 +57,7 @@
     :component="$base"
     :size="$size"
     :disabled="$busy || $disabled"
-    {{ $forward }}
+    :attributes="$forward"
 >
     @if ($busy)
         <x-spinner class="h-4 w-4" aria-hidden="true" />

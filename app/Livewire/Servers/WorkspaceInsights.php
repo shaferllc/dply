@@ -230,13 +230,12 @@ class WorkspaceInsights extends Component
             ->filter(fn (InsightFinding $f): bool => $f->acknowledged_at === null)
             ->values();
 
-        // Banner: top 3 unacknowledged critical *problems*. Suggestions are
-        // excluded defensively so a misconfigured suggestion runner can't
-        // hijack the banner.
-        $bannerFindings = $activeFindings
+        // Count of unacknowledged critical *problems* — drives the condensed
+        // critical banner (summary + Dismiss all). Suggestions are already
+        // excluded since this counts $activeFindings (problems only).
+        $criticalCount = $activeFindings
             ->where('severity', InsightFinding::SEVERITY_CRITICAL)
-            ->take(3)
-            ->values();
+            ->count();
 
         return view('livewire.servers.workspace-insights', [
             'orgHasPro' => $orgHasPro,
@@ -244,7 +243,7 @@ class WorkspaceInsights extends Component
             'dismissedFindings' => $dismissedFindings,
             'suggestionFindings' => $suggestionFindings,
             'ignoredSuggestions' => $ignoredSuggestions,
-            'bannerFindings' => $bannerFindings,
+            'criticalCount' => $criticalCount,
             'recentlyAppliedFindings' => $recentlyAppliedFindings,
             'insightsCatalog' => $catalog,
             'enabledChecks' => $enabledChecks,
