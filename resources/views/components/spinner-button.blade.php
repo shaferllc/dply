@@ -43,13 +43,18 @@
         default => 'secondary-button',
     };
     $busyText = $busyLabel ?? $label;
+
+    // Merge the request-scoped loading attributes here — Blade can't compile a
+    // conditional (@if) inside a component opening tag's attribute list.
+    $forward = $target
+        ? $attributes->merge(['wire:loading.attr' => 'disabled', 'wire:target' => $target])
+        : $attributes;
 @endphp
 <x-dynamic-component
     :component="$base"
     :size="$size"
     :disabled="$busy || $disabled"
-    @if ($target) wire:loading.attr="disabled" wire:target="{{ $target }}" @endif
-    {{ $attributes }}
+    {{ $forward }}
 >
     @if ($busy)
         <x-spinner class="h-4 w-4" aria-hidden="true" />
