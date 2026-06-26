@@ -1357,6 +1357,123 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        'apt_security_upgrade' => [
+            'label' => 'Apply security updates',
+            'description' => 'Upgrade only packages from the -security suite. Leaves regular updates untouched; some services may restart.',
+            'confirm' => 'Apply outstanding security updates now? Only -security packages are upgraded; some services may restart.',
+            'timeout' => 1800,
+            'script' => <<<'BASH'
+set -u
+export DEBIAN_FRONTEND=noninteractive
+if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo -n"; fi
+
+resume_timers() { $SUDO systemctl start apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true; }
+
+echo "[sec] pausing apt-daily timers to avoid a concurrent run..."
+$SUDO systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+
+echo "[sec] waiting up to 3 minutes for any apt/dpkg locks to clear..."
+for _ in $(seq 1 60); do
+  if ! fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; then
+    break
+  fi
+  sleep 3
+done
+
+echo "[sec] refreshing apt index..."
+if ! $SUDO apt-get update -qq -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Dpkg::Lock::Timeout=180; then
+  echo "DPLY_ERR: apt-get update failed" >&2
+  resume_timers
+  exit 1
+fi
+
+echo "[sec] enumerating security-suite upgradables..."
+SEC_PKGS=$(apt list --upgradable 2>/dev/null | awk -F/ '/-security/ { print $1 }' | tr '\n' ' ')
+echo "[sec] found: ${SEC_PKGS:-(none)}"
+
+if [ -z "$(printf '%s' "$SEC_PKGS" | tr -d ' ')" ]; then
+  echo "[sec] no security updates to apply — already current."
+  resume_timers
+  exit 0
+fi
+
+echo "[sec] applying security updates..."
+rc=0
+$SUDO apt-get install -y --only-upgrade \
+  -o Dpkg::Lock::Timeout=300 \
+  -o Dpkg::Options::=--force-confdef \
+  -o Dpkg::Options::=--force-confold \
+  $SEC_PKGS 2>&1 || rc=$?
+
+resume_timers
+
+remaining=$(apt list --upgradable 2>/dev/null | grep -E -- '-security' | wc -l | tr -d '[:space:]')
+echo "[sec] remaining security updates: ${remaining:-0}"
+
+if [ "$rc" -ne 0 ]; then
+  echo "DPLY_ERR: apt-get install exited with code $rc" >&2
+  exit "$rc"
+fi
+if [ "${remaining:-0}" -gt 0 ]; then
+  echo "DPLY_ERR: $remaining security update(s) remain — likely held or pinned packages" >&2
+  exit 1
+fi
+echo "[sec] all security updates applied."
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'unattended_upgrades_install' => [
+            'label' => 'Install unattended-upgrades',
+            'description' => 'apt-get install unattended-upgrades, write /etc/apt/apt.conf.d/20auto-upgrades, and enable the apt-daily timers.',
+            'confirm' => 'Install and enable unattended-upgrades on this server?',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -u
+if ! command -v apt-get >/dev/null 2>&1; then
+  echo "DPLY_ERR: apt-get not found — not a Debian/Ubuntu host" >&2
+  exit 1
+fi
+export DEBIAN_FRONTEND=noninteractive
+if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo -n"; fi
+
+echo "[install] waiting up to 60s for any apt/dpkg locks to clear..."
+for _ in $(seq 1 30); do
+  if ! fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+echo "[install] installing unattended-upgrades..."
+$SUDO apt-get update -qq 2>&1 | tail -n 5 || true
+if ! $SUDO apt-get install -y unattended-upgrades 2>&1; then
+  echo "DPLY_ERR: apt-get install unattended-upgrades failed" >&2
+  exit 1
+fi
+
+echo "[install] writing /etc/apt/apt.conf.d/20auto-upgrades..."
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\nAPT::Periodic::AutocleanInterval "7";\n' \
+  | $SUDO tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null
+
+echo "[install] enabling apt-daily timers..."
+$SUDO systemctl unmask apt-daily-upgrade.timer apt-daily.timer apt-daily-upgrade.service apt-daily.service 2>/dev/null || true
+$SUDO systemctl daemon-reload 2>/dev/null || true
+$SUDO systemctl enable --now apt-daily-upgrade.timer 2>&1 || true
+$SUDO systemctl enable --now apt-daily.timer 2>&1 || true
+
+state=$($SUDO systemctl is-active apt-daily-upgrade.timer 2>/dev/null || true)
+state=${state:-unknown}
+echo "---"
+$SUDO cat /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || cat /etc/apt/apt.conf.d/20auto-upgrades
+echo "timer_state=${state}"
+if [ "$state" != "active" ]; then
+  echo "DPLY_WARN: apt-daily-upgrade.timer is ${state} after enable — the package is installed but the systemd timer didn't start" >&2
+fi
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
         'certbot_renew_dry_run' => [
             'label' => 'Dry-run renew',
             'description' => 'certbot renew --dry-run. Safe — does not change certs on disk.',

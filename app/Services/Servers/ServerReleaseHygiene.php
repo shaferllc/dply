@@ -19,7 +19,8 @@ final class ServerReleaseHygiene
     /**
      * @return array{
      *     overall: string,
-     *     alert_count: int,
+     *     alert_count: int, // actionable cleanup alerts only (excludes scan-status notices)
+     *     disk_alert_count: int, // subset of alert_count that is disk pressure (valid pre-scan)
      *     alerts: list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>,
      *     scan: array{checked_at: ?Carbon, never_scanned: bool, stale: bool},
      *     disk: array{pct: ?float, captured_at: ?Carbon},
@@ -53,13 +54,23 @@ final class ServerReleaseHygiene
         $failedJobs = $this->failedJobs($sites, $snapshot);
         $disk = $this->disk($server);
 
-        $alerts = array_merge(
-            $this->scanAlerts($neverScanned, $stale),
-            $this->diskAlerts($disk, $server),
+        // Scan-status notices ("no scan yet" / "stale") are informational, not
+        // actionable cleanup. They still render in the tab list, but they must
+        // not inflate alert_count — otherwise the overview summary card reads
+        // "1 cleanup alert" when there is nothing to clean up.
+        $scanNotices = $this->scanAlerts($neverScanned, $stale);
+        // Disk pressure comes from health metrics, not the SSH hygiene scan, so
+        // it is the one actionable alert that is valid before a scan has run —
+        // tracked separately so the overview card can surface it pre-scan.
+        $diskAlerts = $this->diskAlerts($disk, $server);
+        $actionableAlerts = array_merge(
+            $diskAlerts,
             $this->releaseAlerts($releases, $server),
             $this->logAlerts($logs, $releases['rows']),
             $this->failedJobAlerts($failedJobs, $server),
         );
+
+        $alerts = array_merge($scanNotices, $actionableAlerts);
 
         usort($alerts, static function (array $a, array $b): int {
             $rank = static fn (string $severity): int => match ($severity) {
@@ -86,7 +97,8 @@ final class ServerReleaseHygiene
 
         return [
             'overall' => $overall,
-            'alert_count' => count($alerts),
+            'alert_count' => count($actionableAlerts),
+            'disk_alert_count' => count($diskAlerts),
             'alerts' => $alerts,
             'scan' => [
                 'checked_at' => $checkedAt,

@@ -183,8 +183,19 @@
                     <x-heroicon-o-no-symbol class="h-4 w-4" aria-hidden="true" />
                     {{ $disableAction['label'] }}
                 </button>
-            @elseif (! $unattendedPresent)
-                <p class="text-xs leading-relaxed text-brand-moss">{{ __('Install the unattended-upgrades package on the server, then run Refresh scan to manage it here.') }}</p>
+            @elseif (! $unattendedPresent && ! empty($serviceActions['unattended_upgrades_install']))
+                @php $installAction = $serviceActions['unattended_upgrades_install']; @endphp
+                <div class="space-y-2">
+                    <button
+                        type="button"
+                        wire:click="openConfirmActionModal('runAllowlistedManageAction', ['unattended_upgrades_install'], @js($installAction['label']), @js($installAction['confirm']), @js($installAction['label']), false)"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-forest/20 bg-brand-forest px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-ink sm:w-auto"
+                    >
+                        <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
+                        {{ $installAction['label'] }}
+                    </button>
+                    <p class="text-xs leading-relaxed text-brand-moss">{{ __('Installs the package, enables daily security updates, and rescans automatically.') }}</p>
+                </div>
             @endif
         @endif
 

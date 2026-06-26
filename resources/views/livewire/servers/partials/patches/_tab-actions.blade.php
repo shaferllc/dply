@@ -8,6 +8,10 @@
                 ],
             ],
             __('Apply updates') => [
+                'apt_security_upgrade' => [
+                    'icon' => 'heroicon-o-shield-check',
+                    'tone' => 'sage',
+                ],
                 'apt_upgrade' => [
                     'icon' => 'heroicon-o-arrow-trending-up',
                     'tone' => 'amber',
@@ -99,6 +103,9 @@
                                         @switch($meta['icon'])
                                             @case('heroicon-o-arrow-path')
                                                 <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                                                @break
+                                            @case('heroicon-o-shield-check')
+                                                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                                                 @break
                                             @case('heroicon-o-arrow-trending-up')
                                                 <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />

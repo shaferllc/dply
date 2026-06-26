@@ -71,8 +71,10 @@ class ServerManageRemoteSshJob implements ShouldQueue
 
         $kind = match (true) {
             $m[1] === 'apt_upgrade' => $success ? 'updates_applied' : 'apply_failed',
+            $m[1] === 'apt_security_upgrade' => $success ? 'updates_applied' : 'apply_failed',
             $m[1] === 'apt_dist_upgrade' => $success ? 'dist_upgrade_applied' : 'apply_failed',
             $m[1] === 'reboot' && $success => 'reboot_completed',
+            $m[1] === 'unattended_upgrades_install' => $success ? 'auto_updates_enabled' : 'apply_failed',
             $m[1] === 'unattended_upgrades_enable' && $success => 'auto_updates_enabled',
             $m[1] === 'unattended_upgrades_disable' && $success => 'auto_updates_disabled',
             default => null,

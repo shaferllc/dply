@@ -8,8 +8,17 @@
 
     $healthRow = \Laravel\Pennant\Feature::active('workspace.health') && $healthCockpitSummary;
     $patchRow = \Laravel\Pennant\Feature::active('workspace.patch_advisor') && $patchFlagged;
+    // Surface the hygiene card once a real SSH scan has run AND it found
+    // actionable cleanup. Before a scan, the release/log/job numbers are empty —
+    // the "run a scan" nudge lives on the Hygiene tab, not the overview alert
+    // list — but disk pressure comes from health metrics (not the scan), so a
+    // disk alert still surfaces here pre-scan.
+    $hygieneScanned = $releaseHygieneSummary && ! ($releaseHygieneSummary['never_scanned'] ?? false);
+    $hygieneDiskAlert = $releaseHygieneSummary && ($releaseHygieneSummary['disk_alert_count'] ?? 0) > 0;
     $hygieneRow = \Laravel\Pennant\Feature::active('workspace.release_hygiene')
-        && $releaseHygieneSummary && $releaseHygieneSummary['alert_count'] > 0;
+        && $releaseHygieneSummary
+        && $releaseHygieneSummary['alert_count'] > 0
+        && ($hygieneScanned || $hygieneDiskAlert);
     $insightsRow = \Laravel\Pennant\Feature::active('workspace.insights') && $openInsightsCount > 0;
 
     $radarPresent = (bool) $sharedHostSummary;

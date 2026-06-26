@@ -75,26 +75,64 @@
                         </div>
                     </div>
                     @if ($opsReady && ! $isDeployer)
-                        <button
-                            type="button"
+                        {{-- Busy is driven by $hygieneScanning (a queued-scan flag the
+                             poll clears), not wire:loading — so it can't get stuck. --}}
+                        <x-spinner-button
                             wire:click="refreshReleaseHygieneScan"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshReleaseHygieneScan"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
-                        >
-                            <span wire:loading.remove wire:target="refreshReleaseHygieneScan" class="inline-flex items-center gap-1.5">
-                                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Scan disk') }}
-                            </span>
-                            <span wire:loading wire:target="refreshReleaseHygieneScan" class="inline-flex items-center gap-1.5">
-                                <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
-                                {{ __('Scanning…') }}
-                            </span>
-                        </button>
+                            :busy="$hygieneScanning"
+                            target="refreshReleaseHygieneScan"
+                            icon="heroicon-o-arrow-path"
+                            :label="__('Scan disk')"
+                            :busy-label="__('Scanning…')"
+                        />
                     @endif
             </div>
 
-            @if ($report['alert_count'] > 0)
+            @if ($hygieneScanTimedOut)
+                {{-- Poll budget exhausted with no result — usually a stopped scan
+                     worker. Stop spinning and offer an explicit retry. --}}
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    <x-heroicon-o-clock class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
+                    <p class="mt-2 font-medium text-brand-ink">{{ __('Scan didn\'t return in time') }}</p>
+                    <p class="mt-1">{{ __('The disk scan was queued but no result came back. The scan worker may be busy or offline.') }}</p>
+                    @if (! empty($hygieneScanProgress))
+                        <div class="mx-auto mt-4 max-h-40 max-w-xl overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 text-left font-mono text-[11px] leading-relaxed text-brand-ink/70">
+                            @foreach ($hygieneScanProgress as $entry)
+                                <div class="break-all">{{ $entry['line'] ?? '' }}</div>
+                            @endforeach
+                        </div>
+                    @endif
+                    <div class="mt-4 flex justify-center">
+                        <x-spinner-button
+                            wire:click="refreshReleaseHygieneScan"
+                            target="refreshReleaseHygieneScan"
+                            icon="heroicon-o-arrow-path"
+                            :label="__('Retry scan')"
+                            :busy-label="__('Scanning…')"
+                        />
+                    </div>
+                </div>
+            @elseif ($hygieneScanning)
+                {{-- Scanning: poll until the job writes a result (or the budget runs
+                     out above). The captured frames replay once the result lands. --}}
+                <div wire:poll.{{ $this->hygieneScanPollInterval() }}s="pollReleaseHygieneScan" class="px-6 py-8 sm:px-7">
+                    <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
+                        <x-spinner class="h-4 w-4" aria-hidden="true" /> {{ __('Scanning disk over SSH…') }}
+                    </span>
+                    @if (! empty($hygieneScanProgress))
+                        <div class="mt-4 max-h-40 overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink/70">
+                            @foreach ($hygieneScanProgress as $entry)
+                                <div class="break-all">{{ $entry['line'] ?? '' }}</div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @else
+            <x-replay-log :frames="$hygieneScanProgress">
+                @if ($hygieneScanError)
+                    <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-7">{{ $hygieneScanError }}</div>
+                @endif
+                @if (! empty($report['alerts']))
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['alerts'] as $alert)
                         @php
@@ -123,10 +161,12 @@
                         </li>
                     @endforeach
                 </ul>
-            @else
+                @else
                 <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">
                     {{ __('No release, log, or failed-job alerts from the latest data.') }}
                 </div>
+                @endif
+            </x-replay-log>
             @endif
         </section>
     </div>
@@ -209,20 +249,17 @@
                         </div>
                     </div>
                     @if (! $isDeployer)
-                        <button
-                            type="button"
+                        <x-spinner-button
                             wire:click="installPruneSavedCommand"
-                            wire:loading.attr="disabled"
-                            wire:target="installPruneSavedCommand"
-                            @disabled($report['prune_command']['installed'])
-                            class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-default disabled:opacity-60"
+                            target="installPruneSavedCommand"
+                            :disabled="$report['prune_command']['installed']"
                         >
                             @if ($report['prune_command']['installed'])
                                 {{ __('Already on Run') }}
                             @else
                                 {{ __('Add to Run') }}
                             @endif
-                        </button>
+                        </x-spinner-button>
                     @endif
             </div>
             <div class="px-6 py-4 sm:px-7">
@@ -385,16 +422,13 @@
                         @endif
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
-                        <button
-                            type="button"
+                        <x-spinner-button
                             wire:click="refreshHygieneLog"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshHygieneLog,viewHygieneLog"
-                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
-                        >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="refreshHygieneLog,viewHygieneLog" aria-hidden="true" />
-                            {{ __('Refresh') }}
-                        </button>
+                            target="refreshHygieneLog,viewHygieneLog"
+                            size="xs"
+                            icon="heroicon-o-arrow-path"
+                            :label="__('Refresh')"
+                        />
                         <button type="button" wire:click="closeHygieneLogModal" class="text-sm text-brand-moss hover:underline">{{ __('Close') }}</button>
                     </div>
                 </div>
@@ -411,15 +445,11 @@
                             class="mt-1 block w-24 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink"
                         />
                     </div>
-                    <button
-                        type="button"
+                    <x-spinner-button
                         wire:click="refreshHygieneLog"
-                        wire:loading.attr="disabled"
-                        wire:target="refreshHygieneLog"
-                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
-                    >
-                        {{ __('Apply') }}
-                    </button>
+                        target="refreshHygieneLog"
+                        :label="__('Apply')"
+                    />
                 </div>
 
                 @if ($hygieneLogError)

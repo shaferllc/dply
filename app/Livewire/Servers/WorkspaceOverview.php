@@ -605,6 +605,8 @@ class WorkspaceOverview extends Component
         return [
             'overall' => $report['overall'],
             'alert_count' => $report['alert_count'],
+            'disk_alert_count' => $report['disk_alert_count'],
+            'never_scanned' => $report['scan']['never_scanned'],
             'sites_over_keep' => $report['releases']['sites_over_keep'],
         ];
     }
