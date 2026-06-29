@@ -839,7 +839,7 @@
         $previewCount = $site->previewDomains->count();
     @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }} mt-6" x-data="{ addOpen: false }">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -859,27 +859,35 @@
             </div>
             @can('update', $site)
                 @if ($this->canAddManagedPreview())
-                    <div class="relative flex shrink-0 items-center" x-data="{ open: false }">
-                        <button type="button" x-on:click="open = ! open"
+                    <div class="flex shrink-0 items-center">
+                        <button type="button" x-on:click="addOpen = ! addOpen"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90"
                             title="{{ __('Provision another dply-managed preview URL (DNS + auto-SSL).') }}">
-                            <x-heroicon-o-plus class="h-4 w-4" />
+                            <x-heroicon-o-plus class="h-4 w-4 transition-transform" x-bind:class="addOpen && 'rotate-45'" />
                             {{ __('Add preview URL') }}
                         </button>
-                        <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 top-full z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 text-left shadow-lg">
-                            <x-input-label for="new_preview_label" :value="__('Label (optional)')" />
-                            <input id="new_preview_label" type="text" wire:model="newPreviewLabel" maxlength="255" placeholder="{{ __('e.g. Client review') }}" class="dply-input mt-1 text-sm" />
-                            <button type="button" wire:click="addManagedPreviewDomain" x-on:click="open = false" wire:loading.attr="disabled" wire:target="addManagedPreviewDomain"
-                                class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
-                                <span wire:loading.remove wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Provision preview URL') }}</span>
-                                <span wire:loading wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-spinner variant="cream" size="sm" />{{ __('Provisioning…') }}</span>
-                            </button>
-                            <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('dply mints a managed hostname with its own DNS record + auto-SSL.') }}</p>
-                        </div>
                     </div>
                 @endif
             @endcan
         </div>
+
+        {{-- Inline expansion (not a floating popover) so the card's overflow-hidden
+             doesn't clip it; the card just grows when open. --}}
+        @can('update', $site)
+            @if ($this->canAddManagedPreview())
+                <div x-show="addOpen" x-cloak class="flex flex-col gap-3 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-end sm:px-7">
+                    <div class="min-w-0 flex-1">
+                        <x-input-label for="new_preview_label" :value="__('Label (optional)')" />
+                        <input id="new_preview_label" type="text" wire:model="newPreviewLabel" maxlength="255" placeholder="{{ __('e.g. Client review') }}" class="dply-input mt-1 w-full text-sm" />
+                    </div>
+                    <button type="button" wire:click="addManagedPreviewDomain" x-on:click="addOpen = false" wire:loading.attr="disabled" wire:target="addManagedPreviewDomain"
+                        class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
+                        <span wire:loading.remove wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Provision preview URL') }}</span>
+                        <span wire:loading wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-spinner variant="cream" size="sm" />{{ __('Provisioning…') }}</span>
+                    </button>
+                </div>
+            @endif
+        @endcan
     </div>
 
     <div class="{{ $card }} mt-6">
