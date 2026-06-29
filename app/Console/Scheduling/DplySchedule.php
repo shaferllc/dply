@@ -37,6 +37,7 @@ use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
+use App\Console\Commands\ReapStuckConsoleActionsCommand;
 use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
@@ -119,6 +120,14 @@ final class DplySchedule
 
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
         $schedule->command(ProcessScheduledSiteDeletionsCommand::class)->everyMinute();
+
+        // Fail console actions a restarted worker stranded mid-flight, so their
+        // page-top banners stop spinning forever (conservative thresholds — never
+        // touches a legitimately long-running job).
+        $schedule->command(ReapStuckConsoleActionsCommand::class)
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->name('reap-stuck-console-actions');
 
         $schedule->command(CloudPollStatusCommand::class)->everyMinute();
 
