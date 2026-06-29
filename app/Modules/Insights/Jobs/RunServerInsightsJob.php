@@ -23,7 +23,10 @@ class RunServerInsightsJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 120;
+    // A full sweep is many SSH checks × round-trips; 120s was too tight on slower
+    // boxes and tripped TimeoutExceededException mid-sweep. Stays well under the
+    // queue retry_after so a long run isn't double-dispatched.
+    public int $timeout = 300;
 
     public function __construct(
         public string $serverId,
@@ -137,6 +140,29 @@ class RunServerInsightsJob implements ShouldQueue
                 $errorKey => $message,
             ]);
         }
+    }
+
+    /**
+     * Finalize the streamed run's meta if the job dies outside the in-handle
+     * catch — most importantly a signal-raised TimeoutExceededException that can
+     * escape mid-SSH — so the workspace never hangs on a perpetual "running".
+     */
+    public function failed(\Throwable $e): void
+    {
+        if ($this->runId === null) {
+            return;
+        }
+
+        $server = Server::find($this->serverId);
+        if ($server === null) {
+            return;
+        }
+
+        $this->updateMeta($server, [
+            (string) config('insights_workspace.meta_run_status_key') => 'failed',
+            (string) config('insights_workspace.meta_run_finished_at_key') => now()->toIso8601String(),
+            (string) config('insights_workspace.meta_run_error_key') => Str::limit(trim($e->getMessage()), 800) ?: 'Insights run did not finish.',
+        ]);
     }
 
     public function cacheKey(): string
