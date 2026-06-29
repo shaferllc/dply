@@ -837,6 +837,10 @@
     @php
         $site->loadMissing('previewDomains.certificates');
         $previewCount = $site->previewDomains->count();
+        // *.testing-zone hosts ride the shared per-server wildcard, not per-host
+        // certs — resolve it once so the SSL badge reflects the real mechanism.
+        $coveringWildcard = $site->coveringServerWildcard();
+        $previewTestingZone = $site->testingZone();
     @endphp
 
     <div class="{{ $card }} mt-6" x-data="{ addOpen: false }">
@@ -933,13 +937,24 @@
                 <ul class="mt-3 space-y-2">
                     @foreach ($site->previewDomains as $previewDomain)
                         @php
-                            $pdCert = $previewDomain->relationLoaded('certificates') ? $previewDomain->certificates->sortByDesc('updated_at')->first() : null;
-                            $pdSsl = match ($pdCert?->status) {
-                                \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],
-                                \App\Models\SiteCertificate::STATUS_INSTALLING, \App\Models\SiteCertificate::STATUS_ISSUED, \App\Models\SiteCertificate::STATUS_PENDING => ['label' => __('SSL pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'],
-                                \App\Models\SiteCertificate::STATUS_FAILED => ['label' => __('SSL failed'), 'cls' => 'bg-rose-50 text-rose-800 ring-rose-200/70', 'icon' => 'heroicon-o-exclamation-triangle'],
-                                default => ['label' => __('No SSL yet'), 'cls' => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10', 'icon' => 'heroicon-o-lock-open'],
-                            };
+                            $pdOnTestingZone = $previewDomain->managed_by_dply
+                                && $previewTestingZone !== null
+                                && strtolower((string) $previewDomain->zone) === strtolower($previewTestingZone);
+                            if ($pdOnTestingZone) {
+                                // Secured by the shared *.zone wildcard (DNS-01), not a per-host cert.
+                                $pdCert = null;
+                                $pdSsl = $coveringWildcard !== null
+                                    ? ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed']
+                                    : ['label' => __('Wildcard pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'];
+                            } else {
+                                $pdCert = $previewDomain->relationLoaded('certificates') ? $previewDomain->certificates->sortByDesc('updated_at')->first() : null;
+                                $pdSsl = match ($pdCert?->status) {
+                                    \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],
+                                    \App\Models\SiteCertificate::STATUS_INSTALLING, \App\Models\SiteCertificate::STATUS_ISSUED, \App\Models\SiteCertificate::STATUS_PENDING => ['label' => __('SSL pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'],
+                                    \App\Models\SiteCertificate::STATUS_FAILED => ['label' => __('SSL failed'), 'cls' => 'bg-rose-50 text-rose-800 ring-rose-200/70', 'icon' => 'heroicon-o-exclamation-triangle'],
+                                    default => ['label' => __('No SSL yet'), 'cls' => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10', 'icon' => 'heroicon-o-lock-open'],
+                                };
+                            }
                         @endphp
                         <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
                             <div class="min-w-0">

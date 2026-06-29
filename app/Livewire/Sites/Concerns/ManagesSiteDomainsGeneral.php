@@ -9,8 +9,6 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Models\Workspace;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
-use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Modules\Cloud\Services\AzureDnsService;
 use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
@@ -466,9 +464,14 @@ trait ManagesSiteDomainsGeneral
     }
 
     /**
-     * "Add preview URL" — provision an additional dply-managed *.preview hostname
-     * (its own DNS record + auto-SSL), wire it into the live vhost, and queue its
-     * certificate. The existing primary is untouched.
+     * "Add preview URL" — provision an additional dply-managed hostname on the
+     * site's testing zone (its own DNS record) and wire it into the live vhost.
+     *
+     * TLS is NOT per-host here: every `*.<testing-zone>` hostname is secured by
+     * the shared per-server wildcard certificate, so a new preview URL is covered
+     * the moment that wildcard is installed — no per-host cert to queue. If the
+     * wildcard isn't up yet, the managed-testing-host card's "Issue TLS" brings it
+     * up and this (and every) preview host inherits it.
      */
     public function addManagedPreviewDomain(): void
     {
@@ -483,21 +486,14 @@ trait ManagesSiteDomainsGeneral
 
         $this->newPreviewLabel = '';
 
-        // Add the hostname to the live webserver config (server_name) …
+        // Add the hostname to the live webserver config (server_name). TLS rides
+        // the shared testing-zone wildcard, so there's nothing per-host to issue.
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation(__('Preview URL added: :host', ['host' => $domain->hostname]));
 
-        // … then auto-issue its preview-scoped certificate.
-        $cert = app(CertificateRequestService::class)->queuePrimaryPreviewAutoSsl(
-            $this->site->fresh(['previewDomains']) ?? $this->site,
-            $domain->fresh(),
-        );
-        if ($cert !== null) {
-            // Brief delay so the webserver apply (server_name) and the just-created
-            // DNS record settle before the HTTP-01 challenge runs; a failure is
-            // self-healing (marked failed → re-queued by the auto-SSL sweep).
-            ExecuteSiteCertificateJob::dispatch((string) $cert->id)->delay(now()->addSeconds(30));
+        if (! $this->site->isCoveredByServerWildcard()) {
+            $this->toastWarning(__('Added — but the :zone wildcard certificate isn’t installed yet, so HTTPS won’t work until it’s issued (use “Issue TLS” on the managed testing host).', ['zone' => $this->site->testingZone() ?? 'testing']));
         }
     }
 }
