@@ -23,4 +23,13 @@ class Route53DnsProvider implements DnsProvider
 
         $this->service->deleteRecord($recordId);
     }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->hostedZoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
 }

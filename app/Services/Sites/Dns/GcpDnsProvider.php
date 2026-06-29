@@ -32,4 +32,13 @@ class GcpDnsProvider implements DnsProvider
 
         $this->service->deleteRecord($zone, $recordId);
     }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->zoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
 }

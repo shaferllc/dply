@@ -32,4 +32,13 @@ class CloudflareDnsProvider implements DnsProvider
     {
         $this->service->deleteDnsRecord($zone, $recordId);
     }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->zoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
 }

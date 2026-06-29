@@ -45,4 +45,13 @@ class HetznerDnsProvider implements DnsProvider
         [$name, $type] = explode('/', $recordId, 2);
         $this->service->deleteZoneRrset($zone, $name, $type);
     }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->zoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
 }

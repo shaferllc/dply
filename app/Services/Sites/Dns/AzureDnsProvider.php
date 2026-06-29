@@ -32,4 +32,13 @@ class AzureDnsProvider implements DnsProvider
 
         $this->service->deleteRecordById($recordId);
     }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->zoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
 }

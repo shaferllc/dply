@@ -32,4 +32,13 @@ class LinodeDnsProvider implements DnsProvider
 
         $this->service->deleteDomainRecord($zone, (int) $recordId);
     }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->domainExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
 }

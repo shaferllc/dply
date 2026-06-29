@@ -34,7 +34,12 @@ class CloudflareDnsService
 
     public function verifyToken(): void
     {
-        $response = $this->request('get', '/user/tokens/verify');
+        // Verify by listing zones rather than /user/tokens/verify: the latter only
+        // validates USER-owned tokens, so an account-owned token (cfat_…) — valid
+        // for DNS — fails there as "Invalid API Token". Listing zones exercises the
+        // Zone:Zone:Read permission dply actually needs and works for both token
+        // kinds. An empty zone list is still a valid token.
+        $response = $this->request('get', '/zones', ['per_page' => 1]);
         $this->assertApiSuccess($response, 'verify Cloudflare token');
     }
 

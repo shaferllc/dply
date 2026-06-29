@@ -88,4 +88,20 @@ class DigitalOceanService
 
         throw new \RuntimeException("DigitalOcean API failed to {$action}: {$message}");
     }
+
+    /**
+     * Whether this DigitalOcean account hosts the given domain (zone). 404 means
+     * not found; any other non-2xx is surfaced as an error.
+     */
+    public function domainExists(string $domainName): bool
+    {
+        $response = $this->request('get', '/domains/'.rawurlencode(strtolower(trim($domainName))));
+        if ($response->status() === 404) {
+            return false;
+        }
+
+        $this->assertSuccess($response, 'look up domain');
+
+        return true;
+    }
 }
