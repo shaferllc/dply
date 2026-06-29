@@ -12,6 +12,8 @@ use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Services\Sites\Dns\DnsZoneCredentialResolver;
+use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Services\Sites\SiteReachabilityChecker;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
@@ -74,7 +76,7 @@ trait ManagesSiteTenantDomains
             'new_tenant_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        SiteTenantDomain::query()->create([
+        $tenant = SiteTenantDomain::query()->create([
             'site_id' => $this->site->id,
             'hostname' => strtolower(trim($validated['new_tenant_hostname'])),
             'tenant_key' => trim((string) ($validated['new_tenant_key'] ?? '')) ?: null,
@@ -89,6 +91,11 @@ trait ManagesSiteTenantDomains
         $this->new_tenant_comment = '';
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain added.');
+
+        // If a connected DNS credential controls this hostname's zone, point it at
+        // the server automatically — so the tenant "just works" without the
+        // operator hand-creating the A record. Silent when no credential covers it.
+        $this->provisionTenantCustomDns($tenant, quietWhenNoCredential: true);
     }
 
     public function confirmRemoveTenantDomain(string $tenantDomainId): void
@@ -350,5 +357,60 @@ trait ManagesSiteTenantDomains
         ExecuteSiteCertificateJob::dispatch((string) $certificate->id);
         $this->toastSuccess(__('SSL requested for :host.', ['host' => $hostname]));
         $this->site->load('certificates');
+    }
+
+    /**
+     * Operator-triggered "Point DNS here" for a tenant's custom domain — creates
+     * the A record at whichever connected provider hosts its zone.
+     */
+    public function provisionTenantDns(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->find($tenantDomainId);
+        if ($tenant === null) {
+            return;
+        }
+
+        $this->provisionTenantCustomDns($tenant, quietWhenNoCredential: false);
+    }
+
+    /**
+     * Auto-point a tenant's custom domain at this server: resolve the connected
+     * DNS credential that owns the hostname's zone and upsert an A record → the
+     * server IP. No-ops (optionally quietly) when no connected credential covers
+     * the zone — then the operator points DNS themselves.
+     */
+    private function provisionTenantCustomDns(SiteTenantDomain $tenant, bool $quietWhenNoCredential = false): void
+    {
+        $hostname = strtolower(trim((string) $tenant->hostname));
+        $serverIp = trim((string) ($this->site->server?->ip_address ?? ''));
+        if ($hostname === '' || $serverIp === '') {
+            return;
+        }
+
+        $match = app(DnsZoneCredentialResolver::class)->resolveForHostname($this->site, $hostname);
+        if ($match === null) {
+            if (! $quietWhenNoCredential) {
+                $this->toastWarning(__('No connected DNS credential controls “:host”’s zone — connect the provider that hosts it (e.g. Cloudflare), or point its DNS at this server manually.', ['host' => $hostname]));
+            }
+
+            return;
+        }
+
+        $zone = $match['zone'];
+        $relative = $hostname === $zone ? '@' : rtrim(substr($hostname, 0, -(strlen($zone) + 1)), '.');
+        $relative = $relative === '' ? '@' : $relative;
+
+        try {
+            SiteDnsProviderFactory::forCredential($match['credential'])->upsertRecord($zone, 'A', $relative, $serverIp);
+            $this->toastSuccess(__('Pointed “:host” at this server (:ip) in :zone — DNS may take a few minutes to propagate, then add SSL.', [
+                'host' => $hostname,
+                'ip' => $serverIp,
+                'zone' => $zone,
+            ]));
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not create the DNS record for “:host”: :err', ['host' => $hostname, 'err' => $e->getMessage()]));
+        }
     }
 }

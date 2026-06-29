@@ -1234,6 +1234,10 @@
                                             {{ __('Create testing URL') }}
                                         </button>
                                     @endif
+                                    <button type="button" wire:click="provisionTenantDns('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantDns('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Create the A record pointing this domain at the server — when dply holds a DNS credential for its zone.') }}">
+                                        <x-heroicon-o-globe-alt class="h-4 w-4" />
+                                        {{ __('Point DNS') }}
+                                    </button>
                                     @if (in_array($tCertStatus, [null, \App\Models\SiteCertificate::STATUS_FAILED], true))
                                         <button type="button" wire:click="issueTenantCertificate('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="issueTenantCertificate('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Issue a Let’s Encrypt certificate for this tenant’s domain (point its DNS here first).') }}">
                                             <x-heroicon-o-lock-closed class="h-4 w-4" />
