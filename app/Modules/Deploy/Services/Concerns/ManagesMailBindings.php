@@ -250,9 +250,20 @@ trait ManagesMailBindings
             'sendgrid' => ($creds['api_key'] ?? '') === ''
                 ? throw new InvalidArgumentException(__('SendGrid API key is required.'))
                 : null,
-            'cloudflare' => (($creds['account_id'] ?? '') === '' || ($creds['key'] ?? '') === '')
-                ? throw new InvalidArgumentException(__('Cloudflare account ID and API key are required.'))
-                : null,
+            'cloudflare' => (function () use ($creds): null {
+                $accountId = trim((string) ($creds['account_id'] ?? ''));
+                if ($accountId === '' || ($creds['key'] ?? '') === '') {
+                    throw new InvalidArgumentException(__('Cloudflare account ID and API key are required.'));
+                }
+                // Cloudflare account IDs are the 32-char hex identifier — catch a
+                // pasted account *name* here instead of a cryptic "Could not route
+                // to /accounts/<name>/…" failure when mail actually sends.
+                if (! preg_match('/^[0-9a-f]{32}$/i', $accountId)) {
+                    throw new InvalidArgumentException(__('The Cloudflare Account ID must be the 32-character hex identifier from your Cloudflare dashboard (Account Home → Account ID) — not an account name.'));
+                }
+
+                return null;
+            })(),
             default => null,
         };
     }

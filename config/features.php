@@ -270,8 +270,10 @@ return [
         'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', true),
         'site_system_user_preview' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER_PREVIEW', false),
         // Routing sub-tabs — coming-soon teaser until each ships.
-        'site_aliases' => env('FEATURE_WORKSPACE_SITE_ALIASES', false),
-        'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', true),
+        // Aliases shipped: real flag on, preview off (UI + ManagesSiteAliases +
+        // ApplySiteWebserverConfigJob wire aliases into server_name and the shared cert).
+        'site_aliases' => env('FEATURE_WORKSPACE_SITE_ALIASES', true),
+        'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', false),
         'site_redirects' => env('FEATURE_WORKSPACE_SITE_REDIRECTS', false),
         'site_redirects_preview' => env('FEATURE_WORKSPACE_SITE_REDIRECTS_PREVIEW', false),
         'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', false),

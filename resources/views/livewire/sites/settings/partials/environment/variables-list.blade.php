@@ -286,23 +286,30 @@
                                         </div>
                                     </div>
                                 @endif
-                                @if ($gManageable && method_exists($this, 'openBindingModal'))
-                                    <button type="button" wire:click="openBindingModal('{{ $group['type'] }}', 'attach')" wire:loading.attr="disabled" wire:target="openBindingModal" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Re-point or refresh this resource (re-pulls its current connection values).') }}">
-                                        <x-heroicon-o-arrow-path class="h-3 w-3" />
-                                        {{ __('Update') }}
-                                    </button>
-                                @endif
-                                @if (method_exists($this, 'openBindingInfoModal'))
-                                    <button type="button" wire:click="openBindingInfoModal(@js((string) $gBindingId))" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('View this connection\'s details (injected variables + reachability).') }}">
-                                        <x-heroicon-o-information-circle class="h-3 w-3" />
-                                        {{ __('Info') }}
-                                    </button>
-                                @endif
-                                @if (method_exists($this, 'detachBinding'))
-                                    <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $gBindingId]), @js(__('Detach binding?')), @js(__('Detach the :type binding? Its variables stop being injected at deploy.', ['type' => $gTypeLabel])), @js(__('Detach')), true)" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700" title="{{ __('Detach binding') }}">
-                                        <x-heroicon-o-x-mark class="h-3 w-3" />
-                                        {{ __('Detach') }}
-                                    </button>
+                                {{-- Secondary actions collapse into a kebab so a row never shows
+                                     more than the primary test/fix actions plus this menu. --}}
+                                @php($gHasOverflow = ($gManageable && method_exists($this, 'openBindingModal')) || method_exists($this, 'openBindingInfoModal') || method_exists($this, 'detachBinding'))
+                                @if ($gHasOverflow)
+                                    <x-overflow-menu>
+                                        @if ($gManageable && method_exists($this, 'openBindingModal'))
+                                            <button type="button" wire:click="openBindingModal('{{ $group['type'] }}', 'attach')" wire:loading.attr="disabled" wire:target="openBindingModal" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
+                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5 text-brand-moss" />
+                                                {{ __('Update') }}
+                                            </button>
+                                        @endif
+                                        @if (method_exists($this, 'openBindingInfoModal'))
+                                            <button type="button" wire:click="openBindingInfoModal(@js((string) $gBindingId))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                <x-heroicon-o-information-circle class="h-3.5 w-3.5 text-brand-moss" />
+                                                {{ __('Info') }}
+                                            </button>
+                                        @endif
+                                        @if (method_exists($this, 'detachBinding'))
+                                            <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $gBindingId]), @js(__('Detach binding?')), @js(__('Detach the :type binding? Its variables stop being injected at deploy.', ['type' => $gTypeLabel])), @js(__('Detach')), true)" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700">
+                                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                                                {{ __('Detach') }}
+                                            </button>
+                                        @endif
+                                    </x-overflow-menu>
                                 @endif
                             </div>
                         </div>
@@ -791,6 +798,8 @@
                                             </button>
                                         @endif
                                     @else
+                                    {{-- Show + Edit stay inline; Import / Remove / Move-to-org-key
+                                         collapse into a kebab so the row stays to two buttons. --}}
                                     <button
                                         type="button"
                                         wire:click="toggleRevealEnvVar('{{ $key }}')"
@@ -814,42 +823,22 @@
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
-                                    <button
-                                        type="button"
-                                        wire:click="$set('env_import_key', '{{ $key }}')"
-                                        x-on:click="$dispatch('open-modal', 'env-import-modal')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                        title="{{ __('Import :key from another site', ['key' => $key]) }}"
-                                    >
-                                        <x-heroicon-o-arrow-down-on-square class="h-4 w-4" />
-                                        {{ __('Import') }}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        wire:click="confirmRemoveEnvVar('{{ $key }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="confirmRemoveEnvVar('{{ $key }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                        title="{{ __('Remove variable') }}"
-                                    >
-                                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $key }}')" />
-                                        <span wire:loading wire:target="confirmRemoveEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
-                                        {{ __('Remove') }}
-                                    </button>
-                                    @if ($canManageResidency && $valueLength > 0)
-                                        <button
-                                            type="button"
-                                            wire:click="escalateEnvVar('{{ $key }}')"
-                                            wire:loading.attr="disabled"
-                                            wire:target="escalateEnvVar('{{ $key }}')"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-brand-forest/30 hover:bg-brand-forest/5 hover:text-brand-forest disabled:cursor-not-allowed disabled:opacity-40"
-                                            title="{{ __('Encrypt this value under your organization key and keep it out of the plaintext .env') }}"
-                                        >
-                                            <x-heroicon-o-lock-closed class="h-4 w-4" wire:loading.remove wire:target="escalateEnvVar('{{ $key }}')" />
-                                            <span wire:loading wire:target="escalateEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
-                                            {{ __('Move to org key') }}
+                                    <x-overflow-menu>
+                                        <button type="button" wire:click="$set('env_import_key', '{{ $key }}')" x-on:click="$dispatch('open-modal', 'env-import-modal')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Import :key from another site', ['key' => $key]) }}">
+                                            <x-heroicon-o-arrow-down-on-square class="h-3.5 w-3.5 text-brand-moss" />
+                                            {{ __('Import') }}
                                         </button>
-                                    @endif
+                                        @if ($canManageResidency && $valueLength > 0)
+                                            <button type="button" wire:click="escalateEnvVar('{{ $key }}')" wire:loading.attr="disabled" wire:target="escalateEnvVar('{{ $key }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-forest/5 hover:text-brand-forest disabled:opacity-40" title="{{ __('Encrypt this value under your organization key and keep it out of the plaintext .env') }}">
+                                                <x-heroicon-o-lock-closed class="h-3.5 w-3.5 text-brand-moss" />
+                                                {{ __('Move to org key') }}
+                                            </button>
+                                        @endif
+                                        <button type="button" wire:click="confirmRemoveEnvVar('{{ $key }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $key }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40" title="{{ __('Remove variable') }}">
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            {{ __('Remove') }}
+                                        </button>
+                                    </x-overflow-menu>
                                     @endif
                                 </div>
                             </div>
