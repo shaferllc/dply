@@ -54,6 +54,9 @@ trait ManagesSiteBindings
     /** The in-flight fix run id — when set, the fix modal shows live progress in place. */
     public ?string $fixBindingRunId = null;
 
+    /** Read-only connection-details modal payload for one binding (null = closed). */
+    public ?array $bindingInfo = null;
+
     public string $bindingModalType = '';
 
     /** attach | provision */

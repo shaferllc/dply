@@ -489,11 +489,23 @@
                                      from the server (cache/queue/session resolve to their engine). --}}
                                 @if ($attached && method_exists($this, 'seedQueuedConsoleAction'))
                                     @if ($type === 'mail' && method_exists($this, 'sendBindingTestEmail'))
-                                        <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail"
-                                            title="{{ __('Send a test email through this transport to your account.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
-                                            <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
-                                        </button>
+                                        {{-- Like the variables-list "Send test": pop a recipient field so
+                                             the operator can pick who gets it (blank → their own email). --}}
+                                        <div class="relative" x-data="{ open: false }" wire:key="cardmailtest-{{ md5((string) $binding->id) }}">
+                                            <button type="button" x-on:click="open = !open"
+                                                title="{{ __('Send a test email through this transport.') }}"
+                                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                                <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
+                                            </button>
+                                            <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 text-left shadow-lg">
+                                                <x-input-label for="cardmailtest_to_{{ md5((string) $binding->id) }}" :value="__('Send test email to')" />
+                                                <input id="cardmailtest_to_{{ md5((string) $binding->id) }}" type="email" wire:model="mailTestRecipient" placeholder="{{ auth()->user()?->email }}" class="dply-input mt-1 text-sm" />
+                                                <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
+                                                    <x-heroicon-o-paper-airplane class="h-4 w-4" /> {{ __('Send test email') }}
+                                                </button>
+                                                <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
+                                            </div>
+                                        </div>
                                     @elseif (in_array($type, ['database', 'redis', 'cache', 'queue', 'session'], true) && method_exists($this, 'verifyBinding'))
                                         <button type="button" wire:click="verifyBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="verifyBinding"
                                             title="{{ __('Probe this connection from the server now.') }}"
@@ -509,6 +521,13 @@
                                             <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                         </button>
                                     @endif
+                                @endif
+                                @if ($attached && method_exists($this, 'openBindingInfoModal'))
+                                    <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
+                                        title="{{ __('View this connection\'s details (injected variables + reachability).') }}"
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ __('Info') }}
+                                    </button>
                                 @endif
                                 {{-- Jump from a managed broadcasting binding to the relay app's own page
                                      (credentials, live stats, connected sites, tier). --}}

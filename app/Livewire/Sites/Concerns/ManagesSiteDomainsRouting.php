@@ -524,7 +524,20 @@ trait ManagesSiteDomainsRouting
             ],
         );
 
-        IssueServerWildcardCertificateJob::dispatch($serverId, $zone);
+        // Stream certbot progress into the page-top banner instead of making the
+        // operator refresh to read last_output. Guarded so any host component
+        // reusing this trait without the console-action machinery still works.
+        $useConsole = method_exists($this, 'seedQueuedConsoleAction') && method_exists($this, 'watchConsoleAction');
+        $run = $useConsole
+            ? $this->seedQueuedConsoleAction('ssl', __('Issuing *.:zone wildcard certificate', ['zone' => $zone]))
+            : null;
+
+        IssueServerWildcardCertificateJob::dispatch(
+            $serverId,
+            $zone,
+            $run !== null ? (string) $run->id : null,
+            $run !== null ? (string) $this->site->id : null,
+        );
 
         $org = $this->site->server?->organization;
         if ($org) {
@@ -534,6 +547,15 @@ trait ManagesSiteDomainsRouting
             ]);
         }
 
-        $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
+        if ($run !== null) {
+            $this->dispatch('dply-console-action-focus');
+            $this->watchConsoleAction(
+                $run,
+                __('Wildcard *.:zone issued.', ['zone' => $zone]),
+                __('Wildcard *.:zone issuance did not finish — check the output below.', ['zone' => $zone]),
+            );
+        } else {
+            $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
+        }
     }
 }

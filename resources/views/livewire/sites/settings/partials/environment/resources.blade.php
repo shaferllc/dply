@@ -135,6 +135,87 @@
     </section>
     @endif
 
+    {{-- Read-only connection-details modal. Opened by the "Info" button on the
+         binding rows / resource cards; shows what the binding injects at deploy
+         (secrets masked) plus its reachability. Lives here so it's in the DOM on
+         both the Environment tab and the Resources hub (which includes this
+         partial for exactly this kind of shared modal). --}}
+    @if (method_exists($this, 'openBindingInfoModal'))
+    <x-modal name="binding-info-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
+        @php $bi = $bindingInfo ?? null; @endphp
+        <div class="relative border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Connection details') }}</p>
+            <h2 class="mt-2 flex flex-wrap items-center gap-2 text-xl font-semibold text-brand-ink">
+                {{ $bi ? ($bindingTypeLabels[$bi['type']] ?? str($bi['type'])->replace('_', ' ')->title()) : __('Binding') }}
+                @if ($bi && $bi['name'])
+                    <span class="font-mono text-sm font-normal text-brand-moss">· {{ $bi['name'] }}</span>
+                @endif
+            </h2>
+            <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
+        </div>
+
+        @if ($bi)
+            <div class="space-y-5 px-6 py-6">
+                {{-- Status / reachability summary --}}
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $bi['status'] }}</span>
+                    @if ($bi['provider'])
+                        <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-200/70">{{ $bi['provider'] }}</span>
+                    @endif
+                    @if ($bi['reachable'] === true)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70"><x-heroicon-m-check class="h-3 w-3" />{{ __('Reachable') }}</span>
+                    @elseif ($bi['reachable'] === false)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200/70" title="{{ $bi['reachable_detail'] }}"><x-heroicon-m-exclamation-triangle class="h-3 w-3" />{{ __('Unreachable') }}</span>
+                    @endif
+                    @if ($bi['private_network'])
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-[11px] font-semibold text-brand-moss"><x-heroicon-o-globe-alt class="h-3 w-3" />{{ __('Private network') }}</span>
+                    @endif
+                </div>
+
+                @if ($bi['needs_remote_access'])
+                    <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ __('Remote access is off on the source — enable it (and allow this server\'s private IP) or the deploy will fail to connect.') }}</p>
+                @endif
+                @if ($bi['last_error'])
+                    <p class="rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700 ring-1 ring-inset ring-rose-200/70">{{ $bi['last_error'] }}</p>
+                @endif
+
+                {{-- Injected variables --}}
+                <div>
+                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Injected at deploy') }} · {{ trans_choice('{1} :count variable|[2,*] :count variables', count($bi['vars']), ['count' => count($bi['vars'])]) }}</p>
+                    @if ($bi['vars'] === [])
+                        <p class="text-xs text-brand-moss">{{ __('This binding injects no environment variables.') }}</p>
+                    @else
+                        <div class="overflow-hidden rounded-xl border border-brand-ink/10">
+                            <table class="w-full table-fixed text-left text-xs">
+                                <tbody class="divide-y divide-brand-ink/8">
+                                    @foreach ($bi['vars'] as $v)
+                                        <tr class="align-top">
+                                            <td class="w-2/5 break-all bg-brand-sand/15 px-3 py-2 font-mono font-semibold text-brand-ink">{{ $v['key'] }}</td>
+                                            <td class="break-all px-3 py-2 font-mono text-brand-moss">
+                                                {{ $v['value'] }}
+                                                @if ($v['sensitive'])
+                                                    <x-heroicon-m-lock-closed class="ml-1 inline h-3 w-3 text-brand-mist" title="{{ __('Secret — masked') }}" />
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Secrets are masked. These values are injected at deploy and can be overridden per-key in the variables list.') }}</p>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        <div class="flex justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+        </div>
+    </x-modal>
+    @endif
+
     {{-- Shared attach / provision modal. Body switches on the chosen type +
          mode; form values live in the loose $bindingForm array on the
          component (see ManagesSiteBindings). Rendered whenever the host

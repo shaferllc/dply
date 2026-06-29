@@ -485,6 +485,74 @@ trait ManagesSiteBindingActions
     }
 
     /**
+     * Open a read-only modal describing a binding's connection: the variables it
+     * injects at deploy (secrets masked), its reachability/status, and where it
+     * points. Pure inspection — no SSH, no mutation — so it's gated on `view`.
+     */
+    public function openBindingInfoModal(string $bindingId): void
+    {
+        Gate::authorize('view', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $config = is_array($binding->config) ? $binding->config : [];
+        $env = is_array($binding->injected_env) ? $binding->injected_env : [];
+
+        $vars = [];
+        foreach ($env as $key => $value) {
+            $sensitive = (bool) preg_match('/(PASSWORD|SECRET|TOKEN|KEY|DSN|URL|PASS)/i', (string) $key);
+            $vars[] = [
+                'key' => (string) $key,
+                'value' => $sensitive ? $this->maskBindingSecret((string) $value) : (string) $value,
+                'sensitive' => $sensitive,
+            ];
+        }
+
+        $conn = is_array($binding->connectivity ?? null) ? $binding->connectivity : null;
+
+        $this->bindingInfo = [
+            'type' => (string) $binding->type,
+            'name' => $binding->name,
+            'status' => (string) $binding->status,
+            'provider' => $config['provider'] ?? null,
+            'private_network' => ! empty($config['source_server_id']),
+            'needs_remote_access' => ! empty($config['needs_remote_access']),
+            'last_error' => $config['last_error'] ?? null,
+            'reachable' => is_array($conn) ? ($conn['ok'] ?? null) : null,
+            'reachable_detail' => is_array($conn) ? ($conn['detail'] ?? null) : null,
+            'checked_at' => is_array($conn) ? ($conn['checked_at'] ?? null) : null,
+            'vars' => $vars,
+        ];
+
+        $this->dispatch('open-modal', 'binding-info-modal');
+    }
+
+    /**
+     * Mask a secret for display: keep a 3-char head/tail on longer values so the
+     * operator can sanity-check it's the right credential without revealing it;
+     * fully bullet short values where head/tail would leak most of the string.
+     */
+    private function maskBindingSecret(string $value): string
+    {
+        $len = mb_strlen($value);
+        if ($len === 0) {
+            return '';
+        }
+        if ($len <= 10) {
+            return str_repeat('•', min($len, 12));
+        }
+
+        return mb_substr($value, 0, 3).' •••••• '.mb_substr($value, -3);
+    }
+
+    /**
      * Open the fix modal for a binding: stash the binding id and clear any
      * progress from a previous run so the options (not stale output) render.
      */

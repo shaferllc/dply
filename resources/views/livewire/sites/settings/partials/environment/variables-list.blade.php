@@ -292,6 +292,12 @@
                                         {{ __('Update') }}
                                     </button>
                                 @endif
+                                @if (method_exists($this, 'openBindingInfoModal'))
+                                    <button type="button" wire:click="openBindingInfoModal(@js((string) $gBindingId))" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('View this connection\'s details (injected variables + reachability).') }}">
+                                        <x-heroicon-o-information-circle class="h-3 w-3" />
+                                        {{ __('Info') }}
+                                    </button>
+                                @endif
                                 @if (method_exists($this, 'detachBinding'))
                                     <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $gBindingId]), @js(__('Detach binding?')), @js(__('Detach the :type binding? Its variables stop being injected at deploy.', ['type' => $gTypeLabel])), @js(__('Detach')), true)" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700" title="{{ __('Detach binding') }}">
                                         <x-heroicon-o-x-mark class="h-3 w-3" />
