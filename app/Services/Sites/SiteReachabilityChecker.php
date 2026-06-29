@@ -9,6 +9,32 @@ use Illuminate\Support\Facades\Http;
 class SiteReachabilityChecker
 {
     /**
+     * Cloudflare's published proxy IPv4 ranges. When a hostname resolves to one
+     * of these it is orange-clouded — the A record points at Cloudflare's edge,
+     * NOT a misconfigured server — so the "wrong server" alarm is a false alarm.
+     * Keep in sync with https://www.cloudflare.com/ips/.
+     *
+     * @var list<string>
+     */
+    private const CLOUDFLARE_IPV4_RANGES = [
+        '173.245.48.0/20',
+        '103.21.244.0/22',
+        '103.22.200.0/22',
+        '103.31.4.0/22',
+        '141.101.64.0/18',
+        '108.162.192.0/18',
+        '190.93.240.0/20',
+        '188.114.96.0/20',
+        '197.234.240.0/22',
+        '198.41.128.0/17',
+        '162.158.0.0/15',
+        '104.16.0.0/13',
+        '104.24.0.0/14',
+        '172.64.0.0/13',
+        '131.0.72.0/22',
+    ];
+
+    /**
      * @return array{
      *   ok: bool,
      *   hostname: ?string,
@@ -137,6 +163,7 @@ class SiteReachabilityChecker
      *   ok: bool,
      *   resolves: bool,
      *   points_here: bool,
+     *   behind_cloudflare: bool,
      *   http_ok: bool,
      *   resolved_ips: list<string>,
      *   server_ip: string,
@@ -153,12 +180,20 @@ class SiteReachabilityChecker
         $resolves = $resolved !== [];
         $pointsHere = $serverIp !== '' && in_array($serverIp, $resolved, true);
 
-        // Only probe HTTP when DNS already points here — otherwise the GET would
-        // hit whatever third party the domain currently resolves to (and could
-        // hang), which tells us nothing about this server.
+        // Orange-clouded domains resolve to Cloudflare's anycast IPs, not this
+        // box — so a naive IP compare reports "wrong server" when nothing is
+        // actually misconfigured. Detect the proxy so we can say so plainly
+        // instead of telling the operator to "fix" a correct A record.
+        $behindCloudflare = ! $pointsHere && $this->ipsBehindCloudflare($resolved);
+
+        // Probe HTTP when DNS points straight here, OR when it's proxied through
+        // Cloudflare (the GET then traverses the proxy to this origin — exactly
+        // the path an HTTP-01 challenge takes). Otherwise the GET would hit
+        // whatever third party the domain resolves to (and could hang), which
+        // tells us nothing about this server.
         $httpOk = false;
         $httpError = null;
-        if ($pointsHere) {
+        if ($pointsHere || $behindCloudflare) {
             try {
                 $response = Http::timeout(5)
                     ->withoutRedirecting()
@@ -179,6 +214,16 @@ class SiteReachabilityChecker
                 'host' => $hostname,
                 'ip' => $serverIp !== '' ? $serverIp : __('this server'),
             ]);
+        } elseif ($behindCloudflare) {
+            // Not an error in itself — Cloudflare serves HTTPS at its edge, so an
+            // origin cert is optional. Only flag it if the proxied origin isn't
+            // answering at all (then even an origin HTTP-01 challenge would fail).
+            if (! $httpOk) {
+                $error = __('“:host” is served through Cloudflare, but this origin isn’t answering the proxied HTTP request yet (:err). Cloudflare can still serve HTTPS at its edge regardless.', [
+                    'host' => $hostname,
+                    'err' => $httpError ?? __('no response'),
+                ]);
+            }
         } elseif (! $pointsHere) {
             $error = __('“:host” resolves to :got, not this server (:ip). Update its A record before requesting SSL.', [
                 'host' => $hostname,
@@ -196,12 +241,59 @@ class SiteReachabilityChecker
             'ok' => $pointsHere && $httpOk,
             'resolves' => $resolves,
             'points_here' => $pointsHere,
+            'behind_cloudflare' => $behindCloudflare,
             'http_ok' => $httpOk,
-            'resolved_ips' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($resolved)))))))))))))))))))))))))))))))),
+            'resolved_ips' => array_values($resolved),
             'server_ip' => $serverIp,
             'error' => $error,
             'checked_at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * Whether EVERY resolved IP belongs to a Cloudflare proxy range — i.e. the
+     * domain is orange-clouded. A mix of Cloudflare and non-Cloudflare IPs is
+     * treated as NOT behind Cloudflare, so a genuinely wrong A record alongside
+     * a stale Cloudflare one still trips the normal warning.
+     *
+     * @param  list<string>  $ips
+     */
+    private function ipsBehindCloudflare(array $ips): bool
+    {
+        if ($ips === []) {
+            return false;
+        }
+
+        foreach ($ips as $ip) {
+            if (! $this->ipInCloudflareRange($ip)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function ipInCloudflareRange(string $ip): bool
+    {
+        $ipLong = ip2long($ip);
+        if ($ipLong === false) {
+            return false; // IPv6 / malformed — not matched against these IPv4 ranges.
+        }
+
+        foreach (self::CLOUDFLARE_IPV4_RANGES as $range) {
+            [$subnet, $bits] = explode('/', $range);
+            $subnetLong = ip2long($subnet);
+            if ($subnetLong === false) {
+                continue;
+            }
+
+            $mask = -1 << (32 - (int) $bits);
+            if (($ipLong & $mask) === ($subnetLong & $mask)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

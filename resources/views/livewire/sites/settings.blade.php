@@ -235,19 +235,30 @@
             </div>
 
             @if ($quick_ssl_reachability !== null)
-                <div class="rounded-xl border px-4 py-3 {{ $quick_ssl_reachability['ok'] ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60' }}">
+                @php($quick_ssl_behind_cloudflare = ! $quick_ssl_reachability['ok'] && ! empty($quick_ssl_reachability['behind_cloudflare']))
+                @php($quick_ssl_panel_classes = $quick_ssl_reachability['ok']
+                    ? 'border-emerald-200 bg-emerald-50/60'
+                    : ($quick_ssl_behind_cloudflare ? 'border-sky-200 bg-sky-50/60' : 'border-amber-200 bg-amber-50/60'))
+                <div class="rounded-xl border px-4 py-3 {{ $quick_ssl_panel_classes }}">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] {{ $quick_ssl_reachability['ok'] ? 'text-emerald-800' : 'text-amber-800' }}">
-                                @if ($quick_ssl_reachability['ok'])
-                                    <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Reachable here') }}
-                                @else
-                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" /> {{ __('Not reachable yet') }}
-                                @endif
-                            </p>
                             @if ($quick_ssl_reachability['ok'])
+                                <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                                    <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Reachable here') }}
+                                </p>
                                 <p class="mt-1 text-xs leading-5 text-emerald-900">{{ __('Resolves to this server (:ip) and answers over HTTP — ready for validation.', ['ip' => $quick_ssl_reachability['server_ip']]) }}</p>
+                            @elseif ($quick_ssl_behind_cloudflare)
+                                <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-sky-800">
+                                    <x-heroicon-o-cloud class="h-4 w-4" aria-hidden="true" /> {{ __('Behind Cloudflare') }}
+                                </p>
+                                <p class="mt-1 text-xs leading-5 text-sky-900">{{ __('“:host” is proxied through Cloudflare (resolves to :got), which already serves HTTPS at its edge — so an origin certificate here is optional. If you want end-to-end TLS to this server, the HTTP challenge is proxied through to this box and can still validate.', ['host' => $quick_ssl_domain_hostname, 'got' => implode(', ', $quick_ssl_reachability['resolved_ips'])]) }}</p>
+                                @if (! empty($quick_ssl_reachability['error']))
+                                    <p class="mt-1 text-xs leading-5 text-amber-900">{{ $quick_ssl_reachability['error'] }}</p>
+                                @endif
                             @else
+                                <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
+                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" /> {{ __('Not reachable yet') }}
+                                </p>
                                 <p class="mt-1 text-xs leading-5 text-amber-900">{{ $quick_ssl_reachability['error'] }}</p>
                             @endif
                         </div>
@@ -256,12 +267,17 @@
                             {{ __('Re-check') }}
                         </button>
                     </div>
-                    @unless ($quick_ssl_reachability['ok'])
+                    @if ($quick_ssl_behind_cloudflare)
+                        <label class="mt-3 flex items-start gap-2 text-xs text-sky-900">
+                            <input type="checkbox" wire:model.live="quick_ssl_force" class="mt-0.5 h-4 w-4 rounded border-sky-300 text-sky-700 focus:ring-sky-500">
+                            <span>{{ __('Issue an origin certificate anyway — the HTTP challenge routes through Cloudflare to this server.') }}</span>
+                        </label>
+                    @elseif (! $quick_ssl_reachability['ok'])
                         <label class="mt-3 flex items-start gap-2 text-xs text-amber-900">
                             <input type="checkbox" wire:model.live="quick_ssl_force" class="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-700 focus:ring-amber-500">
                             <span>{{ __('Request anyway — DNS may still be propagating. The HTTP challenge will keep failing until the domain points here.') }}</span>
                         </label>
-                    @endunless
+                    @endif
                 </div>
             @endif
 
