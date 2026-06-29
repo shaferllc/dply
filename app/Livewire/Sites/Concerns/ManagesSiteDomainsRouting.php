@@ -8,6 +8,8 @@ use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
 use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
+use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
@@ -16,6 +18,7 @@ use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
+use App\Services\Sites\TestingHostnameProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
 
@@ -463,5 +466,74 @@ trait ManagesSiteDomainsRouting
         }
 
         $this->finalizeRoutingMutation('Domain removed.');
+    }
+
+    /**
+     * The per-(server, zone) wildcard cert securing this site's testing
+     * hostname (e.g. *.on-dply.cc), in any status — used by the domains tab to
+     * surface why TLS is or isn't working on the generated testing host. Null
+     * when the site has no testing hostname or no wildcard row exists yet.
+     */
+    public function testingWildcardCertificate(): ?ServerWildcardCertificate
+    {
+        $zone = $this->site->testingZone();
+        if ($zone === null || $this->site->server_id === null) {
+            return null;
+        }
+
+        return ServerWildcardCertificate::query()
+            ->where('server_id', $this->site->server_id)
+            ->where('zone', $zone)
+            ->first();
+    }
+
+    /**
+     * (Re)issue the server wildcard certificate that secures this site's testing
+     * hostname. Mirrors the backfill command: ensure the row exists with its DNS
+     * provider + credential resolved, flip it to PENDING so the job's
+     * needsIssuance() gate fires, then dispatch the DNS-01 issuer job. The
+     * failure reason (if any) lands back in last_output, shown on this tab.
+     */
+    public function reissueTestingWildcard(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $zone = $this->site->testingZone();
+        $serverId = $this->site->server_id;
+        if ($zone === null || $serverId === null) {
+            $this->toastError(__('This site has no dply-managed testing hostname to secure.'));
+
+            return;
+        }
+
+        if (! ($this->site->server?->isReady() ?? false)) {
+            $this->toastError(__('The server is not ready — wait for it to come online, then retry.'));
+
+            return;
+        }
+
+        $route = app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($this->site);
+
+        ServerWildcardCertificate::query()->updateOrCreate(
+            ['server_id' => $serverId, 'zone' => $zone],
+            [
+                'provider' => $route['provider'],
+                'provider_credential_id' => $route['credential']?->id,
+                'status' => ServerWildcardCertificate::STATUS_PENDING,
+                'live_directory' => $zone,
+            ],
+        );
+
+        IssueServerWildcardCertificateJob::dispatch($serverId, $zone);
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.wildcard.reissue_requested', $this->site, null, [
+                'zone' => $zone,
+                'server_id' => $serverId,
+            ]);
+        }
+
+        $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
     }
 }

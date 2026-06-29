@@ -123,6 +123,66 @@
         </div>
     </x-modal>
 
+    {{-- Testing host (managed wildcard TLS). The generated *.on-dply.* hostname
+         is secured by a per-(server, zone) wildcard cert, not a per-site cert —
+         so its status (and any issuance failure) lives nowhere else in this UI. --}}
+    @php
+        $testingZone = $site->testingZone();
+        $testingHost = $site->primaryPreviewDomain()?->hostname;
+        $wildcard = $testingZone ? $this->testingWildcardCertificate() : null;
+        $wildcardInstalled = $wildcard?->isInstalled() ?? false;
+    @endphp
+    @if ($testingZone)
+        <div class="{{ $card }} mt-6">
+            <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $wildcardInstalled ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-amber-50 text-amber-700 ring-amber-200/70' }}">
+                        <x-heroicon-o-shield-check class="h-4 w-4" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed testing host') }}</p>
+                        <p class="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
+                            <span>{{ $testingHost ?? '*.'.$testingZone }}</span>
+                            @if ($wildcardInstalled)
+                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('TLS active') }}</span>
+                            @elseif ($wildcard)
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('Wildcard :status', ['status' => $wildcard->status]) }}</span>
+                            @else
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('No wildcard yet') }}</span>
+                            @endif
+                        </p>
+                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Secured by the shared *.:zone wildcard certificate on this server (DNS-01).', ['zone' => $testingZone]) }}
+                            @if ($wildcardInstalled && $wildcard?->not_after)
+                                {{ __('Renews automatically — expires :date.', ['date' => $wildcard->not_after->toFormattedDateString()]) }}
+                            @endif
+                        </p>
+                        @unless ($wildcardInstalled)
+                            <p class="mt-2 text-xs leading-relaxed text-amber-800">
+                                {{ __('TLS is not active on the testing host yet. This usually means the *.:zone wildcard failed to issue — most often because no DNS API token controls the :zone zone. Reissue to retry, and check the output below for the exact certbot/DNS error.', ['zone' => $testingZone]) }}
+                            </p>
+                        @endunless
+                        @if ($wildcard && trim((string) $wildcard->last_output) !== '')
+                            <details class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
+                                <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last issuance output') }}</summary>
+                                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-brand-ink">{{ $wildcard->last_output }}</pre>
+                            </details>
+                        @endif
+                    </div>
+                </div>
+                @can('update', $site)
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <button type="button" wire:click="reissueTestingWildcard" wire:loading.attr="disabled" wire:target="reissueTestingWildcard" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="reissueTestingWildcard" />
+                            <span wire:loading.remove wire:target="reissueTestingWildcard">{{ $wildcard ? __('Reissue TLS') : __('Issue TLS') }}</span>
+                            <span wire:loading wire:target="reissueTestingWildcard">{{ __('Queuing…') }}</span>
+                        </button>
+                    </div>
+                @endcan
+            </div>
+        </div>
+    @endif
+
     {{-- Domains list --}}
     <div class="{{ $card }} mt-6">
         @if ($domainCount === 0)

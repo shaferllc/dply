@@ -63,9 +63,13 @@
                 @if (($deployableSiteCount ?? 0) > 0)
                     {{-- Deploys the one deployable site immediately, or opens the
                          pick-sites modal when there's more than one (WatchesSiteDeploys). --}}
+                    {{-- Fixed w-36 (matched on Open Sites below) so the idle→busy
+                         label swap (Deploy → Deploying…) can't widen the button and
+                         shove its neighbour onto the next line. --}}
                     <x-spinner-button
                         variant="primary"
                         size="sm"
+                        class="w-36"
                         wire:click="openServerDeploy('{{ $server->id }}')"
                         target="openServerDeploy"
                         icon="heroicon-o-rocket-launch"
@@ -73,7 +77,7 @@
                         :busy-label="__('Deploying…')"
                     />
                 @endif
-                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex w-36 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-white px-4 py-2.5 text-xs font-semibold text-brand-ink shadow-sm ring-1 ring-inset ring-brand-ink/15 transition hover:bg-brand-sand/40">
                     <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Open Sites') }}
                 </a>
