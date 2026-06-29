@@ -281,8 +281,11 @@ return [
         // preview-scoped auto-SSL queued on reachability).
         'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', true),
         'site_preview_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW_PREVIEW', false),
-        'site_tenants' => env('FEATURE_WORKSPACE_SITE_TENANTS', false),
-        'site_tenants_preview' => env('FEATURE_WORKSPACE_SITE_TENANTS_PREVIEW', true),
+        // Tenants shipped: real flag on, preview off. Tenant hostnames flow into
+        // server_name; managed testing URLs ride the wildcard; tenant CUSTOM
+        // domains get their own per-tenant HTTP-01 certificate (issueTenantCertificate).
+        'site_tenants' => env('FEATURE_WORKSPACE_SITE_TENANTS', true),
+        'site_tenants_preview' => env('FEATURE_WORKSPACE_SITE_TENANTS_PREVIEW', false),
     ],
 
     /*

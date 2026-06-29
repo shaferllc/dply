@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ProvisionTenantTestingHostnameJob;
+use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Services\Sites\SiteReachabilityChecker;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
 
@@ -283,5 +287,68 @@ trait ManagesSiteTenantDomains
         $this->bulk_tenant_input = '';
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
+    }
+
+    /**
+     * Issue a per-tenant HTTP-01 certificate for a tenant's CUSTOM domain. Each
+     * tenant onboards over time at its own arbitrary hostname, so they get their
+     * own cert (rather than one ever-growing SAN cert where a single tenant's bad
+     * DNS would break everyone). Gated on reachability so we don't queue a cert
+     * that's guaranteed to fail at the CA; a Cloudflare-proxied tenant still
+     * passes (the HTTP-01 challenge routes through the proxy to this origin).
+     */
+    public function issueTenantCertificate(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->find($tenantDomainId);
+        if ($tenant === null) {
+            return;
+        }
+
+        $hostname = strtolower(trim((string) $tenant->hostname));
+        if ($hostname === '') {
+            return;
+        }
+
+        $alreadyCovered = $this->site->certificates()
+            ->whereIn('status', [
+                SiteCertificate::STATUS_PENDING,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+                SiteCertificate::STATUS_ACTIVE,
+            ])
+            ->get()
+            ->contains(fn (SiteCertificate $certificate): bool => in_array($hostname, $certificate->domainHostnames(), true));
+        if ($alreadyCovered) {
+            $this->toastError(__('SSL is already configured or in progress for :host.', ['host' => $hostname]));
+
+            return;
+        }
+
+        $reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
+        if (! ($reachability['ok'] ?? false) && empty($reachability['behind_cloudflare'])) {
+            $this->toastError($reachability['error']
+                ?? __('“:host” isn’t pointed at this server yet — point its DNS here, then request SSL.', ['host' => $hostname]));
+
+            return;
+        }
+
+        $certificate = app(CertificateRequestService::class)->create([
+            'site_id' => $this->site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => [$hostname],
+            'status' => SiteCertificate::STATUS_PENDING,
+            'requested_settings' => [
+                'source' => 'tenant_ssl',
+                'tenant_domain_id' => (string) $tenant->id,
+            ],
+        ]);
+
+        ExecuteSiteCertificateJob::dispatch((string) $certificate->id);
+        $this->toastSuccess(__('SSL requested for :host.', ['host' => $hostname]));
+        $this->site->load('certificates');
     }
 }

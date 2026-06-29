@@ -105,9 +105,15 @@ CONF;
             }
         }
 
+        // A PREVIEW-scoped cert covers a single preview hostname, so it must never
+        // become the shared ssl_certificate for a multi-host server block — doing
+        // so breaks every OTHER hostname on the block (the exact failure where a
+        // stray per-preview cert shadowed the customer domain + sibling previews).
+        // Preview hosts are secured by the wildcard instead.
         $cert = SiteCertificate::query()
             ->where('site_id', $site->id)
             ->where('provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+            ->where('scope_type', '!=', SiteCertificate::SCOPE_PREVIEW)
             ->whereIn('status', [
                 SiteCertificate::STATUS_ACTIVE,
                 SiteCertificate::STATUS_ISSUED,
@@ -122,6 +128,16 @@ CONF;
         $domains = $cert?->domainHostnames() ?? [];
         if ($domains !== []) {
             return $domains[0];
+        }
+
+        // No customer/non-preview cert: when the testing hostnames are wildcard-
+        // covered, that shared cert secures the block (it covers every *.zone
+        // preview host), so use it rather than a per-host preview path.
+        if ($wildcard !== null) {
+            $dir = strtolower(trim((string) ($wildcard->live_directory ?: $site->testingZone())));
+            if ($dir !== '') {
+                return $dir;
+            }
         }
 
         $site->loadMissing(['previewDomains', 'domains']);

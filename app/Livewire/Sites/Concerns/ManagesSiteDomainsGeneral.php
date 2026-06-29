@@ -492,14 +492,18 @@ trait ManagesSiteDomainsGeneral
 
         $this->newPreviewLabel = '';
 
-        // Add the hostname to the live webserver config (server_name) …
+        // Add the hostname to the live webserver config (server_name). Managed
+        // hosts ride the shared *.zone wildcard for TLS; if that wildcard isn't
+        // installed yet they have no HTTPS until it's issued.
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation(__('Preview URL added: :host', ['host' => $domain->hostname]));
 
-        // … then secure it: a per-host cert unless the box uses the shared
-        // testing-zone wildcard (in which case it's already covered).
         $this->queuePreviewCertificate($domain->fresh());
+
+        if (! $this->site->isCoveredByServerWildcard()) {
+            $this->toastWarning(__('Added — but the :zone wildcard certificate isn’t installed yet, so HTTPS won’t work until it’s issued (use “Issue TLS” on the managed testing host).', ['zone' => $this->site->testingZone() ?? 'testing']));
+        }
     }
 
     /**
@@ -515,7 +519,12 @@ trait ManagesSiteDomainsGeneral
             return;
         }
 
-        if ($this->site->isCoveredByServerWildcard()) {
+        // dply-managed hosts live on the testing zone and are secured by the
+        // shared *.zone wildcard — issuing a per-host cert here is not just
+        // redundant, it shadows the wildcard as the block's ssl_certificate and
+        // breaks sibling hostnames. Only genuinely custom preview domains (BYO,
+        // off the testing zone) take a per-host certificate.
+        if ($domain->managed_by_dply || $this->site->isCoveredByServerWildcard()) {
             return;
         }
 

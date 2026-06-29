@@ -1007,7 +1007,22 @@
         ]"
     />
 @elseif ($routingTab === 'tenants')
-    @php $tenantCount = $site->tenantDomains->count(); @endphp
+    @php
+        $tenantCount = $site->tenantDomains->count();
+        // Per-tenant SSL: map each hostname to its best certificate status so the
+        // row can show a badge + offer "Add SSL". Built once to avoid N+1.
+        $site->loadMissing('certificates');
+        $tenantCertRank = ['active' => 0, 'installing' => 1, 'issued' => 1, 'pending' => 1, 'failed' => 2];
+        $tenantCertStatus = [];
+        foreach ($site->certificates as $tc) {
+            foreach ($tc->domainHostnames() as $tch) {
+                $tch = strtolower($tch);
+                if (! isset($tenantCertStatus[$tch]) || ($tenantCertRank[$tc->status] ?? 3) < ($tenantCertRank[$tenantCertStatus[$tch]] ?? 3)) {
+                    $tenantCertStatus[$tch] = $tc->status;
+                }
+            }
+        }
+    @endphp
 
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
@@ -1130,7 +1145,16 @@
         @else
             <ul class="divide-y divide-brand-ink/8">
                 @foreach ($site->tenantDomains as $tenantDomain)
-                    @php $isEditing = $editing_tenant_id === (string) $tenantDomain->id; @endphp
+                    @php
+                        $isEditing = $editing_tenant_id === (string) $tenantDomain->id;
+                        $tCertStatus = $tenantCertStatus[strtolower((string) $tenantDomain->hostname)] ?? null;
+                        $tSsl = match ($tCertStatus) {
+                            \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],
+                            \App\Models\SiteCertificate::STATUS_INSTALLING, \App\Models\SiteCertificate::STATUS_ISSUED, \App\Models\SiteCertificate::STATUS_PENDING => ['label' => __('SSL pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'],
+                            \App\Models\SiteCertificate::STATUS_FAILED => ['label' => __('SSL failed'), 'cls' => 'bg-rose-50 text-rose-800 ring-rose-200/70', 'icon' => 'heroicon-o-exclamation-triangle'],
+                            default => ['label' => __('SSL missing'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-lock-open'],
+                        };
+                    @endphp
                     <li class="px-6 py-3 sm:px-8" wire:key="tenant-row-{{ $tenantDomain->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedTenantDomain" class="space-y-3">
@@ -1170,6 +1194,9 @@
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $tenantDomain->hostname }}</span>
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $tSsl['cls'] }}">
+                                                <x-dynamic-component :component="$tSsl['icon']" class="h-3 w-3" /> {{ $tSsl['label'] }}
+                                            </span>
                                             @if ($tenantDomain->tenant_key)
                                                 <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('key: :key', ['key' => $tenantDomain->tenant_key]) }}</span>
                                             @endif
@@ -1205,6 +1232,12 @@
                                         <button type="button" wire:click="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10" title="{{ __('Provision a dply testing-domain hostname pointed at this app for this tenant') }}">
                                             <x-heroicon-o-beaker class="h-4 w-4" />
                                             {{ __('Create testing URL') }}
+                                        </button>
+                                    @endif
+                                    @if (in_array($tCertStatus, [null, \App\Models\SiteCertificate::STATUS_FAILED], true))
+                                        <button type="button" wire:click="issueTenantCertificate('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="issueTenantCertificate('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Issue a Let’s Encrypt certificate for this tenant’s domain (point its DNS here first).') }}">
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
+                                            {{ $tCertStatus === \App\Models\SiteCertificate::STATUS_FAILED ? __('Retry SSL') : __('Add SSL') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
