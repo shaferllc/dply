@@ -38,6 +38,7 @@ use App\Console\Commands\PruneAuditLogsCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
 use App\Console\Commands\ReapStuckConsoleActionsCommand;
+use App\Console\Commands\ReconcileTenantDnsCommand;
 use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
@@ -128,6 +129,14 @@ final class DplySchedule
             ->everyFifteenMinutes()
             ->withoutOverlapping()
             ->name('reap-stuck-console-actions');
+
+        // Self-heal tenant custom-domain DNS: ensure each tenant hostname has an A
+        // record pointing at its server wherever dply holds the zone credential —
+        // so pre-existing tenants don't need a manual re-save.
+        $schedule->command(ReconcileTenantDnsCommand::class)
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('reconcile-tenant-dns');
 
         $schedule->command(CloudPollStatusCommand::class)->everyMinute();
 

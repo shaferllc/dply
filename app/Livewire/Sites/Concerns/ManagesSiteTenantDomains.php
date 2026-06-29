@@ -12,9 +12,8 @@ use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
-use App\Services\Sites\Dns\DnsZoneCredentialResolver;
-use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Services\Sites\SiteReachabilityChecker;
+use App\Services\Sites\TenantDnsProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
 
@@ -387,34 +386,16 @@ trait ManagesSiteTenantDomains
      */
     private function provisionTenantCustomDns(SiteTenantDomain $tenant, bool $quietWhenNoCredential = false): void
     {
-        $hostname = strtolower(trim((string) $tenant->hostname));
-        $serverIp = trim((string) ($this->site->server?->ip_address ?? ''));
-        if ($hostname === '' || $serverIp === '') {
-            return;
+        $result = app(TenantDnsProvisioner::class)->ensure($this->site, $tenant);
+        $host = (string) $tenant->hostname;
+
+        if ($result['status'] === 'created') {
+            $this->toastSuccess(__('Pointed “:host” at this server in :zone — DNS may take a few minutes to propagate, then add SSL.', ['host' => $host, 'zone' => $result['zone']]));
+        } elseif ($result['status'] === 'no_credential' && ! $quietWhenNoCredential) {
+            $this->toastWarning(__('No connected DNS credential controls “:host”’s zone — connect the provider that hosts it (e.g. Cloudflare), or point its DNS at this server manually.', ['host' => $host]));
+        } elseif ($result['status'] === 'error') {
+            $this->toastError(__('Could not create the DNS record for “:host”: :err', ['host' => $host, 'err' => $result['message']]));
         }
-
-        $match = app(DnsZoneCredentialResolver::class)->resolveForHostname($this->site, $hostname);
-        if ($match === null) {
-            if (! $quietWhenNoCredential) {
-                $this->toastWarning(__('No connected DNS credential controls “:host”’s zone — connect the provider that hosts it (e.g. Cloudflare), or point its DNS at this server manually.', ['host' => $hostname]));
-            }
-
-            return;
-        }
-
-        $zone = $match['zone'];
-        $relative = $hostname === $zone ? '@' : rtrim(substr($hostname, 0, -(strlen($zone) + 1)), '.');
-        $relative = $relative === '' ? '@' : $relative;
-
-        try {
-            SiteDnsProviderFactory::forCredential($match['credential'])->upsertRecord($zone, 'A', $relative, $serverIp);
-            $this->toastSuccess(__('Pointed “:host” at this server (:ip) in :zone — DNS may take a few minutes to propagate, then add SSL.', [
-                'host' => $hostname,
-                'ip' => $serverIp,
-                'zone' => $zone,
-            ]));
-        } catch (\Throwable $e) {
-            $this->toastError(__('Could not create the DNS record for “:host”: :err', ['host' => $hostname, 'err' => $e->getMessage()]));
-        }
+        // 'no_server_ip' / 'invalid' → silent (nothing actionable for the operator here).
     }
 }
