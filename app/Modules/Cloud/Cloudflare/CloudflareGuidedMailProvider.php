@@ -114,7 +114,10 @@ class CloudflareGuidedMailProvider implements GuidedMailProvider
             $from = 'hello@'.strtolower(trim($domain));
         }
 
-        $fromName = trim((string) ($credentials['from_name'] ?? ''));
+        // Resolve ${APP_NAME}-style placeholders so Cloudflare registers a real
+        // sender name rather than a literal "${APP_NAME}" — this is the control
+        // plane, not the deployed app, so phpdotenv isn't in play.
+        $fromName = \App\Support\Mail\MailPlaceholderResolver::resolve($site, trim((string) ($credentials['from_name'] ?? '')));
 
         try {
             $email = new CloudflareEmailService($sendingToken);

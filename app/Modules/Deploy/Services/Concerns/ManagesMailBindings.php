@@ -60,7 +60,10 @@ trait ManagesMailBindings
         }
 
         $fromAddress = trim((string) ($params['from_address'] ?? ''));
-        $fromName = trim((string) ($params['from_name'] ?? ''));
+        // Resolve ${APP_NAME}-style placeholders against the site env so the
+        // stored MAIL_FROM_NAME / Cloudflare sender ships a real name, not a
+        // literal "${APP_NAME}" (dply's API calls don't run the app's phpdotenv).
+        $fromName = \App\Support\Mail\MailPlaceholderResolver::resolve($site, trim((string) ($params['from_name'] ?? '')));
         if ($provider !== 'log' && ($fromAddress === '' || filter_var($fromAddress, FILTER_VALIDATE_EMAIL) === false)) {
             throw new InvalidArgumentException(__('A valid "from" email address is required.'));
         }
@@ -100,7 +103,7 @@ trait ManagesMailBindings
     private function attachFailoverMail(Site $site, string $transport, array $params): SiteBinding
     {
         $fromAddress = trim((string) ($params['from_address'] ?? ''));
-        $fromName = trim((string) ($params['from_name'] ?? ''));
+        $fromName = \App\Support\Mail\MailPlaceholderResolver::resolve($site, trim((string) ($params['from_name'] ?? '')));
         if ($fromAddress === '' || filter_var($fromAddress, FILTER_VALIDATE_EMAIL) === false) {
             throw new InvalidArgumentException(__('A valid "from" email address is required.'));
         }

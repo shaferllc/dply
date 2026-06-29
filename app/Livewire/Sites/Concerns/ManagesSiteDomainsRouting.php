@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Jobs\ApplySiteDnsRecordsJob;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
 use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
@@ -18,6 +19,7 @@ use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
+use App\Services\Sites\SiteReachabilityChecker;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
@@ -557,5 +559,112 @@ trait ManagesSiteDomainsRouting
         } else {
             $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
         }
+    }
+
+    /**
+     * Per-hostname DNS record status for the routing → DNS tab. Populated lazily
+     * (wire:init) because each row runs a live resolver probe; kept on the
+     * component so a re-check just refreshes it in place.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $dnsRecordStatuses = [];
+
+    public bool $dnsRecordsLoaded = false;
+
+    /** wire:init entry point — defers the resolver probes off the first paint. */
+    public function loadDnsRecordStatuses(): void
+    {
+        $this->dnsRecordStatuses = $this->computeDnsRecordRows();
+        $this->dnsRecordsLoaded = true;
+    }
+
+    /** Operator-triggered refresh (Re-check button). */
+    public function recheckDnsRecords(): void
+    {
+        $this->authorize('view', $this->site);
+        $this->loadDnsRecordStatuses();
+    }
+
+    /**
+     * Whether dply can apply records itself: a DNS credential resolves AND a zone
+     * is known, so {@see ApplySiteDnsRecordsJob} has something to write into.
+     */
+    public function dnsRecordsManaged(): bool
+    {
+        $zone = trim((string) ($this->site->dns_zone ?: ($this->site->guessDnsZoneFromPrimaryHostname() ?? '')));
+
+        return $zone !== '' && $this->site->dnsAutomationCredential() !== null;
+    }
+
+    /**
+     * Queue the provider-side A-record upserts (apex + every customer hostname in
+     * the zone → this server). Streams into the page-top banner; the operator
+     * re-checks once DNS propagates.
+     */
+    public function applySiteDnsRecords(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->dnsRecordsManaged()) {
+            $this->toastError(__('No DNS credential controls this zone — add the records shown above manually instead.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('dns_apply', __('Applying DNS records'));
+        ApplySiteDnsRecordsJob::dispatch((string) $this->site->id, (string) $run->id, (string) auth()->id());
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('DNS records applied — give them a few minutes to propagate, then re-check.'),
+            __('Applying DNS records did not finish — see the output below.'),
+        );
+    }
+
+    /**
+     * Build the per-hostname record + live status rows. Each customer hostname
+     * gets the A record it needs (→ the server IP) plus where it actually points,
+     * reusing the reachability probe (which knows Cloudflare-proxied domains).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function computeDnsRecordRows(): array
+    {
+        $serverIp = trim((string) ($this->site->server->ip_address ?? ''));
+        $zone = strtolower(trim((string) ($this->site->dns_zone ?: ($this->site->guessDnsZoneFromPrimaryHostname() ?? ''))));
+        $checker = app(SiteReachabilityChecker::class);
+
+        $rows = [];
+        foreach ($this->site->customerDomainHostnames() as $host) {
+            $host = strtolower(trim((string) $host));
+            if ($host === '') {
+                continue;
+            }
+
+            $reach = $checker->checkHostname($this->site, $host);
+            $inZone = $zone !== '' && ($host === $zone || str_ends_with($host, '.'.$zone));
+            $recordName = ! $inZone
+                ? $host
+                : ($host === $zone ? '@' : rtrim(substr($host, 0, -(strlen($zone) + 1)), '.'));
+
+            $status = ! empty($reach['behind_cloudflare']) ? 'cloudflare'
+                : (($reach['points_here'] ?? false) ? 'pointing'
+                : (($reach['resolves'] ?? false) ? 'wrong' : 'missing'));
+
+            $rows[] = [
+                'hostname' => $host,
+                'type' => 'A',
+                'name' => $recordName === '' ? '@' : $recordName,
+                'value' => $serverIp,
+                'zone' => $zone,
+                'in_zone' => $inZone,
+                'status' => $status,
+                'resolved_ips' => array_values($reach['resolved_ips'] ?? []),
+            ];
+        }
+
+        return $rows;
     }
 }

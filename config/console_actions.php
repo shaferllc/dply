@@ -24,6 +24,12 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'dns_apply' => [
+            'running' => 'Applying DNS records …',
+            'completed' => 'DNS records applied.',
+            'failed' => 'Applying DNS records failed.',
+            'stale' => 'Applying DNS records did not finish.',
+        ],
         'server_maintenance_op' => [
             'running' => 'Running host maintenance on :host …',
             'completed' => 'Host maintenance finished.',
@@ -367,7 +373,7 @@ return [
         // "tracking in the console" toast isn't a dead end.
         'general' => ['disk_usage_measure'],
         'settings' => ['webserver_config'],
-        'routing' => ['webserver_config'],
+        'routing' => ['webserver_config', 'ssl', 'dns_apply'],
         'certificates' => ['ssl', 'webserver_config'],
         'runtime' => ['webserver_config'],
         'system-user' => ['system_user', 'webserver_config', 'permissions'],
