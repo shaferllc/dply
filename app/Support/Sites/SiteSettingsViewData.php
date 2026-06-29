@@ -89,6 +89,9 @@ final class SiteSettingsViewData
         ];
         $routingTabLabels = [
             'dns' => __('DNS'),
+            // "Preview" reads like per-branch deploy previews; this is a single
+            // shareable staging hostname for the live site, so label it plainly.
+            'preview' => __('Preview URL'),
         ];
         $runtimeTabs = SiteSettingsSidebar::runtimeTabsFor($site);
         $runtimeTabIcons = [

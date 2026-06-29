@@ -276,8 +276,11 @@ return [
         'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', false),
         'site_redirects' => env('FEATURE_WORKSPACE_SITE_REDIRECTS', false),
         'site_redirects_preview' => env('FEATURE_WORKSPACE_SITE_REDIRECTS_PREVIEW', false),
-        'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', false),
-        'site_preview_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW_PREVIEW', true),
+        // Preview hostnames shipped: real flag on, preview off (savePreviewSettings
+        // + finalizeRoutingMutation wire preview hosts into server_name, with
+        // preview-scoped auto-SSL queued on reachability).
+        'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', true),
+        'site_preview_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW_PREVIEW', false),
         'site_tenants' => env('FEATURE_WORKSPACE_SITE_TENANTS', false),
         'site_tenants_preview' => env('FEATURE_WORKSPACE_SITE_TENANTS_PREVIEW', true),
     ],
