@@ -315,6 +315,14 @@ class CloudflareDnsService
             ?? $response->body()
             ?: $response->reason();
 
+        // A token that can read zones but hits an auth/permission wall on records
+        // is almost always missing Zone:DNS:Edit — say so rather than the bare
+        // "Authentication error" Cloudflare returns.
+        $code = (int) ($response->json('errors.0.code') ?? 0);
+        if (in_array($code, [10000, 9109], true) || stripos((string) $message, 'authentication') !== false || $response->status() === 403) {
+            $message .= ' — the API token needs the Zone:DNS:Edit permission for this zone.';
+        }
+
         throw new \RuntimeException("Failed to {$action}: {$message}");
     }
 }

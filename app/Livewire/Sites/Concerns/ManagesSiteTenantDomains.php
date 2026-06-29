@@ -231,6 +231,10 @@ trait ManagesSiteTenantDomains
         $this->cancelEditTenantDomain();
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain updated.');
+
+        // Point the (possibly changed) hostname at the server when a connected
+        // credential owns its zone — so editing a tenant "just works" like adding.
+        $this->provisionTenantCustomDns($tenant->fresh(), quietWhenNoCredential: true);
     }
 
     /**
