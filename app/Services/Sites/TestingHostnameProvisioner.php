@@ -134,6 +134,109 @@ class TestingHostnameProvisioner
      *
      * Idempotent: re-running reuses the tenant's existing hostname/zone.
      */
+    /**
+     * Mint an ADDITIONAL managed preview hostname (non-primary) on a dply-owned
+     * zone — the "Add preview URL" action. Same managed DNS provisioning as the
+     * primary {@see provision()}, but with a unique random hostname and without
+     * demoting the existing primary, so a site can carry several share URLs.
+     */
+    public function provisionAdditional(Site $site, ?string $label = null): ?SitePreviewDomain
+    {
+        $site->loadMissing(['server', 'previewDomains', 'organization', 'dnsProviderCredential']);
+
+        if (! $this->isEnabledForSite($site)) {
+            return null;
+        }
+
+        $serverIp = trim((string) ($site->server->ip_address ?? ''));
+        if ($serverIp === '') {
+            return null;
+        }
+
+        $routing = $this->resolveTestingProviderForSite($site);
+        $dnsProviderKey = $routing['provider'];
+        $dnsProvider = $routing['dns_provider'];
+        $pool = $routing['pool'];
+
+        $zone = $this->chooseZoneFromPool($site, $pool);
+        $hostname = $this->buildAdditionalHostname($site, $zone);
+        $recordName = $this->relativeRecordName($hostname, $zone);
+
+        try {
+            $record = $dnsProvider->upsertRecord($zone, 'A', $recordName, $serverIp);
+
+            return SitePreviewDomain::query()->create([
+                'site_id' => $site->id,
+                'hostname' => $hostname,
+                'label' => $label !== null && trim($label) !== '' ? trim($label) : 'Preview URL',
+                'zone' => $zone,
+                'record_name' => $recordName,
+                'provider_type' => $dnsProviderKey,
+                'provider_record_id' => (string) ($record['id'] ?? ''),
+                'record_type' => 'A',
+                'record_data' => $serverIp,
+                'dns_status' => 'ready',
+                'ssl_status' => 'none',
+                'is_primary' => false,
+                'auto_ssl' => true,
+                'https_redirect' => true,
+                'managed_by_dply' => true,
+                'last_dns_checked_at' => now(),
+                'meta' => [
+                    'provisioned_at' => now()->toIso8601String(),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * A unique managed hostname for an additional preview URL — the per-site
+     * canonical name is deterministic (one per site), so additional ones get a
+     * short random suffix and are checked for collisions before use.
+     */
+    private function buildAdditionalHostname(Site $site, string $zone): string
+    {
+        $base = Str::slug($site->slug !== '' ? $site->slug : $site->name);
+        $base = trim($base, '-');
+        $base = $base !== '' ? $base : 'site';
+
+        for ($attempt = 0; $attempt < 6; $attempt++) {
+            $suffix = Str::lower(Str::random(6));
+            $label = rtrim(Str::limit($base.'-'.$suffix, 63, ''), '-');
+            $candidate = $label.'.'.$zone;
+
+            if (! SitePreviewDomain::query()->where('hostname', $candidate)->exists()) {
+                return $candidate;
+            }
+        }
+
+        return rtrim(Str::limit($base.'-'.Str::lower(Str::random(10)), 63, ''), '-').'.'.$zone;
+    }
+
+    /**
+     * Best-effort removal of a single managed preview domain's provider DNS record
+     * (using the row's own stored zone + record id), so removing an added preview
+     * URL doesn't orphan its A record. Failures are swallowed — the row removal
+     * proceeds regardless, and an orphaned record is harmless beyond clutter.
+     */
+    public function deleteManagedPreviewRecord(Site $site, SitePreviewDomain $domain): void
+    {
+        $recordId = trim((string) ($domain->provider_record_id ?? ''));
+        $zone = trim((string) ($domain->zone ?? ''));
+        if (! (bool) $domain->managed_by_dply || $recordId === '' || $recordId === '0' || $zone === '') {
+            return;
+        }
+
+        try {
+            $routing = $this->resolveTestingProviderForSite($site);
+            $routing['dns_provider']->deleteRecord($zone, $recordId);
+        } catch (\Throwable $e) {
+            // best-effort — leave the row removal to proceed.
+        }
+    }
+
     public function provisionForTenant(Site $site, SiteTenantDomain $tenant): bool
     {
         $site->loadMissing(['server', 'organization']);

@@ -9,6 +9,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Models\Workspace;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Services\Sites\TestingHostnameProvisioner;
 use App\Modules\Cloud\Services\AzureDnsService;
 use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
 use App\Modules\Cloud\Services\DigitalOceanService;
@@ -45,6 +48,9 @@ trait ManagesSiteDomainsGeneral
     public bool $preview_auto_ssl = true;
 
     public bool $preview_https_redirect = true;
+
+    /** Optional label captured in the "Add preview URL" popover. */
+    public string $newPreviewLabel = '';
 
     /** Selected org DigitalOcean credential for DNS automation; empty string = organization default. */
     public string $settings_dns_provider_credential_id = '';
@@ -437,10 +443,61 @@ trait ManagesSiteDomainsGeneral
         $this->authorize('update', $this->site);
 
         $previewDomain = $this->site->previewDomains()->findOrFail($previewDomainId);
+
+        // Drop the managed provider DNS record too, so removing an added preview
+        // URL doesn't leave an orphaned A record behind.
+        app(TestingHostnameProvisioner::class)->deleteManagedPreviewRecord($this->site, $previewDomain);
+
         $previewDomain->delete();
 
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation('Preview domain removed.');
+    }
+
+    /**
+     * Whether dply can mint another managed preview URL here — managed testing
+     * hostnames must be enabled and the server must have an IP to point at.
+     */
+    public function canAddManagedPreview(): bool
+    {
+        return trim((string) ($this->site->server?->ip_address ?? '')) !== ''
+            && app(TestingHostnameProvisioner::class)->isEnabledForSite($this->site);
+    }
+
+    /**
+     * "Add preview URL" — provision an additional dply-managed *.preview hostname
+     * (its own DNS record + auto-SSL), wire it into the live vhost, and queue its
+     * certificate. The existing primary is untouched.
+     */
+    public function addManagedPreviewDomain(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $domain = app(TestingHostnameProvisioner::class)->provisionAdditional($this->site, $this->newPreviewLabel);
+        if ($domain === null) {
+            $this->toastError(__('Could not provision a preview URL — make sure managed DNS is connected and the server has an IP address.'));
+
+            return;
+        }
+
+        $this->newPreviewLabel = '';
+
+        // Add the hostname to the live webserver config (server_name) …
+        $this->site->load('previewDomains');
+        $this->syncPreviewSettingsForm();
+        $this->finalizeRoutingMutation(__('Preview URL added: :host', ['host' => $domain->hostname]));
+
+        // … then auto-issue its preview-scoped certificate.
+        $cert = app(CertificateRequestService::class)->queuePrimaryPreviewAutoSsl(
+            $this->site->fresh(['previewDomains']) ?? $this->site,
+            $domain->fresh(),
+        );
+        if ($cert !== null) {
+            // Brief delay so the webserver apply (server_name) and the just-created
+            // DNS record settle before the HTTP-01 challenge runs; a failure is
+            // self-healing (marked failed → re-queued by the auto-SSL sweep).
+            ExecuteSiteCertificateJob::dispatch((string) $cert->id)->delay(now()->addSeconds(30));
+        }
     }
 }

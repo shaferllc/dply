@@ -834,7 +834,10 @@
         ]"
     />
 @elseif ($routingTab === 'preview')
-    @php $previewCount = $site->previewDomains->count(); @endphp
+    @php
+        $site->loadMissing('previewDomains.certificates');
+        $previewCount = $site->previewDomains->count();
+    @endphp
 
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
@@ -844,16 +847,38 @@
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview domains') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Keep preview hostnames separate so reachability, auto-SSL, and cleanup stay scoped to testing traffic.') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview URLs') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Shareable, auto-SSL hostnames that point at this live site — hand out a working link before the real domain’s DNS is live. dply provisions the DNS and certificate for each one.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no preview hosts|{1} :count host|[2,*] :count hosts', $previewCount, ['count' => $previewCount]) }}
+                            {{ trans_choice('{0} no preview URLs|{1} :count URL|[2,*] :count URLs', $previewCount, ['count' => $previewCount]) }}
                         </span>
                     </div>
                 </div>
             </div>
+            @can('update', $site)
+                @if ($this->canAddManagedPreview())
+                    <div class="relative flex shrink-0 items-center" x-data="{ open: false }">
+                        <button type="button" x-on:click="open = ! open"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90"
+                            title="{{ __('Provision another dply-managed preview URL (DNS + auto-SSL).') }}">
+                            <x-heroicon-o-plus class="h-4 w-4" />
+                            {{ __('Add preview URL') }}
+                        </button>
+                        <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 top-full z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 text-left shadow-lg">
+                            <x-input-label for="new_preview_label" :value="__('Label (optional)')" />
+                            <input id="new_preview_label" type="text" wire:model="newPreviewLabel" maxlength="255" placeholder="{{ __('e.g. Client review') }}" class="dply-input mt-1 text-sm" />
+                            <button type="button" wire:click="addManagedPreviewDomain" x-on:click="open = false" wire:loading.attr="disabled" wire:target="addManagedPreviewDomain"
+                                class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
+                                <span wire:loading.remove wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Provision preview URL') }}</span>
+                                <span wire:loading wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-spinner variant="cream" size="sm" />{{ __('Provisioning…') }}</span>
+                            </button>
+                            <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('dply mints a managed hostname with its own DNS record + auto-SSL.') }}</p>
+                        </div>
+                    </div>
+                @endif
+            @endcan
         </div>
     </div>
 
@@ -899,10 +924,27 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Known preview hosts') }}</p>
                 <ul class="mt-3 space-y-2">
                     @foreach ($site->previewDomains as $previewDomain)
+                        @php
+                            $pdCert = $previewDomain->relationLoaded('certificates') ? $previewDomain->certificates->sortByDesc('updated_at')->first() : null;
+                            $pdSsl = match ($pdCert?->status) {
+                                \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],
+                                \App\Models\SiteCertificate::STATUS_INSTALLING, \App\Models\SiteCertificate::STATUS_ISSUED, \App\Models\SiteCertificate::STATUS_PENDING => ['label' => __('SSL pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'],
+                                \App\Models\SiteCertificate::STATUS_FAILED => ['label' => __('SSL failed'), 'cls' => 'bg-rose-50 text-rose-800 ring-rose-200/70', 'icon' => 'heroicon-o-exclamation-triangle'],
+                                default => ['label' => __('No SSL yet'), 'cls' => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10', 'icon' => 'heroicon-o-lock-open'],
+                            };
+                        @endphp
                         <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
                             <div class="min-w-0">
-                                <p class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('DNS: :dns · SSL: :ssl', ['dns' => $previewDomain->dns_status, 'ssl' => $previewDomain->ssl_status]) }}</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</span>
+                                    @if ($previewDomain->is_primary)
+                                        <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Primary') }}</span>
+                                    @endif
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $pdSsl['cls'] }}" @if ($pdCert?->status === \App\Models\SiteCertificate::STATUS_FAILED) title="{{ \Illuminate\Support\Str::limit((string) $pdCert->last_output, 240) }}" @endif>
+                                        <x-dynamic-component :component="$pdSsl['icon']" class="h-3 w-3" /> {{ $pdSsl['label'] }}
+                                    </span>
+                                </div>
+                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ $previewDomain->label ? $previewDomain->label.' · ' : '' }}{{ __('DNS: :dns', ['dns' => $previewDomain->dns_status]) }}</p>
                             </div>
                             @if (! $previewDomain->is_primary)
                                 <button type="button" wire:click="confirmRemovePreviewDomain('{{ $previewDomain->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
