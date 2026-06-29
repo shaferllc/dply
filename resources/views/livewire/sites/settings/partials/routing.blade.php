@@ -937,16 +937,16 @@
                 <ul class="mt-3 space-y-2">
                     @foreach ($site->previewDomains as $previewDomain)
                         @php
-                            $pdOnTestingZone = $previewDomain->managed_by_dply
+                            $pdOnWildcard = $previewDomain->managed_by_dply
+                                && $coveringWildcard !== null
                                 && $previewTestingZone !== null
                                 && strtolower((string) $previewDomain->zone) === strtolower($previewTestingZone);
-                            if ($pdOnTestingZone) {
+                            if ($pdOnWildcard) {
                                 // Secured by the shared *.zone wildcard (DNS-01), not a per-host cert.
                                 $pdCert = null;
-                                $pdSsl = $coveringWildcard !== null
-                                    ? ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed']
-                                    : ['label' => __('Wildcard pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'];
+                                $pdSsl = ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'];
                             } else {
+                                // Per-host certificate (the model where this server has no wildcard).
                                 $pdCert = $previewDomain->relationLoaded('certificates') ? $previewDomain->certificates->sortByDesc('updated_at')->first() : null;
                                 $pdSsl = match ($pdCert?->status) {
                                     \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],

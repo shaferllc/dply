@@ -9,6 +9,8 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Models\Workspace;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Modules\Cloud\Services\AzureDnsService;
 use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
@@ -421,6 +423,10 @@ trait ManagesSiteDomainsGeneral
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation('Preview settings saved.');
+
+        // Secure the primary preview host if auto-SSL is on and it isn't covered
+        // yet — otherwise it serves whatever per-host cert is the vhost default.
+        $this->queuePreviewCertificate($this->site->primaryPreviewDomain());
     }
 
     public function confirmRemovePreviewDomain(string $previewDomainId): void
@@ -486,14 +492,41 @@ trait ManagesSiteDomainsGeneral
 
         $this->newPreviewLabel = '';
 
-        // Add the hostname to the live webserver config (server_name). TLS rides
-        // the shared testing-zone wildcard, so there's nothing per-host to issue.
+        // Add the hostname to the live webserver config (server_name) …
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation(__('Preview URL added: :host', ['host' => $domain->hostname]));
 
-        if (! $this->site->isCoveredByServerWildcard()) {
-            $this->toastWarning(__('Added — but the :zone wildcard certificate isn’t installed yet, so HTTPS won’t work until it’s issued (use “Issue TLS” on the managed testing host).', ['zone' => $this->site->testingZone() ?? 'testing']));
+        // … then secure it: a per-host cert unless the box uses the shared
+        // testing-zone wildcard (in which case it's already covered).
+        $this->queuePreviewCertificate($domain->fresh());
+    }
+
+    /**
+     * Issue a preview host's certificate when it isn't already covered. Hosts on
+     * a server that carries the shared *.testing-zone wildcard need nothing
+     * (the wildcard secures them); everywhere else each preview host gets its own
+     * HTTP-01 certificate, or its testing cert never matches and the browser
+     * serves whichever per-host cert happens to be the vhost default.
+     */
+    private function queuePreviewCertificate(?SitePreviewDomain $domain): void
+    {
+        if ($domain === null || ! $domain->auto_ssl || trim((string) $domain->hostname) === '') {
+            return;
+        }
+
+        if ($this->site->isCoveredByServerWildcard()) {
+            return;
+        }
+
+        $cert = app(CertificateRequestService::class)->queuePrimaryPreviewAutoSsl(
+            $this->site->fresh(['previewDomains']) ?? $this->site,
+            $domain,
+        );
+        if ($cert !== null) {
+            // Brief delay so the webserver apply (server_name) and the DNS record
+            // settle before the HTTP-01 challenge; failures self-heal on retry.
+            ExecuteSiteCertificateJob::dispatch((string) $cert->id)->delay(now()->addSeconds(15));
         }
     }
 }
