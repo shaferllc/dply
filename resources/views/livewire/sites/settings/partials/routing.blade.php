@@ -196,6 +196,10 @@
                 @foreach ($site->domains as $domain)
                     @php
                         $hasSsl = $coversWithSsl($domain->hostname);
+                        // Cloudflare-fronted domains already serve HTTPS at the edge, so a
+                        // bare "SSL missing" badge is a false alarm. Detection is site-level
+                        // (primary host only), so only soften the primary row's badge.
+                        $behindCloudflare = ! $hasSsl && $domain->is_primary && $site->cloudflareTerminatesTls();
                         $isEditing = $editing_domain_id === (string) $domain->id;
                     @endphp
                     <li class="px-6 py-3 sm:px-8" wire:key="domain-row-{{ $domain->id }}">
@@ -235,6 +239,10 @@
                                             @endif
                                             @if ($hasSsl)
                                                 <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('SSL configured') }}</span>
+                                            @elseif ($behindCloudflare)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70" title="{{ __('Cloudflare terminates HTTPS at its edge for this hostname — an origin certificate here is optional.') }}">
+                                                    <x-heroicon-o-cloud class="h-3 w-3" aria-hidden="true" /> {{ __('Cloudflare edge') }}
+                                                </span>
                                             @else
                                                 <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('SSL missing') }}</span>
                                             @endif

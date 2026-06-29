@@ -370,6 +370,30 @@ trait ManagesSiteBindingActions
             && method_exists($this, 'ensureComposerPackage')) {
             $this->ensureComposerPackage($binding, 'lookout/tracing');
         }
+
+        // Connecting a mail transport must "just work" too: API-based providers
+        // (Cloudflare, Mailgun, Postmark, Resend, SendGrid, SES) ship their
+        // Symfony transport — and its HTTP client — as separate Composer packages.
+        // Without them the app (and a test-send) dies with `Class "…HttpClient"
+        // not found`. Mirror the Lookout path — add each leg's package on the box
+        // now (no-op when present) — so the binding sends instead of fataling.
+        if ($binding->type === 'mail' && method_exists($this, 'ensureComposerPackage')) {
+            $mailConfig = (array) $binding->config;
+            $mailProviders = array_merge(
+                [(string) ($mailConfig['provider'] ?? '')],
+                array_map(strval(...), (array) ($mailConfig['legs'] ?? [])),
+            );
+            $packages = [];
+            foreach ($mailProviders as $mailProvider) {
+                $package = SiteBindingManager::MAIL_TRANSPORT_PACKAGES[strtolower(trim($mailProvider))] ?? null;
+                if ($package !== null) {
+                    $packages[$package] = true;
+                }
+            }
+            foreach (array_keys($packages) as $package) {
+                $this->ensureComposerPackage($binding, $package);
+            }
+        }
     }
 
     /**
