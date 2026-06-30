@@ -98,6 +98,13 @@ class CreateDedicatedDatabaseVm
         $createForm->size = $size;
         $createForm->server_role = 'database';
         $createForm->install_profile = 'database_node';
+        // A pure database node has no app stack. The create-form validation
+        // (ServerProvisionPreferenceRules, filtered by server_role) only allows
+        // 'none' for these on a database role, so the app defaults
+        // (redis / nginx / 8.3) would fail validation and abort provisioning.
+        $createForm->cache_service = 'none';
+        $createForm->webserver = 'none';
+        $createForm->php_version = 'none';
         $createForm->database = DedicatedDatabaseVm::engineFormat($engine);
         $createForm->database_initial_name = $name;
         $createForm->database_username = $username;

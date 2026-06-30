@@ -26,12 +26,15 @@ installFeedbackConsoleBuffer();
  *
  * @see https://livewire.laravel.com/docs/installation
  */
+// z-[110] keeps toasts above open modals (modal panel is z-[100]) so error
+// feedback stays visible while a modal is open — otherwise a validation toast
+// renders behind the modal and the action looks like it did nothing.
 const toastRegionClasses = {
     top_center:
-        'fixed left-1/2 top-24 z-50 flex w-full max-w-xl -translate-x-1/2 flex-col items-center gap-2 px-4',
-    top_right: 'fixed top-24 right-4 z-50 flex max-w-xl flex-col items-end gap-2 px-4',
-    bottom_right: 'fixed bottom-4 right-4 z-50 flex max-w-md flex-col gap-2',
-    bottom_left: 'fixed bottom-4 left-4 z-50 flex max-w-md flex-col gap-2',
+        'fixed left-1/2 top-24 z-[110] flex w-full max-w-xl -translate-x-1/2 flex-col items-center gap-2 px-4',
+    top_right: 'fixed top-24 right-4 z-[110] flex max-w-xl flex-col items-end gap-2 px-4',
+    bottom_right: 'fixed bottom-4 right-4 z-[110] flex max-w-md flex-col gap-2',
+    bottom_left: 'fixed bottom-4 left-4 z-[110] flex max-w-md flex-col gap-2',
 };
 
 document.addEventListener('alpine:init', () => {
