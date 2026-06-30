@@ -52,6 +52,111 @@ final class OpenLiteSpeedTlsPaths
         ];
     }
 
+    /**
+     * Cert groups for the site's :443 server blocks — one nginx server block per
+     * distinct certificate, so hostnames that need DIFFERENT certs (a custom
+     * tenant/customer domain with its own cert + the shared *.zone wildcard) each
+     * get the right one via SNI instead of all sharing one cert (the single-block
+     * model that broke sibling hostnames). A normal site with one cert covering
+     * everything yields exactly one group (== the legacy behaviour).
+     *
+     * Assignment order: each installed per-host cert claims the hostnames it
+     * covers; the wildcard claims remaining testing-zone hosts; anything still
+     * unclaimed falls back to {@see resolve()}'s cert (so every hostname still
+     * gets a :443 block).
+     *
+     * @return list<array{hostnames: list<string>, certFile: string, keyFile: string}>
+     */
+    public static function resolveCertGroups(Site $site): array
+    {
+        if (! self::siteExpectsTls($site)) {
+            return [];
+        }
+
+        $hostnames = array_values(array_unique(array_filter(array_map(
+            static fn (string $h): string => strtolower(trim($h)),
+            $site->webserverHostnames(),
+        ))));
+        if ($hostnames === []) {
+            return [];
+        }
+
+        // hostname => certbot live directory (the cert that covers it).
+        $assigned = [];
+
+        // Only certs actually installed on disk become their own block — a path to
+        // a not-yet-issued cert would fail nginx -t and abort the whole apply.
+        $certs = SiteCertificate::query()
+            ->where('site_id', $site->id)
+            ->where('provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+            ->whereIn('status', [
+                SiteCertificate::STATUS_ACTIVE,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+            ])
+            ->whereNotNull('last_installed_at')
+            ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'issued' THEN 1 ELSE 2 END")
+            ->orderByDesc('last_installed_at')
+            ->get();
+
+        foreach ($certs as $cert) {
+            $certHosts = array_map(static fn (string $h): string => strtolower(trim($h)), $cert->domainHostnames());
+            $dir = $certHosts[0] ?? '';
+            if ($dir === '') {
+                continue;
+            }
+            foreach ($certHosts as $h) {
+                if (in_array($h, $hostnames, true) && ! isset($assigned[$h])) {
+                    $assigned[$h] = $dir;
+                }
+            }
+        }
+
+        $wildcard = $site->coveringServerWildcard();
+        if ($wildcard !== null) {
+            $zone = strtolower(trim((string) ($wildcard->live_directory ?: ($site->testingZone() ?? ''))));
+            if ($zone !== '') {
+                foreach ($hostnames as $h) {
+                    if (! isset($assigned[$h]) && ($h === $zone || str_ends_with($h, '.'.$zone))) {
+                        $assigned[$h] = $zone;
+                    }
+                }
+            }
+        }
+
+        // dir => hostnames
+        $byDir = [];
+        foreach ($assigned as $h => $dir) {
+            $byDir[$dir][] = $h;
+        }
+
+        // Unclaimed hostnames fall back to the single-cert resolver's directory so
+        // they still get a :443 block (legacy behaviour for sites with one cert).
+        $unassigned = array_values(array_filter($hostnames, static fn (string $h): bool => ! isset($assigned[$h])));
+        if ($unassigned !== []) {
+            $single = self::resolve($site);
+            if ($single !== null) {
+                $defaultDir = basename(dirname($single['certFile']));
+                if ($defaultDir !== '' && $defaultDir !== '.') {
+                    foreach ($unassigned as $h) {
+                        $byDir[$defaultDir][] = $h;
+                    }
+                }
+            }
+        }
+
+        $groups = [];
+        foreach ($byDir as $dir => $hosts) {
+            $groups[] = [
+                'hostnames' => array_values(array_unique($hosts)),
+                'certFile' => '/etc/letsencrypt/live/'.$dir.'/fullchain.pem',
+                'keyFile' => '/etc/letsencrypt/live/'.$dir.'/privkey.pem',
+            ];
+        }
+
+        return $groups;
+    }
+
     public static function siteExpectsTls(Site $site): bool
     {
         if ($site->ssl_status === Site::SSL_ACTIVE || $site->ssl_status === Site::SSL_PENDING) {

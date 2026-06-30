@@ -409,26 +409,52 @@ NGINX;
             return $config;
         }
 
-        $paths = OpenLiteSpeedTlsPaths::resolve($site);
-        if ($paths === null) {
+        // One :443 server block per certificate group, so hostnames needing
+        // different certs (a custom domain's own cert + the shared *.zone
+        // wildcard) each present the right one via SNI. A site with a single
+        // covering cert yields one group — identical to the old single block.
+        $groups = OpenLiteSpeedTlsPaths::resolveCertGroups($site);
+        if ($groups === []) {
             return $config;
         }
 
-        $sslDirectives = "    ssl_certificate {$paths['certFile']};\n"
-            ."    ssl_certificate_key {$paths['keyFile']};\n"
-            ."    ssl_protocols TLSv1.2 TLSv1.3;\n";
+        $tlsBlocks = [];
+        foreach ($groups as $group) {
+            if (($group['hostnames'] ?? []) === []) {
+                continue;
+            }
 
-        $tlsBlock = preg_replace(
-            '/(\s*)listen 80;\s*\n\s*listen \[::\]:80;/',
-            "$1listen 443 ssl;\n$1listen [::]:443 ssl;\n{$sslDirectives}",
-            $config,
-            1,
-            $count
-        );
+            $sslDirectives = "    ssl_certificate {$group['certFile']};\n"
+                ."    ssl_certificate_key {$group['keyFile']};\n"
+                ."    ssl_protocols TLSv1.2 TLSv1.3;\n";
 
-        if ($count === 0 || $tlsBlock === null) {
+            $block = preg_replace(
+                '/(\s*)listen 80;\s*\n\s*listen \[::\]:80;/',
+                "$1listen 443 ssl;\n$1listen [::]:443 ssl;\n{$sslDirectives}",
+                $config,
+                1,
+                $count
+            );
+            if ($count === 0 || $block === null) {
+                continue;
+            }
+
+            // Scope this block to just its group's hostnames; SNI picks the block
+            // (and therefore the cert) matching the requested name.
+            $scoped = preg_replace(
+                '/^(\s*server_name\s+)[^;]+;/m',
+                '${1}'.implode(' ', $group['hostnames']).';',
+                $block,
+                1
+            );
+            $tlsBlocks[] = $scoped ?? $block;
+        }
+
+        if ($tlsBlocks === []) {
             return $config;
         }
+
+        $tlsConfig = implode("\n\n", $tlsBlocks);
 
         // Enforce HTTP→HTTPS: replace the :80 app block with a slim redirect
         // that still serves the ACME http-01 challenge from the document root
@@ -436,10 +462,10 @@ NGINX;
         // both :80 and :443 if we can't parse server_name/root out of $config.
         $http80 = $this->httpsRedirectServerBlock($config);
         if ($http80 === null) {
-            return $config."\n\n".$tlsBlock;
+            return $config."\n\n".$tlsConfig;
         }
 
-        return $http80."\n\n".$tlsBlock;
+        return $http80."\n\n".$tlsConfig;
     }
 
     /**
