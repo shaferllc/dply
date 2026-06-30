@@ -288,7 +288,9 @@
                                 @endif
                                 {{-- Secondary actions collapse into a kebab so a row never shows
                                      more than the primary test/fix actions plus this menu. --}}
-                                @php($gHasOverflow = ($gManageable && method_exists($this, 'openBindingModal')) || method_exists($this, 'openBindingInfoModal') || method_exists($this, 'detachBinding'))
+                                @php
+                                    $gHasOverflow = ($gManageable && method_exists($this, 'openBindingModal')) || method_exists($this, 'openBindingInfoModal') || method_exists($this, 'detachBinding');
+                                @endphp
                                 @if ($gHasOverflow)
                                     <x-overflow-menu>
                                         @if ($gManageable && method_exists($this, 'openBindingModal'))
