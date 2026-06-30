@@ -264,6 +264,49 @@ class Show extends Component
         return $this->site->shouldShowPhpOctaneRolloutSettings();
     }
 
+    /** Overview SSL card: probe in flight (see {@see \App\Jobs\DetectSiteCloudflareTlsJob}). */
+    public bool $ssl_recheck_running = false;
+
+    /** `checked_at` seen at dispatch, so the poll can tell when a fresh result lands. */
+    public ?string $ssl_recheck_requested_at = null;
+
+    /**
+     * Re-evaluate the site's SSL from the overview card. dply's own origin cert
+     * may read `failed` while the domain is actually secured at Cloudflare's edge
+     * (orange-clouded) — this fires the header-based Cloudflare TLS probe so the
+     * card can reflect that instead of a misleading "failed". Outbound HTTP only,
+     * no SSH (the job runs off the request).
+     */
+    public function recheckSsl(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->ssl_recheck_requested_at = $this->site->cloudflareTlsCheckedAt();
+        $this->ssl_recheck_running = true;
+        \App\Jobs\DetectSiteCloudflareTlsJob::dispatch($this->site->id);
+    }
+
+    /** Driven by wire:poll while a recheck is in flight; resolves once meta updates. */
+    public function pollSslRecheck(): void
+    {
+        if (! $this->ssl_recheck_running) {
+            return;
+        }
+
+        $this->site->refresh();
+        $checkedAt = $this->site->cloudflareTlsCheckedAt();
+
+        // A fresh result has landed once checked_at advances past dispatch time.
+        if ($checkedAt !== null && $checkedAt !== $this->ssl_recheck_requested_at) {
+            $this->ssl_recheck_running = false;
+            $this->toastSuccess(
+                $this->site->cloudflareTerminatesTls()
+                    ? __('SSL is active — TLS is terminated at Cloudflare’s edge for this domain.')
+                    : __('Recheck complete — Cloudflare edge TLS was not detected for this domain.'),
+            );
+        }
+    }
+
     /**
      * Load the server's workspace (header/breadcrumb) but reuse the row the site
      * just loaded when both share it — the common case — so the render doesn't
