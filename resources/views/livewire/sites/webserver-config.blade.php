@@ -265,26 +265,25 @@
                 <div class="px-5 py-5 space-y-5">
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss mb-3">{{ __('Validate') }}</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-                            <button type="button" wire:click="validateLocalAction" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
-                                <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Validate locally') }}
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button type="button" wire:click="validate" wire:loading.attr="disabled" wire:target="validate" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
+                                <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="validate" />
+                                <svg wire:loading wire:target="validate" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                                <span wire:loading.remove wire:target="validate">{{ __('Validate') }}</span>
+                                <span wire:loading wire:target="validate">{{ __('Validating…') }}</span>
                             </button>
-                            <button type="button" wire:click="validateRemoteAction" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
-                                <x-heroicon-o-server class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Validate on server') }}
-                            </button>
+                            @if ($config_validated)
+                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                    <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" />
+                                    {{ $validation_source === 'local' ? __('Syntax valid (server unreachable — checked locally)') : __('Valid on server') }}
+                                </span>
+                            @endif
                         </div>
-                        @if ($local_validation_message)
-                            <pre class="mt-3 text-xs whitespace-pre-wrap text-brand-ink bg-brand-sand/30 rounded-lg p-3 border border-brand-ink/10 max-h-48 overflow-auto">{{ $local_validation_message }}</pre>
+                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Runs the real config test on the server. If the server can’t be reached, dply falls back to a local syntax check where available.') }}</p>
+                        @if ($validation_message)
+                            <pre class="mt-3 text-xs whitespace-pre-wrap text-brand-ink bg-brand-sand/30 rounded-lg p-3 border border-brand-ink/10 max-h-48 overflow-auto">{{ $validation_message }}</pre>
                         @endif
-                        @error('local')
-                            <p class="mt-2 text-xs text-red-700">{{ $message }}</p>
-                        @enderror
-                        @if ($remote_validation_message)
-                            <pre class="mt-3 text-xs whitespace-pre-wrap text-brand-ink bg-brand-sand/30 rounded-lg p-3 border border-brand-ink/10 max-h-48 overflow-auto">{{ $remote_validation_message }}</pre>
-                        @endif
-                        @error('remote')
+                        @error('validate')
                             <p class="mt-2 text-xs text-red-700">{{ $message }}</p>
                         @enderror
                     </div>

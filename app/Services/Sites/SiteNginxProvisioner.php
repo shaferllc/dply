@@ -724,26 +724,38 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
 
         $ok = false;
         $message = '';
+        // Did `nginx -t` actually run on the box? Distinguishes a genuine config
+        // failure (reachable, ok=false) from an unreachable/SSH error so callers
+        // can fall back to a local syntax check only in the latter case.
+        $reachable = false;
+        $wrote = false;
 
         try {
             $this->writeSystemFile($ssh, $confFile, $pendingMainConfig);
+            $wrote = true;
             $this->writeNginxLayerSnippetFiles($site, $profile, $ssh);
             $out = $ssh->exec(sprintf(
                 '(%s) 2>&1; printf "\nDPLY_NGINX_TEST_EXIT:%%s" "$?"',
                 $this->privilegedCommand($server, 'nginx -t')
             ), 120);
+            $reachable = (bool) preg_match('/DPLY_NGINX_TEST_EXIT:\d+/', $out);
             $ok = (bool) preg_match('/DPLY_NGINX_TEST_EXIT:0\s*$/', $out);
             $message = trim($out);
         } catch (\Throwable $e) {
             $message = $e->getMessage();
         } finally {
-            $this->restoreRemoteFile($ssh, $server, $confFile, $prevMain);
-            $this->restoreRemoteFile($ssh, $server, $beforeFile, $prevBefore);
-            $this->restoreRemoteFile($ssh, $server, $afterFile, $prevAfter);
+            // Only restore if we actually wrote — otherwise a connection failure
+            // before the write would wrongly remove/clobber the live vhost.
+            if ($wrote) {
+                $this->restoreRemoteFile($ssh, $server, $confFile, $prevMain);
+                $this->restoreRemoteFile($ssh, $server, $beforeFile, $prevBefore);
+                $this->restoreRemoteFile($ssh, $server, $afterFile, $prevAfter);
+            }
         }
 
         return [
             'ok' => $ok,
+            'reachable' => $reachable,
             'message' => $message !== '' ? $message : ($ok ? __('Nginx configuration is valid.') : __('Nginx validation failed.')),
         ];
     }

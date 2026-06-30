@@ -33,9 +33,11 @@ class WebserverConfig extends Component
 
     public string $full_override_body = '';
 
-    public ?string $local_validation_message = null;
+    /** Output from the last validation run (server `nginx -t`, or local fallback). */
+    public ?string $validation_message = null;
 
-    public ?string $remote_validation_message = null;
+    /** Where the last validation ran: 'server' (authoritative) or 'local' (fallback). */
+    public ?string $validation_source = null;
 
     public ?string $health_hint = null;
 
@@ -201,30 +203,61 @@ class WebserverConfig extends Component
         $this->toastSuccess(__('Draft saved.'));
     }
 
-    public function validateLocalAction(SiteWebserverConfigEditorService $editor): void
+    /**
+     * Single "Validate": run the authoritative `nginx -t` on the actual server.
+     * If the box can't be reached, fall back to the local sandbox syntax check
+     * (only nginx has a real one — for other engines local is a stub, so an
+     * unreachable server is surfaced as a failure rather than a fake pass). A
+     * pass here is what unlocks "Apply to server".
+     */
+    public function validate(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('view', $this->site);
         $this->resetValidation();
-        $pending = $editor->effectivePreview($this->site, $this->draftProfile());
-        $r = $editor->validateLocal($this->site, $pending);
-        $this->local_validation_message = $r['message'];
-        $this->config_validated = (bool) $r['ok'];
-        if (! $r['ok']) {
-            $this->addError('local', $r['message']);
-        }
-    }
+        $this->validation_message = null;
+        $this->validation_source = null;
 
-    public function validateRemoteAction(SiteWebserverConfigEditorService $editor): void
-    {
-        Gate::authorize('view', $this->site);
-        $this->resetValidation();
         $profile = $this->draftProfile();
         $pending = $editor->effectivePreview($this->site, $profile);
-        $r = $editor->validateRemote($this->site, $pending, $profile);
-        $this->remote_validation_message = $r['message'];
-        $this->config_validated = (bool) $r['ok'];
-        if (! $r['ok']) {
-            $this->addError('remote', $r['message']);
+
+        try {
+            $remote = $editor->validateRemote($this->site, $pending, $profile);
+        } catch (\Throwable $e) {
+            $remote = ['ok' => false, 'reachable' => false, 'message' => $e->getMessage()];
+        }
+
+        // Engines that don't report reachability (caddy/apache/…) are treated as
+        // authoritative — only nginx flags reachable=false to trigger a fallback.
+        $reachable = $remote['reachable'] ?? true;
+
+        if ($reachable) {
+            $this->validation_source = 'server';
+            $this->validation_message = (string) $remote['message'];
+            $this->config_validated = (bool) $remote['ok'];
+            if (! $remote['ok']) {
+                $this->addError('validate', (string) $remote['message']);
+            }
+
+            return;
+        }
+
+        // Server unreachable. nginx has a real local sandbox; other engines don't,
+        // so for them keep Apply locked and report that we couldn't validate.
+        if ($this->site->webserver() !== 'nginx') {
+            $this->config_validated = false;
+            $this->validation_source = 'server';
+            $this->validation_message = (string) $remote['message'];
+            $this->addError('validate', __('Couldn’t reach the server to validate: :msg', ['msg' => (string) $remote['message']]));
+
+            return;
+        }
+
+        $local = $editor->validateLocal($this->site, $pending);
+        $this->validation_source = 'local';
+        $this->validation_message = (string) $local['message'];
+        $this->config_validated = (bool) $local['ok'];
+        if (! $local['ok']) {
+            $this->addError('validate', (string) $local['message']);
         }
     }
 
@@ -237,8 +270,8 @@ class WebserverConfig extends Component
     {
         if (in_array($name, ['before_body', 'main_snippet_body', 'after_body', 'full_override_body', 'mode'], true)) {
             $this->config_validated = false;
-            $this->local_validation_message = null;
-            $this->remote_validation_message = null;
+            $this->validation_message = null;
+            $this->validation_source = null;
             $this->resetValidation();
         }
     }
@@ -405,8 +438,8 @@ class WebserverConfig extends Component
 
         $this->config_validated = false;
         $this->resetValidation();
-        $this->local_validation_message = null;
-        $this->remote_validation_message = null;
+        $this->validation_message = null;
+        $this->validation_source = null;
 
         $this->toastSuccess(__('Reverted to the last saved configuration.'));
     }
