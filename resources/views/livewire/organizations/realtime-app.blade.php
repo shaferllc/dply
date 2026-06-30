@@ -24,13 +24,14 @@
         <x-organization-shell :organization="$organization" section="realtime" :breadcrumb="$breadcrumbs">
             <x-livewire-validation-errors />
 
-            {{-- Header: identity, status, tier/price, peak usage. --}}
+            {{-- Header: identity, status, tier/price, peak usage.
+                 Poll while provisioning — wrapped because @if can't live inside an <x-…> tag. --}}
+            <div @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
             <x-hero-card
                 icon="signal"
                 iconSize="md"
                 :title="$app->name"
                 :description="$app->host()"
-                @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif
             >
                 <x-slot:topAction>
                     <div class="text-right">
@@ -60,6 +61,7 @@
                     <p class="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
                 @endif
             </x-hero-card>
+            </div>
 
             {{-- Live stats: polls the relay while active so the current connection
                  count stays fresh; the peak high-water mark is persisted. --}}
