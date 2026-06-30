@@ -277,7 +277,10 @@
                 @endphp
                 <div>
                     <x-input-label for="binding_connection_name" :value="__('Connection name (optional)')" />
-                    <x-text-input id="binding_connection_name" wire:model.live="bindingForm.connection" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('primary (default :root_* keys)', ['root' => $miRoot]) }}" />
+                    {{-- Debounced so typing a connection name doesn't fire a
+                         round-trip (and full re-render) per keystroke; the live
+                         slug/warning preview still updates ~after you pause. --}}
+                    <x-text-input id="binding_connection_name" wire:model.live.debounce.400ms="bindingForm.connection" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('primary (default :root_* keys)', ['root' => $miRoot]) }}" />
                     @if ($miPrimary && $miExistingPrimary)
                         <p class="mt-1.5 flex items-start gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
                             <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
