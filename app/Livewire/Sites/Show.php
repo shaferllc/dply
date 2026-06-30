@@ -315,19 +315,22 @@ class Show extends Component
      */
     protected function hydrateServerWorkspace(): void
     {
-        // Server and site almost always share one workspace. Load it ONCE on the
-        // site and hand that same instance to the server, so we don't fire two
-        // identical `select * from workspaces where id in (...)` queries — one
-        // here for the server and one when the site's workspace is loaded
-        // elsewhere (e.g. DeploymentSecretInventory's workspace.variables).
+        // Server and site almost always share one workspace. Resolve it through
+        // the request-scoped WorkspaceRegistry (the SitePolicy already populated
+        // it during authorization) and hand that ONE instance to both the site
+        // and server — so we don't fire a second `workspaces where id in (...)`
+        // here on top of the policy's.
         if (
             $this->server->workspace_id !== null
             && (string) $this->server->workspace_id === (string) $this->site->workspace_id
         ) {
-            $this->site->loadMissing('workspace');
+            $workspace = app(\App\Support\Workspaces\WorkspaceRegistry::class)->for($this->site);
 
-            if ($this->site->workspace !== null) {
-                $this->server->setRelation('workspace', $this->site->workspace);
+            if ($workspace !== null) {
+                if (! $this->site->relationLoaded('workspace')) {
+                    $this->site->setRelation('workspace', $workspace);
+                }
+                $this->server->setRelation('workspace', $workspace);
             }
         } else {
             $this->server->loadMissing('workspace');
@@ -337,14 +340,25 @@ class Show extends Component
     }
 
     /**
-     * Site, server and the workspace are all in the same organization — load it
-     * once (on the site) and share that instance onto the server and workspace,
-     * so an auth check on workspace->organization and $site->organization don't
-     * each fire `select * from organizations where id = ?`.
+     * Site, server and the workspace are all in the same organization — and it's
+     * the user's CURRENT org, which is already memoized (with the member role
+     * primed). Reuse that one instance everywhere instead of lazy-loading
+     * site->organization / server->organization / workspace->organization, each
+     * of which fires its own `organizations where id = ?`.
      */
     private function shareOrganizationInstance(): void
     {
-        $this->site->loadMissing('organization');
+        $current = auth()->user()?->currentOrganization();
+        if (
+            $current !== null
+            && (string) $current->id === (string) $this->site->organization_id
+            && ! $this->site->relationLoaded('organization')
+        ) {
+            $this->site->setRelation('organization', $current);
+        } else {
+            $this->site->loadMissing('organization');
+        }
+
         $org = $this->site->organization;
         if ($org === null) {
             return;

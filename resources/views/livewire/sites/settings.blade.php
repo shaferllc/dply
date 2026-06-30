@@ -145,7 +145,10 @@
                                  workspace chrome. VM sites use the bindings hub. --}}
                             @livewire(\App\Livewire\Sites\Resources::class, ['server' => $server, 'site' => $site], key('cloud-resources-'.$site->id))
                         @else
-                            @include('livewire.sites.settings.partials.resource-map')
+                            {{-- Own Livewire component (not an @include) so the heavy
+                                 binding graph + modal only re-render on their own
+                                 state, not on every parent round-trip (polls, etc.). --}}
+                            @livewire(\App\Livewire\Sites\ResourceMap::class, ['server' => $server, 'site' => $site], key('resource-map-'.$site->id))
                         @endif
                     @elseif ($section === 'logs')
                         @if (workspace_surface_coming_soon('site_logs'))
