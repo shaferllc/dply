@@ -45,13 +45,15 @@
     };
 @endphp
 
-{{-- Always-on trigger: probe the primary domain for Cloudflare-edge TLS so the
-     panel below can appear without the operator doing anything. Polls only while
-     a probe is in flight. --}}
-<div
-    wire:init="loadCloudflareTlsStatus"
-    @if ($cloudflare_tls_checking) wire:poll.3s="pollCloudflareTlsStatus" @endif
-></div>
+{{-- Cloudflare-edge TLS detection. The panel below renders from the cached
+     meta result; a fresh probe is operator-triggered via the "Recheck" button
+     (refreshCloudflareTlsStatus) rather than auto-fired on load. An always-on
+     wire:init here POSTed an update for every site on every cert-page load, and
+     when that round-trip 419'd it put the page in a refresh loop. Poll only
+     while a manually-started probe is in flight. --}}
+@if ($cloudflare_tls_checking)
+    <div wire:poll.3s="pollCloudflareTlsStatus"></div>
+@endif
 
 @if ($site->cloudflareTerminatesTls())
     {{-- =================================================================
