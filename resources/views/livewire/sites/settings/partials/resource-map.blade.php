@@ -441,6 +441,13 @@
                                 $attached => \Illuminate\Support\Str::headline((string) $binding->status),
                                 default => __('Not attached yet.'),
                             };
+
+                            // A dedicated-VM database binding owns its own server. Let the status
+                            // badge deep-link to that server — servers.show redirects to the live
+                            // provisioning journey while it's still coming up, then to the server
+                            // workspace once it's ready.
+                            $dbVmServerId = ($cfg['placement'] ?? null) === 'dedicated_vm' ? ($cfg['db_vm_server_id'] ?? null) : null;
+                            $dbVmServerUrl = $attached && filled($dbVmServerId) ? route('servers.show', $dbVmServerId) : null;
                         @endphp
                         <div
                             wire:key="res-{{ $type }}-{{ $attached ? $binding->id : 'new' }}"
@@ -497,7 +504,13 @@
                                     @if ($attached)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
                                             <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
-                                            <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                            @if ($dbVmServerUrl)
+                                                <a href="{{ $dbVmServerUrl }}" wire:navigate
+                                                    title="{{ $binding->status === 'provisioning' ? __('View provisioning status') : __('View database server') }}"
+                                                    class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
+                                            @else
+                                                <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                            @endif
                                             @if ($needsRedeploy)
                                                 <a href="{{ $sectionUrl('deploy') }}" wire:navigate
                                                     title="{{ __('The connection variables apply at the next deploy.') }}"
