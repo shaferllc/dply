@@ -485,7 +485,7 @@ class SiteBindingManager
      *
      * @param  array<string, mixed>  $params
      */
-    private function resolveInstanceConnectionName(Site $site, string $type, array $params): string
+    public function resolveInstanceConnectionName(Site $site, string $type, array $params): string
     {
         $slug = $this->connectionSlug((string) ($params['connection'] ?? ''));
         if ($this->connectionIsPrimary($slug)) {

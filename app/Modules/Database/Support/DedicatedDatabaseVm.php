@@ -20,6 +20,9 @@ final class DedicatedDatabaseVm
     public const ENGINE_FORMATS = [
         'mysql' => 'mysql84',
         'postgres' => 'postgres16',
+        // ClickHouse installs from its own apt repo (unversioned); the dedicated
+        // DB server provision config bootstraps it (DedicatedDatabaseServerProvisionConfig).
+        'clickhouse' => 'clickhouse',
     ];
 
     /** @return list<string> */

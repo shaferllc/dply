@@ -613,9 +613,17 @@ trait ManagesDatabaseBindings
         $config = $binding->config;
         $config['connection_ready_at'] = now()->toIso8601String();
 
+        // Honour the named-connection slug (e.g. a dedicated ClickHouse box added
+        // alongside the primary): inject DB_<SLUG>_* + the config snippet, not the
+        // bare primary keys. Blank slug = primary (bare keys, no snippet).
+        $connection = (string) ($config['connection'] ?? '');
+        if (! $this->databaseConnectionIsPrimary($connection)) {
+            $config['connection_snippet'] = $this->databaseConnectionSnippet($db, $connection);
+        }
+
         $binding->forceFill([
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'injected_env' => $this->databaseEnv($db, $site),
+            'injected_env' => $this->databaseEnv($db, $site, [], $connection),
             'config' => $config,
             'last_error' => null,
         ])->save();

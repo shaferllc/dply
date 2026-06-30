@@ -8,6 +8,8 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Concerns\ManagesSiteEnvRequirements;
+use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Contracts\View\View;
@@ -38,6 +40,12 @@ class ResourceMap extends Component
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesSiteBindings;
+    // The binding Test/Validate/Fix actions seed + watch a queued console action
+    // (SSH probe) and surface its banner; these traits supply seedQueuedConsoleAction,
+    // consoleActionSubject, and the dismiss/remediation plumbing (same recipe as
+    // SiteEnvironment). No mount hooks, so they don't load env state here.
+    use ManagesSiteEnvRequirements;
+    use SurfacesDeploymentRemediation;
     use WatchesConsoleActionOutcomes;
 
     public Server $server;
