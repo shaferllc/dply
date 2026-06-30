@@ -146,7 +146,7 @@ trait ManagesSiteBindingActions
             'sublabel' => __('Free · shares the box'),
             'available' => true,
             'note' => null,
-            'engines' => ['mysql', 'postgres', 'sqlite'],
+            'engines' => ['mysql', 'postgres', 'clickhouse', 'sqlite'],
         ]];
 
         $server = $this->site->server;

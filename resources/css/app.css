@@ -355,12 +355,16 @@
    toggle. Desktop-only: below lg the sidebar stacks full-width, so collapse is
    ignored. The grid reclaim is done here (not in the ~30 page layouts) by
    overriding the two columns' span; the rail hides labels/details and centers
-   the icons, keeping group item lists visible even if a group was collapsed. */
+   the icons, keeping group item lists visible even if a group was collapsed.
+   Both grid rules are scoped with :has(> aside.ws-sidebar) — data-wsnav persists
+   on <html> across wire:navigate, and OTHER 12-col grids (e.g. the server
+   workspace, which uses a different sidebar without .ws-sidebar) must NOT have
+   their col-span-9 reclaimed, or the columns overflow to 14 and wrap. */
 @media (min-width: 1024px) {
-    html[data-wsnav="collapsed"] .lg\:grid-cols-12 > aside.ws-sidebar {
+    html[data-wsnav="collapsed"] .lg\:grid-cols-12:has(> aside.ws-sidebar) > aside.ws-sidebar {
         grid-column: span 1 / span 1 !important;
     }
-    html[data-wsnav="collapsed"] .lg\:grid-cols-12 > .lg\:col-span-9 {
+    html[data-wsnav="collapsed"] .lg\:grid-cols-12:has(> aside.ws-sidebar) > .lg\:col-span-9 {
         grid-column: span 11 / span 11 !important;
     }
     html[data-wsnav="collapsed"] .ws-sidebar .ws-hide-collapsed {

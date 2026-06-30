@@ -253,7 +253,10 @@
                  keys + a generated config snippet. Storage uses its own disk
                  field; provider-keyed types (ai/oauth/sms/captcha) instead key
                  on the provider picked in their form, so they skip this. --}}
-            @if (in_array($bindingModalType, ['database', 'redis', 'mail'], true) && $bindingModalMode !== 'provision')
+            @if (
+                ($bindingModalType === 'database')
+                || (in_array($bindingModalType, ['redis', 'mail'], true) && $bindingModalMode !== 'provision')
+            )
                 @php
                     $miType = $bindingModalType;
                     $miRoot = ['database' => 'DB', 'redis' => 'REDIS', 'mail' => 'MAIL', 'broadcasting' => 'BROADCAST'][$miType] ?? strtoupper($miType);
@@ -533,6 +536,10 @@
                             <select id="binding_db_engine" x-model="engine" class="dply-input">
                                 <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
                                 <option value="postgres">{{ __('PostgreSQL') }}</option>
+                                {{-- ClickHouse provisions on the server (engine must be installed
+                                     from the Databases tab). It has no standard DB_* block, so give
+                                     it a connection name to wire it as a named secondary. --}}
+                                <option value="clickhouse">{{ __('ClickHouse') }}</option>
                                 {{-- Redis here means a managed cluster or a serverless vendor
                                      (Upstash) — on-box Redis is attached via the Redis resource.
                                      The placement cards filter to redis-capable backends. --}}

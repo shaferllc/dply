@@ -265,7 +265,7 @@ trait ManagesDatabaseBindings
         }
 
         $engine = strtolower(trim((string) ($params['engine'] ?? 'mysql')));
-        if (! in_array($engine, ['mysql', 'postgres', 'sqlite'], true)) {
+        if (! in_array($engine, ['mysql', 'postgres', 'clickhouse', 'sqlite'], true)) {
             throw new InvalidArgumentException(__('Unsupported database engine.'));
         }
 
