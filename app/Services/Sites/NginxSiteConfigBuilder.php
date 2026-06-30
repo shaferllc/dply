@@ -80,7 +80,7 @@ class NginxSiteConfigBuilder
      * test port has no real certificate; the test only proves the daemon parses + serves on the alternate
      * port, not that it can negotiate TLS.
      */
-    public function build(Site $site, ?SiteWebserverConfigProfile $profile = null, ?int $listenPort = null): string
+    public function build(Site $site, ?SiteWebserverConfigProfile $profile = null, ?int $listenPort = null, bool $httpOnly = false): string
     {
         if ($site->type === SiteType::Custom) {
             return '';
@@ -113,7 +113,7 @@ class NginxSiteConfigBuilder
 
             return $listenPort !== null
                 ? $this->rewriteForListenPort($suspended, $listenPort)
-                : $this->appendTlsServerBlocks($site, $suspended);
+                : ($httpOnly ? $suspended : $this->appendTlsServerBlocks($site, $suspended));
         }
 
         // Worker-host sites never serve the deployed app — the code must not be
@@ -122,7 +122,9 @@ class NginxSiteConfigBuilder
         // and HTTPS. Without this, nginx roots at the empty/absent app docroot
         // and returns 403. (Caddy already special-cases this; Nginx now matches.)
         if ($site->isWorkerSite()) {
-            return $this->appendTlsServerBlocks($site, $this->workerBlock($site, $basename, $names));
+            $workerConfig = $this->workerBlock($site, $basename, $names);
+
+            return $httpOnly ? $workerConfig : $this->appendTlsServerBlocks($site, $workerConfig);
         }
 
         $root = $site->effectiveDocumentRootForNginx();
@@ -210,7 +212,7 @@ class NginxSiteConfigBuilder
             return $this->rewriteForListenPort($config, $listenPort);
         }
 
-        return $this->appendTlsServerBlocks($site, $config);
+        return $httpOnly ? $config : $this->appendTlsServerBlocks($site, $config);
     }
 
     /**

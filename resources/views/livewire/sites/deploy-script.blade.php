@@ -41,7 +41,8 @@
         <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white/80 p-4 shadow-sm sm:p-5"
              x-data="{ zd: @js($atomic_release) }">
             <label class="flex cursor-pointer items-start gap-3">
-                <input type="checkbox" id="deploy-atomic-toggle" wire:model="atomic_release" x-on:change="zd = $event.target.checked"
+                <input type="checkbox" id="deploy-atomic-toggle" wire:model="atomic_release"
+                    x-on:change="zd = $event.target.checked; $dispatch('dply-zd-changed', { on: $event.target.checked })"
                     class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
                 <span class="min-w-0">
                     <span class="text-sm font-semibold text-brand-ink">{{ __('Zero-downtime (atomic) release') }}</span>
@@ -158,7 +159,8 @@
         </div>
 
         {{-- Deploy hooks — shell scripts at positional anchors around the deploy. --}}
-        <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white/80 p-4 shadow-sm sm:p-5">
+        <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white/80 p-4 shadow-sm sm:p-5"
+             x-data="{ zd: @js($atomic_release) }" x-on:dply-zd-changed.window="zd = $event.detail.on">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
@@ -177,13 +179,28 @@
             @else
                 <ul class="mt-3 divide-y divide-brand-ink/10">
                     @foreach ($hooks as $hook)
-                        @php $editable = $hook->hook_kind === $shellKind && in_array($hook->anchor, $hookAnchorOptions, true); @endphp
-                        <li class="flex items-center gap-3 py-2.5" wire:key="hook-{{ $hook->id }}">
+                        @php
+                            $editable = $hook->hook_kind === $shellKind && in_array($hook->anchor, $hookAnchorOptions, true);
+                            $hookScriptLc = strtolower((string) $hook->script);
+                            // Maintenance down/up are redundant under zero-downtime — the atomic
+                            // symlink swap means the app is never served from a half-updated state,
+                            // so `artisan down`/`up` only adds an unnecessary outage window.
+                            $isMaintenanceHook = str_contains($hookScriptLc, 'artisan down') || str_contains($hookScriptLc, 'artisan up');
+                        @endphp
+                        <li class="flex items-center gap-3 py-2.5" wire:key="hook-{{ $hook->id }}"
+                            @if ($isMaintenanceHook) :class="zd ? 'opacity-50' : ''" @endif>
                             <span class="shrink-0 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-forest">
                                 {{ $hookAnchorLabels[$hook->anchor] ?? $hook->anchor }}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="truncate text-xs font-semibold text-brand-ink">{{ $hook->pillLabel() }}</p>
+                                <p class="truncate text-xs font-semibold text-brand-ink">
+                                    {{ $hook->pillLabel() }}
+                                    @if ($isMaintenanceHook)
+                                        <span x-cloak x-show="zd"
+                                            class="ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-amber-800"
+                                            title="{{ __('Maintenance mode adds an outage window that zero-downtime makes unnecessary. It is skipped at deploy time while zero-downtime is on.') }}">{{ __('Redundant with zero-downtime') }}</span>
+                                    @endif
+                                </p>
                                 @if ($hook->hook_kind === $shellKind && trim((string) $hook->script) !== '')
                                     <p class="truncate font-mono text-[10px] text-brand-mist">{{ \Illuminate\Support\Str::limit(trim((string) $hook->script), 80) }}</p>
                                 @endif

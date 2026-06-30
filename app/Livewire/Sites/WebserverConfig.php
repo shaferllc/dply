@@ -2,15 +2,17 @@
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Models\ConfigRevision;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
 use App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -18,6 +20,7 @@ use Livewire\Component;
 class WebserverConfig extends Component
 {
     use DispatchesToastNotifications;
+    use WatchesConsoleActionOutcomes;
 
     public Server $server;
 
@@ -276,6 +279,14 @@ class WebserverConfig extends Component
         }
     }
 
+    /**
+     * Apply the config to the server. The SSH work runs in a queued job that
+     * streams its progress into a console-action banner (the worker console), so
+     * the operator watches the write/nginx -t/reload happen live instead of a
+     * blocking spinner. The persistence happens here (fast, no SSH) so the job
+     * builds exactly what was validated; the job stamps checksums + records the
+     * "Applied to server" revision on success.
+     */
     public function apply(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('update', $this->site);
@@ -292,64 +303,68 @@ class WebserverConfig extends Component
         $this->resetValidation();
         $this->health_hint = null;
 
-        $lock = $editor->lock($this->site);
-        if (! $lock->get()) {
-            $this->addError('apply', __('Another config apply is in progress. Try again in a moment.'));
+        // Persist the validated content so the queued apply builds exactly this.
+        $editor->persistEditorState($this->site, [
+            'mode' => $this->mode,
+            'before_body' => $this->before_body,
+            'main_snippet_body' => $this->main_snippet_body,
+            'after_body' => $this->after_body,
+            'full_override_body' => $this->full_override_body,
+        ]);
 
-            return;
-        }
+        $run = $this->seedQueuedConsoleAction('webserver_config', __('Applying webserver config to the server'));
 
-        try {
-            $profile = $editor->getOrCreateProfile($this->site);
-            $profile->update([
-                'mode' => $this->mode,
-                'before_body' => $this->before_body,
-                'main_snippet_body' => $this->main_snippet_body,
-                'after_body' => $this->after_body,
-                'full_override_body' => $this->full_override_body,
-            ]);
+        ApplySiteWebserverConfigJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            seededConsoleRunId: (string) $run->id,
+            recordApplied: true,
+        );
 
-            $remote = $editor->validateRemote($this->site, $editor->effectivePreview($this->site->fresh(), $profile->fresh()), $profile->fresh());
-            if (! $remote['ok']) {
-                $this->addError('apply', $remote['message']);
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Web server configuration applied.'),
+            __('The apply did not finish — see the console output below.'),
+        );
 
-                return;
-            }
+        // Re-lock Apply while this run streams: another apply should re-validate
+        // first, and it keeps the button from looking actionable mid-apply.
+        $this->config_validated = false;
+    }
 
-            $out = $editor->applyAndRecord($this->site->fresh(['server']), $profile->fresh());
+    /**
+     * Pre-seed a `queued` console_actions row so the worker-console banner shows
+     * the moment the apply job is dispatched. Supersedes any stale/finished rows
+     * for this site so the banner shows just this run.
+     */
+    protected function seedQueuedConsoleAction(string $kind, ?string $label = null): ConsoleAction
+    {
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
+            ->update(['dismissed_at' => now()]);
 
-            // Record what we shipped into history so there's always a snapshot of
-            // the live config — both for the audit trail and so "Discard changes"
-            // has a known-good state to revert to. The recorder dedupes identical
-            // snapshots, so re-applying the same config won't spam history.
-            $editor->captureProfileSnapshot($this->site->fresh(['server']), [
-                'mode' => $this->mode,
-                'before_body' => $this->before_body,
-                'main_snippet_body' => $this->main_snippet_body,
-                'after_body' => $this->after_body,
-                'full_override_body' => $this->full_override_body,
-            ], auth()->user(), __('Applied to server'));
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
+            ->get()
+            ->filter(fn (ConsoleAction $row): bool => $row->isStale())
+            ->each(fn (ConsoleAction $row) => $row->forceFill(['dismissed_at' => now()])->save());
 
-            $org = $this->site->organization;
-            if ($org) {
-                audit_log($org, auth()->user(), 'site.webserver_config.applied', $this->site->fresh(), null, [
-                    'webserver' => $this->site->webserver(),
-                    'output_excerpt' => Str::limit($out, 500),
-                ]);
-            }
-
-            $this->toastSuccess(__('Web server configuration applied.'));
-            $hint = $editor->optionalHttpHealthHint($this->site->fresh());
-            if ($hint !== null) {
-                $this->health_hint = ($hint['ok'] ?? false)
-                    ? __('HTTP check: :url responded with :status.', ['url' => $hint['url'] ?? '', 'status' => (string) ($hint['status'] ?? '')])
-                    : __('HTTP check failed for :url.', ['url' => $hint['url'] ?? '']).' '.(string) ($hint['error'] ?? '');
-            }
-        } catch (\Throwable $e) {
-            $this->addError('apply', $e->getMessage());
-        } finally {
-            $lock->release();
-        }
+        return ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => $kind,
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => auth()->id(),
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
     }
 
     public function saveRevision(SiteWebserverConfigEditorService $editor): void
@@ -547,6 +562,13 @@ class WebserverConfig extends Component
             'last_applied_at' => $profile?->last_applied_at,
             'has_unapplied_changes' => $hasUnappliedChanges,
             'has_revisions' => $revisions->isNotEmpty(),
+            'webserverConsoleRun' => ConsoleAction::query()
+                ->where('subject_type', $this->site->getMorphClass())
+                ->where('subject_id', $this->site->id)
+                ->where('kind', 'webserver_config')
+                ->whereNull('dismissed_at')
+                ->orderByDesc('created_at')
+                ->first(),
         ]);
     }
 

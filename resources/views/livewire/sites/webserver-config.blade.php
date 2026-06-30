@@ -263,6 +263,25 @@
                 </div>
 
                 <div class="px-5 py-5 space-y-5">
+                    {{-- Worker console: live output from the queued apply job. Polls
+                         while a run is in flight; the focus event scrolls it into
+                         view the moment Apply is pressed. --}}
+                    @if ($watchedConsoleRunId)
+                        <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
+                    @endif
+                    @if ($webserverConsoleRun)
+                        <div
+                            id="site-console-action-banner"
+                            x-data="{}"
+                            x-on:dply-console-action-focus.window="$nextTick(() => { const el = document.getElementById('site-console-action-banner'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })"
+                        >
+                            @include('livewire.partials.console-action-banner-static', [
+                                'run' => $webserverConsoleRun,
+                                'kindLabels' => (array) config('console_actions.kinds', []),
+                            ])
+                        </div>
+                    @endif
+
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss mb-3">{{ __('Validate') }}</p>
                         <div class="flex flex-wrap items-center gap-3">

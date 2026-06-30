@@ -447,10 +447,22 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             }
         }
 
-        throw new \RuntimeException(sprintf(
-            'Refusing to write the vhost: ssl_certificate %s is not on the server and no valid certificate was found to substitute. The existing vhost was left untouched — install the certificate (or the covering wildcard), then re-apply.',
+        // Salvage 3: no cert anywhere (e.g. switching a site to zero-downtime
+        // before its covering wildcard has been issued/installed). Rather than
+        // refusing the apply — which leaves NO enabled vhost, so the hostname
+        // falls through to nginx's default server and every request (including
+        // the deploy health check on /up) 404s — degrade to an HTTP-only vhost.
+        // The site stays served on :80 and the ACME http-01 challenge can reach
+        // the docroot; once the certificate lands, a re-apply finds it on disk
+        // (Salvage 1/2) and restores HTTPS automatically.
+        $emit->warn(sprintf(
+            'ssl_certificate %s is not on the server and no substitute cert was found; serving HTTP-only until the certificate is installed, then re-apply for HTTPS.',
             $incomingPair['cert'],
-        ));
+        ), 'nginx');
+
+        $httpOnly = $this->builder->build($site, $site->webserverConfigProfile, null, true);
+
+        return $this->guard->stamp($httpOnly, $this->configBasename($site));
     }
 
     /**
