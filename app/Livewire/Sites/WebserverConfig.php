@@ -39,7 +39,6 @@ class WebserverConfig extends Component
 
     public ?string $health_hint = null;
 
-    public bool $show_history_modal = false;
 
     public ?string $remote_live_config = null;
 
@@ -329,7 +328,7 @@ class WebserverConfig extends Component
             ]);
         }
 
-        $this->show_history_modal = false;
+        $this->dispatch('close-modal', 'webserver-history-modal');
         $this->toastSuccess(__('Revision restored into the editor.'));
     }
 

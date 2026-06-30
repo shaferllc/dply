@@ -30,6 +30,12 @@ return [
             'failed' => 'Applying DNS records failed.',
             'stale' => 'Applying DNS records did not finish.',
         ],
+        'tenant_dns' => [
+            'running' => 'Updating tenant routing …',
+            'completed' => 'Tenant routing updated.',
+            'failed' => 'Tenant routing update failed.',
+            'stale' => 'Tenant routing update did not finish.',
+        ],
         'server_maintenance_op' => [
             'running' => 'Running host maintenance on :host …',
             'completed' => 'Host maintenance finished.',
@@ -373,7 +379,7 @@ return [
         // "tracking in the console" toast isn't a dead end.
         'general' => ['disk_usage_measure'],
         'settings' => ['webserver_config'],
-        'routing' => ['webserver_config', 'ssl', 'dns_apply'],
+        'routing' => ['webserver_config', 'ssl', 'dns_apply', 'tenant_dns'],
         'certificates' => ['ssl', 'webserver_config'],
         'runtime' => ['webserver_config'],
         'system-user' => ['system_user', 'webserver_config', 'permissions'],

@@ -43,7 +43,7 @@ test('caddy backend builder keeps redirects for traefik backends', function () {
 
     $config = app(CaddySiteConfigBuilder::class)->build($site, 23001);
 
-    $this->assertStringContainsString('example.test:23001, www.example.test:23001, tenant.example.test:23001 {', $config);
+    $this->assertStringContainsString('http://example.test:23001, http://www.example.test:23001, http://tenant.example.test:23001 {', $config);
     $this->assertStringContainsString('redir /old https://example.test/new 301', $config);
 });
 
@@ -67,8 +67,8 @@ test('caddy switch-staging port binds hostnames not a catch-all port', function 
     $configA = app(CaddySiteConfigBuilder::class)->build($siteA->fresh(['domains']), 8080);
     $configB = app(CaddySiteConfigBuilder::class)->build($siteB->fresh(['domains']), 8080);
 
-    expect($configA)->toMatch('/^alpha\.example\.test:8080 \{/m')
-        ->and($configB)->toMatch('/^beta\.example\.test:8080 \{/m');
+    expect($configA)->toMatch('/^http:\/\/alpha\.example\.test:8080 \{/m')
+        ->and($configB)->toMatch('/^http:\/\/beta\.example\.test:8080 \{/m');
     $this->assertDoesNotMatchRegularExpression('/^:8080\s*\{/m', $configA);
     $this->assertDoesNotMatchRegularExpression('/^:8080\s*\{/m', $configB);
 });

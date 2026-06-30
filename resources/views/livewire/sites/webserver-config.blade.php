@@ -258,8 +258,14 @@
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss mb-3">{{ __('Validate') }}</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-                            <button type="button" wire:click="validateLocalAction" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">{{ __('Validate locally') }}</button>
-                            <button type="button" wire:click="validateRemoteAction" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">{{ __('Validate on server') }}</button>
+                            <button type="button" wire:click="validateLocalAction" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
+                                <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Validate locally') }}
+                            </button>
+                            <button type="button" wire:click="validateRemoteAction" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
+                                <x-heroicon-o-server class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Validate on server') }}
+                            </button>
                         </div>
                         @if ($local_validation_message)
                             <pre class="mt-3 text-xs whitespace-pre-wrap text-brand-ink bg-brand-sand/30 rounded-lg p-3 border border-brand-ink/10 max-h-48 overflow-auto">{{ $local_validation_message }}</pre>
@@ -280,11 +286,21 @@
                             <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss mb-3">{{ __('Save & apply') }}</p>
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
                                 <div class="flex flex-col sm:flex-row sm:flex-wrap gap-2">
-                                    <button type="button" wire:click="$set('show_history_modal', true)" class="{{ $actionSecondary }}">{{ __('History') }}</button>
-                                    <button type="button" wire:click="saveDraft" class="{{ $actionSecondary }}">{{ __('Save draft') }}</button>
-                                    <button type="button" wire:click="saveRevision" class="{{ $actionSecondary }}">{{ __('Save revision') }}</button>
+                                    <button type="button" x-on:click="$dispatch('open-modal', 'webserver-history-modal')" class="{{ $actionSecondary }}">
+                                        <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('History') }}
+                                    </button>
+                                    <button type="button" wire:click="saveDraft" class="{{ $actionSecondary }}">
+                                        <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Save draft') }}
+                                    </button>
+                                    <button type="button" wire:click="saveRevision" class="{{ $actionSecondary }}">
+                                        <x-heroicon-o-bookmark-square class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Save revision') }}
+                                    </button>
                                 </div>
                                 <button type="button" wire:click="apply" wire:loading.attr="disabled" class="{{ $actionPrimary }} shrink-0 lg:min-w-[11rem]">
+                                    <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="apply" />
                                     <span wire:loading.remove wire:target="apply">{{ __('Apply to server') }}</span>
                                     <span wire:loading wire:target="apply">{{ __('Applying…') }}</span>
                                 </button>
@@ -423,7 +439,7 @@
         </aside>
     </div>
 
-    <x-modal name="webserver-history-modal" :show="$show_history_modal" maxWidth="lg" overlayClass="bg-brand-ink/40" wire:model.live="show_history_modal">
+    <x-modal name="webserver-history-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('History') }}</p>
             <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Revision history') }}</h2>

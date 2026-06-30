@@ -120,14 +120,13 @@ trait ManagesSiteTenantDomains
         // and delete the row from a queued job (DNS API + webserver re-apply both
         // belong off the web request); otherwise delete inline as before.
         if ($tenant->testingHostname() !== null) {
-            ProvisionTenantTestingHostnameJob::dispatch(
-                (string) $this->site->id,
-                (string) $tenant->id,
+            $this->streamTenantTestingHostnameJob(
+                $tenant,
                 remove: true,
-                userId: (string) (auth()->id() ?? ''),
                 deleteTenantRow: true,
+                label: __('Removing tenant :host', ['host' => $tenant->hostname]),
+                successToast: __('Tenant :host removed.', ['host' => $tenant->hostname]),
             );
-            $this->toastSuccess(__('Removing tenant domain and its testing hostname…'));
 
             return;
         }
@@ -148,14 +147,13 @@ trait ManagesSiteTenantDomains
 
         $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
 
-        ProvisionTenantTestingHostnameJob::dispatch(
-            (string) $this->site->id,
-            (string) $tenant->id,
+        $this->streamTenantTestingHostnameJob(
+            $tenant,
             remove: false,
-            userId: (string) (auth()->id() ?? ''),
+            deleteTenantRow: false,
+            label: __('Creating testing URL for :host', ['host' => $tenant->hostname]),
+            successToast: __('Testing URL ready for :host.', ['host' => $tenant->hostname]),
         );
-
-        $this->toastSuccess(__('Creating a testing URL for this tenant… DNS and the webserver update in the background.'));
     }
 
     public function removeTenantTestingHostname(string $tenantDomainId): void
@@ -164,14 +162,40 @@ trait ManagesSiteTenantDomains
 
         $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
 
+        $this->streamTenantTestingHostnameJob(
+            $tenant,
+            remove: true,
+            deleteTenantRow: false,
+            label: __('Removing testing URL for :host', ['host' => $tenant->hostname]),
+            successToast: __('Testing URL removed for :host.', ['host' => $tenant->hostname]),
+        );
+    }
+
+    /**
+     * Seed a console-action run, dispatch the tenant testing-hostname job bound to
+     * it, focus the console drawer, and watch for completion — so testing-URL
+     * create/remove and tenant removal all stream live instead of a silent toast.
+     */
+    private function streamTenantTestingHostnameJob(
+        SiteTenantDomain $tenant,
+        bool $remove,
+        bool $deleteTenantRow,
+        string $label,
+        string $successToast,
+    ): void {
+        $run = $this->seedQueuedConsoleAction('tenant_dns', $label);
+
         ProvisionTenantTestingHostnameJob::dispatch(
             (string) $this->site->id,
             (string) $tenant->id,
-            remove: true,
+            remove: $remove,
             userId: (string) (auth()->id() ?? ''),
+            deleteTenantRow: $deleteTenantRow,
+            seededConsoleRunId: (string) $run->id,
         );
 
-        $this->toastSuccess(__('Removing this tenant’s testing URL…'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, $successToast, __('Tenant routing update did not finish — see the output below.'));
     }
 
     public function editTenantDomain(string $tenantDomainId): void
