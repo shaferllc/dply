@@ -330,11 +330,18 @@
                                         </button>
                                     @endif
                                 </div>
-                                <button type="button" wire:click="apply" wire:loading.attr="disabled" class="{{ $actionPrimary }} shrink-0 lg:min-w-[11rem]">
-                                    <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="apply" />
-                                    <span wire:loading.remove wire:target="apply">{{ __('Apply to server') }}</span>
-                                    <span wire:loading wire:target="apply">{{ __('Applying…') }}</span>
-                                </button>
+                                <div class="flex flex-col items-stretch gap-1 shrink-0">
+                                    <button type="button" wire:click="apply" wire:loading.attr="disabled" @disabled(! $config_validated) class="{{ $actionPrimary }} lg:min-w-[11rem]" title="{{ $config_validated ? __('Write this config to the server and reload.') : __('Validate the configuration first — Apply unlocks once it passes.') }}">
+                                        <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="apply" />
+                                        <span wire:loading.remove wire:target="apply">{{ __('Apply to server') }}</span>
+                                        <span wire:loading wire:target="apply">{{ __('Applying…') }}</span>
+                                    </button>
+                                    @unless ($config_validated)
+                                        <span class="inline-flex items-center justify-center gap-1 text-[11px] text-brand-moss">
+                                            <x-heroicon-o-lock-closed class="h-3 w-3" aria-hidden="true" />{{ __('Validate to enable') }}
+                                        </span>
+                                    @endunless
+                                </div>
                             </div>
 
                             {{-- Timestamps + plain-language explanation of the three save verbs. --}}
@@ -347,7 +354,7 @@
                                 @endif
                             </div>
                             <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                                {{ __('Save draft keeps a single working copy (overwritten each save) so your edits survive a reload. Save revision adds a restorable checkpoint to History. Apply to server writes the config live — and also records a revision.') }}
+                                {{ __('Save draft keeps a single working copy (overwritten each save) so your edits survive a reload. Save revision adds a restorable checkpoint to History. Apply to server writes the config live — it stays locked until the config passes Validate, and a successful apply also records a revision.') }}
                             </p>
 
                             @error('apply')

@@ -39,6 +39,13 @@ class WebserverConfig extends Component
 
     public ?string $health_hint = null;
 
+    /**
+     * Gate on "Apply to server": true only once the current editor content has
+     * passed a validation (local or server). Any edit clears it, so you can never
+     * push a config you haven't validated since the last change.
+     */
+    public bool $config_validated = false;
+
 
     public ?string $remote_live_config = null;
 
@@ -201,6 +208,7 @@ class WebserverConfig extends Component
         $pending = $editor->effectivePreview($this->site, $this->draftProfile());
         $r = $editor->validateLocal($this->site, $pending);
         $this->local_validation_message = $r['message'];
+        $this->config_validated = (bool) $r['ok'];
         if (! $r['ok']) {
             $this->addError('local', $r['message']);
         }
@@ -214,14 +222,40 @@ class WebserverConfig extends Component
         $pending = $editor->effectivePreview($this->site, $profile);
         $r = $editor->validateRemote($this->site, $pending, $profile);
         $this->remote_validation_message = $r['message'];
+        $this->config_validated = (bool) $r['ok'];
         if (! $r['ok']) {
             $this->addError('remote', $r['message']);
+        }
+    }
+
+    /**
+     * Any edit to the config invalidates the prior validation — clear the gate
+     * (and the now-stale validation output) so the user must re-validate before
+     * "Apply to server" re-enables.
+     */
+    public function updated(string $name): void
+    {
+        if (in_array($name, ['before_body', 'main_snippet_body', 'after_body', 'full_override_body', 'mode'], true)) {
+            $this->config_validated = false;
+            $this->local_validation_message = null;
+            $this->remote_validation_message = null;
+            $this->resetValidation();
         }
     }
 
     public function apply(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('update', $this->site);
+
+        // Never push to the server until the current content has passed a
+        // validation. The button is disabled in this state too, but guard here so
+        // a stale client can't bypass it.
+        if (! $this->config_validated) {
+            $this->addError('apply', __('Validate the configuration first — it must pass before you can apply it to the server.'));
+
+            return;
+        }
+
         $this->resetValidation();
         $this->health_hint = null;
 
@@ -332,6 +366,7 @@ class WebserverConfig extends Component
 
         $editor->restoreRevision($profile, $rev);
         $this->hydrateFromProfile($profile->fresh());
+        $this->config_validated = false;
 
         $org = $this->site->organization;
         if ($org) {
@@ -368,6 +403,7 @@ class WebserverConfig extends Component
         $editor->restoreRevision($profile, $rev);
         $this->hydrateFromProfile($profile->fresh());
 
+        $this->config_validated = false;
         $this->resetValidation();
         $this->local_validation_message = null;
         $this->remote_validation_message = null;
