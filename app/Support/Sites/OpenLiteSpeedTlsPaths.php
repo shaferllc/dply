@@ -110,6 +110,10 @@ CONF;
         // so breaks every OTHER hostname on the block (the exact failure where a
         // stray per-preview cert shadowed the customer domain + sibling previews).
         // Preview hosts are secured by the wildcard instead.
+        // Likewise a PER-TENANT cert (source = tenant_ssl) covers one tenant
+        // hostname, so it must never become the block cert either — otherwise a
+        // tenant's cert shadows the customer domain + the *.zone testing hosts
+        // (the regression where app.<domain> broke every on-dply.com host).
         $cert = SiteCertificate::query()
             ->where('site_id', $site->id)
             ->where('provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
@@ -123,7 +127,12 @@ CONF;
             ])
             ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'issued' THEN 1 ELSE 2 END")
             ->orderByDesc('last_installed_at')
-            ->first();
+            ->get()
+            ->first(function (SiteCertificate $candidate): bool {
+                $source = is_array($candidate->requested_settings) ? ($candidate->requested_settings['source'] ?? null) : null;
+
+                return $source !== 'tenant_ssl';
+            });
 
         $domains = $cert?->domainHostnames() ?? [];
         if ($domains !== []) {
