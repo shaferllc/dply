@@ -251,6 +251,18 @@ class WebserverConfig extends Component
 
             $out = $editor->applyAndRecord($this->site->fresh(['server']), $profile->fresh());
 
+            // Record what we shipped into history so there's always a snapshot of
+            // the live config — both for the audit trail and so "Discard changes"
+            // has a known-good state to revert to. The recorder dedupes identical
+            // snapshots, so re-applying the same config won't spam history.
+            $editor->captureProfileSnapshot($this->site->fresh(['server']), [
+                'mode' => $this->mode,
+                'before_body' => $this->before_body,
+                'main_snippet_body' => $this->main_snippet_body,
+                'after_body' => $this->after_body,
+                'full_override_body' => $this->full_override_body,
+            ], auth()->user(), __('Applied to server'));
+
             $org = $this->site->organization;
             if ($org) {
                 audit_log($org, auth()->user(), 'site.webserver_config.applied', $this->site->fresh(), null, [
@@ -332,6 +344,37 @@ class WebserverConfig extends Component
         $this->toastSuccess(__('Revision restored into the editor.'));
     }
 
+    /**
+     * Throw away unsaved edits in the editor and reload the last saved snapshot
+     * (the most recent revision — an applied config or a manual checkpoint). This
+     * is the "draft" escape hatch: the working copy on the profile is overwritten
+     * with the last known-good state.
+     */
+    public function discardDraft(SiteWebserverConfigEditorService $editor): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $rev = ConfigRevision::query()
+            ->forStream($editor->profileStreamKey($this->site))
+            ->first();
+
+        if (! $rev instanceof ConfigRevision) {
+            $this->toastError(__('There’s no saved configuration to revert to yet — save a revision or apply first.'));
+
+            return;
+        }
+
+        $profile = $editor->getOrCreateProfile($this->site);
+        $editor->restoreRevision($profile, $rev);
+        $this->hydrateFromProfile($profile->fresh());
+
+        $this->resetValidation();
+        $this->local_validation_message = null;
+        $this->remote_validation_message = null;
+
+        $this->toastSuccess(__('Reverted to the last saved configuration.'));
+    }
+
     public function fetchRemoteConfig(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('view', $this->site);
@@ -370,6 +413,13 @@ class WebserverConfig extends Component
         $profile = $this->site->webserverConfigProfile;
         $coreChangedWarning = $profile && $profile->last_applied_core_hash !== null
             && $editor->coreChangedSinceApply($this->site, $profile);
+
+        // Does the current editor content differ from what's live on the server?
+        // Compare the effective build's checksum to the one we stored at last
+        // apply. Never-applied profiles always read as "not yet applied".
+        $lastAppliedChecksum = $profile?->last_applied_effective_checksum;
+        $hasUnappliedChanges = $lastAppliedChecksum !== null
+            && hash('sha256', $effectiveConfigPreview) !== $lastAppliedChecksum;
 
         $revisions = ConfigRevision::query()
             ->forStream($editor->profileStreamKey($this->site))
@@ -424,6 +474,10 @@ class WebserverConfig extends Component
             'config_paths' => $this->configDisplayPaths(),
             'webserverSnippets' => $snippets,
             'configPlaceholders' => $placeholders,
+            'draft_saved_at' => $profile?->draft_saved_at,
+            'last_applied_at' => $profile?->last_applied_at,
+            'has_unapplied_changes' => $hasUnappliedChanges,
+            'has_revisions' => $revisions->isNotEmpty(),
         ]);
     }
 

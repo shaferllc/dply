@@ -534,6 +534,10 @@
             ])
         @endif
 
+        @if ($drop_confirm_db_id)
+            @include('livewire.servers.partials.databases._drop-database-modal')
+        @endif
+
         @if ($editing_db_id)
             <x-modal
                 name="edit-database-modal"
