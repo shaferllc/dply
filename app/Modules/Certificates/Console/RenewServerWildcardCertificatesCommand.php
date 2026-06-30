@@ -41,11 +41,19 @@ class RenewServerWildcardCertificatesCommand extends Command
             ->where('not_after', '<', now())
             ->update(['status' => ServerWildcardCertificate::STATUS_EXPIRED]);
 
+        // Includes PENDING and ISSUING so a row whose first issuance attempt was
+        // lost (no worker on the queue at dispatch time, a stale concurrency
+        // lock, or a job that timed out — IssueServerWildcardCertificateJob has
+        // $tries=1, no retry) self-heals on the next daily run instead of being
+        // orphaned forever. Re-dispatch is safe: the job is concurrency-locked
+        // and gated on needsIssuance(), so a genuinely in-flight issue no-ops.
         $candidates = ServerWildcardCertificate::query()
             ->whereIn('status', [
                 ServerWildcardCertificate::STATUS_ACTIVE,
                 ServerWildcardCertificate::STATUS_EXPIRED,
                 ServerWildcardCertificate::STATUS_FAILED,
+                ServerWildcardCertificate::STATUS_PENDING,
+                ServerWildcardCertificate::STATUS_ISSUING,
             ])
             ->get()
             ->filter(fn (ServerWildcardCertificate $w): bool => $w->needsIssuance($within));

@@ -32,7 +32,14 @@ class IssueServerWildcardCertificateJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
-    public int $tries = 1;
+    // Three attempts so a transient stranding (Horizon restarted mid-flight by a
+    // self-deploy, a brief SSH/DNS-API hiccup) self-recovers instead of leaving
+    // the row stuck until the daily renewer. The (server, zone) cache lock inside
+    // handle() still serialises concurrent issuance, so retries can't double-run.
+    public int $tries = 3;
+
+    /** Backoff between attempts (seconds): 1 min, then 5 min. */
+    public array $backoff = [60, 300];
 
     public int $timeout = 600;
 
@@ -41,7 +48,12 @@ class IssueServerWildcardCertificateJob implements ShouldQueue
         public string $zone,
         public ?string $seededConsoleRunId = null,
         public ?string $consoleSiteId = null,
-    ) {}
+    ) {
+        // Ride the prioritised provisioning queue (Horizon lists dply-provision
+        // first) rather than bare 'default', so wildcard issuance isn't stuck
+        // behind unrelated default-queue work during a server bring-up.
+        $this->onQueue('dply-provision');
+    }
 
     public function uniqueId(): string
     {

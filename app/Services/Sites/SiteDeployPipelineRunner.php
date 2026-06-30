@@ -326,7 +326,93 @@ class SiteDeployPipelineRunner
             }
         }
 
+        // Vite manifest safety net (build phase only). A Laravel/@vite app that
+        // reaches cutover with no public/build/manifest.json 500s on every
+        // request. That happens when the pipeline has NO asset-build step (e.g. a
+        // site whose steps predate Vite detection): the build phase reports ok
+        // with nothing built, and on atomic each release is a pristine clone with
+        // no manifest (flat masked it by reusing a dir that still held an old
+        // one). Rather than ship a broken release, auto-resolve by building the
+        // assets here; if a manifest still can't be produced, fail the phase so
+        // the deploy aborts BEFORE cutover instead of going live broken.
+        if ($ok && $phase === SiteDeployStep::PHASE_BUILD) {
+            $guard = $this->ensureViteManifest($ssh, $workingDirectory, $cwd);
+            $log .= $guard['log'];
+            if ($guard['step'] !== null) {
+                $steps[] = $guard['step'];
+            }
+            if (! $guard['ok']) {
+                $ok = false;
+            }
+        }
+
         return ['log' => $log, 'steps' => $steps, 'ok' => $ok];
+    }
+
+    /**
+     * Self-heal a missing Vite manifest. Returns ok=false only when the app
+     * genuinely needs a build (vite.config present, not opted out) and one still
+     * can't be produced — so the caller fails the deploy before cutover.
+     *
+     * @return array{log: string, ok: bool, step: ?array<string, mixed>}
+     */
+    private function ensureViteManifest(RemoteShell $ssh, string $workingDirectory, string $cwd): array
+    {
+        $probe = $ssh->exec(sprintf(
+            'cd %s 2>/dev/null && { vite=no; for f in vite.config.js vite.config.ts vite.config.mjs vite.config.cjs; do [ -f "$f" ] && vite=yes; done; '
+            .'man=no; { [ -f public/build/manifest.json ] || [ -f public/build/.vite/manifest.json ]; } && man=yes; '
+            .'optout=no; { [ -f package.json ] && tr -d " \t\n\r" < package.json 2>/dev/null | grep -q %s; } && optout=yes; '
+            .'echo "DPLY_VITE vite=$vite man=$man optout=$optout"; }',
+            $cwd,
+            escapeshellarg('"dply":{[^{}]*"build":false')
+        ), 30);
+
+        if (preg_match('/DPLY_VITE vite=(\w+) man=(\w+) optout=(\w+)/', $probe, $m) !== 1) {
+            return ['log' => '', 'ok' => true, 'step' => null]; // probe inconclusive — never block on uncertainty
+        }
+        [, $vite, $man, $optout] = $m;
+
+        if ($vite !== 'yes' || $man === 'yes' || $optout === 'yes') {
+            return ['log' => '', 'ok' => true, 'step' => null];
+        }
+
+        $log = "\n[dply] VITE GUARD → @vite app is missing public/build/manifest.json; auto-building assets so the release doesn't ship a 500…\n";
+
+        // Reuse the node self-heal (mise/NodeSource/snap + loud-fail) via the
+        // tooling prefix by synthesizing an npm step.
+        $synthetic = new SiteDeployStep;
+        $synthetic->step_type = SiteDeployStep::TYPE_NPM_RUN;
+        $buildCmd = 'npm ci --include=dev && npm run build --if-present';
+        $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd).$buildCmd;
+
+        $start = microtime(true);
+        $out = $ssh->exec(sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $runCmd), 900);
+        $durationMs = (int) round((microtime(true) - $start) * 1000);
+        $log .= $out;
+
+        $recheck = $ssh->exec(sprintf(
+            'cd %s 2>/dev/null && { [ -f public/build/manifest.json ] || [ -f public/build/.vite/manifest.json ]; } && echo DPLY_MAN_OK || echo DPLY_MAN_MISSING',
+            $cwd
+        ), 30);
+        $built = str_contains($recheck, 'DPLY_MAN_OK');
+
+        $log .= $built
+            ? "[dply] VITE GUARD → manifest built; release is safe to cut over.\n"
+            : "[dply] VITE GUARD → still no manifest after auto-build — failing the deploy so a broken release can't go live. Fix Node/the build, or set {\"dply\":{\"build\":false}} in package.json to opt out.\n";
+
+        return [
+            'log' => $log,
+            'ok' => $built,
+            'step' => [
+                'step_id' => 'vite_manifest_guard',
+                'step_type' => 'vite_manifest_guard',
+                'command' => $buildCmd,
+                'ok' => $built,
+                'output' => $out,
+                'duration_ms' => $durationMs,
+                'skipped' => false,
+            ],
+        ];
     }
 
     /**
