@@ -9,13 +9,37 @@
     $sidebarUrlSeed = (string) ($sidebarPrimaryHostname ?: $site->name ?: $site->id);
 @endphp
 
-<aside class="sm:col-span-3 mb-8 lg:mb-0"
+{{-- The <aside> stays the grid column (col-span-3); only its CARD contents are
+     @persist'd across wire:navigate so the sidebar isn't rebuilt between sections
+     of the same site (skips ~40 nav items + the error-count query per nav).
+     Keyed by site id → a different site re-renders. Active highlighting is kept
+     client-side on `livewire:navigated` (script below) since the persisted DOM
+     doesn't re-render. NOTE: @persist must wrap the card, NOT the <aside> — it
+     compiles to a wrapping <div x-persist>, which would otherwise become the grid
+     child and collapse the column to 1/12 width. --}}
+<aside class="ws-sidebar sm:col-span-3 mb-8 lg:mb-0"
     x-data="{
         copiedUrl: false,
     }"
+    :class="{ 'ws-collapsed': $store.wsnav && $store.wsnav.collapsed }"
 >
+    @persist('site-sidebar-'.$site->id)
     <div class="{{ $card }}">
-        <div class="border-b border-brand-ink/10 p-4 sm:p-5">
+        {{-- Collapse / expand toggle (icon-rail mode). State lives in the global
+             Alpine `wsnav` store (localStorage-persisted) and also sets
+             data-wsnav on <html> so the workspace grid reclaims the column — see
+             the script below + app.css. --}}
+        <div class="ws-collapse-row flex items-center justify-end border-b border-brand-ink/10 p-1.5">
+            <button type="button" @click="$store.wsnav && $store.wsnav.toggle()"
+                class="inline-flex items-center justify-center rounded-md p-1.5 text-brand-mist transition-colors hover:bg-brand-sand/50 hover:text-brand-ink"
+                :title="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'"
+                :aria-label="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'">
+                <svg class="h-4 w-4 transition-transform duration-200" :class="($store.wsnav && $store.wsnav.collapsed) ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L9.832 9.25H17.5a.75.75 0 010 1.5H9.832l2.938 2.96a.75.75 0 11-1.06 1.06l-4.25-4.25a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+        <div class="ws-hide-collapsed border-b border-brand-ink/10 p-4 sm:p-5">
             <a href="{{ route('servers.sites', $server) }}" wire:navigate
                 class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
                 <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -115,7 +139,7 @@
                         type="button"
                         x-on:click="toggle('{{ $groupKey }}')"
                         :aria-expanded="(! collapsed['{{ $groupKey }}']).toString()"
-                        class="{{ ! $loop->first ? 'mt-3 ' : '' }}group flex w-full items-center gap-1.5 rounded-md px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-moss"
+                        class="ws-hide-collapsed {{ ! $loop->first ? 'mt-3 ' : '' }}group flex w-full items-center gap-1.5 rounded-md px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-moss"
                     >
                         <span x-bind:class="collapsed['{{ $groupKey }}'] ? '' : 'rotate-90'" class="inline-flex transition-transform">
                             <x-heroicon-o-chevron-right class="h-3 w-3" />
@@ -138,7 +162,7 @@
                     </button>
                 @endif
                 <div
-                    class="flex flex-col gap-0.5"
+                    class="ws-group-items flex flex-col gap-0.5"
                     @if ($isCollapsibleGroup) x-show="! collapsed['{{ $groupKey }}']" x-collapse @endif
                 >
                 @foreach ($itemsInGroup as $item)
@@ -165,6 +189,10 @@
                     <a
                         href="{{ $href }}"
                         wire:navigate
+                        data-nav-link
+                        {{-- In the collapsed icon rail the label is hidden, so show
+                             it as a native tooltip on hover; no tooltip when expanded. --}}
+                        :title="($store.wsnav && $store.wsnav.collapsed) ? @js($item['label']) : null"
                         @class([
                             $navLink,
                             // Children indent as a whole pill (margin, not padding) so the
@@ -180,17 +208,21 @@
                         @else
                             <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
                         @endif
-                        <span class="flex-1 truncate">{{ $item['label'] }}</span>
+                        <span class="ws-hide-collapsed flex-1 truncate">{{ $item['label'] }}</span>
+                        {{-- Styled popover tooltip — only rendered visible in the
+                             collapsed icon rail (see app.css); pairs with the native
+                             title above. --}}
+                        <span class="ws-tip" role="tooltip" aria-hidden="true">{{ $item['label'] }}</span>
                         {{-- Only show the open-error count when Errors is actually
                              live — not while it's a "Soon" (preview_only) item. --}}
                         @if ($item['id'] === 'errors' && empty($item['preview_only']))
                             @php $openErrorCount = \App\Models\ErrorEvent::undismissedCountForSite((string) $site->id); @endphp
                             @if ($openErrorCount > 0)
-                                <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
+                                <span class="ws-hide-collapsed shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
                             @endif
                         @endif
                         @if (! empty($item['preview_only']))
-                            <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
+                            <span class="ws-hide-collapsed shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
                                 {{ __('Soon') }}
                             </span>
                         @endif
@@ -207,7 +239,7 @@
                 </div>
             @endforeach
         </nav>
-        <div class="border-t border-brand-ink/10 p-3">
+        <div class="ws-hide-collapsed border-t border-brand-ink/10 p-3">
             @if ($site->usesEdgeRuntime())
                 <a
                     href="{{ route('edge.index') }}"
@@ -229,4 +261,64 @@
             @endif
         </div>
     </div>
+    @endpersist
+
+    {{-- Maintain the active-section highlight client-side. The sidebar DOM is
+         persisted across wire:navigate, so Blade's $section comparison only runs
+         on the first paint; this re-applies the highlight on each navigation by
+         matching location.pathname (exact, then longest-prefix for detail pages
+         nested under a section). --}}
+    @once
+        <script>
+            (function () {
+                if (window.__dplySidebarActiveBound) return;
+                window.__dplySidebarActiveBound = true;
+
+                // Collapse state: set <html data-wsnav> synchronously (no flash) so
+                // the workspace grid reclaims the column on first paint (see app.css),
+                // and expose a global Alpine store the sidebar toggle/labels bind to.
+                const KEY = 'dply.wsnav.collapsed';
+                const applyHtml = () => {
+                    document.documentElement.dataset.wsnav =
+                        localStorage.getItem(KEY) === '1' ? 'collapsed' : 'expanded';
+                };
+                applyHtml();
+                document.addEventListener('alpine:init', () => {
+                    if (!window.Alpine || Alpine.store('wsnav')) return;
+                    Alpine.store('wsnav', {
+                        collapsed: localStorage.getItem(KEY) === '1',
+                        toggle() {
+                            this.collapsed = !this.collapsed;
+                            localStorage.setItem(KEY, this.collapsed ? '1' : '0');
+                            document.documentElement.dataset.wsnav = this.collapsed ? 'collapsed' : 'expanded';
+                        },
+                    });
+                });
+                document.addEventListener('livewire:navigated', applyHtml);
+
+                const sync = () => {
+                    const here = location.pathname;
+                    const links = Array.from(document.querySelectorAll('a[data-nav-link]'));
+                    let best = null;
+                    let bestLen = -1;
+                    for (const a of links) {
+                        let path;
+                        try { path = new URL(a.href).pathname; } catch (e) { continue; }
+                        if (here === path) { best = a; bestLen = Infinity; break; }
+                        const prefix = path.endsWith('/') ? path : path + '/';
+                        if (here.startsWith(prefix) && path.length > bestLen) { best = a; bestLen = path.length; }
+                    }
+                    for (const a of links) {
+                        const on = a === best;
+                        a.classList.toggle('bg-brand-sand/60', on);
+                        a.classList.toggle('text-brand-ink', on);
+                        a.classList.toggle('text-brand-moss', !on);
+                    }
+                };
+
+                document.addEventListener('livewire:navigated', sync);
+                sync();
+            })();
+        </script>
+    @endonce
 </aside>

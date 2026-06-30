@@ -348,3 +348,81 @@
     display: block !important;
 }
 
+
+/* ── Workspace sidebar collapse (icon rail) ──────────────────────────────────
+   Driven by data-wsnav on <html>, which the inline sidebar script sets
+   synchronously on load (no flash) and the Alpine `wsnav` store updates on
+   toggle. Desktop-only: below lg the sidebar stacks full-width, so collapse is
+   ignored. The grid reclaim is done here (not in the ~30 page layouts) by
+   overriding the two columns' span; the rail hides labels/details and centers
+   the icons, keeping group item lists visible even if a group was collapsed. */
+@media (min-width: 1024px) {
+    html[data-wsnav="collapsed"] .lg\:grid-cols-12 > aside.ws-sidebar {
+        grid-column: span 1 / span 1 !important;
+    }
+    html[data-wsnav="collapsed"] .lg\:grid-cols-12 > .lg\:col-span-9 {
+        grid-column: span 11 / span 11 !important;
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar .ws-hide-collapsed {
+        display: none !important;
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar .ws-collapse-row {
+        justify-content: center;
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar a[data-nav-link] {
+        justify-content: center;
+        margin-left: 0;
+        width: 100%;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        position: relative;
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar .ws-group-items {
+        display: flex !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Let the icon tooltips escape the column: the card normally clips
+       (overflow-hidden) and the content column paints over the sidebar, so lift
+       the sidebar's stacking and open up its overflow while collapsed. */
+    html[data-wsnav="collapsed"] aside.ws-sidebar {
+        position: relative;
+        z-index: 30;
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar .dply-card {
+        overflow: visible !important;
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar a[data-nav-link] .ws-tip {
+        display: block;
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%) translateX(0.25rem);
+        margin-left: 0.25rem;
+        z-index: 50;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.12s ease, transform 0.12s ease;
+        background: var(--color-brand-ink);
+        color: var(--color-brand-cream, #fff);
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 500;
+        box-shadow: 0 6px 16px rgb(0 0 0 / 0.18);
+    }
+    html[data-wsnav="collapsed"] .ws-sidebar a[data-nav-link]:hover .ws-tip,
+    html[data-wsnav="collapsed"] .ws-sidebar a[data-nav-link]:focus-visible .ws-tip {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+/* The popover tooltip text only renders in the collapsed rail (above); hidden
+   everywhere else so it never duplicates the visible label. */
+.ws-tip {
+    display: none;
+}
