@@ -156,15 +156,29 @@ trait ManagesDatabaseBindings
             'read_replica_password' => $replicaPassword,
         ];
 
-        $binding = $this->persist($site, 'database', [
+        // --- Instance / connection name ---
+        // Blank = the site's primary database (bare DB_* keys); a slug names a
+        // secondary connection (DB_<SLUG>_* + a config snippet). See databaseEnv.
+        $connection = $this->resolveDatabaseConnectionName($site, $params);
+        $primary = $this->databaseConnectionIsPrimary($connection);
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+
+        $attributes = [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'name' => $db->name,
+            // Primary collapses to one row (name='primary'); a named instance is
+            // keyed by its slug so several can coexist per site.
+            'name' => $primary ? 'primary' : $connection,
             'target_type' => 'server_database',
             'target_id' => (string) $db->id,
-            'injected_env' => $this->databaseEnv($db, $site, $opts),
+            'injected_env' => $this->databaseEnv($db, $site, $opts, $connection),
             'config' => array_filter([
                 'engine' => $db->engine,
+                // The named connection slug ('' for primary) + a display name and
+                // the config/database.php snippet to register a named connection.
+                'connection' => $primary ? '' : $connection,
+                'database_name' => (string) $db->name,
+                'connection_snippet' => $primary ? null : $this->databaseConnectionSnippet($db, $connection, $opts),
                 // Cross-server attachments carry the source so the UI can show
                 // a "network peer" badge and warn when remote access is off.
                 'source_server_id' => $crossServer ? (string) $db->server_id : null,
@@ -185,8 +199,10 @@ trait ManagesDatabaseBindings
                 'db_schema' => $opts['schema'] ?: null,
                 'db_sslmode' => $opts['sslmode'] ?: null,
                 'db_timezone' => $opts['timezone'] ?: null,
-            ]),
-        ]);
+            ], fn ($v) => $v !== null),
+        ];
+
+        $binding = $this->persistDatabaseBinding($site, $attributes, $primary, $editingId);
 
         // The app server may have been provisioned for a different DB engine
         // than the one just attached (e.g. MySQL server, Postgres attached).
@@ -198,6 +214,30 @@ trait ManagesDatabaseBindings
     }
 
     /**
+     * Resolve and validate the connection-name slug for a database binding.
+     * Blank → primary. A named slug must be unique among the site's other named
+     * database instances (the row being edited is excluded), mirroring how
+     * storage rejects a duplicate disk name.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function resolveDatabaseConnectionName(Site $site, array $params): string
+    {
+        return $this->resolveInstanceConnectionName($site, 'database', $params);
+    }
+
+    /**
+     * Upsert a database binding (edit-by-id / one-primary supersede). Thin
+     * wrapper over the shared {@see SiteBindingManager::persistInstanceBinding()}.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function persistDatabaseBinding(Site $site, array $attributes, bool $primary, string $editingId): SiteBinding
+    {
+        return $this->persistInstanceBinding($site, 'database', $attributes, $primary, $editingId);
+    }
+
+    /**
      * @param  array<string, mixed> $params
      */
     private function provisionDatabase(Site $site, array $params): SiteBinding
@@ -205,6 +245,14 @@ trait ManagesDatabaseBindings
         $server = $site->server;
         if ($server === null) {
             throw new RuntimeException(__('This site has no server to provision a database on.'));
+        }
+
+        // "Provision new" creates the site's PRIMARY database (this flow offers
+        // no connection name). Refuse — BEFORE creating any real infra — when a
+        // primary already exists, so an existing primary is never replaced.
+        // (Covers managed/serverless too: both dispatch from here.)
+        if ($this->databaseConnectionIsPrimary($this->resolveDatabaseConnectionName($site, $params))) {
+            $this->assertNoOtherPrimaryInstance($site, 'database', trim((string) ($params['binding_id'] ?? '')));
         }
 
         // Placement decides where the database lives. `on_box` (default) creates
@@ -263,20 +311,29 @@ trait ManagesDatabaseBindings
             'description' => 'Provisioned from site binding ('.$site->slug.')',
         ]);
 
+        // Instance / connection name (blank = primary). Same scheme as attach.
+        $connection = $this->resolveDatabaseConnectionName($site, $params);
+        $primary = $this->databaseConnectionIsPrimary($connection);
+
         // Record the binding as PROVISIONING with its connection variables
         // already resolved — credentials are generated above in PHP, so the
         // injected DB_* are correct immediately even though the database itself
         // is created asynchronously.
-        $binding = $this->persist($site, 'database', [
+        $binding = $this->persistDatabaseBinding($site, [
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_PROVISIONING,
-            'name' => $db->name,
+            'name' => $primary ? 'primary' : $connection,
             'target_type' => 'server_database',
             'target_id' => (string) $db->id,
-            'injected_env' => $this->databaseEnv($db, $site),
-            'config' => ['engine' => $db->engine],
+            'injected_env' => $this->databaseEnv($db, $site, [], $connection),
+            'config' => array_filter([
+                'engine' => $db->engine,
+                'connection' => $primary ? '' : $connection,
+                'database_name' => (string) $db->name,
+                'connection_snippet' => $primary ? null : $this->databaseConnectionSnippet($db, $connection),
+            ], fn ($v) => $v !== null),
             'last_error' => null,
-        ]);
+        ], $primary, '');
 
         // Hand the slow, SSH-bound CREATE DATABASE to the queued job (the same
         // one the Database tab uses). It flips this binding to configured — or
@@ -361,23 +418,27 @@ trait ManagesDatabaseBindings
         ]);
 
         // The connection vars aren't known until the cluster is online, so the
-        // binding starts with an empty injected_env; the job fills it in.
-        $binding = $this->persist($site, 'database', [
+        // binding starts with an empty injected_env; the job fills it in. A
+        // managed cluster is provisioned as the PRIMARY database (the modal
+        // offers no connection name), superseding any existing primary.
+        $binding = $this->persistDatabaseBinding($site, [
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_PROVISIONING,
-            'name' => $name,
+            'name' => 'primary',
             'target_type' => 'cloud_database',
             'target_id' => (string) $database->id,
             'injected_env' => [],
             'config' => array_filter([
                 'engine' => $engine,
+                'connection' => '',
+                'database_name' => $name,
                 'placement' => $placement,
                 'managed' => true,
                 'region' => $region,
                 'size' => $size,
             ], fn ($v) => $v !== null),
             'last_error' => null,
-        ]);
+        ], true, '');
 
         ProvisionManagedDatabaseJob::dispatch(
             (string) $database->id,
@@ -478,15 +539,17 @@ trait ManagesDatabaseBindings
             'meta' => ['provisioned_for_site_id' => (string) $site->id, 'serverless' => true],
         ]);
 
-        $binding = $this->persist($site, 'database', [
+        $binding = $this->persistDatabaseBinding($site, [
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_PROVISIONING,
-            'name' => $name,
+            'name' => 'primary',
             'target_type' => 'cloud_database',
             'target_id' => (string) $database->id,
             'injected_env' => [],
             'config' => [
                 'engine' => $engine,
+                'connection' => '',
+                'database_name' => $name,
                 'placement' => $placement,
                 'managed' => true,
                 'serverless' => true,
@@ -494,7 +557,7 @@ trait ManagesDatabaseBindings
                 'region' => $region,
             ],
             'last_error' => null,
-        ]);
+        ], true, '');
 
         ProvisionManagedDatabaseJob::dispatch(
             (string) $database->id,
@@ -570,37 +633,66 @@ trait ManagesDatabaseBindings
      *   schema, sslmode (Postgres)
      *   timezone (all)
      *
+     * $connection is the named-instance slug. Blank/'default'/'primary' = the
+     * site's PRIMARY database, which keeps Laravel's bare keys (DB_CONNECTION,
+     * DB_HOST, …). A non-empty slug (e.g. 'clickhouse') is a SECONDARY instance:
+     * every key is namespaced to DB_<SLUG>_* so it can't collide with the
+     * primary (or another instance), and no DB_CONNECTION is emitted — the
+     * driver is set in the config/database.php connection block instead (see
+     * {@see databaseConnectionSnippet()}). This mirrors how storage namespaces
+     * named disks as AWS_<DISK>_*.
+     *
      * @param  array<string, mixed> $options
      * @return array<string, string>
      */
-    private function databaseEnv(ServerDatabase $db, Site $site, array $options = []): array
+    private function databaseEnv(ServerDatabase $db, Site $site, array $options = [], string $connection = ''): array
     {
+        $slug = $this->databaseConnectionSlug($connection);
+        $primary = $this->databaseConnectionIsPrimary($slug);
+        $p = $primary ? 'DB_' : 'DB_'.strtoupper($slug).'_';
+
         if ($db->engine === 'sqlite') {
-            return array_filter([
-                'DB_CONNECTION' => 'sqlite',
-                'DB_DATABASE' => (string) ($db->host ?: ''),
-                'DATABASE_URL' => $db->connectionUrl(),
-                'DB_PREFIX' => ($options['prefix'] ?? '') ?: null,
-                'DB_TIMEZONE' => ($options['timezone'] ?? '') ?: null,
-            ], fn ($v) => $v !== null);
+            $env = [$p.'DATABASE' => (string) ($db->host ?: '')];
+            if ($primary) {
+                $env['DB_CONNECTION'] = 'sqlite';
+                $env['DATABASE_URL'] = (string) $db->connectionUrl();
+            } elseif (($url = (string) $db->connectionUrl()) !== '') {
+                $env[$p.'URL'] = $url;
+            }
+            if (($options['prefix'] ?? '') !== '') {
+                $env[$p.'PREFIX'] = (string) $options['prefix'];
+            }
+            if (($options['timezone'] ?? '') !== '') {
+                $env[$p.'TIMEZONE'] = (string) $options['timezone'];
+            }
+
+            return array_filter($env, fn ($v) => $v !== null && $v !== '');
         }
 
         $host = $this->effectiveDatabaseHost($db, $site);
-        $connection = $db->engine === 'postgres' ? 'pgsql' : 'mysql';
+        $driver = $this->databaseConnectionDriver((string) $db->engine);
 
         $env = [
-            'DB_CONNECTION' => $connection,
-            'DB_HOST' => $host,
-            'DB_PORT' => (string) $db->defaultPort(),
-            'DB_DATABASE' => (string) $db->name,
-            'DB_USERNAME' => (string) $db->username,
-            'DB_PASSWORD' => (string) $db->password,
-            'DATABASE_URL' => $db->connectionUrl($host),
+            $p.'HOST' => $host,
+            $p.'PORT' => (string) $db->defaultPort(),
+            $p.'DATABASE' => (string) $db->name,
+            $p.'USERNAME' => (string) $db->username,
+            $p.'PASSWORD' => (string) $db->password,
         ];
+        if ($primary) {
+            // DB_CONNECTION selects the app's DEFAULT connection — only the
+            // primary owns it; a named instance is registered separately.
+            $env = ['DB_CONNECTION' => $driver] + $env;
+            $env['DATABASE_URL'] = (string) $db->connectionUrl($host);
+        } elseif (($url = (string) $db->connectionUrl($host)) !== '') {
+            $env[$p.'URL'] = $url;
+        }
 
-        // Read replica — inject DB_READ_HOST and DB_STICKY; optional overrides
-        // for port/username/password only when they differ from the primary.
-        $readHost = (string) ($options['read_replica_host'] ?? '');
+        // Read replica — a read/write split is a property of the DEFAULT
+        // connection, so it only applies to the primary instance. Injects
+        // DB_READ_HOST and DB_STICKY; optional overrides for port/username/
+        // password only when they differ from the primary.
+        $readHost = $primary ? (string) ($options['read_replica_host'] ?? '') : '';
         if ($readHost !== '') {
             $env['DB_READ_HOST'] = $readHost;
             if (($options['read_replica_port'] ?? '') !== '') {
@@ -615,45 +707,119 @@ trait ManagesDatabaseBindings
             $env['DB_STICKY'] = 'true';
         }
 
-        // Per-connection tuning shared by MySQL and Postgres
+        // Per-connection tuning shared by MySQL and Postgres (namespaced for
+        // named instances so the snippet's env() refs line up).
         if (($options['prefix'] ?? '') !== '') {
-            $env['DB_PREFIX'] = (string) $options['prefix'];
+            $env[$p.'PREFIX'] = (string) $options['prefix'];
         }
         if (($options['timezone'] ?? '') !== '') {
-            $env['DB_TIMEZONE'] = (string) $options['timezone'];
+            $env[$p.'TIMEZONE'] = (string) $options['timezone'];
         }
 
-        if ($connection === 'mysql') {
+        if ($driver === 'mysql') {
             if (($options['charset'] ?? '') !== '') {
-                $env['DB_CHARSET'] = (string) $options['charset'];
+                $env[$p.'CHARSET'] = (string) $options['charset'];
             }
             if (($options['collation'] ?? '') !== '') {
-                $env['DB_COLLATION'] = (string) $options['collation'];
+                $env[$p.'COLLATION'] = (string) $options['collation'];
             }
             if (($options['strict'] ?? '') !== '') {
-                $env['DB_STRICT'] = (string) $options['strict'];
+                $env[$p.'STRICT'] = (string) $options['strict'];
             }
             if (($options['storage_engine'] ?? '') !== '') {
-                $env['DB_ENGINE'] = (string) $options['storage_engine'];
+                $env[$p.'ENGINE'] = (string) $options['storage_engine'];
             }
             if (($options['socket'] ?? '') !== '') {
-                $env['DB_SOCKET'] = (string) $options['socket'];
+                $env[$p.'SOCKET'] = (string) $options['socket'];
             }
         }
 
-        if ($connection === 'pgsql') {
+        if ($driver === 'pgsql') {
             if (($options['charset'] ?? '') !== '') {
-                $env['DB_CHARSET'] = (string) $options['charset'];
+                $env[$p.'CHARSET'] = (string) $options['charset'];
             }
             if (($options['schema'] ?? '') !== '') {
-                $env['DB_SCHEMA'] = (string) $options['schema'];
+                $env[$p.'SCHEMA'] = (string) $options['schema'];
             }
             if (($options['sslmode'] ?? '') !== '') {
-                $env['DB_SSLMODE'] = (string) $options['sslmode'];
+                $env[$p.'SSLMODE'] = (string) $options['sslmode'];
             }
         }
 
         return $env;
+    }
+
+    // Connection-name slug / primary detection are generic across multi-instance
+    // types — delegate to the shared helpers on SiteBindingManager.
+    private function databaseConnectionSlug(string $raw): string
+    {
+        return $this->connectionSlug($raw);
+    }
+
+    private function databaseConnectionIsPrimary(string $slug): bool
+    {
+        return $this->connectionIsPrimary($slug);
+    }
+
+    /** Laravel connection driver for a ServerDatabase engine. */
+    private function databaseConnectionDriver(string $engine): string
+    {
+        return match (strtolower($engine)) {
+            'postgres', 'pgsql' => 'pgsql',
+            'clickhouse' => 'clickhouse',
+            'mongodb', 'mongo' => 'mongodb',
+            'sqlite' => 'sqlite',
+            default => 'mysql', // mysql, mariadb
+        };
+    }
+
+    /**
+     * A ready-to-paste config/database.php connection block for a NAMED
+     * instance (empty for the primary, which uses the framework defaults). The
+     * env() refs match the namespaced keys {@see databaseEnv()} injects. For a
+     * non-core driver (clickhouse, mongodb) it prepends a note that a community
+     * package supplying the driver is required.
+     */
+    private function databaseConnectionSnippet(ServerDatabase $db, string $connection, array $options = []): string
+    {
+        $slug = $this->databaseConnectionSlug($connection);
+        if ($this->databaseConnectionIsPrimary($slug)) {
+            return '';
+        }
+
+        $driver = $this->databaseConnectionDriver((string) $db->engine);
+        $p = 'DB_'.strtoupper($slug).'_';
+
+        $lines = ["'{$slug}' => [", "    'driver' => '{$driver}',"];
+        if ($db->engine === 'sqlite') {
+            $lines[] = "    'database' => env('{$p}DATABASE'),";
+        } else {
+            $lines[] = "    'host' => env('{$p}HOST', '127.0.0.1'),";
+            $lines[] = "    'port' => env('{$p}PORT', '".$db->defaultPort()."'),";
+            $lines[] = "    'database' => env('{$p}DATABASE'),";
+            $lines[] = "    'username' => env('{$p}USERNAME'),";
+            $lines[] = "    'password' => env('{$p}PASSWORD', ''),";
+            $lines[] = "    'url' => env('{$p}URL'),";
+        }
+        if ($driver === 'pgsql') {
+            $lines[] = "    'charset' => env('{$p}CHARSET', 'utf8'),";
+            $lines[] = "    'search_path' => env('{$p}SCHEMA', 'public'),";
+            $lines[] = "    'sslmode' => env('{$p}SSLMODE', 'prefer'),";
+        } elseif ($driver === 'mysql') {
+            $lines[] = "    'charset' => env('{$p}CHARSET', 'utf8mb4'),";
+        }
+        $lines[] = '],';
+
+        $snippet = implode("\n", $lines);
+
+        if (! in_array($driver, ['mysql', 'pgsql', 'sqlite'], true)) {
+            $snippet = "// '{$driver}' is not a built-in Laravel driver — install a community package\n"
+                ."// that registers it (e.g. ClickHouse: composer require bavix/laravel-clickhouse),\n"
+                ."// then add this connection to config/database.php → connections:\n"
+                .$snippet;
+        }
+
+        return $snippet;
     }
 
     /**

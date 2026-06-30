@@ -92,35 +92,78 @@ trait ManagesRedisBindings
         $host = $this->effectiveServiceHost($svcServer, $site);
         $port = (string) ($svc->port ?: ServerCacheService::defaultPortFor((string) $svc->engine));
 
-        $env = array_filter([
-            'REDIS_CLIENT' => 'phpredis',
-            'REDIS_HOST' => $host,
-            'REDIS_PORT' => $port,
-            'REDIS_PASSWORD' => filled($svc->auth_password) ? (string) $svc->auth_password : null,
-            'REDIS_PREFIX' => filled($svc->cache_prefix) ? (string) $svc->cache_prefix : null,
-        ], fn ($v) => $v !== null);
+        // Instance / connection name. Blank = the PRIMARY redis the cache/queue/
+        // session drivers point at (bare REDIS_* keys); a slug names a SECONDARY
+        // connection (REDIS_<SLUG>_*) used via Redis::connection('<slug>').
+        $connection = $this->resolveInstanceConnectionName($site, 'redis', $params);
+        $primary = $this->connectionIsPrimary($connection);
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+        $p = $primary ? 'REDIS_' : 'REDIS_'.strtoupper($connection).'_';
 
-        $binding = $this->persist($site, 'redis', [
+        $env = [];
+        if ($primary) {
+            // REDIS_CLIENT is process-global, so only the primary owns it.
+            $env['REDIS_CLIENT'] = 'phpredis';
+        }
+        $env[$p.'HOST'] = $host;
+        $env[$p.'PORT'] = $port;
+        if (filled($svc->auth_password)) {
+            $env[$p.'PASSWORD'] = (string) $svc->auth_password;
+        }
+        if (filled($svc->cache_prefix)) {
+            $env[$p.'PREFIX'] = (string) $svc->cache_prefix;
+        }
+
+        $binding = $this->persistInstanceBinding($site, 'redis', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'name' => (string) $svc->engine.($crossServer ? ' · '.($svcServer->name ?? '') : ''),
+            'name' => $primary ? 'primary' : $connection,
             'target_type' => 'server_cache_service',
             'target_id' => (string) $svc->id,
             'injected_env' => $env,
             'config' => array_filter([
                 'engine' => (string) $svc->engine,
+                'connection' => $primary ? '' : $connection,
+                'service' => (string) $svc->engine.($crossServer ? ' · '.($svcServer->name ?? '') : ''),
+                'connection_snippet' => $primary ? null : $this->redisConnectionSnippet($connection),
                 'source_server_id' => $crossServer ? (string) $svc->server_id : null,
-            ]),
-        ]);
+            ], fn ($v) => $v !== null),
+        ], $primary, $editingId);
 
-        // One-click "use Redis for cache, sessions, and queue": now that the
-        // Redis binding exists (so the driver dependency check passes), wire the
-        // three driver bindings to redis. Opt-in via the modal checkbox.
-        if (filter_var($params['use_for_drivers'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+        // One-click "use Redis for cache, sessions, and queue": only the PRIMARY
+        // redis backs the framework drivers (they read REDIS_HOST), so a named
+        // secondary connection skips this wiring. Now that the binding exists
+        // (so the driver dependency check passes), wire the three driver
+        // bindings to redis. Opt-in via the modal checkbox.
+        if ($primary && filter_var($params['use_for_drivers'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $this->applyRedisToDriverBindings($site);
         }
 
         return $binding;
+    }
+
+    /**
+     * A ready-to-paste config/database.php → redis connection block for a NAMED
+     * redis instance (empty for the primary, which uses Laravel's defaults). The
+     * env() refs match the namespaced keys this trait injects.
+     */
+    private function redisConnectionSnippet(string $connection): string
+    {
+        $slug = $this->connectionSlug($connection);
+        if ($this->connectionIsPrimary($slug)) {
+            return '';
+        }
+
+        $p = 'REDIS_'.strtoupper($slug).'_';
+
+        return "// config/database.php → 'redis' connections:\n"
+            ."'{$slug}' => [\n"
+            ."    'url' => env('{$p}URL'),\n"
+            ."    'host' => env('{$p}HOST', '127.0.0.1'),\n"
+            ."    'password' => env('{$p}PASSWORD'),\n"
+            ."    'port' => env('{$p}PORT', '6379'),\n"
+            ."    'database' => env('{$p}DB', '0'),\n"
+            ."],";
     }
 
     /**

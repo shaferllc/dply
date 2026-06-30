@@ -48,15 +48,35 @@ trait ManagesMailBindings
     {
         $provider = strtolower(trim((string) ($params['provider'] ?? '')));
 
+        // Multi-instance: blank connection = the PRIMARY (default) mailer — owns
+        // MAIL_MAILER + the bare keys. A name (e.g. "marketing") is a SECONDARY
+        // mailer used via Mail::mailer('marketing').
+        $connection = $this->resolveInstanceConnectionName($site, 'mail', $params);
+        $named = ! $this->connectionIsPrimary($connection);
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+
         // failover / roundrobin compose several single-transport "legs"; their
         // chain ORDER lives in the app's config/mail.php (it can't be expressed
         // in env), so here we only inject MAIL_MAILER + every leg's credentials.
         if (in_array($provider, ['failover', 'roundrobin'], true)) {
-            return $this->attachFailoverMail($site, $provider, $params);
+            if ($named) {
+                throw new InvalidArgumentException(__('A failover / round-robin chain can only be your PRIMARY mailer — leave the connection name blank.'));
+            }
+
+            return $this->attachFailoverMail($site, $provider, $params, $editingId);
         }
 
         if (! in_array($provider, self::MAIL_LEG_PROVIDERS, true)) {
             throw new InvalidArgumentException(__('Unsupported mail provider.'));
+        }
+
+        // A named secondary mailer must use SMTP or Log — those transports are
+        // fully configurable per-mailer in config/mail.php. The API providers
+        // (Mailgun, Postmark, SES, Resend, SendGrid, Cloudflare) read GLOBAL
+        // config/services.php credentials, so a second account can't be expressed
+        // as a named mailer; use one as the primary and add the second over SMTP.
+        if ($named && ! in_array($provider, ['smtp', 'log'], true)) {
+            throw new InvalidArgumentException(__('A named secondary mailer must use SMTP or Log. API providers (Mailgun, Postmark, SES, Resend, …) read global credentials — use one as your primary mailer and add the second account over SMTP.'));
         }
 
         $fromAddress = trim((string) ($params['from_address'] ?? ''));
@@ -71,7 +91,14 @@ trait ManagesMailBindings
         $creds = $this->resolveMailCredentials($site, $provider, $params);
         $this->validateMailCredentials($provider, $creds);
 
-        $binding = $this->persist($site, 'mail', [
+        if ($named) {
+            $binding = $this->attachNamedMail($site, $connection, $provider, $creds, $fromAddress, $fromName, $editingId);
+            $this->maybeSaveMailCredential($site, $provider, $params, $creds);
+
+            return $binding;
+        }
+
+        $binding = $this->persistInstanceBinding($site, 'mail', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $this->mailLabel($provider, $creds),
@@ -84,11 +111,88 @@ trait ManagesMailBindings
                 'from_name' => $fromName ?: null,
             ]),
             'last_error' => null,
-        ]);
+        ], true, $editingId);
 
         $this->maybeSaveMailCredential($site, $provider, $params, $creds);
 
         return $binding;
+    }
+
+    /**
+     * A NAMED secondary mailer (SMTP/log). Injects MAIL_<NAME>_* (never
+     * MAIL_MAILER — that selects the app default, owned by the primary) plus a
+     * config/mail.php mailer snippet the operator pastes; the app then sends via
+     * Mail::mailer('<name>'). SMTP is fully configurable per mailer, so two
+     * independent SMTP accounts never collide.
+     *
+     * @param  array<string, mixed>  $creds
+     */
+    private function attachNamedMail(Site $site, string $connection, string $provider, array $creds, string $fromAddress, string $fromName, string $editingId): SiteBinding
+    {
+        $up = strtoupper($connection);
+
+        $env = [];
+        if ($provider === 'smtp') {
+            $env = array_filter([
+                "MAIL_{$up}_HOST" => ($creds['host'] ?? '') ?: null,
+                "MAIL_{$up}_PORT" => ($creds['port'] ?? '') ?: null,
+                "MAIL_{$up}_USERNAME" => ($creds['username'] ?? '') ?: null,
+                "MAIL_{$up}_PASSWORD" => ($creds['password'] ?? '') ?: null,
+                "MAIL_{$up}_ENCRYPTION" => in_array($creds['encryption'] ?? '', ['tls', 'ssl'], true) ? $creds['encryption'] : null,
+                "MAIL_{$up}_SCHEME" => match ($creds['encryption'] ?? '') {
+                    'ssl' => 'smtps',
+                    'tls' => 'smtp',
+                    default => null,
+                },
+            ], fn ($v) => $v !== null);
+        }
+        if ($fromAddress !== '') {
+            $env["MAIL_{$up}_FROM_ADDRESS"] = $fromAddress;
+        }
+        if ($fromName !== '') {
+            $env["MAIL_{$up}_FROM_NAME"] = $fromName;
+        }
+
+        return $this->persistInstanceBinding($site, 'mail', [
+            'mode' => 'attach_existing',
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'name' => $connection,
+            'target_type' => 'mail_transport',
+            'target_id' => null,
+            'injected_env' => $env,
+            'config' => array_filter([
+                'provider' => $provider,
+                'connection' => $connection,
+                'from_address' => $fromAddress ?: null,
+                'from_name' => $fromName ?: null,
+                'connection_snippet' => $this->mailMailerSnippet($connection, $provider),
+            ]),
+            'last_error' => null,
+        ], false, $editingId);
+    }
+
+    /** config/mail.php → 'mailers' block for a named secondary mailer (SMTP/log). */
+    private function mailMailerSnippet(string $connection, string $provider): string
+    {
+        if ($provider === 'log') {
+            return "// config/mail.php → 'mailers':\n"
+                ."'{$connection}' => ['transport' => 'log'],\n"
+                ."// Send via Mail::mailer('{$connection}')->send(...)";
+        }
+
+        $up = strtoupper($connection);
+
+        return "// config/mail.php → 'mailers':\n"
+            ."'{$connection}' => [\n"
+            ."    'transport' => 'smtp',\n"
+            ."    'host' => env('MAIL_{$up}_HOST', '127.0.0.1'),\n"
+            ."    'port' => env('MAIL_{$up}_PORT', 587),\n"
+            ."    'encryption' => env('MAIL_{$up}_ENCRYPTION', 'tls'),\n"
+            ."    'username' => env('MAIL_{$up}_USERNAME'),\n"
+            ."    'password' => env('MAIL_{$up}_PASSWORD'),\n"
+            ."    'timeout' => null,\n"
+            ."],\n"
+            ."// Send via Mail::mailer('{$connection}')->send(...)";
     }
 
     /**
@@ -100,7 +204,7 @@ trait ManagesMailBindings
      *
      * @param  array<string, mixed> $params
      */
-    private function attachFailoverMail(Site $site, string $transport, array $params): SiteBinding
+    private function attachFailoverMail(Site $site, string $transport, array $params, string $editingId = ''): SiteBinding
     {
         $fromAddress = trim((string) ($params['from_address'] ?? ''));
         $fromName = \App\Support\Mail\MailPlaceholderResolver::resolve($site, trim((string) ($params['from_name'] ?? '')));
@@ -155,7 +259,7 @@ trait ManagesMailBindings
             $injected['MAIL_FROM_NAME'] = $fromName;
         }
 
-        return $this->persist($site, 'mail', [
+        return $this->persistInstanceBinding($site, 'mail', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => ucfirst($transport).' ('.implode(' → ', $legs).')',
@@ -169,7 +273,7 @@ trait ManagesMailBindings
                 'from_name' => $fromName ?: null,
             ]),
             'last_error' => null,
-        ]);
+        ], true, $editingId);
     }
 
     /**

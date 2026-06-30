@@ -38,7 +38,41 @@
             $attachedTypes += $t['attached'] ? 1 : 0;
         }
     }
-    $groupCount = count($hubGroups);
+    // A type renders as a card when it's attached (or is publication, which is
+    // pure runtime-managed state). Everything else is "available" and lives only
+    // in the single global "Add resource" dropdown until attached. Shared by the
+    // header dropdown and each group column so they stay in lockstep.
+    $isShownAsCard = function ($t) {
+        if ($t['type'] === 'storage') {
+            return ($t['bindings'] ?? collect())->isNotEmpty();
+        }
+        if ($t['type'] === 'publication') {
+            return true;
+        }
+        return $t['attached'];
+    };
+
+    // Only draw a group pathway (hub + column + its trunk edge) once it actually
+    // has a card to show. Empty pathways stay hidden until you add a resource to
+    // them from the global "Add resource" dropdown, which then makes them appear.
+    $visibleGroups = array_filter(
+        $hubGroups,
+        fn ($g) => collect($g['types'])->contains(fn ($t) => $isShownAsCard($t))
+    );
+    $groupCount = count($visibleGroups);
+
+    // Available types grouped by their (human) category label, so the global
+    // dropdown shows which column each pick will land in. Spans every group —
+    // even hidden ones — so a hidden pathway is still reachable from here.
+    $availableByGroup = [];
+    foreach ($hubGroups as $g) {
+        foreach ($g['types'] as $t) {
+            if (! $isShownAsCard($t)) {
+                $availableByGroup[$g['label']][] = $t;
+            }
+        }
+    }
+    $availableCount = array_sum(array_map('count', $availableByGroup));
 
     // Attached worker SERVER pool(s) get their own graph column on the right, so the
     // scalable background fleet shows as an attached resource. Scoped to pools that
@@ -66,6 +100,61 @@
             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+            {{-- One global "Add resource" dropdown. Every unattached type lives
+                 here, grouped by category so you can see which column it lands in;
+                 picking one runs the same attach path and it pops out as a card in
+                 its proper group below. --}}
+            @if ($availableCount > 0)
+                <div class="relative" x-data="{ open: false }">
+                    <button type="button" @click="open = ! open" :aria-expanded="open"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                        <x-heroicon-o-plus class="h-4 w-4" />
+                        {{ __('Add resource') }}
+                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-[10px] font-semibold">{{ $availableCount }}</span>
+                        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <div x-show="open" x-cloak x-transition x-on:click.outside="open = false"
+                        class="absolute right-0 z-30 mt-1 max-h-[28rem] w-80 overflow-y-auto rounded-xl border border-brand-ink/10 bg-white py-1.5 text-left shadow-xl">
+                        @foreach ($availableByGroup as $groupLabel => $items)
+                            <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
+                            @foreach ($items as $at)
+                                @php
+                                    $atType = $at['type'];
+                                    $atRuntimeUrl = match ($atType) {
+                                        'logging' => $sectionUrl('logs'),
+                                        'scheduler' => route('sites.schedule', ['server' => $server, 'site' => $site]),
+                                        'workers' => route('sites.daemons', ['server' => $server, 'site' => $site]),
+                                        default => null,
+                                    };
+                                @endphp
+                                @if ($atRuntimeUrl)
+                                    <a href="{{ $atRuntimeUrl }}" wire:navigate
+                                        class="flex items-start gap-2.5 px-3 py-2 transition hover:bg-brand-sand/40">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                                            <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
+                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                        </span>
+                                    </a>
+                                @else
+                                    <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')" @click="open = false"
+                                        class="flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-brand-sand/40">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                                            <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
+                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                        </span>
+                                    </button>
+                                @endif
+                            @endforeach
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             @if ($networkedAttached > 0)
                 <button type="button" wire:click="validateReachability" wire:loading.attr="disabled" wire:target="validateReachability"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
@@ -265,33 +354,46 @@
                 </div>
             </div>
 
-            {{-- One row per group: hub pill (col 2) + resource nodes (col 3) --}}
-            @foreach ($hubGroups as $groupKey => $group)
+            {{-- One row per visible group: hub pill (col 2) + resource nodes (col 3).
+                 Groups with nothing attached are hidden until a resource lands. --}}
+            @foreach ($visibleGroups as $groupKey => $group)
                 @php
                     $col = $loop->iteration;
                     $gAttached = collect($group['types'])->where('attached', true)->count();
-                    $gTotal = count($group['types']);
+
+                    // Only render the resources that are actually present as cards
+                    // (anything attached, plus publication which is purely
+                    // runtime-managed state). Unattached types are added from the
+                    // single global "Add resource" dropdown in the header and pop
+                    // out here once attached — no wall of empty ghost cards.
+                    $cardTypes = collect($group['types'])->filter($isShownAsCard)->values();
                 @endphp
 
                 {{-- Group hub --}}
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
-                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ $gAttached }}/{{ $gTotal }} {{ __('attached') }}</p>
+                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gAttached, ['count' => $gAttached]) }}</p>
                     </div>
                 </div>
 
                 {{-- Resource nodes for this group (left gutter leaves room for the branch curves) --}}
                 <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $col }}; grid-row: 4;">
-                    @foreach ($group['types'] as $t)
+                    @foreach ($cardTypes as $t)
                         @if ($t['type'] === 'storage')
                             @include('livewire.sites.settings.partials._resource-storage-card', ['t' => $t])
                             @continue
                         @endif
                         @php
                             $type = $t['type'];
-                            $binding = $t['binding'];
-                            $attached = $t['attached'];
+                            // Multi-instance types (database, …) render one node per
+                            // attached instance; single types render their one node.
+                            $isMulti = \App\Models\SiteBinding::isMultiInstance($type);
+                            $instances = $isMulti ? collect($t['bindings'] ?? []) : collect([$t['binding']]);
+                        @endphp
+                        @foreach ($instances as $binding)
+                        @php
+                            $attached = $binding instanceof \App\Models\SiteBinding;
                             $envKeys = $attached && is_array($binding->injected_env) ? array_keys($binding->injected_env) : [];
                             $canProvision = in_array($type, $provisionTypes, true);
                             $canConfig = in_array($type, $configTypes, true);
@@ -341,8 +443,8 @@
                             };
                         @endphp
                         <div
-                            wire:key="res-{{ $type }}"
-                            data-resource-node="{{ $type }}"
+                            wire:key="res-{{ $type }}-{{ $attached ? $binding->id : 'new' }}"
+                            data-resource-node="{{ $type }}{{ $attached ? '-'.$binding->id : '' }}"
                             data-group="{{ $groupKey }}"
                             data-attached="{{ $attached ? '1' : '0' }}"
                             x-data="{ open: false }"
@@ -352,12 +454,19 @@
                                 'border-brand-ink/10 border-dashed hover:border-brand-forest/40 hover:shadow-md' => ! $attached,
                             ])
                         >
-                            {{-- corner controls: expand details + detach --}}
+                            {{-- corner controls: expand details + (multi-instance) edit + detach --}}
                             <div class="absolute right-1.5 top-1.5 flex items-center gap-0.5">
                                 @if ($attached && $envKeys !== [])
                                     <button type="button" @click="open = ! open" :aria-expanded="open" title="{{ __('Details') }}"
                                         class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
                                         <svg class="h-4 w-4 transition-transform duration-200" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                                    </button>
+                                @endif
+                                @if ($attached && $isMulti)
+                                    <button type="button" title="{{ __('Edit') }}"
+                                        wire:click="openBindingModal('{{ $type }}', 'attach', @js((string) $binding->id))"
+                                        class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                     </button>
                                 @endif
                                 @if ($attached && ! $isLogging)
@@ -455,6 +564,17 @@
                                                 </div>
                                             @endforeach
                                         </div>
+                                        @if ($isMulti && filled($cfg['connection_snippet'] ?? null))
+                                            {{-- A named (secondary) connection needs a matching block in
+                                                 the app's config/database.php — hand over the exact array. --}}
+                                            <div class="mt-2" x-data="{ copied: false, async copy() { try { await navigator.clipboard.writeText(@js((string) ($cfg['connection_snippet'] ?? ''))); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }">
+                                                <div class="flex items-center justify-between">
+                                                    <p class="text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/database.php → connections') }}</p>
+                                                    <button type="button" @click="copy()" class="text-[10px] font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                                </div>
+                                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-[10px] leading-relaxed text-brand-cream">{{ $cfg['connection_snippet'] }}</pre>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             @endif
@@ -543,7 +663,10 @@
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                     </a>
                                 @elseif ($canProvision)
-                                    @if ($attached)
+                                    @if ($attached && $isMulti)
+                                        {{-- Multi-instance (database): per-instance Edit lives in the
+                                             corner and "Add another" sits below the list, so no Replace. --}}
+                                    @elseif ($attached)
                                         {{-- Already wired up: one binding per type, so attach/provision
                                              both *replace* it. Offer a single "Replace…" that opens the
                                              modal (where you can re-link an existing one or spin up a new). --}}
@@ -559,9 +682,15 @@
                                         </button>
                                     @endif
                                 @elseif ($canConfig)
-                                    <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
-                                    </button>
+                                    @if ($attached && $isMulti)
+                                        {{-- Multi-instance: per-instance Edit lives in the corner and
+                                             "Add another" sits below; the id-less Configure button here
+                                             would open a fresh form, so it's suppressed. --}}
+                                    @else
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
+                                        </button>
+                                    @endif
                                 @else
                                     @php
                                         $runtimeUrl = match ($type) {
@@ -599,6 +728,17 @@
                                 @endif
                             </div>
                         </div>
+                        @endforeach
+                        @if ($isMulti)
+                            {{-- Add another instance of this multi-instance type (e.g.
+                                 a second database / connection). It lands in this same
+                                 column once attached. --}}
+                            <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
+                                class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 bg-white/60 px-3 py-2 text-[11px] font-semibold text-brand-moss shadow-sm transition hover:border-brand-forest/40 hover:text-brand-ink hover:shadow-md">
+                                <x-heroicon-o-plus class="h-3.5 w-3.5 text-brand-forest" />
+                                {{ __('Add another :label', ['label' => \Illuminate\Support\Str::lower($t['label'])]) }}
+                            </button>
+                        @endif
                     @endforeach
                 </div>
             @endforeach

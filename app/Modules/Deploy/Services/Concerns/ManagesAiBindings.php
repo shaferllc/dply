@@ -49,7 +49,10 @@ trait ManagesAiBindings
             throw new InvalidArgumentException(__('An API key is required.'));
         }
 
-        $binding = $this->persist($site, 'ai', [
+        // Multi-instance: keyed by provider name, so OpenAI + Anthropic + … can
+        // coexist (their key namespaces don't collide). Editing updates the row
+        // by id; re-attaching the same provider replaces it.
+        $binding = $this->persistInstanceBinding($site, 'ai', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $this->aiLabel($provider),
@@ -58,7 +61,7 @@ trait ManagesAiBindings
             'injected_env' => $this->aiEnv($provider, $creds),
             'config' => ['provider' => $provider],
             'last_error' => null,
-        ]);
+        ], false, trim((string) ($params['binding_id'] ?? '')));
 
         $this->maybeSaveAiCredential($site, $provider, $params, $creds);
 

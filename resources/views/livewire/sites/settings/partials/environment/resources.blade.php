@@ -246,6 +246,58 @@
                     </button>
                 </div>
             @endif
+
+            {{-- Shared connection/instance name for the connection-style multi
+                 types (database, redis). Blank = the PRIMARY instance (bare
+                 keys); a name attaches a SECOND alongside it with namespaced
+                 keys + a generated config snippet. Storage uses its own disk
+                 field; provider-keyed types (ai/oauth/sms/captcha) instead key
+                 on the provider picked in their form, so they skip this. --}}
+            @if (in_array($bindingModalType, ['database', 'redis', 'mail'], true) && $bindingModalMode !== 'provision')
+                @php
+                    $miType = $bindingModalType;
+                    $miRoot = ['database' => 'DB', 'redis' => 'REDIS', 'mail' => 'MAIL', 'broadcasting' => 'BROADCAST'][$miType] ?? strtoupper($miType);
+                    $miRaw = trim((string) ($bindingForm['connection'] ?? ''));
+                    $miSlug = trim(strtolower((string) preg_replace('/[^a-z0-9_]+/', '_', $miRaw)), '_');
+                    $miPrimary = $miSlug === '' || $miSlug === 'default' || $miSlug === 'primary';
+                    $miPrefix = $miRoot.'_'.strtoupper($miSlug).'_';
+                    $miExistingPrimary = $this->site->bindings
+                        ->first(fn ($b) => $b->type === $miType
+                            && ((($b->config['connection'] ?? '')) === '')
+                            && (string) $b->id !== (string) ($this->bindingModalBindingId ?? ''));
+                    $miPrimaryLabel = $miExistingPrimary
+                        ? ($miExistingPrimary->config['database_name'] ?? $miExistingPrimary->config['service'] ?? $miExistingPrimary->name)
+                        : null;
+                    // A DIFFERENT instance already using this exact name — attaching
+                    // would be rejected server-side; warn before the operator submits.
+                    $miNameTaken = ! $miPrimary && $this->site->bindings
+                        ->contains(fn ($b) => $b->type === $miType
+                            && (string) $b->name === $miSlug
+                            && (string) $b->id !== (string) ($this->bindingModalBindingId ?? ''));
+                @endphp
+                <div>
+                    <x-input-label for="binding_connection_name" :value="__('Connection name (optional)')" />
+                    <x-text-input id="binding_connection_name" wire:model.live="bindingForm.connection" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('primary (default :root_* keys)', ['root' => $miRoot]) }}" />
+                    @if ($miPrimary && $miExistingPrimary)
+                        <p class="mt-1.5 flex items-start gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
+                            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{{ __('This site already has a primary (:name) — it will NOT be replaced. Give this one a connection name (e.g. clickhouse, analytics) to add it alongside, or detach/edit the existing primary first.', ['name' => $miPrimaryLabel]) }}</span>
+                        </p>
+                    @elseif ($miPrimary)
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('Leave blank for the primary — it owns the bare :root_* keys. One primary per site; attaching another replaces it.', ['root' => $miRoot]) }}</p>
+                    @elseif ($miNameTaken)
+                        <p class="mt-1.5 flex items-start gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
+                            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{{ __('A connection named ":name" is already attached. Pick a different name, or edit the existing one — it won\'t be overwritten.', ['name' => $miSlug]) }}</span>
+                        </p>
+                    @else
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('A second, named connection. Injects :prefix* so it won\'t collide with the primary; after attaching, paste the generated config snippet and reference it by name (":name").', ['prefix' => $miPrefix, 'name' => $miSlug]) }}</p>
+                        @if ($miType === 'mail')
+                            <p class="mt-1 text-xs text-amber-700">{{ __('A named secondary mailer must use SMTP or Log — API providers (Mailgun, SES, …) read global credentials, so keep those as your primary.') }}</p>
+                        @endif
+                    @endif
+                </div>
+            @endif
             @if ($bindingModalType === 'database' && $bindingModalMode === 'attach')
                 @php
                     // Derive the selected engine from the targets list so we can gate

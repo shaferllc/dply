@@ -47,7 +47,9 @@ trait ManagesCaptchaBindings
             throw new InvalidArgumentException(__('Both the site key and secret key are required.'));
         }
 
-        $binding = $this->persist($site, 'captcha', [
+        // Multi-instance: keyed by provider (reCAPTCHA/Turnstile/hCaptcha own
+        // distinct keys), so several coexist. Editing updates by id.
+        $binding = $this->persistInstanceBinding($site, 'captcha', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $this->captchaLabel($provider),
@@ -56,7 +58,7 @@ trait ManagesCaptchaBindings
             'injected_env' => $this->captchaEnv($provider, $creds),
             'config' => ['provider' => $provider],
             'last_error' => null,
-        ]);
+        ], false, trim((string) ($params['binding_id'] ?? '')));
 
         $this->maybeSaveCaptchaCredential($site, $provider, $params, $creds);
 

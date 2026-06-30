@@ -47,7 +47,10 @@ trait ManagesPaymentsBindings
 
         $webhookUrl = $this->paymentsWebhookUrl($site, $provider);
 
-        $binding = $this->persist($site, 'payments', [
+        // Multi-instance: keyed by provider (Stripe + Paddle share no env keys),
+        // so both coexist. Editing updates by id; re-attaching a provider
+        // replaces it.
+        $binding = $this->persistInstanceBinding($site, 'payments', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $this->paymentsLabel($provider),
@@ -59,7 +62,7 @@ trait ManagesPaymentsBindings
                 'webhook_url' => $webhookUrl,
             ], fn ($v) => $v !== null),
             'last_error' => null,
-        ]);
+        ], false, trim((string) ($params['binding_id'] ?? '')));
 
         $this->maybeSavePaymentCredential($site, $provider, $params, $creds);
 

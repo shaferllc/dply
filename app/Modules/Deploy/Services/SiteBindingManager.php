@@ -303,7 +303,10 @@ class SiteBindingManager
     private function ownedEnvKeys(SiteBinding $binding): array
     {
         return match ($binding->type) {
-            'mail' => [
+            // Only the PRIMARY (default) mailer owns the bare MAIL_* namespace.
+            // A NAMED secondary mailer owns only its MAIL_<NAME>_* keys (already
+            // covered by its injected_env), so it must not strip the primary's.
+            'mail' => (((array) $binding->config)['connection'] ?? '') !== '' ? [] : [
                 'MAIL_MAILER', 'MAIL_HOST', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD',
                 'MAIL_SCHEME', 'MAIL_ENCRYPTION', 'MAIL_URL', 'MAIL_EHLO_DOMAIN',
                 'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
@@ -421,6 +424,14 @@ class SiteBindingManager
      */
     private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding
     {
+        // Multi-instance types (storage, database, …) key on `name` too, so a
+        // site can hold several rows of the type — each a distinct instance.
+        // Single-instance types keep the narrow (site_id, type) key. Callers may
+        // still pass an explicit $matchOn to override.
+        if ($matchOn === [] && SiteBinding::isMultiInstance($type)) {
+            $matchOn = ['name'];
+        }
+
         $key = ['site_id' => $site->id, 'type' => $type];
         foreach ($matchOn as $attr) {
             if (in_array($attr, ['site_id', 'type'], true)) {
@@ -436,6 +447,151 @@ class SiteBindingManager
     {
         if (! in_array($type, SiteBinding::TYPES, true)) {
             throw new InvalidArgumentException(__('Unknown binding type.'));
+        }
+    }
+
+    // ---- multi-instance helpers (shared by storage/database/redis/…) ------
+
+    /**
+     * Normalise a connection/instance-name slug to [a-z0-9_]. Blank stays blank
+     * (the primary). Used as a named instance's binding `name` and env-prefix
+     * root across every multi-instance type.
+     */
+    private function connectionSlug(string $raw): string
+    {
+        $slug = (string) preg_replace('/[^a-z0-9_]+/', '_', strtolower(trim($raw)));
+
+        return trim($slug, '_');
+    }
+
+    /** A slug is the primary (default) instance when empty or a reserved alias. */
+    private function connectionIsPrimary(string $slug): bool
+    {
+        return $slug === '' || $slug === 'default' || $slug === 'primary';
+    }
+
+    /** Whether an existing binding row is its type's primary instance. */
+    private function bindingIsPrimaryInstance(SiteBinding $binding): bool
+    {
+        return $this->connectionIsPrimary(
+            $this->connectionSlug((string) ((((array) $binding->config)['connection']) ?? '')),
+        );
+    }
+
+    /**
+     * Resolve + validate the connection-name slug for a multi-instance binding.
+     * Blank → primary. A named slug must be unique among the site's other
+     * instances of the same type (the row being edited is excluded).
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function resolveInstanceConnectionName(Site $site, string $type, array $params): string
+    {
+        $slug = $this->connectionSlug((string) ($params['connection'] ?? ''));
+        if ($this->connectionIsPrimary($slug)) {
+            return '';
+        }
+
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+        $clash = $site->bindings()
+            ->where('type', $type)
+            ->where('name', $slug)
+            ->when($editingId !== '', fn ($q) => $q->whereKeyNot($editingId))
+            ->exists();
+
+        if ($clash) {
+            throw new InvalidArgumentException(__('A :type connection named ":name" is already attached to this site. Choose a different connection name.', ['type' => $type, 'name' => $slug]));
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Upsert a multi-instance binding. Editing updates that exact row (so an
+     * instance can be renamed). A new PRIMARY supersedes any existing primary of
+     * the same type — there is exactly one default (bare-key) connection per
+     * type, including legacy rows that predate the connection field. A new named
+     * instance is keyed by its slug.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function persistInstanceBinding(Site $site, string $type, array $attributes, bool $primary, string $editingId): SiteBinding
+    {
+        $name = (string) ($attributes['name'] ?? '');
+
+        if ($editingId !== '') {
+            $existing = $site->bindings()->where('type', $type)->whereKey($editingId)->first();
+            if ($existing instanceof SiteBinding) {
+                if ($primary) {
+                    // Becoming the primary is only allowed if no OTHER primary
+                    // exists — we NEVER replace an existing one.
+                    $this->assertNoOtherPrimaryInstance($site, $type, $editingId);
+                } elseif ($name !== '' && $name !== (string) $existing->name) {
+                    // Renaming onto a name another instance already uses would
+                    // clobber it on the next save — reject instead.
+                    $this->assertInstanceNameFree($site, $type, $name, $editingId);
+                }
+                $existing->forceFill($attributes)->save();
+
+                return $existing;
+            }
+        }
+
+        if ($primary) {
+            // A new primary is rejected when one already exists — it is NEVER
+            // overwritten. The operator must name this one (to add it alongside)
+            // or detach/edit the existing primary first.
+            $this->assertNoOtherPrimaryInstance($site, $type, $editingId);
+
+            return $this->persist($site, $type, $attributes);
+        }
+
+        // A brand-new named instance must NOT reuse another instance's name —
+        // updateOrCreate would silently overwrite it. Block and point the
+        // operator at editing the existing one.
+        $this->assertInstanceNameFree($site, $type, $name, $editingId);
+
+        return $this->persist($site, $type, $attributes);
+    }
+
+    /**
+     * Guarantee a multi-instance name isn't already taken by a DIFFERENT row of
+     * the same type on this site, so persisting can never clobber another
+     * instance. The row being edited (if any) is excluded.
+     */
+    private function assertInstanceNameFree(Site $site, string $type, string $name, string $exceptId): void
+    {
+        if ($name === '') {
+            return;
+        }
+
+        $taken = $site->bindings()
+            ->where('type', $type)
+            ->where('name', $name)
+            ->when($exceptId !== '', fn ($q) => $q->whereKeyNot($exceptId))
+            ->exists();
+
+        if ($taken) {
+            throw new InvalidArgumentException(__('":name" is already attached to this site — edit that instance instead of adding another with the same name.', ['name' => $name]));
+        }
+    }
+
+    /**
+     * Reject creating/becoming a PRIMARY (bare-key) instance when one already
+     * exists for this type — there is exactly one primary per type and it is
+     * NEVER replaced. The operator names the new one (to add it alongside) or
+     * detaches/edits the existing primary first. The row being edited is excluded.
+     */
+    public function assertNoOtherPrimaryInstance(Site $site, string $type, string $exceptId = ''): void
+    {
+        $other = $site->bindings()
+            ->where('type', $type)
+            ->when($exceptId !== '', fn ($q) => $q->whereKeyNot($exceptId))
+            ->get()
+            ->first(fn (SiteBinding $b) => $this->bindingIsPrimaryInstance($b));
+
+        if ($other instanceof SiteBinding) {
+            throw new InvalidArgumentException(__('This site already has a primary :type (":name"). It will not be replaced — give this one a connection name to add it alongside, or detach/edit the existing primary first.', ['type' => $type, 'name' => $other->name]));
         }
     }
 }

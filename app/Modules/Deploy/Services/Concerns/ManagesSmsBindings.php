@@ -34,7 +34,9 @@ trait ManagesSmsBindings
         $creds = $this->resolveSmsCredentials($site, $provider, $params);
         $this->validateSmsCredentials($provider, $creds);
 
-        $binding = $this->persist($site, 'sms', [
+        // Multi-instance: keyed by provider (Twilio/Vonage/FCM own distinct
+        // keys), so several coexist. Editing updates by id.
+        $binding = $this->persistInstanceBinding($site, 'sms', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $this->smsLabel($provider),
@@ -43,7 +45,7 @@ trait ManagesSmsBindings
             'injected_env' => $this->smsEnv($provider, $creds),
             'config' => ['provider' => $provider],
             'last_error' => null,
-        ]);
+        ], false, trim((string) ($params['binding_id'] ?? '')));
 
         $this->maybeSaveSmsCredential($site, $provider, $params, $creds);
 

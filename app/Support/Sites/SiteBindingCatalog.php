@@ -16,8 +16,9 @@ use Illuminate\Support\Collection;
  * offered and how it's grouped, mirroring the LoggingChannelCatalog pattern.
  *
  * Decisions baked in (see the site-resources-hub memory): grouped full palette
- * (attached = configured card, unattached = "add" ghost card), VM-first with a
- * per-type runtime filter, and a light env-keys hint on each card.
+ * (attached = configured card; unattached types live only in a single global
+ * "Add resource" dropdown, grouped by category, rather than a wall of ghost
+ * cards), VM-first with a per-type runtime filter, and a light env-keys hint.
  */
 final class SiteBindingCatalog
 {
@@ -185,11 +186,12 @@ final class SiteBindingCatalog
                 'needs' => $meta['needs'] ?? [],
                 'binding' => $binding,
                 'attached' => $binding instanceof SiteBinding,
-                // Storage is multi-instance: a site can attach several buckets,
-                // each its own filesystem disk. The card renders the full list;
-                // every other type stays single (`bindings` is null for them).
-                'bindings' => $type === 'storage'
-                    ? $bindings->filter(fn (SiteBinding $b) => $b->type === 'storage')->values()
+                // Multi-instance types (storage, database, …) can hold several
+                // rows per site — each a distinct instance (a bucket/disk, a DB
+                // connection). The hub renders the full list; single types stay
+                // one row (`bindings` is null for them).
+                'bindings' => SiteBinding::isMultiInstance($type)
+                    ? $bindings->filter(fn (SiteBinding $b) => $b->type === $type)->values()
                     : null,
             ];
         }

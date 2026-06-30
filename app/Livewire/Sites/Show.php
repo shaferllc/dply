@@ -315,18 +315,57 @@ class Show extends Component
      */
     protected function hydrateServerWorkspace(): void
     {
+        // Server and site almost always share one workspace. Load it ONCE on the
+        // site and hand that same instance to the server, so we don't fire two
+        // identical `select * from workspaces where id in (...)` queries — one
+        // here for the server and one when the site's workspace is loaded
+        // elsewhere (e.g. DeploymentSecretInventory's workspace.variables).
         if (
             $this->server->workspace_id !== null
-            && $this->site->relationLoaded('workspace')
-            && $this->site->workspace !== null
             && (string) $this->server->workspace_id === (string) $this->site->workspace_id
         ) {
-            $this->server->setRelation('workspace', $this->site->workspace);
+            $this->site->loadMissing('workspace');
 
+            if ($this->site->workspace !== null) {
+                $this->server->setRelation('workspace', $this->site->workspace);
+            }
+        } else {
+            $this->server->loadMissing('workspace');
+        }
+
+        $this->shareOrganizationInstance();
+    }
+
+    /**
+     * Site, server and the workspace are all in the same organization — load it
+     * once (on the site) and share that instance onto the server and workspace,
+     * so an auth check on workspace->organization and $site->organization don't
+     * each fire `select * from organizations where id = ?`.
+     */
+    private function shareOrganizationInstance(): void
+    {
+        $this->site->loadMissing('organization');
+        $org = $this->site->organization;
+        if ($org === null) {
             return;
         }
 
-        $this->server->loadMissing('workspace');
+        if (
+            $this->server->organization_id !== null
+            && (string) $this->server->organization_id === (string) $org->id
+            && ! $this->server->relationLoaded('organization')
+        ) {
+            $this->server->setRelation('organization', $org);
+        }
+
+        $workspace = $this->site->workspace;
+        if (
+            $workspace !== null
+            && (string) $workspace->organization_id === (string) $org->id
+            && ! $workspace->relationLoaded('organization')
+        ) {
+            $workspace->setRelation('organization', $org);
+        }
     }
 
     public function render(): View

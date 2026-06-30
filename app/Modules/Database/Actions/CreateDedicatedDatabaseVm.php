@@ -48,6 +48,12 @@ class CreateDedicatedDatabaseVm
             throw new RuntimeException(__('A dedicated database VM needs a connected cloud provider on this server.'));
         }
 
+        // A dedicated DB VM is always the PRIMARY database, and we NEVER replace
+        // an existing primary — refuse up front (before spinning up a server) so
+        // the operator detaches the current primary first.
+        app(\App\Modules\Deploy\Services\SiteBindingManager::class)
+            ->assertNoOtherPrimaryInstance($site, 'database');
+
         $engine = strtolower(trim((string) ($form['engine'] ?? 'mysql')));
         if (! in_array($engine, DedicatedDatabaseVm::supportedEngines(), true)) {
             throw new InvalidArgumentException(__('A dedicated database VM supports MySQL or PostgreSQL.'));
@@ -123,17 +129,21 @@ class CreateDedicatedDatabaseVm
             'description' => 'Dedicated database VM for '.$site->slug,
         ]);
 
+        // Primary uniqueness was asserted up front (no existing primary), so this
+        // is the site's one bare-key database connection.
         $binding = SiteBinding::query()->create([
             'site_id' => $site->id,
             'type' => 'database',
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_PROVISIONING,
-            'name' => $name,
+            'name' => 'primary',
             'target_type' => 'server_database',
             'target_id' => (string) $database->id,
             'injected_env' => [],
             'config' => [
                 'engine' => $engine,
+                'connection' => '',
+                'database_name' => $name,
                 'placement' => 'dedicated_vm',
                 'managed' => false,
                 'db_vm_server_id' => (string) $dbServer->id,

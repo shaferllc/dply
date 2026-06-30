@@ -15,6 +15,27 @@ use App\Models\SiteBinding;
 trait ResolvesReachableResources
 {
     /**
+     * Per-instance memo of each org's PrivateNetwork rows + each server's
+     * reachable-server-id set, so resolving reachability across many bindings /
+     * peers in one request doesn't re-run the same `private_networks` /
+     * peer-server queries (sharePrivateNetwork is called once per peer).
+     *
+     * @var array<string, \Illuminate\Support\Collection<int, PrivateNetwork>>
+     */
+    private array $privateNetworksByOrg = [];
+
+    /** @var array<string, list<string>> */
+    private array $reachableServerIdsByServer = [];
+
+    /** @return \Illuminate\Support\Collection<int, PrivateNetwork> */
+    private function orgPrivateNetworks(string $organizationId)
+    {
+        return $this->privateNetworksByOrg[$organizationId] ??= PrivateNetwork::query()
+            ->where('organization_id', $organizationId)
+            ->get();
+    }
+
+    /**
      * How many OTHER sites already bind each of the given resources, keyed by
      * target_id. Lets the attach pickers warn that a Redis/database/realtime app
      * is shared so the operator sets a prefix / separate DB to avoid collisions.
@@ -58,10 +79,14 @@ trait ResolvesReachableResources
      */
     private function reachableServerIds(Server $server): array
     {
+        if (isset($this->reachableServerIdsByServer[(string) $server->id])) {
+            return $this->reachableServerIdsByServer[(string) $server->id];
+        }
+
         $ids = [(string) $server->id];
 
         if (blank($server->private_ip_address)) {
-            return $ids; // No private interface → only its own (loopback) DBs.
+            return $this->reachableServerIdsByServer[(string) $server->id] = $ids; // No private interface → only its own (loopback) DBs.
         }
 
         $peers = Server::query()
@@ -73,7 +98,7 @@ trait ResolvesReachableResources
             ->map(fn (Server $peer): string => (string) $peer->id)
             ->all();
 
-        return array_values(array_unique([...$ids, ...$peers]));
+        return $this->reachableServerIdsByServer[(string) $server->id] = array_values(array_unique([...$ids, ...$peers]));
     }
 
     /**
@@ -109,7 +134,7 @@ trait ResolvesReachableResources
             return true;
         }
 
-        foreach (PrivateNetwork::query()->where('organization_id', $a->organization_id)->get() as $net) {
+        foreach ($this->orgPrivateNetworks((string) $a->organization_id) as $net) {
             $cidr = (string) $net->ip_range;
             if ($cidr !== '' && $this->ipInCidr($aIp, $cidr) && $this->ipInCidr($bIp, $cidr)) {
                 return true;

@@ -57,6 +57,45 @@ class SiteBinding extends Model
         'oauth',
     ];
 
+    /**
+     * Types a site can hold MORE THAN ONE of — each a distinct instance keyed
+     * by `name`, injecting its own (namespaced) env so they don't collide. The
+     * primary instance keeps the framework's bare keys (DB_HOST, FILESYSTEM_DISK
+     * …); additional named instances inject a prefixed set (DB_<NAME>_*,
+     * AWS_<DISK>_* …) plus a config snippet to register the named connection.
+     * Every other type collapses to one row per site via the (site_id, type)
+     * natural key. Grows as each type's env-namespacing is wired in.
+     */
+    public const MULTI_INSTANCE_TYPES = [
+        'storage',
+        'database',
+        'redis',
+        // Provider-keyed integrations: each provider owns an independent key
+        // namespace (no shared selector key), so several DIFFERENT providers
+        // coexist on one site without collision — the instance IS the provider.
+        // (mail/broadcasting/search/payments are excluded: they share a selector
+        // key — MAIL_MAILER / BROADCAST_CONNECTION / SCOUT_DRIVER / CASHIER_* —
+        // so they need real per-instance namespacing first.)
+        'ai',
+        'oauth',
+        'sms',
+        'captcha',
+        // payments: Stripe (STRIPE_*/CASHIER_*) and Paddle (PADDLE_*) share no
+        // env keys, so the two providers coexist; the instance is the provider.
+        'payments',
+        // Mail: ONE primary (default) mailer — any provider or a failover chain —
+        // owns MAIL_MAILER + the bare keys. Named secondaries are SMTP/log only
+        // (inline-configurable per mailer), injecting MAIL_<NAME>_* + a
+        // config/mail.php snippet. API providers (Mailgun/SES/…) read global
+        // config/services.php creds, so they can't be a second instance.
+        'mail',
+    ];
+
+    public static function isMultiInstance(string $type): bool
+    {
+        return in_array($type, self::MULTI_INSTANCE_TYPES, true);
+    }
+
     public const STATUS_CONFIGURED = 'configured';
 
     public const STATUS_PENDING = 'pending';

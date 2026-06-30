@@ -45,7 +45,10 @@ trait ManagesOauthBindings
         $redirect = $this->oauthRedirectUri($site, $provider, (string) ($creds['redirect'] ?? $params['redirect'] ?? ''));
         $creds['redirect'] = $redirect;
 
-        $binding = $this->persist($site, 'oauth', [
+        // Multi-instance: keyed by provider, so GitHub + Google + … coexist
+        // (each owns its {PROVIDER}_CLIENT_* keys). Editing updates by id;
+        // re-attaching the same provider replaces it.
+        $binding = $this->persistInstanceBinding($site, 'oauth', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $this->oauthLabel($provider),
@@ -54,7 +57,7 @@ trait ManagesOauthBindings
             'injected_env' => $this->oauthEnv($provider, $creds),
             'config' => ['provider' => $provider, 'redirect' => $redirect],
             'last_error' => null,
-        ]);
+        ], false, trim((string) ($params['binding_id'] ?? '')));
 
         $this->maybeSaveOauthCredential($site, $provider, $params, $creds);
 

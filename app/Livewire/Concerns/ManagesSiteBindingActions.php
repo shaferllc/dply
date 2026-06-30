@@ -219,8 +219,9 @@ trait ManagesSiteBindingActions
 
     /**
      * Pre-fill {@see $bindingForm} from an existing binding row for editing.
-     * Currently only `storage` supports multiple rows per site; other types
-     * already round-trip via their own default-form prefill.
+     * Multi-instance types (storage, database) support several rows per site, so
+     * editing one re-seeds its non-secret fields; other types round-trip via
+     * their own default-form prefill.
      */
     private function seedBindingFormForEdit(string $type, string $bindingId): void
     {
@@ -235,6 +236,40 @@ trait ManagesSiteBindingActions
         }
 
         $this->bindingModalBindingId = (string) $binding->id;
+
+        // Multi-instance types (database, redis, …; not storage) re-select the
+        // underlying target + the connection name so the form opens on the exact
+        // instance being edited (secrets are never echoed).
+        if (SiteBinding::isMultiInstance($type) && $type !== 'storage') {
+            $config = (array) $binding->config;
+            $this->bindingForm['target_id'] = (string) ($binding->target_id ?? '');
+            $this->bindingForm['connection'] = (string) ($config['connection'] ?? '');
+            // Provider-keyed types (ai/oauth/sms/captcha) open on the provider
+            // being edited; secrets aren't echoed, so the operator re-supplies
+            // the key (or reuses a saved credential).
+            if (($config['provider'] ?? '') !== '') {
+                $this->bindingForm['provider'] = (string) $config['provider'];
+            }
+            if (($config['redirect'] ?? '') !== '') {
+                $this->bindingForm['redirect'] = (string) $config['redirect'];
+            }
+            // Mail's per-site from-address/name aren't secret, so re-seed them.
+            foreach (['from_address', 'from_name'] as $k) {
+                if (($config[$k] ?? '') !== '') {
+                    $this->bindingForm[$k] = (string) $config[$k];
+                }
+            }
+        }
+
+        if ($type === 'database') {
+            $config = (array) $binding->config;
+            foreach (['read_replica_type', 'read_replica_id', 'read_replica_host', 'read_replica_port', 'read_replica_username',
+                'db_prefix', 'db_charset', 'db_collation', 'db_strict', 'db_engine', 'db_socket', 'db_schema', 'db_sslmode', 'db_timezone'] as $k) {
+                if (($config[$k] ?? '') !== '') {
+                    $this->bindingForm[$k] = (string) $config[$k];
+                }
+            }
+        }
 
         if ($type === 'storage') {
             $config = (array) $binding->config;
