@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ead14844d4442f1d5746da18a5afa6dd",
+    "content-hash": "a77f56dce3a84dc0ec8c3ef713b040fd",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -3997,16 +3997,16 @@
         },
         {
             "name": "lookout/tracing",
-            "version": "2.5.0",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/shaferllc/lookout-tracing.git",
-                "reference": "774c40cdd7d170b51eb1d9e7dc12b034a78de87e"
+                "reference": "3c4af65d50d096e6fc340f9b02f72e55fc065b97"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/shaferllc/lookout-tracing/zipball/774c40cdd7d170b51eb1d9e7dc12b034a78de87e",
-                "reference": "774c40cdd7d170b51eb1d9e7dc12b034a78de87e",
+                "url": "https://api.github.com/repos/shaferllc/lookout-tracing/zipball/3c4af65d50d096e6fc340f9b02f72e55fc065b97",
+                "reference": "3c4af65d50d096e6fc340f9b02f72e55fc065b97",
                 "shasum": ""
             },
             "require": {
@@ -4032,6 +4032,7 @@
                 "symfony/http-client": "Use Lookout\\Tracing\\Http\\SymfonyHttpClientTraceDecorator to wrap Symfony HttpClientInterface.",
                 "symfony/var-dumper": "Required for dump() breadcrumbs when LOOKOUT_INSTRUMENT_DUMP is enabled (Laravel already includes it)."
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -4059,9 +4060,9 @@
             "description": "Distributed tracing, sampled performance spans (limits, Laravel collectors), optional browser RUM beacons, breadcrumbs, structured logs and custom metrics ingest, exception reporting with enrichment pipeline, cron check-ins, and profiling ingest for Lookout.",
             "support": {
                 "issues": "https://github.com/shaferllc/lookout-tracing/issues",
-                "source": "https://github.com/shaferllc/lookout-tracing/tree/v2.5.0"
+                "source": "https://github.com/shaferllc/lookout-tracing/tree/v2.11.1"
             },
-            "time": "2026-06-24T15:57:51+00:00"
+            "time": "2026-07-01T15:41:08+00:00"
         },
         {
             "name": "lorisleiva/cron-translator",
@@ -15408,6 +15409,7 @@
     "stability-flags": {
         "dply/log-parser": 20,
         "dply/nginx-config": 20,
+        "lookout/tracing": 20,
         "shaferllc/dply-php-lambda": 20,
         "soloterm/solo": 20
     },

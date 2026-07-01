@@ -46,7 +46,7 @@
         "league/flysystem-aws-s3-v3": "^3.34",
         "livewire/blaze": "^1.0",
         "livewire/livewire": "^4.0",
-        "lookout/tracing": "^2.5",
+        "lookout/tracing": "dev-main",
         "lorisleiva/cron-translator": "^0.5.1",
         "phpseclib/phpseclib": "^3.0",
         "pragmarx/google2fa": "^9.0",

@@ -30,12 +30,17 @@ class LookoutDebugPageServiceProvider extends ServiceProvider
             return;
         }
 
-        // WHO may see the rich page: an authenticated platform admin, OR an
-        // allow-listed client IP. The IP path is the fallback for 500s that
-        // happen on guest routes or before auth resolves. Guests fail the gate
-        // closed. Lookout::viewerMaySeeDebugPage wraps this in its own try/catch.
+        // WHO may see the rich page:
+        //  - locally/dev (app.debug on) → everyone, the normal Ignition experience;
+        //  - in production → an authenticated platform admin, OR an allow-listed
+        //    client IP (the IP path is the fallback for 500s on guest routes or
+        //    before auth resolves).
+        // Guests without an allow-listed IP fail closed in production.
+        // Lookout::viewerMaySeeDebugPage wraps this in its own try/catch.
         Lookout::showDebugPageUsing(static function (Request $request, Throwable $e): bool {
-            return Gate::allows('viewPlatformAdmin') || DebugAllowedIp::allows($request->ip());
+            return (bool) config('app.debug')
+                || Gate::allows('viewPlatformAdmin')
+                || DebugAllowedIp::allows($request->ip());
         });
 
         // dply-specific view chrome. Reference is the reported occurrence id so
