@@ -48,6 +48,10 @@ return Application::configure(basePath: dirname(__DIR__))
             $middleware->trustProxies(at: $at);
         }
 
+        // Stamp X-Dply-Ref (the Lookout occurrence id) on 5xx responses so a
+        // reference can be quoted by users and resolved by admins.
+        $middleware->append(\App\Http\Middleware\StampDebugReference::class);
+
         $middleware->alias([
             'org' => SetCurrentOrganization::class,
             'auth.api' => AuthenticateApiToken::class,

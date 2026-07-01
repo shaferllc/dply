@@ -18,6 +18,18 @@
     <p class="text-base text-brand-moss mb-8 max-w-md mx-auto leading-relaxed">
         {{ __('We are sorry, but something went wrong on our end. Our team has been notified and we are working to fix the issue. Please try again later.') }}
     </p>
+
+    @php($dplyRef = \App\Support\Debug\DebugReference::current())
+    @if ($dplyRef)
+        <p class="text-xs text-brand-mist mb-1">
+            {{ __('Reference') }}
+            <button type="button"
+                onclick="navigator.clipboard && navigator.clipboard.writeText('{{ $dplyRef }}')"
+                class="ml-1 font-mono text-brand-moss hover:text-brand-ink transition-colors cursor-pointer"
+                title="{{ __('Copy reference') }}">{{ $dplyRef }}</button>
+        </p>
+        <p class="text-[11px] text-brand-mist/80 mb-8">{{ __('Quote this reference to support to help us find what happened.') }}</p>
+    @endif
 @endsection
 
 @section('smart-actions')
