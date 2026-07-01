@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Sites\DeployHookRunner;
+use App\Services\Sites\SiteOpcacheManager;
 use App\Services\SshConnection;
 use Closure;
 use Illuminate\Support\Carbon;
@@ -156,6 +157,16 @@ class DeployPhaseRunner
                 : sprintf('sudo systemctl restart %s', escapeshellarg('dply-site-'.$site->id.'.service'));
 
             $owned = $this->runOne($site, 'restart', SiteDeployStep::PHASE_RESTART, $command, $this->repositoryBase($site), $shellFactory);
+
+            // A php-fpm *reload* re-reads pool config but does NOT flush OPcache;
+            // with revalidate_path off the workers keep serving the prior release
+            // after the swap. Flush inside a worker so the new code is picked up.
+            // No-op for shared-pool sites; best-effort, never fails the deploy.
+            if ($runtime === 'php' && ($owned['ok'] ?? false)) {
+                $owned['output'] = (string) ($owned['output'] ?? '')
+                    .app(SiteOpcacheManager::class)->flushForDeploy($site);
+            }
+
             $results[] = $owned;
 
             if (! ($owned['ok'] ?? false)) {

@@ -146,7 +146,9 @@ class DeployScript extends Component
         if ((bool) $this->site->octane_port || $this->site->resolvedLaravelPackageFlag('octane')) {
             $items[] = __('Octane workers — php artisan octane:reload');
         } elseif ($runtime === 'php') {
-            $items[] = __('PHP-FPM — reloaded so it serves the new release');
+            $items[] = $this->site->usesDedicatedPhpFpmPool()
+                ? __('PHP-FPM — reloaded and OPcache flushed so it serves the new release')
+                : __('PHP-FPM — reloaded so it serves the new release');
         } else {
             $items[] = __('the app service — restarted onto the new release');
         }
@@ -202,11 +204,51 @@ class DeployScript extends Component
 
         $preset = $presets[$key];
         $scripts = app(DeployScriptComposer::class)->preset((string) $preset['runtime'], $preset['framework']);
+        $scripts = $this->dropCommandsAlreadyLocked($scripts);
         $this->build = $scripts['build'] ?? '';
         $this->release = $scripts['release'] ?? '';
         $this->restart = $scripts['restart'] ?? '';
         $this->dispatch('deploy-script-blocks-changed');
         $this->toastSuccess(__(':preset preset loaded — review and save.', ['preset' => $preset['label']]));
+    }
+
+    /**
+     * Strip preset lines a locked builder/pinned step already runs in that phase.
+     *
+     * A preset is the full canonical pipeline rendered to text. When the site
+     * also carries those commands as typed builder steps (shown locked above the
+     * textarea), seeding them into the freeform block would run each one TWICE
+     * per deploy — e.g. loading the Laravel preset onto a site that already has
+     * typed Migrate + Optimize steps. Both the locked steps and the preset lines
+     * derive from the same {@see SiteDeployStep::commandFor()}, so an exact
+     * whitespace-normalized match is a true duplicate and is safe to drop.
+     *
+     * @param  array<string, string>  $scripts  phase => text
+     * @return array<string, string>
+     */
+    private function dropCommandsAlreadyLocked(array $scripts): array
+    {
+        $locked = app(DeployScriptComposer::class)->lockedSteps($this->site);
+        $normalize = static fn (string $c): string => trim((string) preg_replace('/\s+/', ' ', $c));
+
+        foreach ($scripts as $phase => $text) {
+            $existing = collect($locked[$phase] ?? [])
+                ->map(fn (SiteDeployStep $s): string => $normalize((string) ($s->commandFor() ?? '')))
+                ->filter()
+                ->all();
+
+            if ($existing === [] || trim($text) === '') {
+                continue;
+            }
+
+            $kept = collect(preg_split('/\r?\n/', $text) ?: [])
+                ->reject(fn (string $line): bool => trim($line) !== '' && in_array($normalize($line), $existing, true))
+                ->implode("\n");
+
+            $scripts[$phase] = trim($kept);
+        }
+
+        return $scripts;
     }
 
     /**

@@ -50,6 +50,47 @@ final class SiteOpcacheManager
     }
 
     /**
+     * Flush OPcache after a deploy cutover, returning a one-line deploy-log
+     * message describing the outcome.
+     *
+     * An FPM *reload* (the deploy's managed restart) re-reads pool config but
+     * leaves the OPcache shared memory intact. On dply boxes
+     * `opcache.revalidate_path` is off, so workers keep serving the PRIOR
+     * release's cached bytecode AND its resolved `current/public/index.php`
+     * realpath even after the atomic symlink swap — the classic "deployed but
+     * still serving old code" failure (e.g. a stale Vite asset hash 404'ing
+     * because the manifest the app reads is the old release's). {@see reset()}
+     * runs `opcache_reset()` inside a live worker, which is what actually clears
+     * it — no full `systemctl restart`, no cross-pool blip.
+     *
+     * Best-effort by contract: never throws, and a no-op (empty string) for
+     * shared-pool sites (Apache/OpenLiteSpeed), so a flush can never fail an
+     * otherwise-healthy deploy.
+     */
+    public function flushForDeploy(Site $site): string
+    {
+        if (! $site->usesDedicatedPhpFpmPool()) {
+            return '';
+        }
+
+        try {
+            $result = $this->reset($site);
+        } catch (\Throwable $e) {
+            return "[dply] OPcache flush skipped/failed (continuing): {$e->getMessage()}\n";
+        }
+
+        if ($result === null || ($result['ok'] ?? false) !== true) {
+            return "[dply] OPcache flush: pool unreachable — new release picked up on next FPM restart.\n";
+        }
+
+        if (($result['reset'] ?? null) === false) {
+            return "[dply] OPcache not enabled for {$site->phpFpmPoolName()} — nothing to flush.\n";
+        }
+
+        return "[dply] OPcache flushed for {$site->phpFpmPoolName()} — new release live.\n";
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function run(Site $site, string $action): ?array

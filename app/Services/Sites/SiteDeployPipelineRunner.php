@@ -105,6 +105,7 @@ class SiteDeployPipelineRunner
 
         $parts = [];
         $labels = [];
+        $flushOpcache = false;
 
         if ((bool) $site->octane_port || $site->resolvedLaravelPackageFlag('octane')) {
             // Octane serves the app itself — reload its workers onto the new release.
@@ -115,6 +116,8 @@ class SiteDeployPipelineRunner
             // Non-Octane PHP: reload FPM so it serves the freshly swapped `current`.
             $parts[] = 'for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do sudo systemctl reload "$svc" 2>/dev/null && { echo "[dply] reloaded $svc"; break; }; done || true';
             $labels[] = 'PHP-FPM';
+            // A reload re-reads pool config but does NOT flush OPcache — see flushOpcache().
+            $flushOpcache = true;
         }
 
         if ($site->resolvedLaravelPackageFlag('horizon')) {
@@ -161,6 +164,10 @@ class SiteDeployPipelineRunner
         }
 
         $out = $ssh->exec(sprintf('cd %s 2>/dev/null; %s', escapeshellarg($workingDirectory), implode('; ', $parts)), 120);
+
+        if ($flushOpcache) {
+            $out .= app(SiteOpcacheManager::class)->flushForDeploy($site);
+        }
 
         return [
             'log' => sprintf("\n--- managed restart (%s) ---\n%s\n", implode(', ', $labels), $out),
