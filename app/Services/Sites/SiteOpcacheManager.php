@@ -105,6 +105,11 @@ final class SiteOpcacheManager
         $agentPath = '/tmp/.dply-opcache-'.Str::lower(Str::random(24)).'.php';
 
         $b64 = base64_encode($this->agentScript());
+        // The FPM pool socket is owned by the pool user with listen.mode 0660,
+        // so the `dply` SSH user can't connect to it directly ("Permission
+        // denied") — root can (it bypasses the socket's perms). Try `sudo -n`
+        // first and fall back to a direct run on boxes without passwordless
+        // sudo, so a permission-only failure never blanks the whole probe.
         $script = sprintf(
             <<<'BASH'
 AGENT=%s
@@ -113,7 +118,14 @@ chmod 644 "$AGENT"
 PHPBIN=%s
 if [ ! -x "$PHPBIN" ]; then PHPBIN="$(command -v php || true)"; fi
 if [ -z "$PHPBIN" ]; then echo '{"ok":false,"error":"no php binary"}'; rm -f "$AGENT"; exit 0; fi
-"$PHPBIN" "$AGENT" %s %s 2>/dev/null
+SOCK=%s
+ACTION=%s
+OUT="$(sudo -n "$PHPBIN" "$AGENT" "$SOCK" "$ACTION" 2>/dev/null)"
+case "$OUT" in
+  *'"ok":true'*) : ;;
+  *) OUT="$("$PHPBIN" "$AGENT" "$SOCK" "$ACTION" 2>/dev/null)" ;;
+esac
+printf '%%s' "$OUT"
 rm -f "$AGENT"
 BASH,
             escapeshellarg($agentPath),
