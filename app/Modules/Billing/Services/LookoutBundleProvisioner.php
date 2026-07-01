@@ -69,12 +69,19 @@ final class LookoutBundleProvisioner
             return;
         }
 
-        // Fresh provision: create the remote managed project, then persist the row.
+        // Fresh provision: create the remote managed project under a Lookout org
+        // dedicated to this dply org (isolation), then persist the row.
         $tier = (string) config('lookout.default_tier', 'starter');
         $retentionDays = (int) config("lookout.tiers.{$tier}.retention_days", 7);
+        $orgName = \App\Models\Organization::query()->whereKey($organizationId)->value('name');
 
         try {
-            $result = $this->provisioner->provisionManaged('dply-bundle-'.$organizationId, $retentionDays);
+            $result = $this->provisioner->provisionManaged(
+                'dply-bundle-'.$organizationId,
+                $retentionDays,
+                $organizationId,
+                is_string($orgName) ? $orgName : null,
+            );
         } catch (\Throwable $e) {
             // No row persisted → the nightly reconcile re-emits Provisioned and retries.
             Log::warning('bundle.lookout.provision_failed', [

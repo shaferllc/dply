@@ -81,8 +81,12 @@ class LookoutProvisioner
      *
      * @throws RuntimeException when the provisioning endpoint is unconfigured or rejects the request
      */
-    public function provisionManaged(string $projectName, ?int $retentionDays = null): array
-    {
+    public function provisionManaged(
+        string $projectName,
+        ?int $retentionDays = null,
+        ?string $externalOrgId = null,
+        ?string $externalOrgName = null,
+    ): array {
         $token = trim((string) config('services.lookout.provision_token', ''));
         if ($token === '') {
             throw new RuntimeException('Lookout managed provisioning is not configured (set LOOKOUT_PROVISION_TOKEN).');
@@ -91,13 +95,20 @@ class LookoutProvisioner
         $base = $this->baseUrl();
         $org = trim((string) config('services.lookout.managed_organization_id', ''));
 
+        // When a dply org identity is given, Lookout provisions the project under
+        // a DEDICATED Lookout org keyed to that external id (data isolation for
+        // the bundle SSO — one customer never sees another's projects). Omitting
+        // it keeps the legacy single-managed-org behavior for non-bundle managed
+        // projects.
         $response = Http::asJson()
             ->acceptJson()
             ->withToken($token)
             ->timeout(20)
             ->post($base.'/api/provision', array_filter([
                 'name' => $projectName,
-                'organization_id' => $org !== '' ? $org : null,
+                'organization_id' => $externalOrgId === null && $org !== '' ? $org : null,
+                'external_org_id' => $externalOrgId,
+                'external_org_name' => $externalOrgName,
                 'retention_days' => $retentionDays !== null && $retentionDays > 0 ? $retentionDays : null,
             ], fn ($v) => $v !== null));
 

@@ -35,6 +35,19 @@ return [
     )))),
 
     /*
+    | IP allow-list for the Lookout debug page. These addresses (and any
+    | platform admin) may see the interactive stack-trace/debug page for a
+    | production 500; everyone else gets the branded error. Kept separate from
+    | the coming-soon list on purpose. Merged: the base list below + the
+    | comma-separated DEBUG_ALLOWED_IPS env var + the admin-managed rows
+    | (debug_allowed_ips table). Supports IPv4, IPv6, and CIDR ranges.
+    */
+    'debug_allowed_ips' => array_values(array_unique(array_filter(array_map(
+        static fn ($v): string => trim((string) $v),
+        explode(',', (string) env('DEBUG_ALLOWED_IPS', '')),
+    )))),
+
+    /*
     |--------------------------------------------------------------------------
     | Require verified email (dashboard and gated actions)
     |--------------------------------------------------------------------------

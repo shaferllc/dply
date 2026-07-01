@@ -27,6 +27,7 @@ use App\Providers\AppServiceProvider;
 use App\Providers\BundleSsoServiceProvider;
 use App\Providers\FeatureServiceProvider;
 use App\Providers\HorizonServiceProvider;
+use App\Providers\LookoutDebugPageServiceProvider;
 use App\Modules\Secrets\SecretVaultServiceProvider;
 
 return [
@@ -55,6 +56,7 @@ return [
     RoadmapServiceProvider::class,
     AppServiceProvider::class,
     BundleSsoServiceProvider::class,
+    LookoutDebugPageServiceProvider::class,
     FeatureServiceProvider::class,
     HorizonServiceProvider::class,
     SecretVaultServiceProvider::class,

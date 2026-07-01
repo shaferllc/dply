@@ -214,6 +214,7 @@
                      console for the site in scope, next to Documentation. --}}
                 @if ($breadcrumbSite instanceof \App\Models\Site)
                     <livewire:sites.deploy-control :key="'deploy-control-'.$breadcrumbSite->id" />
+                    <livewire:sites.env-quick-edit :key="'env-quick-edit-'.$breadcrumbSite->id" />
                 @endif
                 @if ($docContextual)
                     <x-docs-link :slug="$resolvedContextualDocSlug">
