@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Billing;
 
 use App\Modules\Billing\Console\ProvisionStripeBillingCommand;
+use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
+use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
+use App\Modules\Billing\Events\BundleEntitlementChanged;
+use App\Modules\Billing\Listeners\PropagateBundleEntitlement;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -33,6 +38,8 @@ class BillingServiceProvider extends ServiceProvider
                 ProvisionStripeBillingCommand::class,
                 SnapshotOrganizationBillingCommand::class,
                 SyncAllOrganizationBillingCommand::class,
+                ReconcileBundleEntitlementsCommand::class,
+                PurgeSuspendedBundleEntitlementsCommand::class,
             ]);
         }
     }
@@ -42,5 +49,9 @@ class BillingServiceProvider extends ServiceProvider
         Livewire::component('billing.show', \App\Modules\Billing\Livewire\Show::class);
         Livewire::component('billing.analytics', \App\Modules\Billing\Livewire\Analytics::class);
         Livewire::component('billing.invoices', \App\Modules\Billing\Livewire\Invoices::class);
+
+        // Bundled-products perk: fan a bundle.* transition out to tracely (webhook)
+        // + Lookout (in-process). Dark until config('bundle.enabled').
+        Event::listen(BundleEntitlementChanged::class, PropagateBundleEntitlement::class);
     }
 }

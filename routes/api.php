@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\ServerLogShippingController;
 use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\SiteEnvApiController;
 use App\Http\Controllers\Api\SiteResourceApiController;
 use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,13 @@ Route::prefix('v1')->group(function (): void {
         ->middleware(['throttle:30,1']);
     Route::post('/auth/device/poll', [DeviceAuthorizationController::class, 'poll'])
         ->middleware(['throttle:60,1']);
+
+    // Bundled-products entitlement pull (reconcile backstop) — service-token auth,
+    // called by tracely/Lookout. Dark until BUNDLE_ENTITLEMENTS_API_TOKEN is set.
+    Route::middleware('bundle.service')->group(function (): void {
+        Route::get('/orgs/{organization}/entitlements', [\App\Http\Controllers\Api\BundleEntitlementsController::class, 'show'])
+            ->middleware('throttle:120,1');
+    });
 
     Route::middleware('fleet.operator')->group(function (): void {
         Route::get('/operator/summary', [OperatorSummaryController::class, 'show']);
@@ -177,6 +185,13 @@ Route::prefix('v1')->group(function (): void {
         // Extended site resource endpoints (slug-routed via Site::getRouteKeyName)
         Route::get('/sites/{site}', [SiteResourceApiController::class, 'show'])->middleware('ability:'.$apiAbilities['sites.show']);
         Route::patch('/sites/{site}', [SiteResourceApiController::class, 'update'])->middleware('ability:'.$apiAbilities['sites.update']);
+
+        // VM/BYO site env vars (values encrypted at rest, never returned by GET).
+        Route::get('/sites/{site}/env', [SiteEnvApiController::class, 'index'])->middleware('ability:'.$apiAbilities['sites.env.index']);
+        Route::patch('/sites/{site}/env/{key}', [SiteEnvApiController::class, 'upsert'])
+            ->middleware('ability:'.$apiAbilities['sites.env.set'])->where('key', '[A-Za-z_][A-Za-z0-9_]{0,127}');
+        Route::delete('/sites/{site}/env/{key}', [SiteEnvApiController::class, 'destroy'])
+            ->middleware('ability:'.$apiAbilities['sites.env.delete'])->where('key', '[A-Za-z_][A-Za-z0-9_]{0,127}');
         Route::get('/sites/{site}/workers', [SiteResourceApiController::class, 'workers'])->middleware('ability:'.$apiAbilities['sites.workers']);
         Route::get('/sites/{site}/schedules', [SiteResourceApiController::class, 'schedules'])->middleware('ability:'.$apiAbilities['sites.schedules']);
         Route::get('/sites/{site}/errors', [SiteResourceApiController::class, 'errors'])->middleware('ability:'.$apiAbilities['sites.errors']);

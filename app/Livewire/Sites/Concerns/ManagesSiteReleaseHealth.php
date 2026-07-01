@@ -60,11 +60,6 @@ trait ManagesSiteReleaseHealth
             return;
         }
 
-        $expected = SiteRelease::query()
-            ->where('site_id', $this->site->id)
-            ->where('is_active', true)
-            ->value('folder');
-
         try {
             $status = Cache::remember(
                 $this->opcacheProbeCacheKey(),
@@ -76,6 +71,17 @@ trait ManagesSiteReleaseHealth
         }
 
         $serving = is_array($status) ? ($status['serving_release'] ?? null) : null;
+
+        // Ground truth for "what should be live" = the `current` symlink target
+        // (read in the same probe). The DB SiteRelease row can lag actual
+        // deploys, so it's only a fallback label when the symlink is unreadable.
+        $expected = is_array($status) ? ($status['current_release'] ?? null) : null;
+        if ($expected === null) {
+            $expected = SiteRelease::query()
+                ->where('site_id', $this->site->id)
+                ->where('is_active', true)
+                ->value('folder');
+        }
 
         // 'drifted' only when we can positively compare two known folders and
         // they differ; 'unknown' when the workers' cache is empty/just-flushed

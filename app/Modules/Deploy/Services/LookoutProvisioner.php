@@ -128,6 +128,34 @@ class LookoutProvisioner
     }
 
     /**
+     * Tear down a managed project on the Lookout side (the "managed" account
+     * model), using the service token against DELETE /api/provision/{id}.
+     * Best-effort by contract: returns false (never throws) when the project id
+     * is empty, the token is unset, or Lookout rejects/404s — the local row is
+     * removed regardless, so a lingering remote project is at worst dormant.
+     */
+    public function deprovision(string $projectId): bool
+    {
+        $projectId = trim($projectId);
+        $token = trim((string) config('services.lookout.provision_token', ''));
+        if ($projectId === '' || $token === '') {
+            return false;
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->withToken($token)
+                ->timeout(20)
+                ->delete($this->baseUrl().'/api/provision/'.rawurlencode($projectId));
+
+            // A 404 means it's already gone — treat as success for teardown.
+            return $response->successful() || $response->status() === 404;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Best-effort list of organizations the customer's token can create projects
      * under, so the modal can offer a picker instead of a raw ULID. Reads the
      * existing `GET /api/v1/me` payload (it already returns `organizations`).

@@ -59,6 +59,8 @@ use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
 use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
 use App\Modules\Serverless\Console\ServerlessTickCommand;
+use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
+use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
 use App\Console\Commands\SweepSiteHttpErrorsCommand;
@@ -224,6 +226,18 @@ final class DplySchedule
             ->withoutOverlapping();
 
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
+
+        // Bundled products (free tracely + Lookout): nightly pull-reconcile heals
+        // any missed bundle.* webhook; the daily purge tears down workspaces
+        // suspended past retention. Both no-op while BUNDLE_PRODUCTS_ENABLED is off.
+        $schedule->command(ReconcileBundleEntitlementsCommand::class)
+            ->dailyAt('02:50')
+            ->name('bundle-entitlements-reconcile')
+            ->withoutOverlapping();
+        $schedule->command(PurgeSuspendedBundleEntitlementsCommand::class)
+            ->dailyAt('03:05')
+            ->name('bundle-entitlements-purge')
+            ->withoutOverlapping();
 
         $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();
 

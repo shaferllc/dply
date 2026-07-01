@@ -24,6 +24,7 @@ use App\Modules\Roadmap\RoadmapServiceProvider;
 use App\Modules\Serverless\ServerlessServiceProvider;
 use App\Modules\TaskRunner\TaskServiceProvider;
 use App\Providers\AppServiceProvider;
+use App\Providers\BundleSsoServiceProvider;
 use App\Providers\FeatureServiceProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Modules\Secrets\SecretVaultServiceProvider;
@@ -53,6 +54,7 @@ return [
     ServerlessServiceProvider::class,
     RoadmapServiceProvider::class,
     AppServiceProvider::class,
+    BundleSsoServiceProvider::class,
     FeatureServiceProvider::class,
     HorizonServiceProvider::class,
     SecretVaultServiceProvider::class,

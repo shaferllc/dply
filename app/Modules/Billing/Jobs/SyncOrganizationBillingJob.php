@@ -5,6 +5,7 @@ namespace App\Modules\Billing\Jobs;
 use App\Models\BillingSubscriptionSyncEvent;
 use App\Models\Organization;
 use App\Modules\Billing\Services\BillingSubscriptionSyncEventRecorder;
+use App\Modules\Billing\Services\BundleEntitlementSynchronizer;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use App\Modules\Billing\Services\StripeSubscriptionSyncer;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -41,6 +42,7 @@ class SyncOrganizationBillingJob implements ShouldBeUnique, ShouldQueue
         OrganizationBillingStateComputer $computer,
         StripeSubscriptionSyncer $syncer,
         BillingSubscriptionSyncEventRecorder $eventRecorder,
+        BundleEntitlementSynchronizer $bundle,
     ): void {
         $organization = Organization::find($this->organizationId);
         if (! $organization) {
@@ -80,5 +82,11 @@ class SyncOrganizationBillingJob implements ShouldBeUnique, ShouldQueue
 
             throw $e;
         }
+
+        // Fast path: re-evaluate the bundled-products perk right after billing
+        // syncs so a plan change flips the bundle within seconds. Dark + a no-op
+        // unless qualification actually changed. The nightly reconcile covers
+        // Enterprise (which skips this job) and heals any missed transition.
+        $bundle->sync($organization);
     }
 }

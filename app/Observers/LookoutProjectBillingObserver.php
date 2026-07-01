@@ -19,6 +19,11 @@ class LookoutProjectBillingObserver
 {
     public function created(LookoutProject $project): void
     {
+        // Bundle-origin projects are the free perk — never trigger billing.
+        if ($project->isBundle()) {
+            return;
+        }
+
         if ($project->status === LookoutProject::STATUS_ACTIVE) {
             $this->dispatchBillingSync($project->organization_id);
         }
@@ -26,6 +31,10 @@ class LookoutProjectBillingObserver
 
     public function updated(LookoutProject $project): void
     {
+        if ($project->isBundle()) {
+            return;
+        }
+
         if ($project->wasChanged('status') || $project->wasChanged('tier')) {
             $original = $project->getOriginal('status');
 
@@ -37,6 +46,10 @@ class LookoutProjectBillingObserver
 
     public function deleted(LookoutProject $project): void
     {
+        if ($project->isBundle()) {
+            return;
+        }
+
         if ($this->isActive($project->status)) {
             $this->dispatchBillingSync($project->organization_id);
         }

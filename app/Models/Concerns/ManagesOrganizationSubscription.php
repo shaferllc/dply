@@ -121,6 +121,42 @@ trait ManagesOrganizationSubscription
     }
 
     /**
+     * The single source of truth for the bundled-products perk (free tracely +
+     * Lookout): the org is on the most expensive plan, committed for a year.
+     *
+     * "Most expensive, for a year" resolves to a valid subscription carrying the
+     * BUSINESS yearly plan price OR the (sales-led, annual) Enterprise price.
+     * Business-*monthly* deliberately does not qualify — the annual commitment is
+     * what funds giving two products away. Because {@see subscriptionMatchesAnyPrice}
+     * gates on `subscription('default')->valid()`, this is only ever true for an
+     * active/paid subscription — a trialing/past-due/cancelled org returns false.
+     *
+     * Every consumer (the OIDC entitlement claim, the provisioning emitter, the
+     * nightly reconcile) reads THIS method so the perk can never drift between
+     * surfaces. See docs/adr/bundled-products-sso.md.
+     */
+    public function qualifiesForBundledProducts(): bool
+    {
+        return $this->subscriptionMatchesAnyPrice($this->bundleQualifyingStripePriceIds());
+    }
+
+    /**
+     * The Stripe prices that grant the bundle: business-yearly and Enterprise.
+     *
+     * @return list<?string>
+     */
+    private function bundleQualifyingStripePriceIds(): array
+    {
+        $stripe = (array) config('subscription.standard.stripe', []);
+        $businessYearly = ((array) ($stripe['plans_yearly'] ?? []))['business'] ?? null;
+
+        return [
+            is_string($businessYearly) ? $businessYearly : null,
+            config('subscription.enterprise.stripe_price_id'),
+        ];
+    }
+
+    /**
      * @param  list<?string>  $priceIds
      */
     private function subscriptionMatchesAnyPrice(array $priceIds): bool

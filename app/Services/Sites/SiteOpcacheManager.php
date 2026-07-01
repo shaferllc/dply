@@ -127,12 +127,15 @@ case "$OUT" in
 esac
 printf '%%s' "$OUT"
 rm -f "$AGENT"
+CURREL="$(readlink -f %s 2>/dev/null)"; CURREL="${CURREL##*/}"
+printf '\nDPLY_CURRENT=%%s\n' "$CURREL"
 BASH,
             escapeshellarg($agentPath),
             escapeshellarg($b64),
             escapeshellarg("/usr/bin/php{$version}"),
             escapeshellarg($socket),
             escapeshellarg($action),
+            escapeshellarg(rtrim($site->effectiveRepositoryPath(), '/').'/current'),
         );
 
         try {
@@ -151,8 +154,19 @@ BASH,
         }
 
         $decoded = json_decode($m[0], true);
+        if (! is_array($decoded)) {
+            return null;
+        }
 
-        return is_array($decoded) ? $decoded : null;
+        // The `current` symlink target folder — the ground truth for "what
+        // should be live". Compared against `serving_release`, a mismatch is the
+        // real worker pin (the DB SiteRelease row can lag actual deploys, so it
+        // is NOT a reliable baseline). Captured in the same round-trip.
+        if (preg_match('/DPLY_CURRENT=(\S+)/', $buffer, $cm) && $cm[1] !== '') {
+            $decoded['current_release'] = $cm[1];
+        }
+
+        return $decoded;
     }
 
     /**

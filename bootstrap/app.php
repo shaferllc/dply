@@ -53,6 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.api' => AuthenticateApiToken::class,
             'ability' => EnsureApiTokenAbility::class,
             'fleet.operator' => ValidateFleetOperatorToken::class,
+            'bundle.service' => \App\Http\Middleware\ValidateBundleServiceToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,

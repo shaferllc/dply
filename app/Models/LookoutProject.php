@@ -46,6 +46,9 @@ class LookoutProject extends Model
 
     public const STATUS_PAUSED = 'paused';
 
+    /** Provisioned free via the bundled-products perk — excluded from billing. */
+    public const SOURCE_BUNDLE = 'bundle';
+
     protected $fillable = [
         'organization_id',
         'site_id',
@@ -54,10 +57,17 @@ class LookoutProject extends Model
         'name',
         'tier',
         'status',
+        'source',
         'retention_days',
         'error_message',
         'meta',
     ];
+
+    /** A bundle-origin project is never billed (the free tracely+Lookout perk). */
+    public function isBundle(): bool
+    {
+        return $this->source === self::SOURCE_BUNDLE;
+    }
 
     /** @return array<string, string> */
     protected function casts(): array

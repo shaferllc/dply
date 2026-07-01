@@ -188,6 +188,10 @@ class OrganizationBillingStateComputer
             $freeRemaining = max(0, (int) config('lookout.free_projects_per_org', 1));
             $organization->lookoutProjects()
                 ->where('status', LookoutProject::STATUS_ACTIVE)
+                // Bundle-origin projects are the free tracely+Lookout perk — never
+                // billed, and filtered in the QUERY so they can't even consume the
+                // org's free-project allowance below. See docs/adr/bundled-products-sso.md.
+                ->where(fn ($q) => $q->whereNull('source')->orWhere('source', '!=', LookoutProject::SOURCE_BUNDLE))
                 ->where('created_at', '<=', $ageCutoff)
                 ->orderBy('created_at')
                 ->get(['tier', 'created_at'])
