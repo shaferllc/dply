@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing;
 
+use App\Modules\Billing\Console\BundleStatusCommand;
 use App\Modules\Billing\Console\ProvisionStripeBillingCommand;
 use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
 use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
@@ -40,6 +41,7 @@ class BillingServiceProvider extends ServiceProvider
                 SyncAllOrganizationBillingCommand::class,
                 ReconcileBundleEntitlementsCommand::class,
                 PurgeSuspendedBundleEntitlementsCommand::class,
+                BundleStatusCommand::class,
             ]);
         }
     }

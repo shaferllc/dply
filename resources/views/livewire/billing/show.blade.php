@@ -199,6 +199,44 @@
                 @include('livewire.billing.partials.fleet-table')
                 @include('livewire.billing.partials.bill-preview')
 
+                {{-- Bundled products (free tracely + Lookout). Hidden while the perk
+                     is dark or for orgs that don't participate — see getBundleProperty(). --}}
+                @if ($this->bundle !== null)
+                    @php
+                        $bundle = $this->bundle;
+                        $bundleActive = ($bundle['status'] ?? null) === \App\Models\OrganizationBundleEntitlement::STATUS_ACTIVE;
+                    @endphp
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <x-icon-badge>
+                                <x-heroicon-o-gift class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Included with your plan') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled products') }}</h3>
+                            </div>
+                            <span @class([
+                                'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide',
+                                'bg-brand-forest/10 text-brand-forest' => $bundleActive,
+                                'bg-amber-100 text-amber-800' => ! $bundleActive,
+                            ])>{{ $bundleActive ? __('Active') : ($bundle['entitled'] ? __('Provisioning') : __('Paused')) }}</span>
+                        </div>
+                        <div class="px-6 py-5 sm:px-7">
+                            <p class="text-sm leading-relaxed text-brand-moss">
+                                @if ($bundle['entitled'])
+                                    {{ __('Your annual plan includes free access to tracely (analytics) and Lookout (error tracking). Sign in to each with your dply account.') }}
+                                @else
+                                    {{ __('These were included with your annual plan. Access is paused now that the plan no longer qualifies — your data is retained and restored if you re-subscribe.') }}
+                                @endif
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-4 text-sm font-medium">
+                                <span class="inline-flex items-center gap-1.5 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full {{ $bundleActive ? 'bg-brand-forest' : 'bg-brand-mist' }}"></span>tracely</span>
+                                <span class="inline-flex items-center gap-1.5 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full {{ $bundleActive ? 'bg-brand-forest' : 'bg-brand-mist' }}"></span>Lookout</span>
+                            </div>
+                        </div>
+                    </section>
+                @endif
+
                 {{-- Payment method --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">

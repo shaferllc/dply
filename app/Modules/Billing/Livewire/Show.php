@@ -374,6 +374,32 @@ class Show extends Component
         return $this->organization->onDplyTrial();
     }
 
+    /**
+     * Bundled-products (free tracely + Lookout) state for this org's billing
+     * page. Null — so the card is hidden — while the perk is dark, or for orgs
+     * that neither qualify nor have a provisioned workspace. See
+     * docs/adr/bundled-products-sso.md.
+     *
+     * @return array{entitled: bool, status: ?string}|null
+     */
+    public function getBundleProperty(): ?array
+    {
+        if (! config('bundle.enabled', false)) {
+            return null;
+        }
+
+        $entitled = $this->organization->qualifiesForBundledProducts();
+        $status = \App\Models\OrganizationBundleEntitlement::query()
+            ->where('organization_id', $this->organization->id)
+            ->value('status');
+
+        if (! $entitled && $status === null) {
+            return null;
+        }
+
+        return ['entitled' => $entitled, 'status' => $status !== null ? (string) $status : null];
+    }
+
     public function getDplyTrialDaysLeftProperty(): int
     {
         $endsAt = $this->organization->trial_ends_at;
