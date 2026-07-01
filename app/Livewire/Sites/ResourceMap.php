@@ -9,6 +9,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvRequirements;
+use App\Livewire\Sites\Concerns\ManagesSiteReleaseHealth;
 use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
 use App\Models\Site;
@@ -45,6 +46,9 @@ class ResourceMap extends Component
     // consoleActionSubject, and the dismiss/remediation plumbing (same recipe as
     // SiteEnvironment). No mount hooks, so they don't load env state here.
     use ManagesSiteEnvRequirements;
+    // Release-health card: detects php-fpm serving a stale release after a
+    // deploy (OPcache symlink pin) and offers a one-click flush/re-sync.
+    use ManagesSiteReleaseHealth;
     use SurfacesDeploymentRemediation;
     use WatchesConsoleActionOutcomes;
 

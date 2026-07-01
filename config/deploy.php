@@ -34,4 +34,23 @@ return [
 
     'health_check_auto_rollback' => filter_var(env('DEPLOY_HEALTH_AUTO_ROLLBACK', true), FILTER_VALIDATE_BOOLEAN),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Post-cutover asset-integrity check
+    |--------------------------------------------------------------------------
+    |
+    | Extends the health gate: after the homepage renders non-5xx, the checker
+    | pulls the Vite build assets it references and asserts each returns 200 +
+    | a non-HTML MIME. This catches the "stale release" failure a 5xx probe
+    | can't — a 200 page whose hashed CSS/JS 404s to the branded fallback
+    | (text/html), leaving the site unstyled while the deploy looks green
+    | (typically an OPcache pin after an atomic swap). On a miss it flushes
+    | OPcache and re-probes once before failing the deploy (→ auto-rollback).
+    |
+    | Default-on. Opt a site out via meta.deploy_asset_integrity_enabled=false.
+    |
+    */
+
+    'asset_integrity_default' => filter_var(env('DEPLOY_ASSET_INTEGRITY_CHECK', true), FILTER_VALIDATE_BOOLEAN),
+
 ];

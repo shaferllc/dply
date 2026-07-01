@@ -216,15 +216,29 @@ if ($action === 'reset') {
     echo json_encode(['ok' => true, 'reset' => (bool) $did]);
     exit;
 }
-$s = @opcache_get_status(false);
+$s = @opcache_get_status(true);
 if ($s === false) { echo json_encode(['ok' => true, 'enabled' => false, 'reason' => 'disabled-in-fpm']); exit; }
 $mem = $s['memory_usage'] ?? [];
 $stats = $s['opcache_statistics'] ?? [];
 $hits = (int) ($stats['hits'] ?? 0);
 $misses = (int) ($stats['misses'] ?? 0);
 $total = $hits + $misses;
+// Which release are the LIVE workers actually booted from? The cached-script
+// realpaths carry the atomic-deploy `releases/<folder>/…` segment; the most
+// common one is the release these workers serve. Compared against the `current`
+// symlink target, a mismatch IS the "deployed but serving old code" pin. Derived
+// here so only the short folder string crosses the wire, never the script map.
+$servingRelease = null;
+if (isset($s['scripts']) && is_array($s['scripts'])) {
+    $counts = [];
+    foreach ($s['scripts'] as $path => $info) {
+        if (preg_match('#/releases/([^/]+)/#', (string) $path, $mm)) { $counts[$mm[1]] = ($counts[$mm[1]] ?? 0) + 1; }
+    }
+    if ($counts) { arsort($counts); $servingRelease = (string) array_key_first($counts); }
+}
 echo json_encode([
     'ok' => true,
+    'serving_release' => $servingRelease,
     'enabled' => (bool) ($s['opcache_enabled'] ?? false),
     'full' => (bool) ($s['cache_full'] ?? false),
     'restart_pending' => (bool) ($s['restart_pending'] ?? false),

@@ -173,6 +173,83 @@
         </div>
     </div>
 
+    {{-- Release health. Only meaningful for dedicated-pool atomic sites (a shared
+         pool or flat checkout has no per-release symlink to pin). Gated
+         synchronously here; the live "which release are workers serving?" probe
+         runs off the render path via wire:init. --}}
+    @php $showReleaseHealth = $site->usesDedicatedPhpFpmPool() && $site->isAtomicDeploys(); @endphp
+    @if ($showReleaseHealth)
+        <div wire:init="loadReleaseHealth" wire:key="release-health">
+            @if (! $releaseHealthLoaded)
+                <div class="dply-card flex items-center gap-2.5 px-4 py-3 text-xs text-brand-moss">
+                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin text-brand-mist" />
+                    {{ __('Checking which release the live workers are serving…') }}
+                </div>
+            @elseif ($releaseHealth !== null)
+                @php
+                    $state = $releaseHealth['state'];
+                    $expected = $releaseHealth['expected'];
+                    $serving = $releaseHealth['serving'];
+                    $oc = $releaseHealth['opcache'] ?? null;
+                    $card = match ($state) {
+                        'drifted' => ['ring' => 'ring-amber-300/70 bg-amber-50/60', 'dot' => 'bg-amber-500', 'icon' => 'heroicon-o-exclamation-triangle', 'iconColor' => 'text-amber-600'],
+                        'in_sync' => ['ring' => 'ring-brand-forest/20 bg-brand-forest/5', 'dot' => 'bg-brand-forest', 'icon' => 'heroicon-o-check-circle', 'iconColor' => 'text-brand-forest'],
+                        default => ['ring' => 'ring-brand-ink/10 bg-white', 'dot' => 'bg-brand-mist', 'icon' => 'heroicon-o-cube', 'iconColor' => 'text-brand-moss'],
+                    };
+                @endphp
+                <div class="dply-card ring-1 {{ $card['ring'] }} px-4 py-3.5 sm:px-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <x-dynamic-component :component="$card['icon']" class="mt-0.5 h-5 w-5 shrink-0 {{ $card['iconColor'] }}" />
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Release health') }}</h3>
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $state === 'drifted' ? 'bg-amber-100 text-amber-800' : ($state === 'in_sync' ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-ink/5 text-brand-moss') }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $card['dot'] }}"></span>
+                                        {{ $state === 'drifted' ? __('Workers pinned') : ($state === 'in_sync' ? __('In sync') : __('Unconfirmed')) }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                                    @if ($state === 'drifted')
+                                        {{ __('php-fpm is serving an OLDER release than the one this deploy activated — OPcache pinned the previous `current`. The site may show stale assets (Vite hash 404s). Flush to re-sync.') }}
+                                    @elseif ($state === 'in_sync')
+                                        {{ __('The live workers are serving the current release. Nothing to do.') }}
+                                    @else
+                                        {{ __('Couldn’t confirm the live release (the workers’ cache is empty or just flushed). Refresh after some traffic.') }}
+                                    @endif
+                                </p>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-mist">
+                                    <span>{{ __('Activated') }}: <span class="font-mono text-brand-ink">{{ $expected ?? '—' }}</span></span>
+                                    <span>{{ __('Serving') }}: <span class="font-mono {{ $state === 'drifted' ? 'text-amber-700' : 'text-brand-ink' }}">{{ $serving ?? '—' }}</span></span>
+                                    @if (is_array($oc) && ($oc['enabled'] ?? false))
+                                        <span>{{ __('OPcache hit rate') }}: <span class="font-mono text-brand-ink">{{ $oc['hit_rate'] !== null ? $oc['hit_rate'].'%' : '—' }}</span></span>
+                                        @if (($oc['memory_wasted'] ?? 0) > 0)
+                                            <span>{{ __('wasted') }}: <span class="font-mono text-brand-ink">{{ round(($oc['memory_wasted'] ?? 0) / 1048576, 1) }} MB</span></span>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button" wire:click="refreshReleaseHealth" wire:loading.attr="disabled" wire:target="refreshReleaseHealth"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshReleaseHealth" />
+                                {{ __('Refresh') }}
+                            </button>
+                            @if ($state === 'drifted')
+                                <button type="button" wire:click="flushOpcacheResync" wire:loading.attr="disabled" wire:target="flushOpcacheResync"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60">
+                                    <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                                    {{ __('Flush OPcache & re-sync') }}
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- The graph. Horizontally scrollable on narrow screens so the topology
          keeps its shape instead of collapsing. --}}
     <div class="dply-card overflow-x-auto bg-linear-to-br from-white to-brand-cream/30 p-6 sm:p-8" style="zoom: .95;">
