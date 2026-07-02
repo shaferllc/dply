@@ -14,7 +14,9 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Modules\Database\Backends\DatabaseRouter;
+use App\Modules\Database\Jobs\ProvisionDockerDatabaseJob;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
+use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\DatabaseWorkspaceEngines;
@@ -79,7 +81,7 @@ trait ManagesDatabaseBindings
     }
 
     /**
-     * @param  array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      */
     private function attachDatabase(Site $site, array $params): SiteBinding
     {
@@ -238,7 +240,7 @@ trait ManagesDatabaseBindings
     }
 
     /**
-     * @param  array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      */
     private function provisionDatabase(Site $site, array $params): SiteBinding
     {
@@ -256,10 +258,14 @@ trait ManagesDatabaseBindings
         }
 
         // Placement decides where the database lives. `on_box` (default) creates
-        // it on the site's own server; `do_managed` (and future co-located
-        // backends) provision an isolated managed cluster and attach it. Both
-        // resolve to the same `database` SiteBinding — only the target differs.
+        // it on the site's own server; `docker` runs an isolated container on
+        // that box; `do_managed` (and future co-located backends) provision an
+        // isolated managed cluster and attach it. Both resolve to the same
+        // `database` SiteBinding — only the target differs.
         $placement = strtolower(trim((string) ($params['placement'] ?? 'on_box')));
+        if ($placement === 'docker') {
+            return $this->provisionDockerDatabase($site, $server, $params);
+        }
         if ($placement !== '' && $placement !== 'on_box') {
             return $this->provisionManagedDatabase($site, $server, $placement, $params);
         }
@@ -347,6 +353,79 @@ trait ManagesDatabaseBindings
             userId: auth()->id(),
             seededConsoleRunId: null,
             siteBindingId: (string) $binding->id,
+        );
+
+        return $binding;
+    }
+
+    /**
+     * Provision a database inside a Docker container on the site's server.
+     * Isolated from the native engine install path — only requires Docker.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function provisionDockerDatabase(Site $site, Server $server, array $params): SiteBinding
+    {
+        if (! $server->dockerEnginePresent()) {
+            throw new RuntimeException(__('Docker is not installed on this server — install it from Server → Manage → Tools first.'));
+        }
+
+        $engine = strtolower(trim((string) ($params['engine'] ?? 'mysql')));
+        if (! in_array($engine, DockerDatabase::supportedEngines(), true)) {
+            throw new InvalidArgumentException(__('That engine is not available as a Docker database here.'));
+        }
+
+        if ($this->databaseConnectionIsPrimary($this->resolveDatabaseConnectionName($site, $params))) {
+            $this->assertNoOtherPrimaryInstance($site, 'database', trim((string) ($params['binding_id'] ?? '')));
+        }
+
+        $name = trim((string) ($params['name'] ?? ''));
+        if ($name === '' || preg_match('/^[a-zA-Z0-9_]+$/', $name) !== 1) {
+            throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
+        }
+
+        $base = Str::slug($name, '_') ?: 'db';
+        $username = Str::limit($base, 28, '').'_'.Str::lower(Str::random(4));
+        $password = Str::password(24, symbols: false);
+
+        $db = ServerDatabase::query()->create([
+            'server_id' => $server->id,
+            'site_id' => $site->id,
+            'name' => $name,
+            'engine' => $engine,
+            'username' => $username,
+            'password' => $password,
+            'host' => '127.0.0.1',
+            'description' => 'Docker database for '.$site->slug,
+        ]);
+
+        $connection = $this->resolveDatabaseConnectionName($site, $params);
+        $primary = $this->databaseConnectionIsPrimary($connection);
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+
+        $binding = $this->persistDatabaseBinding($site, [
+            'mode' => 'provision_new',
+            'status' => SiteBinding::STATUS_PROVISIONING,
+            'name' => $primary ? 'primary' : $connection,
+            'target_type' => 'server_database',
+            'target_id' => (string) $db->id,
+            'injected_env' => [],
+            'config' => array_filter([
+                'engine' => $engine,
+                'connection' => $primary ? '' : $connection,
+                'database_name' => (string) $db->name,
+                'connection_snippet' => $primary ? null : $this->databaseConnectionSnippet($db, $connection),
+                'placement' => 'docker',
+            ], fn ($v) => $v !== null),
+            'last_error' => null,
+        ], $primary, $editingId);
+
+        ProvisionDockerDatabaseJob::dispatch(
+            (string) $server->id,
+            (string) $site->id,
+            (string) $db->id,
+            (string) $binding->id,
+            userId: auth()->id() !== null ? (string) auth()->id() : null,
         );
 
         return $binding;
@@ -621,9 +700,14 @@ trait ManagesDatabaseBindings
             $config['connection_snippet'] = $this->databaseConnectionSnippet($db, $connection);
         }
 
+        $envOptions = [];
+        if (in_array($config['placement'] ?? '', ['docker', 'docker_vm'], true) && filled($config['host_port'] ?? null)) {
+            $envOptions['port'] = (string) $config['host_port'];
+        }
+
         $binding->forceFill([
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'injected_env' => $this->databaseEnv($db, $site, [], $connection),
+            'injected_env' => $this->databaseEnv($db, $site, $envOptions, $connection),
             'config' => $config,
             'last_error' => null,
         ])->save();
@@ -650,7 +734,7 @@ trait ManagesDatabaseBindings
      * {@see databaseConnectionSnippet()}). This mirrors how storage namespaces
      * named disks as AWS_<DISK>_*.
      *
-     * @param  array<string, mixed> $options
+     * @param  array<string, mixed>  $options
      * @return array<string, string>
      */
     private function databaseEnv(ServerDatabase $db, Site $site, array $options = [], string $connection = ''): array
@@ -679,10 +763,14 @@ trait ManagesDatabaseBindings
 
         $host = $this->effectiveDatabaseHost($db, $site);
         $driver = $this->databaseConnectionDriver((string) $db->engine);
+        $port = trim((string) ($options['port'] ?? ''));
+        if ($port === '') {
+            $port = (string) $db->defaultPort();
+        }
 
         $env = [
             $p.'HOST' => $host,
-            $p.'PORT' => (string) $db->defaultPort(),
+            $p.'PORT' => $port,
             $p.'DATABASE' => (string) $db->name,
             $p.'USERNAME' => (string) $db->username,
             $p.'PASSWORD' => (string) $db->password,

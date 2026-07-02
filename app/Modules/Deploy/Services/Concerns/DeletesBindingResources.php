@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Services\Servers\DockerDatabaseProvisioner;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
@@ -46,11 +47,36 @@ trait DeletesBindingResources
         }
 
         $cfg = is_array($binding->config) ? $binding->config : [];
-        $dbVmServerId = ($cfg['placement'] ?? '') === 'dedicated_vm'
+        $dbVmServerId = in_array($cfg['placement'] ?? '', ['dedicated_vm', 'docker_vm'], true)
             ? trim((string) ($cfg['db_vm_server_id'] ?? ''))
             : '';
 
         $db = ServerDatabase::query()->find($binding->target_id);
+
+        if (in_array($cfg['placement'] ?? '', ['docker', 'docker_vm'], true) && filled($cfg['docker_container'] ?? null)) {
+            $vmServer = $db?->server;
+            if ($vmServer instanceof Server) {
+                app(DockerDatabaseProvisioner::class)->destroy(
+                    $vmServer,
+                    (string) $cfg['docker_container'],
+                    (string) ($cfg['docker_volume'] ?? 'dply-db-'.$cfg['docker_container']),
+                );
+            }
+            $db?->delete();
+
+            if (($cfg['placement'] ?? '') === 'docker_vm' && $dbVmServerId !== '') {
+                $vmServer = Server::query()->find($dbVmServerId);
+                if ($vmServer instanceof Server) {
+                    app(DeleteServerAction::class)->execute(
+                        $vmServer,
+                        Auth::user(),
+                        ['reason' => 'binding_detach'],
+                    );
+                }
+            }
+
+            return;
+        }
 
         if ($db instanceof ServerDatabase) {
             if ($dbVmServerId !== '') {

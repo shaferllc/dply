@@ -593,7 +593,7 @@
                     </div>
 
                     {{-- Dedicated VM: a real server sized from the provider's catalog. --}}
-                    <div x-show="$wire.bindingForm.placement === 'dedicated_vm'" x-cloak>
+                    <div x-show="['dedicated_vm', 'docker_vm'].includes($wire.bindingForm.placement)" x-cloak>
                         <x-input-label for="binding_db_vm_size" :value="__('Server size')" />
                         <select id="binding_db_vm_size" wire:model="bindingForm.vm_size" class="dply-input">
                             @forelse ($dedicatedVmSizes as $s)
@@ -630,6 +630,8 @@
                     @endforeach
 
                     <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'on_box'">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'docker'" x-cloak>{{ __('Starts an isolated Docker container on this server, maps it to loopback, and injects the connection variables once the container is ready.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'docker_vm'" x-cloak>{{ __('Provisions a new Docker host on your connected provider (same region + private network), starts the database in a container, and attaches it once ready (several minutes). Redeploy to apply.') }}</p>
                     <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'managed'" x-cloak>{{ __('Provisions an isolated managed cluster co-located with this server, locks it to your server\'s network, and injects the connection variables once it\'s online (a few minutes). Redeploy to apply.') }}</p>
                     <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'dedicated_vm'" x-cloak>{{ __('Provisions a new server on your connected provider (same region + private network), installs the engine, and attaches the database once it\'s ready (several minutes). Redeploy to apply.') }}</p>
                 </div>

@@ -176,9 +176,12 @@ class SiteBinding extends Model
 
         return match ($this->type) {
             'database' => match ($this->target_type) {
-                'server_database' => ($this->config['placement'] ?? '') === 'dedicated_vm'
-                    ? __('Also destroy the dedicated database server')
-                    : __('Also drop this database on the server'),
+                'server_database' => match ($this->config['placement'] ?? '') {
+                    'dedicated_vm' => __('Also destroy the dedicated database server'),
+                    'docker_vm' => __('Also destroy the dedicated Docker database server'),
+                    'docker' => __('Also remove the Docker container and its volume'),
+                    default => __('Also drop this database on the server'),
+                },
                 'cloud_database' => $this->wasProvisionedByDply()
                     ? __('Also delete the managed database cluster')
                     : null,
@@ -195,9 +198,12 @@ class SiteBinding extends Model
     {
         return match ($this->type) {
             'database' => match ($this->target_type) {
-                'server_database' => ($this->config['placement'] ?? '') === 'dedicated_vm'
-                    ? __('Destroys the VM dply provisioned for this database and removes the database row. Cannot be undone.')
-                    : __('Runs DROP DATABASE on the server and removes the Dply row. Cannot be undone.'),
+                'server_database' => match ($this->config['placement'] ?? '') {
+                    'dedicated_vm' => __('Destroys the VM dply provisioned for this database and removes the database row. Cannot be undone.'),
+                    'docker_vm' => __('Stops the container, removes its volume, destroys the Docker host VM, and removes the database row. Cannot be undone.'),
+                    'docker' => __('Stops and removes the Docker container and its data volume. Cannot be undone.'),
+                    default => __('Runs DROP DATABASE on the server and removes the Dply row. Cannot be undone.'),
+                },
                 'cloud_database' => __('Tears down the managed cluster at the provider and removes the Dply record. Cannot be undone.'),
                 default => '',
             },

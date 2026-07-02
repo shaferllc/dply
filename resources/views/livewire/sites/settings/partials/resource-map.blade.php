@@ -512,6 +512,10 @@
                                 // minutes, then its connection vars land on the binding. They apply at
                                 // the next deploy, so a configured managed DB prompts a redeploy.
                                 $attached && ($cfg['managed'] ?? false) && $binding->status === 'provisioning' => __('Provisioning the managed cluster — this takes a few minutes.'),
+                                $attached && in_array($cfg['placement'] ?? '', ['docker', 'docker_vm'], true) && $binding->status === 'provisioning' => match ($cfg['placement'] ?? '') {
+                                    'docker_vm' => __('Provisioning the Docker database server and starting the container — this can take several minutes.'),
+                                    default => __('Starting the Docker database container — this usually takes under a minute.'),
+                                },
                                 $needsRedeploy => __('Connection ready — redeploy to apply the connection variables.'),
                                 $attached && $binding->status === 'configured' => __('Configured and ready.'),
                                 $attached && $binding->status === 'pending' => __('Attached, but not fully configured yet.'),
@@ -523,7 +527,7 @@
                             // badge deep-link to that server — servers.show redirects to the live
                             // provisioning journey while it's still coming up, then to the server
                             // workspace once it's ready.
-                            $dbVmServerId = ($cfg['placement'] ?? null) === 'dedicated_vm' ? ($cfg['db_vm_server_id'] ?? null) : null;
+                            $dbVmServerId = in_array($cfg['placement'] ?? null, ['dedicated_vm', 'docker_vm'], true) ? ($cfg['db_vm_server_id'] ?? null) : null;
                             $dbVmServerUrl = $attached && filled($dbVmServerId) ? route('servers.show', $dbVmServerId) : null;
                         @endphp
                         <div

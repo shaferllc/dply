@@ -20,8 +20,10 @@ use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
 use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
+use App\Modules\Database\Actions\CreateDedicatedDockerDatabaseVm;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Support\DedicatedDatabaseVm;
+use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Modules\Deploy\Services\LookoutProvisioner;
 use App\Modules\Deploy\Services\SiteBindingManager;
@@ -128,6 +130,23 @@ trait ManagesSiteBindingActions
         $this->toastSuccess(__('Provisioning a dedicated database server — this can take several minutes.'));
     }
 
+    public function provisionDedicatedDockerDatabaseVm(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        try {
+            app(CreateDedicatedDockerDatabaseVm::class)->handle($this, $this->site, $this->bindingForm);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->toastSuccess(__('Provisioning a dedicated Docker database server — this can take several minutes.'));
+    }
+
     /**
      * Placement options for the "Provision new database" modal: always
      * on-box, plus a co-located managed cluster when the server's provider
@@ -153,6 +172,17 @@ trait ManagesSiteBindingActions
         if ($server === null) {
             return $options;
         }
+
+        $options[] = [
+            'key' => 'docker',
+            'label' => __('Docker container on this server'),
+            'sublabel' => __('Isolated · uses Docker Engine'),
+            'available' => $server->dockerEnginePresent(),
+            'note' => $server->dockerEnginePresent()
+                ? null
+                : __('Install Docker from Server → Manage → Tools first.'),
+            'engines' => DockerDatabase::supportedEngines(),
+        ];
 
         // Co-located managed cluster — only when the server's provider offers
         // one (DO / Vultr). Hetzner & co. skip this card but still get the
@@ -197,6 +227,17 @@ trait ManagesSiteBindingActions
                 'available' => $sizesReady,
                 'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
                 'engines' => DedicatedDatabaseVm::supportedEngines(),
+            ];
+            $options[] = [
+                'key' => 'docker_vm',
+                'label' => __('Dedicated Docker database server'),
+                'sublabel' => implode(' · ', array_filter([
+                    (string) $server->region,
+                    __('new :provider VM · Docker container', ['provider' => $server->provider->label()]),
+                ])),
+                'available' => $sizesReady,
+                'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
+                'engines' => DockerDatabase::supportedEngines(),
             ];
         }
 
@@ -324,6 +365,14 @@ trait ManagesSiteBindingActions
             && $this->bindingModalMode === 'provision'
             && ($this->bindingForm['placement'] ?? '') === 'dedicated_vm') {
             $this->provisionDedicatedDatabaseVm();
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'database'
+            && $this->bindingModalMode === 'provision'
+            && ($this->bindingForm['placement'] ?? '') === 'docker_vm') {
+            $this->provisionDedicatedDockerDatabaseVm();
 
             return;
         }
