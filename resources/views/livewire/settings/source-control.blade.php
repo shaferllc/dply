@@ -238,6 +238,19 @@
                                     </div>
                                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
                                         <span>{{ __('Added :time', ['time' => $account->created_at?->diffForHumans() ?? '—']) }}</span>
+                                        {{-- Health stamped by the daily credential check — OAuth
+                                             tokens die exactly like PATs; the fix is a reconnect. --}}
+                                        @if ($account->validation_error)
+                                            <span class="text-brand-mist">·</span>
+                                            <span class="font-medium text-rose-600">{{ __('Rejected by the provider (:error) — reconnect this account', ['error' => $account->validation_error]) }}</span>
+                                        @elseif ($account->expires_at && $account->expires_at->lte(now()->addDays(7)))
+                                            <span class="text-brand-mist">·</span>
+                                            <span class="font-medium {{ $account->expires_at->isPast() ? 'text-rose-600' : 'text-amber-700' }}">
+                                                {{ $account->expires_at->isPast()
+                                                    ? __('Expired :time — reconnect this account', ['time' => $account->expires_at->diffForHumans()])
+                                                    : __('Expires :time', ['time' => $account->expires_at->diffForHumans()]) }}
+                                            </span>
+                                        @endif
                                         @if ($count > 0)
                                             <span class="text-brand-mist">·</span>
                                             <a href="{{ route('sites.index') }}" wire:navigate class="font-semibold text-brand-sage hover:text-brand-ink">{{ trans_choice(':n site|:n sites', $count, ['n' => $count]) }}</a>
@@ -332,6 +345,17 @@
                                         </button>
                                         <button type="button" wire:click="cancelEditPat" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                                     @else
+                                        {{-- Re-runs the daily token health probe on demand, restamping
+                                             last_validated_at / expires_at / validation_error. --}}
+                                        <button type="button"
+                                            wire:click="validatePat('{{ $pat->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="validatePat('{{ $pat->id }}')"
+                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-progress disabled:opacity-60">
+                                            <x-heroicon-o-shield-check class="h-4 w-4 shrink-0" wire:loading.remove wire:target="validatePat('{{ $pat->id }}')" aria-hidden="true" />
+                                            <span wire:loading wire:target="validatePat('{{ $pat->id }}')" class="inline-flex h-4 w-4 shrink-0 items-center justify-center"><x-spinner size="sm" /></span>
+                                            {{ __('Validate') }}
+                                        </button>
                                         <button type="button" wire:click="startEditPat('{{ $pat->id }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
                                             <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
@@ -362,7 +386,8 @@
         @endforelse
     </div>
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- Inside the component root (NOT a layout <x-slot> — layout slots render
+         once at page load and never re-render on Livewire updates, so the modal
+         could never appear). The partial @teleports itself to <body>. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

@@ -84,12 +84,97 @@ class GitIdentityResolver
         $accountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
         if ($accountId !== '') {
             $identity = $this->forId($user, $accountId);
-            if ($identity instanceof GitIdentity && $identity->accessToken() !== '' && $identity->provider() === $provider) {
+            if ($identity instanceof GitIdentity && $identity->accessToken() !== '' && $identity->provider() === $provider
+                && ! $this->isKnownBad($identity)) {
                 return $identity;
             }
+            // The pinned token was rejected by the provider or has expired
+            // (stamped by the health check / deploy preflight) — fall through
+            // to the best available healthy identity instead of failing the
+            // deploy with a credential we already know is dead.
         }
 
         return $this->forUserProvider($user, $provider);
+    }
+
+    /**
+     * A token the provider has definitively rejected, or whose captured expiry
+     * has passed. OAuth accounts have no health stamps and are never "bad".
+     */
+    public function isKnownBad(GitIdentity $identity): bool
+    {
+        return $identity instanceof GitProviderToken
+            && (filled($identity->validation_error) || ($identity->expires_at?->isPast() ?? false));
+    }
+
+    /**
+     * Every usable identity for a site + provider, in the order deploy auth
+     * should try them: the operator-pinned identity first, then OAuth
+     * accounts, then PATs — healthy tokens (most recently validated first)
+     * ahead of known-rejected/expired ones, which stay as a last resort.
+     *
+     * @return list<GitIdentity>
+     */
+    public function candidatesForSite(Site $site, User $user, string $provider): array
+    {
+        $candidates = [];
+        $seen = [];
+        $push = function (?GitIdentity $identity) use (&$candidates, &$seen, $provider): void {
+            if ($identity === null || $identity->provider() !== $provider || $identity->accessToken() === '') {
+                return;
+            }
+            $key = get_class($identity).':'.$identity->getKey();
+            if (isset($seen[$key])) {
+                return;
+            }
+            $seen[$key] = true;
+            $candidates[] = $identity;
+        };
+
+        $accountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
+        if ($accountId !== '') {
+            $pinned = $this->forId($user, $accountId);
+            if ($pinned instanceof GitIdentity && ! $this->isKnownBad($pinned)) {
+                $push($pinned);
+            }
+        }
+
+        foreach (SocialAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('provider', $provider)
+            ->whereNotNull('access_token')
+            ->where('access_token', '!=', '')
+            ->orderBy('id')
+            ->get() as $oauth) {
+            $push($oauth);
+        }
+
+        foreach ($this->patsHealthyFirst($user, $provider) as $pat) {
+            $push($pat);
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * A user's PATs for a provider, healthy first (no rejection stamp, not
+     * expired; most recently validated wins), known-bad ones trailing.
+     *
+     * @return list<GitProviderToken>
+     */
+    private function patsHealthyFirst(User $user, string $provider): array
+    {
+        return GitProviderToken::query()
+            ->where('user_id', $user->getKey())
+            ->where('provider', $provider)
+            ->orderBy('id')
+            ->get()
+            ->sortBy([
+                fn (GitProviderToken $a, GitProviderToken $b) => $this->isKnownBad($a) <=> $this->isKnownBad($b),
+                fn (GitProviderToken $a, GitProviderToken $b) => ($b->last_validated_at?->getTimestamp() ?? 0) <=> ($a->last_validated_at?->getTimestamp() ?? 0),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -110,13 +195,13 @@ class GitIdentityResolver
             return $oauth;
         }
 
-        $pat = GitProviderToken::query()
-            ->where('user_id', $user->getKey())
-            ->where('provider', $provider)
-            ->orderBy('id')
-            ->first();
-        if ($pat instanceof GitIdentity && $pat->accessToken() !== '') {
-            return $pat;
+        // Healthy PATs first — a token the provider already rejected (or that
+        // expired) must not shadow a working one the user added later. A bad
+        // token is still returned when it's ALL there is (last resort).
+        foreach ($this->patsHealthyFirst($user, $provider) as $pat) {
+            if ($pat->accessToken() !== '') {
+                return $pat;
+            }
         }
 
         return null;

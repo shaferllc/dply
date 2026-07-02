@@ -11,12 +11,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $access_token
+ * @property ?\Illuminate\Support\Carbon $expires_at
  * @property string $label
+ * @property ?\Illuminate\Support\Carbon $last_validated_at
  * @property string $nickname
  * @property string $provider
  * @property ?string $provider_id
  * @property string $refresh_token
  * @property ?string $user_id
+ * @property ?string $validation_error
  * @property-read ?User $user
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
@@ -34,12 +37,24 @@ class SocialAccount extends Model implements GitIdentity
         'nickname',
         'access_token',
         'refresh_token',
+        'last_validated_at',
+        'expires_at',
+        'validation_error',
     ];
 
     protected $hidden = [
         'access_token',
         'refresh_token',
     ];
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'last_validated_at' => 'datetime',
+            'expires_at' => 'datetime',
+        ];
+    }
 
     /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo

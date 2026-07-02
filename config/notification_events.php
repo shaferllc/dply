@@ -24,6 +24,14 @@ return [
                 'server.provision_failed' => 'Server provisioning failed (action required)',
             ],
         ],
+        'source_control' => [
+            'label' => 'Source control notifications',
+            'events' => [
+                // Account-scoped (routed to the credential's owner directly,
+                // not via a server/site subscription target).
+                'account.git_token.unhealthy' => 'Git credential expired or rejected (action required)',
+            ],
+        ],
         'system_user' => [
             'label' => 'System user notifications',
             'events' => [

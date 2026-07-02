@@ -135,7 +135,23 @@ trait ManagesSiteRepositoryConfig
             audit_log($org, auth()->user(), 'site.repository_updated', $this->site, $oldRepoSnapshot, array_intersect_key($updates, $oldRepoSnapshot));
         }
         $this->toastSuccess('Git settings saved.');
+        $this->warnIfRepositoryUnreachable();
         $this->syncFormFromSite();
+    }
+
+    /**
+     * Instant feedback on save: the same control-plane ls-remote the deploy
+     * preflight runs (no SSH — a short git process on the worker/web box).
+     * Non-blocking — the settings still save; a dead credential or missing
+     * branch surfaces as a warning toast HERE instead of at the next deploy.
+     */
+    private function warnIfRepositoryUnreachable(): void
+    {
+        $error = app(\App\Modules\Deploy\Services\DeployRepoPreflight::class)->check($this->site->fresh());
+        if ($error !== null) {
+            $firstLine = trim((string) strtok($error, "\n"));
+            $this->toastError(__('Saved, but the repository check failed: :reason', ['reason' => \Illuminate\Support\Str::limit($firstLine, 180)]));
+        }
     }
 
     public function saveRepositoryWorkspace(): void
@@ -179,6 +195,7 @@ trait ManagesSiteRepositoryConfig
         ]);
         $this->site->save();
         $this->toastSuccess(__('Repository settings saved.'));
+        $this->warnIfRepositoryUnreachable();
         $this->syncFormFromSite();
     }
 

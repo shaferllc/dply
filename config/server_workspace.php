@@ -29,8 +29,10 @@ return [
     */
     'nav' => [
         ['key' => 'cluster', 'route' => 'servers.cluster', 'icon' => 'server-stack', 'label' => 'Cluster', 'group' => 'overview', 'only_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cluster'],
-        ['key' => 'console', 'route' => 'servers.console', 'preview_route' => 'servers.console-preview', 'icon' => 'command-line', 'label' => 'Console', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.console', 'preview_feature' => 'workspace.console_preview'],
+        // Overview leads its group — it's the workspace landing page; Console
+        // (feature-gated / "Soon" preview) must not sit above it.
         ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Overview', 'group' => 'overview', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'console', 'route' => 'servers.console', 'preview_route' => 'servers.console-preview', 'icon' => 'command-line', 'label' => 'Console', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.console', 'preview_feature' => 'workspace.console_preview'],
         ['key' => 'run', 'route' => 'servers.run', 'preview_route' => 'servers.run-preview', 'icon' => 'play-circle', 'label' => 'Run', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.run', 'preview_feature' => 'workspace.run_preview'],
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites', 'group' => 'overview'],
         // monitor — standalone items (Deploys, Errors) lead, then the cluster

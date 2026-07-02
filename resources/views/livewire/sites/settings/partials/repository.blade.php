@@ -75,6 +75,39 @@
                             </select>
                             <x-input-error :messages="$errors->get('git_source_control_account_id')" class="mt-1" />
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Only accounts matching the selected provider are listed.') }}</p>
+
+                            {{-- Credential health for the identity THIS SITE deploys
+                                 with (stamped by the daily check) — a dead token is
+                                 shown where the repo is configured, not just at the
+                                 next failed deploy. --}}
+                            @php
+                                $repoIdentity = null;
+                                try {
+                                    $repoIdentity = $this->site->user
+                                        ? app(\App\Modules\SourceControl\Services\GitIdentityResolver::class)->forSite($this->site, $this->site->user, $git_provider_kind)
+                                        : null;
+                                } catch (\Throwable) {
+                                    $repoIdentity = null;
+                                }
+                                $repoIdentityError = $repoIdentity->validation_error ?? null;
+                                $repoIdentityExpiry = $repoIdentity->expires_at ?? null;
+                                $repoIdentityExpiring = $repoIdentityExpiry !== null && $repoIdentityExpiry->lte(now()->addDays(7));
+                            @endphp
+                            @if ($repoIdentity && ($repoIdentityError || $repoIdentityExpiring))
+                                <div class="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                    <x-heroicon-m-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                                    <p class="text-xs leading-relaxed text-amber-900">
+                                        @if ($repoIdentityError)
+                                            {{ __('This site deploys with :label, which the provider is rejecting (:error). Deploys will fail at clone until it is fixed.', ['label' => $repoIdentity->displayLabel(), 'error' => $repoIdentityError]) }}
+                                        @elseif ($repoIdentityExpiry->isPast())
+                                            {{ __('This site deploys with :label, which expired :time. Deploys will fail at clone until it is fixed.', ['label' => $repoIdentity->displayLabel(), 'time' => $repoIdentityExpiry->diffForHumans()]) }}
+                                        @else
+                                            {{ __('This site deploys with :label, which expires :time.', ['label' => $repoIdentity->displayLabel(), 'time' => $repoIdentityExpiry->diffForHumans()]) }}
+                                        @endif
+                                        <a href="{{ route('profile.source-control') }}" wire:navigate class="font-semibold underline hover:text-amber-950">{{ __('Fix it in Source control settings') }}</a>
+                                    </p>
+                                </div>
+                            @endif
                         </div>
                     @endif
                 </div>

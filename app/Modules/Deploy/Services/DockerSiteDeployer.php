@@ -2,6 +2,7 @@
 
 namespace App\Modules\Deploy\Services;
 
+use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRelease;
@@ -72,6 +73,21 @@ final class DockerSiteDeployer
         $this->hookRunner->assertHooksSucceeded($log, 'clone');
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
+
+        // SSH exec doesn't surface exit codes, so a failed clone (dead token,
+        // missing branch, bad URL) would otherwise sail into the docker build
+        // and fail there with a misleading error. No commit = no checkout —
+        // fail HERE, carrying the clone output so the cause is in the log.
+        if ($sha === '') {
+            $hint = str_contains($log, 'could not read Username')
+                ? ' The repository appears to be private — use an SSH URL (git@github.com:org/repo.git) and add a deploy key.'
+                : ' Check the repository URL, branch ('.$branch.'), and deploy key.';
+            throw new \RuntimeException(
+                'Deploy failed: no Git checkout at '.$path.' after clone.'.$hint
+                ."\n\n".$log
+            );
+        }
+
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'after_clone');
 
@@ -126,14 +142,14 @@ final class DockerSiteDeployer
         SiteRelease::query()->create([
             'site_id' => $site->id,
             'folder' => $releaseFolder,
-            'git_sha' => $sha !== '' ? $sha : null,
+            'git_sha' => $sha,
             'is_active' => true,
         ]);
         $log .= $this->pruneImages($ssh, $site);
 
         return [
             'output' => $log,
-            'sha' => $sha !== '' ? $sha : null,
+            'sha' => $sha,
             'compose_yaml' => $compose,
             'dockerfile' => $dockerfile,
             'release_folder' => $releaseFolder,
@@ -151,7 +167,7 @@ final class DockerSiteDeployer
      * Keep the newest N image tags for this site, remove the rest so the host
      * doesn't fill with old layers. Best-effort — never fails a healthy deploy.
      */
-    private function pruneImages($ssh, Site $site): string
+    private function pruneImages(RemoteShell $ssh, Site $site): string
     {
         $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));
         $repo = escapeshellarg($this->imageRepo($site));

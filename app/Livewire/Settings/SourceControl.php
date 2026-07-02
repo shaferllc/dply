@@ -5,9 +5,11 @@ namespace App\Livewire\Settings;
 use App\Actions\Auth\UnlinkSocialAccount;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesGitProviderTokens;
 use App\Models\GitProviderToken;
 use App\Models\SocialAccount;
+use App\Modules\SourceControl\Services\GitProviderTokenHealth;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -16,6 +18,7 @@ use Livewire\Component;
 class SourceControl extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
     use ManagesGitProviderTokens;
 
     public ?string $editingId = null;
@@ -29,6 +32,7 @@ class SourceControl extends Component
     /** New token value to swap in for the one being edited (optional). */
     public string $editPatToken = '';
 
+    /** @return list<array<string, mixed>> */
     public function getProvidersProperty(): array
     {
         $enabled = OAuthController::getEnabledProviders();
@@ -205,6 +209,29 @@ class SourceControl extends Component
         $this->editingPatId = null;
         $this->editPatLabel = '';
         $this->editPatToken = '';
+    }
+
+    /**
+     * On-demand re-check of a stored PAT against its provider — the same probe
+     * the daily token health check runs, so it stamps last_validated_at,
+     * expires_at, and validation_error on the row and the list re-renders
+     * with the fresh state.
+     */
+    public function validatePat(string $patId, GitProviderTokenHealth $health): void
+    {
+        $pat = GitProviderToken::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($patId);
+
+        $result = $health->refresh($pat);
+
+        if ($result === true) {
+            $this->toastSuccess(__('Token is valid — the provider accepted it.'));
+        } elseif ($result === false) {
+            $this->toastError(__('The provider rejected this token — replace it.'));
+        } else {
+            $this->toastError(__('Could not reach the provider to validate right now — try again shortly.'));
+        }
     }
 
     public function unlinkPat(string $patId): void

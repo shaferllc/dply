@@ -52,8 +52,10 @@ parameters:
         #   - TaskRunCommand: same problem with a `--quiet` option.
         #   - DebounceDecorator: dispatches App\Jobs\ExecuteDebouncedAction,
         #     a class that does not exist anywhere in the codebase.
-        - app/Console/Commands/SecretsRestoreCommand.php
-        - app/TaskRunner/Commands/TaskRunCommand.php
+        # (?) = optional: these two were removed/moved by later work; keep the
+        # exclusions harmless whether or not the files exist.
+        - app/Console/Commands/SecretsRestoreCommand.php (?)
+        - app/TaskRunner/Commands/TaskRunCommand.php (?)
         - app/Actions/Decorators/DebounceDecorator.php
 
         # Demo/example scripts that extend base classes which don't exist in the

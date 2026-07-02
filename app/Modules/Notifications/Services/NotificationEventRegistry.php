@@ -33,6 +33,9 @@ class NotificationEventRegistry
                 'supports_email' => str_starts_with($eventKey, 'import.migration.')
                     || str_starts_with($eventKey, 'site.uptime.')
                     || str_starts_with($eventKey, 'server.logs.')
+                    // A dead/expiring Git credential is action-required: every
+                    // deploy using it fails at clone until it's replaced.
+                    || str_starts_with($eventKey, 'account.git_token.')
                     || $eventKey === 'site.ssl.expiring',
                 'supports_webhook' => true,
             ];
@@ -68,6 +71,7 @@ class NotificationEventRegistry
     protected function severityFor(string $eventKey): string
     {
         if (str_contains($eventKey, 'monitor')
+            || str_starts_with($eventKey, 'account.git_token.')
             || str_contains($eventKey, 'uptime')
             || str_contains($eventKey, '.ssl.')
             || str_contains($eventKey, 'alerts')

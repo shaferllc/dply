@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\SourceControl\Services;
 
 use App\Models\GitProviderToken;
+use App\Models\SocialAccount;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -28,7 +29,7 @@ class GitProviderTokenHealth
      * Validate and stamp. Returns true when the token is healthy, false when
      * the provider rejected it, null when validation couldn't run (network).
      */
-    public function refresh(GitProviderToken $token): ?bool
+    public function refresh(GitProviderToken|SocialAccount $token): ?bool
     {
         $accessToken = $token->accessToken();
         if ($accessToken === '') {
@@ -57,7 +58,7 @@ class GitProviderTokenHealth
         }
     }
 
-    private function refreshGithub(GitProviderToken $token, string $base, string $accessToken): bool
+    private function refreshGithub(GitProviderToken|SocialAccount $token, string $base, string $accessToken): bool
     {
         $request = Http::withToken($accessToken)->acceptJson()->withHeaders([
             'User-Agent' => 'Dply (token-health)',
@@ -83,7 +84,7 @@ class GitProviderTokenHealth
         return false;
     }
 
-    private function refreshGitlab(GitProviderToken $token, string $base, string $accessToken): bool
+    private function refreshGitlab(GitProviderToken|SocialAccount $token, string $base, string $accessToken): bool
     {
         $response = Http::withToken($accessToken)->acceptJson()
             ->get($base.'/api/v4/personal_access_tokens/self');
@@ -113,7 +114,7 @@ class GitProviderTokenHealth
         return false;
     }
 
-    private function refreshSimple(GitProviderToken $token, string $url, string $accessToken): bool
+    private function refreshSimple(GitProviderToken|SocialAccount $token, string $url, string $accessToken): bool
     {
         $response = Http::withToken($accessToken)->acceptJson()->get($url);
 
@@ -143,7 +144,7 @@ class GitProviderTokenHealth
         }
     }
 
-    private function stampHealthy(GitProviderToken $token, ?Carbon $expiresAt): void
+    private function stampHealthy(GitProviderToken|SocialAccount $token, ?Carbon $expiresAt): void
     {
         $token->update([
             'last_validated_at' => now(),
@@ -154,7 +155,7 @@ class GitProviderTokenHealth
         ]);
     }
 
-    private function stampRejected(GitProviderToken $token, Response $response): void
+    private function stampRejected(GitProviderToken|SocialAccount $token, Response $response): void
     {
         $body = $response->json();
         $message = is_array($body) ? (string) ($body['message'] ?? $body['error'] ?? '') : '';

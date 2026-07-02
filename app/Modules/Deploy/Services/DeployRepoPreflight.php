@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services;
 
+use App\Models\GitProviderToken;
 use App\Models\Site;
+use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\SourceControl\Services\GitProviderTokenHealth;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -33,9 +36,17 @@ class DeployRepoPreflight
      */
     private const TRANSIENT_PATTERN = '/Could not resolve host|Connection timed out|Failed to connect to|Connection reset by peer|early EOF|RPC failed|The remote end hung up unexpectedly|GnuTLS recv error|SSL_read|Operation timed out/i';
 
+    /**
+     * Definitive credential rejections (as opposed to repo-not-found or
+     * network trouble) — these make it worth retrying with ANOTHER stored
+     * identity for the same provider.
+     */
+    private const AUTH_PATTERN = '/Authentication failed|Invalid username or token|invalid credentials|could not read Username|HTTP Basic: Access denied|Support for password authentication was removed/i';
+
     public function __construct(
         private readonly GitIdentityResolver $identities,
         private readonly SourceControlRepositoryBrowser $browser,
+        private readonly GitProviderTokenHealth $tokenHealth,
     ) {}
 
     /**
@@ -69,42 +80,55 @@ class DeployRepoPreflight
                     .' -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null';
             }
 
-            $url = $this->resolveUrl($site, $repo, $privateKey !== '');
-
             [$refspec, $refLabel] = $this->refspecFor($site);
 
-            // `-c credential.helper=` disables ambient credential helpers
-            // (e.g. an operator's keychain on a dev box) so the check tests
-            // the credential dply will actually deploy with, nothing else.
-            $args = ['git', '-c', 'credential.helper=', 'ls-remote', $url];
-            if ($refspec !== null) {
-                $args[] = $refspec;
+            // Token-authenticated HTTPS repos get EVERY stored identity for
+            // the provider as a candidate (pinned first, healthy tokens ahead
+            // of known-bad ones). A credential the host rejects is marked via
+            // the token-health prober — so the list page shows "Rejected" and
+            // the resolver stops picking it — and the next identity is tried.
+            $provider = $this->providerFor($site, $repo, $privateKey !== '');
+            $candidates = ($provider !== '' && $site->user !== null)
+                ? $this->identities->candidatesForSite($site, $site->user, $provider)
+                : [];
+
+            if ($candidates === []) {
+                // Deploy key / public / non-token path: single bare attempt.
+                return $this->attempt($site, $repo, $repo, $refspec, $refLabel, $env);
             }
 
-            $process = new Process($args, null, $env, null, self::TIMEOUT_SECONDS);
-            $process->run();
+            $rejected = 0;
+            $lastError = null;
+            foreach ($candidates as $identity) {
+                $url = $this->browser->authenticatedCloneUrl($identity, $repo);
+                $error = $this->attempt($site, $repo, $url, $refspec, $refLabel, $env);
+                if ($error === null) {
+                    // A fallback identity worked after earlier rejections —
+                    // re-pin the site to it so the deployer (which re-resolves
+                    // the identity itself) uses the credential that just
+                    // passed, not the one the host rejected.
+                    if ($rejected > 0) {
+                        $this->pinIdentity($site, $identity);
+                    }
 
-            $output = trim($process->getOutput()."\n".$process->getErrorOutput());
-
-            if (! $process->isSuccessful()) {
-                if (preg_match(self::TRANSIENT_PATTERN, $output) === 1) {
                     return null;
                 }
+                if (preg_match(self::AUTH_PATTERN, $error) !== 1) {
+                    // Repo/branch problem, not this credential — cycling
+                    // identities won't change the answer.
+                    return $error;
+                }
 
-                return 'Repository preflight failed — the Git host rejected the connection, so the deploy was aborted before touching the server.'
-                    ."\n\n".$output;
+                $rejected++;
+                $this->markRejected($identity);
+                $lastError = $error;
             }
 
-            if ($refspec !== null && trim($process->getOutput()) === '') {
-                return sprintf(
-                    "%s '%s' was not found on the remote repository (%s). It may have been renamed or deleted — update the branch on the site's repository settings, then re-deploy.",
-                    ucfirst($refLabel),
-                    $site->git_branch,
-                    $this->redactedRepo($repo),
-                );
-            }
-
-            return null;
+            return $lastError."\n\n".trans_choice(
+                '{1}The stored Git identity for :provider was rejected and has been marked — replace it under Settings → Source control.|[2,*]All :count stored Git identities for :provider were rejected and have been marked — replace them under Settings → Source control.',
+                $rejected,
+                ['count' => $rejected, 'provider' => $provider],
+            );
         } catch (\Throwable $e) {
             // Environment problem (no git binary, tmp not writable, timeout…)
             // — never block the deploy on the preflight's own failure.
@@ -118,13 +142,57 @@ class DeployRepoPreflight
         }
     }
 
-    /** The clone URL with the same credential the deployers will use. */
-    private function resolveUrl(Site $site, string $repo, bool $hasDeployKey): string
+    /**
+     * One `git ls-remote` attempt against a candidate URL. Returns the
+     * blocking error string, or null when reachable / transient-skip.
+     *
+     * @param  array<string, string>  $env
+     */
+    private function attempt(Site $site, string $repo, string $url, ?string $refspec, ?string $refLabel, array $env): ?string
     {
-        // Mirrors AtomicSiteDeployer: a deploy key wins; otherwise inject the
-        // stored token for HTTPS URLs so a private repo authenticates.
+        // `-c credential.helper=` disables ambient credential helpers
+        // (e.g. an operator's keychain on a dev box) so the check tests
+        // the credential dply will actually deploy with, nothing else.
+        $args = ['git', '-c', 'credential.helper=', 'ls-remote', $url];
+        if ($refspec !== null) {
+            $args[] = $refspec;
+        }
+
+        $process = new Process($args, null, $env, null, self::TIMEOUT_SECONDS);
+        $process->run();
+
+        $output = trim($process->getOutput()."\n".$process->getErrorOutput());
+
+        if (! $process->isSuccessful()) {
+            if (preg_match(self::TRANSIENT_PATTERN, $output) === 1) {
+                return null;
+            }
+
+            return 'Repository preflight failed — the Git host rejected the connection, so the deploy was aborted before touching the server.'
+                ."\n\n".$output;
+        }
+
+        if ($refspec !== null && trim($process->getOutput()) === '') {
+            return sprintf(
+                "%s '%s' was not found on the remote repository (%s). It may have been renamed or deleted — update the branch on the site's repository settings, then re-deploy.",
+                ucfirst($refLabel),
+                $site->git_branch,
+                $this->redactedRepo($repo),
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * The token provider for this repo, or '' when the deploy doesn't
+     * authenticate with a stored token (deploy key, public, non-HTTP).
+     * Mirrors AtomicSiteDeployer: a deploy key wins.
+     */
+    private function providerFor(Site $site, string $repo, bool $hasDeployKey): string
+    {
         if ($hasDeployKey || $site->user === null || ! str_starts_with($repo, 'http')) {
-            return $repo;
+            return '';
         }
 
         $provider = (string) ($site->repositoryMeta()['git_provider_kind'] ?? '');
@@ -136,16 +204,50 @@ class DeployRepoPreflight
                 default => '',
             };
         }
-        if ($provider === '') {
-            return $repo;
+
+        return $provider;
+    }
+
+    /**
+     * Stamp a host-rejected identity so the tokens page shows it and the
+     * resolver stops preferring it. Both kinds go through the health prober
+     * (which asks the provider and records validation_error / expires_at) —
+     * PATs and OAuth accounts carry the same health columns.
+     */
+    private function markRejected(GitIdentity $identity): void
+    {
+        if ($identity instanceof GitProviderToken || $identity instanceof \App\Models\SocialAccount) {
+            try {
+                $this->tokenHealth->refresh($identity);
+            } catch (\Throwable $e) {
+                Log::info('Preflight identity health restamp failed', ['identity_id' => $identity->id(), 'error' => $e->getMessage()]);
+            }
+
+            return;
         }
 
-        $identity = $this->identities->forSite($site, $site->user, $provider);
-        if ($identity === null) {
-            return $repo;
-        }
+        Log::info('Deploy preflight: Git identity rejected by host', ['identity_id' => $identity->id()]);
+    }
 
-        return $this->browser->authenticatedCloneUrl($identity, $repo);
+    /**
+     * Point the site's repository meta at the identity that just passed
+     * preflight, so this deploy (and future ones) authenticate with it.
+     */
+    private function pinIdentity(Site $site, GitIdentity $identity): void
+    {
+        try {
+            $site->mergeRepositoryMeta(['git_source_control_account_id' => (string) $identity->id()]);
+            $site->save();
+
+            Log::info('Deploy preflight re-pinned the site to a working Git identity', [
+                'site_id' => $site->id,
+                'identity_id' => $identity->id(),
+            ]);
+        } catch (\Throwable $e) {
+            // Best-effort — the marked-rejected stamps alone already steer the
+            // resolver away from dead tokens for unpinned sites.
+            Log::warning('Deploy preflight could not re-pin the Git identity', ['site_id' => $site->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
