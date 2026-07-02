@@ -279,11 +279,31 @@
                                     </div>
                                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
                                         <span>{{ __('Added :time', ['time' => $pat->created_at?->diffForHumans() ?? '—']) }}</span>
+                                        @if ($pat->last_validated_at)
+                                            <span class="text-brand-mist">·</span>
+                                            {{-- Fine-grained GitHub PATs expire after 30 days by default —
+                                                 nudge before deploys start failing with auth errors. --}}
+                                            <span @class(['text-amber-700 font-medium' => $pat->last_validated_at->lt(now()->subDays(25))])>
+                                                {{ __('Validated :time', ['time' => $pat->last_validated_at->diffForHumans()]) }}
+                                                @if ($pat->last_validated_at->lt(now()->subDays(25)))
+                                                    — {{ __('may be expiring; replace it below if deploys fail to authenticate') }}
+                                                @endif
+                                            </span>
+                                        @endif
                                         @if ($pat->api_base_url)
                                             <span class="text-brand-mist">·</span>
                                             <span class="truncate font-mono">{{ $pat->api_base_url }}</span>
                                         @endif
                                     </p>
+                                    @if ($editingPatId === (string) $pat->id)
+                                        <div class="mt-2 max-w-md space-y-1">
+                                            <x-text-input wire:model="editPatToken" type="password" autocomplete="off" class="block w-full text-xs font-mono" placeholder="{{ __('Paste a new token to replace the stored one (optional)') }}" />
+                                            <p class="text-[11px] text-brand-mist">{{ __('Replacing here keeps every site that uses this token working — no re-linking needed.') }}</p>
+                                            @error('editPatToken')
+                                                <p class="text-[11px] font-medium text-rose-600">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="flex flex-wrap items-center justify-end gap-3">
                                     @if ($editingPatId === (string) $pat->id)

@@ -143,7 +143,7 @@ class SiteGitDeployer
         }
 
         $gitSsh = $privateKey
-            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o StrictHostKeyChecking=accept-new').' && '
+            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new').' && '
             : '';
 
         // For HTTPS repos with no deploy key, inject the stored OAuth/PAT token

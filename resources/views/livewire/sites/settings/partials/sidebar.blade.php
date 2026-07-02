@@ -46,9 +46,15 @@
                 {{ __('Back to sites') }}
             </a>
             <div class="flex items-start gap-3">
-                <x-entity-avatar :seed="$sidebarUrlSeed" :image="$site->logoUrl()" class="h-12 w-12 text-base" />
+                {{-- Avatar + pencil opens the logo edit menu in place (nested
+                     LogoMenu component, so it works from every workspace page). --}}
+                <livewire:sites.logo-menu :site="$site" avatar-class="h-12 w-12 text-base" :key="'sidebar-logo-menu-'.$site->id" />
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $sidebarPrimaryHostname }}</p>
+                    @php $sidebarTestingHostname = trim((string) $site->testingHostname()); @endphp
+                    @if ($sidebarTestingHostname !== '' && $sidebarTestingHostname !== $sidebarPrimaryHostname)
+                        <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist" title="{{ $sidebarTestingHostname }}">{{ $sidebarTestingHostname }}</p>
+                    @endif
                     @if ($server->workspace)
                         @feature('surface.projects')
                             <p class="mt-0.5 truncate text-xs text-brand-moss">
@@ -317,6 +323,16 @@
                 };
 
                 document.addEventListener('livewire:navigated', sync);
+                // A plain Livewire update (poll, action, state change) morphs the
+                // nav back to its server-rendered classes, wiping the highlight
+                // applied here — re-apply after every commit round-trip.
+                document.addEventListener('livewire:init', () => {
+                    if (window.Livewire?.hook) {
+                        window.Livewire.hook('commit', ({ succeed }) => {
+                            succeed(() => queueMicrotask(sync));
+                        });
+                    }
+                });
                 sync();
             })();
         </script>

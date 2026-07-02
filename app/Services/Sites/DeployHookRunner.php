@@ -72,7 +72,19 @@ class DeployHookRunner
         if (preg_match_all('/DPLY_HOOK_EXIT:(\d+)/', $output, $m)) {
             foreach ($m[1] as $code) {
                 if ((int) $code !== 0) {
-                    throw new \RuntimeException("Deploy hook failed ({$label}). Check output for non-zero exit.");
+                    // Carry the hook's own output in the exception: on throw this
+                    // message becomes the deployment's log_output, so without it
+                    // the failure surfaces everywhere as a bare one-liner with
+                    // the actual error discarded.
+                    $tail = trim($output);
+                    if (mb_strlen($tail) > 1500) {
+                        $tail = '…'.mb_substr($tail, -1500);
+                    }
+
+                    throw new \RuntimeException(
+                        "Deploy hook failed ({$label}) with a non-zero exit."
+                        .($tail !== '' ? "\n\n".$tail : '')
+                    );
                 }
             }
         }

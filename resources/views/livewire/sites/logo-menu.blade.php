@@ -1,16 +1,12 @@
 {{--
-    Compact site-logo widget — rendered as the Overview card's header badge on
-    the General tab (replaces the old full-width "Site logo" card, which made
-    the logo the first thing on the page). The avatar doubles as the control:
-    click it to open a small menu with Upload / Pull favicon / Remove.
-
-    Lives inside the same Livewire component scope as the tab (relies on the
-    ManagesSiteLogo trait: site_logo_upload, pullSiteLogoFromFavicon,
-    removeSiteLogo).
+    Site-logo avatar + edit menu (LogoMenu component). The avatar doubles as
+    the control: an always-visible corner pencil, click opens a small menu with
+    Upload / Pull favicon / Remove. Rendered in the workspace sidebar and the
+    General tab's Overview header.
 --}}
 @php
-    // Seed for the gradient + initials fallback (mirrors the sidebar avatar) so
-    // the preview matches what renders when no custom logo is set.
+    // Seed for the gradient + initials fallback (mirrors list rows) so the
+    // preview matches what renders when no custom logo is set.
     $logoSeed = (string) (optional($site->primaryDomain())->hostname ?: $site->name ?: $site->id);
     $canEditLogo = auth()->user()?->can('update', $site);
     // Re-open the menu after an action round-trip so the flash feedback is seen.
@@ -23,9 +19,8 @@
     class="relative shrink-0"
 >
     @if ($canEditLogo)
-        {{-- inline-flex so the button hugs the 44px avatar exactly (a block
-             button picks up inline-image baseline gaps and stray width, which
-             strands the corner badge outside the image). --}}
+        {{-- inline-flex so the button hugs the avatar exactly (a block button
+             picks up inline-image baseline gaps, stranding the corner badge). --}}
         <button
             type="button"
             x-on:click="open = ! open"
@@ -34,7 +29,7 @@
             aria-haspopup="true"
             x-bind:aria-expanded="open"
         >
-            <x-entity-avatar :seed="$logoSeed" :image="$site->logoUrl()" class="h-11 w-11 text-base" />
+            <x-entity-avatar :seed="$logoSeed" :image="$site->logoUrl()" :class="$avatarClass" />
             {{-- Always-visible pencil pinned to the avatar's lower-right corner
                  so the logo reads as editable at a glance. --}}
             <span class="absolute bottom-0 right-0 flex h-4 w-4 translate-x-1/4 translate-y-1/4 items-center justify-center rounded-full bg-brand-ink/70 text-white shadow-sm ring-1 ring-white/60 transition group-hover:bg-brand-ink">
@@ -46,7 +41,7 @@
             x-show="open"
             x-cloak
             x-transition.origin.top.left
-            class="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 shadow-lg"
+            class="absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-brand-ink/10 bg-white p-3 shadow-lg"
         >
             @if (session('logo_status'))
                 <div class="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">{{ session('logo_status') }}</div>
@@ -97,6 +92,6 @@
             </p>
         </div>
     @else
-        <x-entity-avatar :seed="$logoSeed" :image="$site->logoUrl()" class="h-11 w-11 text-base" />
+        <x-entity-avatar :seed="$logoSeed" :image="$site->logoUrl()" :class="$avatarClass" />
     @endif
 </div>

@@ -26,6 +26,9 @@ class SourceControl extends Component
 
     public string $editPatLabel = '';
 
+    /** New token value to swap in for the one being edited (optional). */
+    public string $editPatToken = '';
+
     public function getProvidersProperty(): array
     {
         $enabled = OAuthController::getEnabledProviders();
@@ -137,6 +140,8 @@ class SourceControl extends Component
             ->findOrFail($patId);
         $this->editingPatId = $pat->getKey();
         $this->editPatLabel = (string) ($pat->label ?? '');
+        $this->editPatToken = '';
+        $this->resetErrorBag('editPatToken');
         $this->cancelEdit();
         $this->cancelAddPat();
     }
@@ -145,6 +150,7 @@ class SourceControl extends Component
     {
         $this->validate([
             'editPatLabel' => ['nullable', 'string', 'max:255'],
+            'editPatToken' => ['nullable', 'string', 'min:8', 'max:1024'],
         ]);
 
         if ($this->editingPatId === null) {
@@ -155,9 +161,32 @@ class SourceControl extends Component
             ->where('user_id', auth()->id())
             ->findOrFail($this->editingPatId);
 
-        $pat->update([
+        $data = [
             'label' => $this->editPatLabel === '' ? null : $this->editPatLabel,
-        ]);
+        ];
+
+        // Replace-in-place: swapping the token value on the existing row keeps
+        // every site pointing at this token working (sites reference it by id
+        // via git_source_control_account_id) — unlike remove + re-add, which
+        // breaks that linkage. Validate against the provider first so a typo'd
+        // token never silently replaces a working one.
+        $newToken = trim($this->editPatToken);
+        if ($newToken !== '') {
+            $base = $this->resolveGitProviderBaseUrl($pat->provider, (string) ($pat->api_base_url ?? ''));
+            $result = $this->fetchGitProviderProfile($pat->provider, $base, $newToken);
+            if ($result['profile'] === null) {
+                $this->addError('editPatToken', $this->describePatRejection($pat->provider, $result));
+
+                return;
+            }
+
+            $data['access_token'] = $newToken;
+            $data['provider_id'] = $result['profile']['id'] !== '' ? $result['profile']['id'] : $pat->provider_id;
+            $data['nickname'] = $result['profile']['nickname'] !== '' ? $result['profile']['nickname'] : $pat->nickname;
+            $data['last_validated_at'] = now();
+        }
+
+        $pat->update($data);
 
         $this->cancelEditPat();
     }
@@ -166,6 +195,7 @@ class SourceControl extends Component
     {
         $this->editingPatId = null;
         $this->editPatLabel = '';
+        $this->editPatToken = '';
     }
 
     public function unlinkPat(string $patId): void

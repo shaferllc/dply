@@ -87,7 +87,15 @@
                             $rem = $event->dismissed_at ? null : $event->remediation();
                             $recAction = $rem ? (collect($rem['actions'])->firstWhere('recommended', true) ?? ($rem['actions'][0] ?? null)) : null;
                         @endphp
-                        @if ($rem && $recAction)
+                        @if ($rem && $recAction && ! empty($recAction['route']))
+                            {{-- Link action: the fix lives on another page (e.g. an expired
+                                 Git token), not in an SSH script — navigate, don't dispatch. --}}
+                            <a href="{{ route($recAction['route']) }}" wire:navigate
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
+                                title="{{ $rem['title'] }}">
+                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" /> {{ $recAction['label'] }}
+                            </a>
+                        @elseif ($rem && $recAction)
                             <button type="button"
                                 wire:click="openConfirmActionModal('applyRemediation', ['{{ $event->id }}'], @js($rem['title']), @js($rem['explanation']), @js($recAction['label']), false, @js([
                                     ['label' => __('Action'), 'value' => $recAction['label'], 'multiline' => true],

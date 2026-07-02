@@ -60,7 +60,7 @@ final class DockerSiteDeployer
         }
 
         $gitSsh = $privateKey
-            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o StrictHostKeyChecking=accept-new').' && '
+            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new').' && '
             : '';
 
         $log .= $ssh->exec(sprintf('mkdir -p %s', $pathEsc), 60);

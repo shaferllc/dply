@@ -11,6 +11,10 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
+            {{-- No hero on General: its Overview card opens with the site avatar
+                 + domain identity, so a "Site workspace / General" banner above
+                 it was pure repetition. Other sections keep the hero. --}}
+            @if ($section !== 'general')
             <x-hero-card
                 :eyebrow="$workspaceTitle"
                 :title="$sectionHeader['title']"
@@ -31,8 +35,9 @@
                     </span>
                 @endif
             </x-hero-card>
+            @endif
 
-            <main class="min-w-0 space-y-6 mt-8">
+            <main @class(['min-w-0 space-y-6', 'mt-8' => $section !== 'general'])>
                 @if ($watchedConsoleRunId)
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
                 @endif

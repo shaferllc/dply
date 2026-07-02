@@ -62,7 +62,7 @@
      to be a full-width card above this one. --}}
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        @include('livewire.sites.settings.partials.logo')
+        <livewire:sites.logo-menu :site="$site" :key="'overview-logo-menu-'.$site->id" />
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overview') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
@@ -72,89 +72,88 @@
         </div>
     </div>
 
-    <div class="px-6 py-6 sm:px-7">
-        @if ($testingHostname !== '')
-            @php
-                $testingUrl = 'http://'.$testingHostname;
-            @endphp
-            <div
-                x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($testingUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
-                class="mb-5 rounded-xl border border-brand-ink/10 bg-white p-4"
-            >
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
-                <div class="mt-2 flex min-w-0 items-center gap-1.5 font-mono text-sm text-brand-ink">
-                    <span
-                        class="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap"
-                        title="{{ $testingUrl }}"
-                    >{{ $testingHostname }}</span>
-                    <a
-                        href="{{ $testingUrl }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="{{ __('Open URL') }}"
-                        class="shrink-0 text-brand-mist hover:text-brand-sage"
-                    >
-                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
+    {{-- Compact fact grid: joined hairline tiles (gap-px trick — the tinted
+         wrapper shows through 1px gaps as the grid lines), two per row, label
+         over value. The long testing URL spans the full width; boolean states
+         render as tinted pills. Mirrors the server hero facts card. --}}
+    <div class="px-6 py-5 sm:px-7">
+        <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-ink/[0.06] sm:grid-cols-2">
+            @if ($testingHostname !== '')
+                @php $testingUrl = 'http://'.$testingHostname; @endphp
+                <div
+                    x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($testingUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
+                    class="bg-white px-4 py-3 sm:col-span-2"
+                >
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</dt>
+                    <dd class="mt-1 flex min-w-0 items-center gap-1.5">
+                        <a href="{{ $testingUrl }}" target="_blank" rel="noopener noreferrer"
+                            class="min-w-0 truncate font-mono text-sm text-brand-ink underline decoration-brand-ink/15 underline-offset-2 hover:text-brand-forest hover:decoration-brand-sage"
+                            title="{{ $testingUrl }}">{{ $testingHostname }}</a>
+                        <a href="{{ $testingUrl }}" target="_blank" rel="noopener noreferrer" title="{{ __('Open URL') }}" class="shrink-0 rounded-md p-1 text-brand-mist transition hover:bg-brand-sand/50 hover:text-brand-ink">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
+                        </a>
+                        <button type="button" x-on:click.stop="copy()" :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'" class="shrink-0 rounded-md p-1 text-brand-mist transition hover:bg-brand-sand/50 hover:text-brand-ink">
+                            <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
+                            <x-heroicon-s-check x-show="copied" x-cloak class="h-4 w-4 text-brand-sage" aria-hidden="true" />
+                        </button>
+                    </dd>
+                </div>
+            @endif
+
+            @unless ($site->isHeadless())
+                <div class="group bg-white px-4 py-3">
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $primaryHostnameLabel }}</dt>
+                    <dd class="mt-1 flex min-w-0 items-center gap-1.5">
+                        <span class="min-w-0 truncate font-mono text-sm font-medium text-brand-ink" title="{{ $settings_primary_domain }}">{{ $settings_primary_domain !== '' ? $settings_primary_domain : '—' }}</span>
+                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate
+                            title="{{ __('Edit in Routing') }}" class="shrink-0 rounded-md p-1 text-brand-mist opacity-60 transition hover:bg-brand-sand/50 hover:text-brand-ink group-hover:opacity-100">
+                            <x-heroicon-o-pencil-square class="h-4 w-4" aria-hidden="true" />
+                        </a>
+                    </dd>
+                </div>
+            @endunless
+
+            <div class="group bg-white px-4 py-3">
+                <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $documentRootLabel }}</dt>
+                <dd class="mt-1 flex min-w-0 items-center gap-1.5">
+                    <span class="min-w-0 truncate font-mono text-sm font-medium text-brand-ink" title="{{ $settings_document_root }}">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</span>
+                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate
+                        title="{{ __('Edit in Settings') }}" class="shrink-0 rounded-md p-1 text-brand-mist opacity-60 transition hover:bg-brand-sand/50 hover:text-brand-ink group-hover:opacity-100">
+                        <x-heroicon-o-pencil-square class="h-4 w-4" aria-hidden="true" />
                     </a>
-                    <button
-                        type="button"
-                        x-on:click.stop="copy()"
-                        :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
-                        class="shrink-0 text-brand-mist hover:text-brand-sage"
-                    >
-                        <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
-                        <x-heroicon-s-check x-show="copied" x-cloak class="h-4 w-4 text-brand-sage" aria-hidden="true" />
-                    </button>
-                </div>
+                </dd>
             </div>
-        @endif
-        <div class="grid gap-5">
-                @unless ($site->isHeadless())
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $primaryHostnameLabel }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_primary_domain !== '' ? $settings_primary_domain : '—' }}</span>
-                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
-                            <x-heroicon-o-pencil-square class="h-3 w-3" />
-                            {{ __('Edit in Routing') }}
-                        </a>
-                    </div>
-                </div>
-                @endunless
 
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $documentRootLabel }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</span>
-                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
-                            <x-heroicon-o-pencil-square class="h-3 w-3" />
-                            {{ __('Edit in Settings') }}
-                        </a>
-                    </div>
+            @php
+                // Half-width tiles rendered above the cards (domain + web dir);
+                // used to span the final card across both columns when the
+                // overall tile count is odd, so the grid never ends on a hole.
+                $overviewTileOffset = ($site->isHeadless() ? 0 : 1) + 1;
+            @endphp
+            @foreach ($summaryCards as $card)
+                @php
+                    $cardValue = trim((string) $card['value']);
+                    $cardValueLower = strtolower($cardValue);
+                    $cardIsPositive = \Illuminate\Support\Str::contains($cardValueLower, ['active', 'enabled', 'running', 'ready', 'healthy', 'published']);
+                    $cardIsNegative = \Illuminate\Support\Str::contains($cardValueLower, ['disabled', 'failed', 'inactive', 'error', 'down', 'not ', 'never', 'unhealthy']);
+                    $cardIsPath = \Illuminate\Support\Str::startsWith($cardValue, '/');
+                @endphp
+                <div class="bg-white px-4 py-3 @if ($loop->last && ($overviewTileOffset + $loop->iteration) % 2 !== 0) sm:col-span-2 @endif">
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $card['label'] }}</dt>
+                    <dd class="mt-1 flex min-w-0 items-center">
+                        @if ($cardIsPositive || $cardIsNegative)
+                            <span class="inline-flex min-w-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $cardIsNegative ? 'bg-rose-50 text-rose-800 ring-rose-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200' }}">
+                                <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $cardIsNegative ? 'bg-rose-500' : 'bg-emerald-500' }}" aria-hidden="true"></span>
+                                <span class="truncate">{{ $cardValue }}</span>
+                            </span>
+                        @else
+                            <span class="min-w-0 truncate {{ $cardIsPath ? 'font-mono' : '' }} text-sm font-medium text-brand-ink" title="{{ $cardValue }}">{{ $cardValue !== '' ? $cardValue : '—' }}</span>
+                        @endif
+                    </dd>
                 </div>
-
-                <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    @foreach ($summaryCards as $card)
-                        @php
-                            $cardValue = trim((string) $card['value']);
-                            $cardValueLower = strtolower($cardValue);
-                            $cardIsPositive = \Illuminate\Support\Str::contains($cardValueLower, ['active', 'enabled', 'running', 'ready', 'healthy', 'published']);
-                            $cardIsNegative = \Illuminate\Support\Str::contains($cardValueLower, ['disabled', 'failed', 'inactive', 'error', 'down', 'not ', 'never', 'unhealthy']);
-                            $cardIsPath = \Illuminate\Support\Str::startsWith($cardValue, '/');
-                        @endphp
-                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm">
-                            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $card['label'] }}</dt>
-                            <dd class="mt-1.5 flex items-center gap-2">
-                                @if ($cardIsPositive || $cardIsNegative)
-                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full {{ $cardIsNegative ? 'bg-rose-500' : 'bg-emerald-500' }} ring-4 {{ $cardIsNegative ? 'ring-rose-500/15' : 'ring-emerald-500/15' }}" aria-hidden="true"></span>
-                                @endif
-                                <span class="break-all {{ $cardIsPath ? 'font-mono text-xs' : 'text-sm' }} font-semibold text-brand-ink">{{ $cardValue !== '' ? $cardValue : '—' }}</span>
-                            </dd>
-                        </div>
-                    @endforeach
-                </dl>
-            </div>
-        </div>
+            @endforeach
+        </dl>
+    </div>
 </section>
 
 <section class="dply-card overflow-hidden">

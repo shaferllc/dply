@@ -44,6 +44,26 @@ return [
         'actions' => [],
     ],
 
+    // Git host rejected dply's credentials during clone/fetch. Not an SSH-script
+    // fix — the credential lives on the operator's dply account, so the single
+    // action is a LINK to Settings → Source control where the token can be
+    // replaced in place (see the `route` action key rendered by the panel).
+    // "Repository not found" is included: GitHub answers that for private repos
+    // when auth is bad/expired, indistinguishable from a genuinely wrong URL.
+    'git_auth_failed' => [
+        'signature' => '/Invalid username or token|Support for password authentication was removed|could not read Username for|fatal: Authentication failed|Authentication failed for|Permission denied \(publickey\)|remote: Repository not found|ERROR: Repository not found|HTTP Basic: Access denied/i',
+        'title' => 'Git authentication failed — dply could not access the repository',
+        'explanation' => 'The Git host rejected dply’s stored credentials for this repository. Most often the connected token has expired or been revoked (GitHub fine-grained tokens expire after 30 days by default); it can also mean the deploy key was removed or the account lost access to the repo. Replace the token under Settings → Source control, then re-deploy.',
+        'actions' => [
+            [
+                'key' => 'open_source_control_settings',
+                'label' => 'Update Git credentials',
+                'recommended' => true,
+                'route' => 'profile.source-control',
+            ],
+        ],
+    ],
+
     'php_ext_redis_missing' => [
         'signature' => '/Class ["\']Redis["\'] not found|PhpRedisConnector\.php/i',
         'title' => 'PHP Redis extension (phpredis) is missing',
