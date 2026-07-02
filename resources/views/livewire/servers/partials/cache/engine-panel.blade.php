@@ -411,6 +411,23 @@
                                 <p class="{{ $groupLabel }}">{{ __('Lifecycle') }}</p>
                                 <div class="{{ $groupButtons }}">
                                     @if ($lifecycleAvailable)
+                                        {{-- Failed rows (typically "not installed" — no systemd unit
+                                             found by Recheck) get Reinstall as the primary action.
+                                             installCacheService() already re-runs on a FAILED row;
+                                             this button just surfaces that path on the card instead
+                                             of making the operator force-remove and hunt for the
+                                             Install button. --}}
+                                        @if ($row->status === \App\Models\ServerCacheService::STATUS_FAILED)
+                                            <button
+                                                type="button"
+                                                wire:click="openConfirmActionModal('installCacheService', ['{{ $engine }}'], @js(__('Reinstall :engine?', ['engine' => $engineLabels[$engine]])), @js(__('Re-runs the full install on this server (apt install, systemctl enable, verify ping). Existing config and data directories on the box are left in place. This row will track the new install\'s progress.')), @js(__('Reinstall')), true)"
+                                                class="{{ $btnLifecycle }}"
+                                                title="{{ __('Run the install again — use this when the engine never actually landed on the box.') }}"
+                                            >
+                                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
+                                                {{ __('Reinstall') }}
+                                            </button>
+                                        @endif
                                         <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="{{ $btnLifecycle }}">
                                             <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>

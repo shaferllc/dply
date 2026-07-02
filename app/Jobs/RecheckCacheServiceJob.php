@@ -87,10 +87,24 @@ class RecheckCacheServiceJob implements ShouldQueue
                 $emit->warn('No PONG from '.$row->engine.' on port '.(int) $row->port.'.', 'cache');
 
                 $unitState = $capabilities->instanceUnitState($row->server, $row->engine);
-                if (in_array($unitState, ['not-found', 'inactive', 'failed'], true)) {
-                    $emit->step('cache', $unitState === 'not-found'
-                        ? sprintf('systemd has no unit for %s on this host — the package looks uninstalled or was removed out-of-band.', $row->engine)
-                        : sprintf('systemd reports the %s unit as %s.', $row->engine, $unitState));
+                if ($unitState === 'not-found') {
+                    // No systemd unit under ANY of the engine's candidate names means the
+                    // engine isn't installed — "Stopped" would offer Start/Restart buttons
+                    // for a daemon that doesn't exist. FAILED tells the truth, surfaces the
+                    // message on the card, and unlocks "Force remove row" (which refuses
+                    // running/stopped rows) so the operator can clear the phantom row.
+                    $emit->warn(sprintf('systemd has no unit for %s on this host — the engine is not installed (the original install likely failed, or the package was removed out-of-band).', $row->engine), 'cache');
+
+                    if (in_array($row->status, [ServerCacheService::STATUS_RUNNING, ServerCacheService::STATUS_STOPPED], true)) {
+                        $row->update([
+                            'status' => ServerCacheService::STATUS_FAILED,
+                            'error_message' => sprintf('%s is not installed on this host: no systemd unit found. The original install likely failed silently, or the package was removed outside dply. Click "Reinstall" to run the install again, or "Force remove row" to clear this entry without touching the server.', ucfirst($row->engine)),
+                            'version' => null,
+                        ]);
+                        $emit->step('cache', 'Row marked failed (not installed) — click "Reinstall" to run the install again, or "Force remove row" to clear it.');
+                    }
+                } elseif (in_array($unitState, ['inactive', 'failed'], true)) {
+                    $emit->step('cache', sprintf('systemd reports the %s unit as %s.', $row->engine, $unitState));
 
                     if ($row->status === ServerCacheService::STATUS_RUNNING) {
                         $row->update(['status' => ServerCacheService::STATUS_STOPPED]);
