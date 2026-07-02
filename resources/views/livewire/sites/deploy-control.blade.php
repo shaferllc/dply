@@ -229,6 +229,56 @@
                                 @endforeach
                             </ol>
 
+                            {{-- Failure cause + recognized-failure notice. A deploy that
+                                 dies BEFORE the first phase records (clone/auth/connection)
+                                 leaves every phase gray — without this block the drawer
+                                 shows "failed" with no reason anywhere. --}}
+                            @if ($latest->status === 'failed')
+                                @php
+                                    $anyPhaseFailed = collect($phases)->contains(fn ($p) => ($p['status'] ?? null) === 'failed');
+                                    $failTail = trim((string) $latest->log_output);
+                                    if (mb_strlen($failTail) > 900) {
+                                        $failTail = '…'.mb_substr($failTail, -900);
+                                    }
+                                    $stepText = collect($phases)->flatMap(fn ($p) => collect($p['steps'] ?? [])->pluck('output'))->filter()->implode(' ');
+                                    $drawerRem = app(\App\Modules\Remediations\Services\RemediationCatalog::class)->match($failTail.' '.$stepText);
+                                @endphp
+                                @unless ($anyPhaseFailed)
+                                    <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+                                        <p class="text-xs font-semibold text-rose-800">{{ __('Deploy failed before the first phase started — usually the initial clone or the connection to the server.') }}</p>
+                                        @if ($failTail !== '')
+                                            <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
+                                        @endif
+                                    </div>
+                                @endunless
+                                @if ($drawerRem && empty($drawerRem['guided']))
+                                    <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                        <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                                            <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
+                                            {{ __('dply recognized this failure') }}
+                                        </p>
+                                        <p class="mt-1 text-sm font-semibold text-brand-ink">{{ $drawerRem['title'] }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $drawerRem['explanation'] }}</p>
+                                        @php $drawerLinkActions = collect($drawerRem['actions'] ?? [])->filter(fn ($a) => ! empty($a['route'])); @endphp
+                                        <div class="mt-2 flex flex-wrap gap-2">
+                                            @foreach ($drawerLinkActions as $action)
+                                                <a href="{{ route($action['route']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                                                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    {{ $action['label'] }}
+                                                </a>
+                                            @endforeach
+                                            @if ($drawerLinkActions->isEmpty() && ($drawerRem['actions'] ?? []) !== [])
+                                                {{-- Script-backed fixes are applied from the full deploy page. --}}
+                                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $latest]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                                                    <x-heroicon-o-wrench class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    {{ __('Open the fix') }}
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+                            @endif
+
                             @include('livewire.sites.partials._deploy-fixers', [
                                 'latest' => $latest,
                                 'phases' => $phases,

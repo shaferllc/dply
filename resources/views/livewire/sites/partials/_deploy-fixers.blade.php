@@ -19,6 +19,10 @@
                 }
             }
         }
+        // Pre-phase failures (clone/auth/connection) record nothing in any
+        // step — their cause lives only in log_output. Include it so fixers
+        // can still be detected for deploys that died before the timeline.
+        $failOutput .= ' '.(string) $latest->log_output;
         $alreadyRun = $this->completedFixerKeys;
         $deployFixers = collect(\App\Support\Sites\SiteFixers::detect($failOutput))
             ->reject(fn ($fx) => in_array($fx['key'], $alreadyRun, true))

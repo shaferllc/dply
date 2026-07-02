@@ -37,27 +37,18 @@
             </x-hero-card>
             @endif
 
-            <main @class(['min-w-0 space-y-6', 'mt-8' => $section !== 'general'])>
-                @if ($watchedConsoleRunId)
-                    <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
-                @endif
+            {{-- Outside <main>: it's invisible, and space-y-6 counts hidden
+                 elements as siblings — inside, it gave the first visible card a
+                 phantom top margin the sidebar column doesn't have. --}}
+            @if ($watchedConsoleRunId)
+                <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
+            @endif
 
-                @if ($sectionConsoleActionKinds !== [])
-                    <div
-                        id="site-console-action-banner"
-                        x-data="{}"
-                        x-on:dply-console-action-focus.window="$nextTick(() => {
-                            const el = document.getElementById('site-console-action-banner');
-                            if (el) {
-                                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                        })"
-                    >
-                        @include('livewire.partials.console-action-banner-static', [
-                            'run' => $sectionConsoleActionRun,
-                            'kindLabels' => (array) config('console_actions.kinds', []),
-                        ])
-                    </div>
+            <main @class(['min-w-0 space-y-6', 'mt-8' => $section !== 'general'])>
+                {{-- On General the banner renders inside general-tab, AFTER the
+                     Overview card, so the site identity stays first on the page. --}}
+                @if ($section !== 'general')
+                    @include('livewire.sites.settings.partials._console-action-banner')
                 @endif
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
@@ -72,6 +63,11 @@
 
                         @if (! $isContainerWorkspace)
                             @include('livewire.sites.settings.partials.general-tab')
+                        @else
+                            {{-- general-tab (which carries the banner below its
+                                 Overview card) is skipped for container
+                                 workspaces — render the banner here instead. --}}
+                            @include('livewire.sites.settings.partials._console-action-banner')
                         @endif
 
                         @if ($generalRecentDeployments->isNotEmpty())
@@ -79,6 +75,19 @@
                                 @include('livewire.sites.partials.recent-deployments', ['deployments' => $generalRecentDeployments])
                             </div>
                         @endif
+
+                        {{-- Always the last thing on the General page — after
+                             recent deployments, not baked into the tab partial. --}}
+                        @unless ($isContainerWorkspace)
+                            <x-cli-snippet :commands="[
+                                ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
+                                ['label' => __('Diagnose site'), 'command' => 'dply sites:doctor '.$site->slug],
+                                ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
+                                ['label' => __('Export full config'), 'command' => 'dply sites:export:config '.$site->slug.' --to=site.json'],
+                                ['label' => __('Export deploy manifest'), 'command' => 'dply sites:export:manifest '.$site->slug.' --to=manifest.json'],
+                                ['label' => __('List all sites'), 'command' => 'dply sites:list'],
+                            ]" />
+                        @endunless
                     @elseif ($section === 'settings')
                         @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')

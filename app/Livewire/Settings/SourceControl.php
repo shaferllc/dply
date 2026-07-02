@@ -184,9 +184,18 @@ class SourceControl extends Component
             $data['provider_id'] = $result['profile']['id'] !== '' ? $result['profile']['id'] : $pat->provider_id;
             $data['nickname'] = $result['profile']['nickname'] !== '' ? $result['profile']['nickname'] : $pat->nickname;
             $data['last_validated_at'] = now();
+            // The old token's expiry/health no longer applies to the new value.
+            $data['expires_at'] = null;
+            $data['validation_error'] = null;
         }
 
         $pat->update($data);
+
+        if ($newToken !== '') {
+            // Capture the replacement's real expiry immediately (GitHub sends
+            // it in a response header) so the expiring-soon warning stays live.
+            app(\App\Modules\SourceControl\Services\GitProviderTokenHealth::class)->refresh($pat);
+        }
 
         $this->cancelEditPat();
     }

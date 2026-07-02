@@ -62,7 +62,7 @@ trait ManagesGitProviderTokens
             return;
         }
 
-        GitProviderToken::create([
+        $created = GitProviderToken::create([
             'user_id' => auth()->id(),
             'provider' => $provider,
             'provider_id' => $result['profile']['id'],
@@ -72,6 +72,10 @@ trait ManagesGitProviderTokens
             'api_base_url' => trim($this->patApiBaseUrl) !== '' ? rtrim(trim($this->patApiBaseUrl), '/') : null,
             'last_validated_at' => now(),
         ]);
+
+        // Capture the provider's REAL expiry right away (GitHub reports it in
+        // a response header) so the expiring-soon warning works from day one.
+        app(\App\Modules\SourceControl\Services\GitProviderTokenHealth::class)->refresh($created);
 
         $this->cancelAddPat();
         $this->afterGitProviderTokenSaved($provider);

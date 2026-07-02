@@ -35,7 +35,12 @@
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</p>
             <div class="mt-1 flex items-center gap-2">
                 @if ($org->hasIcon())
-                    <img src="{{ $org->iconUrl() }}" alt="" class="h-6 w-6 shrink-0 rounded-md object-cover ring-1 ring-brand-ink/10" />
+                    {{-- onerror: never show the broken-image glyph when the stored
+                         icon file is gone — swap to the initials fallback beside it. --}}
+                    <img src="{{ $org->iconUrl() }}" alt=""
+                        onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='flex';"
+                        class="h-6 w-6 shrink-0 rounded-md object-cover ring-1 ring-brand-ink/10" />
+                    <span class="h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-moss/15 text-[0.625rem] font-semibold text-brand-moss ring-1 ring-brand-ink/10" style="display: none;" aria-hidden="true">{{ $org->initials() }}</span>
                 @else
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-moss/15 text-[0.625rem] font-semibold text-brand-moss ring-1 ring-brand-ink/10" aria-hidden="true">{{ $org->initials() }}</span>
                 @endif

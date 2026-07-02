@@ -13,9 +13,23 @@ use App\Models\SiteDeployPipeline;
  */
 final class PipelineAnchorScriptRunner
 {
+    /** Max clone attempts when the failure looks like a network blip. */
+    private const CLONE_NETWORK_RETRIES = 3;
+
+    /**
+     * Failure text that indicates the NETWORK, not the credentials or the
+     * repository — the only class of clone failure worth retrying.
+     */
+    private const TRANSIENT_NETWORK_PATTERN = '/Could not resolve host|Connection timed out|Failed to connect to|Connection reset by peer|early EOF|RPC failed|The remote end hung up unexpectedly|GnuTLS recv error|SSL_read/i';
+
     public function __construct(
         private readonly PipelineAnchorScriptExpander $expander,
     ) {}
+
+    private static function isTransientNetworkError(string $output): bool
+    {
+        return preg_match(self::TRANSIENT_NETWORK_PATTERN, $output) === 1;
+    }
 
     public function runClone(
         RemoteShell $ssh,
@@ -42,29 +56,47 @@ final class PipelineAnchorScriptRunner
         $isCommit = $refKind === 'commit';
 
         if ($atomic) {
-            $baseEsc = escapeshellarg(rtrim($site->effectiveRepositoryPath(), '/'));
             $log = "\n--- git clone (atomic) ---\n";
-            if ($isCommit) {
-                // Arbitrary SHAs need full history; --depth 1 --branch <sha>
-                // is not supported by hosts that don't allow reachable-SHA
-                // fetches. Clone the default ref, then checkout the SHA.
-                $log .= $ssh->exec(
-                    $gitSshPrefix.sprintf('git clone %s %s 2>&1', $repoEsc, $releaseEsc),
-                    600
-                );
-                $log .= "\n--- git checkout ---\n";
-                $log .= $ssh->exec(
-                    sprintf('cd %s && %s git checkout %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
-                    120
-                );
-            } else {
-                $log .= $ssh->exec(
-                    $gitSshPrefix.sprintf('git clone --depth 1 --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $releaseEsc),
-                    600
-                );
-            }
-            $hasGit = trim($ssh->exec(sprintf('test -d %s/.git && echo ok', $releaseEsc), 30));
-            if ($hasGit !== 'ok') {
+
+            // Bounded retry for NETWORK-shaped failures only (mirrors
+            // EdgeRepoCloner): a DNS blip or dropped transfer shouldn't fail
+            // the whole deploy. Auth/not-found rejections never match the
+            // transient pattern, so they still fail on the first attempt.
+            $attempt = 0;
+            $hasGit = false;
+            do {
+                $attempt++;
+                if ($attempt > 1) {
+                    $log .= sprintf("\n[dply] clone attempt %d/%d — retrying after a network error…\n", $attempt, self::CLONE_NETWORK_RETRIES);
+                    // Wipe the partial clone so git gets a clean target dir.
+                    $ssh->exec(sprintf('rm -rf %s', $releaseEsc), 120);
+                }
+
+                $attemptLog = '';
+                if ($isCommit) {
+                    // Arbitrary SHAs need full history; --depth 1 --branch <sha>
+                    // is not supported by hosts that don't allow reachable-SHA
+                    // fetches. Clone the default ref, then checkout the SHA.
+                    $attemptLog .= $ssh->exec(
+                        $gitSshPrefix.sprintf('git clone %s %s 2>&1', $repoEsc, $releaseEsc),
+                        600
+                    );
+                    $attemptLog .= "\n--- git checkout ---\n";
+                    $attemptLog .= $ssh->exec(
+                        sprintf('cd %s && %s git checkout %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
+                        120
+                    );
+                } else {
+                    $attemptLog .= $ssh->exec(
+                        $gitSshPrefix.sprintf('git clone --depth 1 --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $releaseEsc),
+                        600
+                    );
+                }
+                $log .= $attemptLog;
+                $hasGit = trim($ssh->exec(sprintf('test -d %s/.git && echo ok', $releaseEsc), 30)) === 'ok';
+            } while (! $hasGit && $attempt < self::CLONE_NETWORK_RETRIES && self::isTransientNetworkError($attemptLog));
+
+            if (! $hasGit) {
                 // Carry git's own stderr in the exception: this message becomes
                 // the deployment's log_output (the accumulated $log is discarded
                 // on throw), so without it every surface reads "Git clone

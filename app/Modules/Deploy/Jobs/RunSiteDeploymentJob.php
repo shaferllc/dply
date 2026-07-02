@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DeployEngineResolver;
+use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
@@ -244,6 +245,16 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // runtime. The Deploy panel turns this failure into a fill-in
                 // prompt.
                 $this->assertRequiredEnvPresent($this->site);
+
+                // Fail fast on a dead token / deleted repo / renamed branch —
+                // a control-plane ls-remote answers in seconds with git's own
+                // error, instead of burning a full engine run on the box. The
+                // preflight itself is conservative: network-shaped and
+                // environment failures skip it rather than block the deploy.
+                $preflightError = app(DeployRepoPreflight::class)->check($this->site);
+                if ($preflightError !== null) {
+                    throw new \RuntimeException($preflightError);
+                }
 
                 // Rolling/canary cutover on a multi-backend site fans the deploy
                 // out across backends (rolling = drain→deploy→re-add per box;

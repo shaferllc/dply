@@ -279,10 +279,29 @@
                                     </div>
                                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
                                         <span>{{ __('Added :time', ['time' => $pat->created_at?->diffForHumans() ?? '—']) }}</span>
-                                        @if ($pat->last_validated_at)
+                                        @if ($pat->validation_error)
                                             <span class="text-brand-mist">·</span>
-                                            {{-- Fine-grained GitHub PATs expire after 30 days by default —
-                                                 nudge before deploys start failing with auth errors. --}}
+                                            <span class="font-medium text-rose-600">
+                                                {{ __('Rejected by the provider (:error) — replace it below', ['error' => $pat->validation_error]) }}
+                                            </span>
+                                        @elseif ($pat->expires_at)
+                                            <span class="text-brand-mist">·</span>
+                                            {{-- Real expiry captured from the provider (GitHub reports it
+                                                 in a response header) by the daily token health check. --}}
+                                            <span @class([
+                                                'font-medium text-rose-600' => $pat->expires_at->isPast(),
+                                                'font-medium text-amber-700' => ! $pat->expires_at->isPast() && $pat->expires_at->lte(now()->addDays(7)),
+                                            ])>
+                                                @if ($pat->expires_at->isPast())
+                                                    {{ __('Expired :time — replace it below', ['time' => $pat->expires_at->diffForHumans()]) }}
+                                                @else
+                                                    {{ __('Expires :time', ['time' => $pat->expires_at->diffForHumans()]) }}
+                                                @endif
+                                            </span>
+                                        @elseif ($pat->last_validated_at)
+                                            <span class="text-brand-mist">·</span>
+                                            {{-- No known expiry — fall back to a staleness nudge: fine-grained
+                                                 GitHub PATs expire after 30 days by default. --}}
                                             <span @class(['text-amber-700 font-medium' => $pat->last_validated_at->lt(now()->subDays(25))])>
                                                 {{ __('Validated :time', ['time' => $pat->last_validated_at->diffForHumans()]) }}
                                                 @if ($pat->last_validated_at->lt(now()->subDays(25)))

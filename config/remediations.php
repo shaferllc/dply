@@ -64,6 +64,47 @@ return [
         ],
     ],
 
+    // The configured ref is gone from the remote — renamed default branch
+    // (master → main) being the classic. Also matches the deploy preflight's
+    // "was not found on the remote repository" fast-fail message.
+    'git_branch_missing' => [
+        'signature' => '/Remote branch .+ not found in upstream|couldn\'?t find remote ref|Could not find remote branch|was not found on the remote repository/i',
+        'title' => 'The configured branch no longer exists on the remote',
+        'explanation' => 'The Git host is reachable and dply authenticated, but the branch (or tag) this site deploys from is gone — usually renamed (e.g. master → main) or deleted. Update the branch on the site’s repository settings, then re-deploy.',
+        'actions' => [],
+    ],
+
+    'git_host_key_failed' => [
+        'signature' => '/Host key verification failed/i',
+        'title' => 'SSH host key verification failed during Git clone',
+        'explanation' => 'The server refused the Git host’s SSH fingerprint. This happens when the host key changed (host migration) or a stale known_hosts entry conflicts. dply clones with accept-new, so a conflicting stale entry on the box is the usual cause — clearing the Git host from the deploy user’s ~/.ssh/known_hosts resolves it.',
+        'actions' => [],
+    ],
+
+    'git_clone_dir_exists' => [
+        'signature' => '/destination path .+ already exists and is not an empty directory/i',
+        'title' => 'The clone target directory already has files in it',
+        'explanation' => 'Git refuses to clone into a non-empty directory — usually leftovers from an earlier failed deploy or a provisioning placeholder. Re-deploying mints a fresh release directory for atomic sites; for simple sites, clear the site directory’s stray files first.',
+        'actions' => [],
+    ],
+
+    'server_disk_full' => [
+        'signature' => '/No space left on device|Disk quota exceeded/i',
+        'title' => 'The server is out of disk space',
+        'explanation' => 'The operation failed because the disk is full. Free space from the server’s Hygiene tab (old releases, logs, apt caches, orphaned images are the usual suspects), then re-run.',
+        'actions' => [],
+    ],
+
+    // Network-shaped git failures: DNS, unreachable host, dropped transfers.
+    // These are usually transient — the clone path retries them automatically;
+    // reaching this remediation means the retries were exhausted.
+    'git_network_unreachable' => [
+        'signature' => '/Could not resolve host|Failed to connect to .+ port|The remote end hung up unexpectedly|early EOF|RPC failed/i',
+        'title' => 'The Git host could not be reached from the server',
+        'explanation' => 'The clone failed on network grounds (DNS, connectivity, or a dropped transfer), not credentials. dply already retried automatically. Check the server’s outbound connectivity / DNS and the Git host’s status page, then re-deploy.',
+        'actions' => [],
+    ],
+
     'php_ext_redis_missing' => [
         'signature' => '/Class ["\']Redis["\'] not found|PhpRedisConnector\.php/i',
         'title' => 'PHP Redis extension (phpredis) is missing',

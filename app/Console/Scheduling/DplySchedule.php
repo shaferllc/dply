@@ -6,6 +6,7 @@ namespace App\Console\Scheduling;
 
 use App\Console\Commands\CdnSyncMetricsCommand;
 use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
+use App\Console\Commands\CheckGitProviderTokensCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Modules\Cloud\Console\CloudPollStatusCommand;
 use App\Modules\Edge\Console\CollectEdgeUsageCommand;
@@ -112,6 +113,13 @@ final class DplySchedule
             ->dailyAt('03:25')
             ->withoutOverlapping()
             ->name('dispatch-release-hygiene-scans');
+
+        // Validate stored Git tokens + capture real expiry, and warn owners
+        // BEFORE an expired token starts failing deploys at clone time.
+        $schedule->command(CheckGitProviderTokensCommand::class)
+            ->dailyAt('03:35')
+            ->withoutOverlapping()
+            ->name('check-git-provider-tokens');
 
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()

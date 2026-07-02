@@ -17,28 +17,29 @@
      doesn't re-render. NOTE: @persist must wrap the card, NOT the <aside> — it
      compiles to a wrapping <div x-persist>, which would otherwise become the grid
      child and collapse the column to 1/12 width. --}}
-<aside class="ws-sidebar sm:col-span-3 mb-8 lg:mb-0"
+<aside class="ws-sidebar relative sm:col-span-3 mb-8 lg:mb-0"
     x-data="{
         copiedUrl: false,
     }"
     :class="{ 'ws-collapsed': $store.wsnav && $store.wsnav.collapsed }"
 >
+    {{-- Collapse / expand handle: a tab riding the sidebar's right edge (the
+         card itself is overflow-hidden, so the tab anchors to the <aside>). It
+         replaced a full-width header row that spent ~40px on one icon. State
+         lives in the global Alpine `wsnav` store (localStorage-persisted) and
+         also sets data-wsnav on <html> so the grid reclaims the column —
+         see the script below + app.css. Desktop-only, like collapse itself. --}}
+    <button type="button" @click="$store.wsnav && $store.wsnav.toggle()"
+        class="absolute -right-3.5 top-7 z-40 hidden h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-mist shadow-md transition hover:text-brand-ink hover:shadow-lg lg:flex"
+        :title="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'"
+        :aria-label="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'">
+        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="($store.wsnav && $store.wsnav.collapsed) ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L9.832 9.25H17.5a.75.75 0 010 1.5H9.832l2.938 2.96a.75.75 0 11-1.06 1.06l-4.25-4.25a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+        </svg>
+    </button>
+
     @persist('site-sidebar-'.$site->id)
     <div class="{{ $card }}">
-        {{-- Collapse / expand toggle (icon-rail mode). State lives in the global
-             Alpine `wsnav` store (localStorage-persisted) and also sets
-             data-wsnav on <html> so the workspace grid reclaims the column — see
-             the script below + app.css. --}}
-        <div class="ws-collapse-row flex items-center justify-end border-b border-brand-ink/10 p-1.5">
-            <button type="button" @click="$store.wsnav && $store.wsnav.toggle()"
-                class="inline-flex items-center justify-center rounded-md p-1.5 text-brand-mist transition-colors hover:bg-brand-sand/50 hover:text-brand-ink"
-                :title="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'"
-                :aria-label="($store.wsnav && $store.wsnav.collapsed) ? '{{ __('Expand sidebar') }}' : '{{ __('Collapse sidebar') }}'">
-                <svg class="h-4 w-4 transition-transform duration-200" :class="($store.wsnav && $store.wsnav.collapsed) ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L9.832 9.25H17.5a.75.75 0 010 1.5H9.832l2.938 2.96a.75.75 0 11-1.06 1.06l-4.25-4.25a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
-                </svg>
-            </button>
-        </div>
         <div class="ws-hide-collapsed border-b border-brand-ink/10 p-4 sm:p-5">
             <a href="{{ route('servers.sites', $server) }}" wire:navigate
                 class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">

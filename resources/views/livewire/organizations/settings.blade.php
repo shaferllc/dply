@@ -78,7 +78,14 @@
                     <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
                         <div class="shrink-0">
                             @if ($organization->iconUrl())
-                                <img src="{{ $organization->iconUrl() }}" alt="{{ $organization->name }}" class="h-16 w-16 rounded-2xl object-cover ring-1 ring-brand-ink/10 shadow-sm bg-white" />
+                                {{-- onerror: swap to the initials fallback if the stored
+                                     icon file is missing — never the broken-image glyph. --}}
+                                <img src="{{ $organization->iconUrl() }}" alt="{{ $organization->name }}"
+                                    onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='inline-flex';"
+                                    class="h-16 w-16 rounded-2xl object-cover ring-1 ring-brand-ink/10 shadow-sm bg-white" />
+                                <span class="h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-white text-lg font-semibold shadow-sm ring-1 ring-brand-ink/10" style="display: none; {{ $iconFallbackStyle }}">
+                                    {{ $organization->initials() }}
+                                </span>
                             @else
                                 <span class="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-white text-lg font-semibold shadow-sm ring-1 ring-brand-ink/10" style="{{ $iconFallbackStyle }}">
                                     {{ $organization->initials() }}
