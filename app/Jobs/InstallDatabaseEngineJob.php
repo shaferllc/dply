@@ -267,9 +267,13 @@ class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
 
     private function parseVersion(string $stdout): ?string
     {
-        $lines = array_filter(array_map('trim', explode("\n", $stdout)), fn ($l) => $l !== '');
-        $last = end($lines);
+        // Token-based extraction (shared with the cache-engine path) instead of
+        // "return the last line": clickhouse-client prints "ClickHouse client
+        // version 26.6.1.1193 (official build)." which overflowed the
+        // varchar(32) version column and failed the whole install job's final
+        // row update — AFTER the engine was already installed successfully.
+        $version = \App\Support\Servers\CacheServiceInstallScripts::parseVersionFromProbeOutput($stdout);
 
-        return is_string($last) ? Str::limit($last, 64, '') : null;
+        return $version !== null ? Str::limit($version, 32, '') : null;
     }
 }
