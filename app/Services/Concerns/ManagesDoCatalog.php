@@ -53,15 +53,39 @@ trait ManagesDoCatalog
             return $cached;
         }
 
-        $response = $this->request('get', $path);
-        $this->assertSuccess($response, 'list '.$primaryKey);
-        $data = $response->json();
-        $items = $data[$primaryKey] ?? $data['data'] ?? [];
-        $items = is_array($items) ? $items : [];
+        // DO paginates these lists (default per_page=20), and /sizes alone has
+        // 100+ plans — a single unpaginated GET silently dropped every size
+        // beyond the 20 cheapest (breaking catalog pricing and the create
+        // wizard's size picker for mid/large plans). Request the max page size
+        // and follow pages until the list is exhausted.
+        $items = [];
+        $page = 1;
+        do {
+            $response = $this->request('get', $path, ['per_page' => 200, 'page' => $page]);
+            $this->assertSuccess($response, 'list '.$primaryKey);
+            $data = $response->json();
+            $batch = $data[$primaryKey] ?? $data['data'] ?? [];
+            $batch = is_array($batch) ? $batch : [];
+            $items = array_merge($items, $batch);
+
+            $hasNext = filled($data['links']['pages']['next'] ?? null);
+            $page++;
+        } while ($hasNext && $batch !== [] && $page <= 10);
 
         Cache::put($cacheKey, $items, now()->addMinutes(10));
 
         return $items;
+    }
+
+    /**
+     * Drop the cached regions/sizes lists for this token — used by callers
+     * that miss a lookup (e.g. a just-resized plan) and need a fresh fetch
+     * before concluding the item doesn't exist.
+     */
+    public function forgetCatalogCaches(): void
+    {
+        Cache::forget('do_regions:'.sha1($this->token));
+        Cache::forget('do_sizes:'.sha1($this->token));
     }
 
     /**

@@ -81,6 +81,19 @@ class ServerProviderCostEstimator
             );
         }
 
+        // Price the machine as it is NOW: re-read the size from the provider
+        // first (best-effort), so a provider-side resize doesn't leave us
+        // pricing the slug the server was created with.
+        $specSync = app(ServerProviderSpecSync::class);
+        if ($specSync->supports($server)) {
+            try {
+                $specSync->sync($server);
+                $server->refresh();
+            } catch (\Throwable) {
+                // Lookup below still works off the stored slug.
+            }
+        }
+
         $base = match ($provider) {
             ServerProvider::DigitalOcean => $this->lookupDigitalOcean($server),
             ServerProvider::Hetzner => $this->lookupHetzner($server),
@@ -101,14 +114,25 @@ class ServerProviderCostEstimator
     /** @return array<string, mixed> */
     protected function lookupDigitalOcean(Server $server): array
     {
+        $do = new DigitalOceanService($server->providerCredential);
         $sizes = $this->cachedCatalog(
             $server,
             'digitalocean:sizes',
-            fn () => (new DigitalOceanService($server->providerCredential))->getSizes()
+            fn () => $do->getSizes()
         );
 
         $slug = (string) $server->size;
         $match = $this->findFirst($sizes, fn ($row) => ($row['slug'] ?? null) === $slug);
+
+        if ($match === null) {
+            // A miss on a live plan usually means a stale cached catalog (e.g.
+            // one captured before a resize, or before pagination was fixed).
+            // Bust both cache layers and refetch once before giving up.
+            $do->forgetCatalogCaches();
+            Cache::forget($this->catalogCacheKey($server, 'digitalocean:sizes'));
+            $sizes = $this->cachedCatalog($server, 'digitalocean:sizes', fn () => $do->getSizes());
+            $match = $this->findFirst($sizes, fn ($row) => ($row['slug'] ?? null) === $slug);
+        }
 
         if ($match === null) {
             throw new ProviderCostUnavailableException(
@@ -300,9 +324,12 @@ class ServerProviderCostEstimator
      */
     protected function cachedCatalog(Server $server, string $tag, callable $fetcher): mixed
     {
-        $key = sprintf('cost-estimator:%s:cred:%d', $tag, $server->providerCredential->id);
+        return Cache::remember($this->catalogCacheKey($server, $tag), self::CACHE_TTL_SECONDS, $fetcher);
+    }
 
-        return Cache::remember($key, self::CACHE_TTL_SECONDS, $fetcher);
+    protected function catalogCacheKey(Server $server, string $tag): string
+    {
+        return sprintf('cost-estimator:%s:cred:%d', $tag, $server->providerCredential->id);
     }
 
     /**
