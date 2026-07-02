@@ -55,6 +55,19 @@
                             @endforeach
                         </dl>
                     @endif
+
+                    @if (! empty($confirmActionModalToggleLabel))
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-3">
+                            <input type="checkbox" wire:model.live="confirmActionModalToggle"
+                                class="mt-0.5 h-4 w-4 shrink-0 rounded border-rose-300 text-rose-600 focus:ring-rose-500/40" />
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-rose-800">{{ $confirmActionModalToggleLabel }}</span>
+                                @if (! empty($confirmActionModalToggleHint))
+                                    <span class="mt-0.5 block text-xs leading-relaxed text-rose-700/90">{{ $confirmActionModalToggleHint }}</span>
+                                @endif
+                            </span>
+                        </label>
+                    @endif
                 </div>
 
                 <x-slot name="footer">

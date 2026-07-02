@@ -883,6 +883,12 @@
     {{-- Fix-unreachable modal (auto-fix in place / re-point for database & redis). --}}
     @include('livewire.sites.settings.partials.environment.fix-binding-modal')
 
+    {{-- Detach / destructive confirm. Property-driven ($showConfirmActionModal),
+         so it must render inside THIS component — the corner "Detach" button sets
+         the flag on ResourceMap, not on the parent Settings host. Without it the X
+         opened nothing. --}}
+    @include('livewire.partials.confirm-action-modal')
+
     @verbatim
         <style>
             [x-cloak] { display: none !important; }

@@ -501,7 +501,16 @@ trait ManagesSiteBindingActions
         }
     }
 
-    public function detachBinding(string $bindingId, SiteBindingManager $manager): void
+    /**
+     * Detach a binding. When $deleteResource is true AND dply provisioned the
+     * underlying resource, its infra is torn down too (managed cluster deleted,
+     * dedicated DB VM destroyed, on-box database dropped, provisioned bucket
+     * emptied). BYO/attached-existing resources the customer owns are never
+     * deleted — the flag is a no-op for them (see SiteBinding::provisionedResource()).
+     * The delete flag is supplied by the confirm modal's opt-in toggle, so it
+     * arrives as the trailing argument (no DI-typed parameter after it).
+     */
+    public function detachBinding(string $bindingId, bool $deleteResource = false): void
     {
         Gate::authorize('update', $this->site);
 
@@ -514,9 +523,18 @@ trait ManagesSiteBindingActions
             return;
         }
 
-        $manager->detach($binding);
+        try {
+            app(SiteBindingManager::class)->detach($binding, $deleteResource);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not delete the resource: :error', ['error' => $e->getMessage()]));
+
+            return;
+        }
+
         $this->site = $this->site->fresh() ?? $this->site;
-        $this->toastSuccess(__('Binding detached.'));
+        $this->toastSuccess($deleteResource && $binding->wasProvisionedByDply()
+            ? __('Binding detached and the resource is being deleted.')
+            : __('Binding detached.'));
     }
 
     /**
