@@ -216,6 +216,7 @@ class SwitchCacheServiceJob implements ShouldQueue
         // Step 2: install the NEW engine.
         try {
             $script = CacheServiceInstallScripts::installScript($newEngine).
+                "\necho ".CacheServiceInstallScripts::VERSION_PROBE_MARKER.
                 "\n".CacheServiceInstallScripts::versionProbeScript($newEngine);
 
             $bufferAcc .= "\n[dply] === Installing {$newEngine} ===\n";
@@ -236,7 +237,7 @@ class SwitchCacheServiceJob implements ShouldQueue
                     ?: 'Install command failed.');
             }
 
-            $version = $this->parseVersion($output->buffer);
+            $version = CacheServiceInstallScripts::parseVersionFromProbeOutput($output->buffer);
             $row->update([
                 'status' => ServerCacheService::STATUS_RUNNING,
                 'version' => $version,
@@ -301,11 +302,4 @@ class SwitchCacheServiceJob implements ShouldQueue
         ]);
     }
 
-    private function parseVersion(string $stdout): ?string
-    {
-        $lines = array_filter(array_map('trim', explode("\n", $stdout)), fn ($l) => $l !== '');
-        $last = end($lines);
-
-        return is_string($last) ? Str::limit($last, 64, '') : null;
-    }
 }

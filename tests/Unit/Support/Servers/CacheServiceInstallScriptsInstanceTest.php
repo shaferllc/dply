@@ -96,6 +96,44 @@ test('parse version walks back past unrelated trailing lines', function () {
     $buffer = "redis-cli 7.0.5\nWarning: something benign happened on stderr";
     expect(CacheServiceInstallScripts::parseVersionFromBuffer($buffer))->toBe('7.0.5');
 });
+test('parse version from probe output ignores everything before the marker', function () {
+    // Regression: the install job used to parse the ENTIRE install buffer, so with an
+    // empty probe (cli not on PATH) an apt byte count like "1607453" leaked into the
+    // version field. Content before the marker must never be considered.
+    $marker = CacheServiceInstallScripts::VERSION_PROBE_MARKER;
+
+    $buffer = "Fetched 1607453 B in 2s\nSetting up valkey (8.0.1) ...\n{$marker}\n";
+    expect(CacheServiceInstallScripts::parseVersionFromProbeOutput($buffer))->toBeNull();
+
+    $buffer = "Fetched 1607453 B in 2s\n{$marker}\nvalkey-cli 8.0.1\n";
+    expect(CacheServiceInstallScripts::parseVersionFromProbeOutput($buffer))->toBe('8.0.1');
+});
+test('parse version from probe output falls back to whole buffer without marker', function () {
+    expect(CacheServiceInstallScripts::parseVersionFromProbeOutput("redis-cli 7.0.5\n"))->toBe('7.0.5');
+});
+test('valkey and keydb version probes never fall back to redis-cli', function () {
+    // A redis-cli fallback reports a co-resident Redis version as the engine's own.
+    expect(CacheServiceInstallScripts::versionProbeScript('valkey'))->not->toContain('redis-cli');
+    expect(CacheServiceInstallScripts::versionProbeScript('keydb'))->not->toContain('redis-cli');
+});
+test('valkey and keydb install verification pings never fall back to redis-cli', function () {
+    // Same false positive at install time: Redis answering on the shared default port
+    // let a failed valkey/keydb start exit 0 and mark the row RUNNING.
+    expect(CacheServiceInstallScripts::installScript('valkey'))->not->toContain('redis-cli');
+    expect(CacheServiceInstallScripts::installScript('keydb'))->not->toContain('redis-cli');
+});
+test('unit candidates mirror the install script fallback chains', function () {
+    expect(CacheServiceInstallScripts::unitCandidatesFor('valkey'))->toBe(['valkey-server', 'valkey']);
+    expect(CacheServiceInstallScripts::unitCandidatesFor('keydb'))->toBe(['keydb-server', 'keydb']);
+    expect(CacheServiceInstallScripts::unitCandidatesFor('memcached'))->toBe(['memcached']);
+});
+test('resolve unit snippet probes each candidate and defaults to the preferred name', function () {
+    $snippet = CacheServiceInstallScripts::resolveUnitSnippet('valkey');
+
+    expect($snippet)->toContain("UNIT='valkey-server'");
+    expect($snippet)->toContain("'valkey-server' 'valkey'");
+    expect($snippet)->toContain('systemctl cat');
+});
 test('install package script verifies keydb binary exists', function () {
     // Belt-and-suspenders: even if `||`-chained apt failures slip past `set -e`, the
     // explicit binary check has to abort the script.

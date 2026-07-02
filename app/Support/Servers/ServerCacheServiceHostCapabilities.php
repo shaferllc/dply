@@ -20,11 +20,12 @@ use Illuminate\Support\Facades\Cache;
  *
  * Engines:
  *   - redis      → `redis-cli -p {port} ping` returns "PONG"
- *   - valkey     → `valkey-cli -p {port} ping` (falls back to redis-cli on
- *                   distros that ship valkey as a redis drop-in)
+ *   - valkey     → `valkey-cli -p {port} ping` (own cli ONLY — a redis-cli
+ *                   fallback would let a co-resident Redis answer the PONG
+ *                   and report a never-installed valkey as running)
  *   - memcached  → `systemctl is-active memcached`
- *   - keydb      → `keydb-cli -p {port} ping`
- *   - dragonfly  → `redis-cli -p {port} ping` (Dragonfly is wire-compat)
+ *   - keydb      → `keydb-cli -p {port} ping` (own cli only, same reason)
+ *   - dragonfly  → `systemctl is-active dragonfly`
  */
 class ServerCacheServiceHostCapabilities
 {
@@ -160,16 +161,64 @@ class ServerCacheServiceHostCapabilities
     }
 
     /**
-     * Resolve the right `*-cli -p <port> ping` command for a Redis-family engine.
-     * Each engine's cli is preferred; redis-cli is the universal fallback because
-     * all three (Redis, Valkey, KeyDB) speak RESP. When the engine has an AUTH
-     * password configured on its {@see ServerCacheService} row, the `-a` flag is
-     * appended — without it the engine returns NOAUTH and the probe wrongly
-     * reports the engine as unreachable.
+     * Ask systemd what state the engine's unit is in, tolerating per-distro unit names
+     * (some packages register `valkey.service`, not `valkey-server.service`). Returns
+     * `not-found` when NO candidate unit exists on the host, systemd's `is-active`
+     * answer (`active` / `inactive` / `failed` / …) for the first unit that does, or
+     * `unknown` when SSH itself failed — callers must treat `unknown` as "no signal",
+     * never as evidence the engine is down.
+     *
+     * Used by the Recheck job to reconcile a stale `running` row: a PONG-less probe
+     * alone can't distinguish "engine gone" from "AUTH mismatch", but PONG-less + unit
+     * missing/inactive is conclusive.
+     */
+    public function instanceUnitState(Server $server, string $engine): string
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return 'unknown';
+        }
+
+        $resolve = CacheServiceInstallScripts::resolveUnitSnippet($engine);
+        $script = <<<BASH
+        STATE=not-found
+        if systemctl cat "\$UNIT" >/dev/null 2>&1; then
+            STATE="\$(systemctl is-active "\$UNIT" 2>/dev/null || true)"
+        fi
+        echo "DPLY_CACHE_UNIT_STATE=\${STATE:-unknown}"
+        BASH;
+
+        try {
+            $out = $this->runner->run(
+                $server,
+                fn ($ssh): string => $ssh->exec('bash -lc '.escapeshellarg($resolve."\n".$script), 30),
+                useRoot: (bool) config('server_cache.probe_use_root_ssh', false),
+                fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
+            );
+        } catch (\Throwable) {
+            return 'unknown';
+        }
+
+        if (preg_match('/DPLY_CACHE_UNIT_STATE=(\S+)/', $out, $m)) {
+            return $m[1];
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Resolve the `*-cli -p <port> ping` command for a Redis-family engine. Each
+     * engine pings with its OWN cli only — the old universal redis-cli fallback
+     * meant a Redis instance on the shared default port answered the PONG for
+     * valkey/keydb probes, so an engine that was never actually installed still
+     * badged "Running". Engine packages always ship their own cli, so a missing
+     * cli means the engine isn't there — reporting false is correct. When the
+     * engine has an AUTH password configured on its {@see ServerCacheService}
+     * row, the `-a` flag is appended — without it the engine returns NOAUTH and
+     * the probe wrongly reports the engine as unreachable.
      */
     private function portPingCommand(Server $server, string $engine, int $port): string
     {
-        $primary = match ($engine) {
+        $cli = match ($engine) {
             'redis' => 'redis-cli',
             'valkey' => 'valkey-cli',
             'keydb' => 'keydb-cli',
@@ -186,9 +235,8 @@ class ServerCacheServiceHostCapabilities
         }
 
         return sprintf(
-            '(command -v %1$s >/dev/null && %1$s %3$s-p %2$d ping 2>/dev/null) '
-            .'|| (command -v redis-cli >/dev/null && redis-cli %3$s-p %2$d ping 2>/dev/null)',
-            $primary,
+            '(command -v %1$s >/dev/null && %1$s %3$s-p %2$d ping 2>/dev/null)',
+            $cli,
             $port,
             $authFlag,
         );

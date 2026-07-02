@@ -935,11 +935,13 @@ APACHE,
             if ($cache === 'redis') {
                 $checks['redis'] = 'redis-cli ping';
             } elseif ($cache === 'valkey') {
-                $checks['valkey'] = 'valkey-cli ping || redis-cli ping';
+                // Own cli only — a redis-cli fallback lets a co-resident Redis
+                // answer the PONG and pass the check for a valkey that never started.
+                $checks['valkey'] = 'valkey-cli ping';
             } elseif ($cache === 'memcached') {
                 $checks['memcached'] = 'systemctl is-active memcached';
             } elseif ($cache === 'keydb') {
-                $checks['keydb'] = 'keydb-cli ping 2>/dev/null || redis-cli ping';
+                $checks['keydb'] = 'keydb-cli ping';
             } elseif ($cache === 'dragonfly') {
                 $checks['dragonfly'] = 'systemctl is-active dragonfly && redis-cli ping';
             }

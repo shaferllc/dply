@@ -120,6 +120,15 @@ trait ManagesCronJobs
             return;
         }
 
+        // Command presets fall back to an editable `/home/dply/<site>/…` template when no
+        // site is in context; installed verbatim it points at a nonexistent path and the
+        // entry silently never runs.
+        if (str_contains($this->new_cron_command, '<site>')) {
+            $this->addError('new_cron_command', __('Replace the <site> placeholder with the real site directory before saving.'));
+
+            return;
+        }
+
         if ($this->new_alert_pattern !== null && trim($this->new_alert_pattern) !== '') {
             set_error_handler(static fn () => true);
             $ok = @preg_match($this->new_alert_pattern, '') !== false;
