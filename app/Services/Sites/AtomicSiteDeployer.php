@@ -218,7 +218,7 @@ class AtomicSiteDeployer
 
             $cloneLog .= $this->anchorRunner->runClone($ssh, $site, $newRelease, $gitSsh, $repo, $branch, true, false);
             $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
-            $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
+            $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease, $cloneLog);
 
             // Post-clone snapshot: confirm exactly what landed in the release dir.
             $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));

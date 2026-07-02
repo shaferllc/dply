@@ -501,6 +501,49 @@
                     <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider server ID') }}</dt>
                     <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $server->provider_id ?: '—' }}</dd>
                 </div>
+                @php
+                    $providerSpec = $server->meta['provider_spec'] ?? null;
+                    $providerSpecError = $server->meta['provider_spec_error'] ?? null;
+                    $specBits = [];
+                    if (is_array($providerSpec)) {
+                        if (! empty($providerSpec['vcpus'])) $specBits[] = $providerSpec['vcpus'].' vCPU';
+                        if (! empty($providerSpec['memory_mb'])) $specBits[] = round($providerSpec['memory_mb'] / 1024, 1).' GB';
+                        if (! empty($providerSpec['disk_gb'])) $specBits[] = $providerSpec['disk_gb'].' GB disk';
+                    }
+                @endphp
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3 sm:col-span-2">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                            <dd class="mt-1 font-mono text-sm font-medium text-brand-ink">{{ $server->size ?: '—' }}</dd>
+                            @if ($specBits !== [])
+                                <p class="mt-0.5 text-xs text-brand-moss">{{ implode(' · ', $specBits) }}</p>
+                            @endif
+                            @if (is_array($providerSpec) && ! empty($providerSpec['size_changed_from']))
+                                <p class="mt-1 text-[11px] text-emerald-700">{{ __('Resize detected — was :old', ['old' => $providerSpec['size_changed_from']]) }}</p>
+                            @endif
+                            @if (is_array($providerSpec) && ! empty($providerSpec['synced_at']))
+                                <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Verified with provider :ago', ['ago' => \Illuminate\Support\Carbon::parse($providerSpec['synced_at'])->diffForHumans()]) }}</p>
+                            @endif
+                            @if (is_array($providerSpecError))
+                                <p class="mt-1 text-[11px] text-rose-700">{{ __('Last verify failed: :msg', ['msg' => $providerSpecError['message'] ?? __('unknown error')]) }}</p>
+                            @endif
+                        </div>
+                        {{-- Post-resize re-sync: re-reads size/region/specs from the
+                             provider API (queued), then re-probes the box + inventory. --}}
+                        <button
+                            type="button"
+                            wire:click="syncProviderSpecs"
+                            wire:loading.attr="disabled"
+                            wire:target="syncProviderSpecs"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                            title="{{ __('Re-read the size and specs from the provider — use after resizing the machine.') }}"
+                        >
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="syncProviderSpecs" />
+                            {{ __('Verify with provider') }}
+                        </button>
+                    </div>
+                </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
                     <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? '—' }}</dd>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\SyncServerProviderSpecsJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
@@ -75,6 +76,19 @@ class WorkspaceSettings extends Component
     public function canEditServerSettings(): bool
     {
         return ! (bool) auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user());
+    }
+
+    /**
+     * Post-resize verification: re-read size/specs from the cloud provider and
+     * reconcile the stored copy, then re-probe the box. Queued — the provider
+     * card polls briefly and shows the refreshed snapshot when it lands.
+     */
+    public function syncProviderSpecs(): void
+    {
+        $this->authorize('update', $this->server);
+
+        SyncServerProviderSpecsJob::dispatch($this->server);
+        $this->toastSuccess(__('Verifying with the provider — stored size and specs will update shortly.'));
     }
 
     public function checkHealth(ServerHealthProbe $probe): void

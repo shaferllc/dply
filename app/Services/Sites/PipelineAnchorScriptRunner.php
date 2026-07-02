@@ -65,7 +65,12 @@ final class PipelineAnchorScriptRunner
             }
             $hasGit = trim($ssh->exec(sprintf('test -d %s/.git && echo ok', $releaseEsc), 30));
             if ($hasGit !== 'ok') {
-                throw new \RuntimeException('Git clone failed. See deployment log.');
+                // Carry git's own stderr in the exception: this message becomes
+                // the deployment's log_output (the accumulated $log is discarded
+                // on throw), so without it every surface reads "Git clone
+                // failed" with no cause anywhere. Redaction happens at the
+                // recording site, so an authenticated URL in the output is safe.
+                throw new \RuntimeException(self::withOutputTail('Git clone failed.', $log));
             }
 
             return $log;
@@ -195,12 +200,36 @@ final class PipelineAnchorScriptRunner
             .'cd {RELEASE_DIR} && {GIT_SSH_PREFIX}git fetch origin && git checkout {BRANCH} && git pull origin {BRANCH}';
     }
 
-    public function assertReleaseHasGit(RemoteShell $ssh, string $releaseDir): void
+    /**
+     * @param  string  $cloneOutput  what the clone step printed — included in the
+     *                               exception so the failure cause survives the throw
+     */
+    public function assertReleaseHasGit(RemoteShell $ssh, string $releaseDir, string $cloneOutput = ''): void
     {
         $releaseEsc = escapeshellarg($releaseDir);
         if (trim($ssh->exec(sprintf('test -d %s/.git && echo ok', $releaseEsc), 30)) !== 'ok') {
-            throw new \RuntimeException('Clone step did not leave a Git checkout in the release directory.');
+            throw new \RuntimeException(self::withOutputTail(
+                'Clone step did not leave a Git checkout in the release directory.',
+                $cloneOutput,
+            ));
         }
+    }
+
+    /**
+     * Append the tail of a captured shell log to an error message, so the
+     * cause travels with the exception instead of dying with the local $log.
+     */
+    private static function withOutputTail(string $message, string $output): string
+    {
+        $tail = trim($output);
+        if ($tail === '') {
+            return $message.' No output was captured from the clone step.';
+        }
+        if (mb_strlen($tail) > 1500) {
+            $tail = '…'.mb_substr($tail, -1500);
+        }
+
+        return $message."\n\n".$tail;
     }
 
     public function defaultActivateScriptHint(Site $site): string
