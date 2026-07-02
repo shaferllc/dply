@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -28,8 +29,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $target_type
  * @property string $type
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class SiteBinding extends Model
 {
@@ -151,5 +152,74 @@ class SiteBinding extends Model
         }
 
         return $clean;
+    }
+
+    public function wasProvisionedByDply(): bool
+    {
+        return $this->mode === 'provision_new';
+    }
+
+    /**
+     * Whether the detach confirm dialog should offer to delete the underlying
+     * resource (database cluster, on-box database, dedicated DB VM, bucket…).
+     */
+    public function canOfferDeleteOnDetach(): bool
+    {
+        return $this->deleteOnDetachLabel() !== null;
+    }
+
+    public function deleteOnDetachLabel(): ?string
+    {
+        if ($this->otherBindingConsumers() > 0) {
+            return null;
+        }
+
+        return match ($this->type) {
+            'database' => match ($this->target_type) {
+                'server_database' => ($this->config['placement'] ?? '') === 'dedicated_vm'
+                    ? __('Also destroy the dedicated database server')
+                    : __('Also drop this database on the server'),
+                'cloud_database' => $this->wasProvisionedByDply()
+                    ? __('Also delete the managed database cluster')
+                    : null,
+                default => null,
+            },
+            'storage' => $this->wasProvisionedByDply()
+                ? __('Also delete the bucket and its contents')
+                : null,
+            default => null,
+        };
+    }
+
+    public function deleteOnDetachHint(): string
+    {
+        return match ($this->type) {
+            'database' => match ($this->target_type) {
+                'server_database' => ($this->config['placement'] ?? '') === 'dedicated_vm'
+                    ? __('Destroys the VM dply provisioned for this database and removes the database row. Cannot be undone.')
+                    : __('Runs DROP DATABASE on the server and removes the Dply row. Cannot be undone.'),
+                'cloud_database' => __('Tears down the managed cluster at the provider and removes the Dply record. Cannot be undone.'),
+                default => '',
+            },
+            'storage' => __('Empties and deletes the bucket dply provisioned for this disk. Cannot be undone.'),
+            default => '',
+        };
+    }
+
+    /**
+     * Other sites that bind the same target resource (shared databases, etc.).
+     */
+    public function otherBindingConsumers(): int
+    {
+        if (! filled($this->target_type) || ! filled($this->target_id) || ! filled($this->site_id)) {
+            return 0;
+        }
+
+        return (int) SiteBinding::query()
+            ->where('target_type', $this->target_type)
+            ->where('target_id', $this->target_id)
+            ->where('site_id', '!=', $this->site_id)
+            ->distinct()
+            ->count('site_id');
     }
 }

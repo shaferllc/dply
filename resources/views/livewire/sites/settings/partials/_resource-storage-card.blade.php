@@ -73,7 +73,7 @@
                                 <x-heroicon-o-pencil-square class="h-4 w-4" />
                             </button>
                             <button type="button"
-                                wire:click="openConfirmActionModal('detachBinding', @js([(string) $bucket->id]), @js(__('Detach :disk?', ['disk' => $disk])), @js(__('Remove this bucket binding? Its injected variables will no longer be applied at deploy.')), @js(__('Detach')), true)"
+                                wire:click="openDetachBindingConfirmModal(@js((string) $bucket->id), @js($disk))"
                                 title="{{ __('Detach') }}" class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
                                 <x-heroicon-o-x-mark class="h-4 w-4" />
                             </button>

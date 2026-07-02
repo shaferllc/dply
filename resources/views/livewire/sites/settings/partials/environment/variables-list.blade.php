@@ -289,7 +289,7 @@
                                 {{-- Secondary actions collapse into a kebab so a row never shows
                                      more than the primary test/fix actions plus this menu. --}}
                                 @php
-                                    $gHasOverflow = ($gManageable && method_exists($this, 'openBindingModal')) || method_exists($this, 'openBindingInfoModal') || method_exists($this, 'detachBinding');
+                                    $gHasOverflow = ($gManageable && method_exists($this, 'openBindingModal')) || method_exists($this, 'openBindingInfoModal') || method_exists($this, 'openDetachBindingConfirmModal');
                                 @endphp
                                 @if ($gHasOverflow)
                                     <x-overflow-menu>
@@ -305,8 +305,8 @@
                                                 {{ __('Info') }}
                                             </button>
                                         @endif
-                                        @if (method_exists($this, 'detachBinding'))
-                                            <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $gBindingId]), @js(__('Detach binding?')), @js(__('Detach the :type binding? Its variables stop being injected at deploy.', ['type' => $gTypeLabel])), @js(__('Detach')), true)" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700">
+                                        @if (method_exists($this, 'openDetachBindingConfirmModal'))
+                                            <button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $gBindingId), @js($gTypeLabel))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700">
                                                 <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
                                                 {{ __('Detach') }}
                                             </button>

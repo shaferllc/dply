@@ -103,7 +103,7 @@
                             {{ $binding->status }}
                         </span>
                         @if ($binding->bindingId)
-                            <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $binding->bindingId]), @js(__('Detach binding?')), @js(__('Detach this :type binding? Its connection variables stop being injected at deploy.', ['type' => $binding->type])), @js(__('Detach')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $binding->bindingId), @js($binding->type))" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 <x-heroicon-o-x-mark class="h-4 w-4" />
                                 {{ __('Detach') }}
                             </button>

@@ -7,6 +7,7 @@ namespace App\Modules\Deploy\Services;
 use App\Models\LookoutProject;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Deploy\Services\Concerns\DeletesBindingResources;
 use App\Modules\Deploy\Services\Concerns\ManagesAiBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesBroadcastingBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesCacheBindings;
@@ -28,6 +29,7 @@ use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
+use App\Support\Sites\SiteRelationPurger;
 use InvalidArgumentException;
 
 /**
@@ -45,6 +47,7 @@ use InvalidArgumentException;
  */
 class SiteBindingManager
 {
+    use DeletesBindingResources;
     use ManagesAiBindings;
     use ManagesBroadcastingBindings;
     use ManagesCacheBindings;
@@ -114,7 +117,7 @@ class SiteBindingManager
     /**
      * Attach an existing resource to the site.
      *
-     * @param  array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      */
     public function attachExisting(Site $site, string $type, array $params): SiteBinding
     {
@@ -149,7 +152,7 @@ class SiteBindingManager
     /**
      * Provision a brand-new resource, then attach it.
      *
-     * @param  array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      */
     public function provisionNew(Site $site, string $type, array $params): SiteBinding
     {
@@ -174,7 +177,7 @@ class SiteBindingManager
         return $binding;
     }
 
-    public function detach(SiteBinding $binding): void
+    public function detach(SiteBinding $binding, bool $deleteResource = false): void
     {
         // Broadcasting tears down its external infra on detach (KV record +
         // billing), but only when no other site still binds the same app.
@@ -187,6 +190,10 @@ class SiteBindingManager
         // would otherwise orphan an ACTIVE project that keeps billing.
         if ($binding->type === 'error_tracking') {
             $this->teardownLookout($binding);
+        }
+
+        if ($deleteResource) {
+            $this->deleteBindingResource($binding);
         }
 
         $binding->delete();
@@ -357,7 +364,7 @@ class SiteBindingManager
      * with no deployed app. The flag + timestamp let a reporter surface them for
      * review. We only tag the binding config; tearing the resource down is a
      * separate, explicit action (managed databases are unlinked, never
-     * auto-dropped — see {@see \App\Support\Sites\SiteRelationPurger}).
+     * auto-dropped — see {@see SiteRelationPurger}).
      */
     private function stampSetupProvenance(Site $site, SiteBinding $binding): void
     {
@@ -365,7 +372,7 @@ class SiteBindingManager
             return;
         }
 
-        $cfg = ($binding->config );
+        $cfg = ($binding->config);
         if (($cfg['provisioned_during_setup'] ?? false) === true) {
             return;
         }
@@ -418,9 +425,9 @@ class SiteBindingManager
      * each its own filesystem disk; every other caller keeps the narrow key and
      * is therefore unaffected.
      *
-     * @param  array<string, mixed> $attributes
-     * @param  array<string, mixed> $matchOn  Attribute keys (from $attributes, plus the
-     *                                 implicit site_id/type) to match the existing row on.
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $matchOn  Attribute keys (from $attributes, plus the
+     *                                         implicit site_id/type) to match the existing row on.
      */
     private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding
     {

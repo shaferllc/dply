@@ -555,7 +555,7 @@
                                 @endif
                                 @if ($attached && ! $isLogging)
                                     <button type="button" title="{{ __('Detach') }}"
-                                        wire:click="openConfirmActionModal('detachBinding', @js([(string) $binding->id]), @js(__('Detach :label?', ['label' => $t['label']])), @js(__('Remove this resource binding? Its injected variables will no longer be applied at deploy.')), @js(__('Detach')), true)"
+                                        wire:click="openDetachBindingConfirmModal(@js((string) $binding->id), @js($t['label']))"
                                         class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
                                         <x-heroicon-o-x-mark class="h-4 w-4" />
                                     </button>

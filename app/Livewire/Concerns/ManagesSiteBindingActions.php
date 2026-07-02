@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
@@ -12,19 +13,20 @@ use App\Models\LogDrainCredential;
 use App\Models\OauthCredential;
 use App\Models\ObjectStorageCredential;
 use App\Models\PaymentCredential;
-use App\Models\SearchCredential;
 use App\Models\ProviderCredential;
+use App\Models\SearchCredential;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
-use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Support\DedicatedDatabaseVm;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
+use App\Modules\Deploy\Services\LookoutProvisioner;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -36,8 +38,6 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSiteBindingActions
 {
-
-
     public function openBindingModal(string $type, string $mode = 'attach', ?string $bindingId = null): void
     {
         Gate::authorize('update', $this->site);
@@ -487,7 +487,7 @@ trait ManagesSiteBindingActions
             return;
         }
 
-        $orgs = app(\App\Modules\Deploy\Services\LookoutProvisioner::class)->organizations($token);
+        $orgs = app(LookoutProvisioner::class)->organizations($token);
         $this->lookoutOrganizations = $orgs;
 
         if ($orgs === []) {
@@ -510,6 +510,51 @@ trait ManagesSiteBindingActions
      * The delete flag is supplied by the confirm modal's opt-in toggle, so it
      * arrives as the trailing argument (no DI-typed parameter after it).
      */
+    public function openDetachBindingConfirmModal(string $bindingId, ?string $label = null): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $label = filled($label) ? $label : Str::headline($binding->type);
+        $title = __('Detach :label?', ['label' => $label]);
+        $message = __('Remove this resource binding? Its injected variables will no longer be applied at deploy.');
+
+        $toggleLabel = $binding->deleteOnDetachLabel();
+        if ($toggleLabel !== null) {
+            $this->openConfirmActionModal(
+                'detachBinding',
+                [$bindingId],
+                $title,
+                $message,
+                __('Detach'),
+                true,
+                null,
+                $toggleLabel,
+                $binding->deleteOnDetachHint(),
+                false,
+            );
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'detachBinding',
+            [$bindingId],
+            $title,
+            $message,
+            __('Detach'),
+            true,
+        );
+    }
+
     public function detachBinding(string $bindingId, bool $deleteResource = false): void
     {
         Gate::authorize('update', $this->site);
@@ -523,6 +568,8 @@ trait ManagesSiteBindingActions
             return;
         }
 
+        $offeredDelete = $binding->canOfferDeleteOnDetach();
+
         try {
             app(SiteBindingManager::class)->detach($binding, $deleteResource);
         } catch (\Throwable $e) {
@@ -532,7 +579,7 @@ trait ManagesSiteBindingActions
         }
 
         $this->site = $this->site->fresh() ?? $this->site;
-        $this->toastSuccess($deleteResource && $binding->wasProvisionedByDply()
+        $this->toastSuccess($deleteResource && $offeredDelete
             ? __('Binding detached and the resource is being deleted.')
             : __('Binding detached.'));
     }
