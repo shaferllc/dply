@@ -24,6 +24,10 @@
     $resolvedContextualDocSlug = $docContextual
         ? ($contextualDocSlug ?? app(\App\Modules\Docs\Support\ContextualDocResolver::class)->resolve())
         : null;
+    // Same trap as hero-card: Livewire's <!--[if BLOCK]--> markers make an
+    // all-conditional-empty actions slot stringify non-empty, which would leave
+    // an empty padded row. Strip comments before deciding to render the div.
+    $hasActionsSlot = isset($actions) && trim(preg_replace('/<!--.*?-->/s', '', (string) $actions) ?? '') !== '';
 @endphp
 
 <header {{ $attributes->class([
@@ -64,7 +68,7 @@
             @endisset
         </div>
 
-        @if ($showDocumentation && ($docRoute || $docContextual || isset($actions)))
+        @if ($showDocumentation && ($docRoute || $docContextual || $hasActionsSlot))
             <div @class([
                 'mt-4 flex flex-wrap items-center gap-2' => ! $toolbar,
                 'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,
@@ -84,7 +88,7 @@
                     {{ $actions }}
                 @endisset
             </div>
-        @elseif (isset($actions))
+        @elseif ($hasActionsSlot)
             <div @class([
                 'mt-4 flex flex-wrap items-center gap-2' => ! $toolbar,
                 'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,

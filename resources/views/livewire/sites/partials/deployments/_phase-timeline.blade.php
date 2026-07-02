@@ -94,6 +94,8 @@
                 <p class="text-xs font-semibold text-rose-800">
                     @if ($failedPhase)
                         {{ __('Failed during the :phase phase', ['phase' => $failedPhase['label']]) }}
+                    @elseif ($phaseDone === 0)
+                        {{ __('Deploy failed before the first phase started — usually the initial clone or the connection to the server.') }}
                     @else
                         {{ __('Deploy failed after the recorded phases — the worker may have been restarted mid-deploy.') }}
                     @endif

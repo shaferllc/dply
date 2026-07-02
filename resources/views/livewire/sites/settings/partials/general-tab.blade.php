@@ -55,16 +55,14 @@
     </section>
 @endif
 
-@include('livewire.sites.settings.partials.logo')
-
 {{-- Read-only overview. Edit affordances live elsewhere:
      primary hostname → Routing > Domains (pencil on the row);
-     everything else → Settings tab. --}}
+     everything else → Settings tab. The header badge doubles as the
+     site-logo control (click the avatar for upload/pull/remove) — it used
+     to be a full-width card above this one. --}}
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
+        @include('livewire.sites.settings.partials.logo')
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overview') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
