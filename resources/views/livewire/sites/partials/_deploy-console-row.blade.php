@@ -66,10 +66,20 @@
         @if ($row['phases'] === [])
             <p class="py-2 text-center text-[11px] text-brand-moss">{{ $row['starting_fresh'] ? __('Starting — clearing the previous run…') : __('Queued — waiting for a worker…') }}</p>
         @else
-            {{-- Error banner: pull the failed step + its output to the top. --}}
-            @if ($rs === 'failed' && $failedStep)
+            {{-- Error banner: pull the failed step + its output to the top. A
+                 deploy that died BEFORE any phase recorded a failed step (the
+                 "Failed · 0/5" case — preflight/clone threw) has no step to
+                 point at, so fall back to the deployment's log_output tail:
+                 the failure must never render as an all-gray silent card. --}}
+            @if ($rs === 'failed')
                 @php
                     $failOutput = trim((string) ($failedStep['output'] ?? ''));
+                    if ($failOutput === '') {
+                        $failOutput = trim((string) ($row['latest']?->log_output ?? ''));
+                        if (mb_strlen($failOutput) > 1200) {
+                            $failOutput = '…'.mb_substr($failOutput, -1200);
+                        }
+                    }
                     $failOutput = str_replace("\r\n", "\n", $failOutput);
                 @endphp
                 <div class="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
@@ -77,8 +87,12 @@
                         <x-heroicon-m-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
                         <div class="min-w-0 flex-1">
                             <p class="text-xs font-semibold text-rose-800">
-                                {{ __('Failed at :phase', ['phase' => $failedPhaseLabel]) }}
-                                <span class="font-normal text-rose-700">· {{ $failedStep['label'] }}</span>
+                                @if ($failedStep)
+                                    {{ __('Failed at :phase', ['phase' => $failedPhaseLabel]) }}
+                                    <span class="font-normal text-rose-700">· {{ $failedStep['label'] }}</span>
+                                @else
+                                    {{ __('Failed before the pipeline phases ran') }}
+                                @endif
                             </p>
                             @if ($failOutput !== '')
                                 <pre class="mt-1.5 max-h-48 overflow-auto rounded-md bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failOutput }}</pre>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\CheckServerHealthJob;
 use App\Jobs\PollDoksClusterStatusJob;
 use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\RunSetupScriptJob;
@@ -35,6 +36,7 @@ use App\Support\Servers\InstalledStack;
 use App\Support\Servers\SharedHostReport;
 use App\Support\Servers\SupervisorQueueProgramTypes;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
@@ -122,6 +124,32 @@ class WorkspaceOverview extends Component
         $this->toastSuccess(__('Re-checking cluster status…'));
     }
 
+    /**
+     * ISO timestamp of the last operator-requested health re-check. While the
+     * queued probe hasn't landed yet (last_health_check_at predates this), the
+     * hero badge shows a spinner and polls for the fresh result.
+     */
+    public ?string $healthRecheckQueuedAt = null;
+
+    /**
+     * Manual reachability re-check from the hero health badge — dispatches the
+     * same queued probe the fleet cadence uses (no SSH in the render path).
+     */
+    public function recheckHealth(): void
+    {
+        $this->authorize('view', $this->server);
+
+        $server = $this->server->fresh();
+        if (! $server || $server->status !== Server::STATUS_READY || empty($server->ip_address)) {
+            $this->toastError(__('This server cannot be health-checked right now.'));
+
+            return;
+        }
+
+        CheckServerHealthJob::dispatch($server);
+        $this->healthRecheckQueuedAt = now()->toIso8601String();
+    }
+
     public function rerunSetup(): void
     {
         $this->authorize('update', $this->server);
@@ -191,9 +219,30 @@ class WorkspaceOverview extends Component
             ->whereIn('status', ['deploying', 'queued'])
             ->count();
 
+        // A manual re-check is "pending" until the probe stamps a
+        // last_health_check_at at/after the moment the operator clicked.
+        // Clearing the marker stops the badge's wire:poll once it lands.
+        $healthRecheckPending = false;
+        if ($this->healthRecheckQueuedAt !== null) {
+            $queuedAt = Carbon::parse($this->healthRecheckQueuedAt);
+            $healthRecheckPending = $this->server->last_health_check_at === null
+                || $this->server->last_health_check_at->lt($queuedAt);
+
+            // Backstop: if the queue never picks the job up (worker down),
+            // stop spinning after 60s instead of polling forever.
+            if ($queuedAt->diffInSeconds(now()) > 60) {
+                $healthRecheckPending = false;
+            }
+
+            if (! $healthRecheckPending) {
+                $this->healthRecheckQueuedAt = null;
+            }
+        }
+
         $healthSummary = [
             'status' => $this->server->health_status,
             'last_checked_at' => $this->server->last_health_check_at,
+            'recheck_pending' => $healthRecheckPending,
         ];
 
         $currentUser = Auth::user();

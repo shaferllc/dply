@@ -134,6 +134,24 @@
                                 @endforeach
                             </div>
 
+                            {{-- Failure excerpt: the last meaningful line of the deploy
+                                 log, so a failed row says WHY without a click-through.
+                                 (A pre-phase failure has no phase chips above at all.) --}}
+                            @if ($isFailed)
+                                @php
+                                    $failExcerpt = '';
+                                    foreach (array_reverse(preg_split('/\r?\n/', trim((string) $deployment->log_output)) ?: []) as $logLine) {
+                                        if (trim($logLine) !== '') {
+                                            $failExcerpt = trim($logLine);
+                                            break;
+                                        }
+                                    }
+                                @endphp
+                                @if ($failExcerpt !== '')
+                                    <p class="mt-2 truncate font-mono text-[11px] text-rose-700" title="{{ \Illuminate\Support\Str::limit($failExcerpt, 600) }}">{{ \Illuminate\Support\Str::limit($failExcerpt, 220) }}</p>
+                                @endif
+                            @endif
+
                             {{-- Footer: deploy id + failure helper --}}
                             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                                 <span class="font-mono text-[10px] text-brand-mist">{{ $deployment->id }}</span>
