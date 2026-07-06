@@ -42,6 +42,25 @@ test('octane supervisor command defaults port when missing', function () {
     expect($site->fresh()->octaneSupervisorCommand())->toBe('php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000');
 });
 
+test('uses octane runtime requires saved octane port not composer package alone', function () {
+    $packageOnly = Site::factory()->create([
+        'octane_port' => null,
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'laravel_octane' => true,
+                ],
+            ],
+        ],
+    ]);
+    expect($packageOnly->fresh()->usesOctaneRuntime())->toBeFalse();
+
+    $configured = Site::factory()->create(['octane_port' => 8080]);
+    expect($configured->fresh()->usesOctaneRuntime())->toBeTrue();
+});
+
 test('should show octane runtime ui requires laravel detection and composer flag', function () {
     $noDetection = Site::factory()->create(['meta' => null]);
     expect($noDetection->shouldShowOctaneRuntimeUi())->toBeFalse();

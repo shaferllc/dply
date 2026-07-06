@@ -154,7 +154,7 @@ class DeployScript extends Component
         }
 
         $items = [];
-        $isOctane = (bool) $this->site->octane_port || $this->site->resolvedLaravelPackageFlag('octane');
+        $isOctane = $this->site->usesOctaneRuntime();
         $fpmStrategySelectable = false;
 
         if ($isOctane) {

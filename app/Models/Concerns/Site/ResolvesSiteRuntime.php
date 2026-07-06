@@ -742,6 +742,17 @@ trait ResolvesSiteRuntime
     }
 
     /**
+     * Whether Octane is the live runtime for this site — i.e. the operator saved
+     * an Octane port under Runtime / Laravel settings. Composer mentioning
+     * laravel/octane alone is not enough; the package may be installed but the
+     * app still serves through PHP-FPM until a port is configured.
+     */
+    public function usesOctaneRuntime(): bool
+    {
+        return (bool) $this->octane_port && $this->resolvedLaravelPackageFlag('octane');
+    }
+
+    /**
      * Local port for Reverb WebSocket server (Supervisor / reverse proxy); stored in meta.laravel_reverb.port.
      */
     public function reverbLocalPort(): int

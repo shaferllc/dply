@@ -107,7 +107,7 @@ class SiteDeployPipelineRunner
         $labels = [];
         $flushOpcache = false;
 
-        if ((bool) $site->octane_port || $site->resolvedLaravelPackageFlag('octane')) {
+        if ($site->usesOctaneRuntime()) {
             // Octane serves the app itself — reload its workers onto the new release.
             $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "octane:reload" '
                 .'&& { echo "[dply] octane:reload"; php artisan octane:reload 2>&1 || echo "[dply] octane:reload skipped/failed (continuing)"; }; } || true';
