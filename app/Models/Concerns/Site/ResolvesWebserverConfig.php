@@ -146,6 +146,30 @@ trait ResolvesWebserverConfig
     }
 
     /**
+     * How a deploy hands PHP-FPM the new release (meta `deploy.php_fpm_strategy`):
+     *
+     *  - `flush` (default): reload FPM, then opcache_reset() inside a live
+     *    worker; if the flush can't reach the pool the deploy restarts the FPM
+     *    service as break-glass, so the box never silently keeps serving the
+     *    prior release's bytecode.
+     *  - `flush_only`: reload + flush, never restart — for boxes where a full
+     *    FPM restart (which bounces every pool on that PHP version) is worse
+     *    than a possibly-stale OPcache.
+     *  - `restart`: skip the reload/flush dance and `systemctl restart` FPM on
+     *    every deploy — OPcache starts empty, at the cost of a brief
+     *    cross-pool blip.
+     *
+     * Unknown values fall back to `flush` so a stale meta write can never turn
+     * the managed restart into a no-op.
+     */
+    public function phpFpmDeployStrategy(): string
+    {
+        $strategy = (string) data_get($this->meta, 'deploy.php_fpm_strategy', 'flush');
+
+        return in_array($strategy, ['flush', 'flush_only', 'restart'], true) ? $strategy : 'flush';
+    }
+
+    /**
      * The pool name == the on-disk pool conf basename == the vhost basename, so
      * the three always agree and an operator can grep one to find the others.
      */

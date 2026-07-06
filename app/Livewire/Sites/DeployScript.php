@@ -64,6 +64,17 @@ class DeployScript extends Component
      */
     public bool $managed_restart_enabled = true;
 
+    /**
+     * Mirrors {@see Site::phpFpmDeployStrategy()} (meta `deploy.php_fpm_strategy`):
+     * how the managed restart hands PHP-FPM the new release — reload + OPcache
+     * flush with a restart break-glass (`flush`, default), flush-only
+     * (`flush_only`), or a full FPM restart every deploy (`restart`).
+     */
+    public string $php_fpm_strategy = 'flush';
+
+    /** The values {@see $php_fpm_strategy} may take, in display order. */
+    public const PHP_FPM_STRATEGIES = ['flush', 'flush_only', 'restart'];
+
     // --- Inline editing of a locked builder/pinned step ---
 
     /** The locked step currently being edited inline, or null. */
@@ -113,6 +124,7 @@ class DeployScript extends Component
         $this->restart = $rendered['restart'] ?? '';
         $this->atomic_release = (string) ($this->site->deploy_strategy ?? 'simple') === 'atomic';
         $this->managed_restart_enabled = ! (bool) data_get($this->site->meta, 'deploy.skip_managed_restart', false);
+        $this->php_fpm_strategy = $this->site->phpFpmDeployStrategy();
     }
 
     /** Discard unsaved textarea / toggle edits — reload persisted state. */
@@ -127,28 +139,38 @@ class DeployScript extends Component
      * Restart card is honest about it. `items` lists each managed restart in
      * run order; mirrors {@see SiteDeployPipelineRunner::runManagedRestart()}.
      *
-     * @return array{has: bool, items: list<string>, label: string}
+     * @return array{has: bool, items: list<string>, label: string, fpm_strategy_selectable: bool}
      */
     public function managedRestartInfo(): array
     {
         if ($this->site->isCustom()) {
-            return ['has' => false, 'items' => [], 'label' => __('Container apps are restarted by their runtime — dply runs no extra restart here.')];
+            return ['has' => false, 'items' => [], 'label' => __('Container apps are restarted by their runtime — dply runs no extra restart here.'), 'fpm_strategy_selectable' => false];
         }
 
         $runtime = $this->site->runtimeKey();
 
         if ($runtime === 'static') {
-            return ['has' => false, 'items' => [], 'label' => __('Static sites need no restart — the new files are served the moment the release activates.')];
+            return ['has' => false, 'items' => [], 'label' => __('Static sites need no restart — the new files are served the moment the release activates.'), 'fpm_strategy_selectable' => false];
         }
 
         $items = [];
+        $isOctane = (bool) $this->site->octane_port || $this->site->resolvedLaravelPackageFlag('octane');
+        $fpmStrategySelectable = false;
 
-        if ((bool) $this->site->octane_port || $this->site->resolvedLaravelPackageFlag('octane')) {
+        if ($isOctane) {
             $items[] = __('Octane workers — php artisan octane:reload');
         } elseif ($runtime === 'php') {
-            $items[] = $this->site->usesDedicatedPhpFpmPool()
-                ? __('PHP-FPM — reloaded and OPcache flushed so it serves the new release')
-                : __('PHP-FPM — reloaded so it serves the new release');
+            $fpmStrategySelectable = true;
+            $flushes = $this->site->usesDedicatedPhpFpmPool();
+            $items[] = match ($this->php_fpm_strategy) {
+                'restart' => __('PHP-FPM — fully restarted so OPcache starts empty on the new release'),
+                'flush_only' => $flushes
+                    ? __('PHP-FPM — reloaded and OPcache flushed so it serves the new release')
+                    : __('PHP-FPM — reloaded so it serves the new release'),
+                default => $flushes
+                    ? __('PHP-FPM — reloaded and OPcache flushed (restarted automatically if the flush can’t reach the pool)')
+                    : __('PHP-FPM — reloaded so it serves the new release'),
+            };
         } else {
             $items[] = __('the app service — restarted onto the new release');
         }
@@ -165,6 +187,22 @@ class DeployScript extends Component
             'has' => true,
             'items' => $items,
             'label' => __('After every deploy, dply automatically restarts:'),
+            'fpm_strategy_selectable' => $fpmStrategySelectable,
+        ];
+    }
+
+    /**
+     * Display labels for the PHP-FPM & OPcache strategy select, keyed by
+     * {@see $php_fpm_strategy} value, in display order.
+     *
+     * @return array<string, string>
+     */
+    public function phpFpmStrategyOptions(): array
+    {
+        return [
+            'flush' => __('Reload + flush OPcache — restart FPM only if the flush fails (recommended)'),
+            'flush_only' => __('Reload + flush OPcache — never restart FPM'),
+            'restart' => __('Restart PHP-FPM on every deploy — OPcache starts empty'),
         ];
     }
 
@@ -306,6 +344,11 @@ class DeployScript extends Component
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         data_set($meta, 'deploy.skip_managed_restart', ! $this->managed_restart_enabled);
+
+        if (! in_array($this->php_fpm_strategy, self::PHP_FPM_STRATEGIES, true)) {
+            $this->php_fpm_strategy = 'flush';
+        }
+        data_set($meta, 'deploy.php_fpm_strategy', $this->php_fpm_strategy);
 
         $this->site->update([
             'deploy_strategy' => $this->atomic_release ? 'atomic' : 'simple',
@@ -524,6 +567,7 @@ class DeployScript extends Component
             'hookAnchorLabels' => SiteDeployHook::anchorLabels(),
             'hookAnchorOptions' => self::HOOK_ANCHORS,
             'managedRestart' => $this->managedRestartInfo(),
+            'phpFpmStrategyOptions' => $this->phpFpmStrategyOptions(),
         ]);
     }
 }

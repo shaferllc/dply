@@ -213,7 +213,7 @@ class WebserverConfig extends Component
      * unreachable server is surfaced as a failure rather than a fake pass). A
      * pass here is what unlocks "Apply to server".
      */
-    public function validate(SiteWebserverConfigEditorService $editor): void
+    public function validateConfig(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('view', $this->site);
         $this->resetValidation();

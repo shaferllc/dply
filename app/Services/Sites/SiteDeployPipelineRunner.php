@@ -113,11 +113,23 @@ class SiteDeployPipelineRunner
                 .'&& { echo "[dply] octane:reload"; php artisan octane:reload 2>&1 || echo "[dply] octane:reload skipped/failed (continuing)"; }; } || true';
             $labels[] = 'Octane';
         } elseif ($site->runtimeKey() === 'php') {
-            // Non-Octane PHP: reload FPM so it serves the freshly swapped `current`.
-            $parts[] = 'for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do sudo systemctl reload "$svc" 2>/dev/null && { echo "[dply] reloaded $svc"; break; }; done || true';
-            $labels[] = 'PHP-FPM';
-            // A reload re-reads pool config but does NOT flush OPcache — see flushOpcache().
-            $flushOpcache = true;
+            if ($site->phpFpmDeployStrategy() === 'restart') {
+                // Operator opted into a full restart: OPcache starts empty on
+                // the new release (no agent flush needed), at the cost of a
+                // brief blip for every pool on that PHP version.
+                $services = array_values(array_unique([
+                    sprintf('php%s-fpm', $site->resolvedPhpFpmVersion()),
+                    'php8.5-fpm', 'php8.4-fpm', 'php8.3-fpm', 'php-fpm',
+                ]));
+                $parts[] = 'for svc in '.implode(' ', $services).'; do sudo systemctl restart "$svc" 2>/dev/null && { echo "[dply] restarted $svc — OPcache starts empty"; break; }; done || true';
+                $labels[] = 'PHP-FPM (restart)';
+            } else {
+                // Non-Octane PHP: reload FPM so it serves the freshly swapped `current`.
+                $parts[] = 'for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do sudo systemctl reload "$svc" 2>/dev/null && { echo "[dply] reloaded $svc"; break; }; done || true';
+                $labels[] = 'PHP-FPM';
+                // A reload re-reads pool config but does NOT flush OPcache — see flushOpcache().
+                $flushOpcache = true;
+            }
         }
 
         if ($site->resolvedLaravelPackageFlag('horizon')) {

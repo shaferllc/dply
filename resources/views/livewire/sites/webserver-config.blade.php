@@ -285,11 +285,11 @@
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss mb-3">{{ __('Validate') }}</p>
                         <div class="flex flex-wrap items-center gap-3">
-                            <button type="button" wire:click="validate" wire:loading.attr="disabled" wire:target="validate" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
-                                <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="validate" />
-                                <svg wire:loading wire:target="validate" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
-                                <span wire:loading.remove wire:target="validate">{{ __('Validate') }}</span>
-                                <span wire:loading wire:target="validate">{{ __('Validating…') }}</span>
+                            <button type="button" wire:click="validateConfig" wire:loading.attr="disabled" wire:target="validateConfig" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
+                                <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="validateConfig" />
+                                <svg wire:loading wire:target="validateConfig" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                                <span wire:loading.remove wire:target="validateConfig">{{ __('Validate') }}</span>
+                                <span wire:loading wire:target="validateConfig">{{ __('Validating…') }}</span>
                             </button>
                             @if ($config_validated)
                                 <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">

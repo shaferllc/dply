@@ -76,11 +76,13 @@ final class SiteOpcacheManager
         try {
             $result = $this->reset($site);
         } catch (\Throwable $e) {
-            return "[dply] OPcache flush skipped/failed (continuing): {$e->getMessage()}\n";
+            return $this->flushFailed($site, $e->getMessage());
         }
 
         if ($result === null || ($result['ok'] ?? false) !== true) {
-            return "[dply] OPcache flush: pool unreachable — new release picked up on next FPM restart.\n";
+            $reason = is_array($result) ? (string) ($result['error'] ?? 'pool unreachable') : 'pool unreachable';
+
+            return $this->flushFailed($site, $reason);
         }
 
         if (($result['reset'] ?? null) === false) {
@@ -88,6 +90,58 @@ final class SiteOpcacheManager
         }
 
         return "[dply] OPcache flushed for {$site->phpFpmPoolName()} — new release live.\n";
+    }
+
+    /**
+     * The flush couldn't run inside a worker (agent unreachable, socket perms,
+     * no sudo…). Under the default `flush` strategy that escalates to a full
+     * FPM restart — the break-glass that used to be manual: a sub-second blip
+     * beats silently serving the prior release's bytecode. `flush_only` keeps
+     * the old warn-and-continue. Never throws.
+     */
+    private function flushFailed(Site $site, string $reason): string
+    {
+        $log = "[dply] OPcache flush failed ({$reason})";
+
+        if ($site->phpFpmDeployStrategy() !== 'flush') {
+            return $log." — continuing; new release picked up on next FPM restart.\n";
+        }
+
+        return $this->restartFpmService($site)
+            ? $log." — restarted PHP-FPM instead; OPcache starts empty on the new release.\n"
+            : $log." — FPM restart fallback also failed; the site may keep serving the prior release until FPM restarts.\n";
+    }
+
+    /**
+     * `systemctl restart` the FPM service that owns this site's pool — the
+     * `restart`-strategy / break-glass path. Restarting the versioned service
+     * bounces every pool of that PHP version on the box, which is exactly why
+     * the flush is preferred and this is the fallback. exec() never surfaces
+     * exit codes, so the script prints an explicit DPLY_FPM_RESTART marker.
+     */
+    public function restartFpmService(Site $site): bool
+    {
+        $server = $site->server;
+        if ($server === null) {
+            return false;
+        }
+
+        $service = sprintf('php%s-fpm', $site->resolvedPhpFpmVersion());
+        // `if` guards the runner's `set -e`; the marker always prints.
+        $script = sprintf(
+            "if sudo -n systemctl restart %s 2>&1; then echo 'DPLY_FPM_RESTART=ok'; else echo 'DPLY_FPM_RESTART=failed'; fi",
+            escapeshellarg($service),
+        );
+
+        try {
+            $out = $this->remote->runInlineBash($server, 'site-fpm-restart', $script, 60, false);
+
+            return str_contains((string) $out->getBuffer(), 'DPLY_FPM_RESTART=ok');
+        } catch (\Throwable $e) {
+            Log::warning('sites.fpm_restart_failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     /**

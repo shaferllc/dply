@@ -124,7 +124,7 @@
                     {{-- Restart phase: be transparent about dply's managed restart and let the user opt out. --}}
                     @if ($phase === 'restart')
                         @if ($managedRestart['has'])
-                            <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3" x-data="{ managed: @js($managed_restart_enabled) }">
+                            <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3" x-data="{ managed: @js($managed_restart_enabled), fpmStrategy: @js($php_fpm_strategy) }">
                                 <label class="flex cursor-pointer items-start gap-2.5">
                                     <input type="checkbox" id="deploy-managed-restart-toggle" wire:model="managed_restart_enabled" x-on:change="managed = $event.target.checked"
                                         class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
@@ -145,6 +145,30 @@
                                         </span>
                                     </span>
                                 </label>
+
+                                {{-- PHP-FPM & OPcache strategy — how the managed restart hands FPM the new release. --}}
+                                @if ($managedRestart['fpm_strategy_selectable'] ?? false)
+                                    <div class="mt-3 border-t border-brand-ink/10 pt-3 pl-[26px]" x-show="managed" x-cloak>
+                                        <label for="deploy-php-fpm-strategy" class="text-[11px] font-semibold text-brand-ink">{{ __('PHP-FPM & OPcache') }}</label>
+                                        <select id="deploy-php-fpm-strategy" wire:model="php_fpm_strategy" x-on:change="fpmStrategy = $event.target.value"
+                                            class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white py-1.5 text-[11px] text-brand-ink focus:border-brand-forest focus:ring-brand-forest">
+                                            @foreach ($phpFpmStrategyOptions as $value => $label)
+                                                <option value="{{ $value }}">{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        <p x-show="fpmStrategy === 'flush'" x-cloak class="mt-1.5 text-[11px] text-brand-moss">
+                                            {{ __('Zero-downtime: FPM is reloaded and OPcache is flushed inside a live worker. If the flush can’t reach the pool, dply restarts PHP-FPM so the new release always goes live.') }}
+                                        </p>
+                                        <p x-show="fpmStrategy === 'flush_only'" x-cloak class="mt-1.5 flex items-start gap-1 text-[11px] font-medium text-amber-700">
+                                            <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                            <span>{{ __('dply never restarts FPM for this site. If the OPcache flush fails, the site may keep serving the previous release until PHP-FPM is restarted by hand.') }}</span>
+                                        </p>
+                                        <p x-show="fpmStrategy === 'restart'" x-cloak class="mt-1.5 flex items-start gap-1 text-[11px] font-medium text-amber-700">
+                                            <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                            <span>{{ __('Restarting PHP-FPM briefly interrupts every site on this PHP version on the server — in-flight requests can be dropped.') }}</span>
+                                        </p>
+                                    </div>
+                                @endif
                             </div>
                         @else
                             <p class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-[11px] text-brand-moss">{{ $managedRestart['label'] }}</p>

@@ -152,8 +152,11 @@ class DeployPhaseRunner
         // dply-owned reload/restart. Static sites skip it — NGINX already serves
         // the new files after the swap — but user restart steps may still apply.
         if ($runtime !== 'static' && ! $managedRestartDisabled) {
+            // `restart` strategy: full FPM restart — OPcache starts empty on
+            // the new release, so the agent flush below is skipped.
+            $fpmVerb = $site->phpFpmDeployStrategy() === 'restart' ? 'restart' : 'reload';
             $command = $runtime === 'php'
-                ? sprintf('sudo systemctl reload php%s-fpm', $site->phpVersion() ?? '8.3')
+                ? sprintf('sudo systemctl %s php%s-fpm', $fpmVerb, $site->phpVersion() ?? '8.3')
                 : sprintf('sudo systemctl restart %s', escapeshellarg('dply-site-'.$site->id.'.service'));
 
             $owned = $this->runOne($site, 'restart', SiteDeployStep::PHASE_RESTART, $command, $this->repositoryBase($site), $shellFactory);
@@ -162,7 +165,7 @@ class DeployPhaseRunner
             // with revalidate_path off the workers keep serving the prior release
             // after the swap. Flush inside a worker so the new code is picked up.
             // No-op for shared-pool sites; best-effort, never fails the deploy.
-            if ($runtime === 'php' && ($owned['ok'] ?? false)) {
+            if ($runtime === 'php' && $fpmVerb === 'reload' && ($owned['ok'] ?? false)) {
                 $owned['output'] = (string) ($owned['output'] ?? '')
                     .app(SiteOpcacheManager::class)->flushForDeploy($site);
             }
