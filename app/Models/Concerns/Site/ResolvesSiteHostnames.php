@@ -167,8 +167,20 @@ trait ResolvesSiteHostnames
     }
 
     /**
+     * Memoized coveringServerWildcard() results, keyed by server+zone.
+     *
+     * @var array<string, ServerWildcardCertificate|null>
+     */
+    private array $coveringServerWildcardCache = [];
+
+    /**
      * The installed per-server wildcard certificate that secures this site's
      * testing hostname (e.g. *.on-dply.com on this site's server), or null.
+     *
+     * Memoized per instance — vhost rendering asks for this several times per
+     * request (443 gate, cert-pair paths). Call
+     * flushCoveringServerWildcardCache() after installing a wildcard on a Site
+     * instance that may have already resolved this.
      */
     public function coveringServerWildcard(): ?ServerWildcardCertificate
     {
@@ -177,12 +189,23 @@ trait ResolvesSiteHostnames
             return null;
         }
 
-        return ServerWildcardCertificate::query()
-            ->where('server_id', $this->server_id)
-            ->where('zone', $zone)
-            ->where('status', ServerWildcardCertificate::STATUS_ACTIVE)
-            ->whereNotNull('last_installed_at')
-            ->first();
+        $key = $this->server_id.'|'.$zone;
+        if (! array_key_exists($key, $this->coveringServerWildcardCache)) {
+            $this->coveringServerWildcardCache[$key] = ServerWildcardCertificate::query()
+                ->where('server_id', $this->server_id)
+                ->where('zone', $zone)
+                ->where('status', ServerWildcardCertificate::STATUS_ACTIVE)
+                ->whereNotNull('last_installed_at')
+                ->first();
+        }
+
+        return $this->coveringServerWildcardCache[$key];
+    }
+
+    /** Drop the memoized coveringServerWildcard() results. */
+    public function flushCoveringServerWildcardCache(): void
+    {
+        $this->coveringServerWildcardCache = [];
     }
 
     /**

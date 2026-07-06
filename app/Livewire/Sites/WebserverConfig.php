@@ -71,7 +71,9 @@ class WebserverConfig extends Component
         Gate::authorize('view', $site);
 
         $this->server = $server;
-        $this->site = $site;
+        // The route already bound both models — pin the relation so nothing
+        // downstream (loadMissing/fresh) re-queries the server row.
+        $this->site = $site->setRelation('server', $server);
 
         // Headless sites (webserver=none) have no vhost/server block to edit.
         // The editor service throws on this case; redirect with a flash so
@@ -91,8 +93,11 @@ class WebserverConfig extends Component
         if (Gate::allows('update', $site)) {
             $hydrate = $editor->hydrateEditorFromServer($site, $profile);
             if ($hydrate['ok']) {
-                $this->site = $site->fresh(['server', 'webserverConfigProfile']);
-                $this->hydrateFromProfile($this->site->webserverConfigProfile ?? $profile->fresh());
+                // hydrateEditorFromServer mutates $profile/$site through the same
+                // instances (Eloquent update() syncs them in memory), so no fresh()
+                // round trip is needed — just pin the relation.
+                $this->site->setRelation('webserverConfigProfile', $profile);
+                $this->hydrateFromProfile($profile);
                 if ($hydrate['remote_config'] !== null) {
                     $this->remote_live_config = $hydrate['remote_config'];
                 }
