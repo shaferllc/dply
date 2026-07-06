@@ -110,12 +110,10 @@ final class SitePipelineAdvisor
             // (guarded on the package + command), so we don't suggest adding an
             // explicit horizon:terminate step anymore.
             //
-            // Octane: composer mentioning laravel/octane isn't enough — we only
-            // nudge `octane:reload` once a queued probe has confirmed Octane is
-            // actually installed AND serving this site (octane in composer but
-            // served by FPM would make the step a no-op / failure). The probe
-            // writes that verdict to meta; this render path only reads it.
-            if (! empty($detection['laravel_octane'])
+            // Octane: composer mentioning laravel/octane isn't enough — only nudge
+            // `octane:reload` when the operator enabled Octane in settings AND a
+            // queued probe confirmed it is actually serving this site.
+            if ($site->usesOctaneRuntime()
                 && OctaneRuntimeVerifier::verifiedWorking($site)
                 && ! $customMatches('octane:reload')) {
                 $out[] = self::make('octane', __('Reload Octane workers'),

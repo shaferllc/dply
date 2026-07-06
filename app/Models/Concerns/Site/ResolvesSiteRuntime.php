@@ -738,18 +738,34 @@ trait ResolvesSiteRuntime
      */
     public function shouldShowOctaneRuntimeUi(): bool
     {
+        return $this->hasOctanePackageInstalled();
+    }
+
+    /**
+     * Composer / runtime detection found `laravel/octane` — the package may be
+     * present but Octane is not the live runtime until {@see isOctaneEnabled()}.
+     */
+    public function hasOctanePackageInstalled(): bool
+    {
         return $this->resolvedLaravelPackageFlag('octane');
     }
 
     /**
-     * Whether Octane is the live runtime for this site — i.e. the operator saved
-     * an Octane port under Runtime / Laravel settings. Composer mentioning
-     * laravel/octane alone is not enough; the package may be installed but the
-     * app still serves through PHP-FPM until a port is configured.
+     * Operator saved an Octane port under Runtime / Laravel settings.
+     */
+    public function isOctaneEnabled(): bool
+    {
+        return (bool) $this->octane_port;
+    }
+
+    /**
+     * Whether Octane is installed AND enabled for this site — both composer
+     * package detection and a saved Octane port are required. Package alone
+     * still serves through PHP-FPM until a port is configured.
      */
     public function usesOctaneRuntime(): bool
     {
-        return (bool) $this->octane_port && $this->resolvedLaravelPackageFlag('octane');
+        return $this->isOctaneEnabled() && $this->hasOctanePackageInstalled();
     }
 
     /**

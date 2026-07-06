@@ -593,7 +593,13 @@
                 @if (! empty($resolvedDetection['laravel_octane']))
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Laravel Octane') }}</dt>
-                        <dd class="mt-1 text-sm font-medium text-brand-ink">{{ __('Yes — `laravel/octane` in composer.json') }}</dd>
+                        <dd class="mt-1 text-sm font-medium text-brand-ink">
+                            @if ($site->usesOctaneRuntime())
+                                {{ __('Enabled — serving on port :port', ['port' => $site->octane_port]) }}
+                            @else
+                                {{ __('Package detected (`laravel/octane` in composer.json) — set an Octane port under Laravel settings to enable') }}
+                            @endif
+                        </dd>
                     </div>
                 @endif
                 @if (! empty($resolvedDetection['laravel_horizon']))

@@ -180,10 +180,9 @@ class OptimizeSitePipelineJob implements ShouldQueue
             // managed restart (guarded on the package + command existing), so we
             // no longer add an explicit horizon:terminate step — it was redundant
             // and, in the release phase, bounced workers onto the old release.
-            // Only when the box-side probe confirmed Octane is installed AND
-            // serving this site — composer alone isn't enough (a require-dev /
-            // FPM-served app would make octane:reload a no-op or failure).
-            if (isset($require['laravel/octane']) && $octaneOk) {
+            // Only when Octane is enabled in site settings AND the box-side probe
+            // confirmed it is installed and serving — composer alone isn't enough.
+            if ($octaneOk) {
                 $needed[] = ['type' => SiteDeployStep::TYPE_CUSTOM, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => 'php artisan octane:reload', 'label' => 'Reload Octane'];
             }
         }
@@ -193,26 +192,25 @@ class OptimizeSitePipelineJob implements ShouldQueue
 
     /**
      * Probe Octane on the box (it's already connected), persist the verdict the
-     * advisor reads, and return whether it's installed AND serving. Returns
-     * false (and skips the probe) when composer doesn't declare laravel/octane.
+     * advisor reads, and return whether it's installed AND serving. Skipped when
+     * Octane is not enabled in site settings ({@see Site::usesOctaneRuntime()}).
      *
      * @param  array<string, mixed>|null  $composer
      */
     private function verifyOctane(SshConnection $conn, Site $site, string $dir, ?array $composer, ConsoleEmitter $emit): bool
     {
-        $require = is_array($composer['require'] ?? null) ? array_change_key_case($composer['require'], CASE_LOWER) : [];
-        if (! isset($require['laravel/octane'])) {
+        if (! $site->usesOctaneRuntime()) {
             return false;
         }
 
-        $port = filled($site->octane_port) ? (int) $site->octane_port : null;
+        $port = (int) $site->octane_port;
         $raw = $conn->exec(OctaneRuntimeVerifier::probeScript($dir, $port), 45);
         $verdict = OctaneRuntimeVerifier::interpret($raw);
         OctaneRuntimeVerifier::persist($site, $verdict);
 
         $emit->step('scan', $verdict['ok']
             ? 'Octane verified — installed and serving this site.'
-            : 'Octane is in composer but not serving this site — skipping octane:reload ('.$verdict['reason'].').');
+            : 'Octane is enabled in settings but not serving this site — skipping octane:reload ('.$verdict['reason'].').');
 
         return $verdict['ok'];
     }
