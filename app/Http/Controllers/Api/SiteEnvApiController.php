@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use Illuminate\Http\JsonResponse;
@@ -31,8 +32,26 @@ class SiteEnvApiController extends Controller
         $this->authorizeSite($request, $site);
 
         $keys = array_keys($parser->parse((string) ($site->env_file_content ?? ''))['variables']);
+        $rows = array_map(fn (string $k): array => ['key' => $k, 'managed' => false], $keys);
 
-        return response()->json(['data' => array_map(fn (string $k): array => ['key' => $k], $keys)]);
+        // Binding-injected keys (DB_HOST, REDIS_*, …) live outside the editable
+        // cache — SiteEnvPusher composes them into the deployed .env. Surface
+        // them as managed rows (key names only, same posture) so consumers see
+        // the full key set the running app actually receives.
+        $site->loadMissing('bindings');
+        foreach ($site->bindings as $binding) {
+            if ($binding->status !== SiteBinding::STATUS_CONFIGURED) {
+                continue;
+            }
+            foreach (array_keys($binding->connectionEnv()) as $key) {
+                if (! in_array($key, $keys, true)) {
+                    $keys[] = $key;
+                    $rows[] = ['key' => $key, 'managed' => true];
+                }
+            }
+        }
+
+        return response()->json(['data' => $rows]);
     }
 
     public function upsert(Request $request, Site $site, string $key, DotEnvFileParser $parser, DotEnvFileWriter $writer): JsonResponse
