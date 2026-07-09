@@ -177,7 +177,7 @@ final class ServerlessCustomDomainProvisioner
     public function remove(Site $site, string $hostname): void
     {
         $hostname = strtolower(trim($hostname));
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $routing = is_array($serverless['routing'] ?? null) ? $serverless['routing'] : [];
         $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
@@ -232,7 +232,7 @@ final class ServerlessCustomDomainProvisioner
      */
     private function updateEntry(Site $site, string $hostname, array $patch): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $routing = is_array($serverless['routing'] ?? null) ? $serverless['routing'] : [];
         $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];

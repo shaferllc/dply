@@ -127,6 +127,17 @@ return [
         'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
         'timeout_seconds' => 900,
         'artifact_max_bytes' => 524_288_000,
+        /*
+         * Where the per-deploy checkout lives before it is bind-mounted
+         * into the build container. This MUST be a path the Docker daemon
+         * is allowed to share: on macOS (Docker Desktop / OrbStack) a
+         * mount of an unshared path such as /var/tmp silently resolves to
+         * an EMPTY directory inside the container, and the build fails
+         * with a misleading "npm ci needs a package-lock.json". Defaults
+         * under storage/ (same convention as git_cache_dir) so it is
+         * always inside the project tree.
+         */
+        'work_root' => env('DPLY_EDGE_BUILD_WORK_ROOT', storage_path('app/edge-builds')),
         // Persistent --mirror clone per repo so repeated builds skip
         // re-downloading the full history. Set git_cache_enabled=false
         // to bypass the mirror and clone directly (slower, but useful

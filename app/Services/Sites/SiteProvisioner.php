@@ -582,7 +582,7 @@ class SiteProvisioner
      */
     private function updateProvisioning(Site $site, array $payload): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $existing = $site->provisioningMeta();
         $meta['provisioning'] = array_merge($existing, $payload);
 
@@ -605,7 +605,7 @@ class SiteProvisioner
      */
     public function appendLog(Site $site, string $level, string $step, string $message, array $context = []): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $existing = $site->provisioningMeta();
         $log = $existing['log'] ?? [];
         $log = is_array($log) ? $log : [];

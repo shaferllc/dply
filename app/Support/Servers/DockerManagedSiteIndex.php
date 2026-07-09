@@ -94,7 +94,7 @@ final class DockerManagedSiteIndex
 
     private static function siteUsesDockerStack(Site $site): bool
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         if (is_array($meta['docker_runtime'] ?? null)
             && (

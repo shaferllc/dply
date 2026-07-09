@@ -61,7 +61,7 @@ final class VmSiteComposerDetectionPersister
             }
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['vm_runtime'] = [
             'detected' => $detected,
             'detected_at' => now()->toIso8601String(),

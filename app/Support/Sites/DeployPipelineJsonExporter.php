@@ -108,7 +108,7 @@ final class DeployPipelineJsonExporter
      */
     private function exportRollout(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         return [
             'deploy_strategy' => (string) ($site->deploy_strategy ?? 'simple'),

@@ -20,7 +20,7 @@ final class DockerRuntimeSiteProvisioner implements SiteRuntimeProvisioner
 
     public function provision(Site $site): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $runtime = is_array($meta['docker_runtime'] ?? null) ? $meta['docker_runtime'] : [];
         $meta['docker_runtime'] = array_merge($runtime, [
             'compose_yaml' => $this->artifactBuilder->build($site),

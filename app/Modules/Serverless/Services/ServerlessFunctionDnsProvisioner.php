@@ -351,7 +351,7 @@ final class ServerlessFunctionDnsProvisioner
      */
     private function store(Site $site, array $payload): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $serverless['dns'] = $payload;
         $meta['serverless'] = $serverless;

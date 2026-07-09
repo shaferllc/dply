@@ -62,7 +62,7 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteBuildEnvVars(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $content = $meta['container']['build_env_file_content'] ?? '';
 
         return $this->parseEnvLines(is_string($content) ? $content : '');
@@ -74,7 +74,7 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteInstanceCount(Site $site): int
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $raw = $meta['container']['instance_count'] ?? null;
 
         return is_int($raw) && $raw > 0 ? $raw : 1;
@@ -93,7 +93,7 @@ trait ManagesDoAppDomainsEnv
      */
     private function siteSizeSlugForDo(Site $site): string
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
 
         return match ($tier) {

@@ -171,7 +171,7 @@ final class EdgeDeploymentConfirmSummary
             ];
         }
 
-        $repoConfig = ($deployment->repo_config );
+        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : [];
         $repoBuild = is_array($repoConfig['build'] ?? null) ? $repoConfig['build'] : [];
         foreach ($repoBuild as $key => $value) {
             if (! is_string($value) || $value === '') {

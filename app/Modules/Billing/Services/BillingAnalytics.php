@@ -409,7 +409,7 @@ final class BillingAnalytics
             ->limit(15)
             ->get(['trigger', 'status', 'changes', 'monthly_total_cents', 'error_message', 'created_at'])
             ->map(function (BillingSubscriptionSyncEvent $event): array {
-                $changes = ($event->changes );
+                $changes = is_array($event->changes) ? $event->changes : [];
 
                 return [
                     'created_at' => $event->created_at->toDateTimeString(),

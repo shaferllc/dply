@@ -134,7 +134,7 @@ trait ProvisionsDoAppPlatform
      */
     private function sourceSpec(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $source = $meta['container']['source'] ?? [];
         if (! is_array($source) || ! is_string($source['repo'] ?? null) || $source['repo'] === '') {
             throw new \RuntimeException('Site has no container source spec recorded — cannot provision from source.');

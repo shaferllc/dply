@@ -101,7 +101,7 @@ final class OpsCopilotContextBuilder
                 ->all();
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $repoConfig = $failure['repo_config'] ?? null;
         if ($repoConfig === null && is_array($meta['repo_config'] ?? null)) {
             $repoConfig = $meta['repo_config'];

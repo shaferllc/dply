@@ -215,7 +215,7 @@ class EdgeSsrBundleUploader
 
     public function scriptNameOnDeployment(EdgeDeployment $deployment): string
     {
-        $meta = ($deployment->meta );
+        $meta = is_array($deployment->meta) ? $deployment->meta : [];
         $ssr = is_array($meta['ssr'] ?? null) ? $meta['ssr'] : [];
 
         return is_string($ssr['script_name'] ?? null) ? trim($ssr['script_name']) : '';
@@ -223,7 +223,7 @@ class EdgeSsrBundleUploader
 
     private function persistScriptName(EdgeDeployment $deployment, string $scriptName): void
     {
-        $meta = ($deployment->meta );
+        $meta = is_array($deployment->meta) ? $deployment->meta : [];
         $ssr = is_array($meta['ssr'] ?? null) ? $meta['ssr'] : [];
         $ssr['script_name'] = $scriptName;
         $ssr['uploaded_at'] = now()->toIso8601String();
@@ -237,7 +237,7 @@ class EdgeSsrBundleUploader
      */
     private function clearScriptName(EdgeDeployment $deployment): void
     {
-        $meta = ($deployment->meta );
+        $meta = is_array($deployment->meta) ? $deployment->meta : [];
         $ssr = is_array($meta['ssr'] ?? null) ? $meta['ssr'] : [];
         unset($ssr['script_name']);
         $ssr['deleted_at'] = now()->toIso8601String();

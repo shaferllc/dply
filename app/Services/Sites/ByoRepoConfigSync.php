@@ -269,7 +269,7 @@ final class ByoRepoConfigSync
      */
     private function persistSnapshot(Site $site, ?array $payload): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         if ($payload === null) {
             unset($meta['byo']['repo_config']);
         } else {

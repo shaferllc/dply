@@ -913,7 +913,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             throw new \RuntimeException('Nginx config cleanup failed. Output: '.Str::limit($out, 2000));
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['nginx_cleanup_output'] = $out;
 
         $site->update(['meta' => $meta]);

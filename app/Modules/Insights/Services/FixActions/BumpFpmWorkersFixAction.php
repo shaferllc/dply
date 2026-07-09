@@ -212,7 +212,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
             return FixResult::failure(__('Validation or write failed during revert: :err', ['err' => $e->getMessage()]));
         }
 
-        $meta = ($finding->meta );
+        $meta = is_array($finding->meta) ? $finding->meta : [];
         unset($meta['backup_path']);
         $meta['revert_applied_at'] = now()->toIso8601String();
         $meta['revert_pool_path'] = $poolPath;
@@ -223,7 +223,7 @@ class BumpFpmWorkersFixAction implements InsightFixActionInterface, RevertableIn
 
     private function stampBackupPath(InsightFinding $finding, string $backupPath, int $newValue, int $previousValue): void
     {
-        $meta = ($finding->meta );
+        $meta = is_array($finding->meta) ? $finding->meta : [];
         $meta['backup_path'] = $backupPath;
         $meta['fix_change'] = [
             'pm_max_children_before' => $previousValue,

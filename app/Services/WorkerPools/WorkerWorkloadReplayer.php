@@ -205,7 +205,7 @@ class WorkerWorkloadReplayer
      */
     private function replicaSiteMeta(Site $sourceSite, string $pinnedSha = ''): array
     {
-        $meta = ($sourceSite->meta );
+        $meta = is_array($sourceSite->meta) ? $sourceSite->meta : [];
 
         // Drop per-site provisioning/runtime state so the clone starts clean,
         // but keep operator intent (repository config, git ref kind, choose_app).

@@ -61,7 +61,8 @@ class EdgeBuildRunner
         string $runtimeMode = self::MODE_STATIC,
         ?string $repoRoot = null,
     ): array {
-        $workRoot = rtrim(sys_get_temp_dir(), '/').'/dply-edge-build-'.$deployment->id;
+        $buildRoot = (string) config('edge.build.work_root') ?: sys_get_temp_dir();
+        $workRoot = rtrim($buildRoot, '/').'/dply-edge-build-'.$deployment->id;
         File::ensureDirectoryExists($workRoot);
         $checkout = $workRoot.'/src';
         $artifactDir = $workRoot.'/out';
@@ -76,7 +77,7 @@ class EdgeBuildRunner
         // filesystem (true for single-host dply deployments). Multi-host
         // setups will want a DB/Redis chunk stream instead — same UI on
         // top, different backing store.
-        $existingMeta = ($deployment->meta );
+        $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
         $deployment->update([
             'meta' => array_merge($existingMeta, ['local_build_log_path' => $buildLog]),
         ]);
@@ -177,7 +178,7 @@ class EdgeBuildRunner
                     $repoArr['contract'] = $contract;
                     $this->appendBuildLog($buildLog, "[dply-contract] Loaded promote requirements from repo.\n");
                 }
-                $yamlBindings = is_array($repoArr['bindings']) ? $repoArr['bindings'] : [];
+                $yamlBindings = is_array($repoArr['bindings'] ?? null) ? $repoArr['bindings'] : [];
 
                 // Merge dply.yaml `bindings:` + wrangler.toml discoveries.
                 // Both are co-equal declarative sources; on conflict

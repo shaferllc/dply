@@ -37,7 +37,7 @@ class CloudflareEdgeDelivery
 
         $artifactBytes = $this->artifactPublisher->directoryBytes($localArtifactDir);
         if ($artifactBytes > 0) {
-            $meta = ($deployment->meta );
+            $meta = is_array($deployment->meta) ? $deployment->meta : [];
             $deployment->update([
                 'meta' => array_merge($meta, ['artifact_bytes' => $artifactBytes]),
             ]);

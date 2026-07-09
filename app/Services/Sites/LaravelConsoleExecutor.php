@@ -76,7 +76,7 @@ final class LaravelConsoleExecutor
      */
     public function customCommands(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $raw = data_get($meta, 'laravel_console.custom_commands');
 
         if (! is_array($raw)) {

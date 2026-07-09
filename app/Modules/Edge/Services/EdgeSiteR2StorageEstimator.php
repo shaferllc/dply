@@ -36,7 +36,7 @@ final class EdgeSiteR2StorageEstimator
         $totals = [];
 
         foreach ($deployments as $deployment) {
-            $meta = ($deployment->meta );
+            $meta = is_array($deployment->meta) ? $deployment->meta : [];
             $bytes = (int) ($meta['artifact_bytes'] ?? 0);
             if ($bytes <= 0) {
                 continue;

@@ -49,7 +49,7 @@ class EdgeRepoBindingTranslator
      */
     public function bindingsFor(EdgeDeployment $deployment): array
     {
-        $config = ($deployment->repo_config );
+        $config = is_array($deployment->repo_config) ? $deployment->repo_config : [];
         $site = $deployment->site;
 
         // Resolve wrangler-declared bindings (titles → CF IDs, with

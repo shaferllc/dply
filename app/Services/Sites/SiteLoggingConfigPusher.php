@@ -45,7 +45,7 @@ class SiteLoggingConfigPusher
             return ['managed' => false, 'log' => "[dply] LOGGING → no managed logging binding; leaving repo's config/logging.php\n"];
         }
 
-        $spec = ($binding->config );
+        $spec = is_array($binding->config) ? $binding->config : [];
         $content = $this->generator->generate($spec);
 
         // Gate 1 — syntax, in dply (no round-trip to the box needed).

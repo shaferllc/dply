@@ -86,7 +86,7 @@ final class RequiredEnvEvaluator
             static fn (array $entry): bool => in_array('code', $entry['sources'], true),
         ));
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         if ($missing === []) {
             if (array_key_exists('deploy_blocked_env', $meta)) {

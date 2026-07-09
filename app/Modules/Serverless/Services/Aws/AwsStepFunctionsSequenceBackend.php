@@ -95,7 +95,7 @@ class AwsStepFunctionsSequenceBackend implements ServerlessSequenceBackend
      */
     private function componentNames(FunctionAction $sequence): array
     {
-        $components = ($sequence->components );
+        $components = is_array($sequence->components) ? $sequence->components : [];
 
         return array_values(array_filter(array_map(
             static fn (mixed $component): string => is_array($component) ? trim((string) ($component['name'] ?? '')) : '',

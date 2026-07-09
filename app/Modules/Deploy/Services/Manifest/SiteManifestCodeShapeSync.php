@@ -237,7 +237,7 @@ final class SiteManifestCodeShapeSync
     /** True when the manifest was removed from the repo but managed rows remain. */
     public function removalPendingConfirm(Site $site): bool
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         return (bool) ($meta['manifest']['removed_pending_confirm'] ?? false);
     }
@@ -264,7 +264,7 @@ final class SiteManifestCodeShapeSync
             return '';
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['manifest']['removed_pending_confirm'] = true;
         $site->forceFill(['meta' => $meta])->save();
 
@@ -274,7 +274,7 @@ final class SiteManifestCodeShapeSync
 
     private function clearRemovalFlag(Site $site): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         if (! isset($meta['manifest']['removed_pending_confirm'])) {
             return;
         }
@@ -329,14 +329,14 @@ final class SiteManifestCodeShapeSync
      */
     private function storePendingRuntimeChange(Site $site, array $change): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['manifest']['pending_runtime_change'] = $change;
         $site->forceFill(['meta' => $meta])->save();
     }
 
     private function clearPendingRuntimeChange(Site $site): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         if (! isset($meta['manifest']['pending_runtime_change'])) {
             return;
         }

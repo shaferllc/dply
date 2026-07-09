@@ -2,6 +2,7 @@
 
 namespace App\Modules\Notifications\Services;
 
+use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
@@ -73,6 +74,19 @@ class ResourceNotificationContextResolver
         }
 
         if ($subject instanceof SiteDeployment) {
+            $subject->loadMissing('site.server', 'site.organization');
+
+            return [
+                'organization_id' => $subject->site?->organization_id,
+                'team_id' => null,
+                'resource_type' => Site::class,
+                'resource_id' => $subject->site ? (string) $subject->site->getKey() : null,
+                'url' => $subject->site ? route('sites.show', [$subject->site->server, $subject->site], absolute: true) : null,
+                'stakeholder_user_ids' => $subject->site ? $this->siteStakeholders($subject->site) : [],
+            ];
+        }
+
+        if ($subject instanceof EdgeDeployment) {
             $subject->loadMissing('site.server', 'site.organization');
 
             return [

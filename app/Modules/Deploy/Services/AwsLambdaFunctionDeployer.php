@@ -52,7 +52,7 @@ final class AwsLambdaFunctionDeployer
                 $providerConfig,
             );
 
-        $siteMeta = ($site->meta );
+        $siteMeta = is_array($site->meta) ? $site->meta : [];
         $serverlessConfig = $site->serverlessConfig();
         $siteMeta['serverless'] = array_merge($serverlessConfig, [
             'target' => Server::HOST_KIND_AWS_LAMBDA,

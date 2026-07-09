@@ -28,7 +28,7 @@ trait BuildsDoAppSpec
      */
     public static function imageRegistryCredentialsFor(Site $site): ?string
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $credId = $meta['container']['image_credential_id'] ?? null;
         if (! is_string($credId) || $credId === '') {
             return null;
@@ -39,7 +39,7 @@ trait BuildsDoAppSpec
             return null;
         }
 
-        $body = ($cred->credentials );
+        $body = is_array($cred->credentials) ? $cred->credentials : [];
         $username = (string) ($body['username'] ?? '');
         $token = (string) ($body['token'] ?? $body['api_token'] ?? '');
         if ($username === '' || $token === '') {

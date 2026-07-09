@@ -125,7 +125,7 @@ class ServerlessEnvironmentPreparer
      */
     private function logIngestSecret(Site $site): string
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $secret = trim((string) ($serverless['log_ingest_secret'] ?? ''));
 

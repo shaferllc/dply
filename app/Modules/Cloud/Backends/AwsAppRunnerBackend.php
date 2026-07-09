@@ -140,7 +140,7 @@ class AwsAppRunnerBackend implements CloudBackend
 
         // Record the outcome note on the site's meta so the dashboard
         // / CLI can surface what actually happened on App Runner.
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $as = is_array($container['autoscaling'] ?? null) ? $container['autoscaling'] : [];
         if ($note === null) {
@@ -219,7 +219,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function sourceSpec(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $source = $meta['container']['source'] ?? [];
         if (! is_array($source) || ! is_string($source['repo'] ?? null) || $source['repo'] === '') {
             throw new \RuntimeException('Site has no container source spec recorded — cannot provision from source.');
@@ -368,7 +368,7 @@ class AwsAppRunnerBackend implements CloudBackend
         // first-class). For AWS, return a single synthetic "latest"
         // entry derived from local meta so the CLI / dashboard show
         // something instead of an empty list.
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $startedAt = is_string($container['last_deploy_started_at'] ?? null) ? (string) $container['last_deploy_started_at'] : null;
         $deploymentId = is_string($container['last_deployment_id'] ?? null) ? (string) $container['last_deployment_id'] : null;
@@ -534,7 +534,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function siteBuildEnvVars(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $content = $meta['container']['build_env_file_content'] ?? '';
 
         return $this->parseEnvLines(is_string($content) ? $content : '');
@@ -549,7 +549,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function siteInstanceCount(Site $site): int
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $raw = $meta['container']['instance_count'] ?? null;
 
         return is_int($raw) && $raw > 0 ? $raw : 1;
@@ -564,7 +564,7 @@ class AwsAppRunnerBackend implements CloudBackend
      */
     private function cpuMemoryForSite(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
 
         // AWS App Runner has one compute axis (CPU + RAM combo) and no

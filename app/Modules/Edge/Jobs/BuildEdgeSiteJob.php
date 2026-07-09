@@ -11,6 +11,7 @@ use App\Modules\Edge\Services\EdgeArtifactPublisher;
 use App\Modules\Edge\Services\EdgeBuildRunner;
 use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
 use App\Modules\Edge\Support\EdgeRepoRoot;
+use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -206,5 +207,29 @@ class BuildEdgeSiteJob implements ShouldQueue
             'failed_at' => now(),
             'failure_reason' => $message,
         ]);
+
+        // P9b: edge.deploy.failed — the publish phase has its own copy of this
+        // in PublishEdgeDeploymentJob, but a build that dies before publish
+        // (clone, dply.yaml lint, docker, install/build, artifact upload)
+        // never reached it, so the most common failure of all was silent.
+        try {
+            app(NotificationPublisher::class)->publish(
+                eventKey: 'edge.deploy.failed',
+                subject: $site->fresh(),
+                title: "Edge deploy failed: {$site->name}",
+                body: $message,
+                url: route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'edge-deploys']),
+                metadata: [
+                    'deployment_id' => (string) $deployment->id,
+                    'commit' => $deployment->git_commit,
+                    'branch' => $deployment->git_branch,
+                    'failure_reason' => $message,
+                    'phase' => 'build',
+                ],
+            );
+        } catch (Throwable) {
+            // Notification publish is best-effort — it must never mask the
+            // build error we were called to record.
+        }
     }
 }

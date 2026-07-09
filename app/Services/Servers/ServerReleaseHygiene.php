@@ -310,7 +310,7 @@ final class ServerReleaseHygiene
             return ['pct' => null, 'captured_at' => null];
         }
 
-        $payload = ($snapshot->payload );
+        $payload = is_array($snapshot->payload) ? $snapshot->payload : [];
         $pct = isset($payload['disk_pct']) ? (float) $payload['disk_pct'] : null;
 
         return [

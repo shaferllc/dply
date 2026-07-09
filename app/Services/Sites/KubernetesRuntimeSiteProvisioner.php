@@ -21,7 +21,7 @@ final class KubernetesRuntimeSiteProvisioner implements SiteRuntimeProvisioner
     public function provision(Site $site): void
     {
         $serverMeta = is_array($site->server?->meta) ? $site->server->meta : [];
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $runtime = is_array($meta['kubernetes_runtime'] ?? null) ? $meta['kubernetes_runtime'] : [];
         $namespace = (string) ($runtime['namespace'] ?? data_get($serverMeta, 'kubernetes.namespace', 'default'));
 

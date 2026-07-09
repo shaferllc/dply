@@ -63,7 +63,7 @@ class CloudScalingConfig
      */
     public static function autoscaling(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $raw = $meta['container']['autoscaling'] ?? [];
         if (! is_array($raw)) {
             $raw = [];
@@ -97,7 +97,7 @@ class CloudScalingConfig
      */
     public static function healthCheck(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $raw = $meta['container']['health_check'] ?? [];
         if (! is_array($raw)) {
             $raw = [];
@@ -203,7 +203,7 @@ class CloudScalingConfig
      */
     public static function persistAutoscaling(Site $site, array $config): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $container['autoscaling'] = $config;
         $meta['container'] = $container;
@@ -217,7 +217,7 @@ class CloudScalingConfig
      */
     public static function persistHealthCheck(Site $site, array $config): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $container['health_check'] = $config;
         $meta['container'] = $container;

@@ -301,7 +301,7 @@ class AtomicSiteDeployer
         // deployer, needed for dply's own self-deploy). Customer sites keep
         // per-release storage unless
         // they explicitly opt in. Default target = <project root>/shared/storage.
-        $deployMeta = ($site->meta );
+        $deployMeta = is_array($site->meta) ? $site->meta : [];
         if (! empty($deployMeta['shared_storage'])) {
             $sharedStorage = trim((string) ($deployMeta['shared_storage_path'] ?? ''));
             if ($sharedStorage === '') {
@@ -526,7 +526,7 @@ class AtomicSiteDeployer
                 'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
             ]]);
 
-            $meta = ($site->meta );
+            $meta = is_array($site->meta) ? $site->meta : [];
             $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? config('deploy.health_check_auto_rollback', true));
             if ($autoRollback && $previousActiveRelease !== null) {
                 try {

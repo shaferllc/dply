@@ -33,7 +33,7 @@ class LocalDockerKubernetesRuntimeManager
         File::put($dockerfilePath, $this->dockerfileBuilder->build($site));
         $this->dockerBuild($repositoryPath, $imageName);
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['kubernetes_runtime'] = array_merge($runtime, [
             'image_name' => $imageName,
             'last_built_at' => now()->toIso8601String(),

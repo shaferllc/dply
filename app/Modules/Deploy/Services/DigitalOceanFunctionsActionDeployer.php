@@ -94,7 +94,7 @@ final class DigitalOceanFunctionsActionDeployer
         $server = $site->server;
         $serverMeta = is_array($server->meta) ? $server->meta : [];
         $hostConfig = is_array($serverMeta['digitalocean_functions'] ?? null) ? $serverMeta['digitalocean_functions'] : [];
-        $siteMeta = ($site->meta );
+        $siteMeta = is_array($site->meta) ? $site->meta : [];
 
         $apiHost = rtrim((string) ($hostConfig['api_host'] ?? ''), '/');
         $namespace = trim((string) ($hostConfig['namespace'] ?? ''));

@@ -21,7 +21,7 @@ final class KubernetesDeployEngine implements DeployEngine
         $site = $context->site();
         if ($site->runtimeTargetFamily() === 'local_orbstack_kubernetes') {
             $result = $this->localRuntimeManager->deploy($site);
-            $siteMeta = ($site->meta );
+            $siteMeta = is_array($site->meta) ? $site->meta : [];
             $kubernetesRuntime = is_array($siteMeta['kubernetes_runtime'] ?? null) ? $siteMeta['kubernetes_runtime'] : [];
             $namespace = (string) ($kubernetesRuntime['namespace'] ?? 'default');
 
@@ -56,7 +56,7 @@ final class KubernetesDeployEngine implements DeployEngine
         }
 
         $serverMeta = is_array($site->server?->meta) ? $site->server->meta : [];
-        $siteMeta = ($site->meta );
+        $siteMeta = is_array($site->meta) ? $site->meta : [];
         $kubernetesRuntime = is_array($siteMeta['kubernetes_runtime'] ?? null) ? $siteMeta['kubernetes_runtime'] : [];
         $namespace = (string) ($kubernetesRuntime['namespace'] ?? $serverMeta['kubernetes']['namespace'] ?? 'default');
         $manifest = $this->manifestBuilder->build($site, $namespace);

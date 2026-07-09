@@ -100,7 +100,7 @@ final class SiteCloneAttributeMapper
      */
     private static function sanitizedMetaCopy(Site $source): array
     {
-        $meta = ($source->meta );
+        $meta = is_array($source->meta) ? $source->meta : [];
 
         unset(
             $meta['provisioning'],

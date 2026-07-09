@@ -204,7 +204,7 @@ class EdgeMiddlewareBundleUploader
 
     public function scriptNameOnDeployment(EdgeDeployment $deployment): string
     {
-        $meta = ($deployment->meta );
+        $meta = is_array($deployment->meta) ? $deployment->meta : [];
         $mw = is_array($meta['middleware'] ?? null) ? $meta['middleware'] : [];
 
         return is_string($mw['script_name'] ?? null) ? trim($mw['script_name']) : '';
@@ -215,7 +215,7 @@ class EdgeMiddlewareBundleUploader
      */
     private function persistScriptName(EdgeDeployment $deployment, string $scriptName, array $sidecarPayload): void
     {
-        $meta = ($deployment->meta );
+        $meta = is_array($deployment->meta) ? $deployment->meta : [];
         $mw = is_array($meta['middleware'] ?? null) ? $meta['middleware'] : [];
         $mw['script_name'] = $scriptName;
         $mw['source_path'] = is_string($sidecarPayload['source_path'] ?? null) ? $sidecarPayload['source_path'] : null;
@@ -230,7 +230,7 @@ class EdgeMiddlewareBundleUploader
      */
     private function clearScriptName(EdgeDeployment $deployment): void
     {
-        $meta = ($deployment->meta );
+        $meta = is_array($deployment->meta) ? $deployment->meta : [];
         $mw = is_array($meta['middleware'] ?? null) ? $meta['middleware'] : [];
         unset($mw['script_name']);
         $mw['deleted_at'] = now()->toIso8601String();

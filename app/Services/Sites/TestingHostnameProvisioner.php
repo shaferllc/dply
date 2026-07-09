@@ -323,7 +323,7 @@ class TestingHostnameProvisioner
             }
         }
 
-        $tenantMeta = ($tenant->meta );
+        $tenantMeta = is_array($tenant->meta) ? $tenant->meta : [];
         unset($tenantMeta['testing']);
         $tenant->forceFill(['meta' => $tenantMeta])->save();
     }
@@ -349,7 +349,7 @@ class TestingHostnameProvisioner
      */
     private function storeTenantResult(SiteTenantDomain $tenant, array $payload): void
     {
-        $meta = ($tenant->meta );
+        $meta = is_array($tenant->meta) ? $tenant->meta : [];
         $meta['testing'] = $payload;
         $tenant->forceFill(['meta' => $meta])->save();
         $tenant->setAttribute('meta', $meta);
@@ -791,7 +791,7 @@ class TestingHostnameProvisioner
      */
     private function storeResult(Site $site, array $payload): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['testing_hostname'] = $payload;
 
         $site->forceFill(['meta' => $meta])->save();

@@ -51,7 +51,7 @@ class CloudResourceCostCalculator
 
         // Web containers — size tier × instance count, per app.
         foreach ($cloudSites as $site) {
-            $meta = ($site->meta );
+            $meta = is_array($site->meta) ? $site->meta : [];
             $tier = (string) ($meta['container']['size_tier'] ?? 'small');
             $instances = max(1, (int) ($meta['container']['instance_count'] ?? 1));
             $total += $this->withMarkup($this->rate($containerRates, $tier), $markupPercent) * $instances;

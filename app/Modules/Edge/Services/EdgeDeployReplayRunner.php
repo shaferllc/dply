@@ -118,7 +118,7 @@ final class EdgeDeployReplayRunner
         ]);
 
         $preview = Site::query()->findOrFail($replay->preview_site_id);
-        $samples = ($replay->samples );
+        $samples = is_array($replay->samples) ? $replay->samples : [];
 
         if ($samples === []) {
             $replay->update([

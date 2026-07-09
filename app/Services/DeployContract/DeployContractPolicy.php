@@ -45,7 +45,7 @@ final class DeployContractPolicy
             }
         }
 
-        $promote = is_array($contract['promote']) ? $contract['promote'] : [];
+        $promote = is_array($contract['promote'] ?? null) ? $contract['promote'] : [];
         if ($requires === [] && isset($promote['requires']) && is_array($promote['requires'])) {
             foreach ($promote['requires'] as $key) {
                 if (is_string($key) && $key !== '') {

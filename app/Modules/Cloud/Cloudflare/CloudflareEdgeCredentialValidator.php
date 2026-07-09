@@ -62,7 +62,7 @@ class CloudflareEdgeCredentialValidator
 
     private function resolveAccountId(ProviderCredential $credential): string
     {
-        $creds = ($credential->credentials );
+        $creds = is_array($credential->credentials) ? $credential->credentials : [];
         $edge = is_array($creds['edge'] ?? null) ? $creds['edge'] : [];
 
         return trim((string) ($edge['account_id'] ?? ''));

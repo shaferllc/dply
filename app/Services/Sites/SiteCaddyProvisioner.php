@@ -80,7 +80,7 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
 
         $emit->success('reload OK', 'caddy');
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['caddy_last_output'] = $out;
 
         $site->update([
@@ -112,7 +112,7 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
             throw new \RuntimeException('Caddy config cleanup failed. Output: '.Str::limit($out, 2000));
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['caddy_cleanup_output'] = $out;
 
         $site->update(['meta' => $meta]);

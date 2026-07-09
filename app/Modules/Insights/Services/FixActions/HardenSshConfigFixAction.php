@@ -224,7 +224,7 @@ BASH;
             return FixResult::failure(mb_substr(trim($buffer), 0, 2000));
         }
 
-        $meta = ($finding->meta );
+        $meta = is_array($finding->meta) ? $finding->meta : [];
         unset($meta['backup_path']);
         $meta['revert_applied_at'] = now()->toIso8601String();
         $finding->forceFill(['meta' => $meta])->save();
@@ -250,7 +250,7 @@ CFG;
 
     private function stampBackup(InsightFinding $finding, string $path): void
     {
-        $meta = ($finding->meta );
+        $meta = is_array($finding->meta) ? $finding->meta : [];
         $meta['backup_path'] = $path;
         $meta['fix_change'] = [
             'snippet_path' => $path,

@@ -16,7 +16,7 @@ class ContainerPublicationManager
 
     public function provision(Site $site): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $runtimeTarget = is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : [];
         $publication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 
@@ -152,7 +152,7 @@ class ContainerPublicationManager
 
     private function storePublicationStatus(Site $site, string $status): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $runtimeTarget = is_array($meta['runtime_target'] ?? null) ? $meta['runtime_target'] : [];
         $publication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 
