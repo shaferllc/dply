@@ -297,7 +297,7 @@ trait ManagesMailBindings
                 throw new InvalidArgumentException(__('That saved mail credential is no longer available.'));
             }
 
-            return ($cred->credentials );
+            return is_array($cred->credentials) ? $cred->credentials : [];
         }
 
         return match ($provider) {

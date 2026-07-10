@@ -173,7 +173,7 @@ final class StandbyBlueprintPlanner
                 'id' => (string) $server->id,
                 'name' => (string) $server->name,
                 'status' => (string) $server->status,
-                'ip_address' => ($server->ip_address ),
+                'ip_address' => is_string($server->ip_address) ? $server->ip_address : null,
                 'href' => route('servers.overview', $server),
             ];
         }

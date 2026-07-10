@@ -115,7 +115,7 @@ class SiteLoggingConfigPusher
             return null;
         }
 
-        return LoggingSpec::isV2(($binding->config )) ? $binding : null;
+        return LoggingSpec::isV2(is_array($binding->config) ? $binding->config : null) ? $binding : null;
     }
 
     private function lintLocally(string $content): void

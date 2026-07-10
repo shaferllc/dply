@@ -217,7 +217,7 @@ final class EdgeCustomDomainProvisioner
 
         $routing['custom_domains'] = $domains;
         $meta['routing'] = $routing;
-        $site->update(['meta' => array_merge(($site->meta ), ['edge' => $meta])]);
+        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta])]);
 
         try {
             $this->hostMapPublisher->unpublishHostname($site, $hostname, $this->contextResolver->forSite($site));
@@ -251,7 +251,7 @@ final class EdgeCustomDomainProvisioner
 
         $routing['custom_domains'] = $domains;
         $meta['routing'] = $routing;
-        $site->update(['meta' => array_merge(($site->meta ), ['edge' => $meta])]);
+        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta])]);
 
         ResolveEdgeCustomDomain::invalidateHostMap();
 

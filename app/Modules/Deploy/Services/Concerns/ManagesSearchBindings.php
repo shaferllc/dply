@@ -84,7 +84,7 @@ trait ManagesSearchBindings
                 throw new InvalidArgumentException(__('That saved search credential is no longer available.'));
             }
 
-            return ($cred->credentials );
+            return is_array($cred->credentials) ? $cred->credentials : [];
         }
 
         return match ($provider) {

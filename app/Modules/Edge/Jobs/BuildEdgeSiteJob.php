@@ -116,13 +116,16 @@ class BuildEdgeSiteJob implements ShouldQueue
                 'committed_at' => $buildResult['git_commit_at'] ?? null,
             ], fn ($value) => is_string($value) && $value !== '');
             if ($commitMeta !== []) {
-                $existingMeta = $deployment->meta;
+                $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
                 $updates['meta'] = array_merge($existingMeta, ['commit' => $commitMeta]);
             }
             $deployment->update($updates);
 
             if (! Site::query()->whereKey($site->id)->exists()) {
-                if (is_dir($artifactDir) && str_contains($artifactDir, sys_get_temp_dir())) {
+                // Same containment rule as PublishEdgeDeploymentJob: only ever
+                // recurse inside the configured build root. A hardcoded temp-dir
+                // check stops matching the moment work_root moves.
+                if (is_dir($artifactDir) && str_starts_with($artifactDir, EdgeBuildRunner::buildRoot())) {
                     File::deleteDirectory($workRoot);
                 }
 
@@ -200,7 +203,7 @@ class BuildEdgeSiteJob implements ShouldQueue
         $meta['last_error_at'] = now()->toIso8601String();
         $site->update([
             'status' => Site::STATUS_EDGE_FAILED,
-            'meta' => array_merge($site->meta, ['edge' => $meta]),
+            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
         ]);
         $deployment->update([
             'status' => EdgeDeployment::STATUS_FAILED,

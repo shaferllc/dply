@@ -107,7 +107,7 @@ class PromoteEdgePreview
 
         $parent->update([
             'status' => Site::STATUS_EDGE_ACTIVE,
-            'meta' => array_merge($parent->meta, ['edge' => $meta]),
+            'meta' => array_merge(is_array($parent->meta) ? $parent->meta : [], ['edge' => $meta]),
         ]);
 
         return $deployment->refresh();

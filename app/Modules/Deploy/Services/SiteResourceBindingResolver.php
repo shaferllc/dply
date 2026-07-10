@@ -168,7 +168,7 @@ final class SiteResourceBindingResolver
                 status: (string) ($row->status ?: $derived->status),
                 source: 'binding',
                 name: $row->name ?: $derived->name,
-                config: array_merge($derived->config, ($row->config ), [
+                config: array_merge($derived->config, is_array($row->config) ? $row->config : [], [
                     'last_error' => $row->last_error,
                 ]),
                 bindingId: (string) $row->id,

@@ -181,7 +181,7 @@ final class OpsCopilotContextBuilder
                 'log_excerpt' => $excerpt,
                 'exit_code' => null,
                 'failed_at' => $edgeAt?->toIso8601String(),
-                'repo_config' => ($edge->repo_config ),
+                'repo_config' => is_array($edge->repo_config) ? $edge->repo_config : null,
             ];
         }
 
