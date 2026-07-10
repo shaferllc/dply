@@ -231,6 +231,27 @@ class EdgeBuildRunner
                         $this->appendBuildLog($buildLog, "[bindings] wrangler.toml: {$kind}.{$bindingName} → '{$value}'\n");
                     }
                 }
+
+                // bindings.dply — resolve sibling dply-resource refs now so the
+                // operator sees each one's status in the build log. Injection
+                // happens later at upload (EdgeRepoBindingTranslator) with a
+                // fresh resolve; this pass is validation + visibility only, and
+                // never persists a connection secret into repo_config.
+                $dplyRefs = is_array($merged['dply'] ?? null) ? $merged['dply'] : [];
+                if ($dplyRefs !== [] && $site !== null) {
+                    foreach (app(EdgeDplyResourceResolver::class)->resolve($site, $dplyRefs) as $r) {
+                        $label = match ($r['status']) {
+                            'public' => 'bound as secret',
+                            'private' => 'via origin',
+                            default => 'unresolved',
+                        };
+                        $suffix = $r['warning'] !== null ? ' — '.$r['warning'] : '';
+                        $this->appendBuildLog($buildLog, "[bindings] dply: {$r['env_name']} → {$r['ref']} ({$label}){$suffix}\n");
+                    }
+                } elseif ($dplyRefs !== []) {
+                    $this->appendBuildLog($buildLog, "[bindings] dply: refs declared but this build has no site context — skipped.\n");
+                }
+
                 // Resolve `error_pages.html_404_path` / `html_500_path` /
                 // `maintenance.html_path` to inline HTML so downstream
                 // consumers (host map publisher) don't need filesystem

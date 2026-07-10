@@ -31,6 +31,7 @@ class EdgeRepoBindingTranslator
     public function __construct(
         private readonly EdgeBindingsAutoResolver $autoResolver,
         private readonly EnsureDefaultEdgeBindings $defaultBindings,
+        private readonly EdgeDplyResourceResolver $dplyResources,
     ) {}
 
     /**
@@ -110,6 +111,28 @@ class EdgeRepoBindingTranslator
                     'd1' => ['name' => $row['name'], 'type' => 'd1', 'id' => $row['value']],
                     'queue' => ['name' => $row['name'], 'type' => 'queue', 'queue_name' => $row['value']],
                 };
+            }
+        }
+
+        // bindings.dply — native references to sibling dply-managed resources
+        // (Postgres/Redis/queue/storage in the same workspace). Resolved FRESH
+        // here at upload time — never snapshotted into repo_config — so the
+        // connection secret is always current and never persisted in cleartext.
+        // Only publicly-reachable resources yield a secret_text value; private
+        // VM resources resolve to no secret (they route via hybrid origin).
+        $dplyRefs = is_array($config['bindings']['dply'] ?? null) ? $config['bindings']['dply'] : [];
+        if ($dplyRefs !== [] && $site instanceof Site) {
+            $used = array_column($out, 'name');
+            foreach ($this->dplyResources->resolve($site, $dplyRefs) as $resolved) {
+                $name = $resolved['env_name'];
+                if ($resolved['status'] !== 'public' || $resolved['value'] === null) {
+                    continue;
+                }
+                if (! $this->isUsableName($name) || in_array($name, $used, true)) {
+                    continue;
+                }
+                $used[] = $name;
+                $out[] = ['name' => $name, 'type' => 'secret_text', 'text' => $resolved['value']];
             }
         }
 

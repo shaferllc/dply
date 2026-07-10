@@ -128,13 +128,18 @@ class EdgeRepoConfigLoader
      *       MAIN_DB: "<database_id>"
      *     queues:
      *       JOBS: "queue-name"
+     *     dply:
+     *       DATABASE_URL: database.main   # a sibling dply resource ref
+     *       REDIS_URL:    redis.cache
      *
      * Names must be ALL_CAPS_WITH_UNDERSCORES (CF binding convention).
-     * Values can be CF resource ids or titles — the auto-resolver
-     * creates the resource on first use when given a title.
+     * kv/r2/d1/queues values can be CF resource ids or titles — the
+     * auto-resolver creates the resource on first use when given a title.
+     * dply values are "<kind>.<name>" refs to a sibling dply-managed
+     * resource, resolved at deploy time by EdgeDplyResourceResolver.
      *
      * @param  array<string, mixed> $warnings
-     * @return array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>}
+     * @return array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>, dply?: array<string, string>}
      */
     private function normalizeBindings(mixed $value, array &$warnings): array
     {
@@ -164,6 +169,32 @@ class EdgeRepoConfigLoader
             }
             if ($clean !== []) {
                 $out[$kind] = $clean;
+            }
+        }
+
+        // bindings.dply — references to sibling dply-managed resources
+        // (ENV_NAME: "<kind>.<name>", e.g. DATABASE_URL: database.main). Unlike
+        // the CF kinds above, the value is a RESOURCE REF resolved at deploy
+        // time against the site's workspace (see EdgeDplyResourceResolver); the
+        // loader is context-free, so it only shape-validates the ref syntax.
+        $dply = $value['dply'] ?? null;
+        if (is_array($dply) && $dply !== []) {
+            $clean = [];
+            foreach ($dply as $name => $ref) {
+                if (! is_string($name) || preg_match('/^[A-Z][A-Z0-9_]{0,63}$/', $name) !== 1) {
+                    $warnings[] = sprintf('bindings.dply.%s — names must be ALL_CAPS_WITH_UNDERSCORES.', (string) $name);
+
+                    continue;
+                }
+                if (! is_string($ref) || preg_match('/^[a-z_]+\.[a-z0-9][a-z0-9_.-]*$/', trim($ref)) !== 1) {
+                    $warnings[] = sprintf('bindings.dply.%s — value must be a "<kind>.<name>" reference (e.g. database.main).', $name);
+
+                    continue;
+                }
+                $clean[$name] = trim($ref);
+            }
+            if ($clean !== []) {
+                $out['dply'] = $clean;
             }
         }
 

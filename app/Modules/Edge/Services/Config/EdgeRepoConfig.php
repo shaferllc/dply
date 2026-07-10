@@ -28,7 +28,7 @@ final class EdgeRepoConfig
      * @param  array{country_mode?: string, countries?: list<string>}  $firewall
      * @param  array{url?: string, routes?: list<string>, failover_html?: string}  $origin
      * @param  array{allowed_hosts?: list<string>}  $images
-     * @param  array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>}  $bindings
+     * @param  array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>, dply?: array<string, string>}  $bindings
      * @param  array{html_404?: string, html_500?: string, html_404_path?: string, html_500_path?: string}  $errorPages
      * @param  array{enabled?: bool, html?: string, html_path?: string}  $maintenance
      * @param  list<string>  $domains

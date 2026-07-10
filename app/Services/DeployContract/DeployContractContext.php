@@ -10,7 +10,10 @@ use App\Models\User;
 
 final class DeployContractContext
 {
-    /** @param  array<string, mixed> $linkedByoSites */
+    /**
+     * @param  array<string, mixed> $linkedByoSites
+     * @param  array<int, Site> $linkedBackendSites  dply.yaml `site.<name>` backend refs
+     */
     public function __construct(
         public Site $parent,
         public Site $preview,
@@ -19,5 +22,6 @@ final class DeployContractContext
         public DeployContractPolicy $policy = new DeployContractPolicy,
         public ?Site $linkedCloudSite = null,
         public array $linkedByoSites = [],
+        public array $linkedBackendSites = [],
     ) {}
 }

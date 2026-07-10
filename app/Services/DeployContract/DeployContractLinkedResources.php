@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\DeployContract;
 
+use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Modules\Edge\Services\EdgeDplyResourceResolver;
 use Illuminate\Support\Collection;
 
 /**
@@ -68,6 +70,25 @@ final class DeployContractLinkedResources
                 return is_string($siteRepo) && $this->normalizeRepo($siteRepo) === $repo;
             })
             ->values();
+    }
+
+    /**
+     * Backend Sites referenced by the promoted deployment's `bindings.dply`
+     * `site.<name>` refs — the frontend→backend link the backend-health gate
+     * protects. Resolved off the EdgeDeployment being promoted (that's what
+     * carries the repo_config), delegating to the Edge resolver.
+     *
+     * @return Collection<int, Site>
+     */
+    public function linkedDplyBackendSites(Site $parent, ?EdgeDeployment $deployment): Collection
+    {
+        $config = is_array($deployment?->repo_config) ? $deployment->repo_config : [];
+        $refs = $config['bindings']['dply'] ?? null;
+        if (! is_array($refs) || $refs === []) {
+            return collect();
+        }
+
+        return app(EdgeDplyResourceResolver::class)->resolveBackendSites($parent, $refs);
     }
 
     private function normalizeRepo(string $url): string

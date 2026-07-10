@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Modules\Edge\Services\EdgeArtifactPublisher;
 use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
 use App\Modules\Edge\Services\EdgeRouter;
+use App\Services\DeployContract\DeployContractState;
 use Illuminate\Support\Str;
 
 /**
@@ -49,6 +50,20 @@ class PromoteEdgePreview
 
         if ($previewDeployment->storage_prefix === null || $previewDeployment->storage_prefix === '') {
             throw new \RuntimeException('Preview artifacts were pruned — redeploy the preview before promoting.');
+        }
+
+        // Deploy-contract promote gate — enforced HERE (not just in the Livewire
+        // confirm UI) so every entry point (API, direct action call) honours it.
+        // Reuses the same decision function the UI consults, so waivers and the
+        // feature flag are respected identically; no-op when the contract is off.
+        $contractState = app(DeployContractState::class);
+        if ($contractState->enabled()) {
+            $blocked = $contractState->promoteBlockedMessage(
+                $contractState->forPreview($parent, $preview),
+            );
+            if ($blocked !== null) {
+                throw new \RuntimeException($blocked);
+            }
         }
 
         $backend = EdgeRouter::backendFor($parent);

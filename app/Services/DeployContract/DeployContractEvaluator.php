@@ -8,6 +8,7 @@ use App\Models\DeployContractRun;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\DeployContract\Checks\BackendHealthyCheck;
 use App\Services\DeployContract\Checks\ByoLinkedDeployHealthCheck;
 use App\Services\DeployContract\Checks\CloudOriginHealthCheck;
 use App\Services\DeployContract\Checks\EdgeDeployReplayPassCheck;
@@ -29,6 +30,7 @@ final class DeployContractEvaluator
         EdgeHybridOriginHealthCheck::class,
         CloudOriginHealthCheck::class,
         ByoLinkedDeployHealthCheck::class,
+        BackendHealthyCheck::class,
     ];
 
     public function __construct(
@@ -139,6 +141,7 @@ final class DeployContractEvaluator
         $contractBlock = is_array($repoConfig['contract'] ?? null) ? $repoConfig['contract'] : null;
         $policy = DeployContractPolicy::fromRepoConfig($contractBlock);
         $linked = $this->linkedResources->forParent($parent);
+        $backendSites = $this->linkedResources->linkedDplyBackendSites($parent, $previewDeployment)->all();
 
         return new DeployContractContext(
             $parent,
@@ -148,6 +151,7 @@ final class DeployContractEvaluator
             $policy,
             $linked['cloud'],
             $linked['byo'],
+            $backendSites,
         );
     }
 
