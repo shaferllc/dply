@@ -251,8 +251,14 @@ Edge sites with no Edge-specific machinery.
 - Every publish is best-effort — a dead channel must never fail a good deploy,
   nor mask the build error on the failure path
 
-Not shipped: `deploy.duration_regressed` (>1.5× rolling p50), and a per-rule
-"Test" button.
+`edge.deploy.duration_regressed` fires from `EdgeDeployDurationRegression` —
+median (not mean) of the last N successful deploys, `min_samples` before it can
+alert, all knobs under `config('edge.duration_regression')`.
+
+The proposed per-rule "Test" button needs no work: it presumed the
+`edge_notification_rules` table that was never built, and the existing
+per-channel test (`ManagesNotificationChannels::sendTest`) already covers
+Slack / Discord / email.
 
 ### 9c — Audit log (Wave E) ✅ shipped
 
