@@ -27,6 +27,13 @@ test('resolves artisan install steps', function (string $type, string $expected)
     ]);
     $runner = new class extends SiteDeployPipelineRunner
     {
+        public function __construct()
+        {
+            // Bypass the parent constructor — resolveCommand() never touches the
+            // injected DeployHookRunner, and constructing one here would drag in
+            // the whole hook stack for a pure string-resolution test.
+        }
+
         public function publicResolve(SiteDeployStep $step): ?string
         {
             return $this->resolveShellCommand($step);

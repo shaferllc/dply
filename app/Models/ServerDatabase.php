@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -33,6 +34,9 @@ use Illuminate\Support\Str;
  */
 class ServerDatabase extends Model
 {
+    /** @use HasFactory<\Database\Factories\ServerDatabaseFactory> */
+    use HasFactory;
+
     use HasUlids;
 
     protected $table = 'server_databases';

@@ -4,19 +4,26 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Logs\LogExplorerWindowTest;
 
+use ArrayObject;
 use App\Models\Server;
 use App\Modules\Logs\Services\ClickHouseClient;
 use App\Modules\Logs\Services\LogExplorerQuery;
 use Illuminate\Support\Carbon;
 use Mockery;
 
-/** @return array{0: LogExplorerQuery, 1: array<string, mixed>} */
+/**
+ * The capture bag must be an object, not an array. An array is returned BY VALUE
+ * while it is still empty, so the closure's later writes land on a copy the test
+ * never sees and every $captured['sql'] read is an undefined-key error.
+ *
+ * @return array{0: LogExplorerQuery, 1: ArrayObject<string, mixed>}
+ */
 function explorerCapturing(): array
 {
-    $captured = [];
+    $captured = new ArrayObject;
     $ch = Mockery::mock(ClickHouseClient::class);
     $ch->shouldReceive('qualifiedTable')->andReturn('dply_logs.server_logs');
-    $ch->shouldReceive('select')->andReturnUsing(function (string $sql, array $params) use (&$captured) {
+    $ch->shouldReceive('select')->andReturnUsing(function (string $sql, array $params) use ($captured) {
         $captured['sql'] = $sql;
         $captured['params'] = $params;
 
