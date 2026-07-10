@@ -7,6 +7,7 @@ namespace App\Modules\Edge\Jobs;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Modules\Edge\Services\EdgeBuildRunner;
+use App\Modules\Edge\Services\EdgeDeployDurationRegression;
 use App\Modules\Edge\Services\EdgeDeploymentPruner;
 use App\Modules\Edge\Services\EdgeGithubCheckRunService;
 use App\Modules\Edge\Services\EdgeGithubPullRequestCommenter;
@@ -203,13 +204,47 @@ class PublishEdgeDeploymentJob implements ShouldQueue
                         'commit' => $deployment->git_commit,
                         'branch' => $deployment->git_branch,
                         'live_url' => $liveUrl,
+                        // Earlier->later: Carbon 3's signed diff made the old
+                        // reversed order negative, which max(0, …) clamped to 0,
+                        // so this metric had always reported zero.
                         'duration_ms' => $deployment->published_at && $deployment->created_at
-                            ? max(0, $deployment->published_at->diffInMilliseconds($deployment->created_at))
+                            ? max(0, $deployment->created_at->diffInMilliseconds($deployment->published_at))
                             : null,
                     ],
                 );
             } catch (Throwable) {
                 // Notification publish is best-effort.
+            }
+
+            // P9b: edge.deploy.duration_regressed — the deploy succeeded, it
+            // was just markedly slower than this site's recent norm. Advisory,
+            // so it rides alongside the success notification rather than
+            // replacing it.
+            try {
+                $regression = app(EdgeDeployDurationRegression::class)->evaluate($deployment->fresh());
+                if ($regression !== null) {
+                    app(NotificationPublisher::class)->publish(
+                        eventKey: 'edge.deploy.duration_regressed',
+                        subject: $site->fresh(),
+                        title: "Edge deploy slower than usual: {$site->name}",
+                        body: sprintf(
+                            'This deploy took %ss, %sx the median of the last %d deploys (%ss).',
+                            round($regression['duration_ms'] / 1000, 1),
+                            $regression['ratio'],
+                            $regression['samples'],
+                            round($regression['p50_ms'] / 1000, 1),
+                        ),
+                        url: $liveUrl,
+                        metadata: [
+                            'deployment_id' => (string) $deployment->id,
+                            'commit' => $deployment->git_commit,
+                            'branch' => $deployment->git_branch,
+                            ...$regression,
+                        ],
+                    );
+                }
+            } catch (Throwable) {
+                // Regression detection is advisory — never fail a live deploy.
             }
         } catch (Throwable $e) {
             $this->markFailed($site, $deployment, $e->getMessage());

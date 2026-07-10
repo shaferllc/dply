@@ -148,6 +148,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Deploy duration regression (edge.deploy.duration_regressed)
+    |--------------------------------------------------------------------------
+    | After a deploy goes live we compare its wall-clock duration against the
+    | median (p50) of the site's recent successful deploys. Slower than
+    | `multiplier` x p50 raises `edge.deploy.duration_regressed`.
+    |
+    | The median — not the mean — is deliberate: a single pathological build
+    | (cold Docker cache, npm registry stall) would drag a mean upward and mask
+    | every later regression. `min_samples` suppresses the alert until there is
+    | enough history for a p50 to mean anything; without it the very first
+    | couple of deploys on a new site alert against a baseline of one.
+    */
+    'duration_regression' => [
+        'enabled' => filter_var(env('DPLY_EDGE_DURATION_REGRESSION', true), FILTER_VALIDATE_BOOLEAN),
+        'window' => (int) env('DPLY_EDGE_DURATION_REGRESSION_WINDOW', 10),
+        'min_samples' => (int) env('DPLY_EDGE_DURATION_REGRESSION_MIN_SAMPLES', 5),
+        'multiplier' => (float) env('DPLY_EDGE_DURATION_REGRESSION_MULTIPLIER', 1.5),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention
     |--------------------------------------------------------------------------
     | Per-site override lives in sites.releases_to_keep (1..50). This value is

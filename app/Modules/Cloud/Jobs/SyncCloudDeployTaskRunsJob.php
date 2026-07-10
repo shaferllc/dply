@@ -113,7 +113,9 @@ class SyncCloudDeployTaskRunsJob implements ShouldQueue
             $finishedAt = $this->parseTimestamp($job['phase_last_updated_at'] ?? $detail['phase_last_updated_at'] ?? null);
             $status = $this->mapJobStatus((string) ($job['status'] ?? ''));
             $exitCode = is_numeric($job['exit_code'] ?? null) ? (int) $job['exit_code'] : null;
-            $duration = ($startedAt && $finishedAt) ? max(0, $finishedAt->diffInMilliseconds($startedAt)) : null;
+            // Earlier->later. Carbon 3's diff is signed, so the reversed order
+            // yielded a negative that max(0, …) clamped to 0 on every run.
+            $duration = ($startedAt && $finishedAt) ? max(0, $startedAt->diffInMilliseconds($finishedAt)) : null;
 
             CloudDeployTaskRun::query()->create([
                 'cloud_deploy_task_id' => $task->id,

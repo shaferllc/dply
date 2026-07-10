@@ -218,6 +218,7 @@ return [
             'events' => [
                 'edge.deploy.succeeded' => 'Edge deploy succeeded',
                 'edge.deploy.failed' => 'Edge deploy failed (action required)',
+                'edge.deploy.duration_regressed' => 'Edge deploy got noticeably slower',
                 'edge.domain.verified' => 'Custom domain verified',
                 'edge.domain.failing' => 'Custom domain verification failing (action required)',
                 'edge.usage.over_budget' => 'Edge usage over budget (action required)',
