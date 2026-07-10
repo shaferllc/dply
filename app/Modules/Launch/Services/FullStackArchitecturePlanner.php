@@ -152,7 +152,7 @@ final class FullStackArchitecturePlanner
         return new FullStackLaunchPlan(
             repo: $repo,
             branch: $branch,
-            isMonorepo: (bool) ($monorepo['is_monorepo']),
+            isMonorepo: (bool) ($monorepo['is_monorepo'] ?? false),
             layers: $layers,
             wiringHints: $this->wiringHints($layers),
             reasons: $reasons,
@@ -187,7 +187,7 @@ final class FullStackArchitecturePlanner
             $targets[] = [
                 'path' => $absolute,
                 'repo_root' => $relative,
-                'label' => (string) ($package['label']),
+                'label' => (string) ($package['label'] ?? $relative),
             ];
         }
 

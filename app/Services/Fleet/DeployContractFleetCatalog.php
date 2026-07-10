@@ -64,7 +64,7 @@ final class DeployContractFleetCatalog
                     'branch' => isset($edge['preview_branch']) ? (string) $edge['preview_branch'] : null,
                     'status' => is_string($contract['status'] ?? null) ? $contract['status'] : null,
                     'ready' => ! empty($contract['ready_to_promote']),
-                    'failed_count' => (int) ($contract['failed_count']),
+                    'failed_count' => (int) ($contract['failed_count'] ?? 0),
                     'href' => route('sites.preview-comments', [
                         'server' => $preview->server_id,
                         'site' => $preview,

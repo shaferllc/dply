@@ -116,7 +116,7 @@ SH;
         $total['mem_mb'] = round($total['mem_kb'] / 1024, 1);
 
         $attributedMem = array_sum(array_column($sites, 'mem_kb'));
-        $attributedCpu = array_sum(array_map(static fn (array $row): float => (float) ($row['cpu_pct']), $sites));
+        $attributedCpu = array_sum(array_map(static fn (array $row): float => (float) ($row['cpu_pct'] ?? 0), $sites));
 
         $unattributedMem = max(0, $total['mem_kb'] - $attributedMem);
         $unattributedCpu = max(0.0, $total['cpu_pct'] - $attributedCpu);

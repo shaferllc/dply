@@ -39,7 +39,7 @@ final class ServerCostCard
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
         $hardware = $this->hardware($server, $tier);
-        $providerCents = (int) ($provider['monthly_usd_cents']);
+        $providerCents = (int) ($provider['monthly_usd_cents'] ?? 0);
         $stackCents = $providerCents + $dplyCents;
         $providerKnown = ($provider['source'] ?? '') !== 'unknown';
 

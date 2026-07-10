@@ -109,7 +109,7 @@ class DesiredBillingState
             $normalized[$tier->value] = max(0, (int) ($tierQuantities[$tier->value] ?? 0));
         }
 
-        $planPriceCents = max(0, (int) ($plan['price_cents']));
+        $planPriceCents = max(0, (int) ($plan['price_cents'] ?? 0));
 
         $serverlessCount = max(0, $serverlessCount);
         $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);

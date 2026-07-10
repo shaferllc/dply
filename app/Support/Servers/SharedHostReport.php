@@ -35,8 +35,8 @@ final class SharedHostReport
 
         return [
             'overall' => $overall,
-            'solo_tenant' => (bool) ($attribution['solo_tenant']),
-            'site_count' => (int) ($attribution['site_count']),
+            'solo_tenant' => (bool) ($attribution['solo_tenant'] ?? true),
+            'site_count' => (int) ($attribution['site_count'] ?? 0),
             'attribution' => $attribution,
             'attribution_range' => $attributionRange,
             'shared_map' => $sharedMap,

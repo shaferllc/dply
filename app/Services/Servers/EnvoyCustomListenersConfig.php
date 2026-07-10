@@ -76,7 +76,7 @@ class EnvoyCustomListenersConfig
             if (($existing['name'] ?? '') === $row['name']) {
                 throw new \RuntimeException("A listener named `{$row['name']}` already exists.");
             }
-            if ((int) ($existing['port']) === $row['port']) {
+            if ((int) ($existing['port'] ?? 0) === $row['port']) {
                 throw new \RuntimeException("Port {$row['port']} is already used by listener `{$existing['name']}`.");
             }
         }
@@ -164,7 +164,7 @@ class EnvoyCustomListenersConfig
     {
         $ports = [];
         foreach ($listeners as $row) {
-            $port = (int) ($row['port']);
+            $port = (int) ($row['port'] ?? 0);
             if (isset($ports[$port])) {
                 throw new \RuntimeException("Port {$port} is used by more than one custom listener.");
             }

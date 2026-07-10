@@ -117,7 +117,7 @@ class ServerImageProvider
     {
         $result = $h->createImageFromServer($serverId, $name);
         $actionId = (int) ($result['action']['id'] ?? 0);
-        $imageId = (int) ($result['image_id']);
+        $imageId = (int) ($result['image_id'] ?? 0);
 
         $h->waitForAction($actionId, onTick: function (array $a) use ($onTick): void {
             if ($onTick !== null) {

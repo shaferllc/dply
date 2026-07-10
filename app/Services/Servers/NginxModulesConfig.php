@@ -201,13 +201,13 @@ class NginxModulesConfig
         foreach ($availableRows as $stem => $meta) {
             $modules[] = [
                 'name' => $stem,
-                'conf_file' => (string) ($meta['conf_file']),
+                'conf_file' => (string) ($meta['conf_file'] ?? $stem),
                 'enabled' => isset($enabled[$stem]),
                 'protected' => in_array($stem, self::PROTECTED_MODULES, true),
                 'type' => $this->classify($stem),
                 'source' => 'dynamic',
                 'package' => $meta['package'],
-                'installed' => (bool) ($meta['installed']),
+                'installed' => (bool) ($meta['installed'] ?? false),
                 'so_path' => $meta['so_path'],
             ];
         }

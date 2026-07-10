@@ -59,7 +59,7 @@ class ServerConfigFileCatalog
                         $files[] = $this->fileRow(
                             $path,
                             (string) ($row['label'] ?? basename($path)),
-                            (int) ($row['size']),
+                            (int) ($row['size'] ?? 0),
                             $row['mtime'] ?? null,
                             $groupKey,
                             $engine,
@@ -103,7 +103,7 @@ class ServerConfigFileCatalog
                         $files[] = $this->fileRow(
                             $path,
                             basename($path),
-                            (int) ($row['size']),
+                            (int) ($row['size'] ?? 0),
                             $row['mtime'] ?? null,
                             $groupKey,
                         );
@@ -423,7 +423,7 @@ class ServerConfigFileCatalog
             $byPath[$path] = [
                 'path' => $path,
                 'label' => $path === $main ? __('main config').' — '.basename($path) : basename($path),
-                'size' => (int) ($row['size']),
+                'size' => (int) ($row['size'] ?? 0),
                 'mtime' => $row['mtime'] ?? null,
             ];
         }

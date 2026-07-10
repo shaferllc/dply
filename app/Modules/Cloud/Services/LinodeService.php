@@ -478,7 +478,7 @@ class LinodeService
         $existing = $this->findDomainRecord($domainId, $type, $name, $domainName);
 
         if ($existing !== null) {
-            $recordId = (int) ($existing['id']);
+            $recordId = (int) ($existing['id'] ?? 0);
             if ($recordId <= 0) {
                 throw new \RuntimeException('Linode record payload did not include an id.');
             }

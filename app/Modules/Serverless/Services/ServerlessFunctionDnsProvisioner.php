@@ -104,7 +104,7 @@ final class ServerlessFunctionDnsProvisioner
                 ]);
                 $do = new DigitalOceanService($token);
                 foreach ($blocking as $r) {
-                    $recordId = (int) ($r['id']);
+                    $recordId = (int) ($r['id'] ?? 0);
                     if ($recordId > 0) {
                         $do->deleteDomainRecord($zone, $recordId);
                     }
