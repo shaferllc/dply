@@ -230,12 +230,14 @@ return [
     'global' => [
         'billing_enabled' => env('FEATURE_GLOBAL_BILLING_ENABLED', true),
         'signups_open' => env('FEATURE_GLOBAL_SIGNUPS_OPEN', true),
-        'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', true),
+
+        // Be careful with this flag.
+        'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
         'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
         'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
         'deploy_contract' => env('FEATURE_GLOBAL_DEPLOY_CONTRACT', true),
         'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
-        'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', true),
+        'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
         'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
         'edge_delivery_enabled' => env('FEATURE_GLOBAL_EDGE_DELIVERY_ENABLED', true),
     ],
