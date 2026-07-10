@@ -69,7 +69,17 @@ Scope: P10a, P10d, P10b, P10c — edge compute moat: middleware, A/B split, depl
 | P10b Deploy hooks | `edge_deploy_hooks` table + `EdgeDeployHook` model (sha256 token storage, plaintext shown once). Public `POST|GET /hooks/edge/deploy/{token}` (rate-limited, no auth) triggers `RedeployEdgeSite`. UI on Build Settings tab to mint + revoke; last-fired timestamps audited. |
 | P10c Bindings declarations | `dply.yaml` now parses a `bindings:` block (`kv` / `r2` / `d1` / `queues`). `EdgeRepoBindingTranslator` converts the snapshot into Cloudflare binding descriptors; both middleware + SSR uploaders inject them into the per-deployment Worker (reserved-name list prevents overwriting HOST_MAP/ASSETS/etc). Read-only panel on Build Settings shows what's declared. |
 
-**Wave D remaining (deferred):** Cron triggers on per-site Workers (needs CF cron API wiring), interactive create/attach/detach UI for bindings (declarations work today), proper service-bindings for middleware → SSR (today they coexist; dispatch overhead is fine for v1).
+**Wave D — complete ✅ (2026-07-09).**
+
+- Cron triggers on per-site Workers: **shipped** (this was listed as "needs CF cron API wiring" long after it landed). `dply.yaml` parses `crons:`, `EdgeEffectiveCrons` merges repo + dashboard rows, and both bundle uploaders push them via `EdgeCloudflareClient::setDispatchScriptSchedules()`. UI on the Crons tab.
+- Interactive create/attach/detach UI for bindings: **shipped**. `edge-bindings` tab, backed by `EdgeEffectiveBindings` + `EdgeDashboardBindingProvisioner`. wrangler.toml stays authoritative; dashboard rows are additive and lose name collisions.
+
+**Still deferred:** proper service-bindings for middleware → SSR (today they coexist; dispatch overhead is fine for v1).
+
+> Bindings and crons only reach a **per-deployment Worker**, which exists for SSR
+> sites and for static/hybrid sites shipping a `middleware.ts`. A purely static
+> site serves assets straight from R2 with no Worker, so neither applies there —
+> the Bindings tab warns about this explicitly.
 
 ## Phase 5 — Programmatic surface (CLI + Public API) ✅ (2026-05-24)
 
