@@ -50,6 +50,22 @@ class EdgeBuildRunner
      *     middleware_source_path?: string
      * }
      */
+    /**
+     * Root directory that per-deploy build workdirs live under.
+     *
+     * Must be a path the Docker daemon is allowed to share — the checkout is
+     * bind-mounted into the build image, and an unshared path (e.g. /var/tmp on
+     * macOS) mounts as an EMPTY directory with no error. Also the single source
+     * of truth for {@see PublishEdgeDeploymentJob::cleanupLocalArtifact()}'s
+     * containment check, which is why it is not inlined at the call sites.
+     */
+    public static function buildRoot(): string
+    {
+        $configured = trim((string) config('edge.build.work_root'));
+
+        return $configured !== '' ? $configured : sys_get_temp_dir();
+    }
+
     public function build(
         EdgeDeployment $deployment,
         string $repoUrl,
@@ -61,8 +77,7 @@ class EdgeBuildRunner
         string $runtimeMode = self::MODE_STATIC,
         ?string $repoRoot = null,
     ): array {
-        $buildRoot = (string) config('edge.build.work_root') ?: sys_get_temp_dir();
-        $workRoot = rtrim($buildRoot, '/').'/dply-edge-build-'.$deployment->id;
+        $workRoot = rtrim(self::buildRoot(), '/').'/dply-edge-build-'.$deployment->id;
         File::ensureDirectoryExists($workRoot);
         $checkout = $workRoot.'/src';
         $artifactDir = $workRoot.'/out';

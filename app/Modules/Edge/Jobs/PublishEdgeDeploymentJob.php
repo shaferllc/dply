@@ -6,6 +6,7 @@ namespace App\Modules\Edge\Jobs;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Modules\Edge\Services\EdgeBuildRunner;
 use App\Modules\Edge\Services\EdgeDeploymentPruner;
 use App\Modules\Edge\Services\EdgeGithubCheckRunService;
 use App\Modules\Edge\Services\EdgeGithubPullRequestCommenter;
@@ -221,7 +222,12 @@ class PublishEdgeDeploymentJob implements ShouldQueue
 
     private function cleanupLocalArtifact(): void
     {
-        if (is_dir($this->localArtifactDir) && str_contains($this->localArtifactDir, sys_get_temp_dir())) {
+        // Containment check: only ever recursively delete inside the build root.
+        // This must track EdgeBuildRunner::buildRoot() — when the root moved off
+        // sys_get_temp_dir() a hardcoded temp-dir check here silently stopped
+        // matching, and every successful deploy leaked its workdir (src/ is
+        // pruned mid-build, but out/ and build.log survived).
+        if (is_dir($this->localArtifactDir) && str_starts_with($this->localArtifactDir, EdgeBuildRunner::buildRoot())) {
             File::deleteDirectory(dirname($this->localArtifactDir));
         }
         if ($this->ssrBundlePath !== null && is_file($this->ssrBundlePath)) {

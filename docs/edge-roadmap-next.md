@@ -1,10 +1,19 @@
 # dply Edge roadmap — next phases
 
-Status: **Wave A closed ✅** · **Wave B complete ✅** (2026-05-25) · Waves C–E next.
+Status: **Waves A–E all complete ✅** (Wave E closed 2026-07-09).
 
 Continuation of [edge-roadmap.md](edge-roadmap.md). Phases 0–4 shipped the core deploy loop, custom domains, and hybrid SSR. The phases below take Edge from "works" to "feels finished" and competitive with Vercel / Netlify / Cloudflare Pages.
 
-Ordering is roughly by dependency, not strict priority. The top-5 must-haves (P5, P6, P7, P9, P14) close the "feels finished" gap. P14 is the single biggest acquisition lever.
+Ordering is roughly by dependency, not strict priority. The must-haves that closed the "feels finished" gap were P5, P6, P7 and P9.
+
+> **Doc-drift warning.** This file has repeatedly lagged the code. Wave E was
+> listed as "next" for six weeks after both its phases had shipped, and P9b/P9c
+> shipped built on *existing* primitives rather than the new tables proposed
+> below — so grepping for `edge_notification_rules` / `edge_audit_log` finds
+> nothing and makes shipped work look missing. Check the code before believing a
+> phase is unbuilt. An earlier "P14" was referenced here as "the single biggest
+> acquisition lever" but was never defined anywhere in this document; the
+> reference has been removed rather than left dangling.
 
 ## Wave A — closed ✅ (2026-05-25)
 
@@ -35,7 +44,7 @@ Scope: P7c, P8a, P8b, P9a — day-2 table stakes (preview gates, monorepo, build
 
 **Wave B follow-ups (nice-to-have, not blockers):** dedicated `EdgeLogs` filter bar + CSV export; CLI WebSocket tail (poll ships today); `EdgeBuildCache` feature tests.
 
-**Deferred to Wave E:** P9b deploy notifications, P9c audit log (see sequencing table).
+**Wave E (P9b deploy notifications, P9c audit log) — complete ✅ (see below).**
 
 ## Wave C — complete ✅ (2026-05-25)
 
@@ -224,23 +233,33 @@ Shipped: Echo live tail on Logs tab, log ingest broadcast, HTTP polling API + CL
 - CLI `dply edge logs --tail` subscribes via WebSocket
 - 7-day retention in `edge_access_logs`; "download last hour" CSV export
 
-### 9b — Deploy notifications (Wave E)
+### 9b — Deploy notifications (Wave E) ✅ shipped
 
-Per-site notification rules.
+Shipped **without** the proposed `edge_notification_rules` table — it would have
+duplicated the platform's existing notification stack. Instead the Edge events are
+registered as ordinary notification event keys, so subscriptions, channels
+(email / Slack / Discord / webhook), routing and the site Settings UI all work for
+Edge sites with no Edge-specific machinery.
 
-- New table `edge_notification_rules` (channel, target, event_mask)
-- Channels: email, Slack webhook, Discord webhook, generic webhook
-- Events: deploy.success, deploy.failed, deploy.duration_regressed (>1.5× rolling p50), domain.verified, domain.failing, usage.over_budget
-- Wired via `App\Events\Edge\*` → `App\Listeners\DispatchEdgeNotification`
-- UI: settings tab with "Test" button per rule
+- Event keys in `config/notification_events.php` under the `edge` category:
+  `edge.deploy.succeeded`, `edge.deploy.failed`, `edge.domain.verified`,
+  `edge.domain.failing`, `edge.usage.over_budget`, `edge.rum.breach`
+- Published via `NotificationPublisher` (subject = the `Site`)
+- `edge.deploy.succeeded` + publish-phase `edge.deploy.failed` fire from
+  `PublishEdgeDeploymentJob`; build-phase `edge.deploy.failed` fires from
+  `BuildEdgeSiteJob::markFailed()` with `metadata.phase = build`
+- Every publish is best-effort — a dead channel must never fail a good deploy,
+  nor mask the build error on the failure path
 
-### 9c — Audit log (Wave E)
+Not shipped: `deploy.duration_regressed` (>1.5× rolling p50), and a per-rule
+"Test" button.
 
-- New table `edge_audit_log` (actor_id, site_id, action, target, before, after, ip, ua)
-- Capture: env changes, domain add/remove, deploys, rollbacks, promotes, access rule changes, member changes
-- UI tab + CSV export; 90-day retention default
+### 9c — Audit log (Wave E) ✅ shipped
 
-**Touchpoints:** new models + migrations, `app/Listeners/Edge/*`, `resources/views/livewire/sites/edge-logs.blade.php`
+Shipped on the shared `AuditLog` model (kernel) rather than a new `edge_audit_log`
+table — Edge rows are scoped by `subject_type = Site::class`.
+
+- CSV export at `sites.edge.audit.export` (`EdgeAuditLogExportController`)
 
 ---
 
