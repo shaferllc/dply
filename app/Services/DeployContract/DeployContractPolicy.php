@@ -54,8 +54,8 @@ final class DeployContractPolicy
             }
         }
 
-        $minRate = $contract['min_replay_pass_rate']['min_replay_pass_rate'];
-        $requireReplay = $contract['require_replay']['require_replay'];
+        $minRate = $contract['min_replay_pass_rate'] ?? $promote['min_replay_pass_rate'] ?? null;
+        $requireReplay = $contract['require_replay'] ?? $promote['require_replay'] ?? null;
 
         return new self(
             requires: array_values(array_unique($requires)),

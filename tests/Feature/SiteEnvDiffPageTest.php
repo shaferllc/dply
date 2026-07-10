@@ -117,7 +117,9 @@ function bindFakeReader(string $serverEnv): void
             // Bypass parent constructor; the wrapper is unused for the fake.
         }
 
-        public function read(Site $site): string
+        // Must match SiteEnvReader::read() — an incompatible declaration is a
+        // PHP fatal that takes down the whole Pest process, not just this test.
+        public function read(Site $site, ?string $pathOverride = null): string
         {
             return $this->payload;
         }
