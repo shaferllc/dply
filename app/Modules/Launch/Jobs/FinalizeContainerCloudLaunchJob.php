@@ -10,6 +10,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+// Without this import PHP resolves the unqualified name against the current
+// namespace (App\Modules\Launch\Jobs) and the Bus::chain below fatals with
+// "Class ... RunSiteDeploymentJob not found" the moment a container launch
+// finalizes. It was missed when the job moved into the Deploy module.
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
