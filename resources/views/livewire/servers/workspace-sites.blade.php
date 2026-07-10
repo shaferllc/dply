@@ -469,7 +469,8 @@
                         </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
-                            @if($sites->count() > 0)
+                            {{-- $sites is not passed to this view; the rest of the file reads $server->sites (eager-loaded in render()). --}}
+                            @if($server->sites->count() > 0)
                             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
                                 <p class="mt-1 text-sm leading-6 text-brand-moss">
                                     {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
