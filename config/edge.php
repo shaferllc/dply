@@ -127,6 +127,12 @@ return [
         'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
         'timeout_seconds' => 900,
         'artifact_max_bytes' => 524_288_000,
+        // Docker should always be present on a build worker, but if a box came
+        // up without it we self-heal by installing Docker inline on the next
+        // deploy (idempotent; needs passwordless sudo when the worker isn't
+        // root). Set false to fail fast with an install hint instead.
+        'docker_autoinstall' => filter_var(env('DPLY_EDGE_BUILD_DOCKER_AUTOINSTALL', true), FILTER_VALIDATE_BOOLEAN),
+        'docker_install_timeout_seconds' => (int) env('DPLY_EDGE_BUILD_DOCKER_INSTALL_TIMEOUT', 600),
         /*
          * Where the per-deploy checkout lives before it is bind-mounted
          * into the build container. This MUST be a path the Docker daemon

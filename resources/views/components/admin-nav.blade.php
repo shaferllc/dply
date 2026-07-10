@@ -12,8 +12,9 @@
     $auditActive = request()->routeIs('admin.audit');
     $roadmapActive = request()->routeIs('admin.roadmap.*');
     $feedbackActive = request()->routeIs('admin.feedback.*');
+    $allFlagsActive = request()->routeIs('admin.flags.all');
     $globalFlagsActive = request()->routeIs('admin.flags.global');
-    $productLineActive = request()->routeIs('admin.flags.*') && ! $globalFlagsActive;
+    $productLineActive = request()->routeIs('admin.flags.*') && ! $globalFlagsActive && ! $allFlagsActive;
     $organizationsActive = request()->routeIs('admin.organizations.*');
     $usersActive = request()->routeIs('admin.users.*');
     $betaInvitesActive = request()->routeIs('admin.beta-invites');
@@ -68,6 +69,10 @@
 
     <div class="pt-2">
         <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Feature flags') }}</p>
+        <a href="{{ route('admin.flags.all') }}" wire:navigate @class([$navBase, $allFlagsActive ? $navOn : $navOff])>
+            <x-heroicon-o-flag class="{{ $navIcon }}" />
+            {{ __('All flags') }}
+        </a>
         <a href="{{ route('admin.flags.global') }}" wire:navigate @class([$navBase, $globalFlagsActive ? $navOn : $navOff])>
             <x-heroicon-o-globe-alt class="{{ $navIcon }}" />
             {{ __('Global') }}

@@ -37,6 +37,7 @@ use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
 use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
 use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
+use App\Livewire\Admin\Flags\AllFlags as AdminAllFlags;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
 use App\Livewire\Admin\Operations as AdminOperations;
@@ -436,6 +437,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::get('/feedback/{report}/screenshot', \App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController::class)->name('feedback.screenshot');
             Route::livewire('/users', \App\Livewire\Admin\Users\Index::class)->name('users.index');
             Route::post('/impersonate/{user}', [\App\Http\Controllers\Admin\ImpersonationController::class, 'start'])->name('impersonate.start');
+            Route::livewire('/flags/all', AdminAllFlags::class)->name('flags.all');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');

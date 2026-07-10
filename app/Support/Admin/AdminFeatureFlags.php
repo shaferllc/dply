@@ -6,10 +6,114 @@ namespace App\Support\Admin;
 
 use App\Models\Organization;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 
 final class AdminFeatureFlags
 {
+    /**
+     * Every flag registered with Pennant, grouped by namespace.
+     *
+     * Enumerated straight from config/features.php (skipping the reserved
+     * `beta_bundle` list), so this is the complete catalog — not the curated
+     * product-line subset. Shape: namespace => [ fullKey => label ].
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function allRegisteredFlags(): array
+    {
+        $grouped = [];
+
+        foreach (config('features', []) as $namespace => $flags) {
+            if ($namespace === 'beta_bundle' || ! is_array($flags)) {
+                continue;
+            }
+
+            foreach (array_keys($flags) as $leaf) {
+                $key = "{$namespace}.{$leaf}";
+                $grouped[$namespace][$key] = self::flagLabel($key);
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * A human label for any flag key: prefer a curated label from the admin
+     * config, otherwise derive one from the leaf name.
+     */
+    public static function flagLabel(string $key): string
+    {
+        $curated = self::orgFlagLabel($key) ?? self::globalFlagLabel($key);
+        if (is_string($curated) && $curated !== '') {
+            return $curated;
+        }
+
+        $leaf = str_contains($key, '.') ? explode('.', $key, 2)[1] : $key;
+
+        return (string) Str::of($leaf)->replace('_', ' ')->headline();
+    }
+
+    /**
+     * The platform-wide override for a flag, or null when none is set.
+     */
+    public static function platformOverride(string $key): ?bool
+    {
+        return PlatformFeatureDefaults::get($key);
+    }
+
+    /**
+     * The effective platform default: an explicit platform override wins,
+     * otherwise the config/env default. (Per-org rows can still override this
+     * for a specific org.)
+     */
+    public static function platformState(string $key): bool
+    {
+        return self::platformOverride($key) ?? self::configDefault($key);
+    }
+
+    public static function isPlatformOverridden(string $key): bool
+    {
+        return self::platformOverride($key) !== null;
+    }
+
+    /**
+     * Count of per-org override rows keyed by flag name, in one query. Any
+     * flag with no org overrides is simply absent from the result.
+     *
+     * @return array<string, int>
+     */
+    public static function orgOverrideCountsByFlag(): array
+    {
+        $counts = DB::table('features')
+            ->where('scope', 'like', self::orgScopeLikePrefixPublic().'%')
+            ->selectRaw('name, count(*) as c')
+            ->groupBy('name')
+            ->pluck('c', 'name');
+
+        $result = [];
+        foreach ($counts as $name => $count) {
+            $result[(string) $name] = (int) $count;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Remove every per-org override row for a flag, regardless of whether the
+     * flag is in the curated product-line set. Falls back to the platform /
+     * config default for each org.
+     */
+    public static function purgeOrgScopedOverridesForAnyFlag(string $flag): int
+    {
+        return self::purgeOrgScopedOverridesRaw($flag);
+    }
+
+    public static function orgScopeLikePrefixPublic(): string
+    {
+        return self::orgScopeLikePrefix();
+    }
+
     /**
      * @return array<string, string>
      */

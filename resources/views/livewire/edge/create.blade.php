@@ -114,16 +114,21 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <x-input-label for="repository_selection" :value="__('Repository')" />
-                                    <select id="repository_selection" wire:model.live="repository_selection" class="dply-input mt-1 block w-full" required>
-                                        <option value="">{{ __('Select a repository…') }}</option>
-                                        @foreach ($availableRepositories as $repository)
-                                            <option value="{{ $repository['url'] }}">{{ $repository['label'] ?? $repository['name'] ?? $repository['url'] }}</option>
-                                        @endforeach
-                                    </select>
-                                    @if ($availableRepositories === [])
+                                    <x-input-label for="repository_selection" :value="__('Repository')" :required="true" />
+                                    @if ($availableRepositories !== [])
+                                        <x-repo-combobox
+                                            :repositories="$availableRepositories"
+                                            property="repository_selection"
+                                            target="source_control_account_id"
+                                            trigger-id="repository_selection"
+                                            :selected="$repository_selection"
+                                            :placeholder="__('Select a repository…')"
+                                            class="mt-1"
+                                        />
+                                    @else
                                         <p class="mt-1 text-xs text-brand-mist">{{ __('No repositories returned for this account. Check the token or enter the repo manually.') }}</p>
                                     @endif
+                                    <x-input-error :messages="$errors->get('repository_selection')" class="mt-2" />
                                 </div>
                             </div>
                             @if ($repo !== '')

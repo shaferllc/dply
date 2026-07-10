@@ -206,6 +206,14 @@ return [
 
     'install_fail2ban' => true,
 
+    // Install Docker on application/worker boxes so they can run Edge builds
+    // (each build compiles the customer repo in a throwaway container on the
+    // queue-draining worker). Off by default — only dply's own control-plane
+    // workers build Edge sites, so customer boxes don't get a container
+    // runtime. Enable on dply's own workers to guarantee Docker is present
+    // instead of leaning on the deploy-time self-heal in EdgeBuildRunner.
+    'edge_build_docker' => (bool) env('DPLY_PROVISION_EDGE_BUILD_DOCKER', false),
+
     // Lock SSH down to key-only auth at the end of provisioning: disable
     // password authentication and reduce root to prohibit-password (key login
     // only). dply always connects as root via an SSH key, and the deploy user

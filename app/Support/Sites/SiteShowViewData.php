@@ -481,13 +481,17 @@ final class SiteShowViewData
     private static function resolveEdgeProvisioningError(Site $site, ?EdgeDeployment $deployment): ?string
     {
         $metaError = $site->edgeMeta()['last_error'] ?? null;
-        if (is_string($metaError) && $metaError !== '') {
-            return $metaError;
-        }
-
         $deploymentError = $deployment?->failure_reason;
-        if (is_string($deploymentError) && $deploymentError !== '') {
-            return $deploymentError;
+
+        // This "Last error" box is rendered *alongside* the BuildJourney
+        // component, which already shows the deployment failure_reason in its
+        // own "Reason" box. So only surface the site-meta last_error here when
+        // it *differs* — i.e. an infra-level failure (R2/KV perms) that never
+        // reached the deployment row. When it matches, or when the only error
+        // is the deployment one, stay null and let BuildJourney be the single
+        // source of truth instead of double-printing the same string.
+        if (is_string($metaError) && $metaError !== '' && $metaError !== $deploymentError) {
+            return $metaError;
         }
 
         return null;

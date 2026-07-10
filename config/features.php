@@ -20,9 +20,10 @@
 |   dply.php, edge.php, …         | Ops / runtime behavior?              | DPLY_* env (not product rollout)
 |
 | Pennant resolution: FeatureServiceProvider registers every leaf below as
-| "{namespace}.{leaf}". Config/env is the global default; explicit per-org
-| DB rows override. No null-scope "platform default" rows — change globals
-| via env or this file + config:clear (tests: config([...]) + flush cache).
+| "{namespace}.{leaf}". Precedence (highest wins): explicit per-org row in
+| `features` → platform override (feature_platform_overrides table, managed
+| at /admin/flags/all) → config/env default here. Change globals from the
+| admin UI, or via env + config:clear (tests: config([...]) + flush cache).
 |
 | Namespaces in this file:
 |   surface.*   — whole product routes (Cloud, Edge, Fleet, …)
