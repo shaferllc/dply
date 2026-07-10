@@ -119,7 +119,15 @@ class EdgeCloudflareClient
                 ->get(self::BASE.'/accounts/'.$this->accountId.'/storage/kv/namespaces'),
         );
 
-        return is_array($payload['result'] ?? null) ? $payload['result'] : [];
+        // decode() already unwraps `result`, so $payload IS the namespace list.
+        // (Mirrors listD1Databases/listQueues; the previous `$payload['result']`
+        // re-index always yielded [] → ensureKvNamespace never matched an
+        // existing namespace and re-created one on every call.)
+        if (isset($payload['value']) && is_array($payload['value'])) {
+            return $payload['value'];
+        }
+
+        return $payload !== [] && array_is_list($payload) ? $payload : [];
     }
 
     /**
