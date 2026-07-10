@@ -18,7 +18,7 @@ test('settings hub is reachable for authenticated user', function () {
     $this->actingAs($user)
         ->get(route('settings.profile'))
         ->assertOk()
-        ->assertSee('Profile stores personal preferences on this page', false);
+        ->assertSee('Identity, preferences, sessions, and account on this page', false);
 });
 
 test('settings hub livewire renders', function () {

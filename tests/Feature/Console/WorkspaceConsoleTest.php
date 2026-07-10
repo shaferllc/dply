@@ -63,7 +63,7 @@ test('console page renders for ready server', function () {
         ->assertOk()
         ->assertSee('Console')
         ->assertSee('Quick read-only SSH console')
-        ->assertSee('type a command, hit Enter')
+        ->assertSee('type a command, Tab for suggestions, Enter to run')
         ->assertSee('Type a command below or pick a quick action above')
         ->assertSee('deploy@test-server');
 });

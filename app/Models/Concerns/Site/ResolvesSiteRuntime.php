@@ -67,7 +67,7 @@ trait ResolvesSiteRuntime
             return $this->runtime;
         }
 
-        return $this->type->value;
+        return $this->type?->value;
     }
 
     /**

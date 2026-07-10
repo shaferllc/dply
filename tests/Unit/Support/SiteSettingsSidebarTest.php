@@ -31,7 +31,7 @@ function makeSite(Server $server, ?string $runtime = 'php'): Site
 
     return $site;
 }
-test('vm site has background group with cron and daemons', function () {
+test('vm site has background group with schedule and daemons', function () {
     $server = makeVmServer();
     $site = makeSite($server);
 
@@ -40,7 +40,9 @@ test('vm site has background group with cron and daemons', function () {
     $byGroup = collect($items)->groupBy('group');
     expect($byGroup->has('background'))->toBeTrue();
     $backgroundIds = $byGroup['background']->pluck('id')->all();
-    expect($backgroundIds)->toContain('cron');
+    // Site-level cron was removed — crontab lives on the server Cron page.
+    expect($backgroundIds)->not->toContain('cron');
+    expect($backgroundIds)->toContain('schedule');
     expect($backgroundIds)->toContain('daemons');
 });
 test('background group lives between observability and access', function () {
@@ -118,14 +120,13 @@ test('daemons links to a dedicated route; cron is not a site page', function () 
     expect($items['daemons']['route'] ?? null)->toBe('sites.daemons');
     expect($items)->not->toHaveKey('queue-workers');
 });
-test('background includes schedule on server route and backups on site route', function () {
+test('background includes schedule on site route and backups on site route', function () {
     $server = makeVmServer();
     $site = makeSite($server);
 
     $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
 
-    expect($items['schedule']['route'] ?? null)->toBe('servers.schedule');
-    expect($items['schedule']['route_params'] ?? null)->toBe('server_with_site');
+    expect($items['schedule']['route'] ?? null)->toBe('sites.schedule');
     expect($items['backups']['route'] ?? null)->toBe('sites.backups');
 });
 test('rails stack item is hidden when rails not detected', function () {

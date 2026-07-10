@@ -36,7 +36,7 @@ class ConfigureCloudAutoscaling
      */
     public function handle(Site $site, array $payload): array
     {
-        if ($site->container_backend === '') {
+        if (! $site->isCloudContainerSite()) {
             throw new InvalidArgumentException('Autoscaling can only be configured on Cloud container sites.');
         }
 

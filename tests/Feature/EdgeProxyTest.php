@@ -23,7 +23,11 @@ use Tests\Concerns\WithFeatures;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['server_workspace.edge_proxy_coming_soon' => []]);
+    config([
+        'server_workspace.edge_proxy_coming_soon' => [],
+        // Workspace itself is gated by coming_soon_keys — clear so tests hit the real UI.
+        'server_workspace.coming_soon_keys' => ['load-balancers'],
+    ]);
 });
 
 uses(WithFeatures::class);
@@ -104,10 +108,9 @@ test('switch edge proxy dispatches add job when another is active', function () 
 
     Livewire::actingAs($user)
         ->test(WorkspaceEdgeProxy::class, ['server' => $server])
-        ->set('workspace_tab', 'haproxy')
+        ->set('workspace_tab', 'change')
         ->assertSee(__('Switch to HAProxy'))
         ->call('addEdgeProxy', 'haproxy')
-        ->assertSee(__('Switching edge proxy to HAProxy …'))
         ->assertSee(__('Switching to :name…', ['name' => 'HAProxy']));
 
     Queue::assertPushed(AddEdgeProxyJob::class, function (AddEdgeProxyJob $job) use ($server) {
@@ -154,7 +157,7 @@ test('envoy live state shows standby copy when another edge proxy is active', fu
         ->test(WorkspaceEdgeProxy::class, ['server' => $server])
         ->set('workspace_tab', 'envoy')
         ->set('engine_subtab', 'listeners')
-        ->assertSee(__('HAProxy is the active edge proxy'))
+        ->assertSee('HAProxy is the active edge proxy')
         ->call('refreshEngineLiveState')
         ->assertDontSee('Envoy admin interface unavailable');
 
@@ -173,10 +176,9 @@ test('switch edge proxy to envoy dispatches add job when another is active', fun
 
     Livewire::actingAs($user)
         ->test(WorkspaceEdgeProxy::class, ['server' => $server])
-        ->set('workspace_tab', 'envoy')
+        ->set('workspace_tab', 'change')
         ->assertSee(__('Switch to Envoy'))
         ->call('addEdgeProxy', 'envoy')
-        ->assertSee(__('Switching edge proxy to Envoy …'))
         ->assertSee(__('Switching to :name…', ['name' => 'Envoy']));
 
     Queue::assertPushed(AddEdgeProxyJob::class, function (AddEdgeProxyJob $job) use ($server) {

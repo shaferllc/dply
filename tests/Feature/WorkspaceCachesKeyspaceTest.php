@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\WorkspaceCachesKeyspaceTest;
 
+use App\Jobs\RefreshKeyspaceSampleJob;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Models\Organization;
 use App\Models\Server;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -21,6 +23,7 @@ usesFeatures('workspace.caches');
 
 beforeEach(function () {
     Queue::fake();
+    Queue::getFacadeRoot()->except([RefreshKeyspaceSampleJob::class]);
 
     $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
         $mock->shouldReceive('forServer')->byDefault()->andReturn([
@@ -30,6 +33,7 @@ beforeEach(function () {
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 });
+
 /**
  * @return array{User, Server}
  */
@@ -57,6 +61,7 @@ function actingOwnerWithRedis(): array
 
     return [$user, $server];
 }
+
 test('loading dashboard appends a sample', function () {
     [$user, $server] = actingOwnerWithRedis();
 
@@ -84,6 +89,7 @@ test('loading dashboard appends a sample', function () {
             expect($samples[0]['hit_rate_window'])->toBeNull('first sample has no previous to delta against');
         });
 });
+
 test('second sample computes hit rate window', function () {
     [$user, $server] = actingOwnerWithRedis();
 
@@ -105,7 +111,6 @@ test('second sample computes hit rate window', function () {
         ->call('loadKeyspaceDashboard');
 
     // Force the second sample to claim a different timestamp by sleeping 1s.
-    // (The sampler uses time() internally — we let it fall through.)
     sleep(1);
 
     $component->call('loadKeyspaceDashboard');
@@ -120,6 +125,7 @@ test('second sample computes hit rate window', function () {
     // 50 commands over ≥1 second → ≥1 op/sec but accept anything > 0
     expect($samples[1]['ops_per_second_window'])->toBeGreaterThan(0.0);
 });
+
 test('sample buffer caps at limit', function () {
     [$user, $server] = actingOwnerWithRedis();
 
@@ -144,6 +150,26 @@ test('sample buffer caps at limit', function () {
         ];
     }
 
+    // Seed a newer sample in the job result cache so ingest appends one more
+    // and trims to KEYSPACE_SAMPLE_LIMIT (re-fake the queue so the job does
+    // not overwrite the seeded cache).
+    Queue::fake();
+    Cache::put(RefreshKeyspaceSampleJob::resultCacheKey($server->id, 'redis'), [
+        'ok' => true,
+        'sample' => [
+            'ts' => 9999,
+            'used_memory' => 999,
+            'used_memory_human' => '999B',
+            'connected_clients' => 0,
+            'hits' => 1,
+            'misses' => 0,
+            'commands' => 1,
+            'ops_per_second_window' => null,
+            'hit_rate_window' => null,
+        ],
+        'at' => now()->addSecond()->toIso8601String(),
+    ], now()->addHour());
+
     $component = Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->call('setWorkspaceTab', 'redis')
@@ -153,6 +179,7 @@ test('sample buffer caps at limit', function () {
     $samples = $component->get('keyspaceSamples');
     expect($samples)->toHaveCount(WorkspaceCaches::KEYSPACE_SAMPLE_LIMIT);
 });
+
 test('hide dashboard wipes state', function () {
     [$user, $server] = actingOwnerWithRedis();
 
@@ -172,6 +199,7 @@ test('hide dashboard wipes state', function () {
         ->assertSet('keyspaceSamples', [])
         ->assertSet('keyspaceError', null);
 });
+
 test('dashboard rejects memcached', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();

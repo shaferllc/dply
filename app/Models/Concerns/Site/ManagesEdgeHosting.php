@@ -225,6 +225,19 @@ trait ManagesEdgeHosting
         return $this->container_backend === 'dply_cloud';
     }
 
+    /**
+     * True when this site is a managed Cloud container app
+     * (DO App Platform / App Runner / dply_cloud), not a BYO VM site.
+     *
+     * Null and empty string both mean "not cloud" — factories and
+     * PHP/VM sites leave container_backend unset (null), so callers
+     * must not rely on `=== ''` alone.
+     */
+    public function isCloudContainerSite(): bool
+    {
+        return is_string($this->container_backend) && $this->container_backend !== '';
+    }
+
     public function isCloudPreview(): bool
     {
         $container = is_array($this->meta['container'] ?? null) ? $this->meta['container'] : [];

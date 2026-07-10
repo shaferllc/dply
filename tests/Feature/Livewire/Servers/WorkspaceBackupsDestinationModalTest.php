@@ -102,7 +102,10 @@ test('destination dropdown lists org destinations', function () {
     [$user, $org, $server] = ownerWithServer();
     BackupConfiguration::factory()->forOrganization($org)->create(['name' => 'Org shared S3']);
 
+    // Destination pickers live on the Schedules tab (and on Overview only when
+    // default storage is set to an S3 destination).
     Livewire::actingAs($user)
         ->test(WorkspaceBackups::class, ['server' => $server])
+        ->call('setBackupsWorkspaceTab', 'schedules')
         ->assertSee('Org shared S3', false);
 });

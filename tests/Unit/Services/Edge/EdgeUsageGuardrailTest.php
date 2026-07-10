@@ -33,19 +33,21 @@ function makeEdgeSite(): Site
     ]);
 }
 
-function seedSnapshot(Site $site, int $requests, int $bytes): void
+function seedSnapshot(Site $site, int $requests, int $bytes, ?string $periodStart = null, string $source = 'manual'): void
 {
+    $day = $periodStart ?? now()->toDateString();
+
     EdgeUsageSnapshot::query()->create([
         'organization_id' => $site->organization_id,
         'site_id' => $site->id,
-        'period_start' => now()->toDateString(),
-        'period_end' => now()->toDateString(),
+        'period_start' => $day,
+        'period_end' => $day,
         'requests' => $requests,
         'bytes_egress' => $bytes,
         'r2_storage_bytes' => 0,
         'r2_class_a_ops' => 0,
         'r2_class_b_ops' => 0,
-        'source' => 'manual',
+        'source' => $source,
     ]);
 }
 
@@ -93,8 +95,9 @@ test('marks over when any metric crosses 100%', function () {
 
 test('sums multiple snapshots within the current month', function () {
     $site = makeEdgeSite();
-    seedSnapshot($site, requests: 400_000, bytes: 0);
-    seedSnapshot($site, requests: 500_000, bytes: 0); // total 900k → warn
+    // Unique on (site_id, period_start, source) — use distinct days in-month.
+    seedSnapshot($site, requests: 400_000, bytes: 0, periodStart: now()->startOfMonth()->toDateString());
+    seedSnapshot($site, requests: 500_000, bytes: 0, periodStart: now()->startOfMonth()->addDay()->toDateString()); // total 900k → warn
 
     $status = app(EdgeUsageGuardrail::class)->evaluate($site);
 

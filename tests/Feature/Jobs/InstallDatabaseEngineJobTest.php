@@ -10,9 +10,11 @@ use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
 use App\Models\User;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Servers\ServerResourcePreflight;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,17 +72,22 @@ test('install runs apt and marks running', function () {
         $mock->shouldReceive('forget')->once();
     });
 
+    $this->mock(ServerDatabaseRemoteExec::class, function ($mock): void {
+        $mock->shouldReceive('engineListeningOnLoopback')->andReturn(true);
+    });
+
     (new InstallDatabaseEngineJob($row->id))
         ->handle(
             app(ExecuteRemoteTaskOnServer::class),
             app(ServerDatabaseHostCapabilities::class),
             app(DatabaseEngineAuditLogger::class),
             app(ServerResourcePreflight::class),
+            app(ServerDatabaseNotificationDispatcher::class),
         );
 
     $row->refresh();
     expect($row->status)->toBe(ServerDatabaseEngine::STATUS_RUNNING);
-    expect($row->version)->toBe('mysql 8.0.39');
+    expect($row->version)->toBe('8.0.39');
     $this->assertDatabaseHas('server_database_engine_audit_events', [
         'server_id' => $server->id,
         'event' => ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALLED,
@@ -113,6 +120,7 @@ test('install blocks on resource preflight', function () {
             app(ServerDatabaseHostCapabilities::class),
             app(DatabaseEngineAuditLogger::class),
             app(ServerResourcePreflight::class),
+            app(ServerDatabaseNotificationDispatcher::class),
         );
 
     $row->refresh();

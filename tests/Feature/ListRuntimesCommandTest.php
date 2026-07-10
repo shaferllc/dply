@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Artisan;
 
 uses(RefreshDatabase::class);
 
-test('command lists all six runtimes with paths', function () {
+test('command lists all eight runtimes with paths', function () {
     $exit = Artisan::call('dply:list-runtimes');
     $output = Artisan::output();
 
@@ -22,6 +22,9 @@ test('command lists all six runtimes with paths', function () {
     $this->assertStringContainsString('python', $output);
     $this->assertStringContainsString('ruby', $output);
     $this->assertStringContainsString('go', $output);
+    $this->assertStringContainsString('bun', $output);
+    $this->assertStringContainsString('deno', $output);
+    $this->assertStringContainsString('java', $output);
 
     // PHP carries its own install path label.
     $this->assertStringContainsString('ondrej/php apt', $output);
@@ -36,7 +39,7 @@ test('command emits json with recommended versions', function () {
     expect($exit)->toBe(0);
     $decoded = json_decode($output, true);
     expect($decoded)->toBeArray();
-    expect($decoded['runtimes'])->toHaveCount(5);
+    expect($decoded['runtimes'])->toHaveCount(8);
 
     $byRuntime = collect($decoded['runtimes'])->keyBy('runtime');
     expect($byRuntime['php']['install_path'])->toBe('ondrej/php apt');
@@ -45,6 +48,7 @@ test('command emits json with recommended versions', function () {
     expect($byRuntime['python']['recommended_version'])->toBe('3.12');
     expect($byRuntime['ruby']['recommended_version'])->toBe('3.3');
     expect($byRuntime['go']['recommended_version'])->toBe('1.22');
+    expect($byRuntime->keys()->all())->toContain('bun', 'deno', 'java');
 });
 test('with usage includes site counts', function () {
     $server = Server::factory()->create();

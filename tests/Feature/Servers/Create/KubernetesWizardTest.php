@@ -577,6 +577,7 @@ test('storing create new doks calls digitalocean api and lands provisioning', fu
         'do_kubernetes_new_node_size' => 's-2vcpu-4gb',
         'do_kubernetes_new_node_count' => 2,
         'do_kubernetes_new_ha' => false,
+        'do_kubernetes_new_version' => '1.30.1-do.0',
         'do_kubernetes_namespace' => 'apps',
     ]);
 

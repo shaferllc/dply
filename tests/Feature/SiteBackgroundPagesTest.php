@@ -137,12 +137,9 @@ test('disabling one task keeps the other', function () {
     expect((bool) ($serverless['queue_worker_enabled'] ?? false))->toBeTrue('Queue worker stays on when only the scheduler is disabled.');
     expect((bool) ($serverless['background_enabled'] ?? false))->toBeTrue('Bundled flag stays true because the queue worker is still on.');
 });
-test('environment section shows bindings sub section', function () {
-    // Q5: Environment page has three sub-sections — Variables / Secrets /
-    // Bindings. The Bindings panel reads from SiteResourceBindingResolver
-    // and lists managed-resource attachments (Database / Redis / Queue /
-    // Object storage / etc.) with status badges. Attach / provision UI
-    // is post-v1; this test confirms the read-only panel is in place.
+test('environment section shows variables workspace', function () {
+    // Serverless Environment is the variables editor (bindings live on the
+    // VM Resources hub). Confirm the section still renders for functions sites.
     $user = actingOrgOwner();
     [$server, $site] = makeFunctionsSite($user);
 
@@ -153,11 +150,7 @@ test('environment section shows bindings sub section', function () {
     ], false));
 
     $response->assertOk()
-        ->assertSee('Bindings')
-        ->assertSee('Database')
-        ->assertSee('Redis')
-        ->assertSee('Queue')
-        ->assertSee('Object storage');
+        ->assertSee('Environment');
 });
 test('every sidebar item renders 200 for serverless site', function () {
     // Sidebar QA guard — walk every sidebar item for a baseline serverless
@@ -169,6 +162,7 @@ test('every sidebar item renders 200 for serverless site', function () {
 
     $items = SiteSettingsSidebar::items($site, $server);
     expect($items)->not->toBeEmpty('Sidebar should have items for a serverless site');
+    expect(collect($items)->pluck('id'))->not->toContain('resources');
 
     foreach ($items as $item) {
         $id = $item['id'] ?? 'unknown';
@@ -243,9 +237,9 @@ test('vm sidebar deploy group routes to deployments repository and pipeline', fu
     $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
 
     expect($items['deploy']['route'] ?? null)->toBe('sites.deployments.index')
-        ->and($items['pipeline']['route'] ?? null)->toBe('sites.pipeline')
+        ->and($items->has('pipeline'))->toBeFalse()
         ->and($items->has('repository'))->toBeTrue()
-        ->and($items['repository']['route'] ?? null)->toBeNull();
+        ->and($items['repository']['route'] ?? null)->toBe('sites.repository');
 });
 test('clicking a history row opens the tick detail modal with the full body', function () {
     // The history table truncates the body to 120 chars; the detail modal

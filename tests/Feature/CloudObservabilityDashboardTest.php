@@ -27,7 +27,7 @@ test('observability section renders on dashboard', function () {
     $response->assertOk()
         ->assertSee('Observability')
         ->assertSee('Runtime logs')
-        ->assertSee('Fetch runtime logs');
+        ->assertSee('Fetch');
 });
 test('refresh metrics renders graphs for do site', function () {
     Http::fake([

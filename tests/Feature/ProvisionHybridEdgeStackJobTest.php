@@ -21,6 +21,7 @@ usesFeatures('surface.cloud');
 
 beforeEach(function (): void {
     Feature::define('surface.cloud', fn (): bool => true);
+    Feature::purge(['surface.cloud']);
     Feature::flushCache();
 });
 

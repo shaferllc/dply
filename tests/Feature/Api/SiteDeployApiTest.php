@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\SiteDeployApiTest;
 
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\Server;
@@ -84,6 +85,10 @@ test('idempotent deploy returns 409 while inflight', function () {
 
 test('sync deploy with idempotency key caches result', function () {
     Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+
+    $this->mock(DeployRepoPreflight::class, function ($mock) {
+        $mock->shouldReceive('check')->andReturn(null);
+    });
 
     $this->mock(SiteGitDeployer::class, function ($mock) {
         $mock->shouldReceive('run')->once()->andReturn(['output' => 'ok', 'sha' => 'abc123']);

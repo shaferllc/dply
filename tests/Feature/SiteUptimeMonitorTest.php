@@ -51,7 +51,7 @@ test('authenticated user can add uptime monitor', function () {
         ->set('newLabel', 'Homepage')
         ->set('newPath', '/api/health')
         ->set('newProbeWorker', 'worker-1')
-        ->call('addMonitor');
+        ->call('saveMonitor');
 
     // The region label is derived from the chosen worker, not set directly.
     $this->assertDatabaseHas('site_uptime_monitors', [

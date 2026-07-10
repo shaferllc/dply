@@ -7,12 +7,18 @@ namespace Tests\Feature\ConnectProviderModalTest;
 use App\Modules\Edge\Livewire\Create;
 use App\Livewire\Settings\ConnectProviderModal;
 use App\Models\GitProviderToken;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
+
+usesFeatures('surface.edge');
 
 test('connect provider modal shows oauth and personal access token entry', function () {
     $user = User::factory()->create();
@@ -55,6 +61,10 @@ test('edge create refreshes linked accounts after source control linked event', 
     ]);
 
     $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
     GitProviderToken::create([
         'user_id' => $user->id,
         'provider' => 'github',
@@ -63,9 +73,11 @@ test('edge create refreshes linked accounts after source control linked event', 
         'access_token' => 'ghp_edge_create_refresh',
     ]);
 
+    // Mount already hydrates linked accounts when a token exists; call refresh
+    // to exercise the source-control-linked listener path.
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->assertSet('linkedSourceControlAccounts', [])
+        ->assertCount('linkedSourceControlAccounts', 1)
         ->call('refreshLinkedSourceControlAccounts')
         ->assertSet('repo_source', 'connected')
         ->assertCount('linkedSourceControlAccounts', 1);

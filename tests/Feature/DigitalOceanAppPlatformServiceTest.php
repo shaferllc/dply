@@ -44,8 +44,10 @@ test('create app posts spec and returns id', function () {
             && $body['spec']['name'] === 'api-acme'
             && $body['spec']['region'] === 'nyc'
             && $body['spec']['services'][0]['http_port'] === 8080
-            && $body['spec']['services'][0]['image']['repository'] === 'acme/api'
-            && $body['spec']['services'][0]['image']['tag'] === 'v1.2.3'
+            && ($body['spec']['services'][0]['image']['registry_type'] ?? null) === 'GHCR'
+            && ($body['spec']['services'][0]['image']['registry'] ?? null) === 'acme'
+            && ($body['spec']['services'][0]['image']['repository'] ?? null) === 'api'
+            && ($body['spec']['services'][0]['image']['tag'] ?? null) === 'v1.2.3'
             && $body['spec']['services'][0]['envs'][0]['key'] === 'APP_ENV';
     });
 });

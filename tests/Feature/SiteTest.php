@@ -1225,8 +1225,8 @@ test('site show defaults to general site workspace', function () {
 
     $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
+    // General no longer shows the "Site workspace" hero (Overview card leads).
     $response->assertOk()
-        ->assertSee('Site workspace')
         ->assertSee('General')
         ->assertSee('Site domain')
         ->assertSee('Status')
@@ -1276,8 +1276,8 @@ test('site show surfaces deployment foundation preflight and resource state', fu
 
     // Docker workspaces land on the container dashboard Overview — preflight,
     // foundation contract, and env keys live on dedicated sections now.
+    // General no longer shows the "Container app workspace" hero.
     $response->assertOk()
-        ->assertSee('Container app workspace')
         ->assertSee('Overview')
         ->assertSee('Container deployment')
         ->assertSee('Backend');
@@ -1733,8 +1733,8 @@ test('site show displays aws lambda runtime target details', function () {
 
     // Lambda invocation metadata lives on the serverless Overview dashboard now,
     // not the legacy "Runtime target" panel from Sites\Show.
+    // General no longer shows the "Cloud app workspace" hero.
     $response->assertOk()
-        ->assertSee('Cloud app workspace')
         ->assertSee('Overview')
         ->assertSee('Serverless')
         ->assertSee('Function')
@@ -2296,7 +2296,7 @@ test('site show displays preview and certificate summary', function () {
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->set('routingTab', 'preview')
-        ->assertSee('Preview domains')
+        ->assertSee('Preview URLs')
         ->assertSee('preview-app.dply.cc')
         ->assertSee('ready');
 

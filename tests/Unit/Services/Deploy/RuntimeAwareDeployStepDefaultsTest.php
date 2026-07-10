@@ -10,13 +10,20 @@ use App\Modules\Deploy\Services\RuntimeAwareDeployStepDefaults;
 test('php laravel emits composer install then migrate then optimize', function () {
     $steps = (new RuntimeAwareDeployStepDefaults)->defaultsFor('php', 'laravel');
 
-    expect($steps)->toHaveCount(3);
+    // Laravel defaults also include npm ci + npm run build (Vite assets) so
+    // `@vite(...)` finds public/build/manifest.json on first deploy.
+    expect($steps)->toHaveCount(5);
     expect($steps[0]['step_type'])->toBe(SiteDeployStep::TYPE_COMPOSER_INSTALL);
     expect($steps[0]['phase'])->toBe(SiteDeployStep::PHASE_BUILD);
-    expect($steps[1]['step_type'])->toBe(SiteDeployStep::TYPE_ARTISAN_MIGRATE);
-    expect($steps[1]['phase'])->toBe(SiteDeployStep::PHASE_RELEASE);
-    expect($steps[2]['step_type'])->toBe(SiteDeployStep::TYPE_ARTISAN_OPTIMIZE);
-    expect($steps[2]['phase'])->toBe(SiteDeployStep::PHASE_RELEASE);
+    expect($steps[1]['step_type'])->toBe(SiteDeployStep::TYPE_NPM_CI);
+    expect($steps[1]['phase'])->toBe(SiteDeployStep::PHASE_BUILD);
+    expect($steps[2]['step_type'])->toBe(SiteDeployStep::TYPE_NPM_RUN);
+    expect($steps[2]['custom_command'])->toBe('build');
+    expect($steps[2]['phase'])->toBe(SiteDeployStep::PHASE_BUILD);
+    expect($steps[3]['step_type'])->toBe(SiteDeployStep::TYPE_ARTISAN_MIGRATE);
+    expect($steps[3]['phase'])->toBe(SiteDeployStep::PHASE_RELEASE);
+    expect($steps[4]['step_type'])->toBe(SiteDeployStep::TYPE_ARTISAN_OPTIMIZE);
+    expect($steps[4]['phase'])->toBe(SiteDeployStep::PHASE_RELEASE);
 });
 test('php generic omits artisan steps', function () {
     $steps = (new RuntimeAwareDeployStepDefaults)->defaultsFor('php', null);

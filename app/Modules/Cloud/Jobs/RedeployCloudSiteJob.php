@@ -59,7 +59,9 @@ class RedeployCloudSiteJob implements ShouldQueue
         // any previously-deployed tag. Cap at the most recent 10
         // entries — beyond that the dashboard list gets unwieldy.
         $history = is_array($meta['container']['image_history'] ?? null) ? $meta['container']['image_history'] : [];
-        $deployedImage = $this->newImage !== '' ? $this->newImage : $previousImage;
+        $deployedImage = (is_string($this->newImage) && $this->newImage !== '')
+            ? $this->newImage
+            : (is_string($previousImage) ? $previousImage : '');
         if ($deployedImage !== '') {
             $history[] = [
                 'image' => $deployedImage,

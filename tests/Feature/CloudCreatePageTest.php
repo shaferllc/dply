@@ -16,6 +16,7 @@ use App\Modules\Deploy\Services\RuntimeDetection\GitCloner;
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\Concerns\WithFeatures;
@@ -74,6 +75,7 @@ test('changing backend resets region to first available', function () {
 });
 test('deploy dispatches provision job and redirects', function () {
     Queue::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,
@@ -253,6 +255,7 @@ test('picker selection populates repo and branch', function () {
 });
 test('source mode dispatches provision with source meta', function () {
     Queue::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,
@@ -320,6 +323,7 @@ test('source mode detection does not overwrite typed port', function () {
 });
 test('source mode detection failure does not block deploy', function () {
     Queue::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,

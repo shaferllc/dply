@@ -55,7 +55,7 @@ test('edge access api updates password protection and republishes host map', fun
         'mode' => 'password',
         'password' => 'review-only',
     ], $headers)
-        ->assertOk()
+        ->assertSuccessful()
         ->assertJsonPath('data.mode', 'password')
         ->assertJsonPath('data.password_set', true);
 

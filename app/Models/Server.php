@@ -402,7 +402,9 @@ class Server extends Model
     /** @return HasMany<Site, $this> */
     public function sites(): HasMany
     {
-        return $this->hasMany(Site::class);
+        // Explicit FK: anonymous Server subclasses (unit fixtures) otherwise
+        // make Eloquent guess a broken parent key like `server@anonymous_…_id`.
+        return $this->hasMany(Site::class, 'server_id');
     }
 
     /**

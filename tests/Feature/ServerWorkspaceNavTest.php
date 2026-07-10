@@ -20,12 +20,20 @@ usesFeatures('workspace.services');
 test('nav shows all items when stack summary is missing', function () {
     $server = serverWithoutProvisionArtifact();
 
-    $keys = array_column(server_workspace_nav_for_server($server), 'key');
+    $items = collect(server_workspace_nav_for_server($server))->keyBy('key');
+    $keys = $items->keys()->all();
+    $memberKeys = $items
+        ->flatMap(fn (array $item): array => $item['match_keys'] ?? [($item['key'] ?? null)])
+        ->filter()
+        ->values()
+        ->all();
 
     // Fail-open: every configured item is visible when we don't yet know the stack.
+    // Leaf rows may collapse into clusters (php → runtime, firewall → network).
     foreach (['php', 'databases', 'daemons', 'firewall'] as $key) {
-        expect($keys)->toContain($key);
+        expect($memberKeys)->toContain($key);
     }
+    expect($keys)->toContain('runtime', 'databases', 'daemons', 'network');
 });
 
 test('nav hides php and databases when stack excludes them', function () {
@@ -37,19 +45,27 @@ test('nav hides php and databases when stack excludes them', function () {
         'expected_services' => ['haproxy', 'ufw'],
     ]);
 
-    $keys = array_column(server_workspace_nav_for_server($server), 'key');
+    $items = collect(server_workspace_nav_for_server($server))->keyBy('key');
+    $keys = $items->keys()->all();
+    $memberKeys = $items
+        ->flatMap(fn (array $item): array => $item['match_keys'] ?? [($item['key'] ?? null)])
+        ->filter()
+        ->values()
+        ->all();
 
-    expect($keys)->not->toContain('php');
+    expect($memberKeys)->not->toContain('php');
     expect($keys)->not->toContain('databases');
+    expect($memberKeys)->not->toContain('databases');
 
     // Daemons stays visible even without supervisor installed — the page itself
     // offers the Install Supervisor CTA, so the nav entry can't be gated on it.
     expect($keys)->toContain('daemons');
     expect($keys)->not->toContain('queue-workers');
 
-    // Always-on / non-gated tabs stay.
-    expect($keys)->toContain('firewall');
-    expect($keys)->toContain('networking');
+    // Always-on / non-gated tabs stay (firewall/networking collapse into network).
+    expect($keys)->toContain('network');
+    expect($memberKeys)->toContain('firewall');
+    expect($memberKeys)->toContain('networking');
     expect($keys)->toContain('settings');
     expect($keys)->toContain('services');
 });
@@ -63,9 +79,16 @@ test('nav shows php and databases when stack installs them', function () {
         'expected_services' => ['nginx', 'php-fpm', 'postgresql', 'redis'],
     ]);
 
-    $keys = array_column(server_workspace_nav_for_server($server), 'key');
+    $items = collect(server_workspace_nav_for_server($server))->keyBy('key');
+    $keys = $items->keys()->all();
+    $memberKeys = $items
+        ->flatMap(fn (array $item): array => $item['match_keys'] ?? [($item['key'] ?? null)])
+        ->filter()
+        ->values()
+        ->all();
 
-    expect($keys)->toContain('php');
+    expect($keys)->toContain('runtime');
+    expect($memberKeys)->toContain('php');
     expect($keys)->toContain('databases');
 
     // Daemons (incl. queue workers) ride on the SSH host, not on Supervisor being installed.

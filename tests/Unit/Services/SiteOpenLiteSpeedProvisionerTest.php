@@ -50,11 +50,14 @@ test('provision writes openlitespeed vhost and placeholder page', function () {
 
     $ssh = Mockery::mock(SshConnection::class);
     $ssh->shouldReceive('effectiveUsername')->andReturn('root');
+    // Placeholder index + managed 500.html + vhconf + httpd_config.
     $ssh->shouldReceive('putFile')
-        ->times(3)
+        ->times(4)
         ->andReturnUsing(function (string $remotePath, string $contents) use (&$writtenFiles): void {
             $writtenFiles[$remotePath] = $contents;
         });
+    // Provisioner merges existing httpd_config when the cat succeeds.
+    $ssh->shouldReceive('lastExecExitCode')->andReturn(1);
     $ssh->shouldReceive('exec')
         ->zeroOrMoreTimes()
         ->andReturnUsing(function (string $command): string {

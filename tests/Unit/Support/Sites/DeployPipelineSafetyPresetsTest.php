@@ -71,5 +71,5 @@ test('migrate pretend step type produces runnable command', function () {
         'step_type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND,
     ]);
 
-    expect($step->commandFor())->toBe('php artisan migrate --pretend --no-interaction');
+    expect($step->commandFor())->toBe('php artisan migrate --pretend --force');
 });

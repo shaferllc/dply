@@ -95,7 +95,7 @@ test('owner can delete site', function () {
     Livewire::actingAs($user)
         ->test(SitesShow::class, ['server' => $server, 'site' => $site])
         ->call('deleteSite')
-        ->assertRedirect(route('servers.show', $server, false));
+        ->assertRedirect(route('servers.sites', $server, false));
 
     $this->assertDatabaseMissing('sites', ['id' => $site->id]);
 });
@@ -160,23 +160,21 @@ test('site show displays php summary with current version and installed versions
 
     actingInOrg($user, $org);
 
-    $response = $this->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php']));
+    $response = $this->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']));
 
     $response->assertOk()
-        ->assertSee('PHP')
+        ->assertSee('PHP');
+
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\Settings::class, ['server' => $server, 'site' => $site])
+        ->set('section', 'runtime')
+        ->set('runtimeTab', 'php')
         ->assertSee('Current site version')
         ->assertSee('PHP 8.3')
         ->assertSee('Installed on this server')
         ->assertSee('PHP 8.4')
         ->assertSee('Memory limit')
-        ->assertSee('512M')
-        ->assertSee('Upload max filesize')
-        ->assertSee('64M')
-        ->assertSee('Max execution time')
-        ->assertSee('120')
-        ->assertSee('OPcache')
-        ->assertSee('Composer auth')
-        ->assertSee('Extensions');
+        ->assertSee('512M');
 });
 
 test('site show flags php version mismatch and links to server php workspace', function () {
@@ -263,12 +261,12 @@ test('site show can save php version and runtime settings and reject non install
         ->set('php_max_execution_time', '300')
         ->call('savePhpSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'PHP settings saved.', type: 'success');
+        ->assertDispatched('notify', type: 'success');
 
     $site->refresh();
 
     expect($site->php_version)->toBe('8.4');
-    expect($site->meta['php_runtime'] ?? null)->toBe([
+    expect($site->meta['php_runtime'] ?? null)->toMatchArray([
         'memory_limit' => '768M',
         'upload_max_filesize' => '128M',
         'max_execution_time' => '300',

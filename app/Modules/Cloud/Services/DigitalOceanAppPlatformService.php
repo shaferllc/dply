@@ -109,7 +109,7 @@ class DigitalOceanAppPlatformService
             'services' => [$service],
         ];
         if ($workers !== []) {
-            $spec['workers'] = array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($workers))))))))))))))))))))))))))))))));
+            $spec['workers'] = array_values($workers);
         }
         if ($jobs !== []) {
             $spec['jobs'] = array_values($jobs);
@@ -207,7 +207,7 @@ class DigitalOceanAppPlatformService
             'services' => [$service],
         ];
         if ($workers !== []) {
-            $spec['workers'] = array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($workers))))))))))))))))))))))))))))))));
+            $spec['workers'] = array_values($workers);
         }
         if ($jobs !== []) {
             $spec['jobs'] = array_values($jobs);

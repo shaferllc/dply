@@ -120,6 +120,12 @@ final class SiteSettingsSidebar
             $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'platform'));
         }
 
+        // Serverless keeps a dedicated Workers page; the Resources Livewire
+        // surface only admits container + VM runtimes and 404s for functions.
+        if ($site->usesFunctionsRuntime()) {
+            $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'resources'));
+        }
+
         // Worker hosts run Caddy purely to attach testing URLs to background/
         // queue workloads — page caching and CDN/edge delivery don't apply, so
         // those tabs are omitted (and their routes 404 — see Caching/Cdn::mount).

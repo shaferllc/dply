@@ -39,12 +39,13 @@ test('panel shows recent deployments with phase breakdown', function () {
     $response->assertOk()
         ->assertSee('Recent deployments')
         ->assertSee('webhook')
-        ->assertSee('build (1)')
-        ->assertSee('release (1)')
-        ->assertSee('restart (1)')
+        // Phase chips render the phase key + step count as separate nodes.
+        ->assertSee('build')
+        ->assertSee('release')
+        ->assertSee('restart')
         // Deployment ID + CLI hint are visible so operators can drill in via terminal.
         ->assertSee($deployment->id)
-        ->assertSee('dply:site:show-deploy');
+        ->assertSee('dply sites:deployment '.$deployment->id);
 });
 test('panel omits when no deployments have phase results', function () {
     [$user, $server, $site] = makeUserSite();
@@ -59,6 +60,7 @@ test('panel omits when no deployments have phase results', function () {
         'status' => SiteDeployment::STATUS_SUCCESS,
         'started_at' => now(),
         'finished_at' => now(),
+        'phase_results' => [],
     ]);
 
     $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));

@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    config(['server_providers.enabled.ploi' => true]);
+});
+
 function userWithOrganization(): User
 {
     $user = User::factory()->create();
@@ -185,15 +189,13 @@ test('active migration replaces migrate cta with view link', function () {
         ->assertSee('View migration in progress')
         ->assertDontSee('Migrate this server');
 });
-test('credentials sidebar shows ploi tab', function () {
+test('credentials page shows ploi provider card', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
     $response = $this->actingAs($user)->get(route('organizations.credentials', ['organization' => $org, 'provider' => 'ploi']));
 
     $response->assertOk()
-        ->assertSee('Migrate sites from Ploi to dply')
-        ->assertSee('Connect Ploi')
+        ->assertSee('Ploi')
         ->assertSee('Migrate from');
-    // sidebar group label
 });

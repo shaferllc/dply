@@ -71,7 +71,7 @@ test('webserver config subtab renders the editor inline without redirecting', fu
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->assertNoRedirect()
         ->assertSet('engine_subtab', 'config')
-        ->assertSee(__(':engine config editor', ['engine' => 'nginx']));
+        ->assertSee(__('Config editor'));
 });
 
 test('edge proxy config subtab no longer redirects to the standalone configuration workspace', function (): void {
@@ -125,24 +125,26 @@ test('configuration workspace applies scope filter from url', function (): void 
         ->assertSee(__('Filtered: :scope', ['scope' => 'Nginx']));
 });
 
-test('load config file queues read job', function (): void {
+test('load config file reads synchronously over ssh', function (): void {
     [$user, $server] = configurationWorkspaceUserWithServer();
 
     Queue::fake();
 
+    $this->mock(\App\Services\Servers\RemoteServerConfigService::class, function ($mock): void {
+        $mock->shouldReceive('read')
+            ->once()
+            ->andReturn(['contents' => "Port 22\n", 'truncated' => false]);
+    });
+
     Livewire::actingAs($user)
         ->test(WorkspaceConfiguration::class, ['server' => $server])
         ->call('loadConfigFile', '/etc/ssh/sshd_config')
-        ->assertSet('pending_load_path', '/etc/ssh/sshd_config')
         ->assertSet('config_selected_path', '/etc/ssh/sshd_config')
-        ->assertViewHas('configConsoleRun', null);
+        ->assertSet('config_file_loaded', true)
+        ->assertSet('config_contents', "Port 22\n")
+        ->assertSet('pending_load_path', null);
 
-    Queue::assertPushed(RunServerConfigOpJob::class, function (RunServerConfigOpJob $job) use ($server): bool {
-        return $job->serverId === $server->id
-            && $job->op === 'read'
-            && $job->path === '/etc/ssh/sshd_config'
-            && $job->engine === null;
-    });
+    Queue::assertNothingPushed();
 });
 
 test('configuration workspace restores selected file from url query param', function (): void {
@@ -150,18 +152,21 @@ test('configuration workspace restores selected file from url query param', func
 
     Queue::fake();
 
+    RunServerConfigOpJob::storeFileContentCache((string) $server->id, '/etc/ssh/sshd_config', [
+        'contents' => "Port 22\n",
+        'truncated' => false,
+    ]);
+
     Livewire::actingAs($user)
         ->withQueryParams(['file' => '/etc/ssh/sshd_config'])
         ->test(WorkspaceConfiguration::class, ['server' => $server])
         ->assertSet('config_selected_path', '/etc/ssh/sshd_config')
         ->call('loadConfigCatalog')
-        ->assertSet('pending_load_path', '/etc/ssh/sshd_config');
+        ->assertSet('config_file_loaded', true)
+        ->assertSet('config_contents', "Port 22\n")
+        ->assertSet('pending_load_path', null);
 
-    Queue::assertPushed(RunServerConfigOpJob::class, function (RunServerConfigOpJob $job) use ($server): bool {
-        return $job->serverId === $server->id
-            && $job->op === 'read'
-            && $job->path === '/etc/ssh/sshd_config';
-    });
+    Queue::assertNothingPushed();
 });
 
 test('invalid file query param is cleared on mount', function (): void {
@@ -222,15 +227,22 @@ test('reload selected config file bypasses cache', function (): void {
         'truncated' => false,
     ]);
 
+    $this->mock(\App\Services\Servers\RemoteServerConfigService::class, function ($mock): void {
+        $mock->shouldReceive('read')
+            ->once()
+            ->andReturn(['contents' => "Port 2222\n", 'truncated' => false]);
+    });
+
     Livewire::actingAs($user)
         ->test(WorkspaceConfiguration::class, ['server' => $server])
         ->call('loadConfigFile', '/etc/ssh/sshd_config')
         ->assertSet('config_loaded_from_cache', true)
         ->call('reloadSelectedConfigFile')
         ->assertSet('config_loaded_from_cache', false)
-        ->assertSet('pending_load_path', '/etc/ssh/sshd_config');
+        ->assertSet('config_contents', "Port 2222\n")
+        ->assertSet('pending_load_path', null);
 
-    Queue::assertPushed(RunServerConfigOpJob::class, fn (RunServerConfigOpJob $job): bool => $job->op === 'read');
+    Queue::assertNothingPushed();
 });
 
 test('disallowed config path is rejected', function (): void {

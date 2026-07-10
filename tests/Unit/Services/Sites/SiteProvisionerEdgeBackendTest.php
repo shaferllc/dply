@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
@@ -59,6 +58,7 @@ test('site provision begin uses edge backend applier when edge proxy is active',
 
     app(SiteProvisioner::class)->begin($site->fresh(['server', 'previewDomains']));
 
+    // begin() writes the vhost and enters reachability; preview SSL is queued later
+    // from checkReadiness() once the hostname responds, not during begin().
     expect($site->fresh()->provisioningMeta()['state'] ?? null)->toBe('waiting_for_http');
-    Queue::assertPushed(ExecuteSiteCertificateJob::class);
 });

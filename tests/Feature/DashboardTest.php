@@ -24,11 +24,11 @@ test('dashboard is displayed for authenticated user', function () {
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Workspace command deck');
-    $response->assertSee('Quick actions');
-    $response->assertSee('Platform surfaces');
-    $response->assertSee('Open launchpad');
-    $response->assertSee(route('launches.create'), false);
+    $response->assertSee('Welcome back');
+    $response->assertSee('Operate from one place');
+    $response->assertSee('Keep the workspace ready');
+    $response->assertSee('Add a server');
+    $response->assertSee(route('servers.create'), false);
 });
 
 test('dashboard prompts for provider setup when no provider credentials exist', function () {
@@ -37,8 +37,8 @@ test('dashboard prompts for provider setup when no provider credentials exist', 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk();
-    $response->assertSee('Set up a provider');
-    $response->assertSee('Add provider credentials before you provision infrastructure.');
+    $response->assertSee('Add provider credentials before you provision');
+    $response->assertSee('Connect a supported infrastructure provider so this workspace can launch and manage real servers instead of stopping at setup.');
 });
 
 test('dashboard redirects guest to login', function () {

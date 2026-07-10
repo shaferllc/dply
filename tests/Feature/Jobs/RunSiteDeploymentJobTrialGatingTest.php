@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Jobs\RunSiteDeploymentJobTrialGatingTest;
 
+use App\Enums\SiteType;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Project;
@@ -30,15 +31,35 @@ test('skipped deployment recorded when org trial expired', function () {
     ]);
     $server = Server::factory()->create([
         'organization_id' => $org->id,
+        'user_id' => $user->id,
         'status' => Server::STATUS_READY,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+    ]);
+    // Edge sites bill from unit 1 — ensures owesNothingThisCycle is false so
+    // the expired trial enters the soft-pause ladder that blocks deploys.
+    // created_at must clear min_billable_age_days or the site is ignored.
+    Site::factory()->create([
+        'organization_id' => $org->id,
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'type' => SiteType::Static,
+        'edge_backend' => 'dply_edge',
+        'status' => Site::STATUS_EDGE_ACTIVE,
+        'meta' => ['runtime_profile' => 'edge_web'],
+        'created_at' => now()->subDays(2),
     ]);
     $site = Site::factory()->create([
         'organization_id' => $org->id,
         'server_id' => $server->id,
         'project_id' => $project->id,
+        'user_id' => $user->id,
     ]);
 
-    RunSiteDeploymentJob::dispatchSync($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+    expect($org->fresh()->canDeploy())->toBeFalse();
+
+    // Machine triggers persist a skipped row; interactive (manual) returns quietly.
+    RunSiteDeploymentJob::dispatchSync($site->fresh(), SiteDeployment::TRIGGER_WEBHOOK);
 
     $deployment = SiteDeployment::query()->where('site_id', $site->id)->latest()->firstOrFail();
 

@@ -34,6 +34,11 @@ test('runtime check fails when horizon inactive on worker split', function () {
         'queue.default' => 'redis',
     ]);
 
+    // Hermetic: local Horizon may be running; force inactive for this assertion.
+    $this->mock(\Laravel\Horizon\Contracts\MasterSupervisorRepository::class, function ($mock): void {
+        $mock->shouldReceive('all')->andReturn([]);
+    });
+
     expect(Artisan::call('dply:runtime:check'))->toBe(1);
 });
 

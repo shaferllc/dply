@@ -17,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('workspace.deploy_pipeline_visual');
 
 function userWithOrganization(string $role = 'owner'): User
 {
@@ -90,15 +91,19 @@ test('pipeline workspace supports creating pipeline and applying template', func
 
     $this->actingAs($user)
         ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
-        ->assertOk()
-        ->assertSee('Pipelines')
-        ->assertSee('Steps only (advanced)')
-        ->assertSee('Hook types')
-        ->assertSee('Browse all steps');
+        ->assertRedirect(route('sites.deployments.index', [
+            'server' => $server,
+            'site' => $site,
+            'tab' => 'pipeline',
+        ]));
 
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('pipelineTab', 'steps')
+        ->assertSee('Pipelines')
+        ->assertSee('Steps only (advanced)')
+        ->assertSee('Hook types')
+        ->assertSee('Browse all steps')
         ->set('new_pipeline_name', 'Quick deploy')
         ->call('createDeployPipeline')
         ->assertHasNoErrors();

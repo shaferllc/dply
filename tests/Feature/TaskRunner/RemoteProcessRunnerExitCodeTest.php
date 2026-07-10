@@ -15,7 +15,7 @@ function capturingRunner(): object
         host: '127.0.0.1',
         port: 22,
         username: 'root',
-        privateKey: 'fake',
+        privateKey: file_get_contents(base_path('app/Modules/TaskRunner/Tests/fixtures/private_key.pem')),
         scriptPath: '/root/.dply-task-runner',
         proxyJump: null,
     );

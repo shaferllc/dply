@@ -42,10 +42,13 @@ test('status filter narrows to failures', function () {
     $success = seedDeploy($site, SiteDeployment::STATUS_SUCCESS, now(), 'manual');
     $failure = seedDeploy($site, SiteDeployment::STATUS_FAILED, now(), 'manual');
 
+    // History is the filterable list; Deploy is the live pipeline hub.
     $response = $this->actingAs($user)->get(route('sites.deployments.index', [
         'server' => $server,
         'site' => $site,
-    ]).'?status=failed');
+        'tab' => 'history',
+        'status' => 'failed',
+    ]));
 
     $response->assertOk()
         ->assertSee($failure->id)
@@ -59,7 +62,9 @@ test('trigger filter narrows to one trigger', function () {
     $response = $this->actingAs($user)->get(route('sites.deployments.index', [
         'server' => $server,
         'site' => $site,
-    ]).'?trigger=webhook');
+        'tab' => 'history',
+        'trigger' => 'webhook',
+    ]));
 
     $response->assertOk()
         ->assertSee($webhook->id)
@@ -71,10 +76,11 @@ test('renders friendly message when no deployments match', function () {
     $response = $this->actingAs($user)->get(route('sites.deployments.index', [
         'server' => $server,
         'site' => $site,
+        'tab' => 'history',
     ]));
 
     $response->assertOk()
-        ->assertSee('No deployments match');
+        ->assertSee('No deployments yet');
 });
 test('aborts when user is not in org', function () {
     [, $server, $site] = makeUserSite();

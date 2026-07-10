@@ -18,6 +18,8 @@ uses(RefreshDatabase::class);
 test('cost card totals provider note and dply tier fee', function (): void {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
+    // BYO VMs pay the provider directly — flat org plans replaced per-server
+    // tier fees, so dply cents stay 0 unless usesManagedHosting().
     $server = Server::factory()->create([
         'organization_id' => $org->id,
         'user_id' => $user->id,
@@ -44,8 +46,9 @@ test('cost card totals provider note and dply tier fee', function (): void {
     expect($report['provider']['source'])->toBe('note')
         ->and($report['provider']['monthly_usd_cents'])->toBe(1200)
         ->and($report['dply']['tier'])->toBe(ServerTier::M->value)
+        ->and($report['dply']['monthly_cents'])->toBe(0)
         ->and($report['sites']['count'])->toBe(1)
-        ->and($report['totals']['monthly_usd_cents'])->toBe(1200 + ServerTier::M->priceCents())
+        ->and($report['totals']['monthly_usd_cents'])->toBe(1200)
         ->and($report['nudge']['kind'] ?? null)->toBe('oversized')
         ->and($report['overall'])->toBe('info')
         ->and($report['alert_count'])->toBeGreaterThan(0)

@@ -17,13 +17,28 @@ use Illuminate\Support\Collection;
 use Mockery;
 
 test('provision writes backend caddy and traefik configs', function () {
-    $server = new class(['name' => 'Traefik Box', 'ip_address' => '203.0.113.22', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
+    $server = new class([
+        'name' => 'Traefik Box',
+        'ip_address' => '203.0.113.22',
+        'ssh_user' => 'root',
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+        'status' => Server::STATUS_READY,
+        // Avoid ServerPhpManager probing an empty inventory during Caddy backend build.
+        'meta' => [
+            'php_inventory' => [
+                'installed_versions' => ['8.3'],
+                'detected_default_version' => '8.3',
+                'supported' => true,
+            ],
+        ],
+    ]) extends Server
     {
         public function recoverySshPrivateKey(): ?string
         {
             return null;
         }
     };
+    $server->id = '01HZYTESTTRAEFIKSERVER0001';
 
     $site = new Site([
         'name' => 'Proxy App',
@@ -32,12 +47,22 @@ test('provision writes backend caddy and traefik configs', function () {
         'document_root' => '/var/www/proxy-app/public',
         'repository_path' => '/var/www/proxy-app',
         'php_version' => '8.3',
+        'runtime' => 'php',
+        'runtime_version' => '8.3',
     ]);
     $site->id = '01HZYTESTTRAEFIK0000000001';
     $site->setRelation('server', $server);
     $site->setRelation('domains', new Collection([
         new SiteDomain(['hostname' => 'proxy.example.com', 'is_primary' => true]),
     ]));
+    // Keep config builders / access-gate sync off the DB — fixture is not persisted.
+    $site->setRelation('domainAliases', new Collection);
+    $site->setRelation('tenantDomains', new Collection);
+    $site->setRelation('previewDomains', new Collection);
+    $site->setRelation('redirects', new Collection);
+    $site->setRelation('basicAuthUsers', new Collection);
+    $site->setRelation('accessGate', null);
+    $site->setRelation('accessGatePasswords', new Collection);
 
     $writtenFiles = [];
 

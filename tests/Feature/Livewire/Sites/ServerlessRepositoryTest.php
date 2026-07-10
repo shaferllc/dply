@@ -22,6 +22,7 @@ function functionSite(?string $repoUrl = 'git@github.com:acme/api.git', string $
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
         'user_id' => $user->id,
@@ -109,7 +110,10 @@ test('switch repository updates url and resets branch', function () {
 
     Livewire::actingAs($user)
         ->test(Repository::class, ['server' => $server, 'site' => $site])
-        ->call('switchRepository', 'git@github.com:acme/web.git', 'production');
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', 'git@github.com:acme/web.git')
+        ->set('git_branch', 'production')
+        ->call('saveConnection');
 
     $site->refresh();
     expect($site->git_repository_url)->toBe('git@github.com:acme/web.git');
@@ -144,9 +148,10 @@ test('save connection writes branch and url and account id', function () {
 
     Livewire::actingAs($user)
         ->test(Repository::class, ['server' => $server, 'site' => $site])
-        ->set('connectionRepositoryUrl', 'git@github.com:acme/billing.git')
-        ->set('connectionBranch', 'staging')
-        ->set('connectionAccountId', (string) $account->id)
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', 'git@github.com:acme/billing.git')
+        ->set('git_branch', 'staging')
+        ->set('source_control_account_id', (string) $account->id)
         ->call('saveConnection');
 
     $site->refresh();
@@ -177,7 +182,7 @@ test('branches tab calls provider api and lists branches', function () {
 
     Livewire::actingAs($user)
         ->test(Repository::class, ['server' => $server, 'site' => $site])
-        ->set('tab', 'branches')
+        ->call('selectTab', 'branches')
         ->assertSee('main')
         ->assertSee('develop')
         ->assertSee('deploy branch');
@@ -203,7 +208,7 @@ test('files tab renders directory tree', function () {
 
     Livewire::actingAs($user)
         ->test(Repository::class, ['server' => $server, 'site' => $site])
-        ->set('tab', 'files')
+        ->call('selectTab', 'files')
         ->assertSee('README.md')
         ->assertSee('src');
 });

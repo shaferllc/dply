@@ -25,6 +25,7 @@ function functionSite(array $serverlessMeta = []): array
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
         'user_id' => $user->id,
@@ -52,18 +53,18 @@ function functionSite(array $serverlessMeta = []): array
     return [$user, $server, $site];
 }
 
-test('routing page renders with default hostname tab', function () {
+test('routing page renders with default domains tab', function () {
     [$user, $server, $site] = functionSite();
 
     Livewire::actingAs($user)
         ->test(ServerlessRouting::class, ['server' => $server, 'site' => $site])
         ->assertOk()
-        ->assertSee('Hostname & DNS')
-        ->assertSee('Custom domains')
+        ->assertSee('Edge hostname & DNS')
+        ->assertSee('Domains')
         ->assertSee('Redirects')
         ->assertSee('Headers & CORS')
         ->assertSee('Invocation URLs')
-        ->assertSet('tab', 'hostname');
+        ->assertSet('tab', 'domains');
 });
 
 test('add redirect persists to site meta', function () {

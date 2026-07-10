@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\ServerMaintenancePageTest;
 
 use App\Jobs\ServerManageRemoteSshJob;
-use App\Livewire\Servers\Concerns\RunsServerMaintenanceActions;
 use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Models\ConsoleAction;
 use App\Models\Organization;
@@ -159,7 +158,7 @@ test('running an allowlisted operation queues the manage job and logs activity',
 
     expect(ConsoleAction::where('subject_type', $server->getMorphClass())
         ->where('subject_id', $server->getKey())
-        ->where('kind', RunsServerMaintenanceActions::OP_CONSOLE_KIND)
+        ->where('kind', 'server_maintenance_op')
         ->exists())->toBeTrue();
 });
 

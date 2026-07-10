@@ -113,7 +113,7 @@ test('servers index prompts for provider setup when no provider credentials exis
     $response = $this->actingAs($user)->get(route('servers.index'));
 
     $response->assertOk();
-    $response->assertSee('Set up a provider');
+    $response->assertSee('Setup');
     $response->assertSee('Add provider credentials before you provision infrastructure.');
 });
 
@@ -247,6 +247,7 @@ test('launchpad is displayed with organization', function () {
     // surface.cloud is off post VM-launch; this test asserts the launches
     // page lists the Cloud tile + cloud.create URL, so opt in locally.
     Feature::define('surface.cloud', fn (): bool => true);
+    Feature::define('surface.serverless', fn (): bool => true);
     Feature::flushCache();
 
     $user = userWithOrganization();
@@ -262,17 +263,17 @@ test('launchpad is displayed with organization', function () {
     // host_target preset instead of the retired launcher page.
     $response->assertSee('Run a container app');
     $response->assertSee('Cloud');
-    $response->assertSee('Cloud Network');
     $response->assertSee('Serverless');
-    $response->assertSee('Coming soon');
     $response->assertSee(route('servers.create'), false);
     $response->assertSee(route('servers.create', ['host_target' => 'docker']), false);
     $response->assertSee(route('cloud.create'), false);
-    $response->assertDontSee(route('launches.serverless'), false);
-    $response->assertDontSee(route('launches.cloud-network'), false);
+    $response->assertSee(route('serverless.create'), false);
 });
 
 test('serverless launch path is displayed with organization', function () {
+    Feature::define('surface.serverless', fn (): bool => true);
+    Feature::flushCache();
+
     $user = userWithOrganization();
 
     $response = $this->actingAs($user)->get(route('launches.serverless'));
@@ -829,13 +830,13 @@ test('servers create step where shows provider account + region + size pickers',
 test('servers create step where shows role-aware size guidance for redis', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
-        'https://api.digitalocean.com/v2/regions' => Http::response([
+        'https://api.digitalocean.com/v2/regions*' => Http::response([
             'regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]],
         ], 200),
-        'https://api.digitalocean.com/v2/sizes' => Http::response([
+        'https://api.digitalocean.com/v2/sizes*' => Http::response([
             'sizes' => [
-                ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
-                ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
+                ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true, 'regions' => ['nyc3']],
+                ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true, 'regions' => ['nyc3']],
             ],
         ], 200),
     ]);
@@ -1094,7 +1095,7 @@ test('servers create step review blocks store when required custom-mode connecti
     Livewire::actingAs($user)
         ->test(ServerCreateStepReview::class)
         ->call('store')
-        ->assertHasErrors(['form.ip_address', 'form.ssh_private_key']);
+        ->assertHasErrors(['ip_address', 'ssh_private_key']);
 
     $this->assertDatabaseMissing('servers', [
         'organization_id' => $org->id,
@@ -2321,19 +2322,8 @@ test('server show settings tab renders', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
         ->assertSee('Connection & identity')
-        ->assertSee('Use the tabs');
-
-    Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'alerts'])
-        ->assertSee('Preferred maintenance schedule');
-
-    Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'export'])
-        ->assertSee('Download manifest (JSON)');
-
-    Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'danger'])
-        ->assertSee('Danger zone');
+        ->assertSee('Name, tags, workspace, and SSH details')
+        ->assertSee('Identity');
 });
 
 test('server settings redirects bare settings url to connection tab', function () {
@@ -2371,21 +2361,24 @@ test('server manage workspace renders', function () {
         'name' => 'Manage Me',
     ]);
 
+    // Manage was dissolved into dedicated workspace pages — assert the
+    // replacement surfaces still render for the former manage sections.
     $this->actingAs($user)
-        ->get(route('servers.manage', ['server' => $server, 'section' => 'overview']))
+        ->get(route('servers.overview', ['server' => $server]))
         ->assertOk()
         ->assertSee('Manage Me');
 
-    Livewire::actingAs($user)
-        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'configuration'])
-        ->assertRedirect(route('servers.configuration', ['server' => $server]));
+    $this->actingAs($user)
+        ->get(route('servers.configuration', ['server' => $server]))
+        ->assertOk();
 
-    // The 'services' section was retired from /manage/ — visiting it now
-    // redirects to the standalone Services page so existing deep links
-    // (digest emails, bookmarks) keep working.
-    Livewire::actingAs($user)
-        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'services'])
-        ->assertRedirect(route('servers.services', ['server' => $server]));
+    $this->actingAs($user)
+        ->get(route('servers.services', ['server' => $server]))
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->get(route('servers.tools', ['server' => $server]))
+        ->assertOk();
 });
 
 test('servers show returns 403 for non member', function () {

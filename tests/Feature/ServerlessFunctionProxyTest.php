@@ -39,7 +39,12 @@ test('it proxies a testing domain subdomain', function () {
         ]],
     ]);
 
-    $this->get('http://orders-api.dply.host/')
+    // Domain routes are registered at boot from DPLY_TESTING_DOMAINS
+    // (.env.testing → dply.test). Using a domain outside that pool falls
+    // through to the coming-soon guest redirect.
+    $domain = (string) (config('services.digitalocean.testing_domains')[0] ?? 'dply.test');
+
+    $this->get('http://orders-api.'.$domain.'/')
         ->assertOk()
         ->assertSee('reached via subdomain');
 });
@@ -52,6 +57,11 @@ test('an undeployed function returns 503', function () {
     Site::factory()->create([
         'meta' => ['serverless' => ['proxy_slug' => 'pending-fn']],
     ]);
+
+    // Lookout's debug page intercepts HttpExceptions when APP_DEBUG=true and
+    // surfaces them as a 500 HTML page. Assert the real abort status with
+    // debug off (production-shaped).
+    config(['app.debug' => false]);
 
     $this->get('/fn/pending-fn')->assertStatus(503);
 });

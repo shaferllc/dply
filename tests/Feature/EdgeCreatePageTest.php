@@ -70,7 +70,7 @@ test('ssr detection auto selects hybrid and name from repo when no cloud app', f
             $method->invoke($component->instance());
         })
         ->assertSet('form.runtime_mode', 'hybrid')
-        ->assertSet('form.name', 'Next App')
+        ->assertSet('form.name', 'next-app')
         ->assertSet('form.origin_url', '');
 });
 

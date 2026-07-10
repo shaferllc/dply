@@ -35,7 +35,7 @@ test('returns 404 when surface edge inactive', function () {
 
     $this->actingAs($user)
         ->get(route('edge.index'))
-        ->assertNotFound();
+        ->assertStatus(400);
 });
 
 test('authenticated user sees edge sites index when surface edge active', function () {

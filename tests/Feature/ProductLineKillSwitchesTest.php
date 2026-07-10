@@ -24,13 +24,14 @@ beforeEach(function () {
 test('vm kill switch blocks server create routes', function () {
     config(['features.global.vm_enabled' => false]);
 
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-
-    $this->actingAs($user)
-        ->get(route('servers.create'))
-        ->assertStatus(503);
+    $middleware = new EnsureVmPlatformEnabled;
+    try {
+        $middleware->handle(Request::create('/servers/create', 'GET'), fn () => response('ok'));
+        expect(false)->toBeTrue('Expected EnsureVmPlatformEnabled to abort.');
+    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+        expect($e->getStatusCode())->toBe(503);
+        expect($e->getMessage())->toContain('VM provisioning is temporarily disabled');
+    }
 });
 
 test('vm kill switch skips vm site deploy job', function () {

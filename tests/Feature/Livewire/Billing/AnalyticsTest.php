@@ -17,6 +17,11 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 test('billing analytics page renders for org admin', function () {
+    Feature::define('surface.edge', fn () => true);
+    Feature::define('surface.cloud', fn () => true);
+    Feature::define('surface.serverless', fn () => true);
+    Feature::flushCache();
+
     $admin = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($admin->id, ['role' => 'admin']);
@@ -43,6 +48,8 @@ test('billing analytics page renders for org admin', function () {
 
 test('billing analytics shows cost observatory when billing flag enabled', function () {
     Feature::define('global.billing_enabled', fn () => true);
+    Feature::define('surface.edge', fn () => true);
+    Feature::flushCache();
 
     $admin = User::factory()->create();
     $org = Organization::factory()->create();
@@ -62,12 +69,16 @@ test('billing analytics shows cost observatory when billing flag enabled', funct
 });
 
 test('billing analytics shows edge usage when snapshots exist', function () {
+    Feature::define('surface.edge', fn () => true);
+    Feature::flushCache();
+
     $admin = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($admin->id, ['role' => 'admin']);
 
     $server = Server::factory()->for($org)->create(['status' => Server::STATUS_READY]);
     $site = Site::factory()->for($org)->for($server)->create([
+        'name' => 'Analytics Edge Site',
         'status' => Site::STATUS_EDGE_ACTIVE,
         'edge_backend' => 'dply_edge',
         'created_at' => now()->subDays(2),
@@ -88,7 +99,7 @@ test('billing analytics shows edge usage when snapshots exist', function () {
 
     Livewire::actingAs($admin)
         ->test(Analytics::class, ['organization' => $org])
-        ->assertSee($site->name)
+        ->assertSee('Analytics Edge Site')
         ->assertSee('12,500')
         ->assertSee('Platform fee');
 });

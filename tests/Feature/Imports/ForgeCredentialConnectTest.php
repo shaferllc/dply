@@ -14,6 +14,10 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    config(['server_providers.enabled.forge' => true]);
+});
+
 function userWithOrganization(): User
 {
     $user = User::factory()->create();
@@ -88,14 +92,13 @@ test('verify credential rechecks token', function () {
         ->call('verifyCredential', $credential->id)
         ->assertHasNoErrors();
 });
-test('credentials sidebar includes forge tab', function () {
+test('credentials page includes forge provider card', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
     $response = $this->actingAs($user)->get(route('organizations.credentials', ['organization' => $org, 'provider' => 'forge']));
 
     $response->assertOk()
-        ->assertSee('Migrate sites from Laravel Forge to dply')
-        ->assertSee('Connect Laravel Forge')
+        ->assertSee('Laravel Forge')
         ->assertSee('Migrate from');
 });

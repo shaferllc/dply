@@ -17,7 +17,8 @@ test('snapshots all organizations', function () {
         ->expectsOutputToContain('Persisted billing snapshots')
         ->assertOk();
 
-    expect(OrganizationBillingSnapshot::query()->count())->toBe(2);
+    expect(OrganizationBillingSnapshot::query()->count())
+        ->toBe(Organization::query()->count());
 });
 
 test('dry run does not persist snapshots', function () {

@@ -63,14 +63,15 @@ test('an AI binding without a key is rejected', function () {
     app(SiteBindingManager::class)->attachExisting($site, 'ai', ['provider' => 'anthropic']);
 })->throws(InvalidArgumentException::class);
 
-test('switching AI providers drops the previous provider key', function () {
+test('switching AI providers keeps both bindings (keys do not collide)', function () {
     [, , $site] = integrationFixture();
     $manager = app(SiteBindingManager::class);
 
     $manager->attachExisting($site, 'ai', ['provider' => 'openai', 'api_key' => 'sk-1']);
     $binding = $manager->attachExisting($site->fresh(), 'ai', ['provider' => 'anthropic', 'api_key' => 'ant-1']);
 
-    expect(SiteBinding::query()->where('site_id', $site->id)->where('type', 'ai')->count())->toBe(1);
+    // Multi-instance AI bindings: OpenAI + Anthropic coexist (separate key namespaces).
+    expect(SiteBinding::query()->where('site_id', $site->id)->where('type', 'ai')->count())->toBe(2);
     expect($binding->connectionEnv())->toHaveKey('ANTHROPIC_API_KEY');
     expect($binding->connectionEnv())->not->toHaveKey('OPENAI_API_KEY');
 });

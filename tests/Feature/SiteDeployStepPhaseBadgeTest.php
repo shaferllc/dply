@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeployStepPhaseBadgeTest;
 
+use App\Livewire\Sites\WorkspacePipeline;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\User;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('workspace.deploy_pipeline_visual');
 
 test('dashboard shows phase badges on each deploy step', function () {
     [$user, $server] = makeUserServer();
@@ -24,37 +28,23 @@ test('dashboard shows phase badges on each deploy step', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    SiteDeployStep::create([
-        'site_id' => $site->id,
-        'sort_order' => 10,
-        'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
-        'phase' => SiteDeployStep::PHASE_BUILD,
-        'timeout_seconds' => 600,
-    ]);
-    SiteDeployStep::create([
-        'site_id' => $site->id,
-        'sort_order' => 20,
-        'step_type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE,
-        'phase' => SiteDeployStep::PHASE_RELEASE,
-        'timeout_seconds' => 300,
-    ]);
+    $manager = app(SiteDeployPipelineManager::class);
+    $pipeline = $manager->ensureDefaultPipeline($site);
+    $manager->addStep($pipeline, SiteDeployStep::TYPE_COMPOSER_INSTALL, null, 600);
+    $manager->addStep($pipeline, SiteDeployStep::TYPE_ARTISAN_MIGRATE, null, 300);
+    $manager->primeSiteForPipelineWorkspace($site);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', [
-        'server' => $server,
-        'site' => $site,
-        'tab' => 'steps',
-    ]));
-
-    $response->assertOk();
-
-    // Both phase badges render.
-    $response->assertSee('build');
-    $response->assertSee('release');
-
-    // Step types still render alongside the badges.
-    $response->assertSee(SiteDeployStep::TYPE_COMPOSER_INSTALL);
-    $response->assertSee(SiteDeployStep::TYPE_ARTISAN_MIGRATE);
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('editingPipelineId', (string) $pipeline->id)
+        ->assertOk()
+        ->assertSee('build')
+        ->assertSee('release')
+        ->assertSee(SiteDeployStep::TYPE_COMPOSER_INSTALL)
+        ->assertSee(SiteDeployStep::TYPE_ARTISAN_MIGRATE);
 });
+
 /**
  * @return array{0: User, 1: Server}
  */

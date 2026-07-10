@@ -54,7 +54,8 @@ test('web unit renders unit for node site', function () {
     $this->assertStringContainsString('WorkingDirectory=/var/www/jobs-app', $unit);
     $this->assertStringContainsString('Environment=PORT=30007', $unit);
     $this->assertStringContainsString('ExecStart=npm start', $unit);
-    $this->assertStringContainsString('Restart=on-failure', $unit);
+    // Long-running daemons use Restart=always so clean exits (e.g. horizon:terminate) come back.
+    $this->assertStringContainsString('Restart=always', $unit);
     $this->assertStringContainsString('After=network-online.target', $unit);
     $this->assertStringContainsString('WantedBy=multi-user.target', $unit);
 });
@@ -103,7 +104,7 @@ test('web unit omits port environment when no port set', function () {
     expect($unit)->not->toBeNull();
     $this->assertStringNotContainsString('Environment=PORT', $unit);
 });
-test('web unit falls back to var www slug when repository path unset', function () {
+test('web unit falls back to conventional home path when repository path unset', function () {
     $site = new Site([
         'runtime' => 'node',
         'slug' => 'autoplaced',
@@ -111,11 +112,13 @@ test('web unit falls back to var www slug when repository path unset', function 
         'internal_port' => 30001,
         'repository_path' => null,
     ]);
+    // Avoid primaryDomain() querying site_domains for this in-memory fixture.
+    $site->setRelation('domains', collect());
 
     $unit = (new SiteSystemdUnitBuilder)->buildWebUnit($site, 'dply');
 
     expect($unit)->not->toBeNull();
-    $this->assertStringContainsString('WorkingDirectory=/var/www/autoplaced', $unit);
+    $this->assertStringContainsString('WorkingDirectory=/home/dply/autoplaced', $unit);
 });
 test('process unit renders for a worker', function () {
     $site = new Site([

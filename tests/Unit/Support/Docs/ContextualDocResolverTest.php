@@ -133,7 +133,7 @@ test('contextual doc resolver resolves vm site monitor route at runtime', functi
     $resolver = app(ContextualDocResolver::class);
 
     expect($resolver->resolve())->toBe('vm-site-monitor')
-        ->and($resolver->guideGroup()['key'] ?? null)->toBe('byo-sites');
+        ->and($resolver->guideGroup()['key'] ?? null)->toBe('sites');
 });
 
 test('contextual doc resolver resolves vm site repository route at runtime', function () {

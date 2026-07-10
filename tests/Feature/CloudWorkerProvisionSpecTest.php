@@ -79,7 +79,8 @@ test('image mode provision emits worker components', function () {
         }
         foreach ($workers as $w) {
             // Workers share the web service's Docker image source.
-            if (($w['image']['repository'] ?? null) !== 'acme/api') {
+            // GHCR refs are split into registry (namespace) + repository (image).
+            if (($w['image']['registry'] ?? null) !== 'acme' || ($w['image']['repository'] ?? null) !== 'api') {
                 return false;
             }
         }

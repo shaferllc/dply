@@ -51,9 +51,7 @@ test('edge site settings sidebar shows edge sections not byo runtime', function 
         ->assertSee('Build & deploy logs')
         ->assertSee('Back to Edge sites')
         ->assertDontSee('System user')
-        ->assertDontSee('Runtime')
-        ->assertDontSee('Certificates')
-        ->assertDontSee('DNS');
+        ->assertDontSee('Certificates');
 });
 
 test('edge overview shows live url redeploy and no nginx references', function () {
@@ -86,8 +84,16 @@ test('edge breadcrumbs use infrastructure and edge not servers path', function (
 test('edge deploys section renders deploy history table', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings();
 
+    EdgeDeployment::query()->create([
+        'site_id' => $site->id,
+        'organization_id' => $site->organization_id,
+        'status' => EdgeDeployment::STATUS_SUPERSEDED,
+        'storage_prefix' => 'edge/test/older-prefix',
+        'published_at' => now()->subHour(),
+    ]);
+
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-deploys'])
+        ->test(Deploys::class, ['server' => $server, 'site' => $site])
         ->assertSee('Deploy history')
         ->assertSee('Roll back');
 });
@@ -388,5 +394,14 @@ function makeEdgeSiteForSettings(bool $withGithub = false, bool $hybrid = false)
         'published_at' => now(),
     ]);
 
-    return [$user, $server, $site];
+    $deployment = EdgeDeployment::query()->where('site_id', $site->id)->latest('id')->first();
+    $site->update([
+        'meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
+            'edge' => array_merge($edgeMeta, [
+                'active_deployment_id' => $deployment?->id,
+            ]),
+        ]),
+    ]);
+
+    return [$user, $server, $site->fresh()];
 }

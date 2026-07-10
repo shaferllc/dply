@@ -17,6 +17,7 @@ test('login screen can be rendered', function () {
 
 test('local login screen shows quick login button', function () {
     config()->set('app.env', 'local');
+    config(['dply.quick_login_enabled' => true]);
 
     $this->get('/login')
         ->assertOk()
@@ -25,6 +26,7 @@ test('local login screen shows quick login button', function () {
 
 test('production login screen hides quick login button', function () {
     config()->set('app.env', 'production');
+    config(['dply.quick_login_enabled' => false]);
 
     $this->get('/login')
         ->assertOk()
@@ -73,6 +75,7 @@ test('local tj account can authenticate without password', function () {
 
 test('local tj account can use quick login button', function () {
     config()->set('app.env', 'local');
+    config(['dply.quick_login_enabled' => true]);
 
     $user = User::factory()->create([
         'email' => 'tj@tjshafer.com',
@@ -87,6 +90,7 @@ test('local tj account can use quick login button', function () {
 
 test('local quick login creates tj user when missing', function () {
     config()->set('app.env', 'local');
+    config(['dply.quick_login_enabled' => true]);
 
     $this->assertDatabaseMissing('users', ['email' => 'tj@tjshafer.com']);
 

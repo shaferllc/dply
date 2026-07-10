@@ -37,12 +37,12 @@ test('guest cannot view backups', function () {
     $this->get('/backups/files')->assertRedirect();
 });
 
-test('backups redirects to databases', function () {
+test('legacy databases path redirects to backups hub', function () {
     $user = userWithOrganization();
 
     $this->actingAs($user)
-        ->get('/backups')
-        ->assertRedirect('/backups/databases');
+        ->get('/backups/databases')
+        ->assertRedirect('/backups');
 });
 
 test('authenticated user can view database backups page', function () {
@@ -51,7 +51,7 @@ test('authenticated user can view database backups page', function () {
     $this->actingAs($user)
         ->get(route('backups.databases'))
         ->assertOk()
-        ->assertSee('Database backups', false)
+        ->assertSee('Backups', false)
         ->assertSee(route('launches.create'), false);
 });
 
@@ -126,9 +126,9 @@ test('database backups page shows storage destinations and latest exports', func
         ->get(route('backups.databases'))
         ->assertOk()
         ->assertSee('Primary S3', false)
-        ->assertSee('Latest export: Completed', false)
+        ->assertSee('Done', false)
         ->assertSee('app_db', false)
-        ->assertSee('1 tracked database on this server.', false);
+        ->assertSee('Storage destinations', false);
 });
 
 test('file backups page shows storage destinations and runbook readiness', function () {

@@ -106,6 +106,8 @@ test('runtime is lowercased', function () {
     expect($manifest->runtime)->toBe('php');
 });
 test('unknown top level keys produce warnings not errors', function () {
+    // `domains` is a recognized unified-file routing key (see DplyManifest::
+    // UNIFIED_FILE_KEYS) — it must not warn. Only genuinely unknown keys do.
     $yaml = <<<'YAML'
 runtime: node
 version: "22"
@@ -117,9 +119,8 @@ YAML;
     $manifest = parser()->parseYaml($yaml);
 
     expect($manifest->runtime)->toBe('node');
-    expect($manifest->warnings)->toHaveCount(2);
-    $this->assertStringContainsString('domains', $manifest->warnings[0]);
-    $this->assertStringContainsString('custom_field', $manifest->warnings[1]);
+    expect($manifest->warnings)->toHaveCount(1);
+    $this->assertStringContainsString('custom_field', $manifest->warnings[0]);
 });
 test('invalid runtime throws with field path', function () {
     try {

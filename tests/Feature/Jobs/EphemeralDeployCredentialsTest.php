@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Jobs;
 
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Project;
@@ -16,18 +17,18 @@ use App\Models\SiteDeploymentEphemeralCredential;
 use App\Models\User;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use App\Services\Sites\SiteGitDeployer;
-use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
 use RuntimeException;
-use Tests\Support\FakeRemoteShell;
-use Tests\Support\FakeSshConnectionFactory;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+    $this->mock(DeployRepoPreflight::class, function ($mock): void {
+        $mock->shouldReceive('check')->andReturn(null);
+    });
 });
 
 test('vm deploy provisions and revokes ephemeral ssh credential when enabled', function () {
@@ -42,10 +43,9 @@ test('vm deploy provisions and revokes ephemeral ssh credential when enabled', f
         });
     });
 
-    app()->instance(
-        SshConnectionFactory::class,
-        new FakeSshConnectionFactory(new FakeRemoteShell),
-    );
+    $this->mock(SiteGitDeployer::class, function ($mock): void {
+        $mock->shouldReceive('run')->once()->andReturn(['output' => 'deployed', 'sha' => null]);
+    });
 
     $user = User::factory()->create();
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(14)]);
@@ -99,10 +99,9 @@ test('vm deploy skips ephemeral credential when site opt-in is off', function ()
         $mock->shouldNotReceive('sync');
     });
 
-    app()->instance(
-        SshConnectionFactory::class,
-        new FakeSshConnectionFactory(new FakeRemoteShell),
-    );
+    $this->mock(SiteGitDeployer::class, function ($mock): void {
+        $mock->shouldReceive('run')->once()->andReturn(['output' => 'deployed', 'sha' => null]);
+    });
 
     $user = User::factory()->create();
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(14)]);

@@ -9,10 +9,12 @@ test('mysql postgres and sqlite are always available', function () {
         ->and(DatabaseEngineAvailability::isComingSoon('mysql'))->toBeFalse();
 });
 
-test('gated database engines default to coming soon', function () {
+test('gated database engines follow features.database config defaults', function () {
     foreach (DatabaseEngineAvailability::GATED_ENGINES as $engine) {
-        expect(DatabaseEngineAvailability::isComingSoon($engine))->toBeTrue()
-            ->and(DatabaseEngineAvailability::isAvailable($engine))->toBeFalse()
+        $available = (bool) config("features.database.{$engine}", false);
+
+        expect(DatabaseEngineAvailability::isComingSoon($engine))->toBe(! $available)
+            ->and(DatabaseEngineAvailability::isAvailable($engine))->toBe($available)
             ->and(DatabaseEngineAvailability::flagFor($engine))->toBe("database.{$engine}");
     }
 });

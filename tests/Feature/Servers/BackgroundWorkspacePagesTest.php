@@ -386,15 +386,15 @@ test('requesting a download without a configured staging bucket does not stage',
 });
 test('empty state explainer offers inline add destination', function () {
     // With org-scoped destinations and the inline "Add destination" modal,
-    // the empty-state copy invites the operator to add one without leaving
+    // the Schedules empty-state invites the operator to add one without leaving
     // the page rather than linking back to the profile settings screen.
     $user = actingOrgUser();
     $server = readyServer($user);
 
-    $this->actingAs($user)
-        ->get(route('servers.backups', $server))
-        ->assertOk()
-        ->assertSee('add one now', false)
+    Livewire::actingAs($user)
+        ->test(WorkspaceBackups::class, ['server' => $server])
+        ->call('setBackupsWorkspaceTab', 'schedules')
+        ->assertSee('Add backup destination', false)
         ->assertSee('openDestinationModal', false);
 });
 test('toggle schedule pauses and resumes managed cron', function () {

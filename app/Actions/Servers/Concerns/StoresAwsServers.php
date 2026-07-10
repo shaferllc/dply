@@ -72,7 +72,7 @@ trait StoresAwsServers
             if ($cluster !== null) {
                 $clusterArn = isset($cluster['arn']) ? (string) $cluster['arn'] : null;
             }
-        } catch (Throwable) {
+        } catch (\Throwable) {
             //
         }
 

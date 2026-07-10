@@ -390,7 +390,7 @@ trait StoresOtherProviderServers
         try {
             $svc = new HetznerService($credential);
             $serverTypes = $svc->getServerTypes();
-        } catch (Throwable) {
+        } catch (\Throwable) {
             // Catalog probe failed — fall through and let the provision job
             // surface the API error. We don't want to block submission on a
             // transient Hetzner outage.

@@ -11,11 +11,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->org = Organization::factory()->create();
     $this->org->users()->attach($this->user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $this->org->id]);
 });
 
 function makeFunction(User $user, Organization $org, string $name): Site

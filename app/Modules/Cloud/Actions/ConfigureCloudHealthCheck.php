@@ -34,7 +34,7 @@ class ConfigureCloudHealthCheck
      */
     public function handle(Site $site, array $payload): array
     {
-        if ($site->container_backend === '') {
+        if (! $site->isCloudContainerSite()) {
             throw new InvalidArgumentException('Health checks can only be configured on Cloud container sites.');
         }
 

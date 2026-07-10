@@ -84,7 +84,7 @@ class CloudRouter
 
     private static function hasPersistedCredential(Site $site): bool
     {
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if (! $site->isCloudContainerSite()) {
             return false;
         }
 
@@ -111,7 +111,7 @@ class CloudRouter
             }
         }
 
-        if (! is_string($site->container_backend) || $site->container_backend === '') {
+        if (! $site->isCloudContainerSite()) {
             return null;
         }
 

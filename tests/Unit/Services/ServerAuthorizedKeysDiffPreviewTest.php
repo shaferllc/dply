@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Servers\ServerAuthorizedKeysDiffPreview;
 use App\Services\Servers\ServerAuthorizedKeysRemoteReader;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
+use App\Services\Servers\SshPublicKeyFingerprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
@@ -36,7 +37,8 @@ it('reports added and removed lines per user', function () {
         ],
     ]);
 
-    $kPanel = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHBhbmVsLWtleS1saW5lLXBsYWNlaG9sZGVy';
+    // Real ed25519 material — placeholder base64 blobs don't fingerprint via phpseclib.
+    $kPanel = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ14kMcp16eYiPmSIyqw+29AAdguesdPBnOXCc6xyf/u panel';
     ServerAuthorizedKey::query()->create([
         'server_id' => $server->id,
         'name' => 'panel',
@@ -44,7 +46,20 @@ it('reports added and removed lines per user', function () {
         'target_linux_user' => '',
     ]);
 
-    $kRemoteOld = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHJlbW90ZS1vbGQta2V5LWxpbmU';
+    $kRemoteOld = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuwxYXsyfYafmWSGxBVhdvEDKCjffV5QIbjEJWZ3Y51 remote-old';
+    $kRemoteOldFp = SshPublicKeyFingerprint::shortSha256($kRemoteOld);
+    expect($kRemoteOldFp)->not->toBeNull();
+
+    // Diff preview only lists a remote key under "removed" when dply previously
+    // managed it (fingerprint in meta). Unmanaged/foreign keys stay under "kept".
+    $server->update([
+        'meta' => array_merge($server->meta ?? [], [
+            ServerAuthorizedKeysSynchronizer::META_SYNCED_LINUX_USERS_KEY => ['root'],
+            ServerAuthorizedKeysSynchronizer::META_MANAGED_FINGERPRINTS_KEY => [
+                'root' => [$kRemoteOldFp],
+            ],
+        ]),
+    ]);
 
     $reader = Mockery::mock(ServerAuthorizedKeysRemoteReader::class);
     $reader->shouldReceive('normalizedKeyLines')
@@ -59,7 +74,7 @@ it('reports added and removed lines per user', function () {
 
     // The service auto-injects the recovery public key (derived from
     // ssh_private_key) into root's desired list — see
-    // ServerAuthorizedKeysDiffPreview::diffPerUser lines 46-56. So
+    // ServerAuthorizedKeysDiffPreview::diffPerUser. So
     // the desired/added arrays carry the panel key + recovery key,
     // and the test asserts the panel key's presence rather than
     // exact-equals the whole list.

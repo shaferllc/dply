@@ -54,7 +54,7 @@ class CloudDatabaseAttachCommand extends Command
             return self::FAILURE;
         }
 
-        if ($site->container_backend === '') {
+        if (! $site->isCloudContainerSite()) {
             $this->error("Site {$site->name} is not a cloud container site.");
 
             return self::FAILURE;

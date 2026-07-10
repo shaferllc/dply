@@ -212,3 +212,5 @@
         @endcan
     </div>
 </section>
+
+<x-cli-snippet tone="stub" />

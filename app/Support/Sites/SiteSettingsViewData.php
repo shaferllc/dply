@@ -631,7 +631,7 @@ final class SiteSettingsViewData
         }
 
         return $site->deployments
-            ->filter(fn (SiteDeployment $deployment): bool => $deployment->phase_results !== [])
+            ->filter(fn (SiteDeployment $deployment): bool => filled($deployment->phase_results))
             ->take(10)
             ->values();
     }

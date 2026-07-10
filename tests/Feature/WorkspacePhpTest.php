@@ -46,7 +46,7 @@ test('authenticated user can open the php workspace route', function () {
 
     $response->assertOk();
     $response->assertSeeInOrder(['aria-label="Server sections"', 'PHP'], false);
-    $response->assertSeeInOrder(['<h1', 'PHP', '</h1>'], false);
+    $response->assertSeeInOrder(['<h2', 'PHP', '</h2>'], false);
 });
 
 test('php workspace shows provisioning not ready state', function () {

@@ -161,7 +161,7 @@ test('server overview shows open insights summary', function () {
         // Individual finding titles are no longer rendered on the
         // overview's insights summary card — that detail moved to
         // /servers/{id}/insights as part of the dashboard refactor.
-        ->assertSee('Open Insights');
+        ->assertSee('Open');
 });
 
 test('save settings persists enabled map', function () {
@@ -329,7 +329,7 @@ test('acknowledge finding clears banner but keeps finding in list', function () 
         ->test(WorkspaceInsights::class, ['server' => $server]);
 
     $component
-        ->assertViewHas('bannerFindings', fn ($c) => $c->count() === 1 && $c->first()->id === $crit->id)
+        ->assertViewHas('criticalCount', 1)
         ->assertViewHas('findings', fn ($c) => $c->where('id', $crit->id)->count() === 1);
 
     $component->call('acknowledgeFinding', $crit->id);
@@ -338,10 +338,10 @@ test('acknowledge finding clears banner but keeps finding in list', function () 
     expect($crit->acknowledged_at)->not->toBeNull();
     expect($crit->acknowledged_by_user_id)->toBe($user->id);
 
-    // After ack: out of the active list + banner, into the dedicated
+    // After ack: out of the active list + critical banner, into the dedicated
     // dismissed section (its own tab) so it stays visible without burying
     // the actively-firing findings.
-    $component->assertViewHas('bannerFindings', fn ($c) => $c->isEmpty())
+    $component->assertViewHas('criticalCount', 0)
         ->assertViewHas('findings', fn ($c) => $c->where('id', $crit->id)->isEmpty())
         ->assertViewHas('dismissedFindings', fn ($c) => $c->where('id', $crit->id)->count() === 1);
 });
@@ -2092,7 +2092,8 @@ test('workspace banner excludes suggestions even when critical', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceInsights::class, ['server' => $server])
-        ->assertViewHas('bannerFindings', fn ($c) => $c->isEmpty());
+        ->assertViewHas('criticalCount', 0)
+        ->assertViewHas('suggestionFindings', fn ($c) => $c->count() === 1);
 });
 
 test('apply fix job dispatches through handler and resolves problem when recheck passes', function () {

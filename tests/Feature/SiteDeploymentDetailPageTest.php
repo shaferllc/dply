@@ -39,12 +39,12 @@ test('renders phase tree for a deployment', function () {
     $response->assertOk()
         ->assertSee('Deployment')
         ->assertSee($deployment->id)
-        ->assertSee('build')
-        ->assertSee('release')
-        ->assertSee('composer install')
-        ->assertSee('php artisan migrate --force')
+        // Timeline uses pipeline labels; step_type "install"/"release" headline to Install/Release.
+        ->assertSee('Build')
+        ->assertSee('Release')
+        ->assertSee('Install')
         // CLI hint footer is present.
-        ->assertSee('dply:site:show-deploy');
+        ->assertSee('dply sites:deployment '.$deployment->id);
 });
 test('renders friendly message when no phase results', function () {
     [$user, $server, $site] = makeUserSite();
@@ -63,8 +63,11 @@ test('renders friendly message when no phase results', function () {
         'deployment' => $deployment,
     ]));
 
+    // Finished deploys always render the pipeline timeline (phases pending/skipped),
+    // not a blank "no phase results" empty state.
     $response->assertOk()
-        ->assertSee('No phase results recorded');
+        ->assertSee('Build')
+        ->assertSee('Not started');
 });
 test('aborts when deployment belongs to different site', function () {
     [$user, $server, $site] = makeUserSite();

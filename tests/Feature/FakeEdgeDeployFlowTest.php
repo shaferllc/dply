@@ -14,11 +14,13 @@ use App\Models\User;
 use App\Modules\Edge\Services\EdgeRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 test('fake edge create runs build and publish to live deployment', function () {
     config(['edge.fake.enabled' => true]);
+    Storage::fake('edge_r2');
     [$user, $org] = scaffold();
 
     $site = (new CreateEdgeSite)->handle($user, $org, [

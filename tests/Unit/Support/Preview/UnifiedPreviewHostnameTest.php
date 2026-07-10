@@ -52,7 +52,14 @@ test('ordered testing zones prefer on-dply apex when configured', function () {
 });
 
 test('edge default hostname uses unified label when no routing hostname set', function () {
-    config(['preview.unified_hostnames' => true, 'edge.testing_domains' => ['on-dply.site']]);
+    // preferredApex() reads the shared DO testing pool first; pin both so the
+    // Edge apex wins over whatever .env / phpunit inherited (e.g. dply.test).
+    config([
+        'preview.unified_hostnames' => true,
+        'preview.prefer_on_dply_apex' => true,
+        'edge.testing_domains' => ['on-dply.site'],
+        'services.digitalocean.testing_domains' => ['on-dply.site', 'dply.host'],
+    ]);
 
     $site = Site::factory()->make([
         'name' => 'Edge App',

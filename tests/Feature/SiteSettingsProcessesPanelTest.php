@@ -36,21 +36,19 @@ test('processes panel lists web and worker for node site', function () {
         'command' => 'npm run worker',
     ]);
 
-    // The processes panel lives on the runtime section now (it's logically a
-    // runtime-of-this-site concern, not a general-overview one). Test the section
-    // where the panel actually renders.
-    $response = $this->actingAs($user)->get(route('sites.show', [
+    // Site processes live on Services (systemd), not the Runtime settings section.
+    $response = $this->actingAs($user)->get(route('sites.services', [
         'server' => $server,
         'site' => $site,
-        'section' => 'runtime',
     ]));
 
     $response->assertOk()
-        ->assertSee('Site processes')
+        ->assertSee('Managed units')
         ->assertSee('npm start')
         ->assertSee('npm run worker')
         ->assertSee('worker');
 });
+
 test('processes panel omitted for static site', function () {
     [$user, $server] = makeUserServer();
     $site = Site::factory()->create([
@@ -62,20 +60,17 @@ test('processes panel omitted for static site', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    // The processes panel lives on the runtime section now (it's logically a
-    // runtime-of-this-site concern, not a general-overview one). Test the section
-    // where the panel actually renders.
-    $response = $this->actingAs($user)->get(route('sites.show', [
+    // Static sites don't use systemd — Services shows the unsupported empty state.
+    $response = $this->actingAs($user)->get(route('sites.services', [
         'server' => $server,
         'site' => $site,
-        'section' => 'runtime',
     ]));
 
-    // Static sites have no SiteProcess rows (Site::created hook
-    // skips static type), so the panel doesn't render.
     $response->assertOk()
-        ->assertDontSee('Site processes');
+        ->assertSee('Systemd services not used for this site')
+        ->assertDontSee('npm run worker');
 });
+
 test('processes panel marks inactive processes', function () {
     [$user, $server] = makeUserServer();
     $site = Site::factory()->create([
@@ -96,19 +91,16 @@ test('processes panel marks inactive processes', function () {
         'is_active' => false,
     ]);
 
-    // The processes panel lives on the runtime section now (it's logically a
-    // runtime-of-this-site concern, not a general-overview one). Test the section
-    // where the panel actually renders.
-    $response = $this->actingAs($user)->get(route('sites.show', [
+    $response = $this->actingAs($user)->get(route('sites.services', [
         'server' => $server,
         'site' => $site,
-        'section' => 'runtime',
     ]));
 
     $response->assertOk()
         ->assertSee('inactive-worker')
         ->assertSee('inactive');
 });
+
 /**
  * @return array{0: User, 1: Server}
  */
@@ -124,10 +116,7 @@ function makeUserServer(): array
         'organization_id' => $org->id,
         'meta' => [
             'webserver' => 'nginx',
-            'php_inventory' => [
-                'supported' => true,
-                'installed_versions' => ['8.4'],
-            ],
+            'php_inventory' => ['supported' => true, 'installed_versions' => ['8.4']],
         ],
     ]);
 

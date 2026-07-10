@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 /** @return array{0: User, 1: Site} */
 function functionSite(): array

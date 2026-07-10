@@ -13,11 +13,13 @@ use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($this->user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
         'user_id' => $this->user->id,

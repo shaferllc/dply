@@ -136,12 +136,16 @@ test('site can run laravel ssh setup requires vm ready ssh and laravel', functio
     expect($site->fresh()->canRunLaravelSshSetupActions())->toBeFalse();
 });
 
-test('can run laravel ssh setup false when effective deploy directory is blank', function () {
+test('can run laravel ssh setup uses conventional path when repository path is blank', function () {
+    // Null repository_path falls back to conventionalRepositoryPath (/home/dply/…),
+    // so SSH setup remains available — document_root is not used for the env dir.
     $site = laravelVmSite();
     $site->update([
         'repository_path' => null,
         'document_root' => ' ',
     ]);
 
-    expect($site->fresh()->canRunLaravelSshSetupActions())->toBeFalse();
+    $fresh = $site->fresh();
+    expect($fresh->effectiveEnvDirectory())->not->toBe('')
+        ->and($fresh->canRunLaravelSshSetupActions())->toBeTrue();
 });

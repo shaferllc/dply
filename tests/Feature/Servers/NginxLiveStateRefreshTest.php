@@ -27,7 +27,7 @@ function makeUser(): User
     return $user->fresh();
 }
 
-test('nginx certs live state shows empty message after refresh with no certs', function () {
+test('nginx certs live state shows coming soon preview', function () {
     $user = makeUser();
     $server = Server::factory()->ready()->create([
         'user_id' => $user->id,
@@ -36,33 +36,15 @@ test('nginx certs live state shows empty message after refresh with no certs', f
         'meta' => ['webserver' => 'nginx'],
     ]);
 
-    $stub = new class extends NginxLiveStateProbe
-    {
-        protected function runFreshProbe(Server $server): EngineLiveState
-        {
-            return new EngineLiveState(
-                engine: 'nginx',
-                capturedAt: CarbonImmutable::parse('2026-05-12T18:00:00Z'),
-                isFresh: true,
-                units: [
-                    'hosts' => [],
-                    'upstreams' => [],
-                    'certs' => [],
-                    'workers' => [],
-                ],
-            );
-        }
-    };
-    $this->app->instance(NginxLiveStateProbe::class, $stub);
-
+    // nginx live-state sub-tabs (hosts/upstreams/certs/…) still render the
+    // shared coming-soon teaser instead of the probe-backed empty state.
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->set('workspace_tab', 'nginx')
         ->set('engine_subtab', 'certs')
-        ->call('refreshEngineLiveState')
-        ->assertDontSee(__('No data yet — open this tab or click "Refresh now" to probe the server.'), false)
-        ->assertSee(__('In sync — nothing to list'))
-        ->assertSee(__('No SSL certificates found — no server block declares ssl_certificate.'));
+        ->assertSee(__('nginx certificates'))
+        ->assertSee(__('nginx certs preview'))
+        ->assertDontSee(__('In sync — nothing to list'));
 });
 
 test('nginx live state cache is reused within ttl', function () {
