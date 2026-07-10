@@ -98,6 +98,8 @@
                         @livewire('sites.edge.workspace.routing', ['server' => $server, 'site' => $site], key('edge-section-routing-'.$site->id))
                     @elseif ($section === 'edge-error-pages')
                         @livewire('sites.edge.workspace.error-pages', ['server' => $server, 'site' => $site], key('edge-section-error-pages-'.$site->id))
+                    @elseif ($section === 'edge-bindings')
+                        @livewire('sites.edge.workspace.bindings', ['server' => $server, 'site' => $site], key('edge-section-bindings-'.$site->id))
                     @elseif ($section === 'edge-crons')
                         @livewire('sites.edge.workspace.crons', ['server' => $server, 'site' => $site], key('edge-section-crons-'.$site->id))
                     @elseif ($section === 'edge-firewall')

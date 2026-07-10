@@ -255,6 +255,7 @@ final class SiteSettingsSidebar
             ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],
             ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'],
             ['id' => 'edge-error-pages', 'label' => __('Error pages'), 'icon' => 'heroicon-o-exclamation-circle', 'group' => 'networking'],
+            ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'deploy'],
             ['id' => 'edge-crons', 'label' => __('Crons'), 'icon' => 'heroicon-o-clock', 'group' => 'background'],
             ['id' => 'edge-firewall', 'label' => __('Firewall'), 'icon' => 'heroicon-o-shield-check', 'group' => 'access'],
             ['id' => 'edge-members', 'label' => __('Members'), 'icon' => 'heroicon-o-user-group', 'group' => 'access'],

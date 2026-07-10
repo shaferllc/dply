@@ -6,6 +6,7 @@ namespace App\Modules\Edge\Services;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Modules\Edge\Support\EdgeEffectiveBindings;
 
 /**
  * Builds the list of Cloudflare binding descriptors uploaded with
@@ -25,15 +26,7 @@ use App\Models\Site;
 class EdgeRepoBindingTranslator
 {
     /** Names the platform Worker already injects — repo + defaults are dropped if they collide. */
-    private const RESERVED_NAMES = [
-        'HOST_MAP',
-        'ASSETS',
-        'DEPLOYMENT_ID',
-        'SITE_ID',
-        'STORAGE_PREFIX',
-        'EDGE_CACHE',
-        'DISPATCHER',
-    ];
+    private const RESERVED_NAMES = EdgeEffectiveBindings::RESERVED_NAMES;
 
     public function __construct(
         private readonly EdgeBindingsAutoResolver $autoResolver,
@@ -97,6 +90,27 @@ class EdgeRepoBindingTranslator
                 continue;
             }
             $out[] = ['name' => $name, 'type' => 'queue', 'queue_name' => $queueName];
+        }
+
+        // Dashboard-declared bindings (site.meta.edge.bindings_overrides).
+        // Purely additive, exactly like EdgeEffectiveCrons: anything already
+        // bound by wrangler.toml, the default env.KV, or a reserved platform
+        // name wins. Two bindings sharing a name would make Cloudflare reject
+        // the script upload and fail an otherwise-good deploy.
+        if ($site instanceof Site) {
+            $used = array_column($out, 'name');
+            foreach (EdgeEffectiveBindings::dashboardOverrides($site) as $row) {
+                if (! $this->isUsableName($row['name']) || in_array($row['name'], $used, true)) {
+                    continue;
+                }
+                $used[] = $row['name'];
+                $out[] = match ($row['kind']) {
+                    'kv' => ['name' => $row['name'], 'type' => 'kv_namespace', 'namespace_id' => $row['value']],
+                    'r2' => ['name' => $row['name'], 'type' => 'r2_bucket', 'bucket_name' => $row['value']],
+                    'd1' => ['name' => $row['name'], 'type' => 'd1', 'id' => $row['value']],
+                    'queue' => ['name' => $row['name'], 'type' => 'queue', 'queue_name' => $row['value']],
+                };
+            }
         }
 
         return $out;
