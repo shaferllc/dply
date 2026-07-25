@@ -14,29 +14,43 @@
 @endphp
 
 <nav class="border-b border-brand-ink/10 bg-brand-cream" aria-label="{{ __('Production') }}">
-    <div class="mx-auto flex max-w-7xl gap-0.5 overflow-x-auto px-4 sm:gap-1 sm:px-6 lg:px-8" style="-webkit-overflow-scrolling: touch;">
-        @foreach ($items as $item)
-            @php $active = request()->routeIs($item['match']); @endphp
-            <a
-                href="{{ route($item['route']) }}"
-                wire:navigate
-                @class([
-                    'group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-sm font-medium leading-5 transition duration-150 ease-in-out sm:px-3',
-                    'border-brand-ink text-brand-ink' => $active,
-                    'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink' => ! $active,
-                ])
-            >
-                <x-dynamic-component
-                    :component="'heroicon-o-'.$item['icon']"
+    <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <div class="flex min-w-0 flex-1 gap-0.5 overflow-x-auto sm:gap-1" style="-webkit-overflow-scrolling: touch;">
+            @foreach ($items as $item)
+                @php $active = request()->routeIs($item['match']); @endphp
+                <a
+                    href="{{ route($item['route']) }}"
+                    wire:navigate
                     @class([
-                        'h-4 w-4 shrink-0',
-                        'text-brand-ink' => $active,
-                        'text-brand-moss group-hover:text-brand-ink' => ! $active,
+                        'group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-sm font-medium leading-5 transition duration-150 ease-in-out sm:px-3',
+                        'border-brand-ink text-brand-ink' => $active,
+                        'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink' => ! $active,
                     ])
-                    aria-hidden="true"
-                />
-                {{ $item['label'] }}
+                >
+                    <x-dynamic-component
+                        :component="'heroicon-o-'.$item['icon']"
+                        @class([
+                            'h-4 w-4 shrink-0',
+                            'text-brand-ink' => $active,
+                            'text-brand-moss group-hover:text-brand-ink' => ! $active,
+                        ])
+                        aria-hidden="true"
+                    />
+                    {{ $item['label'] }}
+                </a>
+            @endforeach
+        </div>
+
+        @can('create', App\Models\Server::class)
+            <a
+                href="{{ route('servers.create') }}"
+                wire:navigate
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
+                title="{{ __('Creates a server in this local workspace — production stays read-only.') }}"
+            >
+                <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Add server') }}
             </a>
-        @endforeach
+        @endcan
     </div>
 </nav>

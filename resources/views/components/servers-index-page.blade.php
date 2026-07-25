@@ -46,11 +46,12 @@
         :title="__('Servers')"
         :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
     >
-        @if ($showHeroActions && $heroActionsHtml !== '')
-            <x-slot:top-action>
+        {{-- Slot must be a direct child of x-hero-card (not wrapped in @if) or Blade drops it. --}}
+        <x-slot:top-action>
+            @if ($showHeroActions && $heroActionsHtml !== '')
                 {{ $actions }}
-            </x-slot:top-action>
-        @endif
+            @endif
+        </x-slot:top-action>
 
         <x-slot:stats>
             <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
