@@ -21,12 +21,26 @@
         :view-mode="$viewMode"
         :show-fleet-ops="false"
         :show-mutations="false"
-        :show-hero-actions="false"
+        :show-hero-actions="true"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'icon' => 'server-stack'],
         ]"
     >
+        <x-slot:actions>
+            @can('create', App\Models\Server::class)
+                <a
+                    href="{{ route('servers.create') }}"
+                    wire:navigate
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    title="{{ __('Creates a server in this local workspace — production stays read-only.') }}"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add server') }}
+                </a>
+            @endcan
+        </x-slot:actions>
+
         <x-slot:alert>
             @if ($error)
                 <x-alert tone="danger">{{ $error }}</x-alert>

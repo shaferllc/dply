@@ -160,6 +160,7 @@ final class ServerIndexAssembler
             'type_label' => $site->type?->label(),
             'runtime_chip' => $runtimeChip,
             'logo_url' => $site->logoUrl(),
+            'git_repository_url' => filled($site->git_repository_url) ? (string) $site->git_repository_url : null,
             'last_deploy_at' => $site->last_deploy_at?->toIso8601String(),
             'last_deploy_human' => $site->last_deploy_at?->diffForHumans(),
             'is_provisioning' => $site->isProvisioning(),

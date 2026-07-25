@@ -47,7 +47,9 @@
         :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
     >
         @if ($showHeroActions && $heroActionsHtml !== '')
-            {{ $actions }}
+            <x-slot:top-action>
+                {{ $actions }}
+            </x-slot:top-action>
         @endif
 
         <x-slot:stats>

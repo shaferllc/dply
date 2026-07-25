@@ -6,6 +6,8 @@ namespace App\Support\Servers;
 
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use App\Models\Site;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -163,6 +165,89 @@ final readonly class ServerIndexRow
         return ! array_key_exists('setup_status', $row)
             || ! array_key_exists('sites', $row)
             || ! array_key_exists('metrics', $row);
+    }
+
+    /**
+     * Fill deploy_sync_count / deploy_anchor_site_id when the remote API omits
+     * them (older fleet-card payloads). Prefers git URLs on nested sites; falls
+     * back to local Site rows with the same ids (common when the local DB is a
+     * prod dump and Production mirror still talks to a host without sync meta).
+     *
+     * @param  list<array<string, mixed>>  $apiRows
+     * @return list<array<string, mixed>>
+     */
+    public static function enrichDeploySyncMeta(array $apiRows): array
+    {
+        if ($apiRows === []) {
+            return [];
+        }
+
+        $repoCounts = [];
+        $siteIds = [];
+        foreach ($apiRows as $row) {
+            foreach ($row['sites'] ?? [] as $site) {
+                if (! is_array($site)) {
+                    continue;
+                }
+                $siteId = isset($site['id']) ? (string) $site['id'] : '';
+                if ($siteId !== '') {
+                    $siteIds[] = $siteId;
+                }
+                $repo = SiteSyncPeers::canonicalRepo((string) ($site['git_repository_url'] ?? ''));
+                if ($repo !== '') {
+                    $repoCounts[$repo] = ($repoCounts[$repo] ?? 0) + 1;
+                }
+            }
+        }
+
+        $localSites = $siteIds !== []
+            ? Site::query()->whereIn('id', array_values(array_unique($siteIds)))->with('server')->get()->keyBy(fn (Site $s): string => (string) $s->id)
+            : collect();
+
+        if ($repoCounts === [] && $localSites->isNotEmpty()) {
+            foreach ($localSites as $site) {
+                $repo = SiteSyncPeers::canonicalRepo((string) $site->git_repository_url);
+                if ($repo !== '') {
+                    $repoCounts[$repo] = ($repoCounts[$repo] ?? 0) + 1;
+                }
+            }
+        }
+
+        return array_map(function (array $row) use ($repoCounts, $localSites): array {
+            $sites = is_array($row['sites'] ?? null) ? $row['sites'] : [];
+            $anchorId = isset($row['deploy_anchor_site_id']) && is_string($row['deploy_anchor_site_id']) && $row['deploy_anchor_site_id'] !== ''
+                ? $row['deploy_anchor_site_id']
+                : (isset($sites[0]['id']) ? (string) $sites[0]['id'] : null);
+            $existingCount = (int) ($row['deploy_sync_count'] ?? 0);
+            if ($existingCount > 1 && filled($anchorId)) {
+                $row['deploy_anchor_site_id'] = $anchorId;
+
+                return $row;
+            }
+
+            $repo = '';
+            if (isset($sites[0]['git_repository_url'])) {
+                $repo = SiteSyncPeers::canonicalRepo((string) $sites[0]['git_repository_url']);
+            }
+            if ($repo === '' && $anchorId !== null && $localSites->has($anchorId)) {
+                $repo = SiteSyncPeers::canonicalRepo((string) $localSites->get($anchorId)->git_repository_url);
+            }
+
+            $syncCount = $repo !== '' ? (int) ($repoCounts[$repo] ?? 0) : 0;
+            if ($syncCount <= 1 && $anchorId !== null && $localSites->has($anchorId)) {
+                $syncCount = SiteSyncPeers::forSite($localSites->get($anchorId))->count();
+            }
+
+            if ($syncCount > 1 && $anchorId !== null) {
+                $row['deploy_sync_count'] = $syncCount;
+                $row['deploy_anchor_site_id'] = $anchorId;
+                if (! array_key_exists('deployable', $row) || ! $row['deployable']) {
+                    $row['deployable'] = true;
+                }
+            }
+
+            return $row;
+        }, $apiRows);
     }
 
     /**

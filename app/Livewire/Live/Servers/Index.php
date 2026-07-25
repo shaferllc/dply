@@ -110,7 +110,7 @@ class Index extends Component
             // prior thin-list cache entry (legacy keys: id/name/status/ip only).
             $apiRows = $this->productionMirror()->remember(
                 $connection,
-                'servers.fleet',
+                'servers.fleet.v3',
                 fn ($client) => $client->servers(),
             );
         } catch (ProductionApiException $e) {
@@ -120,6 +120,8 @@ class Index extends Component
                 $error = $e->getMessage();
             }
         }
+
+        $apiRows = ServerIndexRow::enrichDeploySyncMeta($apiRows);
 
         $legacyApi = ServerIndexRow::isLegacyApiPayload($apiRows);
         $groupLabel = $connection->remote_organization_name;

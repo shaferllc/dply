@@ -34,7 +34,7 @@
         >
             <x-heroicon-o-arrows-right-left class="h-4 w-4 shrink-0" wire:loading.remove wire:target="deploySyncedSites('{{ $server->deployAnchorSiteId }}')" aria-hidden="true" />
             <span wire:loading wire:target="deploySyncedSites('{{ $server->deployAnchorSiteId }}')" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>
-            <span @class(['hidden sm:inline' => $responsive])>{{ __('Sync :n', ['n' => $server->deploySyncCount]) }}</span>
+            <span>{{ __('Sync servers') }}</span>
         </button>
     @endif
 @elseif (! $showMutations && $server->deployable)
@@ -57,7 +57,7 @@
             class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white {{ $btnPad }} text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
         >
             <x-heroicon-o-arrows-right-left class="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span @class(['hidden sm:inline' => $responsive])>{{ __('Sync :n', ['n' => $server->deploySyncCount]) }}</span>
+            <span>{{ __('Sync servers') }}</span>
         </a>
     @endif
 @endif
