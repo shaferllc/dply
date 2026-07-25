@@ -81,11 +81,11 @@ class Index extends Component
             Server::STATUS_ERROR => __('Error'),
             Server::STATUS_DISCONNECTED => __('Disconnected'),
         ];
-        $sortOptions = [
-            'created_at' => __('Newest first'),
-            'name' => __('Name (A–Z)'),
-            'status' => __('Status'),
-        ];
+        $sortOptions = collect(config('user_preferences.server_sort_options', [
+            'created_at' => 'Creation date',
+            'name' => 'Name',
+            'status' => 'Status',
+        ]))->map(fn (string $label): string => __($label))->all();
 
         if ($connection === null) {
             return view('livewire.live.servers.index', [

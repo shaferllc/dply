@@ -12,7 +12,7 @@
         :sort-options="$sortOptions"
         :tag-options="$tagOptions"
         :view-mode="$viewMode"
-        :show-fleet-ops="true"
+        :show-fleet-ops="false"
         :show-mutations="true"
         :show-hero-actions="true"
         :eyebrow="__('Fleet')"

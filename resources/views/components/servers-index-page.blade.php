@@ -105,66 +105,62 @@
 
     @if ($hasServersInScope)
         <div class="dply-card overflow-hidden">
-            <div class="flex flex-col gap-2 px-3 py-3 sm:px-5">
-                <div class="flex items-center gap-2">
-                    <div class="min-w-0 flex-1">
-                        <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
-                        <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
-                    </div>
-
-                    <div class="inline-flex shrink-0 rounded-xl border border-brand-ink/15 bg-white p-0.5" role="group" aria-label="{{ __('View') }}">
-                        <button
-                            type="button"
-                            wire:click="$set('viewMode', 'list')"
-                            class="rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors {{ $viewMode === 'list' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-brand-sand/40' }}"
-                            aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
-                            title="{{ __('List') }}"
-                        >
-                            <span class="sr-only">{{ __('List') }}</span>
-                            <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="$set('viewMode', 'grid')"
-                            class="rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors {{ $viewMode === 'grid' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-brand-sand/40' }}"
-                            aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
-                            title="{{ __('Grid') }}"
-                        >
-                            <span class="sr-only">{{ __('Grid') }}</span>
-                            <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
-                        </button>
-                    </div>
+            <div class="flex items-center gap-2 px-3 py-3 sm:px-5">
+                <div class="min-w-0 flex-1">
+                    <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
+                    <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                    <label for="servers_status" class="sr-only">{{ __('Status') }}</label>
-                    <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0 w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]">
-                        @foreach ($statusOptions as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
+                <label for="servers_status" class="sr-only">{{ __('Status') }}</label>
+                <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0 w-auto min-w-[8.5rem] shrink-0">
+                    @foreach ($statusOptions as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </x-select>
+
+                @if (count($tagOptions) > 0)
+                    <label for="servers_tag" class="sr-only">{{ __('Tag') }}</label>
+                    <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-0 w-auto min-w-[8.5rem] shrink-0">
+                        <option value="">{{ __('All tags') }}</option>
+                        @foreach ($tagOptions as $tag)
+                            <option value="{{ $tag }}">{{ $tag }}</option>
                         @endforeach
                     </x-select>
+                @endif
 
-                    @if (count($tagOptions) > 0)
-                        <label for="servers_tag" class="sr-only">{{ __('Tag') }}</label>
-                        <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-0 w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]">
-                            <option value="">{{ __('All tags') }}</option>
-                            @foreach ($tagOptions as $tag)
-                                <option value="{{ $tag }}">{{ $tag }}</option>
-                            @endforeach
-                        </x-select>
-                    @endif
+                <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
+                <x-select id="servers_sort" wire:model.live="sort" class="mt-0 w-auto min-w-[8.5rem] shrink-0">
+                    @foreach ($sortOptions as $value => $label)
+                        <option value="{{ $value }}">{{ __($label) }}</option>
+                    @endforeach
+                </x-select>
 
-                    <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
-                    <x-select id="servers_sort" wire:model.live="sort" class="mt-0 w-full min-w-0 sm:w-auto sm:min-w-[9.5rem]">
-                        @foreach ($sortOptions as $value => $label)
-                            <option value="{{ $value }}">{{ __($label) }}</option>
-                        @endforeach
-                    </x-select>
-
-                    <button type="button" wire:click="resetFilters" class="col-span-2 inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink sm:col-span-1 sm:w-auto">
-                        {{ __('Reset') }}
+                <div class="inline-flex shrink-0 rounded-xl border border-brand-ink/15 bg-white p-0.5" role="group" aria-label="{{ __('View') }}">
+                    <button
+                        type="button"
+                        wire:click="$set('viewMode', 'list')"
+                        class="rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors {{ $viewMode === 'list' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-brand-sand/40' }}"
+                        aria-pressed="{{ $viewMode === 'list' ? 'true' : 'false' }}"
+                        title="{{ __('List') }}"
+                    >
+                        <span class="sr-only">{{ __('List') }}</span>
+                        <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="$set('viewMode', 'grid')"
+                        class="rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors {{ $viewMode === 'grid' ? 'bg-brand-ink text-brand-cream' : 'text-brand-moss hover:bg-brand-sand/40' }}"
+                        aria-pressed="{{ $viewMode === 'grid' ? 'true' : 'false' }}"
+                        title="{{ __('Grid') }}"
+                    >
+                        <span class="sr-only">{{ __('Grid') }}</span>
+                        <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
+
+                <button type="button" wire:click="resetFilters" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink">
+                    {{ __('Reset') }}
+                </button>
             </div>
         </div>
     @endif
