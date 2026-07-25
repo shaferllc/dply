@@ -496,14 +496,18 @@ class Index extends Component
         $rows = $servers->map(function (Server $server) use ($latestSnapshots, $insightRollup, $relatedServers, $deployTargets): ServerIndexRow {
             $insights = $insightRollup[$server->id] ?? ['open' => 0, 'worst' => null];
 
+            $target = $deployTargets[$server->id] ?? null;
+
             return ServerIndexRow::fromServer(
                 $server,
                 $latestSnapshots->get($server->id),
                 (int) ($insights['open'] ?? 0),
                 isset($insights['worst']) ? (string) $insights['worst'] : null,
                 $relatedServers[$server->id] ?? [],
-                isset($deployTargets[$server->id]),
+                $target !== null,
                 auth()->user()?->can('delete', $server) ?? false,
+                deploySyncCount: (int) ($target['sync_count'] ?? 0),
+                deployAnchorSiteId: isset($target['anchor']) ? (string) $target['anchor']->id : null,
             );
         });
 

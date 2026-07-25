@@ -28,6 +28,8 @@ final class ServerIndexAssembler
         array $related = [],
         bool $deployable = false,
         ?string $manageBaseUrl = null,
+        int $deploySyncCount = 0,
+        ?string $deployAnchorSiteId = null,
     ): array {
         $digest = ProvisioningDigest::forServer($server);
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : null;
@@ -122,6 +124,8 @@ final class ServerIndexAssembler
             'insights_open' => $insightsOpen,
             'insights_worst' => $insightsWorst,
             'deployable' => $deployable,
+            'deploy_sync_count' => $deploySyncCount,
+            'deploy_anchor_site_id' => $deployAnchorSiteId,
             'sites' => $sites,
             'services' => $services,
             'related' => $relatedPayload,

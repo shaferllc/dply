@@ -57,6 +57,8 @@ final readonly class ServerIndexRow
         public ?string $insightsHref = null,
         public bool $canDelete = false,
         public bool $deployable = false,
+        public int $deploySyncCount = 0,
+        public ?string $deployAnchorSiteId = null,
         public array $sites = [],
         public array $services = [],
         public array $related = [],
@@ -75,6 +77,8 @@ final readonly class ServerIndexRow
         array $related = [],
         bool $deployable = false,
         bool $canDelete = false,
+        int $deploySyncCount = 0,
+        ?string $deployAnchorSiteId = null,
     ): self {
         return self::fromPayload(
             ServerIndexAssembler::toArray(
@@ -84,6 +88,8 @@ final readonly class ServerIndexRow
                 $insightsWorst,
                 $related,
                 $deployable,
+                deploySyncCount: $deploySyncCount,
+                deployAnchorSiteId: $deployAnchorSiteId,
             ),
             manageHref: route('servers.show', $server),
             manageExternal: false,
@@ -283,6 +289,10 @@ final readonly class ServerIndexRow
             insightsHref: $insightsHref,
             canDelete: $canDelete,
             deployable: (bool) ($row['deployable'] ?? false),
+            deploySyncCount: (int) ($row['deploy_sync_count'] ?? 0),
+            deployAnchorSiteId: isset($row['deploy_anchor_site_id']) && is_string($row['deploy_anchor_site_id']) && $row['deploy_anchor_site_id'] !== ''
+                ? $row['deploy_anchor_site_id']
+                : null,
             sites: $sites,
             services: $services,
             related: $related,

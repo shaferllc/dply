@@ -23,6 +23,20 @@
         <span wire:loading wire:target="openServerDeploy('{{ $server->id }}')" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>
         <span @class(['hidden sm:inline' => $responsive])>{{ __('Deploy') }}</span>
     </button>
+    @if ($server->deploySyncCount > 1 && filled($server->deployAnchorSiteId))
+        <button
+            type="button"
+            wire:click="deploySyncedSites('{{ $server->deployAnchorSiteId }}')"
+            wire:loading.attr="disabled"
+            wire:target="deploySyncedSites('{{ $server->deployAnchorSiteId }}')"
+            title="{{ __('Deploy this site and its :n linked sites across servers together.', ['n' => $server->deploySyncCount - 1]) }}"
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white {{ $btnPad }} text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
+        >
+            <x-heroicon-o-arrows-right-left class="h-4 w-4 shrink-0" wire:loading.remove wire:target="deploySyncedSites('{{ $server->deployAnchorSiteId }}')" aria-hidden="true" />
+            <span wire:loading wire:target="deploySyncedSites('{{ $server->deployAnchorSiteId }}')" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>
+            <span @class(['hidden sm:inline' => $responsive])>{{ __('Sync :n', ['n' => $server->deploySyncCount]) }}</span>
+        </button>
+    @endif
 @elseif (! $showMutations && $server->deployable)
     <a
         href="{{ $server->manageHref }}"
@@ -34,6 +48,18 @@
         <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
         <span @class(['hidden sm:inline' => $responsive])>{{ __('Deploy') }}</span>
     </a>
+    @if ($server->deploySyncCount > 1)
+        <a
+            href="{{ $server->manageHref }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="{{ __('Deploy sync group on production (:n linked sites)', ['n' => $server->deploySyncCount]) }}"
+            class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white {{ $btnPad }} text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+        >
+            <x-heroicon-o-arrows-right-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span @class(['hidden sm:inline' => $responsive])>{{ __('Sync :n', ['n' => $server->deploySyncCount]) }}</span>
+        </a>
+    @endif
 @endif
 
 <a href="{{ $server->manageHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink {{ $btnPad }} text-xs font-semibold text-brand-cream transition hover:bg-brand-forest">

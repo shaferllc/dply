@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\SshConnection;
 use App\Support\Servers\ServerIndexAssembler;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -56,23 +57,42 @@ class ServerController extends Controller
 
         $relatedMap = ServerIndexAssembler::relatedServersMap($servers, $servers);
 
-        $deployableIds = [];
+        $repoCounts = Site::query()
+            ->where('organization_id', $organization->id)
+            ->whereNotNull('git_repository_url')
+            ->where('git_repository_url', '!=', '')
+            ->pluck('git_repository_url')
+            ->groupBy(fn (string $repo): string => SiteSyncPeers::canonicalRepo($repo))
+            ->map->count();
+
+        $deployMeta = [];
         foreach ($servers as $server) {
-            $hasDeployable = $server->sites->contains(function (Site $site) use ($server): bool {
+            $deployable = $server->sites->filter(function (Site $site) use ($server): bool {
                 $site->setRelation('server', $server);
 
                 return filled($site->git_repository_url)
                     && $server->status === Server::STATUS_READY
                     && $server->setup_status === Server::SETUP_STATUS_DONE;
-            });
-            if ($hasDeployable) {
-                $deployableIds[$server->id] = true;
+            })->values();
+
+            if ($deployable->isEmpty()) {
+                continue;
             }
+
+            $anchor = $deployable->first();
+            $repo = SiteSyncPeers::canonicalRepo((string) $anchor->git_repository_url);
+            $deployMeta[$server->id] = [
+                'sync_count' => $repo !== ''
+                    ? (int) ($repoCounts[$repo] ?? 1)
+                    : (int) $server->sites->count(),
+                'anchor_site_id' => (string) $anchor->id,
+            ];
         }
 
         return response()->json([
-            'data' => $servers->map(function (Server $s) use ($latestSnapshots, $insightRollup, $relatedMap, $deployableIds) {
+            'data' => $servers->map(function (Server $s) use ($latestSnapshots, $insightRollup, $relatedMap, $deployMeta) {
                 $insights = $insightRollup[$s->id] ?? ['open' => 0, 'worst' => null];
+                $meta = $deployMeta[$s->id] ?? null;
 
                 return ServerIndexAssembler::toArray(
                     $s,
@@ -80,7 +100,9 @@ class ServerController extends Controller
                     (int) ($insights['open'] ?? 0),
                     isset($insights['worst']) ? (string) $insights['worst'] : null,
                     $relatedMap[$s->id] ?? [],
-                    isset($deployableIds[$s->id]),
+                    $meta !== null,
+                    deploySyncCount: (int) ($meta['sync_count'] ?? 0),
+                    deployAnchorSiteId: isset($meta['anchor_site_id']) ? (string) $meta['anchor_site_id'] : null,
                 );
             })->values(),
         ]);
