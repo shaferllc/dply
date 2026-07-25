@@ -15,69 +15,22 @@
         :show-fleet-ops="false"
         :show-mutations="true"
         :show-hero-actions="true"
-        :eyebrow="__('Fleet')"
-        :breadcrumbs="array_values(array_filter([
+        :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            multi_surface_active()
-                ? ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group']
-                : null,
             ['label' => __('Servers'), 'icon' => 'server-stack'],
-        ]))"
+        ]"
     >
         <x-slot:actions>
             @can('create', App\Models\Server::class)
-                @if (multi_surface_active())
-                    <a
-                        href="{{ route('launches.create') }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Open launchpad') }}
-                    </a>
-                @else
-                    <a
-                        href="{{ route('servers.create') }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Create a server') }}
-                    </a>
-                @endif
+                <a
+                    href="{{ route('servers.create') }}"
+                    wire:navigate
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add server') }}
+                </a>
             @endcan
-
-            <x-dropdown align="right" width="w-64">
-                <x-slot name="trigger">
-                    <button type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                        <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                        {{ __('More') }}
-                    </button>
-                </x-slot>
-                <x-slot name="content">
-                    @can('create', App\Models\Server::class)
-                        @feature('surface.managed_servers')
-                            <a href="{{ route('servers.create.managed') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
-                                <x-heroicon-o-sparkles class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                {{ __('Dply-hosted server') }}
-                            </a>
-                        @endfeature
-                        <a href="{{ route('servers.import.digitalocean') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
-                            <x-heroicon-o-cloud-arrow-down class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                            {{ __('Import from DigitalOcean') }}
-                        </a>
-                        <div class="my-1.5 border-t border-brand-ink/10" role="presentation"></div>
-                    @endcan
-                    <a href="{{ route('docs.create-first-server') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
-                        <x-heroicon-o-academic-cap class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                        {{ __('First server guide') }}
-                    </a>
-                    <a href="{{ route('docs.index') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                        {{ __('Documentation') }}
-                    </a>
-                </x-slot>
-            </x-dropdown>
         </x-slot:actions>
 
         <x-slot:banners>

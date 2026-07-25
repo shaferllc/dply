@@ -99,10 +99,9 @@ test('servers index is displayed for authenticated user', function () {
 
     $response->assertOk();
     $response->assertSee('Provision hosts', false);
-    $response->assertSee('Open launchpad');
-    $response->assertSee(route('launches.create'), false);
+    $response->assertDontSee('Open launchpad');
     $response->assertSee('No servers yet');
-    $response->assertSee('Create a server');
+    $response->assertSee('Add server');
     $response->assertSee(route('servers.create'), false);
     $response->assertSee('Create a VM from here once a cloud provider is connected', false);
 });

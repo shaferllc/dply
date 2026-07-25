@@ -21,7 +21,6 @@
 ])
 
 @php
-    $eyebrow ??= __('Fleet');
     $showFleetOps = filter_var($showFleetOps, FILTER_VALIDATE_BOOLEAN);
     $showMutations = filter_var($showMutations, FILTER_VALIDATE_BOOLEAN);
     $showHeroActions = filter_var($showHeroActions, FILTER_VALIDATE_BOOLEAN);

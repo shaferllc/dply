@@ -22,10 +22,8 @@
         :show-fleet-ops="false"
         :show-mutations="false"
         :show-hero-actions="false"
-        :eyebrow="__('Production')"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
             ['label' => __('Servers'), 'icon' => 'server-stack'],
         ]"
     >
