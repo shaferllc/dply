@@ -32,11 +32,15 @@ class EdgeDomainApiController extends EdgeApiController
                 'hostname' => strtolower($hostname),
                 'mode' => $info['mode'] ?? 'manual',
                 'dns_status' => $info['dns_status'] ?? 'unknown',
+                'ssl_status' => $info['ssl_status'] ?? null,
                 'cname_target' => $info['cname_target'] ?? $found->edgeHostname(),
+                'cf_custom_hostname_id' => $info['cf_custom_hostname_id'] ?? null,
+                'ownership_verification' => $info['ownership_verification'] ?? null,
                 'analytics_zone' => $info['analytics_zone'] ?? null,
                 'attached_at' => $info['attached_at'] ?? null,
                 'verified_at' => $info['verified_at'] ?? null,
                 'error' => $info['error'] ?? null,
+                'ssl_error' => $info['ssl_error'] ?? null,
             ];
         }
 

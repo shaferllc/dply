@@ -26,7 +26,7 @@
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS here. SSL is provided when traffic is proxied through Cloudflare on your zone, or via the dply Edge zone for managed delivery.') }}</p>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS here. Managed delivery issues TLS via Custom Hostnames on the dply Edge zone; BYO Cloudflare uses your zone’s orange-cloud proxy.') }}</p>
         </div>
     </div>
     <div class="space-y-4 px-6 py-5 sm:px-8">
@@ -35,7 +35,9 @@
                 @foreach ($edgeAttachedDomains as $hostname => $info)
                     @php
                         $dnsStatus = is_array($info) ? (string) ($info['dns_status'] ?? 'pending') : 'pending';
+                        $sslStatus = is_array($info) ? (string) ($info['ssl_status'] ?? '') : '';
                         $cnameTarget = is_array($info) ? (string) ($info['cname_target'] ?? $edgeDeliveryHostname ?? $site->edgeHostname()) : ($edgeDeliveryHostname ?? $site->edgeHostname());
+                        $ownership = is_array($info) && is_array($info['ownership_verification'] ?? null) ? $info['ownership_verification'] : null;
                         $statusBadge = match ($dnsStatus) {
                             'ready' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300',
                             'failed' => 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300',
@@ -46,6 +48,18 @@
                             'failed' => __('Failed'),
                             default => __('Pending DNS'),
                         };
+                        $sslBadge = match ($sslStatus) {
+                            'active' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300',
+                            'failed' => 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300',
+                            'pending' => 'bg-sky-100 text-sky-900 dark:bg-sky-950/40 dark:text-sky-200',
+                            default => null,
+                        };
+                        $sslLabel = match ($sslStatus) {
+                            'active' => __('TLS active'),
+                            'failed' => __('TLS failed'),
+                            'pending' => __('Issuing certificate'),
+                            default => null,
+                        };
                     @endphp
                     <li class="px-4 py-4" wire:key="edge-domain-{{ $hostname }}">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -53,6 +67,9 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="font-mono text-sm text-brand-ink">{{ $hostname }}</p>
                                     <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
+                                    @if ($sslLabel && $sslBadge)
+                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $sslBadge }}">{{ $sslLabel }}</span>
+                                    @endif
                                 </div>
                                 @if ($cnameTarget !== '')
                                     <div class="mt-2" x-data="{ copied: false }">
@@ -71,8 +88,29 @@
                                         </div>
                                     </div>
                                 @endif
+                                @if (is_array($ownership) && ($ownership['name'] ?? '') !== '' && ($ownership['value'] ?? '') !== '' && $sslStatus !== 'active')
+                                    <div class="mt-2" x-data="{ copied: false }">
+                                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ownership :type record', ['type' => strtoupper((string) ($ownership['type'] ?? 'TXT'))]) }}</p>
+                                        <p class="mt-1 font-mono text-[11px] text-brand-moss break-all">{{ $ownership['name'] }}</p>
+                                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                                            <code class="rounded-lg bg-brand-sand/30 px-2 py-1 font-mono text-xs text-brand-ink break-all">{{ $ownership['value'] }}</code>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                                @click="navigator.clipboard.writeText(@js($ownership['value'])); copied = true; setTimeout(() => copied = false, 2000)"
+                                            >
+                                                <x-heroicon-o-clipboard class="h-4 w-4" />
+                                                <span x-show="!copied">{{ __('Copy') }}</span>
+                                                <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
                                 @if (is_array($info) && ! empty($info['error']))
                                     <p class="mt-2 text-xs text-rose-700 dark:text-rose-300">{{ $info['error'] }}</p>
+                                @endif
+                                @if (is_array($info) && ! empty($info['ssl_error']))
+                                    <p class="mt-2 text-xs text-rose-700 dark:text-rose-300">{{ $info['ssl_error'] }}</p>
                                 @endif
                             </div>
                             <div class="flex flex-wrap items-center gap-2">

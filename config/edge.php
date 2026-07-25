@@ -223,6 +223,26 @@ return [
     */
     'testing_dns_target' => env('DPLY_EDGE_TESTING_DNS_TARGET'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Hostnames (SSL for SaaS) — Phase 3b
+    |--------------------------------------------------------------------------
+    | When enabled, managed `dply_edge` sites register attached custom domains
+    | via Cloudflare Custom Hostnames on the worker zone so TLS is issued for
+    | customer hostnames that CNAME to the Edge delivery hostname. BYO
+    | `org_cloudflare` sites keep customer-zone TLS (orange cloud) and skip
+    | this path. Requires Custom Hostnames entitlement + API token permission
+    | "SSL and Certificates → Custom Hostnames → Edit" on the worker zone.
+    */
+    'custom_hostnames' => [
+        'enabled' => filter_var(env('DPLY_EDGE_CUSTOM_HOSTNAMES', true), FILTER_VALIDATE_BOOLEAN),
+        // DV method: http (default), txt, or email.
+        'ssl_method' => env('DPLY_EDGE_CUSTOM_HOSTNAME_SSL_METHOD', 'http'),
+        // Optional override for CF custom_origin_server / CNAME target shown
+        // in the UI. When empty, sites keep CNAME → {slug}.{on-dply apex}.
+        'fallback_origin' => env('DPLY_EDGE_CUSTOM_HOSTNAME_FALLBACK_ORIGIN'),
+    ],
+
     'default_backend' => 'dply_edge',
 
     /*

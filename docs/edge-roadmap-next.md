@@ -56,7 +56,9 @@ Scope: P11b, P11a, P11c — acquisition: framework presets, import from incumben
 | P11a Import wizard | `EdgeImporter` interface + `ImportedEdgeProject` DTO + `NetlifyImporter` / `VercelImporter` / `CloudflarePagesImporter` (all three real implementations, all PAT-based). New `/edge/import` Livewire wizard walks provider → credential → project list → preview → hand-off to `/edge/create` with the build/repo/framework/env-var-count prefilled. Tokens stay in-memory; nothing persists until the user confirms in Create. |
 | P11c Template gallery | `EdgeTemplateRegistry` (8 curated starters), `/edge/templates` Livewire gallery with tag filter. "Deploy" button pre-fills `/edge/create` via query params. New Templates + Import buttons on the Edge index header. |
 
-**Wave C remaining (deferred):** DNS swap instructions per provider, real template screenshots (hero emoji placeholder for now), env var transfer (waits on env-var storage feature), automatic `dply.yaml` PR-open against the source repo on import.
+**Wave C remaining (deferred):** real template screenshots (SVG heroes ship today; photo screenshots optional), automatic `dply.yaml` PR-open against the source repo on import.
+
+**Wave C landed (doc catch-up):** DNS swap runbook in `/edge/import` preview + migration docs; env var transfer on import → create (`persistImportedEnvVars`).
 
 ## Wave D — complete ✅ (2026-05-25)
 
@@ -74,7 +76,7 @@ Scope: P10a, P10d, P10b, P10c — edge compute moat: middleware, A/B split, depl
 - Cron triggers on per-site Workers: **shipped** (this was listed as "needs CF cron API wiring" long after it landed). `dply.yaml` parses `crons:`, `EdgeEffectiveCrons` merges repo + dashboard rows, and both bundle uploaders push them via `EdgeCloudflareClient::setDispatchScriptSchedules()`. UI on the Crons tab.
 - Interactive create/attach/detach UI for bindings: **shipped**. `edge-bindings` tab, backed by `EdgeEffectiveBindings` + `EdgeDashboardBindingProvisioner`. wrangler.toml stays authoritative; dashboard rows are additive and lose name collisions.
 
-**Still deferred:** proper service-bindings for middleware → SSR (today they coexist; dispatch overhead is fine for v1).
+**Still deferred:** proper service-bindings for middleware → SSR (today they coexist; dispatch overhead is fine for v1). **Phase 3b Custom Hostnames (SSL for SaaS)** shipped on managed `dply_edge` — see `EdgeCustomDomainProvisioner` + `config/edge.php` `custom_hostnames`.
 
 > Bindings and crons only reach a **per-deployment Worker**, which exists for SSR
 > sites and for static/hybrid sites shipping a `middleware.ts`. A purely static

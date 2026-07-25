@@ -7,13 +7,10 @@ return [
     | Coming-soon gate
     |--------------------------------------------------------------------------
     | Redirect logged-out visitors to the marketing "coming soon" page.
-    | COMING_SOON=true forces it on (even locally, for preview); =false turns it
-    | fully off; unset falls back to the legacy behavior (on in any non-local
-    | environment). See App\Http\Middleware\RedirectGuestsToComingSoon.
+    | COMING_SOON=true forces it on (even locally, for preview). Default is off
+    | — the public site is live. See App\Http\Middleware\RedirectGuestsToComingSoon.
     */
-    'coming_soon' => env('COMING_SOON') !== null
-        ? filter_var(env('COMING_SOON'), FILTER_VALIDATE_BOOLEAN)
-        : null,
+    'coming_soon' => filter_var(env('COMING_SOON', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
     | IP allow-list for the coming-soon gate. These addresses (and any logged-in

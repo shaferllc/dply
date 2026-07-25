@@ -36,11 +36,22 @@ class VerifyEdgeCustomDomainsJob implements ShouldQueue
                         if (! is_string($hostname) || $hostname === '') {
                             continue;
                         }
-                        if (! is_array($info) || ($info['dns_status'] ?? null) !== 'pending') {
+                        if (! is_array($info)) {
                             continue;
                         }
 
-                        $provisioner->verify($site->fresh(), $hostname);
+                        $dnsStatus = $info['dns_status'] ?? null;
+                        if ($dnsStatus === 'pending') {
+                            $provisioner->verify($site->fresh(), $hostname);
+
+                            continue;
+                        }
+
+                        // Phase 3b: poll SaaS cert issuance (and recover transient failures).
+                        $sslStatus = $info['ssl_status'] ?? null;
+                        if ($dnsStatus === 'ready' && in_array($sslStatus, [null, 'pending', 'failed'], true)) {
+                            $provisioner->syncCustomHostnameSsl($site->fresh(), $hostname);
+                        }
                     }
                 }
             });

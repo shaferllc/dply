@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\EdgeSiteMember;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -19,7 +20,12 @@ class SitePolicy
     {
         $server = $this->resolveServer($site);
 
-        return $server !== null && $user->can('view', $server);
+        if ($server !== null && $user->can('view', $server)) {
+            return true;
+        }
+
+        // Edge per-site members elevate — never restrict — org access.
+        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_VIEWER);
     }
 
     public function create(User $user): bool
@@ -45,12 +51,20 @@ class SitePolicy
                 return false;
             }
 
-            return $workspace->userCanUpdate($user);
+            if ($workspace->userCanUpdate($user)) {
+                return true;
+            }
+
+            return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
         }
 
         $server = $this->resolveServer($site);
 
-        return $server !== null && $user->can('update', $server);
+        if ($server !== null && $user->can('update', $server)) {
+            return true;
+        }
+
+        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
     }
 
     public function clone(User $user, Site $site): bool
@@ -73,19 +87,33 @@ class SitePolicy
     }
 
     /**
-     * Manage per-site team members on an Edge site. Org admin only.
-     * The per-site members feature (edge_site_members) was deprecated
-     * along with the Members workspace tab — kept as a method for
-     * backwards-compat with any lingering Gate checks.
+     * Manage per-site Edge members (Wave E P12). Org admins always can;
+     * Edge site admins elevate to the same gate.
      */
     public function manageMembers(User $user, Site $site): bool
     {
-        $server = $this->resolveServer($site);
+        if ($site->organization_id === null) {
+            return false;
+        }
 
-        return $server !== null
-            && $user->can('view', $server)
-            && $site->organization_id !== null
-            && ($this->resolveOrganization($user, $site)?->hasAdminAccess($user) ?? false);
+        if ($this->resolveOrganization($user, $site)?->hasAdminAccess($user) ?? false) {
+            return true;
+        }
+
+        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_ADMIN);
+    }
+
+    private function edgeMemberRank(User $user, Site $site): int
+    {
+        if (! $site->usesEdgeRuntime()) {
+            return 0;
+        }
+
+        $role = $site->edgeSiteMembers()
+            ->where('user_id', $user->id)
+            ->value('role');
+
+        return is_string($role) ? EdgeSiteMember::rankFor($role) : 0;
     }
 
     /**

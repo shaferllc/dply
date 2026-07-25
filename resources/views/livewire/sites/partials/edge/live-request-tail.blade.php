@@ -28,10 +28,29 @@
             </p>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs text-brand-moss">
+            <select x-model="methodFilter"
+                    class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900">
+                <option value="">{{ __('All methods') }}</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+                <option value="DELETE">DELETE</option>
+                <option value="HEAD">HEAD</option>
+                <option value="OPTIONS">OPTIONS</option>
+            </select>
+            <select x-model="statusFilter"
+                    class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900">
+                <option value="">{{ __('All statuses') }}</option>
+                <option value="2xx">2xx</option>
+                <option value="3xx">3xx</option>
+                <option value="4xx">4xx</option>
+                <option value="5xx">5xx</option>
+            </select>
             <input type="text"
                    x-model="filter"
-                   placeholder="{{ __('Filter path / status / method') }}"
-                   class="w-44 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
+                   placeholder="{{ __('Filter path') }}"
+                   class="w-36 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
             <button type="button"
                     x-on:click="paused = ! paused"
                     class="rounded-lg border border-brand-ink/15 px-2 py-1 text-[11px] font-semibold transition"
@@ -44,6 +63,12 @@
                     class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-moss hover:bg-brand-sand/40">
                 {{ __('Clear') }}
             </button>
+            <a href="{{ route('sites.edge.logs.csv', ['server' => $server ?? $site->server, 'site' => $site]) }}"
+               class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-moss hover:bg-brand-sand/40"
+               title="{{ __('Download recent access logs as CSV') }}">
+                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ __('CSV') }}
+            </a>
             <span class="font-mono text-[10px] text-brand-mist" x-text="rows.length + ' / {{ 200 }}'"></span>
         </div>
     </div>
@@ -100,16 +125,36 @@
                     status: 'connecting',
                     rows: [],
                     filter: '',
+                    methodFilter: '',
+                    statusFilter: '',
                     paused: false,
                     lastTickAt: null,
                     _channel: null,
                     _newTimers: new Map(),
 
                     get filteredRows() {
-                        if (! this.filter) return this.rows;
-                        const needle = this.filter.toLowerCase();
+                        const needle = (this.filter || '').toLowerCase();
+                        const method = (this.methodFilter || '').toUpperCase();
+                        const bucket = this.statusFilter || '';
 
                         return this.rows.filter((row) => {
+                            if (method && (row.method || '').toUpperCase() !== method) {
+                                return false;
+                            }
+
+                            if (bucket) {
+                                const code = Number(row.status || 0);
+                                const ok = (
+                                    (bucket === '2xx' && code >= 200 && code < 300)
+                                    || (bucket === '3xx' && code >= 300 && code < 400)
+                                    || (bucket === '4xx' && code >= 400 && code < 500)
+                                    || (bucket === '5xx' && code >= 500 && code < 600)
+                                );
+                                if (! ok) return false;
+                            }
+
+                            if (! needle) return true;
+
                             return (row.path || '').toLowerCase().includes(needle)
                                 || String(row.status || '').includes(needle)
                                 || (row.method || '').toLowerCase().includes(needle);

@@ -53,7 +53,7 @@ class EdgeCloudflareClient
             Http::withToken($this->apiToken)->get(self::BASE.'/accounts'),
         );
 
-        return ($payload );
+        return $payload;
     }
 
     /**
@@ -190,7 +190,7 @@ class EdgeCloudflareClient
                 ->get(self::BASE.'/accounts/'.$this->accountId.'/workers/dispatch/namespaces'),
         );
 
-        return (array_values(array_filter($payload, 'is_array')) );
+        return array_values(array_filter($payload, 'is_array'));
     }
 
     /**
@@ -250,7 +250,7 @@ class EdgeCloudflareClient
      *
      * @param  string  $namespace  Namespace NAME (not id) — CF API uses name here.
      * @param  string  $entryModulePath  File name the metadata.main_module points at (e.g. "worker.js").
-     * @param  array<string, mixed> $modules  Map of module file name → module source. Must include $entryModulePath.
+     * @param  array<string, mixed>  $modules  Map of module file name → module source. Must include $entryModulePath.
      * @param  list<array<string, mixed>>  $bindings  Cloudflare binding descriptors (kv_namespace, r2_bucket, plain_text, secret_text, etc.).
      * @param  array{compatibility_date?: string, compatibility_flags?: list<string>, tags?: list<string>}  $metaExtras
      * @return array<string, mixed>
@@ -333,7 +333,7 @@ class EdgeCloudflareClient
      * dispatch script (P10b / Phase 4c). Pass an empty array to
      * clear all schedules.
      *
-     * @param  array<string, mixed> $schedules  Cron expressions ("0 * * * *")
+     * @param  array<string, mixed>  $schedules  Cron expressions ("0 * * * *")
      */
     public function setDispatchScriptSchedules(string $namespace, string $scriptName, array $schedules): void
     {
@@ -373,7 +373,7 @@ class EdgeCloudflareClient
             return $payload['value'];
         }
 
-        return ($payload) && array_is_list($payload) ? $payload : [];
+        return $payload && array_is_list($payload) ? $payload : [];
     }
 
     /**
@@ -409,7 +409,7 @@ class EdgeCloudflareClient
             return $payload['value'];
         }
 
-        return ($payload) && array_is_list($payload) ? $payload : [];
+        return $payload && array_is_list($payload) ? $payload : [];
     }
 
     /**
@@ -532,7 +532,7 @@ class EdgeCloudflareClient
      * Uses Cloudflare GraphQL httpRequestsAdaptiveGroups. Requires Analytics
      * read on the API token and a resolvable zone for worker_zone_name.
      *
-     * @param  array<string, mixed> $hostnames
+     * @param  array<string, mixed>  $hostnames
      * @return Collection<string, EdgeUsageTotals>
      */
     public function fetchHttpUsageByHostnames(
@@ -883,28 +883,107 @@ class EdgeCloudflareClient
     }
 
     /**
-     * MVP stub for Cloudflare Custom Hostnames (SSL for SaaS) — full provisioning deferred to Phase 3b.
+     * Create a Custom Hostname (SSL for SaaS) on the managed Edge zone.
      *
-     * @param  array<string, mixed> $options
+     * @param  array<string, mixed>  $options  Extra Cloudflare payload fields (merged over defaults).
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createCustomHostname(string $zoneId, string $hostname, array $options = []): array
     {
+        $sslMethod = (string) config('edge.custom_hostnames.ssl_method', 'http');
+        if (! in_array($sslMethod, ['http', 'txt', 'email'], true)) {
+            $sslMethod = 'http';
+        }
+
+        $payload = [
+            'hostname' => strtolower(trim($hostname)),
+            'ssl' => [
+                'method' => $sslMethod,
+                'type' => 'dv',
+            ],
+        ];
+
+        $customOrigin = trim((string) config('edge.custom_hostnames.fallback_origin', ''));
+        if ($customOrigin !== '') {
+            $payload['custom_origin_server'] = $customOrigin;
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = array_replace_recursive($payload, $options);
+
         $response = Http::withToken($this->apiToken)
-            ->post(self::BASE.'/zones/'.$zoneId.'/custom_hostnames', array_merge([
-                'hostname' => strtolower(trim($hostname)),
-                'ssl' => [
-                    'method' => 'http',
-                    'type' => 'dv',
-                ],
-            ], $options));
+            ->post(self::BASE.'/zones/'.$zoneId.'/custom_hostnames', $payload);
 
         return $this->decode($response);
     }
 
     /**
-     * @param  array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    public function getCustomHostname(string $zoneId, string $customHostnameId): array
+    {
+        $response = Http::withToken($this->apiToken)
+            ->get(self::BASE.'/zones/'.$zoneId.'/custom_hostnames/'.$customHostnameId);
+
+        return $this->decode($response);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listCustomHostnames(string $zoneId, ?string $hostname = null): array
+    {
+        $query = ['per_page' => 50];
+        if (is_string($hostname) && $hostname !== '') {
+            $query['hostname'] = strtolower(trim($hostname));
+        }
+
+        $response = Http::withToken($this->apiToken)
+            ->get(self::BASE.'/zones/'.$zoneId.'/custom_hostnames', $query);
+
+        $payload = $this->decode($response);
+        if ($payload === []) {
+            return [];
+        }
+
+        // List endpoints return a numeric list in `result`.
+        if (array_is_list($payload)) {
+            return array_values(array_filter($payload, 'is_array'));
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deleteCustomHostname(string $zoneId, string $customHostnameId): array
+    {
+        $response = Http::withToken($this->apiToken)
+            ->delete(self::BASE.'/zones/'.$zoneId.'/custom_hostnames/'.$customHostnameId);
+
+        return $this->decode($response);
+    }
+
+    /**
+     * Find an existing Custom Hostname by hostname (first page match).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findCustomHostnameByHostname(string $zoneId, string $hostname): ?array
+    {
+        $hostname = strtolower(trim($hostname));
+        foreach ($this->listCustomHostnames($zoneId, $hostname) as $row) {
+            if (strtolower((string) ($row['hostname'] ?? '')) === $hostname) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     private function decode(Response $response): array
