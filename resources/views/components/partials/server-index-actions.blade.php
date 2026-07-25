@@ -3,10 +3,11 @@
     'server',
     'showMutations' => false,
     'compact' => false,
+    'responsive' => false,
 ])
 
 @php
-    $btnPad = $compact ? 'px-3 py-1.5' : 'px-3.5 py-2';
+    $btnPad = $compact ? 'px-2.5 py-1.5 sm:px-3' : 'px-3.5 py-2';
 @endphp
 
 @if ($showMutations && $server->deployable)
@@ -20,7 +21,7 @@
     >
         <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" wire:loading.remove wire:target="openServerDeploy('{{ $server->id }}')" aria-hidden="true" />
         <span wire:loading wire:target="openServerDeploy('{{ $server->id }}')" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>
-        {{ __('Deploy') }}
+        <span @class(['hidden sm:inline' => $responsive])>{{ __('Deploy') }}</span>
     </button>
 @elseif (! $showMutations && $server->deployable)
     <a
@@ -31,7 +32,7 @@
         class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white {{ $btnPad }} text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
     >
         <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-        {{ __('Deploy') }}
+        <span @class(['hidden sm:inline' => $responsive])>{{ __('Deploy') }}</span>
     </a>
 @endif
 
@@ -43,7 +44,7 @@
 @if ($showMutations && ($server->canDelete || $server->scheduledDeletionAt !== null))
     <x-dropdown align="right" width="w-56">
         <x-slot name="trigger">
-            <button type="button" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white {{ $compact ? 'p-1.5' : 'p-2' }} text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink" title="{{ __('More actions') }}">
+            <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-ink/15 bg-white text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink sm:h-9 sm:w-9" title="{{ __('More actions') }}">
                 <span class="sr-only">{{ __('More actions') }}</span>
                 <x-heroicon-o-ellipsis-vertical class="h-4 w-4" aria-hidden="true" />
             </button>
@@ -65,6 +66,21 @@
                     {{ __('Remove server') }}
                 </button>
             @endif
+        </x-slot>
+    </x-dropdown>
+@elseif ($server->manageExternal)
+    <x-dropdown align="right" width="w-56">
+        <x-slot name="trigger">
+            <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-ink/15 bg-white text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink sm:h-9 sm:w-9" title="{{ __('More actions') }}">
+                <span class="sr-only">{{ __('More actions') }}</span>
+                <x-heroicon-o-ellipsis-vertical class="h-4 w-4" aria-hidden="true" />
+            </button>
+        </x-slot>
+        <x-slot name="content">
+            <a href="{{ $server->manageHref }}" target="_blank" rel="noopener noreferrer" class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
+                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                {{ __('Open on production') }}
+            </a>
         </x-slot>
     </x-dropdown>
 @endif

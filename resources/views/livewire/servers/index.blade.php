@@ -14,6 +14,7 @@
         :view-mode="$viewMode"
         :show-fleet-ops="true"
         :show-mutations="true"
+        :show-hero-actions="true"
         :eyebrow="__('Fleet')"
         :breadcrumbs="array_values(array_filter([
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],

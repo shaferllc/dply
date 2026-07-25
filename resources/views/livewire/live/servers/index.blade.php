@@ -21,6 +21,7 @@
         :view-mode="$viewMode"
         :show-fleet-ops="false"
         :show-mutations="false"
+        :show-hero-actions="false"
         :eyebrow="__('Production')"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
@@ -28,11 +29,19 @@
             ['label' => __('Servers'), 'icon' => 'server-stack'],
         ]"
     >
-        @if ($error)
-            <x-slot:alert>
+        <x-slot:alert>
+            @if ($error)
                 <x-alert tone="danger">{{ $error }}</x-alert>
-            </x-slot:alert>
-        @endif
+            @endif
+            @if ($legacyApi ?? false)
+                <div class="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4">
+                    <p class="text-sm font-semibold text-amber-950">{{ __('Production API is missing fleet-card fields') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-amber-900/90">
+                        {{ __('Connected host :host still returns the legacy servers list (name/status/IP only). Deploy this app’s enriched GET /api/v1/servers to that control plane, then hit Refresh — metrics, sites, services, insights, and group labels come from that payload.', ['host' => $connection->hostLabel()]) }}
+                    </p>
+                </div>
+            @endif
+        </x-slot:alert>
 
         <x-slot:empty>
             <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]">

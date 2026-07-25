@@ -1,5 +1,5 @@
 @props([
-    'connection',
+    'connection' => null,
 ])
 
 @php
@@ -13,20 +13,28 @@
     ];
 @endphp
 
-<nav class="border-b border-brand-ink/10 bg-brand-sand/30" aria-label="{{ __('Production') }}">
-    <div class="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6 lg:px-8">
+<nav class="border-b border-brand-ink/10 bg-brand-cream" aria-label="{{ __('Production') }}">
+    <div class="mx-auto flex max-w-7xl gap-0.5 overflow-x-auto px-4 sm:gap-1 sm:px-6 lg:px-8" style="-webkit-overflow-scrolling: touch;">
         @foreach ($items as $item)
             @php $active = request()->routeIs($item['match']); @endphp
             <a
                 href="{{ route($item['route']) }}"
                 wire:navigate
                 @class([
-                    'inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition',
-                    'border-amber-600 text-brand-ink' => $active,
+                    'group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-sm font-medium leading-5 transition duration-150 ease-in-out sm:px-3',
+                    'border-brand-ink text-brand-ink' => $active,
                     'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink' => ! $active,
                 ])
             >
-                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <x-dynamic-component
+                    :component="'heroicon-o-'.$item['icon']"
+                    @class([
+                        'h-4 w-4 shrink-0',
+                        'text-brand-ink' => $active,
+                        'text-brand-moss group-hover:text-brand-ink' => ! $active,
+                    ])
+                    aria-hidden="true"
+                />
                 {{ $item['label'] }}
             </a>
         @endforeach

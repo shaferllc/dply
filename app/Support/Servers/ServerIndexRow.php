@@ -97,9 +97,35 @@ final readonly class ServerIndexRow
     /**
      * @param  array<string, mixed>  $row
      */
-    public static function fromProductionApi(array $row, string $remoteBaseUrl): self
-    {
+    public static function fromProductionApi(
+        array $row,
+        string $remoteBaseUrl,
+        ?string $defaultGroupLabel = null,
+    ): self {
         $id = (string) ($row['id'] ?? '');
+
+        // Thin/legacy list payloads omit fleet-card fields. Fill display defaults
+        // so Ready hosts don't look mid-provision and groups use the connected org.
+        if (! array_key_exists('group_label', $row) || $row['group_label'] === null || $row['group_label'] === '') {
+            $row['group_label'] = $defaultGroupLabel ?: __('Organization');
+        }
+        if (! array_key_exists('setup_status', $row)) {
+            $row['setup_status'] = ((string) ($row['status'] ?? '')) === Server::STATUS_READY
+                ? Server::SETUP_STATUS_DONE
+                : '';
+        }
+        if (! array_key_exists('health_status', $row)
+            && ((string) ($row['status'] ?? '')) === Server::STATUS_READY
+            && ((string) ($row['setup_status'] ?? '')) === Server::SETUP_STATUS_DONE
+        ) {
+            // Unknown reachability on a ready host — paint like reachable for
+            // visual parity with the local fleet (green stripe + Ready).
+            $row['health_status'] = Server::HEALTH_REACHABLE;
+        }
+        if (! array_key_exists('deployable', $row)) {
+            $row['deployable'] = ((string) ($row['status'] ?? '')) === Server::STATUS_READY
+                && ((string) ($row['setup_status'] ?? '')) === Server::SETUP_STATUS_DONE;
+        }
 
         return self::fromPayload(
             $row,
@@ -112,6 +138,25 @@ final readonly class ServerIndexRow
             rewriteNestedHrefs: true,
             remoteBaseUrl: $remoteBaseUrl,
         );
+    }
+
+    /**
+     * True when the remote list payload predates the fleet-card API
+     * (missing metrics / nested sites / setup_status).
+     *
+     * @param  list<array<string, mixed>>  $apiRows
+     */
+    public static function isLegacyApiPayload(array $apiRows): bool
+    {
+        if ($apiRows === []) {
+            return false;
+        }
+
+        $row = $apiRows[0];
+
+        return ! array_key_exists('setup_status', $row)
+            || ! array_key_exists('sites', $row)
+            || ! array_key_exists('metrics', $row);
     }
 
     /**

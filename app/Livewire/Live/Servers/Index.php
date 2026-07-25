@@ -54,7 +54,7 @@ class Index extends Component
         if ($connection === null) {
             return;
         }
-        $this->productionMirror()->forget($connection, 'servers');
+        $this->productionMirror()->forget($connection, 'servers.fleet');
         $this->toastSuccess(__('Servers refreshed from production.'));
     }
 
@@ -97,6 +97,7 @@ class Index extends Component
                 'sortOptions' => $sortOptions,
                 'tagOptions' => [],
                 'error' => null,
+                'legacyApi' => false,
                 'writesUnlocked' => false,
             ]);
         }
@@ -105,9 +106,11 @@ class Index extends Component
         $apiRows = [];
 
         try {
+            // Cache key versioned so a deployed fleet-card API isn't masked by a
+            // prior thin-list cache entry (legacy keys: id/name/status/ip only).
             $apiRows = $this->productionMirror()->remember(
                 $connection,
-                'servers',
+                'servers.fleet',
                 fn ($client) => $client->servers(),
             );
         } catch (ProductionApiException $e) {
@@ -118,9 +121,16 @@ class Index extends Component
             }
         }
 
+        $legacyApi = ServerIndexRow::isLegacyApiPayload($apiRows);
+        $groupLabel = $connection->remote_organization_name;
+
         /** @var Collection<int, ServerIndexRow> $allRows */
         $allRows = collect($apiRows)->map(
-            fn (array $row): ServerIndexRow => ServerIndexRow::fromProductionApi($row, $connection->base_url)
+            fn (array $row): ServerIndexRow => ServerIndexRow::fromProductionApi(
+                $row,
+                $connection->base_url,
+                $groupLabel,
+            )
         );
         $tagOptions = $allRows->flatMap(fn (ServerIndexRow $r) => $r->tags)->unique()->sort()->values()->all();
         $rows = $this->filterRows($allRows);
@@ -134,6 +144,7 @@ class Index extends Component
             'sortOptions' => $sortOptions,
             'tagOptions' => $tagOptions,
             'error' => $error,
+            'legacyApi' => $legacyApi,
             'writesUnlocked' => $this->productionMirror()->writesUnlocked(),
         ]);
     }

@@ -26,13 +26,13 @@
         default => null,
     };
 
-    $tabBtnBase = 'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-sm transition';
+    $tabBtnBase = 'inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition';
     $panelBox = 'divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white';
 @endphp
 
 @if ($siteCount > 0 || $serviceCount > 0 || $relatedCount > 0)
-    <div x-data="{ tab: '' }" class="mt-2">
-        <div class="flex flex-wrap items-center gap-2">
+    <div x-data="{ tab: '' }" class="min-w-0">
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
             @if ($siteCount > 0)
                 <button
                     type="button"
