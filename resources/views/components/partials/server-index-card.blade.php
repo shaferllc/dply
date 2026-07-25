@@ -2,6 +2,7 @@
     /** @var \App\Support\Servers\ServerIndexRow $server */
     'server',
     'layout' => 'list',
+    'showDeployActions' => false,
     'showMutations' => false,
 ])
 
@@ -51,7 +52,7 @@
             @include('components.partials.server-index-resource-tabs', ['server' => $server])
 
             <div class="mt-auto flex flex-wrap items-center justify-stretch gap-2 pt-1 sm:justify-end">
-                @include('components.partials.server-index-actions', ['server' => $server, 'showMutations' => $showMutations, 'compact' => true])
+                @include('components.partials.server-index-actions', ['server' => $server, 'showDeployActions' => $showDeployActions, 'showMutations' => $showMutations, 'compact' => true])
             </div>
         </div>
     </li>
@@ -84,7 +85,7 @@
                 </div>
 
                 <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-                    @include('components.partials.server-index-actions', ['server' => $server, 'showMutations' => $showMutations, 'compact' => true, 'responsive' => true])
+                    @include('components.partials.server-index-actions', ['server' => $server, 'showDeployActions' => $showDeployActions, 'showMutations' => $showMutations, 'compact' => true, 'responsive' => true])
                 </div>
             </div>
 

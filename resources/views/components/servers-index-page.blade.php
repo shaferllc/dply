@@ -15,6 +15,9 @@
     'viewMode' => 'list',
     /** Local fleet only — Production mirror must leave this false. */
     'showFleetOps' => false,
+    /** Deploy / Sync servers — local Livewire or Production API (same buttons). */
+    'showDeployActions' => false,
+    /** Destructive local-only actions (delete / schedule removal). */
     'showMutations' => false,
     'showHeroActions' => false,
     'eyebrow' => null,
@@ -22,6 +25,7 @@
 
 @php
     $showFleetOps = filter_var($showFleetOps, FILTER_VALIDATE_BOOLEAN);
+    $showDeployActions = filter_var($showDeployActions, FILTER_VALIDATE_BOOLEAN);
     $showMutations = filter_var($showMutations, FILTER_VALIDATE_BOOLEAN);
     $showHeroActions = filter_var($showHeroActions, FILTER_VALIDATE_BOOLEAN);
     $heroActionsHtml = isset($actions) ? trim(preg_replace('/<!--.*?-->/s', '', (string) $actions) ?? '') : '';
@@ -203,7 +207,7 @@
                             </div>
                             <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                 @foreach ($groupServers as $server)
-                                    @include('components.partials.server-index-card', ['server' => $server, 'layout' => 'grid', 'showMutations' => $showMutations])
+                                    @include('components.partials.server-index-card', ['server' => $server, 'layout' => 'grid', 'showDeployActions' => $showDeployActions, 'showMutations' => $showMutations])
                                 @endforeach
                             </ul>
                         </div>
@@ -222,7 +226,7 @@
                             </div>
                             <ul>
                                 @foreach ($groupServers as $server)
-                                    @include('components.partials.server-index-card', ['server' => $server, 'layout' => 'list', 'showMutations' => $showMutations])
+                                    @include('components.partials.server-index-card', ['server' => $server, 'layout' => 'list', 'showDeployActions' => $showDeployActions, 'showMutations' => $showMutations])
                                 @endforeach
                             </ul>
                         </div>

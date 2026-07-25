@@ -20,6 +20,7 @@
         :tag-options="$tagOptions"
         :view-mode="$viewMode"
         :show-fleet-ops="false"
+        :show-deploy-actions="true"
         :show-mutations="false"
         :show-hero-actions="false"
         :breadcrumbs="[
@@ -50,4 +51,6 @@
             </section>
         </x-slot:empty>
     </x-servers-index-page>
+
+    @include('components.production-write-confirm-modal')
 </div>

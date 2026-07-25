@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Live\Servers;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Live\Concerns\ConfirmsProductionWrites;
 use App\Livewire\Live\Concerns\InteractsWithProductionData;
 use App\Models\ProductionDataConnection;
 use App\Models\Server;
+use App\Models\Site;
 use App\Services\ProductionData\ProductionApiException;
 use App\Support\Servers\ServerIndexRow;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -19,6 +22,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use ConfirmsProductionWrites;
     use DispatchesToastNotifications;
     use InteractsWithProductionData;
 
@@ -54,7 +58,7 @@ class Index extends Component
         if ($connection === null) {
             return;
         }
-        $this->productionMirror()->forget($connection, 'servers.fleet');
+        $this->productionMirror()->forget($connection, 'servers.fleet.v3');
         $this->toastSuccess(__('Servers refreshed from production.'));
     }
 
@@ -68,6 +72,94 @@ class Index extends Component
         $this->productionMirror()->disconnect($connection);
         $this->toastWarning(__('Disconnected from production.'));
         $this->redirect(route('live.connect'), navigate: true);
+    }
+
+    /**
+     * Same entry point as the local fleet — queues production deploys via API
+     * after the PRODUCTION write confirm (not an external link).
+     */
+    public function openServerDeploy(string $serverId): void
+    {
+        $siteIds = $this->deployableSiteIdsForServer($serverId);
+        if ($siteIds === []) {
+            $this->toastError(__('No deployable sites on this host.'));
+
+            return;
+        }
+
+        $this->runProductionWrite(
+            'performProductionDeploys',
+            [$siteIds],
+            __('Deploy on production'),
+            trans_choice(
+                'Queue a deploy for :n production site.|Queue deploys for :n production sites.',
+                count($siteIds),
+                ['n' => count($siteIds)],
+            ).' '.__('Type PRODUCTION to allow writes for this session.'),
+        );
+    }
+
+    /**
+     * Same entry point as the local fleet Sync servers button.
+     */
+    public function deploySyncedSites(string $siteId): void
+    {
+        $siteIds = $this->syncPeerSiteIds($siteId);
+        if ($siteIds === []) {
+            $this->toastError(__('No linked sites to sync-deploy.'));
+
+            return;
+        }
+
+        $this->runProductionWrite(
+            'performProductionDeploys',
+            [$siteIds],
+            __('Sync deploy on production'),
+            trans_choice(
+                'Queue a sync deploy for :n production site.|Queue sync deploys for :n production sites.',
+                count($siteIds),
+                ['n' => count($siteIds)],
+            ).' '.__('Type PRODUCTION to allow writes for this session.'),
+        );
+    }
+
+    /**
+     * @param  list<string>  $siteIds
+     */
+    public function performProductionDeploys(array $siteIds): void
+    {
+        $connection = $this->requireProductionConnection();
+        if ($connection === null) {
+            return;
+        }
+
+        $siteIds = array_values(array_unique(array_filter($siteIds, fn ($id): bool => is_string($id) && $id !== '')));
+        if ($siteIds === []) {
+            $this->toastError(__('No sites to deploy.'));
+
+            return;
+        }
+
+        try {
+            $queued = 0;
+            $mirror = $this->productionMirror();
+            $mirror->withClient($connection, function ($client) use ($siteIds, $connection, $mirror, &$queued): void {
+                foreach ($siteIds as $siteId) {
+                    $client->deploy($siteId);
+                    $queued++;
+                    $mirror->forget($connection, 'site:'.$siteId.':deployments');
+                    $mirror->forget($connection, 'site:'.$siteId);
+                }
+            });
+
+            $this->toastSuccess(trans_choice(
+                'Queued :n production deploy.|Queued :n production deploys.',
+                $queued,
+                ['n' => $queued],
+            ));
+        } catch (ProductionApiException $e) {
+            $this->handleProductionApiError($e);
+        }
     }
 
     public function render(): View
@@ -106,8 +198,6 @@ class Index extends Component
         $apiRows = [];
 
         try {
-            // Cache key versioned so a deployed fleet-card API isn't masked by a
-            // prior thin-list cache entry (legacy keys: id/name/status/ip only).
             $apiRows = $this->productionMirror()->remember(
                 $connection,
                 'servers.fleet.v3',
@@ -149,6 +239,106 @@ class Index extends Component
             'legacyApi' => $legacyApi,
             'writesUnlocked' => $this->productionMirror()->writesUnlocked(),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function deployableSiteIdsForServer(string $serverId): array
+    {
+        foreach ($this->cachedApiServerRows() as $row) {
+            if ((string) ($row['id'] ?? '') !== $serverId) {
+                continue;
+            }
+
+            $ids = [];
+            foreach ($row['sites'] ?? [] as $site) {
+                if (! is_array($site)) {
+                    continue;
+                }
+                $id = isset($site['id']) ? (string) $site['id'] : '';
+                if ($id !== '') {
+                    $ids[] = $id;
+                }
+            }
+
+            return $ids;
+        }
+
+        return Site::query()
+            ->where('server_id', $serverId)
+            ->whereNotNull('git_repository_url')
+            ->where('git_repository_url', '!=', '')
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function syncPeerSiteIds(string $siteId): array
+    {
+        $local = Site::query()->with('server')->find($siteId);
+        if ($local !== null) {
+            return SiteSyncPeers::forSite($local)
+                ->pluck('id')
+                ->map(fn ($id): string => (string) $id)
+                ->values()
+                ->all();
+        }
+
+        $anchorRepo = '';
+        $idsByRepo = [];
+        foreach ($this->cachedApiServerRows() as $row) {
+            foreach ($row['sites'] ?? [] as $site) {
+                if (! is_array($site)) {
+                    continue;
+                }
+                $id = isset($site['id']) ? (string) $site['id'] : '';
+                if ($id === '') {
+                    continue;
+                }
+                $repo = SiteSyncPeers::canonicalRepo((string) ($site['git_repository_url'] ?? ''));
+                if ($repo === '') {
+                    continue;
+                }
+                $idsByRepo[$repo][] = $id;
+                if ($id === $siteId) {
+                    $anchorRepo = $repo;
+                }
+            }
+        }
+
+        if ($anchorRepo !== '' && isset($idsByRepo[$anchorRepo])) {
+            return array_values(array_unique($idsByRepo[$anchorRepo]));
+        }
+
+        return [$siteId];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function cachedApiServerRows(): array
+    {
+        $connection = $this->productionConnection;
+        if ($connection === null) {
+            return [];
+        }
+
+        try {
+            $rows = $this->productionMirror()->remember(
+                $connection,
+                'servers.fleet.v3',
+                fn ($client) => $client->servers(),
+            );
+
+            return ServerIndexRow::enrichDeploySyncMeta(is_array($rows) ? $rows : []);
+        } catch (ProductionApiException) {
+            return [];
+        }
     }
 
     /**
