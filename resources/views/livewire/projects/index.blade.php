@@ -3,7 +3,9 @@
     $hasFilters = trim($search ?? '') !== '' || ($labelFilter ?? '') !== '' || ($roleFilter ?? '') !== '';
 @endphp
 
-<div>
+<div class="contents">
+    <x-compute-index-nav surface="local" />
+
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-dashboard-breadcrumb :current="__('Projects')" current-icon="rectangle-group" doc-route="docs.markdown" doc-slug="projects-overview" />
 
@@ -280,4 +282,5 @@
         </x-modal>
         @endcan
     @endif
+    </div>
 </div>

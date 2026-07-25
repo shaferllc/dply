@@ -1,8 +1,9 @@
-<div>
+<div class="contents">
+    <x-compute-index-nav surface="local" />
+
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-breadcrumb-trail :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
             ['label' => __('Serverless'), 'icon' => 'bolt'],
         ]" />
 

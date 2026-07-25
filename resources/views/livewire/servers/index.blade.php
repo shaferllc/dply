@@ -3,7 +3,10 @@
     @if ($needsPoll)
         wire:poll.10s
     @endif
+    class="contents"
 >
+    <x-compute-index-nav surface="local" />
+
     <x-servers-index-page
         :grouped-rows="$groupedRows"
         :summary="$summary"
@@ -15,25 +18,12 @@
         :show-fleet-ops="false"
         :show-deploy-actions="true"
         :show-mutations="true"
-        :show-hero-actions="true"
+        :show-hero-actions="false"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'icon' => 'server-stack'],
         ]"
     >
-        <x-slot:actions>
-            @can('create', App\Models\Server::class)
-                <a
-                    href="{{ route('servers.create') }}"
-                    wire:navigate
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                >
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Add server') }}
-                </a>
-            @endcan
-        </x-slot:actions>
-
         <x-slot:banners>
             @if (session('success'))
                 <x-alert tone="success">{{ session('success') }}</x-alert>

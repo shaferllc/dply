@@ -1,7 +1,9 @@
-<div class="mx-auto max-w-6xl px-6 py-10">
+<div class="contents">
+    <x-compute-index-nav surface="local" />
+
+    <div class="mx-auto max-w-6xl px-6 py-10">
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
         ['label' => __('Cloud apps'), 'icon' => 'cloud'],
     ]" />
 
@@ -250,4 +252,5 @@
             @endforeach
         </ul>
     @endif
+    </div>
 </div>
