@@ -188,6 +188,10 @@ Route::prefix('v1')->group(function (): void {
 
         // VM/BYO site env vars (values encrypted at rest, never returned by GET).
         Route::get('/sites/{site}/env', [SiteEnvApiController::class, 'index'])->middleware('ability:'.$apiAbilities['sites.env.index']);
+        Route::get('/sites/{site}/env/content', [SiteEnvApiController::class, 'showContent'])
+            ->middleware('ability:'.$apiAbilities['sites.env.content']);
+        Route::put('/sites/{site}/env/content', [SiteEnvApiController::class, 'updateContent'])
+            ->middleware('ability:'.$apiAbilities['sites.env.content_put']);
         Route::patch('/sites/{site}/env/{key}', [SiteEnvApiController::class, 'upsert'])
             ->middleware('ability:'.$apiAbilities['sites.env.set'])->where('key', '[A-Za-z_][A-Za-z0-9_]{0,127}');
         Route::delete('/sites/{site}/env/{key}', [SiteEnvApiController::class, 'destroy'])

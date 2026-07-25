@@ -32,6 +32,7 @@
     $browseActive = $req->routeIs(
         'infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*',
         'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*', 'backups.*',
+        'live.*',
     );
     $moreMenuActive = $featuresActive
         || $changelogActive
@@ -278,6 +279,19 @@
                                                 </x-slot>
                                                 {{ __('Backups') }}
                                             </x-coming-soon-dropdown-link>
+                                            @if (production_data_mirror_available())
+                                                <x-dropdown-link
+                                                    :href="production_data_mirror_entry_url()"
+                                                    :description="production_data_mirror_connected()
+                                                        ? __('Browse live org data from this local app')
+                                                        : __('Device-flow login to a production control plane')"
+                                                >
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-exclamation-triangle class="{{ $hi }} text-amber-600" />
+                                                    </x-slot>
+                                                    {{ production_data_mirror_connected() ? __('Production') : __('Production data') }}
+                                                </x-dropdown-link>
+                                            @endif
 
                                             <p class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Org') }}</p>
                                             <x-dropdown-link :href="route('organizations.index')" :description="__('Workspaces, members & billing')">
@@ -589,6 +603,14 @@
                     </x-slot>
                     {{ __('Backups') }}
                 </x-coming-soon-responsive-nav-link>
+                @if (production_data_mirror_available())
+                    <x-responsive-nav-link :href="production_data_mirror_entry_url()" :active="request()->routeIs('live.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-exclamation-triangle class="{{ $hi }} text-amber-600" />
+                        </x-slot>
+                        {{ production_data_mirror_connected() ? __('Production') : __('Production data') }}
+                    </x-responsive-nav-link>
+                @endif
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Org') }}</p>
                 <x-responsive-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
                     <x-slot name="icon">

@@ -16,7 +16,7 @@ use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Support\Servers\ProvisioningDigest;
+use App\Support\Servers\ServerIndexRow;
 use App\Support\Servers\ServerTags;
 use App\Support\Sites\SiteSyncPeers;
 use Carbon\Carbon;
@@ -24,7 +24,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Laravel\Pennant\Feature;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -451,17 +450,17 @@ class Index extends Component
     {
         $base = $this->baseQuery();
         $org = auth()->user()->currentOrganization();
-        $allInScope = $base !== null ? (clone $base)->get() : collect();
+        $allInScope = $base !== null
+            ? (clone $base)->with(['organization', 'team', 'workspace'])->withCount('sites')->get()
+            : collect();
         $tagOptions = ServerTags::collectFromServers($allInScope);
-        $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
+        $hasServersInScope = $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)
                 ->with(['sites', 'organization', 'team', 'workspace', 'databaseEngines', 'cacheServices'])
                 ->withCount('sites')
                 ->get()
             : collect();
-
-        $groupedServers = $this->groupedServers($servers);
 
         // Per-server Deploy / Sync targets for the fleet card action buttons.
         $deployTargets = $this->buildDeployTargets($servers, $org);
@@ -478,13 +477,10 @@ class Index extends Component
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
 
-        // Live metric pulse per server — latest CPU/Mem/Disk for fleet
-        // glance. One distinct subquery joining the latest captured_at
-        // per server, keyed by id for the blade.
         $latestSnapshots = collect();
         if ($servers->isNotEmpty()) {
             $serverIds = $servers->pluck('id')->all();
-            $latestPerServer = ServerMetricSnapshot::query()
+            $latestSnapshots = ServerMetricSnapshot::query()
                 ->whereIn('server_id', $serverIds)
                 ->whereIn('id', function ($q) use ($serverIds): void {
                     $q->from('server_metric_snapshots')
@@ -492,36 +488,31 @@ class Index extends Component
                         ->whereIn('server_id', $serverIds)
                         ->groupBy('server_id');
                 })
-                ->get(['id', 'server_id', 'captured_at', 'payload']);
-            $latestSnapshots = $latestPerServer->keyBy('server_id');
+                ->get(['id', 'server_id', 'captured_at', 'payload'])
+                ->keyBy('server_id');
         }
 
-        $summary = [
-            'total' => $servers->count(),
-            'ready' => $servers->where('status', Server::STATUS_READY)->count(),
-            'attention' => $servers->filter(function (Server $server): bool {
-                if ($server->scheduled_deletion_at !== null) {
-                    return true;
-                }
+        /** @var Collection<int, ServerIndexRow> $rows */
+        $rows = $servers->map(function (Server $server) use ($latestSnapshots, $insightRollup, $relatedServers, $deployTargets): ServerIndexRow {
+            $insights = $insightRollup[$server->id] ?? ['open' => 0, 'worst' => null];
 
-                if (in_array($server->status, [Server::STATUS_ERROR, Server::STATUS_DISCONNECTED], true)) {
-                    return true;
-                }
+            return ServerIndexRow::fromServer(
+                $server,
+                $latestSnapshots->get($server->id),
+                (int) ($insights['open'] ?? 0),
+                isset($insights['worst']) ? (string) $insights['worst'] : null,
+                $relatedServers[$server->id] ?? [],
+                isset($deployTargets[$server->id]),
+                auth()->user()?->can('delete', $server) ?? false,
+            );
+        });
 
-                return $server->status === Server::STATUS_READY
-                    && $server->health_status === Server::HEALTH_UNREACHABLE;
-            })->count(),
-            'sites' => (int) $servers->sum('sites_count'),
-        ];
+        $allRows = $allInScope->map(fn (Server $server): ServerIndexRow => ServerIndexRow::fromServer($server));
 
-        $openInsights = (int) $insightRollup->sum(fn (array $row): int => (int) ($row['open'] ?? 0));
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
-        // Q19 onboarding empty state: surface per-source "Migrate from {X}" CTAs
-        // alongside Create Server when matching inventory-import credentials are
-        // connected for the current org. Keeps Ploi and Forge as separate buttons
-        // so an empty page doesn't push a user toward a source they aren't on.
+
         $importSources = collect();
         if ($org) {
             $importSources = ProviderCredential::query()
@@ -531,7 +522,6 @@ class Index extends Component
                 ->unique()
                 ->values();
         }
-        $hasImportCredentials = $importSources->isNotEmpty();
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -542,40 +532,36 @@ class Index extends Component
 
         $serverCreateDraft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
 
-        // Per-server "what's happening right now" digest. Returns null for
-        // servers that aren't mid-provision; the blade only renders the
-        // detail row when there's something to show.
-        $provisioningDigests = $servers
-            ->mapWithKeys(static fn (Server $server) => [$server->id => ProvisioningDigest::forServer($server)])
-            ->filter();
-
-        // Servers whose provision step flipped to failed. Surfaced as a
-        // page-level banner above the fleet list so a stalled provision is
-        // visible without scrolling — pairs with the per-card "Setup failed"
-        // chip rendered by displayStatus().
-        $failedSetups = $servers
+        $failedSetups = $allInScope
             ->where('setup_status', Server::SETUP_STATUS_FAILED)
             ->values();
 
+        $needsPoll = $allInScope->contains(function (Server $server): bool {
+            return $server->setup_status !== Server::SETUP_STATUS_DONE
+                && $server->setup_status !== Server::SETUP_STATUS_FAILED
+                && in_array($server->status, [
+                    Server::STATUS_PENDING,
+                    Server::STATUS_PROVISIONING,
+                    Server::STATUS_READY,
+                ], true);
+        });
+
         return view('livewire.servers.index', [
             'hasServersInScope' => $hasServersInScope,
-            'servers' => $servers,
-            'groupedServers' => $groupedServers,
-            'deployTargets' => $deployTargets,
-            'relatedServers' => $relatedServers,
-            'insightRollup' => $insightRollup,
-            'latestSnapshots' => $latestSnapshots,
-            'provisioningDigests' => $provisioningDigests,
+            'groupedRows' => ServerIndexRow::group($rows),
+            'summary' => ServerIndexRow::summarize($allRows),
             'failedSetups' => $failedSetups,
-            'summary' => $summary,
-            'openInsights' => $openInsights,
+            'needsPoll' => $needsPoll,
             'hasProviderCredentials' => $hasProviderCredentials,
-            'hasImportCredentials' => $hasImportCredentials,
             'importSources' => $importSources,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'serverCreateDraft' => $serverCreateDraft,
-            'sortOptions' => config('user_preferences.server_sort_options', []),
+            'sortOptions' => config('user_preferences.server_sort_options', [
+                'created_at' => 'Newest first',
+                'name' => 'Name (A–Z)',
+                'status' => 'Status',
+            ]),
             'statusOptions' => [
                 '' => __('All statuses'),
                 Server::STATUS_PENDING => __('Pending'),

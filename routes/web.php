@@ -204,7 +204,13 @@ use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Files;
+use App\Livewire\Live\ApiInventory as LiveApiInventory;
+use App\Livewire\Live\Connect as LiveConnect;
+use App\Livewire\Live\Servers\Index as LiveServersIndex;
+use App\Livewire\Live\Sites\Index as LiveSitesIndex;
+use App\Livewire\Live\Sites\Show as LiveSitesShow;
 use App\Livewire\Sites\Index as SitesIndex;
+use App\Services\ProductionData\ProductionDataMirror;
 use App\Livewire\Sites\Logs as SitesLogs;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
@@ -531,6 +537,24 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
+
+    // Local-only Production data mirror — proxies remote /api/v1 into Livewire UI.
+    Route::middleware('production.mirror')->prefix('live')->name('live.')->group(function (): void {
+        Route::get('/', function () {
+            $connected = app(ProductionDataMirror::class)->connectionFor(auth()->user()) !== null;
+
+            return redirect()->route($connected ? 'live.sites.index' : 'live.connect');
+        })->name('index');
+        Route::livewire('/connect', LiveConnect::class)->name('connect');
+        Route::livewire('/sites', LiveSitesIndex::class)->name('sites.index');
+        Route::livewire('/sites/{remoteSite}', LiveSitesShow::class)->name('sites.show');
+        Route::livewire('/servers', LiveServersIndex::class)->name('servers.index');
+        Route::livewire('/projects', LiveApiInventory::class)->name('projects.index');
+        Route::livewire('/edge', LiveApiInventory::class)->name('edge.index');
+        Route::livewire('/cloud', LiveApiInventory::class)->name('cloud.index');
+        Route::livewire('/serverless', LiveApiInventory::class)->name('serverless.index');
+    });
+
     Route::middleware('feature:surface.cloud')->group(function (): void {
         Route::livewire('cloud', CloudIndex::class)->name('cloud.index');
         Route::livewire('cloud/create', CloudCreate::class)->name('cloud.create');

@@ -22,6 +22,8 @@ use Illuminate\Http\Request;
  * deploy writes the resulting .env to the server afterwards.
  *
  * GET    /api/v1/sites/{site}/env           list keys (never values)
+ * GET    /api/v1/sites/{site}/env/content   full .env body (sites.write — secrets)
+ * PUT    /api/v1/sites/{site}/env/content   replace full .env body
  * PATCH  /api/v1/sites/{site}/env/{key}     set a single value
  * DELETE /api/v1/sites/{site}/env/{key}     remove
  */
@@ -52,6 +54,39 @@ class SiteEnvApiController extends Controller
         }
 
         return response()->json(['data' => $rows]);
+    }
+
+    /**
+     * Full editable .env cache for privileged clients (Production data mirror).
+     * Requires sites.write — never expose on sites.read tokens.
+     */
+    public function showContent(Request $request, Site $site): JsonResponse
+    {
+        $this->authorizeSite($request, $site);
+
+        return response()->json([
+            'data' => [
+                'content' => (string) ($site->env_file_content ?? ''),
+            ],
+        ]);
+    }
+
+    public function updateContent(Request $request, Site $site, DotEnvFileParser $parser, DotEnvFileWriter $writer): JsonResponse
+    {
+        $this->authorizeSite($request, $site);
+
+        $data = $request->validate([
+            'content' => ['required', 'string', 'max:524288'],
+        ]);
+
+        $map = $parser->parse((string) $data['content'])['variables'];
+        $this->persist($site, $writer, $map);
+
+        return response()->json([
+            'data' => [
+                'keys' => array_keys($map),
+            ],
+        ]);
     }
 
     public function upsert(Request $request, Site $site, string $key, DotEnvFileParser $parser, DotEnvFileWriter $writer): JsonResponse

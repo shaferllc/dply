@@ -4,40 +4,87 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Server;
+use App\Models\ServerMetricSnapshot;
+use App\Models\Site;
+use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\SshConnection;
+use App\Support\Servers\ServerIndexAssembler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ServerController extends Controller
 {
     /**
-     * List servers for the token's organization.
+     * List servers for the token's organization (full fleet-card payload).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, OrganizationInsightsMetricsService $insightsMetrics): JsonResponse
     {
         $organization = $request->attributes->get('api_organization');
 
         $servers = Server::query()
             ->where('organization_id', $organization->id)
+            ->with([
+                'workspace:id,name',
+                'organization:id,name',
+                'team:id,name',
+                'sites',
+                'databaseEngines',
+                'cacheServices',
+            ])
+            ->withCount('sites')
             ->orderBy('name')
-            ->get(['id', 'name', 'status', 'ip_address', 'provider', 'created_at']);
+            ->get();
+
+        $latestSnapshots = collect();
+        if ($servers->isNotEmpty()) {
+            $serverIds = $servers->pluck('id')->all();
+            $latestSnapshots = ServerMetricSnapshot::query()
+                ->whereIn('server_id', $serverIds)
+                ->whereIn('id', function ($q) use ($serverIds): void {
+                    $q->from('server_metric_snapshots')
+                        ->selectRaw('MAX(id)')
+                        ->whereIn('server_id', $serverIds)
+                        ->groupBy('server_id');
+                })
+                ->get(['id', 'server_id', 'captured_at', 'payload'])
+                ->keyBy('server_id');
+        }
+
+        $insightRollup = $servers->isNotEmpty()
+            ? $insightsMetrics->perServerRollup($servers->pluck('id'))
+            : collect();
+
+        $relatedMap = ServerIndexAssembler::relatedServersMap($servers, $servers);
+
+        $deployableIds = [];
+        foreach ($servers as $server) {
+            $hasDeployable = $server->sites->contains(function (Site $site) use ($server): bool {
+                $site->setRelation('server', $server);
+
+                return filled($site->git_repository_url)
+                    && $server->status === Server::STATUS_READY
+                    && $server->setup_status === Server::SETUP_STATUS_DONE;
+            });
+            if ($hasDeployable) {
+                $deployableIds[$server->id] = true;
+            }
+        }
 
         return response()->json([
-            'data' => $servers->map(fn (Server $s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-                'status' => $s->status,
-                'ip_address' => $s->ip_address,
-                'provider' => $s->provider->value,
-                'created_at' => $s->created_at->toIso8601String(),
-            ]),
+            'data' => $servers->map(function (Server $s) use ($latestSnapshots, $insightRollup, $relatedMap, $deployableIds) {
+                $insights = $insightRollup[$s->id] ?? ['open' => 0, 'worst' => null];
+
+                return ServerIndexAssembler::toArray(
+                    $s,
+                    $latestSnapshots->get($s->id),
+                    (int) ($insights['open'] ?? 0),
+                    isset($insights['worst']) ? (string) $insights['worst'] : null,
+                    $relatedMap[$s->id] ?? [],
+                    isset($deployableIds[$s->id]),
+                );
+            })->values(),
         ]);
     }
-
-    // The `deploy()` action was removed alongside the legacy
-    // `Server.deploy_command` column. Server-level commands are now
-    // ServerRecipe rows runnable from the /run UI; programmatic
-    // execution can use `runCommand` below.
 
     /**
      * Run an arbitrary command on the server.

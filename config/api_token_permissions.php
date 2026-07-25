@@ -80,6 +80,8 @@ return [
         'sites.show' => 'sites.read',
         'sites.update' => 'sites.write',
         'sites.env.index' => 'sites.read',
+        'sites.env.content' => 'sites.write',
+        'sites.env.content_put' => 'sites.write',
         'sites.env.set' => 'sites.write',
         'sites.env.delete' => 'sites.write',
         'sites.deploy' => 'sites.deploy',
