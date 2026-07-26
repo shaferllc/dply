@@ -4,17 +4,7 @@
     so the panel never captures itself.
 --}}
 <div class="dply-feedback-sidebar" x-data="dplyFeedbackSidebar()" data-feedback-redact>
-    {{-- Floating launcher — sits just above the Console pill, bottom-right. --}}
-    <button
-        type="button"
-        x-on:click="toggle()"
-        x-show="!open"
-        class="fixed bottom-20 right-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white/95 px-3.5 py-2 text-xs font-semibold text-brand-ink shadow-lg shadow-brand-ink/10 backdrop-blur hover:bg-brand-sand/40 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-        title="{{ __('Send feedback or report a bug') }}"
-    >
-        <x-heroicon-o-chat-bubble-left-right class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-        {{ __('Feedback') }}
-    </button>
+    {{-- Launcher lives in the shared floating dock (layouts/app). --}}
 
     {{-- Backdrop --}}
     <div

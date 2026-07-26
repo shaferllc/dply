@@ -53,12 +53,18 @@ class SiteResourceApiController extends Controller
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
+            'git_branch' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         $site->update($data);
 
         return response()->json([
-            'data' => ['id' => $site->id, 'slug' => $site->slug, 'name' => $site->name],
+            'data' => [
+                'id' => $site->id,
+                'slug' => $site->slug,
+                'name' => $site->name,
+                'git_branch' => $site->git_branch,
+            ],
         ]);
     }
 

@@ -5,7 +5,7 @@
 @endphp
 
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} overflow-hidden px-6 py-6 sm:px-8">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <x-empty-state
             borderless
             icon="heroicon-o-share"
@@ -22,8 +22,8 @@
         </x-empty-state>
     </div>
 @elseif ($engineDatabases->isEmpty())
-    <div class="{{ $card }} overflow-hidden">
-        <div class="px-6 py-6 sm:px-8">
+    <div class="{{ $card }}">
+        <div class="px-5 py-5 sm:px-6">
             <x-empty-state
                 borderless
                 icon="heroicon-o-share"
@@ -43,8 +43,8 @@
     </div>
 @else
     {{-- Engine-level status banner --}}
-    <div class="{{ $card }} overflow-hidden">
-        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+    <div class="{{ $card }}">
+        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
             <div class="flex items-center gap-3">
                 <x-icon-badge>
                     <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
@@ -66,7 +66,7 @@
                 </span>
             @endif
         </div>
-        <div class="px-6 py-5 sm:px-8">
+        <div class="px-5 py-5 sm:px-6">
             <p class="max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Each database can be opened to a specific CIDR — a VPC subnet like 10.0.0.0/8 to allow only your own servers, or a single app server like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule (or MySQL GRANT) for that database only and opens the UFW rule for port :port to that source alone.', ['port' => $enginePort]) }}
             </p>
@@ -84,8 +84,8 @@
             $dbRemote = (bool) $db->remote_access;
             $dbCidr = $db->allowed_from ?: __('no source set');
         @endphp
-        <div class="{{ $card }} overflow-hidden" wire:key="db-networking-{{ $db->id }}">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/10 px-6 py-4 sm:px-8">
+        <div class="{{ $card }}" wire:key="db-networking-{{ $db->id }}">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/10 px-5 py-4 sm:px-6">
                 <div class="flex items-center gap-3 min-w-0">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-circle-stack class="h-4 w-4" aria-hidden="true" />
@@ -109,7 +109,7 @@
                 @endif
             </div>
 
-            <div class="px-6 py-5 sm:px-8">
+            <div class="px-5 py-5 sm:px-6">
                 @if ($dbRemote)
                     <p class="text-sm text-brand-moss">
                         {{ __('Connections to :name from :cidr on port :port are permitted.', ['name' => $db->name, 'cidr' => $dbCidr, 'port' => $enginePort]) }}

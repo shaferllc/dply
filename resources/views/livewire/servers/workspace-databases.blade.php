@@ -3,6 +3,7 @@
     active="databases"
     :title="__('Databases')"
     :description="__('Create databases on this server, then reveal credentials and copy connection details for your apps.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -15,24 +16,38 @@
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
 
-    @if ($opsReady)
-        @if (! $capabilitiesLoaded)
-            {{-- Probe installed engines off the render path so the workspace paints
-                 instantly; badges + create buttons appear once loadCapabilities() returns. --}}
-            <div wire:init="loadCapabilities" class="hidden" aria-hidden="true"></div>
-        @endif
+    @if ($opsReady && ! $capabilitiesLoaded)
+        {{-- Probe installed engines off the render path so the workspace paints
+             instantly; badges + create buttons appear once loadCapabilities() returns. --}}
+        <div wire:init="loadCapabilities" class="hidden" aria-hidden="true"></div>
+    @endif
 
-        @if ($databaseConsoleBannerRun)
-            <div class="mb-4">
-                @include('livewire.partials.console-action-banner-static', [
-                    'run' => $databaseConsoleBannerRun,
-                    'kindLabels' => (array) config('console_actions.kinds', []),
-                ])
+    @if ($opsReady && $databaseConsoleBannerRun)
+        @include('livewire.partials.console-action-banner-static', [
+            'run' => $databaseConsoleBannerRun,
+            'kindLabels' => (array) config('console_actions.kinds', []),
+        ])
+    @endif
+
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-800 ring-1 ring-sky-200">
+                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Databases') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Create databases on this server, then reveal credentials and copy connection details for your apps.') }}
+                        </p>
+                    </div>
+                </div>
             </div>
-        @endif
+        </div>
 
-        <div class="min-w-0">
-            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll class="w-full">
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                 <x-server-workspace-tab
                     id="db-tab-basics"
                     icon="heroicon-o-circle-stack"
@@ -108,52 +123,54 @@
             </x-server-workspace-tablist>
         </div>
 
-        <x-workspace-tab-panel-loading>
-            @if ($workspace_tab === 'databases')
-                <x-server-workspace-tab-panel
-                    id="db-panel-basics"
-                    labelled-by="db-tab-basics"
-                    panel-class="space-y-8"
-                >
+        <div wire:loading.block wire:target="setWorkspaceTab" class="px-5 py-6 sm:px-6" aria-busy="true">
+            <span class="sr-only">{{ __('Loading…') }}</span>
+            <div class="space-y-3" aria-hidden="true">
+                <div class="flex items-start gap-3">
+                    <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
+                    <div class="min-w-0 flex-1 space-y-2">
+                        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
+                        <div class="h-2.5 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
+                    </div>
+                </div>
+                @foreach (range(1, 3) as $row)
+                    <div class="flex items-start gap-3 border-t border-brand-ink/10 pt-3">
+                        <span class="mt-1 h-5 w-14 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
+                        <div class="min-w-0 flex-1 space-y-2">
+                            <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
+                            <div class="h-2.5 w-3/4 max-w-md animate-pulse rounded bg-brand-ink/10"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        <div wire:loading.remove wire:target="setWorkspaceTab">
+            @if (! $opsReady)
+                <div class="px-5 py-5 sm:px-6">
+                    @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
+                </div>
+            @else
+                @if ($workspace_tab === 'databases')
                     @include('livewire.servers.partials.databases.overview-tab')
-                </x-server-workspace-tab-panel>
-            @endif
-
-            @foreach ($engines as $engine)
-                @if ($workspace_tab === $engine)
-                    <x-server-workspace-tab-panel
-                        :id="'db-panel-'.$engine"
-                        :labelled-by="'db-tab-'.$engine"
-                        panel-class="space-y-8"
-                    >
-                        @include('livewire.servers.partials.databases.engine-panel', compact('engine'))
-                    </x-server-workspace-tab-panel>
                 @endif
-            @endforeach
 
-            @if ($workspace_tab === 'advanced')
-                <x-server-workspace-tab-panel
-                    id="db-panel-advanced"
-                    labelled-by="db-tab-advanced"
-                    panel-class="space-y-8"
-                >
+                @foreach ($engines as $engine)
+                    @if ($workspace_tab === $engine)
+                        @include('livewire.servers.partials.databases.engine-panel', compact('engine'))
+                    @endif
+                @endforeach
+
+                @if ($workspace_tab === 'advanced')
                     @include('livewire.servers.partials.databases.advanced-tab')
-                </x-server-workspace-tab-panel>
-            @endif
+                @endif
 
-            @if ($workspace_tab === 'notifications')
-                <x-server-workspace-tab-panel
-                    id="db-panel-notifications"
-                    labelled-by="db-tab-notifications"
-                    panel-class="space-y-8"
-                >
+                @if ($workspace_tab === 'notifications')
                     @include('livewire.servers.partials.databases.notifications-tab')
-                </x-server-workspace-tab-panel>
+                @endif
             @endif
-        </x-workspace-tab-panel-loading>
-    @else
-        @include('livewire.servers.partials.workspace-ops-not-ready')
-    @endif
+        </div>
+    </section>
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')

@@ -2,36 +2,39 @@
     /** @var \Illuminate\Support\Collection $notifSubscriptions */
     /** @var \Illuminate\Support\Collection $notifChannels */
     /** @var array<string, string> $notifEventLabels */
-    $card = 'dply-card overflow-hidden';
     $subscriptionsByChannel = $notifSubscriptions->groupBy('notification_channel_id');
 @endphp
 
-<div class="{{ $card }}">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+{{-- Nested inside the merged Insights card — same chrome as Health / Deploys Notifications. --}}
+<div>
+    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-bell class="h-5 w-5" />
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Insights alerts') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Insights alerts') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s insights alerts. When a new finding opens (or a resolved issue recurs), subscribed channels get a short message with a link back here.') }}
                 </p>
             </div>
         </div>
-        <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
+        <a
+            href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
+            wire:navigate
+            class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+        >
             {{ __('Manage in Settings') }}
-            <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0" aria-hidden="true" />
-        </x-secondary-button>
+            <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        </a>
     </div>
 
-    <div class="mx-6 mt-5 flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-relaxed text-brand-moss sm:mx-8">
-        <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-        <p>{{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry when insights findings open or resolve — no setup needed. Add a channel below only to also send email / chat / webhook alerts. Delivery honours your org\'s digest & quiet-hours settings (Settings tab).') }}</p>
-    </div>
+    <p class="border-b border-brand-ink/10 px-5 py-3 text-xs leading-relaxed text-brand-moss sm:px-6">
+        {{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry when insights findings open or resolve — no setup needed. Add a channel below only to also send email / chat / webhook alerts. Delivery honours your org\'s digest & quiet-hours settings (Settings tab).') }}
+    </p>
 
-    {{-- Current subscriptions --}}
-    <div class="px-6 py-5 sm:px-8">
+    <div class="px-5 py-5 sm:px-6">
         @if ($subscriptionsByChannel->isEmpty())
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
@@ -71,9 +74,8 @@
         @endif
     </div>
 
-    {{-- Add subscription --}}
-    <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
-        <p class="text-sm font-medium text-brand-ink">{{ __('Add a channel') }}</p>
+    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
         <form wire:submit="addInsightsNotificationSubscription" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>

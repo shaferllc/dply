@@ -1,18 +1,19 @@
-<section class="dply-card overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <div class="flex items-start gap-3">
-            <x-icon-badge>
+{{-- Nested inside the merged Health card — no second outer card/header. --}}
+<div>
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-heart class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                     @switch($report['overall'])
                         @case('critical') {{ __('Needs attention') }} @break
                         @case('warning') {{ __('Watch closely') }} @break
                         @default {{ __('Healthy') }}
                     @endswitch
-                </h2>
+                </h3>
                 <p class="mt-1 text-sm text-brand-moss">
                     {{ trans_choice(':count open alert|:count open alerts', $report['alert_count'], ['count' => $report['alert_count']]) }}
                     · {{ __('Headroom') }}:
@@ -26,9 +27,9 @@
     </div>
 
     @if (count($report['alerts']) > 0)
-        <ul class="divide-y divide-brand-ink/10 px-6 py-2 sm:px-7">
+        <ul class="divide-y divide-brand-ink/10">
             @foreach ($report['alerts'] as $alert)
-                <li class="flex flex-wrap items-start justify-between gap-3 py-3 text-sm">
+                <li class="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5 text-sm sm:px-6">
                     <div>
                         <span @class([
                             'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
@@ -45,25 +46,23 @@
             @endforeach
         </ul>
     @else
-        <p class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('No active health alerts on this server.') }}</p>
+        <p class="border-b border-brand-ink/10 px-5 py-5 text-sm text-brand-moss sm:px-6">{{ __('No active health alerts on this server.') }}</p>
     @endif
-</section>
 
-@if ($report['capacity']['has_samples'] ?? false)
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
+    @if ($report['capacity']['has_samples'] ?? false)
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-chart-bar-square class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
+            </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Summary') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Capacity snapshot') }}</h3>
                 @if ($report['capacity']['captured_at'])
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Sampled :ago', ['ago' => $report['capacity']['captured_at']->diffForHumans()]) }}</p>
                 @endif
             </div>
         </div>
-        <div class="grid gap-3 px-6 py-5 sm:grid-cols-2 sm:px-7 xl:grid-cols-4">
+        <div class="grid gap-3 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
             @foreach ([
                 __('CPU') => $report['capacity']['metrics']['cpu_pct'] ?? null,
                 __('Memory') => $report['capacity']['metrics']['mem_pct'] ?? null,
@@ -88,7 +87,7 @@
                 </p>
             </div>
         </div>
-        <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
             <button
                 type="button"
                 wire:click="setHealthWorkspaceTab('capacity')"
@@ -98,5 +97,5 @@
                 <x-heroicon-m-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
             </button>
         </div>
-    </section>
-@endif
+    @endif
+</div>

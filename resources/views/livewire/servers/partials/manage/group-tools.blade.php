@@ -65,17 +65,37 @@
     };
 @endphp
 
-<section class="space-y-4" aria-labelledby="manage-tools-title">
+<div aria-labelledby="manage-tools-title">
     <h2 id="manage-tools-title" class="sr-only">{{ __('Tools') }}</h2>
-
-    <p class="text-sm text-brand-moss">
-        {{ __('Installed CLIs and version managers from the inventory probe — install, upgrade, or repair from here.') }}
-    </p>
 
     @if ($report)
         @include('livewire.servers.partials.manage.tools.header')
 
-        @include('livewire.servers.partials.manage.tools.panel-tabs')
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Tools sections')" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab
+                    id="manage-tools-tab-catalog"
+                    :active="$toolsPanel === 'tools'"
+                    wire:click="setToolsPanel('tools')"
+                    icon="heroicon-o-wrench-screwdriver"
+                >
+                    {{ __('Tools') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab
+                    id="manage-tools-tab-runtimes"
+                    :active="$toolsPanel === 'runtimes'"
+                    wire:click="setToolsPanel('runtimes')"
+                    icon="heroicon-o-cpu-chip"
+                >
+                    {{ __('Runtimes') }}
+                    @if (($summary['runtime_versions'] ?? 0) > 0)
+                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-brand-moss">
+                            {{ $summary['runtime_versions'] }}
+                        </span>
+                    @endif
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
 
         @if ($toolsPanel === 'tools')
             @include('livewire.servers.partials.manage.tools.tools-list')
@@ -83,6 +103,6 @@
             @include('livewire.servers.partials.manage.tools.runtimes')
         @endif
     @else
-        <p class="text-sm text-brand-moss">{{ __('Tool inventory appears after the first successful probe.') }}</p>
+        <p class="px-5 py-6 text-sm text-brand-moss sm:px-6">{{ __('Tool inventory appears after the first successful probe.') }}</p>
     @endif
-</section>
+</div>

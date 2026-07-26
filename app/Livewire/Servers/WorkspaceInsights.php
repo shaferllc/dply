@@ -116,6 +116,21 @@ class WorkspaceInsights extends Component
         $this->notif_channel_id = $channelId;
     }
 
+    /**
+     * Merged Insights card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-insights-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
 
     // ─── Workspace banner state ──────────────────────────────────────────────────────────
     //

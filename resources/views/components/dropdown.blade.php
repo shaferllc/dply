@@ -1,4 +1,10 @@
-@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1.5'])
+@props([
+    'align' => 'right',
+    'width' => '48',
+    'contentClasses' => 'py-1.5',
+    /** When false, clicking inside the panel does not close (filter forms, etc.). */
+    'closeOnContentClick' => true,
+])
 
 @php
 // A width like "24rem"/"384px" is applied as an inline style so it never
@@ -10,6 +16,7 @@ $widthClass = $isCssWidth ? '' : match ($width) {
     default => $width,
 };
 $widthStyle = $isCssWidth ? "width: {$width};" : '';
+$closeOnContentClick = filter_var($closeOnContentClick, FILTER_VALIDATE_BOOLEAN);
 @endphp
 
 {{--
@@ -80,7 +87,9 @@ $widthStyle = $isCssWidth ? "width: {$width};" : '';
             x-transition:leave="transition ease-in duration-100"
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-[0.98]"
-            @@click="close()"
+            @if ($closeOnContentClick)
+                @@click="close()"
+            @endif
             @@scroll.window.passive="open && compute()"
             @@resize.window.passive="open && compute()"
             x-bind:style="`top: ${position.top}px; left: ${position.left}px;`"
@@ -90,7 +99,13 @@ $widthStyle = $isCssWidth ? "width: {$width};" : '';
             {{-- Width lives on the panel, not the positioned wrapper above: Alpine's
                  x-bind:style rewrites the wrapper's style for top/left, which would
                  strip an inline width. The fixed wrapper shrink-wraps to this panel. --}}
-            <div class="dply-dropdown-panel {{ $contentClasses }}" @style([$widthStyle])>
+            <div
+                class="dply-dropdown-panel {{ $contentClasses }}"
+                @style([$widthStyle])
+                @unless ($closeOnContentClick)
+                    @@click.stop
+                @endunless
+            >
                 {{ $content }}
             </div>
         </div>

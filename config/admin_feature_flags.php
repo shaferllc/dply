@@ -137,6 +137,8 @@ return [
             'groups' => [
                 'Site capabilities' => [
                     'workspace.site_promote' => 'Site promote',
+                    'workspace.site_cli' => 'Site CLI',
+                    'workspace.site_cli_preview' => 'Coming soon preview',
                     'workspace.site_cdn' => 'Site CDN / Edge',
                     'workspace.site_cdn_preview' => 'Coming soon preview',
                     'workspace.site_caching' => 'Site caching',
@@ -237,6 +239,7 @@ return [
     'feature_preview_pairs' => [
         'workspace.console' => 'workspace.console_preview',
         'workspace.cli' => 'workspace.cli_preview',
+        'workspace.site_cli' => 'workspace.site_cli_preview',
         'workspace.insights' => 'workspace.insights_preview',
         'workspace.server_blueprint' => 'workspace.server_blueprint_preview',
         'workspace.files' => 'workspace.files_preview',

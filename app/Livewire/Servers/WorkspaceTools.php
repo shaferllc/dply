@@ -46,15 +46,17 @@ class WorkspaceTools extends WorkspaceManage
     }
 
     /**
-     * Tools-only placeholder while the body lazy-loads: a peer workspace frame
-     * with no Manage sub-tab strip (the parent's placeholder renders that strip).
+     * Merged Tools card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
      */
     public function placeholder(): View
     {
-        return view('livewire.servers.partials.workspace-placeholder', [
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-tools-placeholder', [
             'server' => $this->server,
-            'active' => 'tools',
-            'title' => __('Tools'),
         ]);
     }
 

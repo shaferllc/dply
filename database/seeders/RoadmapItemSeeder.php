@@ -47,8 +47,8 @@ class RoadmapItemSeeder extends Seeder
             [
                 'title' => 'Browser-based server Console',
                 'summary' => 'Audited in-browser SSH sessions with RBAC.',
-                'description' => 'Server workspace Console tab for time-boxed shell access without leaving the app — gated behind workspace.console.',
-                'status' => RoadmapItem::STATUS_IN_PROGRESS,
+                'description' => 'Server workspace Console tab for time-boxed shell access without leaving the app — global drawer, per-server workspace tab, rolling history, and per-command audit records.',
+                'status' => RoadmapItem::STATUS_SHIPPED,
                 'area' => 'servers',
                 'sort_order' => 3,
                 'is_published' => true,

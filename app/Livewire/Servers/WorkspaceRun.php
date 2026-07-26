@@ -550,6 +550,21 @@ class WorkspaceRun extends Component
         return Str::limit(trim((string) $firstLine), 110, '…');
     }
 
+    /**
+     * Merged Run card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-run-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         $this->server->refresh();

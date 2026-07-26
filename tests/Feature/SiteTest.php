@@ -186,7 +186,7 @@ test('site settings runtime section shows php mismatch state and server php reme
     $response->assertOk()
         ->assertSee('PHP version mismatch')
         ->assertSee('This site references PHP 8.1, but that version is not currently installed on this server.')
-        ->assertSee(route('servers.php', $server, false), escape: false)
+        ->assertSee(route('servers.runtime', $server, false), escape: false)
         ->assertDontSee('value="8.1"', escape: false);
 });
 

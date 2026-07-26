@@ -55,7 +55,7 @@ return [
         ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases', 'group' => 'stacks', 'requires_any_tags' => ['postgres', 'mysql'], 'except_host_kinds' => ['kubernetes']],
         ['key' => 'caches', 'route' => 'servers.caches', 'icon' => 'bolt', 'label' => 'Caches', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.caches'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.services'],
-        ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'php', 'route' => 'servers.runtime', 'icon' => 'command-line', 'label' => 'Runtime', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
         ['key' => 'configuration', 'route' => 'servers.configuration', 'icon' => 'document-text', 'label' => 'Configuration', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'tools', 'route' => 'servers.tools', 'icon' => 'wrench-screwdriver', 'label' => 'Tools', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'webserver', 'route' => 'servers.webserver', 'icon' => 'globe-alt', 'label' => 'Webserver', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
@@ -229,6 +229,9 @@ return [
             'label' => 'Runtime',
             'icon' => 'command-line',
             'members' => ['php', 'configuration', 'tools'],
+            // Leaf nav label is also "Runtime"; keep the cluster sub-tab as PHP
+            // so the strip reads Runtime → PHP | Configuration | Tools.
+            'tab_labels' => ['php' => 'PHP'],
         ],
         'settings' => [
             'label' => 'Settings',

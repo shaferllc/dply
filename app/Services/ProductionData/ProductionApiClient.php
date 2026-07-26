@@ -132,6 +132,21 @@ class ProductionApiClient
     }
 
     /**
+     * @param  array{name?: string, git_branch?: string|null}  $attributes
+     * @return array<string, mixed>
+     */
+    public function updateSite(string $siteId, array $attributes): array
+    {
+        $response = $this->authedClient()->patch('/sites/'.$siteId, $attributes);
+        $this->throwUnlessSuccessful($response, 'site update');
+
+        /** @var array{data?: array<string, mixed>} $payload */
+        $payload = $response->json() ?? [];
+
+        return $payload['data'] ?? [];
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function servers(): array

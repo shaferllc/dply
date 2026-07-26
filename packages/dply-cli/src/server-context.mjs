@@ -6,8 +6,21 @@ import { defaultBaseUrl, readGlobalConfig } from './config.mjs';
  */
 export async function requireClient(flags = {}) {
   const cfg = await readGlobalConfig();
-  const baseUrl = (flags['base-url'] || flags.b || cfg?.baseUrl || defaultBaseUrl()).replace(/\/+$/, '');
-  const token = cfg?.token;
+  const baseUrl = (
+    flags['base-url'] ||
+    flags.b ||
+    process.env.DPLY_API_BASE_URL ||
+    process.env.DPLY_BASE_URL ||
+    process.env.DPLY_HOST ||
+    cfg?.baseUrl ||
+    defaultBaseUrl()
+  ).replace(/\/+$/, '');
+  // Env tokens let CI + the in-browser CLI console inject auth without
+  // writing ~/.dply/config.json (DPLY_TOKEN is the historical name).
+  const token =
+    process.env.DPLY_TOKEN ||
+    process.env.DPLY_API_TOKEN ||
+    cfg?.token;
 
   if (!token) {
     const err = new Error('Not logged in. Run `dply login` first (or `dply login --token …` for CI).');

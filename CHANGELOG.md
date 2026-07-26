@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- The browser console is now live. Run shell commands on any ready server from a floating drawer available on every page (backtick toggles it) or from the full Console tab in the server workspace, with quick actions, command autocomplete, rolling per-session history, and a per-command audit record. Deployers stay read-only.
+### Added
 - Connecting Redis to a site can now wire cache, sessions, and queue in one step and auto-installs Redis when none is available.
 ### Changed
 - Page headers are now consistent across the server, project, and site workspaces, all rendered from a single shared hero card.

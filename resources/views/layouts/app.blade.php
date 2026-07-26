@@ -124,60 +124,7 @@
             @endphp
             @feature('workspace.console')
             @unless ($hideDrawer)
-                <div
-                    x-data="{
-                        open: false,
-                        init() {
-                            this.open = localStorage.getItem('dply.consoleDrawer.open') === '1';
-                            document.addEventListener('keydown', (e) => {
-                                const tag = (e.target.tagName || '').toLowerCase();
-                                const inInput = ['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable;
-                                if (e.key === '`' && !inInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
-                                    e.preventDefault();
-                                    this.toggle();
-                                } else if (e.key === 'Escape' && this.open) {
-                                    this.close();
-                                }
-                            });
-                            // Programmatic open — e.g. a one-click "Suggested fix"
-                            // streams its live output into the drawer.
-                            window.addEventListener('dply-open-console-drawer', () => {
-                                if (!this.open) {
-                                    this.open = true;
-                                    localStorage.setItem('dply.consoleDrawer.open', '1');
-                                    this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
-                                }
-                            });
-                        },
-                        toggle() {
-                            this.open = !this.open;
-                            localStorage.setItem('dply.consoleDrawer.open', this.open ? '1' : '0');
-                            if (this.open) {
-                                this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
-                            }
-                        },
-                        close() {
-                            this.open = false;
-                            localStorage.setItem('dply.consoleDrawer.open', '0');
-                        },
-                    }"
-                >
-                    <button
-                        type="button"
-                        x-on:click="toggle()"
-                        x-show="!open"
-                        class="fixed bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-brand-ink px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-brand-ink/30 hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-                        title="{{ __('Open SSH console — backtick (`) toggles') }}"
-                    >
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/>
-                            <path d="M5.5 7.5l2.5 2.5-2.5 2.5"/>
-                            <path d="M9.5 13h3"/>
-                        </svg>
-                        {{ __('Console') }}
-                        <kbd class="ml-1 hidden sm:inline-flex items-center rounded bg-white/15 px-1 py-0.5 text-[10px]">`</kbd>
-                    </button>
-
+                <div x-data="dplyConsoleDrawer">
                     <div
                         x-show="open"
                         x-cloak
@@ -187,24 +134,26 @@
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="translate-y-0 opacity-100"
                         x-transition:leave-end="translate-y-full opacity-0"
-                        class="fixed inset-x-3 bottom-0 z-40 overflow-hidden rounded-t-2xl border border-brand-ink/10 bg-white shadow-2xl shadow-brand-ink/15 sm:inset-x-auto sm:right-6 sm:left-auto sm:w-[min(100%,42rem)]"
+                        class="fixed inset-x-3 bottom-0 z-50 overflow-hidden rounded-t-2xl border border-white/10 bg-[#0b1020] shadow-2xl shadow-black/40 ring-1 ring-black/20 sm:inset-x-auto sm:right-6 sm:left-auto sm:w-[min(100%,42rem)]"
                         style="height: min(58vh, 540px);"
                     >
                         <div class="flex h-full min-h-0 flex-col">
-                            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/60 px-4 py-2.5">
+                            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-4 py-2.5">
                                 <div class="flex min-w-0 items-center gap-2.5">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                        <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
-                                    </span>
+                                    <div class="flex items-center gap-1.5" aria-hidden="true">
+                                        <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#ff5f57]"></span>
+                                        <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
+                                        <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
+                                    </div>
                                     <div class="min-w-0">
-                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ __('Console') }}</p>
-                                        <p class="truncate text-[11px] text-brand-moss">{{ __('SSH shell — backtick (`) toggles') }}</p>
+                                        <p class="truncate font-mono text-[11px] font-medium text-slate-200">{{ __('Console') }}</p>
+                                        <p class="truncate text-[10px] text-slate-500">{{ __('SSH shell · ` toggles') }}</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     x-on:click="close()"
-                                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-1.5 text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
+                                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
                                     title="{{ __('Close (Esc or backtick)') }}"
                                 >
                                     <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
@@ -221,53 +170,14 @@
                 </div>
             @endunless
             @endfeature
-            @if (workspace_console_preview_active() && ! $hideDrawer)
-                <div
-                    x-data="{ open: false }"
-                    x-on:keydown.escape.window="open = false"
-                >
-                    <button
-                        type="button"
-                        x-on:click="open = true"
-                        class="fixed bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white/95 px-3.5 py-2 text-xs font-semibold text-brand-ink shadow-lg shadow-brand-ink/10 backdrop-blur hover:bg-brand-sand/40 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-                        title="{{ __('Browser console — coming soon') }}"
-                    >
-                        <x-heroicon-o-command-line class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                        {{ __('Console') }}
-                        <span class="rounded-full bg-brand-sand px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Soon') }}</span>
-                    </button>
 
-                    <div
-                        x-show="open"
-                        x-cloak
-                        class="fixed inset-0 z-[100] overflow-y-auto"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="console-preview-modal-title"
-                    >
-                        <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="open = false"></div>
-                        <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
-                            <div class="relative w-full max-w-xl">
-                                <button
-                                    type="button"
-                                    x-on:click="open = false"
-                                    class="absolute -top-3 end-0 z-10 inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
-                                    aria-label="{{ __('Close') }}"
-                                >
-                                    <x-heroicon-o-x-mark class="h-4 w-4" />
-                                    {{ __('Close') }}
-                                </button>
-                                <x-console-preview-panel compact :server="$routeServer" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
+            @unless ($hideDrawer)
+                @include('partials.floating-app-dock', ['routeServer' => $routeServer, 'hideDrawer' => $hideDrawer])
+            @endunless
 
             @include('partials.docs-sidebar')
 
-            {{-- Global feedback / bug-report sidebar. Reachable from every
-                 authenticated page via the floating "Feedback" launcher. --}}
+            {{-- Global feedback / bug-report sidebar. Launcher is in the floating dock. --}}
             <livewire:feedback.sidebar :key="'global-feedback-sidebar'" />
         @endauth
 

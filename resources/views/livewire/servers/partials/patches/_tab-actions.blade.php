@@ -1,75 +1,77 @@
-@if ($opsReady && ! $isDeployer)
-    @php
-        $aptActionGroups = [
-            __('Prepare') => [
-                'apt_update' => [
-                    'icon' => 'heroicon-o-arrow-path',
-                    'tone' => 'sage',
+<div>
+    @if ($opsReady && ! $isDeployer)
+        @php
+            $aptActionGroups = [
+                __('Prepare') => [
+                    'apt_update' => [
+                        'icon' => 'heroicon-o-arrow-path',
+                        'tone' => 'sage',
+                    ],
                 ],
-            ],
-            __('Apply updates') => [
-                'apt_security_upgrade' => [
-                    'icon' => 'heroicon-o-shield-check',
-                    'tone' => 'sage',
+                __('Apply updates') => [
+                    'apt_security_upgrade' => [
+                        'icon' => 'heroicon-o-shield-check',
+                        'tone' => 'sage',
+                    ],
+                    'apt_upgrade' => [
+                        'icon' => 'heroicon-o-arrow-trending-up',
+                        'tone' => 'amber',
+                        'destructive' => true,
+                    ],
+                    'apt_dist_upgrade' => [
+                        'icon' => 'heroicon-o-rocket-launch',
+                        'tone' => 'rose',
+                        'destructive' => true,
+                    ],
                 ],
-                'apt_upgrade' => [
-                    'icon' => 'heroicon-o-arrow-trending-up',
-                    'tone' => 'amber',
-                    'destructive' => true,
+                __('Housekeeping') => [
+                    'apt_autoremove' => [
+                        'icon' => 'heroicon-o-trash',
+                        'tone' => 'neutral',
+                    ],
+                    'apt_clean' => [
+                        'icon' => 'heroicon-o-archive-box',
+                        'tone' => 'neutral',
+                    ],
                 ],
-                'apt_dist_upgrade' => [
-                    'icon' => 'heroicon-o-rocket-launch',
-                    'tone' => 'rose',
-                    'destructive' => true,
-                ],
-            ],
-            __('Housekeeping') => [
-                'apt_autoremove' => [
-                    'icon' => 'heroicon-o-trash',
-                    'tone' => 'neutral',
-                ],
-                'apt_clean' => [
-                    'icon' => 'heroicon-o-archive-box',
-                    'tone' => 'neutral',
-                ],
-            ],
-        ];
+            ];
 
-        $aptToneStyles = [
-            'sage' => [
-                'icon' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-                'card' => 'border-brand-ink/10 bg-white hover:border-brand-sage/35 hover:bg-brand-sage/5',
-                'cta' => 'text-brand-forest',
-            ],
-            'amber' => [
-                'icon' => 'bg-amber-50 text-amber-900 ring-amber-200',
-                'card' => 'border-amber-200/80 bg-amber-50/30 hover:border-amber-300 hover:bg-amber-50/70',
-                'cta' => 'text-amber-900',
-            ],
-            'rose' => [
-                'icon' => 'bg-rose-50 text-rose-800 ring-rose-200',
-                'card' => 'border-rose-200/70 bg-rose-50/20 hover:border-rose-300 hover:bg-rose-50/50',
-                'cta' => 'text-rose-800',
-            ],
-            'neutral' => [
-                'icon' => 'bg-brand-sand/50 text-brand-moss ring-brand-ink/10',
-                'card' => 'border-brand-ink/10 bg-brand-cream/20 hover:border-brand-ink/20 hover:bg-brand-sand/30',
-                'cta' => 'text-brand-ink',
-            ],
-        ];
-    @endphp
+            $aptToneStyles = [
+                'sage' => [
+                    'icon' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+                    'card' => 'border-brand-ink/10 bg-white hover:border-brand-sage/35 hover:bg-brand-sage/5',
+                    'cta' => 'text-brand-forest',
+                ],
+                'amber' => [
+                    'icon' => 'bg-amber-50 text-amber-900 ring-amber-200',
+                    'card' => 'border-amber-200/80 bg-amber-50/30 hover:border-amber-300 hover:bg-amber-50/70',
+                    'cta' => 'text-amber-900',
+                ],
+                'rose' => [
+                    'icon' => 'bg-rose-50 text-rose-800 ring-rose-200',
+                    'card' => 'border-rose-200/70 bg-rose-50/20 hover:border-rose-300 hover:bg-rose-50/50',
+                    'cta' => 'text-rose-800',
+                ],
+                'neutral' => [
+                    'icon' => 'bg-brand-sand/50 text-brand-moss ring-brand-ink/10',
+                    'card' => 'border-brand-ink/10 bg-brand-cream/20 hover:border-brand-ink/20 hover:bg-brand-sand/30',
+                    'cta' => 'text-brand-ink',
+                ],
+            ];
+        @endphp
 
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Actions') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Queued over SSH — output streams in the banner above. Run Refresh scan after upgrades to update the package list.') }}
-                </p>
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Actions') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Queued over SSH — output streams in the banner above. Run Refresh scan after upgrades to update the package list.') }}
+                    </p>
+                </div>
             </div>
             <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-server-stack class="h-4 w-4" aria-hidden="true" />
@@ -77,7 +79,7 @@
             </span>
         </div>
 
-        <div class="space-y-8 px-6 py-6 sm:px-7">
+        <div class="space-y-8 px-5 py-6 sm:px-6">
             @foreach ($aptActionGroups as $groupLabel => $groupActions)
                 <div>
                     <h3 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $groupLabel }}</h3>
@@ -138,45 +140,43 @@
                 </div>
             @endforeach
         </div>
-    </section>
-@else
-    <section class="dply-card overflow-hidden border-amber-200">
-        <div class="flex items-start gap-3 px-6 py-5 sm:px-7">
-            <x-icon-badge tone="amber">
-                <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Actions unavailable') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    @if ($isDeployer)
-                        {{ __('Deployers can view patch state but cannot run apt actions.') }}
-                    @else
-                        {{ __('Provisioning and SSH must be ready before apt actions work.') }}
-                    @endif
-                </p>
+    @else
+        <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-4 sm:px-6">
+            <div class="flex items-start gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-900 ring-1 ring-amber-200">
+                    <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Actions unavailable') }}</h3>
+                    <p class="mt-1 text-sm text-brand-moss">
+                        @if ($isDeployer)
+                            {{ __('Deployers can view patch state but cannot run apt actions.') }}
+                        @else
+                            {{ __('Provisioning and SSH must be ready before apt actions work.') }}
+                        @endif
+                    </p>
+                </div>
             </div>
         </div>
-    </section>
-@endif
+    @endif
 
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
+        </span>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Reboot') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot & uptime') }}</h2>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Reboot') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot & uptime') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Kernel reboot flag and live uptime from the extended probe.') }}</p>
         </div>
     </div>
-    <div class="space-y-4 px-6 py-4 sm:px-7">
+    <div class="space-y-4 px-5 py-4 sm:px-6">
         <div class="flex flex-wrap items-center gap-2">
-            @if ($report['reboot']['required'] === true)
+            @if (($report['reboot']['required'] ?? null) === true)
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
                     {{ __('Reboot required') }}
                 </span>
-            @elseif ($report['reboot']['required'] === false)
+            @elseif (($report['reboot']['required'] ?? null) === false)
                 <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
                     {{ __('No reboot pending') }}
                 </span>
@@ -185,13 +185,13 @@
             @endif
         </div>
 
-        @if ($report['uptime']['raw'])
+        @if ($report['uptime']['raw'] ?? null)
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 font-mono text-xs text-brand-ink">
                 {{ $report['uptime']['raw'] }}
             </div>
         @endif
 
-        @if ($report['reboot']['required'] === true)
+        @if (($report['reboot']['required'] ?? null) === true)
             <div class="flex flex-wrap gap-3">
                 @feature('workspace.server_maintenance')
                     <a href="{{ route('servers.maintenance', $server) }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
@@ -212,4 +212,4 @@
             </div>
         @endif
     </div>
-</section>
+</div>

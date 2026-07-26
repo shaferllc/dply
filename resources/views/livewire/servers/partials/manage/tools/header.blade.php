@@ -1,5 +1,5 @@
 @if ($report)
-    <div class="dply-card flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
         <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-brand-moss">
             <span class="font-semibold text-brand-ink">
                 {{ __(':installed of :total installed', [
@@ -57,7 +57,7 @@
         @endif
     </div>
 
-    <nav class="flex flex-wrap items-center gap-2" aria-label="{{ __('Related workspaces') }}">
+    <nav class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6" aria-label="{{ __('Related workspaces') }}">
         <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Also') }}</span>
         <a
             href="{{ route('servers.caches', $server) }}"
@@ -68,12 +68,12 @@
             {{ __('Caches') }}
         </a>
         <a
-            href="{{ route('servers.php', $server) }}"
+            href="{{ route('servers.runtime', $server) }}"
             wire:navigate
             class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
         >
             <x-heroicon-o-command-line class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
-            {{ __('PHP') }}
+            {{ __('Runtime') }}
         </a>
         <a
             href="{{ route('servers.run', $server) }}"

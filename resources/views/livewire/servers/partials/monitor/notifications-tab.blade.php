@@ -3,15 +3,17 @@
     $serverEventLabels = $serverEventLabels ?? [];
 @endphp
 
-<div class="{{ $card }}">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+{{-- Nested inside the merged Metrics card — same chrome as Health Notifications. --}}
+<div>
+    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-bell class="h-5 w-5" />
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Notification routing') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification routing') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Pick which notification channels should receive alerts for this server\'s events. Each row binds one channel to one event.') }}
                 </p>
             </div>
@@ -22,8 +24,11 @@
         </x-secondary-button>
     </div>
 
-    {{-- Current subscriptions list --}}
-    <div class="px-6 py-5 sm:px-8">
+    <p class="border-b border-brand-ink/10 px-5 py-3 text-xs leading-relaxed text-brand-moss sm:px-6">
+        {{ __('Routes fire when metrics go stale or server thresholds are breached — add a channel below or manage the full alert catalog in Settings.') }}
+    </p>
+
+    <div class="px-5 py-5 sm:px-6">
         @if ($subscriptionsByChannel->isEmpty())
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
@@ -38,7 +43,7 @@
             <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
                 @foreach ($subscriptionsByChannel as $channelId => $subs)
                     @php $channel = $subs->first()->channel; @endphp
-                    <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" wire:key="monitor-notif-ch-{{ $channelId }}">
                         <div class="min-w-0">
                             <p class="truncate text-sm font-medium text-brand-ink">{{ $channel?->label ?? __('(deleted channel)') }}</p>
                             <p class="text-xs text-brand-moss">
@@ -47,7 +52,7 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             @foreach ($subs as $sub)
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2 py-1 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10" wire:key="monitor-notif-sub-{{ $sub->id }}">
                                     {{ $serverEventLabels[$sub->event_key] ?? $sub->event_key }}
                                     @if (! $isDeployer)
                                         <button
@@ -67,10 +72,9 @@
         @endif
     </div>
 
-    {{-- Add subscription form --}}
     @if (! $isDeployer)
-        <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
-            <p class="text-sm font-medium text-brand-ink">{{ __('Add subscription') }}</p>
+        <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add subscription') }}</p>
             <form wire:submit="addServerNotificationSubscription" class="mt-4 space-y-4">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -139,23 +143,22 @@
             </form>
         </div>
     @endif
-</div>
 
-{{-- Routing summary card --}}
-<div class="{{ $card }} p-6 sm:p-8">
-    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Routing summary') }}</h3>
-    <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Server routes') }}</dt>
-            <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['server_routes'] }}</dd>
-        </div>
-        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Project routes') }}</dt>
-            <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['project_routes'] }}</dd>
-        </div>
-        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Available channels') }}</dt>
-            <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $assignableChannels->count() }}</dd>
-        </div>
-    </dl>
+    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Routing summary') }}</h4>
+        <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Server routes') }}</dt>
+                <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['server_routes'] }}</dd>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Project routes') }}</dt>
+                <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $routingSummary['project_routes'] }}</dd>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Available channels') }}</dt>
+                <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $assignableChannels->count() }}</dd>
+            </div>
+        </dl>
+    </div>
 </div>

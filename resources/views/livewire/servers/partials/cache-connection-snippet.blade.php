@@ -37,7 +37,7 @@
     $hasPrefix = $cachePrefixValue !== '';
 @endphp
 @if ($cacheService)
-    <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8" x-data="{ subtab: 'laravel' }">
+    <div class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6" x-data="{ subtab: 'laravel' }">
         <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine — connection snippet', ['engine' => $engineLabel]) }}</h2>
         <p class="mt-2 text-sm text-brand-moss">
             @if ($snippetIsExposed)
@@ -47,7 +47,7 @@
             @endif
         </p>
         @if ($isRedisFork)
-            <p class="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <p class="mt-2 border-t border-brand-ink/10 pt-3 text-xs leading-relaxed text-brand-moss">
                 {{ __(':engine speaks the Redis wire protocol — Laravel\'s `redis` driver and any Redis client library work as-is. The env vars stay REDIS_* on purpose.', ['engine' => $engineLabel]) }}
             </p>
         @endif

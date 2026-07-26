@@ -6,7 +6,7 @@
     'duration' => 10,
     'payload' => null,
     'replUnlocked' => false,
-    'card' => 'dply-card overflow-hidden',
+    'card' => 'border-b border-brand-ink/10',
 ])
 
 @php

@@ -184,7 +184,7 @@ test('route gate returns 404 for php when php is not installed', function () {
     ]);
 
     $this->actingAs($server->user)
-        ->get(route('servers.php', $server))
+        ->get(route('servers.runtime', $server))
         ->assertNotFound();
 });
 
@@ -212,7 +212,7 @@ test('route gate allows php when php is installed', function () {
     ]);
 
     $this->actingAs($server->user)
-        ->get(route('servers.php', $server))
+        ->get(route('servers.runtime', $server))
         ->assertOk();
 });
 
@@ -221,7 +221,7 @@ test('route gate fails open when stack summary is unknown', function () {
 
     // No stack summary artifact yet → tags include 'unknown' → middleware passes through.
     $this->actingAs($server->user)
-        ->get(route('servers.php', $server))
+        ->get(route('servers.runtime', $server))
         ->assertOk();
 });
 

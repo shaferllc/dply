@@ -907,7 +907,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.services')->group(function (): void {
         Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     });
-    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
+    Route::livewire('servers/{server}/runtime', WorkspacePhp::class)->name('servers.runtime');
+    Route::get('servers/{server}/php', function (Server $server) {
+        return redirect()->route('servers.runtime', $server);
+    })->name('servers.php');
     Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/edge-proxy', WorkspaceEdgeProxy::class)->name('servers.edge-proxy');
     Route::get('servers/{server}/webserver/caddy/admin-api/{path?}', CaddyAdminApiProxyController::class)

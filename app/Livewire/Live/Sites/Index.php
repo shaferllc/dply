@@ -48,7 +48,7 @@ class Index extends Component
         if ($connection === null) {
             return;
         }
-        $this->productionMirror()->forget($connection, 'sites');
+        $this->productionMirror()->forget($connection, 'sites.fleet.v2');
         $this->toastSuccess(__('Sites refreshed from production.'));
     }
 
@@ -98,7 +98,7 @@ class Index extends Component
         try {
             $apiRows = $this->productionMirror()->remember(
                 $connection,
-                'sites',
+                'sites.fleet.v2',
                 fn ($client) => $client->sites(),
             );
         } catch (ProductionApiException $e) {
@@ -109,9 +109,11 @@ class Index extends Component
             }
         }
 
+        $remoteBaseUrl = (string) $connection->base_url;
+
         /** @var Collection<int, SiteIndexRow> $allRows */
         $allRows = collect($apiRows)->map(
-            fn (array $row): SiteIndexRow => SiteIndexRow::fromProductionApi($row)
+            fn (array $row): SiteIndexRow => SiteIndexRow::fromProductionApi($row, $remoteBaseUrl)
         );
         $hasSitesInScope = $allRows->isNotEmpty();
         $rows = $this->filterRows($allRows);

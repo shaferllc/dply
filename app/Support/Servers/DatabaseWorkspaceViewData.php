@@ -27,7 +27,8 @@ final class DatabaseWorkspaceViewData
         array $capabilities,
         bool $includeDiscoveryContext = false,
     ): array {
-        $card = 'dply-card overflow-hidden';
+        // Nested section chrome inside the merged Databases workspace card (not dply-card).
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ssh_private_key;
         $isDeployer = auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
         $engineLabels = collect(DatabaseWorkspaceEngines::ENGINE_TABS)

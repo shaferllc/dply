@@ -176,6 +176,21 @@ class WorkspaceOverview extends Component
         $this->redirectRoute('servers.journey', $server, navigate: true);
     }
 
+    /**
+     * Identity-hero shaped skeleton (hide-hero) so Overview load matches the
+     * merged page instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-overview-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         // No $this->server->refresh() here: Livewire re-resolves the bound

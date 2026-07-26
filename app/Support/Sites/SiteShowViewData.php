@@ -207,7 +207,35 @@ final class SiteShowViewData
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
         ];
 
-        if ($site->usesEdgeRuntime()) {
+        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
+            && function_exists('production_data_mirror_connected')
+            && production_data_mirror_connected();
+
+        if ($isProductionMirror) {
+            $siteHeaderBreadcrumbs[] = [
+                'label' => __('Production'),
+                'href' => route('live.sites.index'),
+                'icon' => 'exclamation-triangle',
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => __('Sites'),
+                'href' => route('live.sites.index'),
+                'icon' => 'globe-alt',
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $server->name,
+                'href' => route('live.servers.index'),
+                'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $site->name,
+                'icon' => 'globe-alt',
+                'avatar' => $site->name ?: (string) $site->id,
+                'avatar_image' => $site->logoUrl(),
+            ];
+        } elseif ($site->usesEdgeRuntime()) {
             $siteHeaderBreadcrumbs[] = ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'];
             $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
             $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];

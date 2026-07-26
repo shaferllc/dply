@@ -19,12 +19,17 @@
         :sort-options="$sortOptions"
         :tag-options="$tagOptions"
         :view-mode="$viewMode"
+        :status-filter="$statusFilter"
+        :sort="$sort"
+        :tag-filter="$tagFilter"
         :show-fleet-ops="false"
         :show-deploy-actions="true"
         :show-mutations="false"
         :show-hero-actions="false"
+        :eyebrow="__('Production')"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Production'), 'href' => route('live.servers.index'), 'icon' => 'exclamation-triangle'],
             ['label' => __('Servers'), 'icon' => 'server-stack'],
         ]"
     >

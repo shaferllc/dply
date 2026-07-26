@@ -1,5 +1,5 @@
 @if ($heroTool)
-    <div class="{{ $card }} flex flex-col p-5 sm:p-6">
+    <div class="{{ $card ?? 'border-b border-brand-ink/10' }} flex flex-col px-5 py-5 sm:px-6">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex min-w-0 items-start gap-3">
                 <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">

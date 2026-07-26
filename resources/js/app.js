@@ -6,6 +6,7 @@ import {
 } from './lazy-load.js';
 import { registerDplyThemeListeners } from './theme.js';
 import { registerDeployPipelineWorkspace } from './deploy-pipeline-dnd.js';
+import { registerConsoleDrawer } from './console-drawer.js';
 import {
     installFeedbackConsoleBuffer,
     registerFeedbackSidebar,
@@ -72,6 +73,7 @@ document.addEventListener('alpine:init', () => {
     });
 
     registerDeployPipelineWorkspace(window.Alpine);
+    registerConsoleDrawer(window.Alpine);
     registerFeedbackSidebar(window.Alpine);
 });
 

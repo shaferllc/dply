@@ -40,13 +40,13 @@ test('authenticated user can open the php workspace route', function () {
         'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
     ]);
 
-    expect(Route::has('servers.php'))->toBeTrue('Expected [servers.php] route to exist.');
+    expect(Route::has('servers.runtime'))->toBeTrue('Expected [servers.runtime] route to exist.');
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
-    $response->assertSeeInOrder(['aria-label="Server sections"', 'PHP'], false);
-    $response->assertSeeInOrder(['<h2', 'PHP', '</h2>'], false);
+    $response->assertSeeInOrder(['aria-label="Server sections"', 'Runtime'], false);
+    $response->assertSeeInOrder(['<h2', 'Runtime', '</h2>'], false);
 });
 
 test('php workspace shows provisioning not ready state', function () {
@@ -61,12 +61,12 @@ test('php workspace shows provisioning not ready state', function () {
         'ssh_private_key' => null,
     ]);
 
-    expect(Route::has('servers.php'))->toBeTrue('Expected [servers.php] route to exist.');
+    expect(Route::has('servers.runtime'))->toBeTrue('Expected [servers.runtime] route to exist.');
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
-    $response->assertSee('Provisioning and SSH must be ready before you can use this section.');
+    $response->assertSee('Once provisioning finishes, this page will show installed PHP versions');
 });
 
 test('php workspace shows ssh unavailable state for ready server without ssh access', function () {
@@ -79,9 +79,9 @@ test('php workspace shows ssh unavailable state for ready server without ssh acc
         'ssh_private_key' => null,
     ]);
 
-    expect(Route::has('servers.php'))->toBeTrue('Expected [servers.php] route to exist.');
+    expect(Route::has('servers.runtime'))->toBeTrue('Expected [servers.runtime] route to exist.');
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('SSH unavailable');
@@ -98,9 +98,9 @@ test('php workspace shows inventory never run state', function () {
         'meta' => [],
     ]);
 
-    expect(Route::has('servers.php'))->toBeTrue('Expected [servers.php] route to exist.');
+    expect(Route::has('servers.runtime'))->toBeTrue('Expected [servers.runtime] route to exist.');
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('No PHP inventory yet');
@@ -122,9 +122,9 @@ test('php workspace shows refresh failure state', function () {
         ],
     ]);
 
-    expect(Route::has('servers.php'))->toBeTrue('Expected [servers.php] route to exist.');
+    expect(Route::has('servers.runtime'))->toBeTrue('Expected [servers.runtime] route to exist.');
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('PHP inventory refresh failed');
@@ -146,7 +146,7 @@ test('php workspace shows refresh running state', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('PHP inventory refresh running');
@@ -173,7 +173,7 @@ test('php workspace shows stale inventory warning after failed action', function
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('PHP inventory may be stale');
@@ -195,9 +195,9 @@ test('php workspace shows unsupported environment state', function () {
         ],
     ]);
 
-    expect(Route::has('servers.php'))->toBeTrue('Expected [servers.php] route to exist.');
+    expect(Route::has('servers.runtime'))->toBeTrue('Expected [servers.runtime] route to exist.');
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('Unsupported environment');
@@ -273,7 +273,7 @@ test('php workspace renders version rows and package actions', function () {
         'php_version' => '8.3',
     ]);
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('PHP 8.4');
@@ -314,7 +314,7 @@ test('php workspace falls back to known default version before inventory refresh
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('servers.php', $server, false));
+    $response = $this->actingAs($user)->get(route('servers.runtime', $server, false));
 
     $response->assertOk();
     $response->assertSee('PHP 8.3');

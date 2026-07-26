@@ -1,5 +1,6 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    // Modal editor nested panels (not page-level cards).
+    $card = 'overflow-hidden rounded-xl border border-brand-ink/10';
     $btnPrimary = 'inline-flex w-auto shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-ink/90 disabled:cursor-not-allowed disabled:opacity-60';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-60';
     $tonePalette = [
@@ -21,15 +22,12 @@
 <x-server-workspace-layout
     :server="$server"
     active="php"
-    :title="__('PHP')"
-    :description="__('Review server-level PHP inventory, defaults, and runtime configuration from one workspace.')"
+    :title="__('Runtime')"
+    :description="__('Server-level PHP inventory, defaults, and runtime configuration.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
-
-    @if (! $opsReady && ! $sshUnavailable)
-        @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
-    @endif
 
     {{-- Console banner — install/uninstall/patch/refresh-inventory, config load/save,
          and set-default actions stream into the shared ConsoleAction partial. --}}
@@ -38,19 +36,20 @@
         'kindLabels' => (array) config('console_actions.kinds', []),
     ])
 
-    {{-- PHP runtime: hero card with eyebrow + title + summary stat tiles. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP runtime') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Server-owned PHP inventory, CLI default, and new-site default.') }}
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Runtime') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('PHP inventory, CLI default, and new-site default for this server.') }}
                         </p>
                     </div>
+                </div>
                 @can('update', $server)
                     @if ($opsReady)
                         <div class="flex shrink-0 flex-wrap items-center gap-2">
@@ -71,12 +70,14 @@
                         </div>
                     @endif
                 @endcan
+            </div>
         </div>
-        <dl class="grid grid-cols-1 gap-2 p-6 sm:grid-cols-3 sm:p-7">
+
+        <dl class="grid grid-cols-1 gap-2 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-3 sm:px-6">
             <div @class([
-                'rounded-2xl border px-4 py-3 shadow-sm',
+                'rounded-xl border px-4 py-3',
                 'border-brand-sage/30 bg-brand-sage/8' => (int) ($phpSummary['installed_count'] ?? 0) > 0,
-                'border-brand-ink/10 bg-white' => (int) ($phpSummary['installed_count'] ?? 0) === 0,
+                'border-brand-ink/10 bg-brand-sand/15' => (int) ($phpSummary['installed_count'] ?? 0) === 0,
             ])>
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Installed versions') }}</dt>
                 <dd class="mt-1 flex items-baseline gap-1.5">
@@ -85,97 +86,75 @@
                 </dd>
                 <p class="mt-1 text-[11px] text-brand-mist">{{ __('Detected on host') }}</p>
             </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CLI default') }}</dt>
                 <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink">{{ $phpSummary['cli_default'] ? 'PHP '.$phpSummary['cli_default'] : __('not set') }}</dd>
                 <p class="mt-1 text-[11px] text-brand-mist">{{ __('update-alternatives') }}</p>
             </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('New-site default') }}</dt>
                 <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink">{{ $phpSummary['new_site_default'] ? 'PHP '.$phpSummary['new_site_default'] : __('not set') }}</dd>
                 <p class="mt-1 text-[11px] text-brand-mist">{{ __('Applied to new sites') }}</p>
             </div>
         </dl>
 
-        @if ($sshUnavailable || $phpInventoryRefreshRunning || $phpInventoryRefreshFailed || $phpInventoryStale || $phpEnvironmentUnsupported || $phpInventoryNeverRun || (! $opsReady && ! $sshUnavailable))
-            <div class="space-y-3 border-t border-brand-ink/10 bg-brand-cream/20 px-6 py-5 sm:px-7">
-                    @if ($sshUnavailable)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
-                            <p class="min-w-0 leading-6">
-                                <span class="font-semibold">{{ __('SSH unavailable.') }}</span>
-                                {{ __('Add or restore this server\'s SSH access before Dply can inspect or manage PHP.') }}
-                            </p>
-                        </div>
-                    @endif
-
-                    @if ($phpInventoryRefreshRunning)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm text-sky-900">
-                            <p class="min-w-0 leading-6">
-                                <span class="font-semibold">{{ __('PHP inventory refresh running') }}.</span>
-                                {{ __('Dply is collecting the latest installed versions and CLI default from the server.') }}
-                            </p>
-                        </div>
-                    @endif
-
-                    @if ($phpInventoryRefreshFailed)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm text-rose-900">
-                            <p class="min-w-0 leading-6">
-                                <span class="font-semibold">{{ __('PHP inventory refresh failed') }}.</span>
-                                {{ $phpInventoryRefreshError ?: __('The last PHP inspection attempt did not complete successfully.') }}
-                            </p>
-                        </div>
-                    @endif
-
-                    @if ($phpInventoryStale)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
-                            <p class="min-w-0 leading-6">
-                                <span class="font-semibold">{{ __('PHP inventory may be stale') }}.</span>
-                                {{ $phpInventoryRefreshError ?: __('Remote PHP state changed, but Dply could not save the refreshed snapshot.') }}
-                            </p>
-                        </div>
-                    @endif
-
-                    @if ($phpEnvironmentUnsupported)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
-                            <p class="min-w-0 leading-6">
-                                <span class="font-semibold">{{ __('Unsupported environment') }}.</span>
-                                {{ __('This server does not currently report a PHP environment that the management workspace can support.') }}
-                            </p>
-                        </div>
-                    @endif
-
-                    @if ($phpInventoryNeverRun)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-4 py-3 text-sm text-brand-ink">
-                            <p class="min-w-0 leading-6">
-                                <span class="font-semibold">{{ __('No PHP inventory yet') }}.</span>
-                                {{ __('PHP inventory will appear here after the first refresh runs.') }}
-                            </p>
-                        </div>
-                    @endif
-
-                    @if (! $opsReady && ! $sshUnavailable)
-                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-white/70 px-4 py-3 text-sm text-brand-moss">
-                            <p class="min-w-0 leading-6">
-                                {{ __('Once provisioning finishes, this page will show installed PHP versions, defaults, and shared configuration entry points.') }}
-                            </p>
-                        </div>
-                    @endif
+        @if ($sshUnavailable)
+            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+                <span class="font-semibold">{{ __('SSH unavailable.') }}</span>
+                {{ __('Add or restore this server\'s SSH access before Dply can inspect or manage PHP.') }}
+            </div>
+        @elseif (! $opsReady)
+            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+                {{ __('Once provisioning finishes, this page will show installed PHP versions, defaults, and shared configuration entry points.') }}
             </div>
         @endif
-    </section>
 
-    @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Versions on this server') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.') }}</p>
-                    </div>
-                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ count($phpVersionRows) }}</span>
+        @if ($phpInventoryRefreshRunning)
+            <div class="border-b border-sky-200/80 bg-sky-50/60 px-5 py-3.5 text-sm text-sky-900 sm:px-6">
+                <span class="font-semibold">{{ __('PHP inventory refresh running') }}.</span>
+                {{ __('Dply is collecting the latest installed versions and CLI default from the server.') }}
+            </div>
+        @endif
+
+        @if ($phpInventoryRefreshFailed)
+            <div class="border-b border-rose-200/80 bg-rose-50/60 px-5 py-3.5 text-sm text-rose-900 sm:px-6">
+                <span class="font-semibold">{{ __('PHP inventory refresh failed') }}.</span>
+                {{ $phpInventoryRefreshError ?: __('The last PHP inspection attempt did not complete successfully.') }}
+            </div>
+        @endif
+
+        @if ($phpInventoryStale)
+            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+                <span class="font-semibold">{{ __('PHP inventory may be stale') }}.</span>
+                {{ $phpInventoryRefreshError ?: __('Remote PHP state changed, but Dply could not save the refreshed snapshot.') }}
+            </div>
+        @endif
+
+        @if ($phpEnvironmentUnsupported)
+            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+                <span class="font-semibold">{{ __('Unsupported environment') }}.</span>
+                {{ __('This server does not currently report a PHP environment that the management workspace can support.') }}
+            </div>
+        @endif
+
+        @if ($phpInventoryNeverRun)
+            <div class="border-b border-brand-ink/10 px-5 py-3.5 text-sm text-brand-ink sm:px-6">
+                <span class="font-semibold">{{ __('No PHP inventory yet') }}.</span>
+                {{ __('PHP inventory will appear here after the first refresh runs.') }}
+            </div>
+        @endif
+
+        @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Versions on this server') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.') }}</p>
+                </div>
+                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ count($phpVersionRows) }}</span>
             </div>
 
             <ul class="divide-y divide-brand-ink/10">
@@ -452,8 +431,8 @@
                         </x-workspace-table-row>
                     @endforeach
                 </ul>
-        </section>
-    @endif
+        @endif
+    </section>
 
     <x-slot name="modals">
         @if ($phpConfigEditorOpen)

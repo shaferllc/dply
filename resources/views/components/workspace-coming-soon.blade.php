@@ -43,12 +43,16 @@
             <div class="flex items-center gap-2">
                 <x-mac-window-dots />
             </div>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200/90">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/90">
                 <span class="relative flex h-1.5 w-1.5">
                     <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400/60 opacity-75"></span>
                     <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-sky-400"></span>
                 </span>
-                {{ __('Coming soon') }}
+                {{-- Split words so letter-spacing doesn’t collapse the gap between them. --}}
+                <span class="inline-flex items-center gap-[0.45em]" aria-label="{{ __('Coming soon') }}">
+                    <span>{{ __('Coming') }}</span>
+                    <span>{{ __('soon') }}</span>
+                </span>
             </span>
         </div>
 

@@ -83,18 +83,19 @@ test('console preview page is hidden when full console is enabled', function ():
         ->assertNotFound();
 });
 
-test('floating console soon button appears when preview active and console off', function (): void {
+test('floating dock shows console chip when preview active and console off', function (): void {
     $user = ownerWithOrg();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
+        ->assertSee(__('Feedback'))
         ->assertSee(__('Console'))
-        ->assertSee(__('Soon'))
-        ->assertSee(__('Browser console — coming soon'), false);
+        ->assertSee(__('Browser console — preview'), false)
+        ->assertDontSee(__('Browser console — coming soon'), false);
 });
 
-test('floating console soon button hidden when preview inactive', function (): void {
+test('floating console preview chip hidden when preview inactive', function (): void {
     Feature::define('workspace.console_preview', fn (): bool => false);
     Feature::flushCache();
 
@@ -103,6 +104,7 @@ test('floating console soon button hidden when preview inactive', function (): v
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
+        ->assertDontSee(__('Browser console — preview'), false)
         ->assertDontSee(__('Browser console — coming soon'), false);
 });
 

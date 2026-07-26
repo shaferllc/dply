@@ -21,6 +21,9 @@
     'showMutations' => false,
     'showHeroActions' => false,
     'eyebrow' => null,
+    'statusFilter' => '',
+    'sort' => 'created_at',
+    'tagFilter' => '',
 ])
 
 @php
@@ -29,6 +32,9 @@
     $showMutations = filter_var($showMutations, FILTER_VALIDATE_BOOLEAN);
     $showHeroActions = filter_var($showHeroActions, FILTER_VALIDATE_BOOLEAN);
     $heroActionsHtml = isset($actions) ? trim(preg_replace('/<!--.*?-->/s', '', (string) $actions) ?? '') : '';
+    $filtersActive = $statusFilter !== ''
+        || $sort !== 'created_at'
+        || trim((string) $tagFilter) !== '';
     $summaryStats = [
         ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'] ?? 0, 'tone' => 'text-brand-sage'],
         ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'] ?? 0, 'tone' => 'text-brand-sage'],
@@ -117,29 +123,65 @@
                     <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
                 </div>
 
-                <label for="servers_status" class="sr-only">{{ __('Status') }}</label>
-                <x-select id="servers_status" wire:model.live="statusFilter" class="mt-0 w-auto min-w-[8.5rem] shrink-0">
-                    @foreach ($statusOptions as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </x-select>
+                <x-dropdown align="right" width="w-72" content-classes="p-3" :close-on-content-click="false">
+                    <x-slot name="trigger">
+                        <button
+                            type="button"
+                            class="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand-ink/15 bg-white text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink"
+                            title="{{ __('Filters') }}"
+                        >
+                            <span class="sr-only">{{ __('Filters') }}</span>
+                            <x-heroicon-o-funnel class="h-4 w-4" aria-hidden="true" />
+                            @if ($filtersActive)
+                                <span class="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-forest ring-2 ring-white" aria-hidden="true"></span>
+                            @endif
+                        </button>
+                    </x-slot>
+                    <x-slot name="content">
+                        <div class="space-y-3">
+                            <div>
+                                <label for="servers_status" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</label>
+                                <x-select id="servers_status" wire:model.live="statusFilter" class="mt-1.5 w-full">
+                                    @foreach ($statusOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </x-select>
+                            </div>
 
-                @if (count($tagOptions) > 0)
-                    <label for="servers_tag" class="sr-only">{{ __('Tag') }}</label>
-                    <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-0 w-auto min-w-[8.5rem] shrink-0">
-                        <option value="">{{ __('All tags') }}</option>
-                        @foreach ($tagOptions as $tag)
-                            <option value="{{ $tag }}">{{ $tag }}</option>
-                        @endforeach
-                    </x-select>
-                @endif
+                            @if (count($tagOptions) > 0)
+                                <div>
+                                    <label for="servers_tag" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tag') }}</label>
+                                    <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-1.5 w-full">
+                                        <option value="">{{ __('All tags') }}</option>
+                                        @foreach ($tagOptions as $tag)
+                                            <option value="{{ $tag }}">{{ $tag }}</option>
+                                        @endforeach
+                                    </x-select>
+                                </div>
+                            @endif
 
-                <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
-                <x-select id="servers_sort" wire:model.live="sort" class="mt-0 w-auto min-w-[8.5rem] shrink-0">
-                    @foreach ($sortOptions as $value => $label)
-                        <option value="{{ $value }}">{{ __($label) }}</option>
-                    @endforeach
-                </x-select>
+                            <div>
+                                <label for="servers_sort" class="block text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Order by') }}</label>
+                                <x-select id="servers_sort" wire:model.live="sort" class="mt-1.5 w-full">
+                                    @foreach ($sortOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ __($label) }}</option>
+                                    @endforeach
+                                </x-select>
+                            </div>
+
+                            <div class="flex justify-end border-t border-brand-ink/10 pt-3">
+                                <button
+                                    type="button"
+                                    wire:click="resetFilters"
+                                    @@click="$dispatch('close')"
+                                    class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink"
+                                >
+                                    {{ __('Reset') }}
+                                </button>
+                            </div>
+                        </div>
+                    </x-slot>
+                </x-dropdown>
 
                 <div class="inline-flex shrink-0 rounded-xl border border-brand-ink/15 bg-white p-0.5" role="group" aria-label="{{ __('View') }}">
                     <button
@@ -163,10 +205,6 @@
                         <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
-
-                <button type="button" wire:click="resetFilters" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-moss shadow-sm transition hover:bg-brand-sand/40 hover:text-brand-ink">
-                    {{ __('Reset') }}
-                </button>
             </div>
         </div>
     @endif

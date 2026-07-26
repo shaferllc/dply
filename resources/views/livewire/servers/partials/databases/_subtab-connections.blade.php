@@ -1,5 +1,5 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} overflow-hidden px-6 py-6 sm:px-8">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <x-empty-state
             borderless
             icon="heroicon-o-link"

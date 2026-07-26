@@ -41,7 +41,7 @@ test('configuration workspace route renders editor shell', function (): void {
     $this->actingAs($user)
         ->get(route('servers.configuration', $server))
         ->assertOk()
-        ->assertSee(__('Configuration editor'));
+        ->assertSee(__('Configuration'));
 });
 
 test('configuration workspace defers catalog discovery until wire init', function (): void {

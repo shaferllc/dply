@@ -3,46 +3,9 @@
     active="insights"
     :title="__('Insights')"
     :description="__('Monitoring, recommendations, and optional fixes for this server.')"
-    :pageHeaderToolbar="true"
+    hide-hero
 >
-    <x-slot name="headerActions">
-        <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
-            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
-            <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
-            <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-        </x-primary-button>
-    </x-slot>
-
     @include('livewire.servers.partials.workspace-flashes')
-
-    @if ($server->workspace)
-        @feature('surface.projects')
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Project insight context') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('These findings are scoped to this server. For shared incident context, runbooks, and grouped notifications, use the linked project pages for the broader project view.') }}</p>
-                    </div>
-                </div>
-                <div class="px-6 py-6 sm:px-7">
-                    <div class="flex flex-wrap gap-2">
-                        <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-m-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Open project operations') }}
-                        </a>
-                        <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-m-shield-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Open project access') }}
-                        </a>
-                    </div>
-                </div>
-            </section>
-        @endfeature
-    @endif
 
     {{-- Workspace console banner. Three banner sources share one slot — `run` (full
          sweep / single recheck), `fix` (apply-fix per finding), `revert` (revert-fix
@@ -140,67 +103,116 @@
     @php
         $dismissedCount = $dismissedFindings->count() + $ignoredSuggestions->count();
     @endphp
-    <x-server-workspace-tablist ariaLabel="{{ __('Insights sections') }}">
-        <x-server-workspace-tab wire:click="setTab('overview')" :active="$tab === 'overview'">
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-list-bullet class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Overview') }}
-            </span>
-        </x-server-workspace-tab>
-        <x-server-workspace-tab wire:click="setTab('dismissed')" :active="$tab === 'dismissed'">
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-eye-slash class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Dismissed') }}
-                @if ($dismissedCount > 0)
-                    <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $dismissedCount }}</span>
-                @endif
-            </span>
-        </x-server-workspace-tab>
-        <x-server-workspace-tab wire:click="setTab('notifications')" :active="$tab === 'notifications'">
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-bell-alert class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </span>
-        </x-server-workspace-tab>
-        <x-server-workspace-tab wire:click="setTab('settings')" :active="$tab === 'settings'">
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Settings') }}
-            </span>
-        </x-server-workspace-tab>
-    </x-server-workspace-tablist>
 
-    @if ($tab === 'overview' && $criticalCount > 0)
-        {{-- Compact summary only — the full findings (with Apply fix / View details)
-             render in the Open findings list below, so we don't repeat each one here. --}}
-        <div role="alert" aria-live="polite" class="rounded-2xl border border-red-200 bg-red-50/70 shadow-sm">
-            <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="flex min-w-0 items-start gap-3">
-                    <x-heroicon-s-exclamation-triangle class="h-5 w-5 shrink-0 text-red-700 mt-0.5" aria-hidden="true" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                        <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
+                    </span>
                     <div class="min-w-0">
-                        <h2 class="text-sm font-semibold text-red-900">{{ __('Critical attention required') }}</h2>
-                        <p class="mt-0.5 text-xs text-red-900/80">
-                            {{ trans_choice(':count critical finding needs attention.|:count critical findings need attention.', $criticalCount, ['count' => $criticalCount]) }}
-                            {{ __('Review them below, or dismiss to clear this banner — recurring issues resurface automatically.') }}
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Insights') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Monitoring, recommendations, and optional fixes for this server.') }}
                         </p>
                     </div>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
-                    <a href="#insights-open-findings" class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100">
-                        {{ __('View findings') }}
-                        <x-heroicon-o-arrow-down class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    </a>
-                    <button type="button" wire:click="acknowledgeCriticalFindings" wire:loading.attr="disabled" wire:target="acknowledgeCriticalFindings" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
-                        <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ trans_choice('Dismiss|Dismiss all', $criticalCount) }}
-                    </button>
-                </div>
+                <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="shrink-0">
+                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
+                    <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+                    <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+                </x-primary-button>
             </div>
         </div>
-    @endif
 
-    @if ($tab === 'overview')
-        <div class="dply-card overflow-hidden scroll-mt-6" id="insights-open-findings">
+        @if ($server->workspace)
+            @feature('surface.projects')
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/10 px-5 py-3 sm:px-6">
+                    <p class="min-w-0 text-xs leading-relaxed text-brand-moss">
+                        {{ __('Findings are scoped to this server. For shared incident context and runbooks, use the linked project.') }}
+                    </p>
+                    <div class="flex shrink-0 flex-wrap gap-2">
+                        <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Project operations') }}
+                        </a>
+                        <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-m-shield-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Project access') }}
+                        </a>
+                    </div>
+                </div>
+            @endfeature
+        @endif
+
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Insights sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab id="insights-tab-overview" icon="heroicon-o-list-bullet" wire:click="setTab('overview')" :active="$tab === 'overview'">
+                    {{ __('Overview') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="insights-tab-dismissed" icon="heroicon-o-eye-slash" wire:click="setTab('dismissed')" :active="$tab === 'dismissed'">
+                    {{ __('Dismissed') }}
+                    @if ($dismissedCount > 0)
+                        <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $dismissedCount }}</span>
+                    @endif
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="insights-tab-notifications" icon="heroicon-o-bell-alert" wire:click="setTab('notifications')" :active="$tab === 'notifications'">
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="insights-tab-settings" icon="heroicon-o-cog-6-tooth" wire:click="setTab('settings')" :active="$tab === 'settings'">
+                    {{ __('Settings') }}
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
+
+        <div wire:loading.block wire:target="setTab" class="px-5 py-6 sm:px-6" aria-busy="true">
+            <span class="sr-only">{{ __('Loading…') }}</span>
+            <ul class="divide-y divide-brand-ink/10" aria-hidden="true">
+                @foreach (range(1, 3) as $row)
+                    <li class="flex items-start gap-3 py-4">
+                        <span class="mt-0.5 h-7 w-7 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
+                        <div class="min-w-0 flex-1 space-y-2">
+                            <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
+                            <div class="h-2.5 w-3/4 max-w-md animate-pulse rounded bg-brand-ink/10"></div>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+
+        <div wire:loading.remove wire:target="setTab">
+            @if ($tab === 'overview' && $criticalCount > 0)
+                {{-- Compact summary only — the full findings (with Apply fix / View details)
+                     render in the Open findings list below, so we don't repeat each one here. --}}
+                <div role="alert" aria-live="polite" class="border-b border-red-200 bg-red-50/70">
+                    <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-4 sm:px-6">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <x-heroicon-s-exclamation-triangle class="h-5 w-5 shrink-0 text-red-700 mt-0.5" aria-hidden="true" />
+                            <div class="min-w-0">
+                                <h2 class="text-sm font-semibold text-red-900">{{ __('Critical attention required') }}</h2>
+                                <p class="mt-0.5 text-xs text-red-900/80">
+                                    {{ trans_choice(':count critical finding needs attention.|:count critical findings need attention.', $criticalCount, ['count' => $criticalCount]) }}
+                                    {{ __('Review them below, or dismiss to clear this banner — recurring issues resurface automatically.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <a href="#insights-open-findings" class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100">
+                                {{ __('View findings') }}
+                                <x-heroicon-o-arrow-down class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            </a>
+                            <button type="button" wire:click="acknowledgeCriticalFindings" wire:loading.attr="disabled" wire:target="acknowledgeCriticalFindings" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-900 shadow-sm hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
+                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ trans_choice('Dismiss|Dismiss all', $criticalCount) }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($tab === 'overview')
+        <div class="overflow-hidden scroll-mt-6" id="insights-open-findings">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
@@ -348,7 +360,7 @@
         </div>
 
         @if ($suggestionFindings->isNotEmpty())
-            <div class="dply-card overflow-hidden">
+            <div class="overflow-hidden border-t border-brand-ink/10">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
@@ -418,7 +430,7 @@
         @endif
 
         @if ($recentlyAppliedFindings->isNotEmpty())
-            <div class="dply-card overflow-hidden">
+            <div class="overflow-hidden border-t border-brand-ink/10">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-arrow-uturn-left class="h-5 w-5" aria-hidden="true" />
@@ -470,11 +482,11 @@
                 </ul>
             </div>
         @endif
-    @endif
+            @endif
 
-    @if ($tab === 'dismissed')
+            @if ($tab === 'dismissed')
         @if ($dismissedFindings->isNotEmpty())
-            <div class="dply-card overflow-hidden">
+            <div class="overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-eye-slash class="h-5 w-5" aria-hidden="true" />
@@ -535,7 +547,7 @@
         @endif
 
         @if ($ignoredSuggestions->isNotEmpty())
-            <div class="dply-card overflow-hidden">
+            <div class="overflow-hidden border-t border-brand-ink/10">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
@@ -569,30 +581,32 @@
         @endif
 
         @if ($dismissedFindings->isEmpty() && $ignoredSuggestions->isEmpty())
-            <div class="dply-card overflow-hidden">
-                <div class="px-5 py-12 text-center">
-                    <x-heroicon-o-eye-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
-                    <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('Nothing dismissed.') }}</p>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Anything you dismiss from Overview or ignore from Recommendations will show up here.') }}</p>
-                </div>
+            <div class="px-5 py-12 text-center">
+                <x-heroicon-o-eye-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
+                <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('Nothing dismissed.') }}</p>
+                <p class="mt-2 text-sm text-brand-moss">{{ __('Anything you dismiss from Overview or ignore from Recommendations will show up here.') }}</p>
             </div>
         @endif
-    @endif
+            @endif
 
-    @if ($tab === 'notifications')
+            @if ($tab === 'notifications')
         @include('livewire.servers.partials.insights._tab-notifications')
-    @endif
+            @endif
 
-    @if ($tab === 'settings')
-        @include('livewire.partials.insights-settings-form', ['catalog' => $insightsCatalog, 'orgHasPro' => $orgHasPro])
-        <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-brand-ink/10">
-            <div class="flex flex-wrap gap-2">
-                <x-secondary-button size="sm" type="button" wire:click="enableAll">{{ __('Enable all') }}</x-secondary-button>
-                <x-secondary-button size="sm" type="button" wire:click="disableAll">{{ __('Disable all') }}</x-secondary-button>
+            @if ($tab === 'settings')
+        <div class="px-5 py-5 sm:px-6">
+            @include('livewire.partials.insights-settings-form', ['catalog' => $insightsCatalog, 'orgHasPro' => $orgHasPro, 'nested' => true])
+            <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-brand-ink/10 pt-5">
+                <div class="flex flex-wrap gap-2">
+                    <x-secondary-button size="sm" type="button" wire:click="enableAll">{{ __('Enable all') }}</x-secondary-button>
+                    <x-secondary-button size="sm" type="button" wire:click="disableAll">{{ __('Disable all') }}</x-secondary-button>
+                </div>
+                <x-primary-button size="sm" type="button" wire:click="saveSettings">{{ __('Save settings') }}</x-primary-button>
             </div>
-            <x-primary-button size="sm" type="button" wire:click="saveSettings">{{ __('Save settings') }}</x-primary-button>
         </div>
-    @endif
+            @endif
+        </div>
+    </section>
 
     <x-slot name="modals">
         {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),

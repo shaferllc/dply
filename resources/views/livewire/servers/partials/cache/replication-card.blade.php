@@ -14,7 +14,7 @@
 @endphp
 
 <div
-    class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8"
+    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6"
     wire:init="loadReplicationState"
     wire:poll.15s="loadReplicationState"
 >

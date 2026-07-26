@@ -57,18 +57,25 @@
             @endforeach
         </div>
 
-        @can('create', App\Models\Server::class)
-            <a
-                href="{{ route('servers.create') }}"
-                wire:navigate
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
-                @if ($surface === 'production')
-                    title="{{ __('Creates a server in this local workspace — production stays read-only.') }}"
-                @endif
-            >
-                <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {{ __('Add server') }}
-            </a>
-        @endcan
+        @php
+            $onServersIndex = $surface === 'production'
+                ? request()->routeIs('live.servers.index')
+                : request()->routeIs('servers.index');
+        @endphp
+        @if ($onServersIndex)
+            @can('create', App\Models\Server::class)
+                <a
+                    href="{{ route('servers.create') }}"
+                    wire:navigate
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
+                    @if ($surface === 'production')
+                        title="{{ __('Creates a server in this local workspace — production stays read-only.') }}"
+                    @endif
+                >
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Add server') }}
+                </a>
+            @endcan
+        @endif
     </div>
 </nav>

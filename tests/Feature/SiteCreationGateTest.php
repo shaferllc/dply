@@ -208,7 +208,7 @@ test('site show flags php version mismatch and links to server php workspace', f
     $response->assertOk()
         ->assertSee('PHP version mismatch')
         ->assertSee('This site references PHP 8.2, but that version is not currently installed on this server.')
-        ->assertSee(route('servers.php', $server, false), escape: false);
+        ->assertSee(route('servers.runtime', $server, false), escape: false);
 });
 
 test('site show can save php version and runtime settings and reject non installed versions', function () {
@@ -247,7 +247,7 @@ test('site show can save php version and runtime settings and reject non install
             ],
             'selected_version_installed' => in_array($resolvedSite->php_version, ['8.4', '8.3'], true),
             'mismatch_version' => in_array($resolvedSite->php_version, ['8.4', '8.3'], true) ? null : $resolvedSite->php_version,
-            'server_php_workspace_url' => route('servers.php', $resolvedServer, false),
+            'server_php_workspace_url' => route('servers.runtime', $resolvedServer, false),
         ]);
     $this->app->instance(ServerPhpManager::class, $manager);
 

@@ -1,6 +1,6 @@
 @php
-    $card = 'dply-card overflow-hidden';
     $opsReady = $server->isReady() && $server->ssh_private_key;
+    $recipeCount = $server->recipes->count();
 @endphp
 
 <x-server-workspace-layout
@@ -8,12 +8,13 @@
     active="run"
     :title="__('Run')"
     :description="__('Run server-level commands. Saved commands, ad-hoc shell, and library presets all in one place. Site deploys live on each site’s page.')"
+    hide-hero
 >
     @include('livewire.servers.partials.run-output-panel')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if ($container_scope_id !== '')
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-cream/50 p-4">
+        <div class="mb-4 rounded-2xl border border-brand-gold/40 bg-brand-cream/50 p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Container scope') }}</p>
@@ -33,182 +34,198 @@
         </div>
     @endif
 
-    {{-- Top-of-page banner clarifying scope. The page used to be
-         called "Deploy" and operators kept landing here looking for
-         site deploys. The banner explicitly redirects them to the
-         right surfaces. --}}
-    <div class="rounded-2xl border border-sky-200/70 bg-sky-50/60 p-4">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0 max-w-3xl">
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Server-level commands') }}</p>
-                <p class="mt-1 text-sm leading-6 text-brand-moss">
-                    {{ __('This page runs commands against the whole server. To deploy a site, open the site’s own page. For coordinated multi-site delivery, use the project delivery page.') }}
-                </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
-                    {{ __('Open Sites') }}
-                </a>
-                @if ($server->workspace)
-                    @feature('surface.projects')
-                        <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
-                            {{ __('Open Project delivery') }}
-                        </a>
-                    @endfeature
-                @endif
-            </div>
-        </div>
-    </div>
-
     @if ($opsReady)
-        <div class="space-y-6">
-            <div class="{{ $card }}">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
-                            </p>
-                        </div>
-                    </div>
-                    {{-- flex-nowrap + shrink-0 keeps Browse + Write your own
-                         on a single row even when the heading column is wide.
-                         The previous flex-wrap let them stack vertically when
-                         the right column was narrower than the two buttons'
-                         combined width. --}}
-                    <div class="flex flex-row flex-nowrap items-center gap-2 shrink-0 sm:justify-end">
-                        <button
-                            type="button"
-                            wire:click="openLibrary"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-                        >
-                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="3" y="3" width="14" height="14" rx="2"/>
-                                <path d="M3 8h14"/>
-                                <path d="M8 3v14"/>
-                            </svg>
-                            {{ __('Browse library') }}
-                            <span class="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-medium">
-                                {{ $libraryTotals['marketplace'] + $libraryTotals['organization'] }}
+        <div class="space-y-4">
+            <div class="dply-card min-w-0 overflow-hidden p-0">
+                {{-- Page identity + actions (replaces layout hero + blue banner) --}}
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-play class="h-5 w-5" aria-hidden="true" />
                             </span>
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="startNewRecipe"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                        >
-                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M10 4v12"/>
-                                <path d="M4 10h12"/>
-                            </svg>
-                            {{ __('Write your own') }}
-                        </button>
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Run') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Saved recipes and one-off shell on this server. Site deploys live on each site’s page.') }}
+                                </p>
+                                <p class="mt-2 text-xs text-brand-mist">
+                                    {{ __(':count saved on this server', ['count' => $recipeCount]) }}
+                                    ·
+                                    <a href="{{ route('servers.sites', $server) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Open Sites') }}</a>
+                                    @if ($server->workspace)
+                                        @feature('surface.projects')
+                                            ·
+                                            <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Project delivery') }}</a>
+                                        @endfeature
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex flex-row flex-nowrap items-center gap-2 shrink-0">
+                            <button
+                                type="button"
+                                wire:click="openLibrary"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                            >
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect x="3" y="3" width="14" height="14" rx="2"/>
+                                    <path d="M3 8h14"/>
+                                    <path d="M8 3v14"/>
+                                </svg>
+                                {{ __('Browse library') }}
+                                <span class="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-medium">
+                                    {{ $libraryTotals['marketplace'] + $libraryTotals['organization'] }}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="startNewRecipe"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            >
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M10 4v12"/>
+                                    <path d="M4 10h12"/>
+                                </svg>
+                                {{ __('Write your own') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="px-6 py-6 sm:px-7">
-                @if ($server->recipes->isEmpty())
-                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
-                        <p class="font-medium text-brand-ink">{{ __('No saved commands yet.') }}</p>
-                        <p class="mt-1">
-                            {{ __('Open the library to import a marketplace preset or an organization script — or write your own from scratch.') }}
-                        </p>
+                {{-- Library --}}
+                <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+                    <div class="mb-3 flex items-center gap-2">
+                        <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library on this server') }}</p>
                     </div>
-                @else
-                    <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
-                        @foreach ($server->recipes as $rec)
-                            <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div class="min-w-0">
-                                    <p class="truncate font-medium text-brand-ink">{{ $rec->name }}</p>
-                                    <p class="mt-0.5 text-xs text-brand-moss">
-                                        {{ __('Updated :when', ['when' => $rec->updated_at?->diffForHumans() ?? '—']) }}
-                                    </p>
-                                </div>
-                                <div class="flex flex-wrap gap-2 text-xs font-medium">
-                                    {{-- Per-row spinners scoped via exact wire:target call signature so
-                                         clicking Run on recipe A doesn't dim Run on recipes B + C. --}}
-                                    @php
-                                        $deleteCall = "openConfirmActionModal('deleteRecipe', ['".$rec->id."'], '".addslashes(__('Delete saved command'))."', '".addslashes(__('Delete saved command?'))."', '".addslashes(__('Delete'))."', true)";
-                                    @endphp
 
-                                    <button
-                                        type="button"
-                                        wire:click="runRecipe('{{ $rec->id }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="runRecipe('{{ $rec->id }}')"
-                                        @disabled($isRunning)
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <span wire:loading.remove wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                            {{ __('Run') }}
-                                        </span>
-                                        <span wire:loading wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
-                                            <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-sage/40 border-t-brand-sage" aria-hidden="true"></span>
-                                            {{ __('Running…') }}
-                                        </span>
-                                    </button>
+                    @if ($server->recipes->isEmpty())
+                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
+                            <p class="font-medium text-brand-ink">{{ __('No saved commands yet.') }}</p>
+                            <p class="mt-1">
+                                {{ __('Browse the library for a marketplace preset or organization script — or write your own.') }}
+                            </p>
+                        </div>
+                    @else
+                        <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+                            @foreach ($server->recipes as $rec)
+                                <li class="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-medium text-brand-ink">{{ $rec->name }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">
+                                            {{ __('Updated :when', ['when' => $rec->updated_at?->diffForHumans() ?? '—']) }}
+                                        </p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 text-xs font-medium">
+                                        @php
+                                            $deleteCall = "openConfirmActionModal('deleteRecipe', ['".$rec->id."'], '".addslashes(__('Delete saved command'))."', '".addslashes(__('Delete saved command?'))."', '".addslashes(__('Delete'))."', true)";
+                                        @endphp
 
-                                    <button
-                                        type="button"
-                                        wire:click="editRecipe('{{ $rec->id }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="editRecipe('{{ $rec->id }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <span wire:loading.remove wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                            {{ __('Edit') }}
-                                        </span>
-                                        <span wire:loading wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
-                                            <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
-                                            {{ __('Loading…') }}
-                                        </span>
-                                    </button>
+                                        <button
+                                            type="button"
+                                            wire:click="runRecipe('{{ $rec->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="runRecipe('{{ $rec->id }}')"
+                                            @disabled($isRunning)
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <span wire:loading.remove wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Run') }}
+                                            </span>
+                                            <span wire:loading wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
+                                                <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-sage/40 border-t-brand-sage" aria-hidden="true"></span>
+                                                {{ __('Running…') }}
+                                            </span>
+                                        </button>
 
-                                    <button
-                                        type="button"
-                                        wire:click="{{ $deleteCall }}"
-                                        wire:loading.attr="disabled"
-                                        wire:target="{{ $deleteCall }}"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <span wire:loading.remove wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                            {{ __('Delete') }}
-                                        </span>
-                                        <span wire:loading wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1.5">
-                                            <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-red-300 border-t-red-700" aria-hidden="true"></span>
-                                            {{ __('Deleting…') }}
-                                        </span>
-                                    </button>
-                                </div>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
+                                        <button
+                                            type="button"
+                                            wire:click="editRecipe('{{ $rec->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="editRecipe('{{ $rec->id }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <span wire:loading.remove wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Edit') }}
+                                            </span>
+                                            <span wire:loading wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
+                                                <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
+                                                {{ __('Loading…') }}
+                                            </span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            wire:click="{{ $deleteCall }}"
+                                            wire:loading.attr="disabled"
+                                            wire:target="{{ $deleteCall }}"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <span wire:loading.remove wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Delete') }}
+                                            </span>
+                                            <span wire:loading wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1.5">
+                                                <span class="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-red-300 border-t-red-700" aria-hidden="true"></span>
+                                                {{ __('Deleting…') }}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+
+                {{-- One-off --}}
+                <div class="px-5 py-5 sm:px-6">
+                    <div class="mb-3 flex items-center gap-2">
+                        <x-heroicon-o-bolt class="h-4 w-4 text-brand-mist" aria-hidden="true" />
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('One-off command') }}</p>
+                    </div>
+                    <p class="mb-3 text-sm text-brand-moss">
+                        @if ($container_scope_id !== '')
+                            {{ __('Runs inside the scoped container. Output streams above; nothing is saved unless you add it as a recipe.') }}
+                        @else
+                            {{ __('Type a shell command and run it now. Output streams above; save it as a recipe when you want to keep it.') }}
+                        @endif
+                    </p>
+                    <form wire:submit="runAdhocCommand" class="space-y-3">
+                        <textarea
+                            wire:model="adhoc_command"
+                            rows="4"
+                            @disabled($isRunning)
+                            class="w-full rounded-xl border border-brand-ink/15 bg-white font-mono text-xs shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:opacity-60"
+                            placeholder="{{ $container_scope_id !== '' ? 'php artisan migrate --force' : 'uname -a' }}"
+                        ></textarea>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <x-primary-button type="submit" class="!py-2" :disabled="$isRunning">
+                                {{ $isRunning ? __('Running…') : __('Run command') }}
+                            </x-primary-button>
+                            <a href="{{ route('scripts.index') }}" wire:navigate class="text-xs font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline">
+                                {{ __('Organization scripts') }}
+                            </a>
+                        </div>
+                    </form>
                 </div>
             </div>
 
             @if ($showEditor)
-                <div class="{{ $card }}">
-                    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                <div class="dply-card overflow-hidden p-0">
+                    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
                         <div class="flex min-w-0 items-start gap-3">
-                            <x-icon-badge>
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
+                            </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Saved command') }}</p>
-                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                <h3 class="text-base font-semibold text-brand-ink">
                                     {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
-                                </h2>
+                                </h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Store the command exactly as it should run on this server. Recipes are listed above and can be run, edited, or deleted any time.') }}
+                                    {{ __('Store the command exactly as it should run on this server.') }}
                                 </p>
                             </div>
                         </div>
@@ -217,89 +234,40 @@
                         </button>
                     </div>
 
-                    <div class="px-6 py-6 sm:px-7">
-                    @if (! $editing_recipe_id && ! empty($starterTemplates))
-                        {{-- Starter templates: pre-fill the form from the
-                             small set of presets that the deleted /deploy
-                             page used to surface as quick-fill buttons.
-                             Only shown when CREATING a new recipe — editing
-                             an existing one shouldn't offer a "wipe and
-                             repopulate from template" footgun. --}}
-                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start from a template') }}</p>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                @foreach ($starterTemplates as $template)
-                                    <button
-                                        type="button"
-                                        wire:click="applyStarterTemplate('{{ $template['key'] }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                        title="{{ $template['description'] }}"
-                                    >
-                                        {{ $template['label'] }}
-                                    </button>
-                                @endforeach
+                    <div class="px-5 py-5 sm:px-6">
+                        @if (! $editing_recipe_id && ! empty($starterTemplates))
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start from a template') }}</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @foreach ($starterTemplates as $template)
+                                        <button
+                                            type="button"
+                                            wire:click="applyStarterTemplate('{{ $template['key'] }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                            title="{{ $template['description'] }}"
+                                        >
+                                            {{ $template['label'] }}
+                                        </button>
+                                    @endforeach
+                                </div>
                             </div>
-                        </div>
-                    @endif
+                        @endif
 
-                    <form wire:submit="addRecipe" class="mt-6 space-y-4">
-                        <x-text-input wire:model="new_recipe_name" placeholder="{{ __('Saved command name') }}" />
-                        <textarea wire:model="new_recipe_script" rows="14" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="#!/bin/bash&#10;set -euo pipefail&#10;…"></textarea>
-                        <div class="flex flex-wrap gap-3">
-                            <x-primary-button type="submit" class="!py-2">
-                                {{ $editing_recipe_id ? __('Save changes') : __('Add saved command') }}
-                            </x-primary-button>
-                            <button type="button" wire:click="cancelEditingRecipe" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                {{ __('Cancel') }}
-                            </button>
-                        </div>
-                    </form>
+                        <form wire:submit="addRecipe" @class(['space-y-4', 'mt-5' => ! $editing_recipe_id && ! empty($starterTemplates)])>
+                            <x-text-input wire:model="new_recipe_name" placeholder="{{ __('Saved command name') }}" />
+                            <textarea wire:model="new_recipe_script" rows="14" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="#!/bin/bash&#10;set -euo pipefail&#10;…"></textarea>
+                            <div class="flex flex-wrap gap-3">
+                                <x-primary-button type="submit" class="!py-2">
+                                    {{ $editing_recipe_id ? __('Save changes') : __('Add saved command') }}
+                                </x-primary-button>
+                                <button type="button" wire:click="cancelEditingRecipe" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    {{ __('Cancel') }}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             @endif
-
-            {{-- Ad-hoc one-off command runner. Absorbed from the deleted
-                 /deploy page so /run owns all command execution. Output
-                 streams to the live SSH panel via the StreamsRemoteSshLivewire
-                 trait — same plumbing the recipe runner uses. --}}
-            <div class="{{ $card }}">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('One-off') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            @if ($container_scope_id !== '')
-                                {{ __('Type a command to run inside the scoped container. Output streams below; nothing is saved unless you add it as a saved command.') }}
-                            @else
-                                {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-                <div class="px-6 py-6 sm:px-7">
-                <form wire:submit="runAdhocCommand" class="space-y-3">
-                    <textarea wire:model="adhoc_command" rows="4" @disabled($isRunning) class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm disabled:opacity-60" placeholder="{{ $container_scope_id !== '' ? 'php artisan migrate --force' : 'uname -a' }}"></textarea>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <x-primary-button type="submit" class="!py-2" :disabled="$isRunning">
-                            {{ $isRunning ? __('Running…') : __('Run command') }}
-                        </x-primary-button>
-                    </div>
-                </form>
-                </div>
-            </div>
-
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 px-5 py-4 text-sm text-brand-moss">
-                <p class="font-medium text-brand-ink">{{ __('Where else commands live') }}</p>
-                <p class="mt-1 leading-relaxed">
-                    {{ __('Saved commands stay on this server only. Use Scripts for organization-wide reusable automation.') }}
-                </p>
-                <div class="mt-3 flex flex-wrap gap-3 text-sm font-medium">
-                    <a href="{{ route('scripts.index') }}" wire:navigate class="text-brand-ink hover:text-brand-sage">{{ __('Open scripts') }}</a>
-                </div>
-            </div>
         </div>
     @else
         <section class="dply-card overflow-hidden border-amber-200">

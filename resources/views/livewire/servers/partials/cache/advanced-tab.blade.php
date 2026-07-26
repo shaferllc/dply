@@ -1,4 +1,4 @@
-            <div class="{{ $card }} p-6 sm:p-8">
+            <div class="{{ $card }} px-5 py-5 sm:px-6">
                 <h2 class="text-base font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Recent install / uninstall / restart / stop / start / flush events on cache services for this server.') }}</p>
                 <ul class="mt-6 divide-y divide-brand-ink/10 text-sm">

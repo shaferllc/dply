@@ -7,6 +7,8 @@
         :has-sites-in-scope="$hasSitesInScope"
         :status-options="$statusOptions"
         :sort-options="$sortOptions"
+        :status-filter="$statusFilter"
+        :sort="$sort"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Sites'), 'icon' => 'globe-alt'],

@@ -5,8 +5,8 @@
         $credentialsEmailed = (bool) ($generated_database_credentials['credentials_emailed'] ?? false);
         $showPasswordOnce = filled($plainPassword) && ! $passwordHidden;
     @endphp
-    <section
-        class="dply-card overflow-hidden"
+    <div
+        class="border-b border-brand-ink/10"
         @if ($showPasswordOnce)
             x-data="{
                 copied: false,
@@ -26,7 +26,7 @@
             x-init="setTimeout(() => hidePassword(), 90000)"
         @endif
     >
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
             <x-icon-badge>
                 <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
@@ -46,7 +46,7 @@
                 {{ __('Dismiss') }}
             </button>
         </div>
-        <dl class="grid gap-3 p-6 sm:grid-cols-2 sm:p-7">
+        <dl class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6">
             <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</dt>
                 <dd class="mt-0.5 font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['name'] }}</dd>
@@ -102,5 +102,5 @@
                 </div>
             @endif
         </dl>
-    </section>
+    </div>
 @endif

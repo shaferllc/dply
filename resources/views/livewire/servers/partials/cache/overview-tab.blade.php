@@ -1,5 +1,5 @@
             @if ($cacheServices->isEmpty())
-                <div class="{{ $card }} overflow-hidden">
+                <div class="{{ $card }} px-5 py-5 sm:px-6">
                     <div class="px-6 py-6 sm:px-8">
                         <x-empty-state
                             borderless
@@ -31,7 +31,7 @@
                             \App\Models\ServerCacheService::STATUS_UNINSTALLING,
                         ], true);
                     @endphp
-                    <div class="{{ $card }} p-6 sm:p-8">
+                    <div class="{{ $card }} px-5 py-5 sm:px-6">
                         <div class="flex flex-wrap items-center gap-3">
                             <h2 class="text-base font-semibold text-brand-ink">
                                 {{ $engineLabel }}

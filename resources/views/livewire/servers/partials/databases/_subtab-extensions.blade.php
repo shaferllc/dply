@@ -1,5 +1,5 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} overflow-hidden px-6 py-6 sm:px-8">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <x-empty-state
             borderless
             icon="heroicon-o-puzzle-piece"
@@ -15,8 +15,8 @@
         </x-empty-state>
     </div>
 @else
-    <div class="{{ $card }} overflow-hidden" wire:init="loadPostgresExtensions">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+    <div class="{{ $card }}" wire:init="loadPostgresExtensions">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PostgreSQL') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Optional extensions') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
@@ -28,7 +28,7 @@
                 @php
                     $installed = in_array($meta['extension'], $postgres_installed_extensions ?? [], true);
                 @endphp
-                <li class="flex flex-wrap items-start justify-between gap-4 px-6 py-5 sm:px-7">
+                <li class="flex flex-wrap items-start justify-between gap-4 px-5 py-5 sm:px-6">
                     <div class="min-w-0 max-w-xl">
                         <div class="flex flex-wrap items-center gap-2">
                             <h4 class="text-sm font-semibold text-brand-ink">{{ $meta['label'] }}</h4>

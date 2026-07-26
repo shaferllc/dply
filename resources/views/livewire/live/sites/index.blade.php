@@ -17,11 +17,14 @@
         :has-sites-in-scope="$hasSitesInScope"
         :status-options="$statusOptions"
         :sort-options="$sortOptions"
+        :status-filter="$statusFilter"
+        :sort="$sort"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
             ['label' => __('Sites'), 'icon' => 'globe-alt'],
         ]"
+        :eyebrow="__('Production')"
         :servers-index-url="route('live.servers.index')"
         empty-state="production"
     >

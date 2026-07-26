@@ -9,22 +9,41 @@
             default => ['bg-brand-sand/60', 'text-brand-moss', 'ring-brand-ink/10'],
         };
     };
+    $nested = (bool) ($nested ?? false);
 @endphp
-<section class="dply-card overflow-hidden" wire:poll.5s>
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent action logs') }}</h2>
+<section @class([
+    'overflow-hidden',
+    'dply-card' => ! $nested,
+    'border-b border-brand-ink/10' => $nested,
+]) wire:poll.5s>
+    <div @class([
+        'flex items-start gap-3 border-b border-brand-ink/10',
+        'bg-brand-sand/20 px-6 py-5 sm:px-7' => ! $nested,
+        'px-5 py-4 sm:px-6' => $nested,
+    ])>
+        @if (! $nested)
+            <x-icon-badge>
+                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+        @else
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+            </span>
+        @endif
+        <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Action logs') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent action logs') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Installs and per-service actions, newest first. Click a row to view the SSH output.') }}</p>
         </div>
-        <p class="ml-auto shrink-0 text-xs text-brand-mist">{{ trans_choice(':count entry|:count entries', $rows->count(), ['count' => $rows->count()]) }}</p>
+        <p class="ml-auto shrink-0 text-xs text-brand-mist">{{ trans_choice(':count entry|:count entries', $rows->total(), ['count' => $rows->total()]) }}</p>
     </div>
 
     @if ($rows->isEmpty())
-        <p class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">{{ __('No actions have run on this server yet.') }}</p>
+        <p @class([
+            'text-center text-sm text-brand-moss',
+            'px-6 py-10 sm:px-8' => ! $nested,
+            'px-5 py-8 sm:px-6' => $nested,
+        ])>{{ __('No actions have run on this server yet.') }}</p>
     @else
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($rows as $row)
@@ -34,7 +53,10 @@
                     $hasError = is_string($row->error_message) && trim($row->error_message) !== '';
                     $clickable = $hasOutput || $hasError;
                 @endphp
-                <li class="px-6 py-3 sm:px-8">
+                <li @class([
+                    'px-6 py-3 sm:px-8' => ! $nested,
+                    'px-5 py-3 sm:px-6' => $nested,
+                ])>
                     <button
                         type="button"
                         @if ($clickable) wire:click="viewLog('{{ $row->id }}')" @endif
@@ -48,15 +70,15 @@
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $bg }} {{ $text }} {{ $ring }}">{{ strtoupper($row->status) }}</span>
-                                <span class="text-sm font-medium text-brand-ink truncate">{{ $row->label ?: $row->task_name }}</span>
+                                <span class="truncate text-sm font-medium text-brand-ink">{{ $row->label ?: $row->task_name }}</span>
                             </div>
-                            <p class="mt-1 text-xs text-brand-mist font-mono break-all">{{ $row->task_name }}</p>
+                            <p class="mt-1 break-all font-mono text-xs text-brand-mist">{{ $row->task_name }}</p>
                             @if ($hasError)
-                                <p class="mt-1 text-xs text-red-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ \Illuminate\Support\Str::limit($row->error_message, 240) }}</p>
+                                <p class="mt-1 whitespace-pre-wrap break-words text-xs text-red-700 [overflow-wrap:anywhere]">{{ \Illuminate\Support\Str::limit($row->error_message, 240) }}</p>
                             @endif
                         </div>
                         <div class="flex shrink-0 flex-col items-end gap-1 text-right">
-                            <span class="text-xs text-brand-mist whitespace-nowrap">
+                            <span class="whitespace-nowrap text-xs text-brand-mist">
                                 @if ($row->finished_at)
                                     {{ $row->finished_at->diffForHumans() }}
                                 @elseif ($row->started_at)
@@ -73,6 +95,16 @@
                 </li>
             @endforeach
         </ul>
+
+        @if ($rows->hasPages())
+            <div @class([
+                'border-t border-brand-ink/10',
+                'px-6 py-4 sm:px-8' => ! $nested,
+                'px-5 py-3 sm:px-6' => $nested,
+            ])>
+                {{ $rows->links() }}
+            </div>
+        @endif
     @endif
 </section>
 
@@ -90,10 +122,10 @@
             <div class="relative w-full max-w-3xl dply-modal-panel" wire:click.stop>
                 <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-7">
                     <h2 id="action-log-modal-title" class="text-base font-semibold text-brand-ink">{{ $openLog->label ?: $openLog->task_name }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss font-mono break-all">{{ $openLog->task_name }}</p>
+                    <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $openLog->task_name }}</p>
                 </div>
                 <div class="space-y-3 px-6 py-5 sm:px-7">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs text-brand-moss">
+                    <div class="grid grid-cols-1 gap-3 text-xs text-brand-moss sm:grid-cols-3">
                         <div>
                             <dt class="font-medium uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                             <dd class="mt-0.5 font-semibold text-brand-ink">{{ strtoupper($openLog->status) }}</dd>
@@ -108,7 +140,7 @@
                         </div>
                     </div>
                     @if ($openLog->error_message)
-                        <div class="rounded-lg border border-red-200/80 bg-red-50/80 px-3 py-2 text-xs text-red-900 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $openLog->error_message }}</div>
+                        <div class="whitespace-pre-wrap break-words rounded-lg border border-red-200/80 bg-red-50/80 px-3 py-2 text-xs text-red-900 [overflow-wrap:anywhere]">{{ $openLog->error_message }}</div>
                     @endif
                     @if (is_string($openLog->output) && trim($openLog->output) !== '')
                         <div
@@ -142,7 +174,7 @@
                                 </button>
                             </div>
                             <pre x-ref="raw" class="hidden">{{ $openLog->output }}</pre>
-                            <pre class="font-mono text-[11px] leading-snug whitespace-pre-wrap break-words text-zinc-900 [overflow-wrap:anywhere] max-h-[60vh] overflow-y-auto">{{ $openLog->output }}</pre>
+                            <pre class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-zinc-900 [overflow-wrap:anywhere]">{{ $openLog->output }}</pre>
                         </div>
                     @else
                         <p class="text-xs text-brand-moss">{{ __('No output was captured for this action.') }}</p>

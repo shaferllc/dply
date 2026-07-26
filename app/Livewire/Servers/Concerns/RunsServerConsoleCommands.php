@@ -91,6 +91,12 @@ trait RunsServerConsoleCommands
         $cmd = trim($this->command);
         $startedAt = microtime(true);
 
+        // The console prompt is deliberately synchronous — it is an interactive
+        // shell, not a queued job — so PHP's default 30s ceiling would kill the
+        // request before the exec timeout ever fired. Lift it past the SSH
+        // budget, same as the other SSH-backed workspace actions.
+        set_time_limit(self::CONSOLE_EXEC_TIMEOUT + 30);
+
         try {
             $ssh = app(SshConnectionFactory::class)->forServer($this->server);
             [$out, $exit] = $ssh->execWithCallbackAndExit(

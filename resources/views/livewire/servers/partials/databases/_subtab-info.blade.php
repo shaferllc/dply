@@ -17,7 +17,7 @@
         ])
     @endif
 
-    <div class="{{ $card }} p-6 sm:p-8">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="max-w-2xl">
                 <h3 class="text-lg font-semibold text-brand-ink">{{ __('Live processlist') }}</h3>
@@ -41,7 +41,7 @@
         </div>
     </div>
 
-    <div id="db-manage-hints-{{ $engine }}" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
+    <div id="db-manage-hints-{{ $engine }}" class="{{ $card }} scroll-mt-24 px-5 py-5 sm:px-6">
         <h3 class="text-lg font-semibold text-brand-ink">{{ __('Database connection hints') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Optional values for Dply features such as backups, and to authenticate the processlist action above.') }}
