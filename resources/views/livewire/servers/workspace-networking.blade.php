@@ -3,6 +3,7 @@
     active="networking"
     :title="__('Networking')"
     :description="__('All servers in your workspace — their private IPs, running services, and which databases are open to the network.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -13,35 +14,54 @@
         $hasAccessControls = $databaseEngines->isNotEmpty() || $databasesByEngine->flatten()->isNotEmpty() || $cacheServices->isNotEmpty();
     @endphp
 
-    <x-server-workspace-tablist :aria-label="__('Networking sections')">
-        <x-server-workspace-tab id="net-tab-servers" icon="heroicon-o-share" :active="$networking_tab === 'servers'" wire:click="setNetworkingTab('servers')">
-            {{ __('Servers') }}
-        </x-server-workspace-tab>
-        <x-server-workspace-tab id="net-tab-access" icon="heroicon-o-lock-closed" :active="$networking_tab === 'access'" wire:click="setNetworkingTab('access')">
-            {{ __('Access') }}
-        </x-server-workspace-tab>
-        <x-server-workspace-tab id="net-tab-attached" icon="heroicon-o-arrows-right-left" :active="$networking_tab === 'attached'" wire:click="setNetworkingTab('attached')">
-            {{ __('Attached') }}
-            @if (count($attachedRemoteResources) > 0)
-                <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ count($attachedRemoteResources) }}</span>
-            @endif
-        </x-server-workspace-tab>
-        @if ($showRoutesTab)
-            <x-server-workspace-tab id="net-tab-routes" icon="heroicon-o-map" :active="$networking_tab === 'routes'" wire:click="setNetworkingTab('routes')">
-                {{ __('Routes') }}
-            </x-server-workspace-tab>
-        @endif
-        <x-server-workspace-tab id="net-tab-notifications" icon="heroicon-o-bell" :active="$networking_tab === 'notifications'" wire:click="setNetworkingTab('notifications')">
-            {{ __('Notifications') }}
-        </x-server-workspace-tab>
-    </x-server-workspace-tablist>
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Networking') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('All servers in your workspace — their private IPs, running services, and which databases are open to the network.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Networking sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab id="net-tab-servers" icon="heroicon-o-share" :active="$networking_tab === 'servers'" wire:click="setNetworkingTab('servers')">
+                    {{ __('Servers') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="net-tab-access" icon="heroicon-o-lock-closed" :active="$networking_tab === 'access'" wire:click="setNetworkingTab('access')">
+                    {{ __('Access') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="net-tab-attached" icon="heroicon-o-arrows-right-left" :active="$networking_tab === 'attached'" wire:click="setNetworkingTab('attached')">
+                    {{ __('Attached') }}
+                    @if (count($attachedRemoteResources) > 0)
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ count($attachedRemoteResources) }}</span>
+                    @endif
+                </x-server-workspace-tab>
+                @if ($showRoutesTab)
+                    <x-server-workspace-tab id="net-tab-routes" icon="heroicon-o-map" :active="$networking_tab === 'routes'" wire:click="setNetworkingTab('routes')">
+                        {{ __('Routes') }}
+                    </x-server-workspace-tab>
+                @endif
+                <x-server-workspace-tab id="net-tab-notifications" icon="heroicon-o-bell" :active="$networking_tab === 'notifications'" wire:click="setNetworkingTab('notifications')">
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
 
     {{-- Skeleton placeholder shown while the incoming tab loads. --}}
-    <div wire:loading.block wire:target="setNetworkingTab">
+    <div wire:loading.block wire:target="setNetworkingTab" class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
         @include('livewire.servers.partials._skeleton-cards')
     </div>
 
-    <div class="space-y-6" wire:loading.remove wire:target="setNetworkingTab">
+    <div class="min-w-0" wire:loading.remove wire:target="setNetworkingTab">
 
         {{-- ─── SERVERS: ALL SERVERS OVERVIEW ─────────────────────────────── --}}
         @if ($networking_tab === 'servers')
@@ -54,7 +74,7 @@
             :empty-text="__('Once a server runs a database or cache, it appears here with its exposure.')"
         />
 
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
@@ -303,7 +323,7 @@
 
         {{-- ─── ATTACHED RESOURCES: remote DBs/caches this server reaches ──── --}}
         @if ($networking_tab === 'attached')
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
@@ -393,7 +413,7 @@
         {{-- ─── ACCESS: PER-DATABASE + CACHE REMOTE ACCESS CONTROLS ────────── --}}
         @if ($networking_tab === 'access')
         @if (! $hasAccessControls)
-            <section class="dply-card overflow-hidden">
+            <section class="border-b border-brand-ink/10">
                 <div class="px-6 py-6 sm:px-7">
                     <x-empty-state
                         icon="heroicon-o-lock-closed"
@@ -407,7 +427,7 @@
 
         {{-- ─── THIS SERVER: PER-DATABASE ACCESS CONTROLS ─────────────────── --}}
         @if ($databaseEngines->isNotEmpty() || $databasesByEngine->flatten()->isNotEmpty())
-            <section class="dply-card overflow-hidden">
+            <section class="border-b border-brand-ink/10">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
@@ -582,7 +602,7 @@
 
         {{-- ─── CACHE ENGINES — inline expose / lockdown controls (#3) ───── --}}
         @if ($cacheServices->isNotEmpty())
-            <section class="dply-card overflow-hidden">
+            <section class="border-b border-brand-ink/10">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
@@ -672,7 +692,7 @@
 
         {{-- ─── NETWORK ROUTES ─────────────────────────────────────────────── --}}
         @if ($networking_tab === 'routes' && $networkId > 0 && $server->provider->value === 'hetzner')
-            <section class="dply-card overflow-hidden">
+            <section class="border-b border-brand-ink/10">
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-center gap-3">
                         <x-icon-badge>
@@ -800,6 +820,7 @@
         @endif
 
     </div>
+    </section>
 
     @include('livewire.partials.confirm-action-modal')
     {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),

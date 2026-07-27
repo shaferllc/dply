@@ -27,7 +27,7 @@ final class FirewallWorkspaceViewData
         bool $includeActivityContext = false,
         array $activityItems = [],
     ): array {
-        $card = 'dply-card overflow-hidden';
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ssh_private_key;
 
         $applyStatus = (string) data_get($server->meta ?? [], config('server_firewall.meta_apply_status_key'));

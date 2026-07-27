@@ -4,7 +4,7 @@
 
 {{-- Site identity (display name + slug). Mirrors dply sites:rename semantics: row
      update only, on-disk path under /home/dply/<domain> stays put. --}}
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <form wire:submit="saveSiteIdentity">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
@@ -43,14 +43,14 @@
             </x-primary-button>
         </div>
     </form>
-</section>
+</div>
 
 {{-- Web directory — document_root. VM-only: container/serverless apps don't
      have an on-disk document root (no host webserver, no nginx vhost). Editing
      the primary domain itself happens in Routing because the cascade (cert /
      backend / dns_zone) belongs to the domain change, not to the path. --}}
 @if (! $isContainerWorkspace)
-<section class="dply-card mt-6 overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <form wire:submit="saveWebDirectory">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
@@ -87,14 +87,14 @@
             </x-primary-button>
         </div>
     </form>
-</section>
+</div>
 @endif
 
 {{-- Serving mode — worker lockdown. When on, Caddy serves a static "this runs
      workers" page for every request and the deployed code is never browsable.
      VM-only; worker hosts default this on. --}}
 @if ($this->canConfigureWorkerMode)
-<section class="dply-card mt-6 overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <form wire:submit="saveWorkerMode">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
@@ -149,11 +149,11 @@
             </x-primary-button>
         </div>
     </form>
-</section>
+</div>
 @endif
 
 {{-- Project / workspace assignment — moved from General. --}}
-<section class="dply-card mt-6 overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <form wire:submit="saveProjectSettings">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
@@ -207,10 +207,10 @@
             </x-primary-button>
         </div>
     </form>
-</section>
+</div>
 
 {{-- Site notes — moved from General. --}}
-<section class="dply-card mt-6 overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <form wire:submit="saveSiteNotes">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
@@ -240,7 +240,7 @@
             </x-primary-button>
         </div>
     </form>
-</section>
+</div>
 
 {{-- Error pages — VM webserver sites only. By default dply does NOT intercept:
      the app renders its own error pages (its 500/503, the framework debug page
@@ -249,7 +249,7 @@
      unavailable" splash, which also carries a reference id for the Errors tab. --}}
 @if (! $isContainerWorkspace)
     @php $rawServerErrors = $this->serverErrorsExposed(); @endphp
-    <section class="dply-card mt-6 overflow-hidden">
+    <div class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
@@ -302,14 +302,16 @@
                 </button>
             @endif
         </div>
-    </section>
+    </div>
 @endif
 
 {{-- CLI snippet — every settings section ships one so operators always know the
      equivalent dply CLI command. This section's edits are name/slug only, both
      of which today flow through the rename cascade modal rather than a direct
      CLI verb, so the stub variant explains the gap until that lands. --}}
+<div class="px-5 py-5 sm:px-6">
 <x-cli-snippet :commands="[
     ['label' => __('Show site'), 'command' => 'dply sites:show '.$site->slug],
     ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' <new-slug>'],
 ]" />
+</div>

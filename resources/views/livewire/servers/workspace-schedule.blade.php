@@ -1,10 +1,3 @@
-@php
-    // Site-context schedule (reached from a site's sidebar with ?site=)
-    // renders inside the site workspace wrapper to match the other site
-    // sub-pages. The server-level Schedule keeps the server shell.
-    $scheduleContextSite = $contextSite ?? null;
-@endphp
-
 {{-- Single stable root: a Livewire component must morph against ONE consistent
      root element. This page renders two structurally different layouts (site
      context vs server context); without a shared wrapper the root element
@@ -12,9 +5,9 @@
      orphaned, snapshot-less root ("Snapshot missing on Livewire component").
      `display:contents` keeps the wrapper layout-neutral. --}}
 <div class="contents">
-@if ($scheduleContextSite)
+@if ($siteDedicatedContext ?? false)
     @php
-        $site = $scheduleContextSite;
+        $site = $contextSite ?? $contextSiteModel;
         $runtimeMode = $site->runtimeTargetMode();
         $runtimeTarget = $site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
@@ -38,16 +31,7 @@
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
             @include('livewire.sites.settings.partials.sidebar')
 
-            <main class="min-w-0 space-y-6 lg:col-span-9">
-                <x-page-header
-                    :eyebrow="__('Background')"
-                    :title="__('Schedule')"
-                    :description="__('Framework schedulers for this site (schedule:run tick health, cadence, run-now).')"
-                    :show-documentation="false"
-                    flush
-                    compact
-                />
-
+            <main class="min-w-0 lg:col-span-9">
                 @include('livewire.servers.partials.schedule._workspace-content')
             </main>
         </div>
@@ -60,6 +44,7 @@
         active="schedule"
         :title="__('Schedule')"
         :description="__('Framework schedulers running on this server. Tracks tick health for each scheduler; nudges you when one stops firing.')"
+        hide-hero
     >
         @include('livewire.servers.partials.schedule._workspace-content')
 

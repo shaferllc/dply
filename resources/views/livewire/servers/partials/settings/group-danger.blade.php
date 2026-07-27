@@ -1,4 +1,4 @@
-<div id="settings-danger" class="{{ $card }} scroll-mt-24 border-rose-200">
+<div id="settings-danger" class="{{ $card }} scroll-mt-24">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
         <x-icon-badge tone="danger">
             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />

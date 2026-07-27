@@ -39,7 +39,7 @@
         && ($fr = $this->fixerRun) !== null && $fr->isInFlight();
 @endphp
 
-<div class="space-y-6" @if ($deployInProgress || $fixerInFlight) wire:poll.5s @endif>
+<div @if ($deployInProgress || $fixerInFlight) wire:poll.5s @endif>
     {{-- While a queued console action is being watched (e.g. "Optimize pipeline"
          scanning the repo), poll so the deploy hub re-renders on completion: the
          success toast fires and the proposed-changes preview modal below auto-opens
@@ -424,7 +424,7 @@
         </div>
     @endif
 
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:px-8">
             <x-icon-badge>
                 <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />

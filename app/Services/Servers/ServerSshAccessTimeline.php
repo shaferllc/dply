@@ -256,10 +256,11 @@ final class ServerSshAccessTimeline
         $spanSeconds = max(1, $to->getTimestamp() - $from->getTimestamp());
 
         $lanes = collect($intervals)
-            ->map(function (array $interval) use ($from, $to, $spanSeconds): array {
+            ->map(function (array $interval) use ($from, $to, $spanSeconds): ?array {
                 $start = $interval['start']->lt($from) ? $from->copy() : $interval['start']->copy();
                 $end = $interval['end']->gt($to) ? $to->copy() : $interval['end']->copy();
 
+                // Clamped window can invert (e.g. interval entirely before $from).
                 if ($end->lt($start)) {
                     return null;
                 }

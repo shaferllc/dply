@@ -1,4 +1,4 @@
-            <div @class([$card, 'mb-6' => $server->supervisorPrograms->isNotEmpty()])>
+            <div class="{{ $card }}">
                 <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
                     <x-icon-badge>
                         <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />

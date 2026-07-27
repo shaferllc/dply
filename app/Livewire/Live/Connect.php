@@ -178,6 +178,7 @@ class Connect extends Component
                 'last_used_at' => now(),
             ],
         );
+        ProductionDataMirror::forgetConnectionMemo((string) $user->id);
 
         $this->status = 'connected';
         $this->toastSuccess(__('Connected to production data.'));

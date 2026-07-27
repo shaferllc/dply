@@ -1,137 +1,144 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @if ($contextSite && ! ($siteDedicatedContext ?? false))
-        <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-funnel class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filter') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Filtered to :site', ['site' => $contextSite->name]) }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Runs and schedules target only this site and any databases linked to it.') }}
-                            </p>
-                        </div>
-                    </div>
-                    <a href="{{ route('servers.backups', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                        <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Clear filter') }}
-                    </a>
-                </div>
-            </div>
-        </section>
-    @elseif ($contextSite && ($siteDedicatedContext ?? false))
-        <p class="text-sm text-brand-moss">
-            {{ __('Scoped to :site — runs and schedules here only target this site and its linked databases.', ['site' => $contextSite->name]) }}
-            <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Open server backups') }}</a>
-        </p>
-    @endif
+    @php
+        $backupsDescription = ($siteDedicatedContext ?? false)
+            ? __('Database and site-files backup runs for this site, plus recurring schedules. Backups write to the destination configured in Settings → Backup configurations.')
+            : __('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup configurations.');
+    @endphp
 
-    {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recent activity') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backups at a glance') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Counts from the last 7 days plus current state.') }}</p>
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Backups') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $backupsDescription }}</p>
+                    </div>
                 </div>
             </div>
         </div>
-        <dl class="grid grid-cols-1 gap-2 p-6 sm:grid-cols-2 sm:p-7 lg:grid-cols-4">
-            <div @class([
-                'rounded-2xl border px-4 py-3 shadow-sm',
-                'border-rose-200 bg-rose-50/60' => $stats['db_failed_7d'] > 0,
-                'border-emerald-200 bg-emerald-50/60' => $stats['db_failed_7d'] === 0 && $stats['db_completed_7d'] > 0,
-                'border-brand-ink/10 bg-white' => $stats['db_failed_7d'] === 0 && $stats['db_completed_7d'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database backups') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stats['db_completed_7d'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ __('completed (7d)') }}</span>
-                </dd>
-                @if ($stats['db_failed_7d'] > 0)
-                    <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
-                        <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                        {{ trans_choice(':n failed|:n failed', $stats['db_failed_7d'], ['n' => $stats['db_failed_7d']]) }}
-                    </p>
-                @else
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('No failures') }}</p>
-                @endif
-            </div>
-            <div @class([
-                'rounded-2xl border px-4 py-3 shadow-sm',
-                'border-rose-200 bg-rose-50/60' => $stats['files_failed_7d'] > 0,
-                'border-emerald-200 bg-emerald-50/60' => $stats['files_failed_7d'] === 0 && $stats['files_completed_7d'] > 0,
-                'border-brand-ink/10 bg-white' => $stats['files_failed_7d'] === 0 && $stats['files_completed_7d'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Site file backups') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stats['files_completed_7d'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ __('completed (7d)') }}</span>
-                </dd>
-                @if ($stats['files_failed_7d'] > 0)
-                    <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
-                        <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                        {{ trans_choice(':n failed|:n failed', $stats['files_failed_7d'], ['n' => $stats['files_failed_7d']]) }}
-                    </p>
-                @else
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('No failures') }}</p>
-                @endif
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total stored') }}</dt>
-                <dd class="mt-1 truncate font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $formatBytes($stats['total_bytes']) }}</dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all targets') }}</p>
-            </div>
-            <div @class([
-                'rounded-2xl border px-4 py-3 shadow-sm',
-                'border-brand-sage/30 bg-brand-sage/8' => $activeScheduleCount > 0,
-                'border-brand-ink/10 bg-white' => $activeScheduleCount === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedules') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $activeScheduleCount }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('active|active', $activeScheduleCount) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Recurring jobs') }}</p>
-            </div>
-        </dl>
-    </section>
 
-    <x-server-workspace-tablist :aria-label="__('Backups sections')">
-        <x-server-workspace-tab id="backups-tab-overview" :active="$backups_workspace_tab === 'overview'" wire:click="setBackupsWorkspaceTab('overview')">
-            <span class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
-                {{ __('Overview') }}
-            </span>
-        </x-server-workspace-tab>
-        <x-server-workspace-tab id="backups-tab-schedules" :active="$backups_workspace_tab === 'schedules'" wire:click="setBackupsWorkspaceTab('schedules')">
-            <span class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                {{ __('Schedules') }}
-            </span>
-        </x-server-workspace-tab>
-        <x-server-workspace-tab id="backups-tab-history" :active="$backups_workspace_tab === 'history'" wire:click="setBackupsWorkspaceTab('history')">
-            <span class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-archive-box class="h-4 w-4" aria-hidden="true" />
-                {{ __('History') }}
-            </span>
-        </x-server-workspace-tab>
-        <x-server-workspace-tab id="backups-tab-notifications" :active="$backups_workspace_tab === 'notifications'" wire:click="setBackupsWorkspaceTab('notifications')">
-            <span class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                {{ __('Notifications') }}
-            </span>
-        </x-server-workspace-tab>
-    </x-server-workspace-tablist>
+        @if ($contextSite && ! ($siteDedicatedContext ?? false))
+            <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-sky-50/50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+                <div class="flex min-w-0 items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-funnel class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filter') }}</p>
+                        <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Filtered to :site', ['site' => $contextSite->name]) }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                            {{ __('Runs and schedules target only this site and any databases linked to it.') }}
+                        </p>
+                    </div>
+                </div>
+                <a href="{{ route('servers.backups', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                    <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Clear filter') }}
+                </a>
+            </div>
+        @elseif ($contextSite && ($siteDedicatedContext ?? false))
+            <div class="border-b border-brand-ink/10 px-5 py-3.5 text-sm text-brand-moss sm:px-6">
+                {{ __('Scoped to :site — runs and schedules here only target this site and its linked databases.', ['site' => $contextSite->name]) }}
+                <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">{{ __('Open server backups') }}</a>
+            </div>
+        @endif
+
+        {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
+        <div class="border-b border-brand-ink/10">
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recent activity') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backups at a glance') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Counts from the last 7 days plus current state.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <dl class="grid grid-cols-1 gap-2 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+                <div @class([
+                    'rounded-xl border px-4 py-3',
+                    'border-rose-200 bg-rose-50/60' => $stats['db_failed_7d'] > 0,
+                    'border-emerald-200 bg-emerald-50/60' => $stats['db_failed_7d'] === 0 && $stats['db_completed_7d'] > 0,
+                    'border-brand-ink/10 bg-brand-sand/15' => $stats['db_failed_7d'] === 0 && $stats['db_completed_7d'] === 0,
+                ])>
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database backups') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stats['db_completed_7d'] }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ __('completed (7d)') }}</span>
+                    </dd>
+                    @if ($stats['db_failed_7d'] > 0)
+                        <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
+                            <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {{ trans_choice(':n failed|:n failed', $stats['db_failed_7d'], ['n' => $stats['db_failed_7d']]) }}
+                        </p>
+                    @else
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('No failures') }}</p>
+                    @endif
+                </div>
+                <div @class([
+                    'rounded-xl border px-4 py-3',
+                    'border-rose-200 bg-rose-50/60' => $stats['files_failed_7d'] > 0,
+                    'border-emerald-200 bg-emerald-50/60' => $stats['files_failed_7d'] === 0 && $stats['files_completed_7d'] > 0,
+                    'border-brand-ink/10 bg-brand-sand/15' => $stats['files_failed_7d'] === 0 && $stats['files_completed_7d'] === 0,
+                ])>
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Site file backups') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stats['files_completed_7d'] }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ __('completed (7d)') }}</span>
+                    </dd>
+                    @if ($stats['files_failed_7d'] > 0)
+                        <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
+                            <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {{ trans_choice(':n failed|:n failed', $stats['files_failed_7d'], ['n' => $stats['files_failed_7d']]) }}
+                        </p>
+                    @else
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('No failures') }}</p>
+                    @endif
+                </div>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total stored') }}</dt>
+                    <dd class="mt-1 truncate font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $formatBytes($stats['total_bytes']) }}</dd>
+                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all targets') }}</p>
+                </div>
+                <div @class([
+                    'rounded-xl border px-4 py-3',
+                    'border-brand-sage/30 bg-brand-sage/8' => $activeScheduleCount > 0,
+                    'border-brand-ink/10 bg-brand-sand/15' => $activeScheduleCount === 0,
+                ])>
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedules') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $activeScheduleCount }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ trans_choice('active|active', $activeScheduleCount) }}</span>
+                    </dd>
+                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Recurring jobs') }}</p>
+                </div>
+            </dl>
+        </div>
+
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Backups sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab id="backups-tab-overview" :active="$backups_workspace_tab === 'overview'" wire:click="setBackupsWorkspaceTab('overview')" icon="heroicon-o-bolt">
+                    {{ __('Overview') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="backups-tab-schedules" :active="$backups_workspace_tab === 'schedules'" wire:click="setBackupsWorkspaceTab('schedules')" icon="heroicon-o-clock">
+                    {{ __('Schedules') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="backups-tab-history" :active="$backups_workspace_tab === 'history'" wire:click="setBackupsWorkspaceTab('history')" icon="heroicon-o-archive-box">
+                    {{ __('History') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="backups-tab-notifications" :active="$backups_workspace_tab === 'notifications'" wire:click="setBackupsWorkspaceTab('notifications')" icon="heroicon-o-bell">
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
 
     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setBackupsWorkspaceTab">
 
@@ -143,7 +150,7 @@
     @endif
 
     @if ($backups_workspace_tab === 'overview')
-    <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="space-y-6">
+    <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="min-w-0">
     {{-- On-demand backup progress (database + site files) streams here. The
          banner derives from the latest non-dismissed backup console run, so it
          rehydrates across reload and is visible to anyone watching this server. --}}
@@ -167,19 +174,21 @@
          restorable, to your destination) vs Download now (ephemeral quick download
          straight to the browser, no S3). They share the "run a backup now" intent
          but differ in what happens to the artifact, so they're one group + toggle. --}}
-    <div x-data="{ runMode: 'save' }" class="space-y-6">
-        <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
-            <button type="button" x-on:click="runMode = 'save'" :class="runMode === 'save' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
-                <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Save a backup') }}
-            </button>
-            <button type="button" x-on:click="runMode = 'download'" :class="runMode === 'download' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
-                <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Download now') }}
-            </button>
+    <div x-data="{ runMode: 'save' }" class="min-w-0">
+        <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
+                <button type="button" x-on:click="runMode = 'save'" :class="runMode === 'save' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
+                    <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Save a backup') }}
+                </button>
+                <button type="button" x-on:click="runMode = 'download'" :class="runMode === 'download' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
+                    <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Download now') }}
+                </button>
+            </div>
         </div>
 
-    <section x-show="runMode === 'download'" x-cloak class="dply-card overflow-hidden" wire:init="detectLiveDatabases">
+    <section x-show="runMode === 'download'" x-cloak class="border-b border-brand-ink/10" wire:init="detectLiveDatabases">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -258,7 +267,7 @@
         </div>
     </section>
 
-    <section x-show="runMode === 'save'" x-cloak class="dply-card overflow-hidden">
+    <section x-show="runMode === 'save'" x-cloak class="border-b border-brand-ink/10">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -341,8 +350,8 @@
     </section>
 
     {{-- Run now -------------------------------------------------------------------- --}}
-    <div x-show="runMode === 'save'" x-cloak class="grid gap-4 lg:grid-cols-2">
-        <section class="dply-card overflow-hidden">
+    <div x-show="runMode === 'save'" x-cloak class="grid lg:grid-cols-2 lg:divide-x lg:divide-brand-ink/10">
+        <section class="border-b border-brand-ink/10 lg:border-b-0">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
                     <x-icon-badge>
@@ -413,7 +422,7 @@
             </div>
         </section>
 
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
                     <x-icon-badge>
@@ -465,7 +474,7 @@
     @endif
 
     @if ($backups_workspace_tab === 'schedules')
-    <x-server-workspace-tab-panel id="backups-panel-schedules" labelled-by="backups-tab-schedules" panel-class="space-y-6">
+    <x-server-workspace-tab-panel id="backups-panel-schedules" labelled-by="backups-tab-schedules" panel-class="min-w-0">
     {{-- A "Run now" launched from this tab streams into the same banner. --}}
     @if ($backupConsoleRun)
         @include('livewire.partials.console-action-banner-static', [
@@ -474,7 +483,7 @@
         ])
     @endif
     {{-- Schedules ------------------------------------------------------------------ --}}
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -720,10 +729,10 @@
     @endif
 
     @if ($backups_workspace_tab === 'history')
-    <x-server-workspace-tab-panel id="backups-panel-history" labelled-by="backups-tab-history" panel-class="space-y-6">
+    <x-server-workspace-tab-panel id="backups-panel-history" labelled-by="backups-tab-history" panel-class="min-w-0">
     {{-- Recent runs ---------------------------------------------------------------- --}}
-    <div class="grid gap-4 lg:grid-cols-2">
-        <section class="dply-card overflow-hidden">
+    <div class="grid lg:grid-cols-2 lg:divide-x lg:divide-brand-ink/10">
+        <section class="border-b border-brand-ink/10 lg:border-b-0">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
                     <x-icon-badge>
@@ -804,7 +813,7 @@
             @endif
         </section>
 
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
                     <x-icon-badge>
@@ -889,12 +898,22 @@
     @endif
 
     @if ($backups_workspace_tab === 'notifications')
-    <x-server-workspace-tab-panel id="backups-panel-notifications" labelled-by="backups-tab-notifications" panel-class="space-y-6">
+    <x-server-workspace-tab-panel id="backups-panel-notifications" labelled-by="backups-tab-notifications" panel-class="min-w-0">
         @include('livewire.servers.partials.backups._tab-notifications')
     </x-server-workspace-tab-panel>
     @endif
 
     </div>{{-- /tab container --}}
+
+    {{-- CLI equivalents — same idea as Cron / Daemons pages. Lets operators script the same flows. --}}
+    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['label' => __('Run all due backup schedules now'), 'command' => 'dply:run-backup-schedule {schedule_id}'],
+            ['label' => __('Prune old backups (dry-run)'), 'command' => 'dply:prune-backups --dry-run'],
+            ['label' => __('Prune old backups for real'), 'command' => 'dply:prune-backups'],
+        ]" />
+    </div>
+    </section>
 
     {{-- Poll the staging row while a download is being prepared, then it redirects. --}}
     @if ($stagingId !== null)
@@ -905,13 +924,6 @@
     @if ($databaseBackups->where('status', 'pending')->isNotEmpty() || $fileBackups->where('status', 'pending')->isNotEmpty())
         <div wire:poll.10s="$refresh" class="hidden" aria-hidden="true"></div>
     @endif
-
-    {{-- CLI equivalents — same idea as Cron / Daemons pages. Lets operators script the same flows. --}}
-    <x-cli-snippet :commands="[
-        ['label' => __('Run all due backup schedules now'), 'command' => 'dply:run-backup-schedule {schedule_id}'],
-        ['label' => __('Prune old backups (dry-run)'), 'command' => 'dply:prune-backups --dry-run'],
-        ['label' => __('Prune old backups for real'), 'command' => 'dply:prune-backups'],
-    ]" />
 
     {{-- Add backup destination modal (reusable across server workspaces). --}}
     @include('livewire.servers.partials.backups._add-destination-modal')

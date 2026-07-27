@@ -1,10 +1,11 @@
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                            <x-heroicon-o-clock class="h-5 w-5" />
-                        </span>
+                <div class="{{ $card }}">
+                    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                        <x-icon-badge>
+                            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Activity') }}</h2>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Apply runs, rule edits, template applications, and imports — chronologically. Apply rows are expandable for the full UFW transcript.') }}</p>
                             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                                 <span class="inline-flex items-center gap-1">
@@ -20,7 +21,7 @@
                     </div>
 
                     @if ($activityCount > 0)
-                        <div class="mt-6 space-y-2">
+                        <div class="space-y-2 px-6 py-5 sm:px-8">
                             @foreach ($activityItems as $item)
                                 @if ($item['kind'] === 'apply')
                                     @php
@@ -86,33 +87,33 @@
                                     </div>
                                 @endif
                             @endforeach
-                        </div>
 
-                        @if (! $activity_exhausted)
-                            <div class="mt-4 flex justify-center">
-                                <button
-                                    type="button"
-                                    wire:click="loadMoreFirewallActivity"
-                                    wire:loading.attr="disabled"
-                                    wire:target="loadMoreFirewallActivity"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <x-heroicon-o-arrow-down class="h-4 w-4" wire:loading.remove wire:target="loadMoreFirewallActivity" />
-                                    <span wire:loading wire:target="loadMoreFirewallActivity" class="inline-flex h-4 w-4 items-center justify-center">
-                                        <x-spinner variant="forest" size="sm" />
-                                    </span>
-                                    <span wire:loading.remove wire:target="loadMoreFirewallActivity">{{ __('Load older activity') }}</span>
-                                    <span wire:loading wire:target="loadMoreFirewallActivity">{{ __('Loading…') }}</span>
-                                </button>
-                            </div>
-                        @elseif ($activity_visible >= \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE)
-                            <p class="mt-4 text-center text-[11px] italic text-brand-mist">
-                                {{ __('Showing the most recent :n events. Older history lives in audit logs.', ['n' => \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE]) }}
-                            </p>
-                        @endif
+                            @if (! $activity_exhausted)
+                                <div class="flex justify-center pt-2">
+                                    <button
+                                        type="button"
+                                        wire:click="loadMoreFirewallActivity"
+                                        wire:loading.attr="disabled"
+                                        wire:target="loadMoreFirewallActivity"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <x-heroicon-o-arrow-down class="h-4 w-4" wire:loading.remove wire:target="loadMoreFirewallActivity" />
+                                        <span wire:loading wire:target="loadMoreFirewallActivity" class="inline-flex h-4 w-4 items-center justify-center">
+                                            <x-spinner variant="forest" size="sm" />
+                                        </span>
+                                        <span wire:loading.remove wire:target="loadMoreFirewallActivity">{{ __('Load older activity') }}</span>
+                                        <span wire:loading wire:target="loadMoreFirewallActivity">{{ __('Loading…') }}</span>
+                                    </button>
+                                </div>
+                            @elseif ($activity_visible >= \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE)
+                                <p class="pt-2 text-center text-[11px] italic text-brand-mist">
+                                    {{ __('Showing the most recent :n events. Older history lives in audit logs.', ['n' => \App\Livewire\Servers\WorkspaceFirewall::ACTIVITY_MAX_VISIBLE]) }}
+                                </p>
+                            @endif
+                        </div>
                     @else
-                        <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
-                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                        <div class="flex flex-col items-center gap-2 px-6 py-10 text-center sm:px-8">
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-clock class="h-5 w-5" />
                             </span>
                             <p class="text-sm font-medium text-brand-ink">{{ __('No firewall activity yet.') }}</p>

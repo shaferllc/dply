@@ -5,12 +5,13 @@
     $hookCount = $pipelineOverviewHookCount ?? $editingDeployPipeline?->hooks?->count() ?? $site->deployHooks->count();
     $strategyLabel = $site->deploy_strategy === 'atomic' ? __('Zero downtime (atomic)') : __('Simple (in-place)');
     $isLocked = ($lockedTab ?? '') !== '';
+    $nested = (bool) ($isEmbedded ?? false);
 @endphp
 
 @unless ($isLocked)
 {{-- The intro card (and its "Open deployments" link) is redundant when embedded
      inside the Deployments page — we're already there. Show it only standalone. --}}
-@unless ($isEmbedded)
+@unless ($nested)
 <section class="{{ $card }}">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
@@ -49,19 +50,30 @@
 </section>
 @endunless
 
-<x-server-workspace-tablist :aria-label="__('Pipeline sections')" class="mt-6">
-    @foreach ($pipelineTabs as $tabId => $tabLabel)
-        <x-server-workspace-tab
-            id="pipeline-tab-{{ $tabId }}"
-            :active="$pipelineTab === $tabId"
-            :icon="$pipelineTabIcons[$tabId] ?? 'heroicon-o-adjustments-horizontal'"
-            wire:click="setPipelineTab('{{ $tabId }}')"
-        >{{ __($tabLabel) }}</x-server-workspace-tab>
-    @endforeach
-</x-server-workspace-tablist>
+<div @class([
+    'border-b border-brand-ink/10 px-3 py-2.5 sm:px-4' => $nested,
+    'mt-6' => ! $nested,
+])>
+    <x-server-workspace-tablist
+        :aria-label="__('Pipeline sections')"
+        :scroll="$nested"
+        @class([
+            '!mb-0 w-full border-0 bg-transparent p-0 shadow-none' => $nested,
+        ])
+    >
+        @foreach ($pipelineTabs as $tabId => $tabLabel)
+            <x-server-workspace-tab
+                id="pipeline-tab-{{ $tabId }}"
+                :active="$pipelineTab === $tabId"
+                :icon="$pipelineTabIcons[$tabId] ?? 'heroicon-o-adjustments-horizontal'"
+                wire:click="setPipelineTab('{{ $tabId }}')"
+            >{{ __($tabLabel) }}</x-server-workspace-tab>
+        @endforeach
+    </x-server-workspace-tablist>
+</div>
 @endunless
 
-<div @class(['space-y-6', 'mt-6' => ! $isLocked]) wire:key="pipeline-panel-{{ $pipelineTab }}">
+<div @class(['min-w-0', 'space-y-6 mt-6' => ! $nested && ! $isLocked]) wire:key="pipeline-panel-{{ $pipelineTab }}">
     {{-- Sub-tab switch shows the skeleton placeholder instantly (client-side via
          wire:loading, no spinner) and swaps the real panel in when setPipelineTab's
          single round-trip lands. --}}

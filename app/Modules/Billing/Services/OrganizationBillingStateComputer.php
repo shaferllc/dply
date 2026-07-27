@@ -46,33 +46,57 @@ class OrganizationBillingStateComputer
 
     /**
      * READY servers past the min-billable age, with the latest metric snapshot
-     * eager-loaded. Memoised per org per request: both the tier scan here and
-     * {@see BillingAnalytics::billableServers()} need this exact set, and the
-     * `latestMetricSnapshot` eager load is an expensive latestOfMany subquery —
-     * sharing it collapses what was a duplicate query into one.
+     * eager-loaded. Request-scoped (static) memo: the tier scan here,
+     * {@see BillingAnalytics::billableServers()}, and
+     * {@see Organization::currentSubscriptionPlan()} all need this set —
+     * sharing it collapses duplicate ready-server SELECTs into one.
      *
      * @var array<string, Collection<int, Server>>
      */
-    private array $readyBillableServersMemo = [];
+    private static array $readyBillableServersMemo = [];
 
     /**
      * @return Collection<int, Server>
      */
     public function readyBillableServers(Organization $organization): Collection
     {
-        if (isset($this->readyBillableServersMemo[$organization->id])) {
-            return $this->readyBillableServersMemo[$organization->id];
+        $key = (string) $organization->id;
+        if (isset(self::$readyBillableServersMemo[$key])) {
+            return self::$readyBillableServersMemo[$key];
         }
 
         $ageCutoff = now()->subDays(max(0, (int) config('subscription.standard.min_billable_age_days', 1)));
 
-        return $this->readyBillableServersMemo[$organization->id] = $organization->servers()
+        return self::$readyBillableServersMemo[$key] = $organization->servers()
             ->where('status', Server::STATUS_READY)
             ->where('created_at', '<=', $ageCutoff)
-            // billingTier() (and the managed-server cost calc) read the latest
+            // billing tiers() (and the managed-server cost calc) read the latest
             // metric snapshot per server — eager load it to avoid an N+1.
             ->with('latestMetricSnapshot')
             ->get();
+    }
+
+    /**
+     * BYO server count used to pick the flat plan — same filter as
+     * {@see compute()}'s `$serverCount` (excludes managed-product hosts and
+     * dply-hosted VMs billed cost-plus).
+     */
+    public function billableByoServerCount(Organization $organization): int
+    {
+        return $this->readyBillableServers($organization)
+            ->reject(fn (Server $server) => $server->isManagedProductHost() || $server->usesManagedHosting())
+            ->count();
+    }
+
+    public static function flushReadyBillableServersMemo(?string $organizationId = null): void
+    {
+        if ($organizationId === null) {
+            self::$readyBillableServersMemo = [];
+
+            return;
+        }
+
+        unset(self::$readyBillableServersMemo[$organizationId]);
     }
 
     public function compute(Organization $organization): DesiredBillingState

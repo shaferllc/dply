@@ -1,5 +1,5 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
 
     $resolvedCredential = $site->dnsAutomationCredential();
     $resolvedCredentialIsExplicit = $resolvedCredential !== null
@@ -26,7 +26,7 @@
 {{-- Records this site needs + where they actually point. This is the headline:
      "is my domain pointed here, and fix it in one click." The provider/zone
      automation config lives below in a collapsed disclosure. --}}
-<div class="{{ $card }} mt-6" wire:init="loadDnsRecordStatuses">
+<div class="{{ $card }}" wire:init="loadDnsRecordStatuses">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
             <x-icon-badge>
@@ -133,7 +133,7 @@
 {{-- Automation (advanced): which credential + zone dply uses for its own DNS
      machinery (preview hostnames, DNS-01 challenge defaults, provisioning
      records). Collapsed by default — most operators never need to touch it. --}}
-<details class="{{ $card }} group mt-6">
+<details class="{{ $card }} group">
     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-brand-sand/20 px-6 py-4 sm:px-7">
         <span class="flex min-w-0 items-center gap-3">
             <x-icon-badge>
@@ -222,4 +222,6 @@
     </form>
 </details>
 
-<x-cli-snippet class="mt-6" tone="stub" />
+<div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet tone="stub" />
+</div>

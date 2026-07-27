@@ -27,9 +27,9 @@
         default => 'bg-amber-50 text-amber-800 ring-amber-200',
     };
 @endphp
-<x-server-workspace-tab-panel id="snapshots-panel-databases" labelled-by="snapshots-tab-databases" panel-class="space-y-8">
+<x-server-workspace-tab-panel id="snapshots-panel-databases" labelled-by="snapshots-tab-databases" panel-class="min-w-0">
     {{-- Take a database snapshot. --}}
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
@@ -76,7 +76,7 @@
     </section>
 
     {{-- History. Polls while a dump is still running, then goes quiet. --}}
-    <section class="dply-card overflow-hidden" @if ($snapshotsInFlight) wire:poll.10s @endif>
+    <section class="border-b border-brand-ink/10" @if ($snapshotsInFlight) wire:poll.10s @endif>
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />

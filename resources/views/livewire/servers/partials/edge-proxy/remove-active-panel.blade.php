@@ -7,7 +7,7 @@
     $inflightSwitch = $inflightSwitch ?? $this->hasInflightWebserverSwitch();
     $actionInFlight = $actionInFlight ?? false;
 @endphp
-<div class="mt-6 rounded-xl border border-rose-200/80 bg-rose-50/40 p-4 sm:p-5">
+<div class="border-b border-rose-200/80 bg-rose-50/40 px-5 py-5 sm:px-6">
     <h4 class="text-sm font-semibold text-brand-ink">{{ __('Remove :name', ['name' => $info['label']]) }}</h4>
     <p class="mt-1 text-xs leading-relaxed text-brand-moss">
         {{ __('Stop :name on :port and restore :webserver as the webserver serving your sites. This cannot be undone from the UI — you can add an edge proxy again from the Add / remove tab.', [

@@ -66,6 +66,9 @@ class WorkspaceDaemons extends Component
 
     public bool $siteContextUnavailable = false;
 
+    /** True when mounted from {@see sites.daemons} (native site workspace). */
+    public bool $siteDedicatedContext = false;
+
     /** @var 'programs'|'service'|'sync'|'logs'|'inspect'|'activity' */
     #[Url(as: 'tab', keep: false)]
     public string $daemons_workspace_tab = 'programs';
@@ -128,6 +131,7 @@ class WorkspaceDaemons extends Component
             abort_unless($site->server_id === $server->id, 404);
             abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
             Gate::authorize('view', $site);
+            $this->siteDedicatedContext = true;
         }
 
         $this->bootWorkspace($server);
@@ -216,6 +220,25 @@ class WorkspaceDaemons extends Component
 
     public string $log_tail_slug = '';
 
+
+    /**
+     * Merged Workers card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        if ($this->siteDedicatedContext) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-workers-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
 
     public function render(): View
     {

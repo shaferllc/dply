@@ -1,4 +1,4 @@
-<section id="settings-group-export" class="space-y-4" aria-labelledby="settings-group-export-title">
+<section id="settings-group-export" aria-labelledby="settings-group-export-title">
     <div class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>

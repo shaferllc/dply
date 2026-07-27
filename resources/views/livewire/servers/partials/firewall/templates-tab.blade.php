@@ -1,8 +1,11 @@
-                <div class="{{ $card }} p-6 sm:p-8 space-y-8">
-                    <div>
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
-                        <p class="mt-2 text-sm text-brand-moss">{{ __('Each card lists the exact rules it manages. Click to add the rules to this server’s list, or — when they’re all already present — to remove them again. The SSH rule is always kept so you can’t lock yourself out. Changes take effect on the next Apply.') }}</p>
-                        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="{{ $card }}">
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Templates') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Each card lists the exact rules it manages. Click to add the rules to this server’s list, or — when they’re all already present — to remove them again. The SSH rule is always kept so you can’t lock yourself out. Changes take effect on the next Apply.') }}</p>
+                    </div>
+                    <div class="space-y-8 px-6 py-5 sm:px-8">
+                        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($bundledTemplates as $bKey => $b)
                                 @php
                                     $meta = $bundledAppliedMap[$bKey] ?? ['state' => 'none', 'present_count' => 0, 'total' => count($b['rules'] ?? []), 'removable_count' => 0, 'has_ssh' => false, 'chips' => []];
@@ -90,40 +93,40 @@
                                 </button>
                             @endforeach
                         </div>
-                    </div>
 
-                    @if ($savedTemplates->isNotEmpty())
-                        <div>
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Saved templates') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss">{{ __('Organization or server-scoped templates.') }}</p>
-                            <ul class="mt-4 space-y-2">
-                                @foreach ($savedTemplates as $tpl)
-                                    <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-3 py-2 text-sm">
-                                        <span>
-                                            <span class="font-medium text-brand-ink">{{ $tpl->name }}</span>
-                                            @if ($tpl->server_id)
-                                                <span class="ml-2 text-xs text-brand-moss">{{ __('This server') }}</span>
-                                            @else
-                                                <span class="ml-2 text-xs text-brand-moss">{{ __('Organization') }}</span>
-                                            @endif
-                                        </span>
-                                        <button
-                                            type="button"
-                                            wire:click="applySavedFirewallTemplate('{{ $tpl->id }}')"
-                                            class="text-xs font-medium text-brand-forest hover:underline"
-                                        >
-                                            {{ __('Apply') }}
-                                        </button>
-                                    </li>
-                                @endforeach
-                            </ul>
+                        @if ($savedTemplates->isNotEmpty())
+                            <div>
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Saved templates') }}</h2>
+                                <p class="mt-2 text-sm text-brand-moss">{{ __('Organization or server-scoped templates.') }}</p>
+                                <ul class="mt-4 space-y-2">
+                                    @foreach ($savedTemplates as $tpl)
+                                        <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-3 py-2 text-sm">
+                                            <span>
+                                                <span class="font-medium text-brand-ink">{{ $tpl->name }}</span>
+                                                @if ($tpl->server_id)
+                                                    <span class="ml-2 text-xs text-brand-moss">{{ __('This server') }}</span>
+                                                @else
+                                                    <span class="ml-2 text-xs text-brand-moss">{{ __('Organization') }}</span>
+                                                @endif
+                                            </span>
+                                            <button
+                                                type="button"
+                                                wire:click="applySavedFirewallTemplate('{{ $tpl->id }}')"
+                                                class="text-xs font-medium text-brand-forest hover:underline"
+                                            >
+                                                {{ __('Apply') }}
+                                            </button>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        <div class="border-t border-brand-ink/10 pt-6">
+                            <p class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
+                                <x-heroicon-o-information-circle class="h-4 w-4 shrink-0 text-brand-mist" />
+                                {{ __('To save the rules currently in the panel as a reusable template, use the “More → Save as template” menu on the Rules tab.') }}
+                            </p>
                         </div>
-                    @endif
-
-                    <div class="border-t border-brand-ink/10 pt-6">
-                        <p class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
-                            <x-heroicon-o-information-circle class="h-4 w-4 shrink-0 text-brand-mist" />
-                            {{ __('To save the rules currently in the panel as a reusable template, use the “More → Save as template” menu on the Rules tab.') }}
-                        </p>
                     </div>
                 </div>

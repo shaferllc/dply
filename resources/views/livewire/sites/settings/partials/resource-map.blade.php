@@ -92,13 +92,11 @@
     $routingActive = $routingDomainCount > 0;
 @endphp
 
-<div class="space-y-5">
-    {{-- Header: title, count chip, legend --}}
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink">{{ __('Resource map') }}</h2>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
-        </div>
+{{-- Nested inside Settings Resources merged card — toolbar + strips, no second page card. --}}
+<div class="min-w-0">
+    {{-- Toolbar: actions + status (page title lives in the outer sand identity). --}}
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
+        <p class="text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
         <div class="flex flex-wrap items-center gap-3">
             {{-- One global "Add resource" dropdown. Every unattached type lives
                  here, grouped by category so you can see which column it lands in;
@@ -181,7 +179,7 @@
     @if ($showReleaseHealth)
         <div wire:init="loadReleaseHealth" wire:key="release-health">
             @if (! $releaseHealthLoaded)
-                <div class="dply-card flex items-center gap-2.5 px-4 py-3 text-xs text-brand-moss">
+                <div class="flex items-center gap-2.5 border-b border-brand-ink/10 px-5 py-3 text-xs text-brand-moss sm:px-6">
                     <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin text-brand-mist" />
                     {{ __('Checking which release the live workers are serving…') }}
                 </div>
@@ -192,12 +190,12 @@
                     $serving = $releaseHealth['serving'];
                     $oc = $releaseHealth['opcache'] ?? null;
                     $card = match ($state) {
-                        'drifted' => ['ring' => 'ring-amber-300/70 bg-amber-50/60', 'dot' => 'bg-amber-500', 'icon' => 'heroicon-o-exclamation-triangle', 'iconColor' => 'text-amber-600'],
-                        'in_sync' => ['ring' => 'ring-brand-forest/20 bg-brand-forest/5', 'dot' => 'bg-brand-forest', 'icon' => 'heroicon-o-check-circle', 'iconColor' => 'text-brand-forest'],
-                        default => ['ring' => 'ring-brand-ink/10 bg-white', 'dot' => 'bg-brand-mist', 'icon' => 'heroicon-o-cube', 'iconColor' => 'text-brand-moss'],
+                        'drifted' => ['ring' => 'border-amber-200/80 bg-amber-50/40', 'dot' => 'bg-amber-500', 'icon' => 'heroicon-o-exclamation-triangle', 'iconColor' => 'text-amber-600'],
+                        'in_sync' => ['ring' => 'border-brand-ink/10 bg-brand-forest/5', 'dot' => 'bg-brand-forest', 'icon' => 'heroicon-o-check-circle', 'iconColor' => 'text-brand-forest'],
+                        default => ['ring' => 'border-brand-ink/10 bg-white', 'dot' => 'bg-brand-mist', 'icon' => 'heroicon-o-cube', 'iconColor' => 'text-brand-moss'],
                     };
                 @endphp
-                <div class="dply-card ring-1 {{ $card['ring'] }} px-4 py-3.5 sm:px-5">
+                <div class="border-b {{ $card['ring'] }} px-5 py-3.5 sm:px-6">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex min-w-0 items-start gap-3">
                             <x-dynamic-component :component="$card['icon']" class="mt-0.5 h-5 w-5 shrink-0 {{ $card['iconColor'] }}" />
@@ -251,8 +249,8 @@
     @endif
 
     {{-- The graph. Horizontally scrollable on narrow screens so the topology
-         keeps its shape instead of collapsing. --}}
-    <div class="dply-card overflow-x-auto bg-linear-to-br from-white to-brand-cream/30 p-6 sm:p-8" style="zoom: .95;">
+         keeps its shape instead of collapsing. Strip inside the merged card. --}}
+    <div class="overflow-x-auto border-b border-brand-ink/10 bg-linear-to-br from-white to-brand-cream/30 px-5 py-6 sm:px-6 sm:py-8" style="zoom: .95;">
         <div
             x-data="{
                 w: 0, h: 0, _ro: null, _zoom: 1,

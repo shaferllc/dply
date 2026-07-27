@@ -1,5 +1,5 @@
     @if ($envInDocroot)
-        <div class="dply-card overflow-hidden">
+        <div class="{{ $card }}">
             <div class="flex flex-wrap items-start justify-between gap-3 bg-amber-50 px-5 py-4">
                 <div class="flex min-w-0 items-start gap-3">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">

@@ -13,6 +13,14 @@ class ProductionDataMirror
 {
     public const SESSION_WRITE_UNLOCKED = 'production_data_write_unlocked';
 
+    /**
+     * Request-scoped memo: nav, Live pages, and helpers all ask for the same
+     * connection — one SELECT per user per request instead of N.
+     *
+     * @var array<string, ProductionDataConnection|null>
+     */
+    private static array $connectionMemo = [];
+
     public static function available(): bool
     {
         return (bool) config('dply.production_data_mirror.enabled', false)
@@ -30,9 +38,25 @@ class ProductionDataMirror
             return null;
         }
 
-        return ProductionDataConnection::query()
+        $key = (string) $user->id;
+        if (array_key_exists($key, self::$connectionMemo)) {
+            return self::$connectionMemo[$key];
+        }
+
+        return self::$connectionMemo[$key] = ProductionDataConnection::query()
             ->where('user_id', $user->id)
             ->first();
+    }
+
+    public static function forgetConnectionMemo(?string $userId = null): void
+    {
+        if ($userId === null) {
+            self::$connectionMemo = [];
+
+            return;
+        }
+
+        unset(self::$connectionMemo[$userId]);
     }
 
     public function clientFor(ProductionDataConnection $connection): ProductionApiClient
@@ -92,6 +116,7 @@ class ProductionDataMirror
         $this->forget($connection);
         Cache::forget($this->versionKey($connection));
         Session::forget(self::SESSION_WRITE_UNLOCKED);
+        self::forgetConnectionMemo((string) $connection->user_id);
         $connection->delete();
     }
 

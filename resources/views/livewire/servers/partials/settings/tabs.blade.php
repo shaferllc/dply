@@ -1,4 +1,4 @@
-<x-server-workspace-tablist :aria-label="__('Settings categories')">
+<x-server-workspace-tablist :aria-label="__('Settings categories')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
     @foreach (($settingsTabs ?? config('server_settings.workspace_tabs', [])) as $slug => $meta)
         @php
             $tabIcon = ! empty($meta['icon']) ? 'heroicon-o-'.$meta['icon'] : null;

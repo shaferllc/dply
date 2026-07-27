@@ -1,8 +1,8 @@
-<section class="space-y-6">
+<section>
     {{-- No overflow-hidden here: the Deploy-ref picker is an absolutely-positioned
          dropdown that must escape the card bounds. Header/footer round their own
          corners instead so the card still looks clipped. --}}
-    <div class="dply-card">
+    <div class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />

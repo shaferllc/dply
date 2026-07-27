@@ -1,5 +1,5 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
     $events = $this->events;
     $trends = $this->trends;
     $actors = $this->actors;
@@ -28,39 +28,44 @@
 
 {{-- Single root: this component is nested inside the Logs page's Activity tab,
      so it must not emit page chrome (no <x-server-workspace-layout>). --}}
-<div class="space-y-6">
+<div class="min-w-0">
 
     {{-- Inline header replaces the page-layout title now that Activity is a tab. --}}
-    <div>
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Activity') }}</h2>
-        <p class="mt-0.5 max-w-2xl text-sm leading-relaxed text-brand-moss">
-            {{ __('Audit events for this server and its sites — who did what, when, and what changed.') }}
-        </p>
-    </div>
+    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Audit timeline') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Audit events for this server and its sites — who did what, when, and what changed.') }}
+                </p>
+            </div>
 
-    {{-- Feed / Trends switch — a light segmented control so it reads as a sub-view
-         of the Logs › Activity tab rather than a second, peer-level tab bar. --}}
-    <div class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-1" role="tablist" aria-label="{{ __('Activity sections') }}">
-        <button type="button" role="tab" id="activity-tab-feed" wire:click="setTab('feed')"
-            aria-selected="{{ $tab === 'feed' ? 'true' : 'false' }}"
-            @class([
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'feed',
-                'text-brand-moss hover:text-brand-ink' => $tab !== 'feed',
-            ])>
-            <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
-            {{ __('Feed') }}
-        </button>
-        <button type="button" role="tab" id="activity-tab-trends" wire:click="setTab('trends')"
-            aria-selected="{{ $tab === 'trends' ? 'true' : 'false' }}"
-            @class([
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'trends',
-                'text-brand-moss hover:text-brand-ink' => $tab !== 'trends',
-            ])>
-            <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
-            {{ __('Trends') }}
-        </button>
+            {{-- Feed / Trends switch — a light segmented control so it reads as a sub-view
+                 of the Logs › Activity tab rather than a second, peer-level tab bar. --}}
+            <div class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1" role="tablist" aria-label="{{ __('Activity sections') }}">
+                <button type="button" role="tab" id="activity-tab-feed" wire:click="setTab('feed')"
+                    aria-selected="{{ $tab === 'feed' ? 'true' : 'false' }}"
+                    @class([
+                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                        'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'feed',
+                        'text-brand-moss hover:text-brand-ink' => $tab !== 'feed',
+                    ])>
+                    <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Feed') }}
+                </button>
+                <button type="button" role="tab" id="activity-tab-trends" wire:click="setTab('trends')"
+                    aria-selected="{{ $tab === 'trends' ? 'true' : 'false' }}"
+                    @class([
+                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                        'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'trends',
+                        'text-brand-moss hover:text-brand-ink' => $tab !== 'trends',
+                    ])>
+                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Trends') }}
+                </button>
+            </div>
+        </div>
     </div>
 
     {{-- Filter card — shared across both subtabs so the URL state and the visual range stay coherent. --}}

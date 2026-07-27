@@ -1,7 +1,7 @@
 @php
     use App\Models\SiteCertificate;
 
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
 
     // Helper: does this hostname have an active SSL certificate covering it?
     // Used in the Domains and Aliases lists to show the SSL coverage chip.
@@ -20,7 +20,8 @@
 @endphp
 
 
-<x-server-workspace-tablist :aria-label="__('Routing sections')" class="mt-6">
+<div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+<x-server-workspace-tablist :aria-label="__('Routing sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
     @foreach ($routingTabs as $tab)
         <x-server-workspace-tab
             as="a"
@@ -32,12 +33,13 @@
         >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}@if (in_array($tab, ['aliases', 'redirects', 'preview', 'tenants'], true) && workspace_surface_coming_soon('site_'.$tab))<span class="ml-1.5 rounded-full bg-brand-sage/20 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-brand-forest">{{ __('Soon') }}</span>@endif</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
+</div>
 
 @if ($routingTab === 'domains')
     @php $domainCount = $site->domains->count(); @endphp
 
     {{-- Domains: slim header card with count pill + Add CTA --}}
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -133,7 +135,7 @@
         $wildcardInstalled = $wildcard?->isInstalled() ?? false;
     @endphp
     @if ($testingZone)
-        <div class="{{ $card }} mt-6">
+        <div class="{{ $card }}">
             <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $wildcardInstalled ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-amber-50 text-amber-700 ring-amber-200/70' }}">
@@ -184,7 +186,7 @@
     @endif
 
     {{-- Domains list --}}
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($domainCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-globe-alt class="h-6 w-6" /></span>
@@ -277,12 +279,14 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:domains:add '.$site->slug.' new.example.com --primary'],
         ['label' => __('Remove'), 'command' => 'dply sites:domains:remove '.$site->slug.' old.example.com'],
         ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
         ['label' => __('Find by hostname'), 'command' => 'dply fleet:domains:find example.com'],
     ]" />
+</div>
 
 @elseif ($routingTab === 'dns')
     @include('livewire.sites.settings.partials.routing._tab-dns')
@@ -310,7 +314,7 @@
 @elseif ($routingTab === 'aliases')
     @php $aliasCount = $site->domainAliases->count(); @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -415,7 +419,7 @@
         </div>
     </x-modal>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($aliasCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-link class="h-6 w-6" /></span>
@@ -501,11 +505,13 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:aliases:add '.$site->slug.' alt.example.com --label=Marketing'],
         ['label' => __('Remove'), 'command' => 'dply sites:aliases:remove '.$site->slug.' alt.example.com'],
         ['label' => __('List'), 'command' => 'dply sites:aliases:list '.$site->slug],
     ]" />
+</div>
 
 @elseif ($routingTab === 'redirects' && workspace_surface_coming_soon('site_redirects'))
     <x-workspace-coming-soon
@@ -530,7 +536,7 @@
 @elseif ($routingTab === 'redirects')
     @php $redirectCount = $site->redirects->count(); @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -672,7 +678,7 @@
         </div>
     </x-modal>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($redirectCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-arrow-uturn-right class="h-6 w-6" /></span>
@@ -805,13 +811,15 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:redirects:add '.$site->slug.' /old /new --code=301'],
         ['label' => __('Remove'), 'command' => 'dply sites:redirects:remove '.$site->slug.' /old'],
         ['label' => __('List'), 'command' => 'dply sites:redirects:list '.$site->slug],
         ['label' => __('Bulk import'), 'command' => 'dply sites:redirects:import '.$site->slug.' --file=redirects.csv'],
         ['label' => __('Export CSV'), 'command' => 'dply sites:redirects:export '.$site->slug.' --to=redirects.csv'],
     ]" />
+</div>
 
 @elseif ($routingTab === 'preview' && workspace_surface_coming_soon('site_preview'))
     <x-workspace-coming-soon
@@ -843,7 +851,7 @@
         $previewTestingZone = $site->testingZone();
     @endphp
 
-    <div class="{{ $card }} mt-6" x-data="{ addOpen: false }">
+    <div class="{{ $card }}" x-data="{ addOpen: false }">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -894,7 +902,7 @@
         @endcan
     </div>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <form wire:submit="savePreviewSettings" class="space-y-5 px-6 py-6 sm:px-8">
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -981,10 +989,12 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Set preview'), 'command' => 'dply sites:preview:set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
         ['label' => __('Remove preview'), 'command' => 'dply sites:preview:remove '.$site->slug.' preview.example.dply.cc'],
     ]" />
+</div>
 
 @elseif ($routingTab === 'tenants' && workspace_surface_coming_soon('site_tenants'))
     <x-workspace-coming-soon
@@ -1024,7 +1034,7 @@
         }
     @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -1135,7 +1145,7 @@
         </div>
     </x-modal>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($tenantCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-building-office-2 class="h-6 w-6" /></span>
@@ -1256,11 +1266,13 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:tenants:add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
         ['label' => __('Remove'), 'command' => 'dply sites:tenants:remove '.$site->slug.' acme.example.com'],
         ['label' => __('List'), 'command' => 'dply sites:tenants:list '.$site->slug],
     ]" />
+</div>
 
 @endif
 

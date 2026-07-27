@@ -12,7 +12,7 @@
 @endphp
 
 @if (! $isPhpSite && ! $showPhpStackDetails)
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
@@ -27,7 +27,7 @@
 @else
 
 @if ($supportsMachinePhp && is_array($sitePhpData) && $isPhpSite)
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -47,7 +47,7 @@
         <div class="space-y-8 px-6 py-6 sm:px-7">
 
         @if ($sitePhpData['mismatch_version'])
-            <section class="dply-card overflow-hidden border-amber-200">
+            <section class="border-b border-amber-200/80 bg-amber-50/40">
                 <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
@@ -181,7 +181,7 @@
         $poolWorkerMb = $poolMemLimitBytes > 0 ? (int) round($poolMemLimitBytes / 1048576) : 128;
         $poolReserveMb = $poolServerRamMb !== null ? max(256, (int) round($poolServerRamMb * 0.25)) : 512;
     @endphp
-    <section class="dply-card overflow-hidden mt-6">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
@@ -289,7 +289,7 @@
 @endif
 
 @if ($showPhpStackDetails)
-    <section class="dply-card overflow-hidden mt-6">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
@@ -336,9 +336,11 @@
     </section>
 @endif
 
-<x-cli-snippet :commands="[
-    ['label' => __('Set PHP version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=php --runtime-version=8.4'],
-    ['label' => __('Open server PHP workspace'), 'command' => 'dply:server:php '.($server->name ?? 'SERVER')],
-]" />
+<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+    <x-cli-snippet :commands="[
+        ['label' => __('Set PHP version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=php --runtime-version=8.4'],
+        ['label' => __('Open server PHP workspace'), 'command' => 'dply:server:php '.($server->name ?? 'SERVER')],
+    ]" />
+</div>
 
 @endif

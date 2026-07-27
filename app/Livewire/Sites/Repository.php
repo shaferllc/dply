@@ -25,6 +25,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -42,6 +43,7 @@ use Livewire\Component;
  * {@see RepositoryWebhookProvisioner} for webhooks) rather than wiring
  * up new code paths.
  */
+#[Lazy]
 #[Layout('layouts.app')]
 class Repository extends Component
 {
@@ -118,7 +120,42 @@ class Repository extends Component
     // linkedSourceControlAccounts, availableRepositories) lives in the
     // ConfiguresGitRepository trait; the rich picker renders from those.
 
-    public function mount(Server $server, Site $site, SourceControlRepositoryBrowser $browser): void
+    /**
+     * Full-page Lazy skeleton matches the merged Repository chrome. Embedded
+     * hosts (Deployments tabs) get the shared strip panel skeleton only.
+     */
+    public function placeholder(): View
+    {
+        if ($this->embedded || $this->lockedTab !== '') {
+            return view('livewire.sites.partials._panel-skeleton');
+        }
+
+        if (! isset($this->server, $this->site)) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        $tabs = [
+            ['id' => 'overview', 'label' => __('Overview'), 'icon' => 'heroicon-o-home'],
+            ['id' => 'commits', 'label' => __('Commits'), 'icon' => 'heroicon-o-clock'],
+            ['id' => 'files', 'label' => __('Files'), 'icon' => 'heroicon-o-folder'],
+            ['id' => 'branches', 'label' => __('Branches'), 'icon' => 'heroicon-o-rectangle-stack'],
+            ['id' => 'connection', 'label' => __('Connection'), 'icon' => 'heroicon-o-link'],
+            ['id' => 'danger', 'label' => __('Danger'), 'icon' => 'heroicon-o-exclamation-triangle', 'variant' => 'danger'],
+        ];
+
+        return view('livewire.sites.partials.site-workspace-chrome-placeholder', [
+            'server' => $this->server,
+            'site' => $this->site,
+            'title' => __('Repository'),
+            'description' => __('Browse commits, switch branches, and manage the Git connection.'),
+            'icon' => 'heroicon-o-folder-open',
+            'section' => 'repository',
+            'tabs' => $tabs,
+            'activeTab' => $this->tab !== '' ? $this->tab : 'overview',
+        ]);
+    }
+
+    public function mount(Server $server, Site $site): void
     {
         abort_unless($site->server_id === $server->id, 404);
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
@@ -143,7 +180,9 @@ class Repository extends Component
         $storedKind = is_array($site->meta ?? null) ? (string) ($site->meta['git_ref_kind'] ?? '') : '';
         $this->git_ref_kind = in_array($storedKind, ['branch', 'tag', 'commit'], true) ? $storedKind : null;
 
-        $this->primeRepositoryPicker($browser);
+        // Resolve via app() rather than mount() injection: #[Lazy] snapshots
+        // mount params for the placeholder, and services aren't serializable.
+        $this->primeRepositoryPicker(app(SourceControlRepositoryBrowser::class));
     }
 
 

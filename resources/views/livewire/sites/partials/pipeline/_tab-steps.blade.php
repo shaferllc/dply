@@ -94,12 +94,17 @@
     }
 @endphp
 
+@php $pipelineStepsNested = (bool) ($isEmbedded ?? false); @endphp
+
 @if (! $functionsHost && $editingPipeline)
     {{-- deployPipelineWorkspace() is registered from the main app.js bundle (before Alpine.start). --}}
     @vite(['resources/css/deploy-pipeline.css'])
 
     <section
-        class="dply-card overflow-hidden"
+        @class([
+            'overflow-hidden',
+            'dply-card' => ! $pipelineStepsNested,
+        ])
         x-data="deployPipelineWorkspace()"
     >
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
@@ -150,15 +155,14 @@
         {{-- Pipeline review also shown here (mirrors the Overview subtab) so
              warnings are visible while editing steps, not just on Overview. --}}
         @if (($pipelineActionableChecks ?? collect())->isNotEmpty())
-            <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                <x-site-preflight-issues-panel
-                    :checks="$pipelineActionableChecks"
-                    compact
-                    section-id="pipeline-advisor-steps"
-                    :title="__('Pipeline review')"
-                    :description="__('Adjust the flagged steps and hooks below.')"
-                />
-            </div>
+            <x-site-preflight-issues-panel
+                :checks="$pipelineActionableChecks"
+                :embedded="$pipelineStepsNested"
+                :compact="! $pipelineStepsNested"
+                section-id="pipeline-advisor-steps"
+                :title="__('Pipeline review')"
+                :description="__('Adjust the flagged steps and hooks below.')"
+            />
         @endif
 
         <div class="space-y-6 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">

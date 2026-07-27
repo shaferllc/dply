@@ -41,7 +41,7 @@
 @endphp
 
 {{-- 1. Runtime card --}}
-<section class="dply-card overflow-hidden">
+<section class="border-b border-brand-ink/10">
     <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
             <x-icon-badge>
@@ -104,7 +104,7 @@
         $fpmSaturated = $fpmPct >= 85;
         $phpTabUrl = route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php']);
     @endphp
-    <section class="mt-6 dply-card overflow-hidden" wire:init="loadRuntimeHealth">
+    <section class="border-b border-brand-ink/10" wire:init="loadRuntimeHealth">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -232,7 +232,7 @@
     </section>
 @elseif ($site->runtimeHealthProbeKind() === 'port')
     @php $appPort = (int) $site->app_port; @endphp
-    <section class="mt-6 dply-card overflow-hidden" wire:init="loadRuntimeHealth">
+    <section class="border-b border-brand-ink/10" wire:init="loadRuntimeHealth">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -331,7 +331,7 @@
             $ocPressure = $ocFull || $ocOom > 0 || $ocMemPct >= 90 || $ocKeysPct >= 90;
         }
     @endphp
-    <section class="mt-6 dply-card overflow-hidden" wire:init="loadOpcacheStatus">
+    <section class="border-b border-brand-ink/10" wire:init="loadOpcacheStatus">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -480,7 +480,7 @@
         ];
         $phpTabUrl = route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php']);
     @endphp
-    <section class="mt-6 dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
@@ -517,7 +517,7 @@
 
 {{-- 1d. Recent errors tail (cheap DB read; full stream on the Errors tab) --}}
 @if (! empty($runtimeRecentErrors) && count($runtimeRecentErrors) > 0)
-    <section class="mt-6 dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -553,7 +553,7 @@
 @endif
 
 {{-- 2. Detection panel --}}
-<section class="mt-6 dply-card overflow-hidden">
+<section class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-magnifying-glass-circle class="h-5 w-5" aria-hidden="true" />
@@ -640,7 +640,7 @@
 
 {{-- Background processes callout --}}
 @if ($site->type !== \App\Enums\SiteType::Static)
-<section class="mt-6 dply-card overflow-hidden">
+<section class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
@@ -678,7 +678,7 @@
 {{-- 4. Container lifecycle (Docker only) --}}
 @if ($site->usesDockerRuntime())
     @if ($dockerContainers->isNotEmpty() || $runtimePublication !== [])
-        <section class="mt-6 dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
                     <x-icon-badge>
@@ -752,7 +752,7 @@
     @endif
 
     @if ($site->usesLocalDockerHostRuntime())
-        <section class="mt-6 dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-arrows-pointing-out class="h-5 w-5" aria-hidden="true" />
@@ -796,7 +796,7 @@
 @endif
 
 {{-- 5. Working directory footer --}}
-<div class="mt-6 dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
@@ -810,10 +810,12 @@
 </div>
 
 {{-- 6. CLI snippets --}}
-<x-cli-snippet :commands="[
-    ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=node --runtime-version=22'],
-    ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],
-    ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
-    ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
-    ['label' => __('Install runtime on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' node 22'],
-]" />
+<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+    <x-cli-snippet :commands="[
+        ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=node --runtime-version=22'],
+        ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],
+        ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
+        ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
+        ['label' => __('Install runtime on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' node 22'],
+    ]" />
+</div>

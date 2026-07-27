@@ -3,7 +3,7 @@
     $isRailsLike = $detectedFramework === 'rails' || $site->shouldShowRailsRuntimeSettings();
 @endphp
 
-<section class="dply-card overflow-hidden">
+<section class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
@@ -44,7 +44,9 @@
     </div>
 </section>
 
-<x-cli-snippet :commands="[
-    ['label' => __('Set Ruby version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=ruby --runtime-version=3.3'],
-    ['label' => __('Set start command'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'bundle exec puma -C config/puma.rb\' --port=3000'],
-]" />
+<div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+    <x-cli-snippet :commands="[
+        ['label' => __('Set Ruby version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=ruby --runtime-version=3.3'],
+        ['label' => __('Set start command'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'bundle exec puma -C config/puma.rb\' --port=3000'],
+    ]" />
+</div>

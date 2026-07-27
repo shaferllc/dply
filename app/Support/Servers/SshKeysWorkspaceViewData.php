@@ -28,7 +28,7 @@ final class SshKeysWorkspaceViewData
         bool $includeActivityContext = false,
         ?Collection $auditEvents = null,
     ): array {
-        $card = 'dply-card overflow-hidden';
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->hasAnySshPrivateKey();
 
         $syncStatus = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_status_key'));

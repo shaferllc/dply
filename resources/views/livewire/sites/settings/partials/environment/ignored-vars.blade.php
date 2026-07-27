@@ -1,7 +1,7 @@
     {{-- Ignored variables — the operator marked these as intentionally unset,
          so they don't count toward "missing required". One-click un-ignore. --}}
     @if ($canIgnoreEnv && $ignoredEnvKeys !== [])
-        <div class="dply-card overflow-hidden">
+        <div class="{{ $card }}">
             <div class="flex flex-wrap items-start justify-between gap-3 bg-brand-sand/20 px-5 py-4">
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ignored variables') }}</p>

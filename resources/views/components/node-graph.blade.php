@@ -32,7 +32,7 @@
     ];
     $rowH = $map['row_h'] ?? 58;
 @endphp
-<section class="dply-card overflow-hidden">
+<section class="border-b border-brand-ink/10">
     @if ($title || $eyebrow || $description)
         <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
             <div class="flex min-w-0 items-start gap-3">

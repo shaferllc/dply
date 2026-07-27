@@ -23,9 +23,9 @@
     );
 @endphp
 
-<div class="space-y-6">
+<div class="min-w-0">
     {{-- 1. Execution profile — what the function is and how it's invoked. --}}
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
@@ -97,7 +97,7 @@
     </section>
 
     {{-- 2. Resource limits — the editable control surface. --}}
-    <form wire:submit="saveServerlessRuntime" class="dply-card overflow-hidden">
+    <form wire:submit="saveServerlessRuntime" class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
@@ -171,7 +171,7 @@
     </form>
 
     {{-- 3. Cold starts — keep-warm is owned by the Workers tab; surface its state here. --}}
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
@@ -194,7 +194,9 @@
     </section>
 
     {{-- 4. CLI parity --}}
-    <x-cli-snippet :commands="[
-        ['label' => __('Deploy / redeploy the function'), 'command' => 'dply sites:deploy '.$site->slug],
-    ]" />
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['label' => __('Deploy / redeploy the function'), 'command' => 'dply sites:deploy '.$site->slug],
+        ]" />
+    </div>
 </div>

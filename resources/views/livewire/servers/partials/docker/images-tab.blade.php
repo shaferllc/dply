@@ -1,4 +1,4 @@
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
         <h2 class="text-base font-semibold text-brand-ink">{{ __('Images') }}</h2>
         <div class="flex flex-wrap items-center gap-2">
@@ -80,4 +80,4 @@
             </table>
         </div>
     @endif
-</section>
+</div>

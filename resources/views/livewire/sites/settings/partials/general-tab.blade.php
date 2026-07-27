@@ -1,6 +1,7 @@
 {{-- Services-first: a live site with no app yet. Configure services here, then
-     connect a repo — the bindings wire into the first deploy automatically. --}}
-@if ($site->canRechooseApp())
+     connect a repo — the bindings wire into the first deploy automatically.
+     Stays outside the merged General card (see settings.blade.php). --}}
+@if ($site->canRechooseApp() && ! ($generalTabSkipChooseApp ?? false))
     @php
         // Each option is a shortcut that deep-links into the picker pre-selected
         // (?app=<key>) so the click lands on the exact action. "Install an app"
@@ -55,12 +56,13 @@
     </section>
 @endif
 
+@unless ($generalTabChooseAppOnly ?? false)
 {{-- Read-only overview. Edit affordances live elsewhere:
      primary hostname → Routing > Domains (pencil on the row);
      everything else → Settings tab. The header badge doubles as the
      site-logo control (click the avatar for upload/pull/remove) — it used
      to be a full-width card above this one. --}}
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <livewire:sites.logo-menu :site="$site" :key="'overview-logo-menu-'.$site->id" />
         <div class="min-w-0">
@@ -164,13 +166,13 @@
             @endforeach
         </dl>
     </div>
-</section>
+</div>
 
 {{-- Console-action banner sits BELOW the Overview card on General (it renders
      at the top of <main> on every other section). --}}
-@include('livewire.sites.settings.partials._console-action-banner')
+@include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
             <x-icon-badge>
@@ -304,9 +306,9 @@
             </div>
         @endif
     </div>
-</section>
+</div>
 
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
@@ -437,10 +439,10 @@
             </div>
         </dl>
     </div>
-</section>
+</div>
 
 @if (data_get($site->meta, 'notes'))
-    <section class="dply-card overflow-hidden">
+    <div class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
@@ -457,8 +459,9 @@
         <div class="px-6 py-6 sm:px-7">
             <p class="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{{ data_get($site->meta, 'notes') }}</p>
         </div>
-    </section>
+    </div>
 @endif
 
 {{-- The General CLI snippet renders in settings.blade.php AFTER the
      recent-deployments block, so it always sits at the very bottom of the page. --}}
+@endunless

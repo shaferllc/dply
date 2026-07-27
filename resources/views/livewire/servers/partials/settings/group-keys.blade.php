@@ -63,7 +63,7 @@
     ];
 @endphp
 
-<section id="settings-group-keys" class="space-y-6" aria-labelledby="settings-group-keys-title">
+<section id="settings-group-keys" aria-labelledby="settings-group-keys-title">
     {{-- Outbound: provisioned key for Git/scripts --}}
     <div id="settings-keys-outbound" class="{{ $card }} scroll-mt-24" x-data="{ copied: false, copiedFp: false }">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">

@@ -85,6 +85,21 @@ class WorkspaceSnapshots extends Component
     }
 
     /**
+     * Merged Snapshots card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-snapshots-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
+    /**
      * Fired by {@see CreatesNotificationChannelInline} after the inline modal
      * creates a channel. Jump to the Notifications tab and pre-select the new
      * channel so the operator can finish wiring it to events in one motion.

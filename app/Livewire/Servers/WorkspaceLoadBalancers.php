@@ -402,6 +402,21 @@ class WorkspaceLoadBalancers extends Component
         $this->toastSuccess(__('Load balancer deleted.'));
     }
 
+    /**
+     * Merged Load balancers card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-load-balancers-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         // Filtered read-only view — only LBs that target THIS server.

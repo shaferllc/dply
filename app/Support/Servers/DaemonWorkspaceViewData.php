@@ -18,7 +18,8 @@ final class DaemonWorkspaceViewData
      */
     public static function for(Server $server, WorkspaceDaemons $component): array
     {
-        $card = 'dply-card overflow-hidden';
+        // Nested sections inside the merged Workers card — not second page cards.
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ssh_private_key;
 
         $supervisorPresets = $component->supervisorPresetOptionsForForm();

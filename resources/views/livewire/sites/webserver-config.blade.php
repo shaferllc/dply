@@ -42,16 +42,24 @@
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9">
-    <x-hero-card
-        :eyebrow="__('Settings')"
-        :title="__('Web server config')"
-        :description="__('Edit, validate, and apply your :engine virtual host configuration.', ['engine' => $config_paths['engine_label']])"
-        icon="globe-alt"
-    />
+        <main class="min-w-0 lg:col-span-9">
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Web server config') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Edit, validate, and apply your :engine virtual host.', ['engine' => $config_paths['engine_label']]) }}
+                    </p>
+                </div>
+            </div>
+        </div>
 
     @if ($core_changed_warning)
-        <div class="mb-6 dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10">
             <div class="flex items-start gap-3 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <x-icon-badge tone="amber">
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
@@ -66,7 +74,7 @@
     @endif
 
     @if ($health_hint)
-        <div class="mb-6 dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10">
             <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
@@ -81,10 +89,10 @@
     @endif
 
     {{-- 75% / 25%: plain 4-column grid, main spans 3, pipeline spans 1 (md+). --}}
-    <div class="grid grid-cols-1 gap-8 md:grid-cols-4 md:items-start md:gap-x-6 lg:gap-x-8">
-        <div class="min-w-0 space-y-5 md:col-span-3">
+    <div class="grid grid-cols-1 md:grid-cols-4 md:items-start md:gap-x-0">
+        <div class="min-w-0 md:col-span-3">
             <div
-                class="dply-card overflow-hidden min-w-0"
+                class="border-b border-brand-ink/10 min-w-0"
                 x-data="{
                     insertAtCursor(text, block = true) {
                         const el = $refs.cfgEditor;
@@ -250,7 +258,7 @@
                 </div>
             </div>
 
-            <div class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
                         <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
@@ -278,6 +286,7 @@
                             @include('livewire.partials.console-action-banner-static', [
                                 'run' => $webserverConsoleRun,
                                 'kindLabels' => (array) config('console_actions.kinds', []),
+                                'embedded' => true,
                             ])
                         </div>
                     @endif
@@ -384,7 +393,7 @@
             </div>
         </div>
 
-        <aside class="min-w-0 w-full space-y-0 md:col-span-1 md:sticky md:top-6" aria-label="{{ __('Configuration pipeline') }}">
+        <aside class="min-w-0 w-full space-y-0 border-t border-brand-ink/10 px-5 py-5 md:col-span-1 md:sticky md:top-6 md:border-t-0 md:border-l md:px-4 md:py-5" aria-label="{{ __('Configuration pipeline') }}">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist mb-4">{{ __('Config pipeline') }}</p>
 
             @php
@@ -540,7 +549,10 @@
         </div>
     </x-modal>
 
-    <x-cli-snippet tone="stub" />
+    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+        <x-cli-snippet tone="stub" />
+    </div>
+    </section>
         </main>
     </div>
 

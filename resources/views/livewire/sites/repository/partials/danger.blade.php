@@ -1,5 +1,5 @@
-<section class="space-y-6">
-    <div class="dply-card overflow-hidden border-red-200">
+<section>
+    <div class="border-b border-rose-200">
         <div class="flex items-start gap-3 border-b border-red-200 bg-red-50/60 px-6 py-5 sm:px-7">
             <x-icon-badge tone="red">
                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />

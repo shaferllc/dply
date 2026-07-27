@@ -1,5 +1,5 @@
 <section class="space-y-4">
-    <div class="dply-card overflow-hidden">
+    <div class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
@@ -36,7 +36,7 @@
             @endif
         </div>
     @else
-        <ul class="dply-card divide-y divide-brand-ink/10 overflow-hidden">
+        <ul class="divide-y divide-brand-ink/10 border-b border-brand-ink/10">
             @foreach ($branchesFiltered as $branch)
                 <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3" wire:key="branch-{{ $branch['name'] }}">
                     <div class="min-w-0">

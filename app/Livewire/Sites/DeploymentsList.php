@@ -34,6 +34,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -45,6 +47,8 @@ use Livewire\WithPagination;
  * detail) so operators can browse historic deploys without
  * scrolling through the recent-deployments collapsibles.
  */
+#[Lazy]
+#[Layout('layouts.app')]
 class DeploymentsList extends Component
 {
     use ConfirmsActionWithModal;
@@ -169,6 +173,37 @@ class DeploymentsList extends Component
         SiteDeployment::STATUS_FAILED,
         SiteDeployment::STATUS_SKIPPED,
     ];
+
+    /**
+     * Merged Deployments card skeleton so lazy load matches the page chrome
+     * (identity + tabs + strip panel) instead of flashing the old hero layout.
+     */
+    public function placeholder(): View
+    {
+        if (! isset($this->server, $this->site)) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        $tabs = [
+            ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
+            ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
+            ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
+            ['id' => self::TAB_WEBHOOK, 'label' => __('Webhook'), 'icon' => 'heroicon-o-bolt'],
+            ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
+            ['id' => self::TAB_HISTORY, 'label' => __('History'), 'icon' => 'heroicon-o-clock'],
+        ];
+
+        return view('livewire.sites.partials.site-workspace-chrome-placeholder', [
+            'server' => $this->server,
+            'site' => $this->site,
+            'title' => __('Deployments'),
+            'description' => __('Deploy, review history, and manage release settings.'),
+            'icon' => 'heroicon-o-rocket-launch',
+            'section' => 'deploy',
+            'tabs' => $tabs,
+            'activeTab' => $this->tab !== '' ? $this->tab : self::TAB_DEPLOY,
+        ]);
+    }
 
     public function mount(Server $server, Site $site): void
     {

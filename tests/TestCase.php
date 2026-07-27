@@ -3,6 +3,9 @@
 namespace Tests;
 
 use App\Actions\Servers\GetProviderCredentialsForServerType;
+use App\Modules\Billing\Services\OrganizationBillingStateComputer;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Services\ProductionData\ProductionDataMirror;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -77,6 +80,9 @@ abstract class TestCase extends BaseTestCase
 
         GetProviderCredentialsForServerType::flushMemo();
         CacheServiceNetworkExposure::flushManagedRuleMemo();
+        OrganizationBillingStateComputer::flushReadyBillableServersMemo();
+        ProductionDataMirror::forgetConnectionMemo();
+        AssignableNotificationChannels::flushMemo();
 
         parent::tearDown();
     }

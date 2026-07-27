@@ -1,5 +1,5 @@
 <div class="grid gap-6 lg:grid-cols-2">
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
@@ -22,7 +22,7 @@
         </div>
     </section>
 
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />

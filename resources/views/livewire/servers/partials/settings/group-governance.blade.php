@@ -1,4 +1,4 @@
-<section id="settings-group-governance" class="space-y-6" aria-labelledby="settings-group-governance-title">
+<section id="settings-group-governance" aria-labelledby="settings-group-governance-title">
     @if (! empty($costReport))
         @include('livewire.servers.partials.settings.cost-card-estimate', [
             'card' => $card,

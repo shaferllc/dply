@@ -1,11 +1,12 @@
-        <details class="{{ $card }} overflow-hidden" open>
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 sm:px-8">
+        <details class="{{ $card }}" open>
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
                     <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Default chain policies') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Policies') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Default chain policies') }}</h2>
                         <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('What UFW does with traffic that doesn\'t match any rule. "Use UFW default" leaves the host\'s current setting alone; a chosen value is pushed on the next Apply.') }}</p>
                         @if ($defaultPolicies === [])
                             <p class="mt-1 text-[11px] text-brand-mist">{{ __('No overrides set — UFW defaults (deny incoming, allow outgoing, deny routed) apply.') }}</p>
@@ -70,14 +71,15 @@
             </div>
         </details>
 
-        <div class="{{ $card }} overflow-hidden">
-                    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="{{ $card }}">
+                    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                         <div class="flex min-w-0 items-start gap-3">
                             <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
                                 <x-heroicon-o-shield-check class="h-5 w-5" />
                             </span>
                             <div class="min-w-0">
-                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Rules') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply, applied to the server with UFW.') }}</p>
                                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                                     <span class="inline-flex items-center gap-1">

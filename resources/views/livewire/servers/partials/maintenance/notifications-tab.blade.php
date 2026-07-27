@@ -2,12 +2,11 @@
     /** @var \Illuminate\Support\Collection $notifSubscriptions */
     /** @var \Illuminate\Support\Collection $notifChannels */
     /** @var array<string, string> $notifEventLabels */
-    $card = 'dply-card overflow-hidden';
     $subscriptionsByChannel = $notifSubscriptions->groupBy('notification_channel_id');
 @endphp
 
-<div class="{{ $card }}">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+<div class="min-w-0">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
         <div class="flex min-w-0 items-start gap-3">
             <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
                 <x-heroicon-o-bell class="h-5 w-5" />
@@ -25,15 +24,15 @@
         </x-secondary-button>
     </div>
 
-    <div class="mx-6 mt-5 flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-relaxed text-brand-moss sm:mx-8">
+    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3.5 text-sm leading-relaxed text-brand-moss sm:px-6">
         <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
         <p>{{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry whenever a maintenance window is enabled or ended — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}</p>
     </div>
 
     {{-- Current subscriptions --}}
-    <div class="px-6 py-5 sm:px-8">
+    <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
         @if ($subscriptionsByChannel->isEmpty())
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
+            <div class="border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
                 <p class="mt-3 text-sm text-brand-moss">
                     {{ __('No external channels are routed for maintenance events yet.') }}
@@ -43,7 +42,7 @@
                 </p>
             </div>
         @else
-            <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+            <ul class="divide-y divide-brand-ink/10 border border-brand-ink/10 bg-white">
                 @foreach ($subscriptionsByChannel as $channelId => $subs)
                     @php $channel = $subs->first()->channel; @endphp
                     <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" wire:key="maint-notif-ch-{{ $channelId }}">
@@ -72,7 +71,7 @@
     </div>
 
     {{-- Add subscription --}}
-    <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
+    <div class="px-5 py-5 sm:px-6">
         <p class="text-sm font-medium text-brand-ink">{{ __('Add a channel') }}</p>
         <form wire:submit="addMaintenanceNotificationSubscription" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">

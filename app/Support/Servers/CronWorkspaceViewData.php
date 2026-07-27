@@ -22,7 +22,8 @@ final class CronWorkspaceViewData
         bool $includeBannerContext = false,
         bool $includeSummaryContext = false,
     ): array {
-        $card = 'dply-card overflow-hidden';
+        // Nested sections inside the merged Cron card — not second page cards.
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ssh_private_key;
         $presets = [
             'every_minute' => [__('Every minute'), '* * * * *'],

@@ -3,6 +3,8 @@
     $productionConnection = $productionMirrorSite && production_data_mirror_connected()
         ? app(\App\Services\ProductionData\ProductionDataMirror::class)->connectionFor(auth()->user())
         : null;
+    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources'];
+    $usesMergedChrome = in_array($section, $mergedChromeSections, true);
 @endphp
 <div>
     @if ($productionConnection)
@@ -32,10 +34,9 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
-            {{-- No hero on General: its Overview card opens with the site avatar
-                 + domain identity, so a "Site workspace / General" banner above
-                 it was pure repetition. Other sections keep the hero. --}}
-            @if ($section !== 'general')
+            {{-- No floating hero on merged-chrome sections — one outer dply-card.
+                 Other sections keep the classic hero-card. --}}
+            @if (! $usesMergedChrome)
             <x-hero-card
                 :eyebrow="$productionConnection ? __('Production · :section', ['section' => $workspaceTitle]) : $workspaceTitle"
                 :title="$sectionHeader['title']"
@@ -65,14 +66,23 @@
                 <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
             @endif
 
-            <main @class(['min-w-0 space-y-6', 'mt-8' => $section !== 'general'])>
-                {{-- On General the banner renders inside general-tab, AFTER the
-                     Overview card, so the site identity stays first on the page. --}}
-                @if ($section !== 'general')
+            <main @class([
+                'min-w-0',
+                'space-y-6' => ! $usesMergedChrome,
+                'mt-8' => ! $usesMergedChrome,
+            ])>
+                {{-- On merged-chrome sections the banner renders inside the
+                     card. Other sections keep it above the panel. --}}
+                @if (! $usesMergedChrome)
                     @include('livewire.sites.settings.partials._console-action-banner')
                 @endif
 
-                <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
+                <div
+                    role="tabpanel"
+                    id="site-settings-panel"
+                    aria-labelledby="site-settings-sidebar"
+                    @class(['space-y-6' => ! $usesMergedChrome])
+                >
                     @if ($section === 'general')
                         @if ($isContainerWorkspace && ! $site->usesFunctionsRuntime())
                             @include('livewire.sites.partials.container-dashboard')
@@ -83,42 +93,161 @@
                         @endif
 
                         @if (! $isContainerWorkspace)
-                            @include('livewire.sites.settings.partials.general-tab')
+                            {{-- choose-app CTA (if any) stays outside; everything
+                                 else shares one merged card like server Settings. --}}
+                            @if ($site->canRechooseApp())
+                                @include('livewire.sites.settings.partials.general-tab', ['generalTabChooseAppOnly' => true])
+                            @endif
+
+                            <section class="dply-card min-w-0 overflow-hidden p-0">
+                                @include('livewire.sites.settings.partials.general-tab', ['generalTabSkipChooseApp' => true])
+
+                                @if ($generalRecentDeployments->isNotEmpty())
+                                    @include('livewire.sites.partials.recent-deployments', [
+                                        'deployments' => $generalRecentDeployments,
+                                        'asStrip' => true,
+                                    ])
+                                @endif
+
+                                <div class="px-5 py-5 sm:px-6">
+                                    <x-cli-snippet :commands="[
+                                        ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
+                                        ['label' => __('Diagnose site'), 'command' => 'dply sites:doctor '.$site->slug],
+                                        ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
+                                        ['label' => __('Export full config'), 'command' => 'dply sites:export:config '.$site->slug.' --to=site.json'],
+                                        ['label' => __('Export deploy manifest'), 'command' => 'dply sites:export:manifest '.$site->slug.' --to=manifest.json'],
+                                        ['label' => __('List all sites'), 'command' => 'dply sites:list'],
+                                    ]" />
+                                </div>
+                            </section>
                         @else
                             {{-- general-tab (which carries the banner below its
-                                 Overview card) is skipped for container
+                                 Overview strip) is skipped for container
                                  workspaces — render the banner here instead. --}}
                             @include('livewire.sites.settings.partials._console-action-banner')
                         @endif
-
-                        @if ($generalRecentDeployments->isNotEmpty())
-                            <div class="mt-6">
-                                @include('livewire.sites.partials.recent-deployments', ['deployments' => $generalRecentDeployments])
-                            </div>
-                        @endif
-
-                        {{-- Always the last thing on the General page — after
-                             recent deployments, not baked into the tab partial. --}}
-                        @unless ($isContainerWorkspace)
-                            <x-cli-snippet :commands="[
-                                ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
-                                ['label' => __('Diagnose site'), 'command' => 'dply sites:doctor '.$site->slug],
-                                ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
-                                ['label' => __('Export full config'), 'command' => 'dply sites:export:config '.$site->slug.' --to=site.json'],
-                                ['label' => __('Export deploy manifest'), 'command' => 'dply sites:export:manifest '.$site->slug.' --to=manifest.json'],
-                                ['label' => __('List all sites'), 'command' => 'dply sites:list'],
-                            ]" />
-                        @endunless
                     @elseif ($section === 'settings')
-                        @include('livewire.sites.settings.partials.settings-tab')
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                            <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                                {{ $sectionDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    @if ($headerRoleLabel !== null)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                                            @if ($headerIsDeployer)
+                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                                            @elseif ($headerCanUpdateSite)
+                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                            @else
+                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                                            @endif
+                                            {{ $headerRoleLabel }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+                            @include('livewire.sites.settings.partials.settings-tab')
+                        </section>
                     @elseif ($section === 'routing')
-                        @include('livewire.sites.settings.partials.routing')
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                            <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                                {{ $sectionDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    @if ($headerRoleLabel !== null)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                                            @if ($headerIsDeployer)
+                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                                            @elseif ($headerCanUpdateSite)
+                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                            @else
+                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                                            @endif
+                                            {{ $headerRoleLabel }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+                            @include('livewire.sites.settings.partials.routing')
+                        </section>
                     @elseif ($section === 'backends')
                         @livewire(\App\Livewire\Sites\Backends::class, ['server' => $server, 'site' => $site], key('backends-'.$site->id))
                     @elseif ($section === 'certificates')
-                        @include('livewire.sites.settings.partials.certificates')
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                            <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                                {{ $sectionDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    @if ($headerRoleLabel !== null)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                                            @if ($headerIsDeployer)
+                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                                            @elseif ($headerCanUpdateSite)
+                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                            @else
+                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                                            @endif
+                                            {{ $headerRoleLabel }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+                            @include('livewire.sites.settings.partials.certificates')
+                        </section>
                     @elseif ($section === 'repository')
-                        @include('livewire.sites.settings.partials.repository')
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                        <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                            {{ $sectionDescription }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+                            @include('livewire.sites.settings.partials.repository')
+                        </section>
                     @elseif ($section === 'deploy')
                         @if ($functionsHost)
                             @include('livewire.sites.settings.partials.deploy-recipe')
@@ -134,11 +263,44 @@
                             </div>
                         @endif
                     @elseif ($section === 'runtime')
-                        @if ($site->usesFunctionsRuntime())
-                            @include('livewire.sites.settings.partials.runtime-serverless')
-                        @else
-                            @include('livewire.sites.settings.partials.runtime-workspace')
-                        @endif
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                            <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                                {{ $sectionDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    @if ($headerRoleLabel !== null)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                                            @if ($headerIsDeployer)
+                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                                            @elseif ($headerCanUpdateSite)
+                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                            @else
+                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                                            @endif
+                                            {{ $headerRoleLabel }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+
+                            @if ($site->usesFunctionsRuntime())
+                                @include('livewire.sites.settings.partials.runtime-serverless')
+                            @else
+                                @include('livewire.sites.settings.partials.runtime-workspace')
+                            @endif
+                        </section>
                     @elseif ($section === 'system-user')
                         @if (workspace_surface_coming_soon('site_system_user'))
                             <x-workspace-coming-soon
@@ -174,17 +336,50 @@
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')
-                        @if ($isContainerWorkspace)
-                            {{-- Container/Cloud sites keep their managed Cloud resources
-                                 panel (CloudDatabase/CloudWorker), now embedded in the
-                                 workspace chrome. VM sites use the bindings hub. --}}
-                            @livewire(\App\Livewire\Sites\Resources::class, ['server' => $server, 'site' => $site], key('cloud-resources-'.$site->id))
-                        @else
-                            {{-- Own Livewire component (not an @include) so the heavy
-                                 binding graph + modal only re-render on their own
-                                 state, not on every parent round-trip (polls, etc.). --}}
-                            @livewire(\App\Livewire\Sites\ResourceMap::class, ['server' => $server, 'site' => $site], key('resource-map-'.$site->id))
-                        @endif
+                        <section class="dply-card min-w-0 overflow-hidden p-0">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                            <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                                {{ $sectionDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    @if ($headerRoleLabel !== null)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                                            @if ($headerIsDeployer)
+                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                                            @elseif ($headerCanUpdateSite)
+                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                            @else
+                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                                            @endif
+                                            {{ $headerRoleLabel }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+
+                            @if ($isContainerWorkspace)
+                                {{-- Container/Cloud sites keep their managed Cloud resources
+                                     panel (CloudDatabase/CloudWorker), now embedded in the
+                                     workspace chrome. VM sites use the bindings hub. --}}
+                                @livewire(\App\Livewire\Sites\Resources::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('cloud-resources-'.$site->id))
+                            @else
+                                {{-- Own Livewire component (not an @include) so the heavy
+                                     binding graph + modal only re-render on their own
+                                     state, not on every parent round-trip (polls, etc.). --}}
+                                @livewire(\App\Livewire\Sites\ResourceMap::class, ['server' => $server, 'site' => $site], key('resource-map-'.$site->id))
+                            @endif
+                        </section>
                     @elseif ($section === 'logs')
                         @if (workspace_surface_coming_soon('site_logs'))
                             <x-workspace-coming-soon
@@ -240,7 +435,38 @@
                     @elseif ($section === 'basic-auth')
                         @include('livewire.sites.settings.partials.basic-auth')
                     @elseif ($section === 'cli')
-                        @include('livewire.sites.settings.partials.cli')
+                        @if (workspace_surface_coming_soon('site_cli'))
+                            @include('livewire.sites.settings.partials.cli')
+                        @else
+                            <section class="dply-card min-w-0 overflow-hidden p-0">
+                                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                                    <div class="flex flex-wrap items-start justify-between gap-4">
+                                        <div class="flex min-w-0 items-start gap-3">
+                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                                    {{ __('Run commands here, or install the CLI on your machine.') }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <a
+                                            href="{{ route('profile.cli') }}"
+                                            wire:navigate
+                                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        >
+                                            {{ __('Install & login') }}
+                                            <x-heroicon-m-arrow-up-right class="h-3 w-3" />
+                                        </a>
+                                    </div>
+                                </div>
+
+                                @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+                                @include('livewire.sites.settings.partials.cli', ['cliNestedInShell' => true])
+                            </section>
+                        @endif
                     @elseif ($section === 'danger')
                         @include('livewire.sites.settings.partials.danger')
                     @endif

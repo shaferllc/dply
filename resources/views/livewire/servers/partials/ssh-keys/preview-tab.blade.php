@@ -1,6 +1,13 @@
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
+            <div class="{{ $card }}">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Drift') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Compares the panel’s desired keys with what is on the server now (read-only).') }}</p>
+                        <p class="mt-1 text-xs text-brand-mist">
+                            {{ __('“Will add” / “Will remove” means: when you click Sync, the server\'s authorized_keys file will gain or lose that key. Adding a key in the panel doesn\'t touch the server — only Sync does.') }}
+                        </p>
+                    </div>
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"
@@ -33,12 +40,9 @@
                         </button>
                     </div>
                 </div>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('Compares the panel’s desired keys with what is on the server now (read-only).') }}</p>
-                <p class="mt-1 text-xs text-brand-mist">
-                    {{ __('“Will add” / “Will remove” means: when you click Sync, the server\'s authorized_keys file will gain or lose that key. Adding a key in the panel doesn\'t touch the server — only Sync does.') }}
-                </p>
+                <div class="px-6 py-5 sm:px-8">
                 @if ($diff_result === null)
-                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
+                    <div class="flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
                             <x-heroicon-o-arrows-right-left class="h-5 w-5" />
                         </span>
@@ -57,7 +61,7 @@
                         @endif
                     </div>
                 @else
-                    <div class="mt-6 space-y-4">
+                    <div class="space-y-4">
                         @php
                             // One-time helpers for the rendering loop. Pull a stable "type" out of an
                             // OpenSSH public key line so we can render it as a chip; the comment (last
@@ -244,4 +248,5 @@
                      the tabs (same one the sync flow uses). Keeping the diff structure here on
                      the tab and routing the transcript through the shared banner makes the UX
                      consistent across both flows. --}}
+                </div>
             </div>

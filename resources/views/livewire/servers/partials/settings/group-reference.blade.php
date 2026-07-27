@@ -1,4 +1,4 @@
-<section id="settings-group-reference" class="space-y-6" aria-labelledby="settings-group-reference-title">
+<section id="settings-group-reference" aria-labelledby="settings-group-reference-title">
     <div id="settings-notes" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>

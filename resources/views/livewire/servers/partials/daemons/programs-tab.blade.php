@@ -16,7 +16,7 @@
      and never appear in the Supervisor list — surface them so "where's my
      Horizon worker?" answers itself and nobody double-creates one here. --}}
 @if (isset($systemdWorkers) && $systemdWorkers->isNotEmpty())
-    <section class="dply-card mb-5 overflow-hidden border border-sky-200">
+    <section class="border-b border-sky-200/80 bg-sky-50/40">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sky-200 bg-sky-50 px-6 py-4 sm:px-7">
             <div class="min-w-0">
                 <h3 class="text-sm font-semibold text-sky-900">{{ __(':n worker(s) run via systemd — not Supervisor', ['n' => $systemdWorkers->count()]) }}</h3>
@@ -41,7 +41,7 @@
 
 {{-- Programs list card. Header carries the primary actions (Sync, Restart all,
      Add program) and a count chip; rows below. --}}
-<section class="dply-card overflow-hidden" wire:init="loadProgramStatuses">
+<section class="border-b border-brand-ink/10" wire:init="loadProgramStatuses">
     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         {{-- Top row: icon + title + buttons --}}
         <div class="flex flex-wrap items-center justify-between gap-3">

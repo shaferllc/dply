@@ -10,7 +10,7 @@
     $monoInputClass = $inputClass.' font-mono';
 @endphp
 
-<section id="settings-group-connect" class="space-y-6" aria-labelledby="settings-group-connect-title">
+<section id="settings-group-connect" aria-labelledby="settings-group-connect-title">
     <div id="settings-connection" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>

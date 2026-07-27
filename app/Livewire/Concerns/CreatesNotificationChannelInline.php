@@ -8,6 +8,7 @@ use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -177,6 +178,11 @@ trait CreatesNotificationChannelInline
             'label' => $this->new_label,
             'config' => $this->newChannelConfigFromInput($this->new_type),
         ]);
+
+        // Drop request memo so hosts that re-query assignable channels see the new row.
+        AssignableNotificationChannels::flushMemo(
+            Auth::id() !== null ? (string) Auth::id() : null,
+        );
 
         $org = match (true) {
             $owner instanceof Organization => $owner,

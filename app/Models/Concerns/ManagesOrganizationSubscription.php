@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns;
 
-use App\Models\Server;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
 use App\Modules\Billing\Services\SubscriptionPlanResolver;
 use Laravel\Cashier\Billable;
@@ -30,21 +29,15 @@ trait ManagesOrganizationSubscription
     }
 
     /**
-     * Billable BYO server count used to pick the plan. Mirrors the filter in
-     * {@see OrganizationBillingStateComputer}: ready, past the new-server age
-     * grace, and excluding dply-managed logical hosts.
+     * Billable BYO server count used to pick the plan. Delegates to
+     * {@see OrganizationBillingStateComputer::billableByoServerCount()} so the
+     * ready-server SELECT (and metric eager-load) is shared with bill compute
+     * / analytics in the same request.
      */
     private function billablePlanServerCount(): int
     {
-        $minAgeDays = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
-        $ageCutoff = now()->subDays($minAgeDays);
-
-        return $this->servers()
-            ->where('status', Server::STATUS_READY)
-            ->where('created_at', '<=', $ageCutoff)
-            ->get()
-            ->reject(fn (Server $server) => $server->isManagedProductHost())
-            ->count();
+        return app(OrganizationBillingStateComputer::class)
+            ->billableByoServerCount($this);
     }
 
     public function planTierLabel(): string

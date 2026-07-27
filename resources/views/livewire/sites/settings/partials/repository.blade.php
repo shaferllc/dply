@@ -1,5 +1,5 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
     $repoGroup = $repositorySyncGroup ?? null;
     $orgSites = $organizationSites ?? collect();
     $hasDeployKey = ! $server->hostCapabilities()->supportsFunctionDeploy() && $site->git_deploy_key_public;
@@ -11,7 +11,7 @@
     };
 @endphp
 
-<div class="space-y-6">
+<div>
     {{-- Repository configuration: branch, provider, source-control account, URL. --}}
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
@@ -453,7 +453,7 @@
     </section>
 
     {{-- Danger zone. --}}
-    <section class="dply-card overflow-hidden border-rose-200">
+    <section class="border-b border-rose-200">
         <div class="flex flex-col gap-4 border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge tone="danger">
@@ -478,9 +478,11 @@
         </div>
     </section>
 
+    <div class="px-5 py-5 sm:px-6">
     <x-cli-snippet :commands="[
         ['label' => __('Update remote / branch'), 'command' => 'dply sites:repo:set '.$site->slug.' --url=git@github.com:org/repo.git --branch=main'],
         ['label' => __('Switch monorepo path'), 'command' => 'dply sites:repo:set '.$site->slug.' --path=apps/web'],
         ['label' => __('Trigger redeploy after change'), 'command' => 'dply sites:deploy '.$site->slug],
     ]" />
+</div>
 </div>

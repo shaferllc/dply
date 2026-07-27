@@ -26,20 +26,28 @@
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-hero-card
-                :eyebrow="__('Site')"
-                :title="__('Repository')"
-                :description="__('Browse the connected repository, switch branches, and manage the source-control connection.')"
-                icon="folder-open"
-            />
+        <main class="min-w-0 lg:col-span-9">
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Repository') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('Browse commits, switch branches, and manage the Git connection.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 @else
-<div class="space-y-6">
+<div>
 @endif
 
             @if ($currentRepositoryUrl === '')
                 @if (! $isEmbedded)
-                <section class="dply-card overflow-hidden border-amber-200">
+                <section class="border-b border-brand-ink/10">
                     <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
@@ -92,7 +100,8 @@
                 @endphp
 
                 @unless ($isLocked)
-                    <x-server-workspace-tablist :aria-label="__('Repository sections')">
+                    <div @class(['border-b border-brand-ink/10 px-3 py-2.5 sm:px-4' => ! $isEmbedded])>
+                    <x-server-workspace-tablist :aria-label="__('Repository sections')" scroll @class(['!mb-0 w-full border-0 bg-transparent p-0 shadow-none' => ! $isEmbedded])>
                         @foreach ($tabs as $entry)
                             <x-server-workspace-tab
                                 id="repository-tab-{{ $entry['id'] }}"
@@ -103,6 +112,7 @@
                             >{{ $entry['label'] }}</x-server-workspace-tab>
                         @endforeach
                     </x-server-workspace-tablist>
+                    </div>
                 @endunless
 
                 <div wire:key="repository-tab-{{ $activeTab }}-{{ $branchInUse }}-{{ $filesPath }}">
@@ -133,12 +143,18 @@
                 </div>
             @endif
 
-            <x-cli-snippet class="mt-6" :commands="[
-                ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
-                ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
-            ]" />
+            <div @class([
+                'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => ! $isEmbedded,
+                'mt-6' => $isEmbedded,
+            ])>
+                <x-cli-snippet :commands="[
+                    ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                    ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                ]" />
+            </div>
 
 @if (! $isEmbedded)
+            </section>
         </main>
     </div>
 </div>

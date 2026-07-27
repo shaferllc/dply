@@ -1,7 +1,7 @@
-<section class="space-y-6">
+<section>
     {{-- The page-level "No repository connected" card covers the empty case. --}}
     @if ($currentRepositoryUrl !== '')
-        <div class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
                     <x-icon-badge>

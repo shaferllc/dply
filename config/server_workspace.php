@@ -75,8 +75,8 @@ return [
         ['key' => 'networking', 'route' => 'servers.networking', 'icon' => 'share', 'label' => 'Networking', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'system-users', 'route' => 'servers.system-users', 'icon' => 'user-group', 'label' => 'System users', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.system_users'],
-        // admin — standalone (Logs, Files) lead, then the Settings
-        // (settings/notifications/maintenance) and Automation (blueprint/cli) clusters.
+        // admin — standalone (Logs, Files, Blueprint, CLI) lead, then the
+        // Settings (settings/notifications/maintenance) cluster.
         // Deploy windows merged into the Deploys page (servers.deploys?tab=deploy-windows).
         // 'manage' nav entry retired: the Manage workspace was dissolved. Tools is
         // now its own Stacks entry (servers.tools); Updates lives on Patches,
@@ -239,11 +239,9 @@ return [
             'members' => ['settings', 'notifications', 'maintenance'],
             'tab_labels' => ['settings' => 'General'],
         ],
-        'automation' => [
-            'label' => 'Blueprints',
-            'icon' => 'document-duplicate',
-            'members' => ['blueprint', 'cli'],
-        ],
+        // Blueprint + CLI used to share an "automation / Blueprints" cluster, but
+        // CLI is the dply terminal client (install / coming soon) — unrelated to
+        // golden-server blueprints — so both stay as standalone admin leaves.
     ],
 
     /*

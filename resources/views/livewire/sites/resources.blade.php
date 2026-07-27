@@ -1,5 +1,8 @@
 @php
-    $card = 'rounded-xl border border-brand-ink/10 bg-white p-5 shadow-sm';
+    $isEmbedded = (bool) ($embedded ?? false);
+    $card = $isEmbedded
+        ? 'border-b border-brand-ink/10 px-5 py-5 sm:px-6'
+        : 'rounded-xl border border-brand-ink/10 bg-white p-5 shadow-sm';
     $labelCls = 'block text-xs font-semibold uppercase tracking-wide text-brand-moss mb-1';
     $inputCls = 'block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest';
     $statusColors = [
@@ -10,6 +13,7 @@
     ];
 @endphp
 
+@if (! $isEmbedded)
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
         <ol class="flex flex-wrap items-center gap-2">
@@ -42,13 +46,28 @@
             @endif
         </x-slot:topAction>
     </x-hero-card>
+@else
+{{-- Nested in Settings merged card — toolbar strip only. --}}
+<div class="min-w-0">
+    <div class="flex flex-wrap items-center justify-end gap-2 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
+        @if ($isContainer)
+            <x-primary-button size="sm" type="button" wire:click="openAttach('attach')">
+                + {{ __('Attach resource') }}
+            </x-primary-button>
+        @else
+            <x-primary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate>
+                {{ __('Manage workers') }}
+            </x-primary-button>
+        @endif
+    </div>
+@endif
 
 @if (! $isContainer)
     {{-- Worker SERVER pools attached to this site's workspace — the scalable
          background fleet. Distinct from the process roll-up below; scale on the
          pool page. Only shows when a worker pool shares this site's network. --}}
     @if ($this->attachedWorkerPools->isNotEmpty())
-        <div class="{{ $card }} mb-6">
+        <div @class([$card, 'mb-6' => ! $isEmbedded])>
             <div class="flex items-baseline justify-between gap-3">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Worker servers') }}</h2>
@@ -130,7 +149,7 @@
     </div>
 @else
     {{-- Databases --}}
-    <div class="{{ $card }} mb-6">
+    <div @class([$card, 'mb-6' => ! $isEmbedded])>
         <div class="flex items-baseline justify-between gap-3">
             <div>
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Databases') }}</h2>

@@ -42,6 +42,9 @@ class Resources extends Component
 
     public Site $site;
 
+    /** When true, suppress page chrome (breadcrumb / hero) — already wrapped by Settings. */
+    public bool $embedded = false;
+
     /**
      * Container (Cloud) sites get the full attach/detach CRUD against
      * CloudWorker/CloudDatabase. VM sites get a read-only roll-up of their

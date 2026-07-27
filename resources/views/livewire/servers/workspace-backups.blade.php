@@ -74,17 +74,7 @@
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
             @include('livewire.sites.settings.partials.sidebar')
 
-            <main class="min-w-0 space-y-6 lg:col-span-9">
-                {{-- Shared hero header so this page matches the rest of the
-                     app. The 7-day health tiles live in the "Backups at a
-                     glance" strip below, so the hero stays lean. --}}
-                <x-hero-card
-                    :eyebrow="__('Background')"
-                    :title="__('Backups')"
-                    :description="__('Database and site-files backup runs for this site, plus recurring schedules. Backups write to the destination configured in Settings → Backup configurations.')"
-                    icon="archive-box"
-                />
-
+            <main class="min-w-0 lg:col-span-9">
                 @include('livewire.servers.partials.backups._workspace-content')
             </main>
         </div>
@@ -95,6 +85,7 @@
         active="backups"
         :title="__('Backups')"
         :description="__('Recent database and site-files backup runs for this server, plus recurring schedules. Backups write to the destination configured in your account Settings → Backup configurations.')"
+        hide-hero
     >
         @include('livewire.servers.partials.backups._workspace-content')
     </x-server-workspace-layout>

@@ -11,7 +11,7 @@
     $statusTone = $tonePalette[$statusMeta['tone']] ?? $tonePalette['mist'];
 @endphp
 
-<div class="space-y-6">
+<div class="min-w-0">
     {{-- Poll while a job is in flight so install output + status stream in --}}
     @if ($busy)
         <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
@@ -20,22 +20,24 @@
     @php $sub = $shippingSubTab ?? 'logs'; @endphp
 
     {{-- Sub-tabs — Logs first so the stream is visible without scrolling past setup --}}
-    <div class="flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1">
-        @foreach ([
-            'logs' => [__('Logs'), 'heroicon-m-bars-3-bottom-left'],
-            'settings' => [__('Settings'), 'heroicon-m-cog-6-tooth'],
-            'activity' => [__('Activity'), 'heroicon-m-clipboard-document-list'],
-        ] as $key => $meta)
-            <button type="button" wire:click="setShippingSubTab('{{ $key }}')"
-                @class([
-                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition',
-                    'bg-brand-forest text-white shadow-sm' => $sub === $key,
-                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $sub !== $key,
-                ])>
-                <x-dynamic-component :component="$meta[1]" class="h-4 w-4" aria-hidden="true" />
-                {{ $meta[0] }}
-            </button>
-        @endforeach
+    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <div class="flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1">
+            @foreach ([
+                'logs' => [__('Logs'), 'heroicon-m-bars-3-bottom-left'],
+                'settings' => [__('Settings'), 'heroicon-m-cog-6-tooth'],
+                'activity' => [__('Activity'), 'heroicon-m-clipboard-document-list'],
+            ] as $key => $meta)
+                <button type="button" wire:click="setShippingSubTab('{{ $key }}')"
+                    @class([
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition',
+                        'bg-brand-forest text-white shadow-sm' => $sub === $key,
+                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $sub !== $key,
+                    ])>
+                    <x-dynamic-component :component="$meta[1]" class="h-4 w-4" aria-hidden="true" />
+                    {{ $meta[0] }}
+                </button>
+            @endforeach
+        </div>
     </div>
 
     @if ($sub === 'settings')
@@ -54,7 +56,7 @@
         @if ($aggBusy)
             <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
         @endif
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex flex-wrap items-center gap-3 px-6 py-4 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-inbox-arrow-down class="h-5 w-5" aria-hidden="true" />
@@ -93,7 +95,7 @@
         </section>
     @endif
 
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
@@ -246,7 +248,7 @@
 
     {{-- Activity sub-tab: streaming install output + agent metadata --}}
     @if ($sub === 'activity')
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
@@ -290,7 +292,7 @@
     @if ($sub === 'logs')
     {{-- Shipping isn't running: nudge to Settings rather than show an empty stream --}}
     @unless ($agent?->isRunning())
-        <div class="dply-card flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-7">
             <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
                 <x-heroicon-o-paper-airplane class="h-4 w-4" aria-hidden="true" />
                 {{ __('Log shipping is not running on this server, so there are no persisted logs yet.') }}
@@ -306,7 +308,7 @@
         @if (($logCorrelationEnabled ?? true) && ($logHistogram ?? null) !== null)
             <x-logs-correlation-chart :histogram="$logHistogram" />
         @elseif (! ($logCorrelationEnabled ?? true))
-            <div class="dply-card flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-7">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-6 py-3 sm:px-7">
                 <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
                     <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
                     {{ __('Events vs logs graph is hidden.') }}
@@ -321,7 +323,7 @@
 
     {{-- Shipped logs explorer (reads ClickHouse, org + server scoped) --}}
     @if ($logExplorer !== null)
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
                 <x-icon-badge>
                     <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />

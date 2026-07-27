@@ -1,30 +1,42 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-    ];
+    $blueprintDescription = __('Save this server\'s reconciled stack as a golden blueprint for the next VM you provision.');
 @endphp
 
 <x-server-workspace-layout
     :server="$server"
     active="blueprint"
     :title="__('Blueprint')"
-    :description="__('Save this server\'s reconciled stack as a golden blueprint for the next VM you provision.')"
+    :description="$blueprintDescription"
+    hide-hero
 >
+    @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div class="space-y-6">
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Blueprint') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ $blueprintDescription }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Snapshot preview') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $previewSummary }}</h2>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $previewSummary }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Role') }}: <span class="font-semibold text-brand-ink">{{ ucfirst((string) ($previewSnapshot['server_role'] ?? 'application')) }}</span>
                         @if ($previewExtras['firewall_rules'] > 0)
@@ -37,7 +49,7 @@
                 </div>
             </div>
 
-            <form wire:submit.prevent="saveBlueprint" class="space-y-4 px-6 py-6 sm:px-7">
+            <form wire:submit.prevent="saveBlueprint" class="space-y-4 px-5 py-6 sm:px-6">
                 <div>
                     <x-input-label for="blueprint_name" :value="__('Blueprint name')" />
                     <x-text-input
@@ -58,17 +70,17 @@
                     <span wire:loading wire:target="saveBlueprint">{{ __('Saving…') }}</span>
                 </x-primary-button>
             </form>
-        </section>
+        </div>
 
         @if ($orgBlueprints->isNotEmpty())
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization blueprints') }}</h2>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization blueprints') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pick any of these when provisioning a new VM in Step 3 — What it runs.') }}</p>
                     </div>
                 </div>
@@ -76,9 +88,8 @@
                     @foreach ($orgBlueprints as $blueprint)
                         @php
                             $tagline = $summary->tagline($blueprint->snapshot);
-                            $extras = $summary->extras($blueprint->snapshot);
                         @endphp
-                        <li class="flex flex-wrap items-start justify-between gap-3 px-6 py-4 sm:px-7">
+                        <li class="flex flex-wrap items-start justify-between gap-3 px-5 py-4 sm:px-6">
                             <div class="min-w-0">
                                 <p class="font-semibold text-brand-ink">{{ $blueprint->name }}</p>
                                 <p class="mt-0.5 text-sm text-brand-moss">{{ $tagline }}</p>
@@ -99,9 +110,9 @@
                         </li>
                     @endforeach
                 </ul>
-            </section>
+            </div>
         @endif
-    </div>
+    </section>
 
     <x-modal name="delete-blueprint-confirmation" maxWidth="md">
         <div class="p-6">
