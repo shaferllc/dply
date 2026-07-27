@@ -74,6 +74,7 @@ class NotificationChannels extends Component
             'backUrl' => null,
             'backLabel' => null,
             'useOrgShell' => false,
+            'useProfileShell' => true,
             'organization' => null,
             'orgShellSection' => 'notifications',
         ], $this->notificationChannelsViewData(), [

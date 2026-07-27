@@ -195,16 +195,12 @@
                                 @endphp
                                 <tr class="hover:bg-brand-sand/20">
                                     <td class="whitespace-nowrap px-4 py-2 font-mono">
-                                        @if ($entry->isDir())
-                                            <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
-                                                <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                <span>{{ $entry->name }}/</span>
-                                            </button>
-                                        @elseif ($entry->isLink())
+                                        {{-- Links before dirs: directory symlinks report isDir()=true but still need → / Follow. --}}
+                                        @if ($entry->isLink())
                                             @if ($entry->linkTargetIsDir)
-                                                <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
+                                                <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}', '{{ addslashes((string) $entry->linkTarget) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
                                                     <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                    <span>{{ $entry->name }}</span>
+                                                    <span>{{ $entry->name }}/</span>
                                                 </button>
                                             @else
                                                 @if ($entryDownloadUrl)
@@ -220,6 +216,11 @@
                                                 @endif
                                             @endif
                                             <span class="ml-1 text-brand-moss">→ {{ $entry->linkTarget }}</span>
+                                        @elseif ($entry->isDir())
+                                            <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
+                                                <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" />
+                                                <span>{{ $entry->name }}/</span>
+                                            </button>
                                         @else
                                             <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-ink hover:underline">
                                                 <x-heroicon-o-document class="h-4 w-4 shrink-0 text-brand-mist" />
@@ -232,7 +233,9 @@
                                     <td class="whitespace-nowrap px-4 py-2 font-mono text-brand-moss">{{ $entry->mode }}</td>
                                     <td class="whitespace-nowrap px-4 py-2 text-brand-moss">{{ $entry->owner }}:{{ $entry->group }}</td>
                                     <td class="whitespace-nowrap px-4 py-2 text-right">
-                                        @if ($entry->isFile() || ($entry->isLink() && ! $entry->linkTargetIsDir))
+                                        @if ($entry->isLink() && $entry->linkTargetIsDir)
+                                            <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}', '{{ addslashes((string) $entry->linkTarget) }}')" class="font-semibold text-brand-forest hover:underline">{{ __('Follow') }}</button>
+                                        @elseif ($entry->isFile() || ($entry->isLink() && ! $entry->linkTargetIsDir))
                                             <div class="inline-flex items-center gap-2">
                                                 <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="font-semibold text-brand-ink hover:underline">{{ __('View') }}</button>
                                                 @if ($entryDownloadUrl)

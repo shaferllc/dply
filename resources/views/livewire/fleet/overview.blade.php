@@ -2,30 +2,33 @@
     <x-fleet-shell
         :title="__('Fleet ops')"
         :description="__('Cross-product, read-only views over every server and site in :org. Spot drift, in-flight deploys, and failure surfaces across BYO, Cloud, and Edge — without leaving a single screen.', ['org' => $org->name])"
+        icon="heroicon-o-rectangle-stack"
     >
         {{-- Headline stats --}}
-        <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{ __('Fleet at a glance') }}">
-            <x-fleet-stat :label="__('Servers')">
-                <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $serverCount }}</p>
-            </x-fleet-stat>
-            <x-fleet-stat :label="__('Sites')">
-                <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</p>
-            </x-fleet-stat>
-            <x-fleet-stat :label="__('In-flight deploys')">
-                <p class="mt-2 text-3xl font-semibold tabular-nums {{ $runningDeploys > 0 ? 'text-brand-forest' : 'text-brand-ink' }}">{{ $runningDeploys }}</p>
-            </x-fleet-stat>
-            <x-fleet-stat :label="__('7-day success')">
-                @if ($successRate['percent'] === null)
-                    <p class="mt-2 text-3xl font-semibold text-brand-mist">—</p>
-                @else
-                    <p class="mt-2 text-3xl font-semibold tabular-nums {{ $successRate['percent'] >= 95 ? 'text-emerald-600' : ($successRate['percent'] >= 80 ? 'text-amber-600' : 'text-rose-600') }}">{{ $successRate['percent'] }}%</p>
-                @endif
-            </x-fleet-stat>
+        <section class="border-b border-brand-ink/10 px-5 py-5 sm:px-6" aria-label="{{ __('Fleet at a glance') }}">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <x-fleet-stat :label="__('Servers')">
+                    <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $serverCount }}</p>
+                </x-fleet-stat>
+                <x-fleet-stat :label="__('Sites')">
+                    <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</p>
+                </x-fleet-stat>
+                <x-fleet-stat :label="__('In-flight deploys')">
+                    <p class="mt-2 text-3xl font-semibold tabular-nums {{ $runningDeploys > 0 ? 'text-brand-forest' : 'text-brand-ink' }}">{{ $runningDeploys }}</p>
+                </x-fleet-stat>
+                <x-fleet-stat :label="__('7-day success')">
+                    @if ($successRate['percent'] === null)
+                        <p class="mt-2 text-3xl font-semibold text-brand-mist">—</p>
+                    @else
+                        <p class="mt-2 text-3xl font-semibold tabular-nums {{ $successRate['percent'] >= 95 ? 'text-emerald-600' : ($successRate['percent'] >= 80 ? 'text-amber-600' : 'text-rose-600') }}">{{ $successRate['percent'] }}%</p>
+                    @endif
+                </x-fleet-stat>
+            </div>
         </section>
 
         {{-- What is the fleet --}}
-        <section class="mt-8 overflow-hidden rounded-2xl border border-brand-sage/30 bg-brand-sand/20">
-            <div class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:p-7">
+        <section class="border-b border-brand-ink/10">
+            <div class="flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-start sm:px-6">
                 <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-rectangle-stack class="h-6 w-6" aria-hidden="true" />
                 </span>
@@ -57,24 +60,24 @@
         </section>
 
         {{-- Migration & parity --}}
-        <section class="mt-8 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-            <div class="flex flex-wrap items-end justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <section class="border-b border-brand-ink/10">
+            <div class="flex flex-wrap items-end justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                 <div>
                     <h2 class="text-base font-semibold text-brand-ink">{{ __('Migrate in an afternoon') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm text-brand-moss">{{ __('Import from Forge, Ploi, Vercel, Netlify, or Cloudflare Pages — then keep a continuous parity view until cut-over is done.') }}</p>
                 </div>
                 <a href="{{ route('imports.parity') }}" wire:navigate class="text-sm font-semibold text-brand-sage hover:text-brand-ink">{{ __('Import parity') }} →</a>
             </div>
-            <div class="grid gap-3 p-6 sm:grid-cols-2 lg:grid-cols-3">
-                <a href="{{ route('migrate.show', 'forge') }}" wire:navigate class="rounded-xl border border-brand-ink/10 p-4 transition hover:border-brand-sage/45 hover:shadow-sm">
+            <div class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
+                <a href="{{ route('migrate.show', 'forge') }}" wire:navigate class="rounded-xl border border-brand-ink/10 p-4 transition hover:border-brand-sage/45 hover:bg-brand-sand/20">
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-sage">{{ __('BYO') }}</p>
                     <p class="mt-1 font-semibold text-brand-ink">{{ __('From Forge') }}</p>
                 </a>
-                <a href="{{ route('migrate.show', 'ploi') }}" wire:navigate class="rounded-xl border border-brand-ink/10 p-4 transition hover:border-brand-sage/45 hover:shadow-sm">
+                <a href="{{ route('migrate.show', 'ploi') }}" wire:navigate class="rounded-xl border border-brand-ink/10 p-4 transition hover:border-brand-sage/45 hover:bg-brand-sand/20">
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-sage">{{ __('BYO') }}</p>
                     <p class="mt-1 font-semibold text-brand-ink">{{ __('From Ploi') }}</p>
                 </a>
-                <a href="{{ route('migrate.show', 'vercel') }}" wire:navigate class="rounded-xl border border-brand-ink/10 p-4 transition hover:border-brand-sage/45 hover:shadow-sm">
+                <a href="{{ route('migrate.show', 'vercel') }}" wire:navigate class="rounded-xl border border-brand-ink/10 p-4 transition hover:border-brand-sage/45 hover:bg-brand-sand/20">
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-sage">{{ __('Edge') }}</p>
                     <p class="mt-1 font-semibold text-brand-ink">{{ __('From Vercel') }}</p>
                 </a>
@@ -104,14 +107,16 @@
             }
         @endphp
 
-        <section class="mt-10" aria-labelledby="fleet-sections-heading">
-            <h2 id="fleet-sections-heading" class="text-sm font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Explore') }}</h2>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <section aria-labelledby="fleet-sections-heading">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                <h2 id="fleet-sections-heading" class="text-sm font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Explore') }}</h2>
+            </div>
+            <div class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-3 xl:grid-cols-4">
                 @foreach ($sections as $section)
                     <a
                         href="{{ $section['route_url'] ?? route($section['route']) }}"
                         wire:navigate
-                        class="group flex flex-col rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-sage/45 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
+                        class="group flex flex-col rounded-xl border border-brand-ink/10 bg-brand-cream/20 p-4 transition hover:border-brand-sage/45 hover:bg-brand-sand/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
                     >
                         <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                             <x-dynamic-component :component="$section['icon']" class="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -124,6 +129,8 @@
             </div>
         </section>
 
-        <x-cli-snippet class="mt-10" command="dply fleet:doctor" />
+        <x-slot:footer>
+            <x-cli-snippet command="dply fleet:doctor" />
+        </x-slot:footer>
     </x-fleet-shell>
 </div>

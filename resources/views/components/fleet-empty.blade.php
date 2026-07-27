@@ -3,8 +3,8 @@
     'title' => null,
 ])
 
-{{-- Shared empty / zero-state for fleet pages. --}}
-<div {{ $attributes->class(['rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss']) }}>
+{{-- Flush empty state inside fleet-shell body — comfortable spacing, no nested card. --}}
+<div {{ $attributes->class(['px-5 py-10 text-center text-sm text-brand-moss sm:px-6']) }}>
     @if ($title)
         <p class="font-medium text-brand-ink">{{ $title }}</p>
     @endif

@@ -45,10 +45,9 @@
     @endif
 @endif
 
-<div class="space-y-6">
-    {{-- Hero: positioning + at-a-glance counts. The right-hand stat strip
-         replaces the previous "stored encrypted" pill scattered inside the
-         panel, so the reassurance is visible the moment the page opens. --}}
+<div @class(["space-y-6" => empty($useOrgShell)])>
+@if (empty($useOrgShell))
+{{-- Standalone settings surface keeps its own hero; org shell already has title. --}}
     <section class="dply-card overflow-hidden">
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
@@ -96,11 +95,12 @@
             </dl>
         </div>
     </section>
+@endif
 
-    {{-- Capability filter. Replaces the legacy mobile-pills + desktop-tablist
-         duplication with one responsive segmented control that works at every
-         breakpoint. Wires to the same $tab property. --}}
-    <section aria-label="{{ __('Capability filter') }}">
+    {{-- Capability filter. --}}
+    <section aria-label="{{ __('Capability filter') }}" @class([
+        'border-b border-brand-ink/10 px-3 py-2.5 sm:px-4' => ! empty($useOrgShell),
+    ])>
         <x-server-workspace-tablist :aria-label="__('Capability filter')" scroll class="!mb-0">
             @foreach ($capabilityTabs as $tabItem)
                 <x-server-workspace-tab :icon="$tabItem['icon']" :active="$tab === $tabItem['id']" wire:click="$set('tab', '{{ $tabItem['id'] }}')">
@@ -114,7 +114,10 @@
          surface a single "Connect your first provider" card above the grid
          so an empty workspace doesn't read as a wall of greyed-out tiles. --}}
     @if ($credentials->isEmpty())
-        <section class="rounded-2xl border border-brand-sage/30 bg-brand-sage/5 p-5 sm:p-6">
+        <section @class([
+            'rounded-2xl border border-brand-sage/30 bg-brand-sage/5 p-5 sm:p-6' => empty($useOrgShell),
+            'border-b border-brand-ink/10 bg-brand-sage/5 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
+        ])>
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
                 <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
                     <x-heroicon-o-link class="h-6 w-6" aria-hidden="true" />
@@ -139,7 +142,10 @@
          out by category. Each card shows capability dots, a count badge,
          and a clear connect / manage state — clicking sets the active
          provider and the panel below jumps in to take over. --}}
-    <section aria-label="{{ __('Pick a provider') }}" class="space-y-6">
+    <section aria-label="{{ __('Pick a provider') }}" @class([
+        'space-y-6' => empty($useOrgShell),
+        'space-y-6 border-b border-brand-ink/10 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
+    ])>
         @foreach ($providerNav as $group)
             @php
                 $groupItems = $group['items'];

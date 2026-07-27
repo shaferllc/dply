@@ -12,8 +12,14 @@
     $typeOptions = $this->loggingChannelTypeOptions();
 @endphp
 
-<section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8 sm:py-6">
+@php
+    $logsMergedChrome = (bool) ($logsMergedChrome ?? false);
+@endphp
+<section @class(['border-b border-brand-ink/10' => $logsMergedChrome, 'dply-card overflow-hidden' => ! $logsMergedChrome])>
+    <div @class([
+        'border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6' => $logsMergedChrome,
+        'border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8 sm:py-6' => ! $logsMergedChrome,
+    ])>
         <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
                 <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
@@ -28,7 +34,7 @@
         </div>
     </div>
 
-    <div class="space-y-5 px-6 py-5 sm:px-8">
+    <div @class(['space-y-5 px-5 py-5 sm:px-6' => $logsMergedChrome, 'space-y-5 px-6 py-5 sm:px-8' => ! $logsMergedChrome])>
         {{-- Channels --}}
         <div class="space-y-3">
             <div class="flex items-center justify-between">

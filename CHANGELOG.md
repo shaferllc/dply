@@ -1,6 +1,20 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Site, server, Fleet, organization, and profile pages now share one merged card layout — sand identity header, flush tabs, and hairline sections instead of stacked floating heroes.
+### Changed
+- Changelog, Features, and Roadmap use the same quieter feed/board chrome so public product pages match the in-app workspace look.
+### Fixed
+- Site and server Files now treat directory symlinks (like current → releases/…) as folders you can Follow into, instead of offering View/Edit/Download on the link itself.
+### Added
+- Edge deploys can declare bindings.dply and gate promotes on backend health so hybrid stacks stay honest about origin readiness.
+### Added
+- Attach, create, and detach KV, R2, and D1 bindings for Edge sites from an interactive Bindings tab — wrangler.toml stays authoritative, dashboard rows are additive.
+### Added
+- Edge can alert when a deploy takes unusually long, and deploy durations no longer always read as zero.
+### Changed
+- Device-flow login can grant sites.write so the dply CLI can manage site environment variables, and large --json responses no longer truncate on exit.
 ### Added
 - The browser console is now live. Run shell commands on any ready server from a floating drawer available on every page (backtick toggles it) or from the full Console tab in the server workspace, with quick actions, command autocomplete, rolling per-session history, and a per-command audit record. Deployers stay read-only.
 ### Added

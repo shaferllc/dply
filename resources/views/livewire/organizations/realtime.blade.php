@@ -10,47 +10,91 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="realtime" :breadcrumb="$breadcrumbs">
-            <x-livewire-validation-errors />
+        <x-organization-shell
+            :organization="$organization"
+            section="realtime"
+            :title="__('Realtime')"
+            :description="__('Managed Pusher-compatible relay for your apps. Each active app is billed monthly by its connection tier and added to this workspace subscription.')"
+            icon="heroicon-o-signal"
+            :breadcrumb="$breadcrumbs"
+        >
+            <x-slot:actions>
+                @if ($featureActive && $canManage && $apps->isNotEmpty())
+                    <button
+                        type="button"
+                        wire:click="startCreate"
+                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('New app') }}
+                    </button>
+                @endif
+            </x-slot:actions>
 
-            {{-- Hero + billing notice: what realtime is and what it costs this workspace. --}}
-            <x-hero-card
-                icon="signal"
-                :eyebrow="__('Broadcasting')"
-                :title="__('Realtime')"
-                :description="__('Managed Pusher-compatible relay for your apps. Each active app is billed monthly by its connection tier and added to this workspace’s subscription.')"
-            >
+            @if ($apps->isNotEmpty())
                 <x-slot:stats>
-                    {{-- Billing notice: live total added to the bill. --}}
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('On this workspace’s bill') }}</p>
-                        <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $money($monthlyCents) }}<span class="text-sm font-normal text-brand-moss">/{{ __('mo') }}</span></p>
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ trans_choice('{0}No active apps yet.|{1}:count active app across your sites.|[2,*]:count active apps across your sites.', $activeCount, ['count' => $activeCount]) }}
-                        </p>
-                        @if ($featureActive && $canManage)
-                            <x-primary-button type="button" wire:click="startCreate" class="mt-4 w-full justify-center text-sm">
-                                <x-heroicon-o-plus class="-ml-0.5 mr-1.5 h-4 w-4" /> {{ __('New app') }}
-                            </x-primary-button>
-                        @endif
-                    </div>
+                    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="{{ __('Realtime at a glance') }}">
+                        <x-fleet-stat :label="__('On this bill')">
+                            <p class="mt-2 flex items-baseline gap-1">
+                                <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $money($monthlyCents) }}</span>
+                                <span class="text-[11px] text-brand-moss">/{{ __('mo') }}</span>
+                            </p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Workspace subscription') }}</p>
+                        </x-fleet-stat>
+                        <x-fleet-stat :label="__('Active apps')">
+                            <p class="mt-2 flex items-baseline gap-1.5">
+                                <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $activeCount }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('app|apps', $activeCount) }}</span>
+                            </p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across your sites') }}</p>
+                        </x-fleet-stat>
+                        <x-fleet-stat
+                            :label="__('Managed realtime')"
+                            @class([
+                                'border-brand-sage/30 bg-brand-sage/8' => $featureActive,
+                                'col-span-2 sm:col-span-1' => true,
+                            ])
+                        >
+                            <p class="mt-2 flex items-center gap-1.5">
+                                @if ($featureActive)
+                                    <x-heroicon-m-check-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                                    <span class="text-sm font-semibold text-brand-forest">{{ __('Enabled') }}</span>
+                                @else
+                                    <x-heroicon-m-no-symbol class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    <span class="text-sm font-semibold text-brand-mist">{{ __('Unavailable') }}</span>
+                                @endif
+                            </p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Feature flag') }}</p>
+                        </x-fleet-stat>
+                    </dl>
                 </x-slot:stats>
-            </x-hero-card>
+            @endif
+
+            @if ($errors->isNotEmpty())
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                </div>
+            @endif
+
 
             @if ($apps->isEmpty())
-                {{-- Empty state: apps are provisioned from a site's broadcasting binding. --}}
-                <section class="dply-card mt-6 p-8 text-center">
-                    <x-icon-badge size="md" class="mx-auto">
+                <section class="border-b border-brand-ink/10 px-5 py-16 text-center sm:px-6">
+                    <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                         <x-heroicon-o-signal class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('No broadcasting apps yet') }}</h3>
-                    <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-brand-moss">
-                        {{ __('Create one here, or add managed broadcasting to a site from its Resources tab → Configure broadcasting → dply realtime. Provisioned apps show up here to manage and bill.') }}
+                    </span>
+                    <h3 class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No broadcasting apps yet') }}</h3>
+                    <p class="mx-auto mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                        {{ __('Create one here, or add managed broadcasting from a site’s Resources tab. Provisioned apps show up here to manage and bill.') }}
                     </p>
                     @if ($featureActive && $canManage)
-                        <x-primary-button type="button" wire:click="startCreate" class="mx-auto mt-4 text-sm">
-                            <x-heroicon-o-plus class="-ml-0.5 mr-1.5 h-4 w-4" /> {{ __('New app') }}
-                        </x-primary-button>
+                        <button
+                            type="button"
+                            wire:click="startCreate"
+                            class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('New app') }}
+                        </button>
                     @endif
                     @unless ($featureActive)
                         <p class="mx-auto mt-3 max-w-md text-xs text-brand-moss">
@@ -59,13 +103,13 @@
                     @endunless
                 </section>
             @else
-                <section class="mt-6 space-y-4">
+                <section class="divide-y divide-brand-ink/10">
                     @foreach ($apps as $app)
                         @php
                             $sites = $siteUsage->get($app->id) ?? collect();
                             $tier = $app->tierConfig();
                         @endphp
-                        <article class="dply-card relative p-5 sm:p-6 transition hover:border-brand-forest/40 hover:shadow-md" @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
+                        <article class="relative px-5 py-5 transition-colors hover:bg-brand-sand/15 sm:px-6" @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
                             {{-- Stretched link: the whole card clicks through to the app's detail
                                  page; the action buttons below sit above it via z-10. --}}
                             <a href="{{ route('organizations.realtime.show', [$organization, $app]) }}" wire:navigate

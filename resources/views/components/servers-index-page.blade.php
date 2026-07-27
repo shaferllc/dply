@@ -24,6 +24,8 @@
     'statusFilter' => '',
     'sort' => 'created_at',
     'tagFilter' => '',
+    'sitesIndexUrl' => null,
+    'emptyState' => 'local',
 ])
 
 @php
@@ -32,9 +34,11 @@
     $showMutations = filter_var($showMutations, FILTER_VALIDATE_BOOLEAN);
     $showHeroActions = filter_var($showHeroActions, FILTER_VALIDATE_BOOLEAN);
     $heroActionsHtml = isset($actions) ? trim(preg_replace('/<!--.*?-->/s', '', (string) $actions) ?? '') : '';
+    $sitesIndexUrl ??= route('sites.index');
     $filtersActive = $statusFilter !== ''
         || $sort !== 'created_at'
         || trim((string) $tagFilter) !== '';
+    $isProductionSurface = $emptyState === 'production';
     $summaryStats = [
         ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'] ?? 0, 'tone' => 'text-brand-sage'],
         ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'] ?? 0, 'tone' => 'text-brand-sage'],
@@ -43,30 +47,35 @@
     ];
 @endphp
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <x-breadcrumb-trail :items="$breadcrumbs" />
 
-    {{ $alert ?? '' }}
-    {{ $banners ?? '' }}
-
-    <x-hero-card
-        icon="server-stack"
-        iconSize="md"
-        :eyebrow="$eyebrow"
+    <x-profile-shell
         :title="__('Servers')"
-        :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
+        :description="$isProductionSurface
+            ? __('Live servers from the connected control plane — Manage opens the real workspace with Production data.')
+            : __('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
+        icon="heroicon-o-server-stack"
     >
-        {{-- Slot must be a direct child of x-hero-card (not wrapped in @if) or Blade drops it. --}}
-        <x-slot:top-action>
+        <x-slot:actions>
+            <a
+                href="{{ $sitesIndexUrl }}"
+                wire:navigate
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+            >
+                <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                {{ __('Sites') }}
+                <span aria-hidden="true">→</span>
+            </a>
             @if ($showHeroActions && $heroActionsHtml !== '')
                 {{ $actions }}
             @endif
-        </x-slot:top-action>
+        </x-slot:actions>
 
         <x-slot:stats>
             <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 @foreach ($summaryStats as $stat)
-                    <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 shadow-sm sm:min-w-[6.5rem]">
+                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
                         <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
                             <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                             <span class="truncate">{{ $stat['label'] }}</span>
@@ -76,48 +85,76 @@
                 @endforeach
             </dl>
         </x-slot:stats>
-    </x-hero-card>
 
-    @if ($showFleetOps)
-        @feature('surface.fleet')
-            @php
-                $serversPillOrg = auth()->user()?->currentOrganization();
-                $serversPillCanTimeline = $serversPillOrg !== null && $serversPillOrg->hasAdminAccess(auth()->user());
-                $serversPillTiles = [
-                    ['url' => route('fleet.health'), 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
-                    ['url' => route('fleet.deploys'), 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
-                    ['url' => route('fleet.domains'), 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
-                    ['url' => route('fleet.env-search'), 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
-                    ['url' => route('fleet.env-drift'), 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
-                    ['url' => route('fleet.intelligence'), 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
-                ];
-                if ($serversPillCanTimeline) {
-                    $serversPillTiles[] = [
-                        'url' => route('organizations.activity', $serversPillOrg),
-                        'label' => __('Timeline'),
-                        'icon' => 'heroicon-o-clock',
+        @if (isset($alert) && filled(trim((string) $alert)))
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                {{ $alert }}
+            </div>
+        @endif
+
+        @if (isset($banners) && filled(trim((string) $banners)))
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6 space-y-4">
+                {{ $banners }}
+            </div>
+        @endif
+
+        @if ($showFleetOps)
+            @feature('surface.fleet')
+                @php
+                    $serversPillOrg = auth()->user()?->currentOrganization();
+                    $serversPillCanTimeline = $serversPillOrg !== null && $serversPillOrg->hasAdminAccess(auth()->user());
+                    $serversPillTiles = [
+                        ['url' => route('fleet.health'), 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
+                        ['url' => route('fleet.deploys'), 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
+                        ['url' => route('fleet.domains'), 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
+                        ['url' => route('fleet.env-search'), 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
+                        ['url' => route('fleet.env-drift'), 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
+                        ['url' => route('fleet.intelligence'), 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
                     ];
-                }
-            @endphp
-            <nav class="-mt-2 flex flex-wrap items-center gap-1.5 text-sm" aria-label="{{ __('Fleet ops') }}">
-                <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Fleet ops') }}</span>
-                @foreach ($serversPillTiles as $fleetTile)
-                    <a
-                        href="{{ $fleetTile['url'] }}"
-                        wire:navigate
-                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
-                    >
-                        <x-dynamic-component :component="$fleetTile['icon']" class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ $fleetTile['label'] }}
-                    </a>
-                @endforeach
-            </nav>
-        @endfeature
-    @endif
+                    if ($serversPillCanTimeline) {
+                        $serversPillTiles[] = [
+                            'url' => route('organizations.activity', $serversPillOrg),
+                            'label' => __('Timeline'),
+                            'icon' => 'heroicon-o-clock',
+                        ];
+                    }
+                @endphp
+                <nav class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-5 py-3 text-sm sm:px-6" aria-label="{{ __('Fleet ops') }}">
+                    <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Fleet ops') }}</span>
+                    @foreach ($serversPillTiles as $fleetTile)
+                        <a
+                            href="{{ $fleetTile['url'] }}"
+                            wire:navigate
+                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
+                        >
+                            <x-dynamic-component :component="$fleetTile['icon']" class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ $fleetTile['label'] }}
+                        </a>
+                    @endforeach
+                </nav>
+            @endfeature
+        @endif
 
-    @if ($hasServersInScope)
-        <div class="dply-card overflow-hidden">
-            <div class="flex items-center gap-2 px-3 py-3 sm:px-5">
+        @unless ($hasServersInScope)
+            @if (isset($empty) && ! $empty->isEmpty())
+                {{ $empty }}
+            @else
+                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="servers-empty-heading">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <h2 id="servers-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">
+                        {{ $isProductionSurface ? __('No production servers') : __('No servers yet') }}
+                    </h2>
+                    <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                        {{ $isProductionSurface
+                            ? __('The connected control plane returned no servers for this organization.')
+                            : __('Create a VM once a cloud provider is connected.') }}
+                    </p>
+                </div>
+            @endif
+        @else
+            <div class="flex items-center gap-2 border-b border-brand-ink/10 px-3 py-3 sm:px-5">
                 <div class="min-w-0 flex-1">
                     <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
                     <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
@@ -206,37 +243,25 @@
                     </button>
                 </div>
             </div>
-        </div>
-    @endif
 
-    @unless ($hasServersInScope)
-        {{ $empty ?? '' }}
-        @if (! isset($empty) || $empty->isEmpty())
-            <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]">
-                <div class="px-6 py-12 text-center sm:px-10 sm:py-14">
-                    <p class="text-2xl font-semibold tracking-tight text-brand-ink">{{ __('No servers yet') }}</p>
-                    <p class="mt-3 text-base text-brand-moss">{{ __('Create a VM once a cloud provider is connected.') }}</p>
-                </div>
-            </section>
-        @endif
-    @else
-        <div class="dply-card overflow-hidden rounded-[2rem]">
             @if ($groupedRows->flatten()->isEmpty())
-                <div class="px-6 py-14 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('No results') }}</p>
-                    <h3 class="mt-3 text-xl font-semibold text-brand-ink">{{ __('No servers match your current filters') }}</h3>
-                    <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-brand-moss">
-                        {{ __('Try widening the search, switching the status filter, or resetting the command rail to bring the full fleet back into view.') }}
+                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No servers match your current filters') }}</p>
+                    <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                        {{ __('Try widening the search, switching the status filter, or resetting to bring every server back into view.') }}
                     </p>
-                    <button type="button" wire:click="resetFilters" class="mt-5 inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-brand-cream">
+                    <button type="button" wire:click="resetFilters" class="mt-4 text-xs font-semibold text-brand-sage hover:text-brand-ink">
                         {{ __('Reset filters') }}
                     </button>
                 </div>
             @elseif ($viewMode === 'grid')
-                <div class="space-y-10 bg-white p-4 sm:p-6">
+                <div class="space-y-8 px-4 py-4 sm:px-5 sm:py-5">
                     @foreach ($groupedRows as $groupLabel => $groupServers)
-                        <div>
-                            <div class="mb-4 flex items-center justify-between gap-3 border-b border-brand-ink/10 pb-2">
+                        <div wire:key="group-grid-{{ \Illuminate\Support\Str::slug((string) $groupLabel) }}">
+                            <div class="mb-3 flex items-center justify-between gap-3 border-b border-brand-ink/10 pb-2">
                                 <h2 class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                     <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                     {{ $groupLabel }}
@@ -252,27 +277,25 @@
                     @endforeach
                 </div>
             @else
-                <div class="divide-y divide-brand-ink/10 bg-white">
-                    @foreach ($groupedRows as $groupLabel => $groupServers)
-                        <div wire:key="group-{{ \Illuminate\Support\Str::slug((string) $groupLabel) }}">
-                            <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-6">
-                                <h2 class="flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-ink">
-                                    <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                    <span class="truncate">{{ $groupLabel }}</span>
-                                </h2>
-                                <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
-                            </div>
-                            <ul>
-                                @foreach ($groupServers as $server)
-                                    @include('components.partials.server-index-card', ['server' => $server, 'layout' => 'list', 'showDeployActions' => $showDeployActions, 'showMutations' => $showMutations])
-                                @endforeach
-                            </ul>
+                @foreach ($groupedRows as $groupLabel => $groupServers)
+                    <div wire:key="group-{{ \Illuminate\Support\Str::slug((string) $groupLabel) }}">
+                        <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-6">
+                            <h2 class="flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-ink">
+                                <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span class="truncate">{{ $groupLabel }}</span>
+                            </h2>
+                            <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $groupServers->count() }}</span>
                         </div>
-                    @endforeach
-                </div>
+                        <ul>
+                            @foreach ($groupServers as $server)
+                                @include('components.partials.server-index-card', ['server' => $server, 'layout' => 'list', 'showDeployActions' => $showDeployActions, 'showMutations' => $showMutations])
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
             @endif
-        </div>
-    @endunless
+        @endunless
+    </x-profile-shell>
 
     {{ $modals ?? '' }}
 </div>

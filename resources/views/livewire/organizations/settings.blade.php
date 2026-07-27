@@ -11,57 +11,60 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="general" :breadcrumb="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('General'), 'icon' => 'cog-6-tooth'],
-        ]">
-            <x-livewire-validation-errors />
-
-            @if (session('settings_status'))
-                <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">{{ session('settings_status') }}</div>
-            @endif
-
-            {{-- Hero: the shared header used across the app. --}}
-            <x-hero-card
-                :eyebrow="__('Organization')"
-                :title="__('General settings')"
-                :description="__('Update this organization\'s name, contact email, time zone, and branding. Changes apply across the dashboard for everyone with access.')"
-                icon="cog-6-tooth"
-                iconSize="md"
-            >
+        <x-organization-shell
+            :organization="$organization"
+            section="general"
+            :title="__('General settings')"
+            :description="__('Update this organization\'s name, contact email, time zone, and branding. Changes apply across the dashboard for everyone with access.')"
+            icon="heroicon-o-cog-6-tooth"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('General'), 'icon' => 'cog-6-tooth'],
+            ]"
+        >
+            <x-slot:actions>
                 <x-outline-link href="{{ route('organizations.show', $organization) }}" wire:navigate>
                     <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Organization overview') }}
                 </x-outline-link>
+            </x-slot:actions>
 
-                <x-slot:stats>
-                    <dl class="grid grid-cols-3 gap-2">
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</dt>
-                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Members') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('With access') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created') }}</dt>
-                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">{{ $organization->created_at?->format('M j, Y') ?? '—' }}</dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->created_at?->diffForHumans() ?? '' }}</p>
-                        </div>
-                    </dl>
-                </x-slot:stats>
-            </x-hero-card>
+            <x-slot:stats>
+                <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Organization settings at a glance') }}">
+                    <x-fleet-stat :label="__('Plan')">
+                        <p class="mt-2 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Members')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('With access') }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Created')">
+                        <p class="mt-2 truncate text-sm font-semibold text-brand-ink">{{ $organization->created_at?->format('M j, Y') ?? '—' }}</p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->created_at?->diffForHumans() ?? '' }}</p>
+                    </x-fleet-stat>
+                </dl>
+            </x-slot:stats>
+
+            @if ($errors->isNotEmpty() || session('settings_status'))
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                    @if (session('settings_status'))
+                        <div @class([
+                            'rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900',
+                            'mt-3' => $errors->isNotEmpty(),
+                        ])>{{ session('settings_status') }}</div>
+                    @endif
+                </div>
+            @endif
 
             {{-- Icon / branding --}}
-            <section class="dply-card overflow-hidden mt-6">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge tone="gold">
                         <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -74,7 +77,7 @@
                     </div>
                 </div>
 
-                <div class="px-6 py-6 sm:px-7">
+                <div class="px-5 py-5 sm:px-6">
                     <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
                         <div class="shrink-0">
                             @if ($organization->iconUrl())
@@ -116,8 +119,8 @@
             </section>
 
             {{-- General details --}}
-            <form wire:submit="saveGeneral" class="dply-card overflow-hidden mt-6">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <form wire:submit="saveGeneral" class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -127,7 +130,7 @@
                     </div>
                 </div>
 
-                <div class="space-y-5 px-6 py-6 sm:px-7">
+                <div class="space-y-5 px-5 py-5 sm:px-6">
                     <div>
                         <x-input-label for="org_name" :value="__('Name')" />
                         <x-text-input id="org_name" wire:model="name" type="text" class="mt-1 block w-full" maxlength="255" />
@@ -165,7 +168,7 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4 sm:px-7">
+                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/10 px-5 py-4 sm:px-6">
                     <x-primary-button type="submit">
                         <span wire:loading.remove wire:target="saveGeneral">{{ __('Save changes') }}</span>
                         <span wire:loading wire:target="saveGeneral">{{ __('Saving…') }}</span>
@@ -175,8 +178,8 @@
 
             {{-- Danger zone --}}
             @if ($canDelete)
-                <section class="mt-6 rounded-2xl border border-red-200 bg-red-50/40 overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-red-200 bg-red-50 px-6 py-5 sm:px-7">
+                <section>
+                    <div class="flex items-start gap-3 border-b border-red-200/80 bg-red-50 px-5 py-4 sm:px-6">
                         <x-heroicon-o-exclamation-triangle class="h-6 w-6 shrink-0 text-red-600" aria-hidden="true" />
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">{{ __('Danger zone') }}</p>
@@ -187,16 +190,16 @@
                         </div>
                     </div>
 
-                    <form wire:submit="deleteOrganization" class="space-y-3 px-6 py-6 sm:px-7">
+                    <div class="space-y-3 bg-red-50/40 px-5 py-5 sm:px-6">
                         <div>
                             <x-input-label for="delete_confirm" :value="__('Type the organization name to confirm')" />
-                            <x-text-input id="delete_confirm" wire:model="delete_confirm" type="text" class="mt-1 block w-full" placeholder="{{ $organization->name }}" autocomplete="off" />
+                            <x-text-input id="delete_confirm" wire:model.live="delete_confirm" type="text" class="mt-1 block w-full" placeholder="{{ $organization->name }}" autocomplete="off" />
                             <x-input-error :messages="$errors->get('delete_confirm')" class="mt-2" />
                         </div>
                         <div class="flex justify-end">
                             <button
-                                type="submit"
-                                wire:confirm="{{ __('Delete this organization? This cannot be undone.') }}"
+                                type="button"
+                                x-on:click="$dispatch('open-modal', 'delete-organization-confirmation')"
                                 wire:loading.attr="disabled"
                                 wire:target="deleteOrganization"
                                 @disabled($delete_confirm !== $organization->name)
@@ -206,9 +209,53 @@
                                 {{ __('Delete organization') }}
                             </button>
                         </div>
-                    </form>
+                    </div>
                 </section>
             @endif
         </x-organization-shell>
     </div>
+
+    @if ($canDelete)
+        <x-modal
+            name="delete-organization-confirmation"
+            :show="false"
+            maxWidth="md"
+            overlayClass="bg-brand-ink/30"
+            panelClass="dply-modal-panel overflow-hidden shadow-xl"
+            focusable
+        >
+            <div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600 ring-1 ring-red-200">
+                        <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">{{ __('Danger zone') }}</p>
+                        <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Delete this organization?') }}</h2>
+                    </div>
+                </div>
+                <div class="space-y-3 px-6 py-6 text-sm leading-6 text-brand-moss">
+                    <p>{{ __('This permanently deletes :name and its settings. Servers, sites, and any active subscription must already be cleared. This cannot be undone.', ['name' => $organization->name]) }}</p>
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                    <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'delete-organization-confirmation')">
+                        {{ __('Cancel') }}
+                    </x-secondary-button>
+                    <x-danger-button
+                        type="button"
+                        wire:click="deleteOrganization"
+                        wire:loading.attr="disabled"
+                        wire:target="deleteOrganization"
+                        @disabled($delete_confirm !== $organization->name)
+                    >
+                        <span wire:loading.remove wire:target="deleteOrganization">{{ __('Delete organization') }}</span>
+                        <span wire:loading wire:target="deleteOrganization" class="inline-flex items-center gap-2">
+                            <x-spinner variant="cream" size="sm" />
+                            {{ __('Deleting…') }}
+                        </span>
+                    </x-danger-button>
+                </div>
+            </div>
+        </x-modal>
+    @endif
 </div>

@@ -19,7 +19,11 @@
     $orgForTimeline = auth()->user()?->currentOrganization();
     $canSeeTimeline = $orgForTimeline !== null && $orgForTimeline->hasAdminAccess(auth()->user());
 @endphp
-<x-server-workspace-tablist :aria-label="__('Fleet sections')" scroll>
+<x-server-workspace-tablist
+    :aria-label="__('Fleet sections')"
+    scroll
+    class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+>
     @foreach ($tabs as $tab)
         <x-server-workspace-tab
             as="a"

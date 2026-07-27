@@ -1,23 +1,21 @@
-@if (! $site->isLaravelFrameworkDetected())
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Laravel') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Laravel') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when your site is detected as a Laravel application from repository inspection.') }}</p>
-            </div>
+{{-- Nested inside Settings Laravel merged card — strips + sand CLI footer. --}}
+<div class="min-w-0">
+    @if (! $site->isLaravelFrameworkDetected())
+        <div class="px-5 py-5 sm:px-6">
+            <p class="text-sm leading-relaxed text-brand-moss">
+                {{ __('This section appears when your site is detected as a Laravel application from repository inspection.') }}
+            </p>
         </div>
-    </section>
-@else
-    @include('livewire.sites.settings.partials.laravel.workspace')
-@endif
+    @else
+        @include('livewire.sites.settings.partials.laravel.workspace')
+    @endif
 
-<x-cli-snippet :commands="[
-    ['label' => __('Migration status'), 'command' => 'dply:artisan '.$site->slug.' -- migrate:status'],
-    ['label' => __('Run migrations'), 'command' => 'dply:artisan '.$site->slug.' -- migrate --force'],
-    ['label' => __('Roll back one batch'), 'command' => 'dply:laravel:migrate:rollback '.$site->slug.' --step=1 --snapshot-first'],
-    ['label' => __('Run any artisan command'), 'command' => 'dply:artisan '.$site->slug.' -- about'],
-]" />
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['label' => __('Migration status'), 'command' => 'dply:artisan '.$site->slug.' -- migrate:status'],
+            ['label' => __('Run migrations'), 'command' => 'dply:artisan '.$site->slug.' -- migrate --force'],
+            ['label' => __('Roll back one batch'), 'command' => 'dply:laravel:migrate:rollback '.$site->slug.' --step=1 --snapshot-first'],
+            ['label' => __('Run any artisan command'), 'command' => 'dply:artisan '.$site->slug.' -- about'],
+        ]" />
+    </div>
+</div>

@@ -16,11 +16,26 @@ use Illuminate\Support\Facades\DB;
  */
 class ServerlessOrganizationUsageReader
 {
+    /**
+     * Request-scoped totals keyed by org + period.
+     *
+     * @var array<string, ServerlessUsageTotals>
+     */
+    private static array $totalsMemo = [];
+
     public function totalsForOrganization(
         Organization $organization,
         CarbonInterface $periodStart,
         CarbonInterface $periodEnd,
     ): ServerlessUsageTotals {
+        $key = (string) $organization->id
+            .'|'.$periodStart->toDateString()
+            .'|'.$periodEnd->toDateString();
+
+        if (isset(self::$totalsMemo[$key])) {
+            return self::$totalsMemo[$key];
+        }
+
         $row = ServerlessUsageSnapshot::query()
             ->where('organization_id', $organization->id)
             ->where('period_start', '>=', $periodStart->toDateString())
@@ -32,13 +47,28 @@ class ServerlessOrganizationUsageReader
             ->first();
 
         if ($row === null) {
-            return new ServerlessUsageTotals;
+            return self::$totalsMemo[$key] = new ServerlessUsageTotals;
         }
 
-        return new ServerlessUsageTotals(
+        return self::$totalsMemo[$key] = new ServerlessUsageTotals(
             invocations: (int) $row->invocations,
             gibSeconds: (int) $row->gib_seconds,
         );
+    }
+
+    public static function flushMemo(?string $organizationId = null): void
+    {
+        if ($organizationId === null) {
+            self::$totalsMemo = [];
+
+            return;
+        }
+
+        foreach (array_keys(self::$totalsMemo) as $key) {
+            if (str_starts_with($key, $organizationId.'|')) {
+                unset(self::$totalsMemo[$key]);
+            }
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Modules\Billing\Services;
 
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,11 +16,27 @@ use Illuminate\Support\Facades\DB;
  */
 class EdgeOrganizationUsageReader
 {
+    /**
+     * Request-scoped totals keyed by org + period — billing state / analytics
+     * can ask more than once per render.
+     *
+     * @var array<string, EdgeUsageTotals>
+     */
+    private static array $totalsMemo = [];
+
     public function totalsForOrganization(
         Organization $organization,
-        \Carbon\CarbonInterface $periodStart,
-        \Carbon\CarbonInterface $periodEnd,
+        CarbonInterface $periodStart,
+        CarbonInterface $periodEnd,
     ): EdgeUsageTotals {
+        $key = (string) $organization->id
+            .'|'.$periodStart->toDateString()
+            .'|'.$periodEnd->toDateString();
+
+        if (isset(self::$totalsMemo[$key])) {
+            return self::$totalsMemo[$key];
+        }
+
         $row = EdgeUsageSnapshot::query()
             ->where('organization_id', $organization->id)
             ->where('period_start', '>=', $periodStart->toDateString())
@@ -34,16 +51,31 @@ class EdgeOrganizationUsageReader
             ->first();
 
         if ($row === null) {
-            return new EdgeUsageTotals;
+            return self::$totalsMemo[$key] = new EdgeUsageTotals;
         }
 
-        return new EdgeUsageTotals(
+        return self::$totalsMemo[$key] = new EdgeUsageTotals(
             requests: (int) $row->requests,
             bytesEgress: (int) $row->bytes_egress,
             r2StorageBytes: (int) $row->r2_storage_bytes,
             r2ClassAOps: (int) $row->r2_class_a_ops,
             r2ClassBOps: (int) $row->r2_class_b_ops,
         );
+    }
+
+    public static function flushMemo(?string $organizationId = null): void
+    {
+        if ($organizationId === null) {
+            self::$totalsMemo = [];
+
+            return;
+        }
+
+        foreach (array_keys(self::$totalsMemo) as $key) {
+            if (str_starts_with($key, $organizationId.'|')) {
+                unset(self::$totalsMemo[$key]);
+            }
+        }
     }
 
     /**

@@ -37,8 +37,8 @@
     }
 @endphp
 
-<div class="dply-card overflow-hidden">
-    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+<section class="border-b border-brand-ink/10">
+    <div class="grid gap-8 px-5 py-5 sm:px-6 lg:grid-cols-12">
         <div class="lg:col-span-5">
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-gold/90">
                 @if ($this->subscription)
@@ -63,10 +63,10 @@
 
             <div class="mt-6">
                 <div class="flex items-baseline gap-2">
-                    <span class="text-5xl font-bold tracking-tight text-brand-ink">
+                    <span class="text-4xl font-semibold tracking-tight text-brand-ink">
                         ${{ number_format($interval === 'year' ? $yearlyDollars : $monthlyDollars, 2) }}
                     </span>
-                    <span class="text-brand-moss">{{ $interval === 'year' ? __('/yr') : __('/mo') }}</span>
+                    <span class="text-sm text-brand-moss">{{ $interval === 'year' ? __('/yr') : __('/mo') }}</span>
                 </div>
                 @if ($interval === 'year')
                     <p class="mt-1 text-sm text-brand-moss">${{ number_format($yearlyDollars / 12, 2) }} {{ __('/mo effective — 20% off monthly') }}</p>
@@ -90,7 +90,7 @@
                 @endif
 
                 {{-- Usage run-rate — derived from the monthly total, no history. --}}
-                <div class="mt-4 rounded-lg bg-brand-cream/60 border border-brand-ink/10 px-4 py-3">
+                <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-cream/35 px-4 py-3">
                     <p class="text-sm text-brand-ink">
                         {{ __('Your plan') }}
                         <span class="font-bold">{{ $state->planLabel }}</span>
@@ -180,4 +180,4 @@
             </div>
         </div>
     </div>
-</div>
+</section>

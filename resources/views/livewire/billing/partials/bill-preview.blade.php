@@ -15,8 +15,8 @@
     $annualPct = (int) config('subscription.standard.annual_discount_pct', 20);
 @endphp
 
-<div class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 p-6 sm:p-8 bg-brand-cream/30">
+<section class="border-b border-brand-ink/10">
+    <div class="border-b border-brand-ink/10 bg-brand-cream/30 px-5 py-5 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
                 <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-gold/90">{{ __('What would it cost?') }}</h2>
@@ -39,7 +39,7 @@
         </div>
     </div>
 
-    <div class="px-6 sm:px-8 py-4 border-b border-brand-ink/10 flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <span class="text-xs font-semibold uppercase tracking-wider text-brand-ink/60 mr-2">{{ __('Quick picks') }}</span>
         @foreach ($presets as $preset)
             <button type="button"
@@ -56,11 +56,11 @@
         </button>
     </div>
 
-    <div class="px-6 sm:px-8 py-4 text-xs text-brand-moss">
+    <div class="px-5 py-4 text-xs text-brand-moss sm:px-6">
         {{ __('Add servers of any size — your plan is set by total server count, not size. Managed products are billed separately.') }}
     </div>
 
-    <div class="px-6 sm:px-8 pb-6 space-y-2">
+    <div class="space-y-2 px-5 pb-5 sm:px-6">
         @foreach ($tierSpecs as $key => $spec)
             <div class="flex items-center gap-4 rounded-lg hover:bg-brand-cream/30 transition-colors px-3 py-2">
                 <div class="flex-1 min-w-0">
@@ -89,7 +89,7 @@
         @endforeach
     </div>
 
-    <div class="px-6 sm:px-8 py-5 bg-brand-cream/40 border-t border-brand-ink/10 text-sm">
+    <div class="border-t border-brand-ink/10 bg-brand-cream/40 px-5 py-5 text-sm sm:px-6">
         <div class="flex items-center justify-between">
             <span class="text-brand-moss">
                 {{ __('Plan') }} (<span x-text="previewServerCount"></span> <span x-text="previewServerCount === 1 ? '{{ __('server') }}' : '{{ __('servers') }}'"></span>)
@@ -99,9 +99,9 @@
                 · <span x-text="fmt(previewMonthlyTotal)"></span>
             </span>
         </div>
-        <div x-show="billingPreviewAnnual" x-cloak class="flex items-center justify-between mt-1.5 text-brand-forest">
+        <div x-show="billingPreviewAnnual" x-cloak class="mt-1.5 flex items-center justify-between text-brand-forest">
             <span>{{ __('Annual discount') }} ({{ $annualPct }}%)</span>
             <span class="font-semibold tabular-nums" x-text="'−' + fmt(previewMonthlyTotal * 12 * previewAnnualPct / 100)"></span>
         </div>
     </div>
-</div>
+</section>

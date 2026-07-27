@@ -1,12 +1,4 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-    ];
-
     $providers = $this->providers;
     $totalOAuth = collect($providers)->sum(fn ($p) => $p['accounts']->count());
     $totalPats = collect($providers)->sum(fn ($p) => $p['pats']->count());
@@ -26,28 +18,27 @@
         ]" />
     @endpush
 
-    {{-- Hero: positioning + at-a-glance link counts. --}}
-    <x-hero-card
-        :eyebrow="__('Git')"
+    <x-profile-shell
         :title="__('Source control')"
         :description="__('Link GitHub, GitLab, or Bitbucket via OAuth, or paste a personal access token. Tokens unlock clone, browse, and webhook automation — and let you connect self-hosted hosts that OAuth can\'t cover.')"
-        icon="code-bracket-square"
-        iconSize="md"
+        icon="heroicon-o-code-bracket"
     >
-        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Back to profile') }}
-        </x-outline-link>
-        @if (auth()->user()->currentOrganization())
-            <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
-                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Server providers') }}
+        <x-slot:actions>
+            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Back to profile') }}
             </x-outline-link>
-        @endif
+            @if (auth()->user()->currentOrganization())
+                <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
+                    <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Server providers') }}
+                </x-outline-link>
+            @endif
+        </x-slot:actions>
 
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hosts') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $providersWithAny }}</span>
@@ -56,9 +47,9 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('GitHub, GitLab, Bitbucket') }}</p>
                 </div>
                 <div @class([
-                    'rounded-2xl border px-4 py-3 shadow-sm',
+                    'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $totalOAuth > 0,
-                    'border-brand-ink/10 bg-white' => $totalOAuth === 0,
+                    'border-brand-ink/10 bg-white/80' => $totalOAuth === 0,
                 ])>
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('OAuth') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -68,9 +59,9 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Browser sign-in flow') }}</p>
                 </div>
                 <div @class([
-                    'rounded-2xl border px-4 py-3 shadow-sm',
+                    'rounded-xl border px-4 py-3',
                     'border-violet-200 bg-violet-50' => $totalPats > 0,
-                    'border-brand-ink/10 bg-white' => $totalPats === 0,
+                    'border-brand-ink/10 bg-white/80' => $totalPats === 0,
                 ])>
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -81,36 +72,36 @@
                 </div>
             </dl>
         </x-slot:stats>
-    </x-hero-card>
 
-    {{-- Prefer the terminal? Point at the CLI install + sign-in steps on
-         /profile/cli instead of duplicating them here. --}}
-    <div class="mt-6 flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Prefer the command line?') }}</p>
-                <p class="mt-0.5 text-sm leading-relaxed text-brand-moss">{{ __('Install the dply CLI to link repositories and deploy straight from your terminal.') }}</p>
+        {{-- Prefer the terminal? Point at the CLI install + sign-in steps on
+             /profile/cli instead of duplicating them here. --}}
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div class="flex items-start gap-3">
+                <x-icon-badge>
+                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Prefer the command line?') }}</p>
+                    <p class="mt-0.5 text-sm leading-relaxed text-brand-moss">{{ __('Install the dply CLI to link repositories and deploy straight from your terminal.') }}</p>
+                </div>
             </div>
+            <a href="{{ route('profile.cli') }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:self-auto">
+                <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Install the CLI') }}
+            </a>
         </div>
-        <a href="{{ route('profile.cli') }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:self-auto">
-            <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-            {{ __('Install the CLI') }}
-        </a>
-    </div>
 
-    @error('unlink')
-        <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-            <span class="inline-flex items-center gap-1.5 font-semibold">
-                <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ $message }}
-            </span>
-        </div>
-    @enderror
+        @error('unlink')
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+                    <span class="inline-flex items-center gap-1.5 font-semibold">
+                        <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ $message }}
+                    </span>
+                </div>
+            </div>
+        @enderror
 
-    <div class="mt-6 space-y-6">
         @forelse ($providers as $provider)
             @php
                 $count = $this->repositoryCount($provider['host']);
@@ -118,17 +109,16 @@
                 $providerLinkedCount = $provider['accounts']->count() + $provider['pats']->count();
             @endphp
 
-            <section class="dply-card overflow-hidden" aria-labelledby="sc-heading-{{ $provider['id'] }}">
+            <div class="border-b border-brand-ink/10 last:border-b-0" aria-labelledby="sc-heading-{{ $provider['id'] }}">
                 {{-- Provider header strip. Brand icon stays in a sand tile
                      for visual consistency with the rest of the family,
                      while OAuth/PAT counts show as a quick-read chip. --}}
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
-                        <h3 id="sc-heading-{{ $provider['id'] }}" class="mt-0.5 text-base font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
+                        <h3 id="sc-heading-{{ $provider['id'] }}" class="text-base font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link an OAuth account or paste a personal access token for self-hosted hosts and machine-user workflows.') }}</p>
                     </div>
                     @if ($hasAny)
@@ -140,7 +130,7 @@
                 </div>
 
                 {{-- Action row: OAuth link button + PAT add button. --}}
-                <div class="flex flex-wrap items-center justify-end gap-2 border-b border-brand-ink/10 bg-brand-sand/25 px-6 py-3 sm:px-7">
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
                     @if ($provider['oauth_enabled'])
                         <a
                             href="{{ route('oauth.redirect', ['provider' => $provider['id']]) }}"
@@ -162,7 +152,7 @@
 
                 {{-- PAT inline editor. --}}
                 @if ($addingPatProvider === $provider['id'])
-                    <div class="space-y-4 border-b border-brand-ink/10 bg-brand-sage/5 p-6 sm:p-7">
+                    <div class="space-y-4 border-t border-brand-ink/10 bg-brand-sage/5 px-5 py-5 sm:px-6">
                         <div>
                             <p class="text-sm font-semibold text-brand-ink">{{ __('Add a :name personal access token', ['name' => $provider['name']]) }}</p>
                             <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
@@ -213,19 +203,18 @@
                     </div>
                 @endif
 
-                {{-- Linked accounts + tokens list. Each item is a row in
-                     the family card style. --}}
+                {{-- Linked accounts + tokens list. --}}
                 @if (! $hasAny)
-                    <div class="px-6 py-10 text-center sm:px-7">
+                    <div class="px-5 py-8 text-center sm:px-6">
                         <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                             <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
                         </span>
                         <p class="mt-3 text-sm text-brand-moss">{{ __('No linked accounts or tokens yet.') }}</p>
                     </div>
                 @else
-                    <ul class="divide-y divide-brand-ink/10">
+                    <ul class="divide-y divide-brand-ink/10 border-t border-brand-ink/10">
                         @foreach ($provider['accounts'] as $account)
-                            <li wire:key="sc-oauth-{{ $account->id }}" class="flex flex-col gap-3 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7">
+                            <li wire:key="sc-oauth-{{ $account->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="inline-flex items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('OAuth') }}</span>
@@ -279,7 +268,7 @@
                         @endforeach
 
                         @foreach ($provider['pats'] as $pat)
-                            <li wire:key="sc-pat-{{ $pat->id }}" class="flex flex-col gap-3 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7">
+                            <li wire:key="sc-pat-{{ $pat->id }}" class="flex flex-col gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">{{ __('PAT') }}</span>
@@ -370,21 +359,19 @@
                         @endforeach
                     </ul>
                 @endif
-            </section>
+            </div>
         @empty
-            <div class="dply-card overflow-hidden">
-                <div class="px-6 py-12 text-center sm:px-7">
-                    <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
-                    </span>
-                    <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No Git providers available') }}</p>
-                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                        {{ __('Ask an administrator to configure GitHub, GitLab, or Bitbucket OAuth, or add a personal access token for any provider.') }}
-                    </p>
-                </div>
+            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+                <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
+                </span>
+                <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No Git providers available') }}</p>
+                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    {{ __('Ask an administrator to configure GitHub, GitLab, or Bitbucket OAuth, or add a personal access token for any provider.') }}
+                </p>
             </div>
         @endforelse
-    </div>
+    </x-profile-shell>
 
     {{-- Inside the component root (NOT a layout <x-slot> — layout slots render
          once at page load and never re-render on Livewire updates, so the modal

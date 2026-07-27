@@ -10,59 +10,61 @@
         ]" />
     @endpush
 
-    <div class="space-y-8">
-        <x-hero-card
-            :title="__('Bulk assign notifications')"
-            :description="__('Link channels you can manage to events, then choose servers and sites in your current organization.')"
-        >
-            <x-slot:topAction>
-                <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Documentation') }}
-                </x-outline-link>
-                @if ($currentOrganization)
-                    <x-badge tone="accent" :caps="false" class="text-xs">
-                        {{ __('Organization: :name', ['name' => $currentOrganization->name]) }}
-                    </x-badge>
-                @endif
-            </x-slot:topAction>
-        </x-hero-card>
+    <x-profile-shell
+        :title="__('Bulk assign notifications')"
+        :description="__('Link channels you can manage to events, then choose servers and sites in your current organization.')"
+        icon="heroicon-o-paper-airplane"
+    >
+        <x-slot:actions>
+            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Documentation') }}
+            </x-outline-link>
+            @if ($currentOrganization)
+                <x-badge tone="accent" :caps="false" class="text-xs">
+                    {{ __('Organization: :name', ['name' => $currentOrganization->name]) }}
+                </x-badge>
+            @endif
+        </x-slot:actions>
 
         @if (! $currentOrganization)
-            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                {{ __('Select a current organization from the header to load servers and sites as assignment targets.') }}
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                    {{ __('Select a current organization from the header to load servers and sites as assignment targets.') }}
+                </div>
             </div>
         @endif
 
         @if ($contextServer || $contextSite)
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-ink">
-                @if ($contextServer)
-                    <p>
-                        {{ __('Assigning notifications for server:') }}
-                        <span class="font-semibold">{{ $contextServer->name }}</span>
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-ink">
+                    @if ($contextServer)
+                        <p>
+                            {{ __('Assigning notifications for server:') }}
+                            <span class="font-semibold">{{ $contextServer->name }}</span>
+                        </p>
+                    @endif
+                    @if ($contextSite)
+                        <p class="{{ $contextServer ? 'mt-1' : '' }}">
+                            {{ __('Assigning notifications for site:') }}
+                            <span class="font-semibold">{{ $contextSite->name }}</span>
+                        </p>
+                    @endif
+                    <p class="mt-2 text-brand-moss">
+                        {{ __('Choose channels and event types below. The matching target is already preselected for you.') }}
                     </p>
-                @endif
-                @if ($contextSite)
-                    <p class="{{ $contextServer ? 'mt-1' : '' }}">
-                        {{ __('Assigning notifications for site:') }}
-                        <span class="font-semibold">{{ $contextSite->name }}</span>
-                    </p>
-                @endif
-                <p class="mt-2 text-brand-moss">
-                    {{ __('Choose channels and event types below. The matching target is already preselected for you.') }}
-                </p>
+                </div>
             </div>
         @endif
 
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Channels') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification channels') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Select which channels to attach to the chosen events and targets.') }}</p>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Notification channels') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Select which channels to attach to the chosen events and targets.') }}</p>
                 </div>
                 @if ($assignableChannels->isNotEmpty())
                     <div class="flex shrink-0 gap-2">
@@ -71,7 +73,7 @@
                     </div>
                 @endif
             </div>
-            <div class="px-6 py-4 sm:px-8 space-y-2 max-h-64 overflow-y-auto">
+            <div class="max-h-64 space-y-2 overflow-y-auto px-5 py-4 sm:px-6">
                 @forelse ($assignableChannels as $ch)
                     <label class="flex items-center gap-3 text-sm cursor-pointer">
                         <input type="checkbox" wire:model.live="selected_channel_ids" value="{{ $ch->id }}" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
@@ -106,26 +108,25 @@
                 @endforelse
             </div>
             @error('selected_channel_ids')
-                <p class="px-6 sm:px-8 pb-2 text-xs text-red-600">{{ $message }}</p>
+                <p class="px-5 pb-3 text-xs text-red-600 sm:px-6">{{ $message }}</p>
             @enderror
-        </section>
+        </div>
 
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Events') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification type') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Choose which events should trigger notifications on the selected channels.') }}</p>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Notification type') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Choose which events should trigger notifications on the selected channels.') }}</p>
                 </div>
                 <div class="flex shrink-0 gap-2">
                     <button type="button" wire:click="selectAllEvents" class="text-sm font-medium text-brand-sage hover:underline">{{ __('Select all') }}</button>
                     <button type="button" wire:click="deselectAllEvents" class="text-sm font-medium text-brand-moss hover:underline">{{ __('Deselect all') }}</button>
                 </div>
             </div>
-            <div class="px-6 py-4 sm:px-8 space-y-6">
+            <div class="space-y-6 px-5 py-4 sm:px-6">
                 @foreach ($eventCatalog as $catKey => $cat)
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-brand-mist mb-2">{{ $cat['label'] }}</p>
@@ -143,19 +144,18 @@
                 @endforeach
             </div>
             @error('selected_event_keys')
-                <p class="px-6 sm:px-8 pb-2 text-xs text-red-600">{{ $message }}</p>
+                <p class="px-5 pb-3 text-xs text-red-600 sm:px-6">{{ $message }}</p>
             @enderror
-        </section>
+        </div>
 
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Targets') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Select targets') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Servers apply to server events; sites apply to site and backup events.') }}</p>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Select targets') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Servers apply to server events; sites apply to site and backup events.') }}</p>
                 </div>
                 <div class="flex shrink-0 flex-wrap gap-2">
                     <button type="button" wire:click="selectAllServers" class="text-sm font-medium text-brand-sage hover:underline">{{ __('All servers') }}</button>
@@ -164,7 +164,7 @@
                     <button type="button" wire:click="deselectAllSites" class="text-sm font-medium text-brand-moss hover:underline">{{ __('No sites') }}</button>
                 </div>
             </div>
-            <div class="px-6 py-4 sm:px-8">
+            <div class="px-5 py-4 sm:px-6">
                 @if ($selected_channel_ids === [] || $selected_event_keys === [])
                     <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
                         {{ __('Select at least one channel and a notification type first.') }}
@@ -206,9 +206,9 @@
                     </div>
                 @endif
             </div>
-        </section>
+        </div>
 
-        <div class="flex justify-end">
+        <div class="flex justify-end px-5 py-4 sm:px-6">
             <button
                 type="button"
                 wire:click="assign"
@@ -224,7 +224,7 @@
                 </span>
             </button>
         </div>
-    </div>
+    </x-profile-shell>
 
     <x-notification-channel-quick-add-modal
         :show="$showQuickNotificationChannelModal"

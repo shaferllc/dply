@@ -15,6 +15,9 @@ class SiteLogViewer extends Component
 
     public Server $server;
 
+    /** When true, skip the nested hero (parent page owns merged chrome). */
+    public bool $embedded = false;
+
     public bool $logOptionsMenuOpen = false;
 
     public bool $logSourceMenuOpen = false;

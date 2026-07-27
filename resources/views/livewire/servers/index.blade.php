@@ -21,19 +21,34 @@
         :show-fleet-ops="false"
         :show-deploy-actions="true"
         :show-mutations="true"
-        :show-hero-actions="false"
+        :show-hero-actions="true"
+        :sites-index-url="route('sites.index')"
+        empty-state="local"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'icon' => 'server-stack'],
         ]"
     >
+        <x-slot:actions>
+            @can('create', App\Models\Server::class)
+                <a
+                    href="{{ route('servers.create') }}"
+                    wire:navigate
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add server') }}
+                </a>
+            @endcan
+        </x-slot:actions>
+
         <x-slot:banners>
             @if (session('success'))
                 <x-alert tone="success">{{ session('success') }}</x-alert>
             @endif
 
             @if ($failedSetups->isNotEmpty())
-                <div class="rounded-2xl border border-red-200 bg-red-50/70 px-5 py-4">
+                <div class="rounded-xl border border-red-200 bg-red-50/70 px-4 py-3">
                     <div class="min-w-0 flex-1">
                         <p class="flex items-center gap-2 text-sm font-semibold text-red-900">
                             <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
@@ -70,7 +85,7 @@
                     ];
                     $stepLabel = $stepLabels[$serverCreateDraft->step] ?? __('In progress');
                 @endphp
-                <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-5 py-4">
+                <div class="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-sky-900">{{ __('You have an in-progress server draft.') }}</p>
@@ -90,15 +105,15 @@
             @endif
 
             @unless ($hasProviderCredentials)
-                <section class="dply-card overflow-hidden border-amber-200">
-                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="flex items-start gap-3">
                             <x-icon-badge tone="amber">
                                 <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add provider credentials before you provision infrastructure.') }}</h3>
+                                <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add provider credentials before you provision infrastructure.') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                     {{ __('This fleet can show guidance and empty states, but you will need a connected provider before you can provision cloud infrastructure from the workspace.') }}
                                 </p>
@@ -115,70 +130,66 @@
                             </a>
                         </div>
                     </div>
-                </section>
+                </div>
             @endunless
         </x-slot:banners>
 
         <x-slot:empty>
-            <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]" aria-labelledby="servers-empty-heading">
-                <div class="px-6 py-12 text-center sm:px-10 sm:py-14">
-                    <div class="mx-auto flex max-w-xl flex-col items-center">
-                        <span class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-sand/55 text-brand-forest ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-server-stack class="h-9 w-9" aria-hidden="true" />
-                        </span>
-                        <h2 id="servers-empty-heading" class="mt-6 text-2xl font-semibold tracking-tight text-brand-ink">
-                            {{ __('No servers yet') }}
-                        </h2>
-                        <p class="mt-3 text-base leading-relaxed text-brand-moss">
-                            {{ __('Create a VM from here once a cloud provider is connected—or pick a guided path first.') }}
-                        </p>
-                        <div class="mt-10 flex w-full flex-wrap items-center justify-center gap-3">
-                            @can('create', App\Models\Server::class)
+            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="servers-empty-heading">
+                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                </span>
+                <h2 id="servers-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">
+                    {{ __('No servers yet') }}
+                </h2>
+                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    {{ __('Create a VM from here once a cloud provider is connected—or pick a guided path first.') }}
+                </p>
+                <div class="mt-5 flex w-full flex-wrap items-center justify-center gap-2">
+                    @can('create', App\Models\Server::class)
+                        <a
+                            href="{{ route('servers.create') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Create a server') }}
+                        </a>
+                        @foreach ($importSources as $importSource)
+                            @php
+                                $importRoute = match ($importSource) {
+                                    'ploi' => route('imports.ploi.inventory'),
+                                    'forge' => route('imports.forge.inventory'),
+                                    default => null,
+                                };
+                                $importLabel = match ($importSource) {
+                                    'ploi' => __('Migrate from Ploi'),
+                                    'forge' => __('Migrate from Forge'),
+                                    default => __('Migrate'),
+                                };
+                            @endphp
+                            @if ($importRoute !== null)
                                 <a
-                                    href="{{ route('servers.create') }}"
+                                    href="{{ $importRoute }}"
                                     wire:navigate
-                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition hover:bg-brand-forest"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950 shadow-sm transition hover:bg-amber-100"
                                 >
-                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Create a server') }}
+                                    <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                    {{ $importLabel }}
                                 </a>
-                                @foreach ($importSources as $importSource)
-                                    @php
-                                        $importRoute = match ($importSource) {
-                                            'ploi' => route('imports.ploi.inventory'),
-                                            'forge' => route('imports.forge.inventory'),
-                                            default => null,
-                                        };
-                                        $importLabel = match ($importSource) {
-                                            'ploi' => __('Migrate from Ploi'),
-                                            'forge' => __('Migrate from Forge'),
-                                            default => __('Migrate'),
-                                        };
-                                    @endphp
-                                    @if ($importRoute !== null)
-                                        <a
-                                            href="{{ $importRoute }}"
-                                            wire:navigate
-                                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-950 shadow-sm transition hover:bg-amber-100"
-                                        >
-                                            <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                            {{ $importLabel }}
-                                        </a>
-                                    @endif
-                                @endforeach
-                            @endcan
-                            <a
-                                href="{{ route('credentials.index') }}"
-                                wire:navigate
-                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-sage/40 bg-brand-sand/30 px-5 py-3 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/50"
-                            >
-                                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Connect a provider') }}
-                            </a>
-                        </div>
-                    </div>
+                            @endif
+                        @endforeach
+                    @endcan
+                    <a
+                        href="{{ route('credentials.index') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Connect a provider') }}
+                    </a>
                 </div>
-            </section>
+            </div>
         </x-slot:empty>
 
         <x-slot:modals>

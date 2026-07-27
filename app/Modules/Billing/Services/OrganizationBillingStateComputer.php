@@ -6,11 +6,11 @@ use App\Enums\ServerTier;
 use App\Models\FunctionAction;
 use App\Models\LookoutProject;
 use App\Models\Organization;
-use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Server;
 use App\Models\ServerLogUsageDaily;
 use App\Models\Site;
 use App\Modules\Logs\Services\ServerLogEntitlements;
+use App\Modules\Realtime\Models\RealtimeApp;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -56,6 +56,30 @@ class OrganizationBillingStateComputer
     private static array $readyBillableServersMemo = [];
 
     /**
+     * Full {@see DesiredBillingState} per org for the request. Livewire billing
+     * blades, trial banners ({@see Organization::owesNothingThisCycle}), and
+     * analytics all call {@see compute()} — without this each access re-runs
+     * site scans + usage SUMs (Debugbar duplicate-query noise).
+     *
+     * @var array<string, DesiredBillingState>
+     */
+    private static array $desiredStateMemo = [];
+
+    /**
+     * Request-scoped Schema::hasTable('function_actions') — information_schema
+     * round-trips otherwise repeat once per compute() before the desired-state
+     * memo lands (and whenever compute is flushed mid-request).
+     */
+    private static ?bool $functionActionsTableExists = null;
+
+    /**
+     * Metered log-bytes SUM keyed by org + period window.
+     *
+     * @var array<string, int>
+     */
+    private static array $serverLogBytesMemo = [];
+
+    /**
      * @return Collection<int, Server>
      */
     public function readyBillableServers(Organization $organization): Collection
@@ -88,18 +112,50 @@ class OrganizationBillingStateComputer
             ->count();
     }
 
+    /**
+     * Drop request-scoped memos (ready servers + desired state + schema/usage
+     * helpers). Call from TestCase tearDown and after fleet mutations that must
+     * be visible to a later compute() in the same process.
+     */
     public static function flushReadyBillableServersMemo(?string $organizationId = null): void
+    {
+        self::flushMemo($organizationId);
+    }
+
+    public static function flushMemo(?string $organizationId = null): void
     {
         if ($organizationId === null) {
             self::$readyBillableServersMemo = [];
+            self::$desiredStateMemo = [];
+            self::$serverLogBytesMemo = [];
+            self::$functionActionsTableExists = null;
 
             return;
         }
 
-        unset(self::$readyBillableServersMemo[$organizationId]);
+        unset(
+            self::$readyBillableServersMemo[$organizationId],
+            self::$desiredStateMemo[$organizationId],
+        );
+
+        foreach (array_keys(self::$serverLogBytesMemo) as $key) {
+            if (str_starts_with($key, $organizationId.'|')) {
+                unset(self::$serverLogBytesMemo[$key]);
+            }
+        }
     }
 
     public function compute(Organization $organization): DesiredBillingState
+    {
+        $key = (string) $organization->id;
+        if (isset(self::$desiredStateMemo[$key])) {
+            return self::$desiredStateMemo[$key];
+        }
+
+        return self::$desiredStateMemo[$key] = $this->computeFresh($organization);
+    }
+
+    private function computeFresh(Organization $organization): DesiredBillingState
     {
         $tierQuantities = array_fill_keys(
             array_map(fn (ServerTier $t) => $t->value, ServerTier::ordered()),
@@ -156,7 +212,7 @@ class OrganizationBillingStateComputer
         $siteQuery = $organization->sites()
             ->where('created_at', '<=', $ageCutoff);
 
-        if (Schema::hasTable('function_actions')) {
+        if ($this->functionActionsTableExists()) {
             $siteQuery->withCount(['functionActions as code_action_count' => fn ($query) => $query->where('kind', FunctionAction::KIND_CODE)]);
         }
 
@@ -247,10 +303,11 @@ class OrganizationBillingStateComputer
         // metered bytes for the current month from server_log_usage_daily (PR A).
         // Dark until billing is enabled + a plan carries a rate; subtotal is 0
         // otherwise, so this never adds a line today. Reuses the Edge month window.
-        $serverLogBytes = (int) ServerLogUsageDaily::query()
-            ->where('organization_id', $organization->id)
-            ->whereBetween('day', [$usagePeriodStart->toDateString(), $usagePeriodEnd->toDateString()])
-            ->sum('bytes');
+        $serverLogBytes = $this->serverLogBytesForPeriod(
+            $organization,
+            $usagePeriodStart->toDateString(),
+            $usagePeriodEnd->toDateString(),
+        );
         $serverLogEntitlement = $this->serverLogEntitlements->forOrganization($organization);
         $serverLogUsageEstimate = array_merge(
             $this->serverLogUsageCostCalculator->estimate($serverLogEntitlement, $serverLogBytes),
@@ -305,5 +362,26 @@ class OrganizationBillingStateComputer
             serverLogUsageSubtotalCents: $serverLogUsageSubtotalCents,
             serverLogUsageEstimate: $serverLogUsageEstimate,
         );
+    }
+
+    private function functionActionsTableExists(): bool
+    {
+        return self::$functionActionsTableExists ??= Schema::hasTable('function_actions');
+    }
+
+    private function serverLogBytesForPeriod(
+        Organization $organization,
+        string $periodStart,
+        string $periodEnd,
+    ): int {
+        $key = (string) $organization->id.'|'.$periodStart.'|'.$periodEnd;
+        if (isset(self::$serverLogBytesMemo[$key])) {
+            return self::$serverLogBytesMemo[$key];
+        }
+
+        return self::$serverLogBytesMemo[$key] = (int) ServerLogUsageDaily::query()
+            ->where('organization_id', $organization->id)
+            ->whereBetween('day', [$periodStart, $periodEnd])
+            ->sum('bytes');
     }
 }

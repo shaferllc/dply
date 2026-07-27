@@ -19,63 +19,61 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" :section="$orgShellSection ?? 'webserver'" :breadcrumb="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('Webserver templates'), 'icon' => 'server'],
-        ]">
-            <x-livewire-validation-errors />
+        <x-organization-shell
+            :organization="$organization"
+            :section="$orgShellSection ?? 'webserver'"
+            :title="__('Webserver templates')"
+            :description="__('Reusable config snippets for nginx, Apache, Caddy and friends — with before / inside / after slots so upstreams and sibling server blocks have a real home.')"
+            icon="heroicon-o-server-stack"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Webserver templates'), 'icon' => 'server-stack'],
+            ]"
+        >
+            <x-slot:stats>
+                <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Templates at a glance') }}">
+                    <x-fleet-stat :label="__('Templates')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $templates->count() }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $templates->count()) }}</span>
+                        </p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Engines')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $templates->pluck('engine')->unique()->count() }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ __('in use') }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ count($engines) }} {{ __('supported') }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Editor')">
+                        <p class="mt-2 flex items-center gap-1.5">
+                            @if ($editingId)
+                                <x-heroicon-m-pencil-square class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                                <span class="text-sm font-semibold text-brand-ink">{{ __('Editing') }}</span>
+                            @else
+                                <x-heroicon-m-plus-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                                <span class="text-sm font-semibold text-brand-ink">{{ __('New') }}</span>
+                            @endif
+                        </p>
+                        <p class="mt-1 truncate text-[11px] text-brand-mist">{{ $editingId ? $label : __('Ready') }}</p>
+                    </x-fleet-stat>
+                </dl>
+            </x-slot:stats>
 
-            {{-- Hero card. Stat tiles count templates total + templates by
-                 the default nginx engine so an admin sees coverage at a
-                 glance without scrolling the list. --}}
-            <x-hero-card
-                :eyebrow="__('Templates')"
-                :title="__('Webserver templates')"
-                :description="__('Reusable config snippets for nginx, Apache, Caddy and friends — with before / inside / after slots so upstreams and sibling server blocks have a real home.')"
-                icon="server"
-                iconSize="md"
-            >
-                <x-slot:stats>
-                    <dl class="grid grid-cols-3 gap-2">
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Templates') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $templates->count() }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $templates->count()) }}</span>
-                            </dd>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engines') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $templates->pluck('engine')->unique()->count() }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('in use|in use', $templates->pluck('engine')->unique()->count()) }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ count($engines) }} {{ __('supported') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Editor') }}</dt>
-                            <dd class="mt-1 flex items-center gap-1.5">
-                                @if ($editingId)
-                                    <x-heroicon-m-pencil-square class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
-                                    <span class="text-sm font-semibold text-brand-ink">{{ __('Editing') }}</span>
-                                @else
-                                    <x-heroicon-m-plus-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
-                                    <span class="text-sm font-semibold text-brand-ink">{{ __('New') }}</span>
-                                @endif
-                            </dd>
-                            <p class="mt-1 truncate text-[11px] text-brand-mist">{{ $editingId ? $label : __('Ready') }}</p>
-                        </div>
-                    </dl>
-                </x-slot:stats>
-            </x-hero-card>
+            @if ($errors->isNotEmpty())
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                </div>
+            @endif
+
 
             @if ($testMessage)
                 <div
                     @class([
-                        'mt-6 rounded-xl border px-4 py-3 text-sm',
-                        'border-emerald-200 bg-emerald-50 text-emerald-900' => $testOk,
-                        'border-red-200 bg-red-50 text-red-900' => ! $testOk,
+                        'border-b border-brand-ink/10 px-5 py-4 text-sm sm:px-6',
+                        'bg-emerald-50 text-emerald-900' => $testOk,
+                        'bg-red-50 text-red-900' => ! $testOk,
                     ])
                     role="status"
                 >
@@ -92,10 +90,9 @@
                 </div>
             @endif
 
-            <div class="mt-6 space-y-6">
-                {{-- Editor section --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            {{-- Editor section --}}
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -107,7 +104,7 @@
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick an engine, name the template, then fill in any of the three slots — placeholders are substituted at apply time.') }}</p>
                         </div>
                     </div>
-                    <div class="grid gap-6 p-6 sm:p-7 lg:grid-cols-12 lg:gap-8">
+                    <div class="grid gap-6 px-5 py-5 sm:px-6 lg:grid-cols-12 lg:gap-8">
                         <div class="lg:col-span-4">
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Placeholders') }}</p>
@@ -299,8 +296,8 @@
                 </section>
 
                 {{-- Saved templates list --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10 last:border-b-0">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -311,7 +308,7 @@
                         </div>
                     </div>
                     @if ($templates->isEmpty())
-                        <div class="px-6 py-12 text-center sm:px-7">
+                        <div class="px-5 py-12 text-center sm:px-6">
                             <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                             </span>
@@ -325,7 +322,7 @@
                                     $engineSlug = $template->engine ?: 'nginx';
                                     $engineClasses = $engineBadgeClasses[$engineSlug] ?? 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss';
                                 @endphp
-                                <li class="flex flex-col gap-3 px-6 py-4 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                                <li class="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-brand-sand/15 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                             <span class="text-sm font-semibold text-brand-ink">{{ $template->label }}</span>
@@ -391,7 +388,6 @@
                         </ul>
                     @endif
                 </section>
-            </div>
         </x-organization-shell>
     </div>
 

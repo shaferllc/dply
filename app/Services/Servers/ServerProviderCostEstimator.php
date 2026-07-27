@@ -3,6 +3,7 @@
 namespace App\Services\Servers;
 
 use App\Enums\ServerProvider;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Cloud\Services\HetznerService;
@@ -26,6 +27,15 @@ class ServerProviderCostEstimator
     public const HOURS_PER_MONTH = 730.0;
 
     /**
+     * Request-scoped ProviderCredential rows by id. Cost observatory walks
+     * every BYO server and each estimate() used to re-query the same
+     * credential after refresh() dropped the eager-loaded relation.
+     *
+     * @var array<string|int, ProviderCredential>
+     */
+    private static array $credentialMemo = [];
+
+    /**
      * Providers we know how to look up prices for.
      */
     public static function isSupported(?ServerProvider $provider): bool
@@ -39,6 +49,11 @@ class ServerProviderCostEstimator
             ServerProvider::Hetzner,
             ServerProvider::Vultr,
         ], true);
+    }
+
+    public static function flushCredentialMemo(): void
+    {
+        self::$credentialMemo = [];
     }
 
     /**
@@ -69,7 +84,8 @@ class ServerProviderCostEstimator
             );
         }
 
-        if (! $server->providerCredential) {
+        $credential = $this->resolveProviderCredential($server);
+        if ($credential === null) {
             throw new ProviderCostUnavailableException(
                 __('No saved provider credential is linked to this server. Reconnect a credential to pull pricing.')
             );
@@ -83,16 +99,20 @@ class ServerProviderCostEstimator
 
         // Price the machine as it is NOW: re-read the size from the provider
         // first (best-effort), so a provider-side resize doesn't leave us
-        // pricing the slug the server was created with.
+        // pricing the slug the server was created with. sync() already mutates
+        // the in-memory model — skip refresh(), which would drop the eager-
+        // loaded credential and re-query provider_credentials per server.
         $specSync = app(ServerProviderSpecSync::class);
         if ($specSync->supports($server)) {
             try {
                 $specSync->sync($server);
-                $server->refresh();
             } catch (\Throwable) {
                 // Lookup below still works off the stored slug.
             }
         }
+
+        // Keep the relation pinned for catalog lookups below.
+        $server->setRelation('providerCredential', $credential);
 
         $base = match ($provider) {
             ServerProvider::DigitalOcean => $this->lookupDigitalOcean($server),
@@ -106,6 +126,38 @@ class ServerProviderCostEstimator
         };
 
         return $this->withRuntimeBreakdown($server, $base);
+    }
+
+    private function resolveProviderCredential(Server $server): ?ProviderCredential
+    {
+        if ($server->relationLoaded('providerCredential')) {
+            $loaded = $server->getRelation('providerCredential');
+            if ($loaded instanceof ProviderCredential) {
+                self::$credentialMemo[$loaded->getKey()] = $loaded;
+
+                return $loaded;
+            }
+
+            return null;
+        }
+
+        $credentialId = $server->provider_credential_id;
+        if ($credentialId === null || $credentialId === '') {
+            return null;
+        }
+
+        if (isset(self::$credentialMemo[$credentialId])) {
+            $server->setRelation('providerCredential', self::$credentialMemo[$credentialId]);
+
+            return self::$credentialMemo[$credentialId];
+        }
+
+        $credential = $server->providerCredential;
+        if ($credential instanceof ProviderCredential) {
+            self::$credentialMemo[$credential->getKey()] = $credential;
+        }
+
+        return $credential;
     }
 
     /**
@@ -319,7 +371,7 @@ class ServerProviderCostEstimator
      * @template TResult
      *
      * @param  callable(): TResult  $fetcher
-     * @param  array<string, mixed> $base
+     * @param  array<string, mixed>  $base
      * @return TResult
      */
     protected function cachedCatalog(Server $server, string $tag, callable $fetcher): mixed
@@ -333,7 +385,7 @@ class ServerProviderCostEstimator
     }
 
     /**
-     * @param  array<string, mixed> $rows
+     * @param  array<string, mixed>  $rows
      * @param  callable(array<string, mixed>): bool  $predicate
      * @return array<string, mixed>|null
      */

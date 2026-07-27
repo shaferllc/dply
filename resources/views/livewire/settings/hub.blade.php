@@ -1,12 +1,4 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-    ];
-
     $u = auth()->user();
     $isProfile = $section !== 'servers';
     $themeOptions = config('user_preferences.theme_options', []);
@@ -22,7 +14,18 @@
     $currentNavLayout = $ui['navigation_layout'] ?? 'sidebar';
 @endphp
 
-<div>
+<div
+    x-data="{
+        profileSaved: false,
+        sessionRevoked: false,
+        sessionsRevoked: false,
+        init() {
+            $wire.on('profile-updated', () => { this.profileSaved = true; setTimeout(() => { this.profileSaved = false }, 2000); });
+            $wire.on('session-revoked', () => { this.sessionRevoked = true; setTimeout(() => { this.sessionRevoked = false }, 3000); });
+            $wire.on('sessions-revoked', () => { this.sessionsRevoked = true; setTimeout(() => { this.sessionsRevoked = false }, 3000); });
+        },
+    }"
+>
     @push('breadcrumbs')
         <x-breadcrumb-trail
             doc-route="docs.index"
@@ -34,26 +37,23 @@
         />
     @endpush
 
-    {{-- Hero card. Stat tiles show the user's current theme / nav layout /
-         timezone so a glance reveals what's set without opening each form. --}}
-    <x-hero-card
-        :eyebrow="__('Settings')"
-        :title="__('Profile')"
-        :description="__('Identity, preferences, sessions, and account on this page. Servers & Sites covers organization and team defaults — servers belong to teams.')"
-        icon="cog-6-tooth"
+    <x-profile-shell
+        :title="$isProfile ? __('Profile') : __('Servers & Sites')"
+        :description="$isProfile
+            ? __('Identity, preferences, sessions, and account on this page.')
+            : __('Organization and team defaults for servers and sites.')"
+        :icon="$isProfile ? 'heroicon-o-user-circle' : 'heroicon-o-server'"
     >
-        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Profile') }}
-        </x-outline-link>
-        <x-outline-link href="{{ route('profile.security') }}" wire:navigate>
-            <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Security') }}
-        </x-outline-link>
+        <x-slot:actions>
+            <x-outline-link href="{{ route('profile.security') }}" wire:navigate>
+                <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Security') }}
+            </x-outline-link>
+        </x-slot:actions>
 
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Theme') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
                         @if ($currentTheme === 'light')
@@ -67,7 +67,7 @@
                     </dd>
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Appearance') }}</p>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Nav') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
                         @if ($currentNavLayout === 'top')
@@ -80,69 +80,44 @@
                     </dd>
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Settings layout') }}</p>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Timezone') }}</dt>
                     <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $u?->timezone ?? config('app.timezone') }}">{{ $u?->timezone ?? config('app.timezone') }}</dd>
                     <p class="mt-1 truncate text-[11px] text-brand-mist">{{ now($u?->timezone ?? config('app.timezone'))->format('g:i A') }} · {{ __('local time') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
-    </x-hero-card>
 
-    {{-- Section tabs. Family's segmented control rather than the previous
-         underlined nav — same affordance, lower visual weight. --}}
-    <div class="mt-6">
-        <nav class="inline-flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm" aria-label="{{ __('Settings sections') }}">
-            <a
-                href="{{ route('settings.profile') }}"
-                wire:navigate
-                @class([
-                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                    'bg-brand-ink text-brand-cream shadow-sm' => request()->routeIs('settings.profile'),
-                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('settings.profile'),
-                ])
-            >
-                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Profile') }}
-            </a>
-            <a
-                href="{{ route('settings.servers') }}"
-                wire:navigate
-                @class([
-                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                    'bg-brand-ink text-brand-cream shadow-sm' => request()->routeIs('settings.servers'),
-                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('settings.servers'),
-                ])
-            >
-                <x-heroicon-o-server class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Servers & Sites') }}
-            </a>
-        </nav>
-    </div>
+        <x-slot:tabs>
+            <x-server-workspace-tablist :aria-label="__('Settings sections')" class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab
+                    as="a"
+                    :href="route('settings.profile')"
+                    :active="request()->routeIs('settings.profile')"
+                    wire:navigate
+                    icon="heroicon-o-user-circle"
+                >{{ __('Profile') }}</x-server-workspace-tab>
+                <x-server-workspace-tab
+                    as="a"
+                    :href="route('settings.servers')"
+                    :active="request()->routeIs('settings.servers')"
+                    wire:navigate
+                    icon="heroicon-o-server"
+                >{{ __('Servers & Sites') }}</x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </x-slot:tabs>
 
-    <div class="mt-6 space-y-6"
-         x-data="{
-             profileSaved: false,
-             sessionRevoked: false,
-             sessionsRevoked: false,
-             init() {
-                 $wire.on('profile-updated', () => { this.profileSaved = true; setTimeout(() => { this.profileSaved = false }, 2000); });
-                 $wire.on('session-revoked', () => { this.sessionRevoked = true; setTimeout(() => { this.sessionRevoked = false }, 3000); });
-                 $wire.on('sessions-revoked', () => { this.sessionsRevoked = true; setTimeout(() => { this.sessionsRevoked = false }, 3000); });
-             },
-         }">
         @if ($section === 'profile')
             {{-- Identity: name / email / country / locale / timezone.
                  Lifted from the old /profile/edit page so settings/profile
                  is the single personal-settings surface. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your details') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Your details') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Name, login email, country, language, and timezone. Avatar is loaded via Gravatar — change it by updating the email tied to your Gravatar account.') }}</p>
                     </div>
                     <p x-show="profileSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
@@ -150,7 +125,7 @@
                         {{ __('Saved') }}
                     </p>
                 </div>
-                <div class="grid gap-6 p-6 sm:p-7 lg:grid-cols-3 lg:gap-8">
+                <div class="grid gap-6 px-5 py-5 sm:px-6 lg:grid-cols-3 lg:gap-8">
                     <div class="lg:col-span-1">
                         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 text-center">
                             <img
@@ -221,20 +196,19 @@
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Personal') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your preferences') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Your preferences') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Only you see these — not shared with your organization or teams.') }}</p>
                     </div>
                 </div>
-                <form wire:submit="saveProfile" class="p-6 sm:p-7">
+                <form wire:submit="saveProfile" class="px-5 py-5 sm:px-6">
                     <button type="submit" class="sr-only">{{ __('Save settings') }}</button>
 
                     {{-- Toggle stack. Same row pattern used on Automation
@@ -348,17 +322,16 @@
                         @error('ui.notification_position') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </form>
-            </section>
+            </div>
 
             {{-- Active sessions --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Devices') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active sessions') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Active sessions') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each device currently signed in. Revoking a session logs that device out on its next request.') }}</p>
                     </div>
                     @if ($otherSessions > 0)
@@ -368,7 +341,7 @@
                         </button>
                     @endif
                 </div>
-                <div class="p-6 sm:p-7">
+                <div class="px-5 py-5 sm:px-6">
                     <p x-show="sessionRevoked" x-transition x-cloak class="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                         <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Session revoked.') }}
@@ -382,8 +355,11 @@
                     @enderror
 
                     @if ($sessions === [])
-                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-5 py-8 text-center">
-                            <p class="text-sm text-brand-moss">{{ __('No active sessions.') }}</p>
+                        <div class="flex flex-col items-center justify-center px-5 py-10 text-center">
+                            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <p class="mt-3 text-sm text-brand-moss">{{ __('No active sessions.') }}</p>
                         </div>
                     @else
                         <ul class="space-y-2">
@@ -417,34 +393,30 @@
                         </ul>
                     @endif
                 </div>
-            </section>
+            </div>
 
             {{-- Danger zone --}}
-            <section>
-                <p class="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-600/80">{{ __('Danger zone') }}</p>
-                <div class="dply-card overflow-hidden border-rose-200">
-                    <div class="flex items-start gap-3 border-b border-rose-200/60 bg-rose-50/60 px-6 py-5 sm:px-7">
-                        <x-icon-badge tone="danger">
-                            <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Permanent') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Delete account') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('You\'ll be signed out and lose access to organizations and data tied to this login. This cannot be undone.') }}</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-end gap-3 px-6 py-4 sm:px-7">
-                        <a
-                            href="{{ route('profile.delete-account') }}"
-                            wire:navigate
-                            class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100"
-                        >
-                            <x-heroicon-o-arrow-right-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Go to delete account page') }}
-                        </a>
+            <div>
+                <div class="flex items-start gap-3 bg-rose-50/60 px-5 py-4 sm:px-6">
+                    <x-icon-badge tone="danger">
+                        <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Delete account') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('You\'ll be signed out and lose access to organizations and data tied to this login. This cannot be undone.') }}</p>
                     </div>
                 </div>
-            </section>
+                <div class="flex flex-wrap items-center justify-end gap-3 px-5 py-4 sm:px-6">
+                    <a
+                        href="{{ route('profile.delete-account') }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100"
+                    >
+                        <x-heroicon-o-arrow-right-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Go to delete account page') }}
+                    </a>
+                </div>
+            </div>
 
             <x-unsaved-changes-bar
                 :message="__('You have unsaved changes to your profile information.')"
@@ -461,26 +433,21 @@
                 :targets="$profileUnsavedTargets"
                 :saveLabel="__('Save settings')"
             />
-
-            <x-slot name="modals">
-                @include('livewire.partials.confirm-action-modal')
-            </x-slot>
         @endif
 
         @if ($section === 'servers')
             {{-- Your timezone --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Time') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your timezone') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Your timezone') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Used for schedules, Insights quiet hours, and when applying timezone on new servers below.') }}</p>
                     </div>
                 </div>
-                <form wire:submit="saveProfileTimezone" class="p-6 sm:p-7">
+                <form wire:submit="saveProfileTimezone" class="px-5 py-5 sm:px-6">
                     <button type="submit" class="sr-only">{{ __('Save timezone') }}</button>
                     <x-input-label for="hub-profile-timezone" :value="__('Timezone')" required />
                     <select
@@ -495,7 +462,7 @@
                     </select>
                     @error('profileTimezone') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
                 </form>
-            </section>
+            </div>
 
             <x-unsaved-changes-bar
                 :message="__('You have unsaved changes to your timezone.')"
@@ -506,21 +473,20 @@
             />
 
             {{-- Organization defaults --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Org-wide') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization defaults') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Organization defaults') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Email and new-server policy for the current organization.') }}</p>
                     </div>
                     @if ($currentOrg)
                         <span class="shrink-0 rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss" title="{{ $currentOrg->name }}">{{ $currentOrg->name }}</span>
                     @endif
                 </div>
-                <form wire:submit="saveOrganizationServersSites" class="p-6 sm:p-7">
+                <form wire:submit="saveOrganizationServersSites" class="px-5 py-5 sm:px-6">
                     <button type="submit" class="sr-only">{{ __('Save organization settings') }}</button>
                     @if (! $currentOrg)
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -549,21 +515,20 @@
                         </div>
                     @endif
                 </form>
-            </section>
+            </div>
 
             {{-- Insights preferences --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Insights preferences') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Insights preferences') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Org defaults for alert batching and quiet hours. Critical findings still notify immediately when channels are subscribed.') }}</p>
                     </div>
                 </div>
-                <form wire:submit="saveOrganizationInsights" class="p-6 sm:p-7">
+                <form wire:submit="saveOrganizationInsights" class="px-5 py-5 sm:px-6">
                     <button type="submit" class="sr-only">{{ __('Save Insights preferences') }}</button>
                     @if (! $currentOrg)
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -640,21 +605,20 @@
                         </div>
                     @endif
                 </form>
-            </section>
+            </div>
 
             {{-- Team defaults --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div>
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Per-team') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Team defaults') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Team defaults') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('List and creation defaults for servers and sites in the selected team.') }}</p>
                     </div>
                 </div>
-                <form wire:submit="saveTeamServersSites" class="p-6 sm:p-7">
+                <form wire:submit="saveTeamServersSites" class="px-5 py-5 sm:px-6">
                     <button type="submit" class="sr-only">{{ __('Save team settings') }}</button>
                     @if (! $currentOrg)
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -734,7 +698,7 @@
                         </div>
                     @endif
                 </form>
-            </section>
+            </div>
 
             <x-unsaved-changes-bar
                 :message="__('You have unsaved changes to organization defaults.')"
@@ -763,5 +727,9 @@
                 :saveLabel="__('Save team settings')"
             />
         @endif
-    </div>
+    </x-profile-shell>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

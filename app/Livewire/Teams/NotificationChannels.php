@@ -35,8 +35,8 @@ class NotificationChannels extends Component
     protected function notificationChannelsViewData(): array
     {
         return [
-            'pageTitle' => __('Team notification channels'),
-            'intro' => __('Destinations for team-scoped notifications. Team admins and organization admins can manage channels; all team members can view.'),
+            'pageTitle' => __('Notification channels'),
+            'intro' => __('Destinations for team-scoped notifications. Team and organization admins can manage channels.'),
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
                 ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],

@@ -70,8 +70,54 @@ test('owner loads site files at repository path', function () {
         ->assertSet('path', '/home/dply/site.com')
         ->assertSee('shared')
         ->assertSee('releases')
-        ->assertSee('current');
+        ->assertSee('current')
+        ->assertSee('Follow');
 });
+
+test('openEntry follows directory symlink to resolved path inside site root', function () {
+    $user = actingOrgUser('owner');
+    [$server, $site] = readyServerWithSite($user);
+
+    $releasePath = '/home/dply/site.com/releases/20260707154231';
+    $reader = $this->createMock(ServerFileBrowserRemoteReader::class);
+    $reader->method('list')->willReturnCallback(function (Server $server, string $path) use ($releasePath) {
+        if ($path === $releasePath) {
+            return new FileBrowserListing($releasePath, [
+                new FileBrowserEntry('app', 'dir', 0, time(), 'drwxr-xr-x', 'dply', 'dply'),
+            ], false, 1);
+        }
+
+        return new FileBrowserListing('/home/dply/site.com', [
+            new FileBrowserEntry('current', 'link', 0, time(), 'lrwxrwxrwx', 'dply', 'dply', $releasePath, true),
+        ], false, 1);
+    });
+    $this->app->instance(ServerFileBrowserRemoteReader::class, $reader);
+
+    $this->actingAs($user);
+
+    Livewire::test(Files::class, ['server' => $server, 'site' => $site])
+        ->call('openEntry', 'current', $releasePath)
+        ->assertSet('path', $releasePath)
+        ->assertSee('app');
+});
+
+test('openEntry refuses directory symlink that escapes the site root', function () {
+    $user = actingOrgUser('owner');
+    [$server, $site] = readyServerWithSite($user);
+
+    $reader = $this->createMock(ServerFileBrowserRemoteReader::class);
+    $reader->method('list')->willReturn(new FileBrowserListing('/home/dply/site.com', [
+        new FileBrowserEntry('escape', 'link', 0, time(), 'lrwxrwxrwx', 'dply', 'dply', '/etc', true),
+    ], false, 1));
+    $this->app->instance(ServerFileBrowserRemoteReader::class, $reader);
+
+    $this->actingAs($user);
+
+    Livewire::test(Files::class, ['server' => $server, 'site' => $site])
+        ->call('openEntry', 'escape', '/etc')
+        ->assertSet('path', '/home/dply/site.com');
+});
+
 test('edit inside releases warns before saving', function () {
     $user = actingOrgUser('owner');
     [$server, $site] = readyServerWithSite($user);

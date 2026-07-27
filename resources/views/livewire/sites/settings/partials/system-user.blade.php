@@ -1,18 +1,6 @@
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ownership') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('System user') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('Linux account that owns this site\'s files and runs its PHP-FPM pool. Pick from accounts that already exist on the server; create new accounts on the server\'s System users page.') }}
-            </p>
-        </div>
-    </div>
-
-    <div class="space-y-8 p-6 sm:p-8">
+{{-- Nested inside Settings System user merged card — strips, no second page card. --}}
+<div class="min-w-0">
+    <div class="space-y-6 px-5 py-5 sm:px-6">
     @if (! $this->shouldShowSystemUserPanel())
         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm text-brand-moss">
             {{ __('System user management is available for VM-backed PHP sites on this workspace. Use Runtime for container, serverless, and non-PHP targets.') }}
@@ -118,7 +106,7 @@
     @endif
     </div>
 
-    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
         <x-cli-snippet :command="'dply sites:system-user '.$site->slug" />
     </div>
-</section>
+</div>

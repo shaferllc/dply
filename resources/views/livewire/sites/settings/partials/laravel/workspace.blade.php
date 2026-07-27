@@ -17,67 +17,75 @@
     $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($site);
 @endphp
 
-<div class="space-y-6">
+{{-- Nested inside Settings Laravel merged card — flush tabs + hairline strips. --}}
+<div class="min-w-0">
     @if ($daemonSuggestions !== [])
-        <x-site-daemon-suggestions
-            :suggestions="$daemonSuggestions"
-            mode="links"
-            :daemons-url="$daemonsUrl"
-            :schedule-url="$cronUrl"
-        />
+        <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            <x-site-daemon-suggestions
+                :suggestions="$daemonSuggestions"
+                mode="links"
+                :daemons-url="$daemonsUrl"
+                :schedule-url="$cronUrl"
+            />
+        </div>
     @endif
 
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-            <h2 class="text-base font-semibold text-brand-ink">{{ __('Laravel') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Artisan commands, Octane and Reverb hints, application logs, and links to server automation.') }}</p>
-            @if ($execProfile === 'unsupported')
-                <p class="mt-2 text-sm text-amber-800">{{ __('Remote Artisan from this panel requires a BYO VM with SSH, or a local Orbstack Docker/Kubernetes runtime. Other container hosts need your provider or SSH tooling.') }}</p>
-            @endif
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <a
-                href="{{ $envUrl }}"
-                wire:navigate
-                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-            >
-                {{ __('Edit environment') }}
-            </a>
-            <button
-                type="button"
-                wire:click="$set('laravel_tab', 'commands')"
-                class="inline-flex items-center justify-center rounded-xl bg-brand-forest px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-forest/90"
-            >
-                {{ __('Custom commands') }}
-            </button>
-        </div>
+    <div class="flex flex-wrap items-center justify-end gap-2 border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+        <a
+            href="{{ $envUrl }}"
+            wire:navigate
+            class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+        >
+            {{ __('Edit environment') }}
+        </a>
+        <button
+            type="button"
+            wire:click="$set('laravel_tab', 'commands')"
+            class="inline-flex items-center justify-center rounded-xl bg-brand-forest px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-forest/90"
+        >
+            {{ __('Custom commands') }}
+        </button>
     </div>
 
-    <x-server-workspace-tablist :aria-label="__('Laravel sections')" scroll>
-        @foreach ([
-            'commands' => __('Commands'),
-            'octane' => __('Octane'),
-            'reverb' => __('Reverb'),
-            'logs' => __('Logs'),
-            'setup' => __('Setup'),
-            'schedule' => __('Schedule'),
-            'migrations' => __('Migrations'),
-            'pail' => __('Pail'),
-        ] as $tabId => $tabLabel)
-            <x-server-workspace-tab :active="$laravel_tab === $tabId" wire:click="$set('laravel_tab', '{{ $tabId }}')">
-                {{ $tabLabel }}
-            </x-server-workspace-tab>
-        @endforeach
-    </x-server-workspace-tablist>
+    @if ($execProfile === 'unsupported')
+        <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+            <p class="text-sm text-amber-800">{{ __('Remote Artisan from this panel requires a BYO VM with SSH, or a local Orbstack Docker/Kubernetes runtime. Other container hosts need your provider or SSH tooling.') }}</p>
+        </div>
+    @endif
+
+    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <x-server-workspace-tablist
+            :aria-label="__('Laravel sections')"
+            scroll
+            class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+        >
+            @foreach ([
+                'commands' => __('Commands'),
+                'octane' => __('Octane'),
+                'reverb' => __('Reverb'),
+                'logs' => __('Logs'),
+                'setup' => __('Setup'),
+                'schedule' => __('Schedule'),
+                'migrations' => __('Migrations'),
+                'pail' => __('Pail'),
+            ] as $tabId => $tabLabel)
+                <x-server-workspace-tab :active="$laravel_tab === $tabId" wire:click="$set('laravel_tab', '{{ $tabId }}')">
+                    {{ $tabLabel }}
+                </x-server-workspace-tab>
+            @endforeach
+        </x-server-workspace-tablist>
+    </div>
 
     @if ($laravel_tab === 'commands')
-        <div class="space-y-6">
+        <div class="min-w-0">
             @if ($laravel_console_error)
-                <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
+                <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+                    <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
+                </div>
             @endif
 
-            <div class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -86,11 +94,10 @@
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preset commands') }}</h3>
                     </div>
                 </div>
-                <div class="px-6 py-6 sm:px-7">
-                <div class="space-y-4">
+                <div class="space-y-4 px-5 py-5 sm:px-6">
                     @foreach ($presetCategories as $category => $commands)
                         @if (is_array($commands) && $commands !== [])
-                            <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ $category }}</p>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($commands as $cmd)
@@ -107,18 +114,19 @@
                         @endif
                     @endforeach
                 </div>
-                </div>
-            </div>
+            </section>
 
-            <div class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Discovery') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Discovered Artisan commands') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('From `php artisan list` on the app (cached). Run only preset or saved custom commands.') }}</p>
+            <section class="border-b border-brand-ink/10">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <x-icon-badge>
+                            <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Discovery') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Discovered Artisan commands') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('From `php artisan list` on the app (cached). Run only preset or saved custom commands.') }}</p>
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -128,23 +136,23 @@
                         {{ __('Refresh') }}
                     </button>
                 </div>
-                <div class="px-6 py-6 sm:px-7">
-                @if (! empty($laravel_artisan_discovery['ok']))
-                    <ul class="max-h-64 overflow-y-auto rounded-lg border border-brand-ink/10 bg-slate-50/80 p-3 font-mono text-[11px] text-brand-ink">
-                        @foreach (array_slice($laravel_artisan_discovery['commands'] ?? [], 0, 400) as $row)
-                            <li class="py-0.5">{{ $row['name'] ?? '' }}@if (! empty($row['description']))<span class="text-brand-moss"> — {{ $row['description'] }}</span>@endif</li>
-                        @endforeach
-                    </ul>
-                @elseif (! empty($laravel_artisan_discovery['error']))
-                    <p class="text-sm text-amber-800">{{ $laravel_artisan_discovery['error'] }}</p>
-                @else
-                    <p class="text-sm text-brand-moss">{{ __('Load discovery with Refresh, or open this tab again.') }}</p>
-                @endif
+                <div class="px-5 py-5 sm:px-6">
+                    @if (! empty($laravel_artisan_discovery['ok']))
+                        <ul class="max-h-64 overflow-y-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] text-brand-ink">
+                            @foreach (array_slice($laravel_artisan_discovery['commands'] ?? [], 0, 400) as $row)
+                                <li class="py-0.5">{{ $row['name'] ?? '' }}@if (! empty($row['description']))<span class="text-brand-moss"> — {{ $row['description'] }}</span>@endif</li>
+                            @endforeach
+                        </ul>
+                    @elseif (! empty($laravel_artisan_discovery['error']))
+                        <p class="text-sm text-amber-800">{{ $laravel_artisan_discovery['error'] }}</p>
+                    @else
+                        <p class="text-sm text-brand-moss">{{ __('Load discovery with Refresh, or open this tab again.') }}</p>
+                    @endif
                 </div>
-            </div>
+            </section>
 
-            <form wire:submit="saveLaravelCustomCommands" class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <form wire:submit="saveLaravelCustomCommands" class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -154,21 +162,21 @@
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('One Artisan tail per line (e.g. `migrate --force`). These appear as runnable alongside presets.') }}</p>
                     </div>
                 </div>
-                <div class="space-y-3 px-6 py-6 sm:px-7">
-                <textarea
-                    wire:model="laravel_custom_commands_text"
-                    rows="5"
-                    class="w-full rounded-lg border border-slate-300 font-mono text-sm shadow-sm"
-                    placeholder="migrate --force"
-                ></textarea>
-                <x-input-error :messages="$errors->get('laravel_custom_commands_text')" class="mt-1" />
-                <x-primary-button type="submit">{{ __('Save custom commands') }}</x-primary-button>
+                <div class="space-y-3 px-5 py-5 sm:px-6">
+                    <textarea
+                        wire:model="laravel_custom_commands_text"
+                        rows="5"
+                        class="w-full rounded-lg border border-slate-300 font-mono text-sm shadow-sm"
+                        placeholder="migrate --force"
+                    ></textarea>
+                    <x-input-error :messages="$errors->get('laravel_custom_commands_text')" class="mt-1" />
+                    <x-primary-button type="submit">{{ __('Save custom commands') }}</x-primary-button>
                 </div>
             </form>
 
             @if ($canLaravelSshSetup ?? false)
-                <div class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -178,38 +186,38 @@
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('One-shot Composer and install steps on the server.') }}</p>
                         </div>
                     </div>
-                    <div class="px-6 py-6 sm:px-7">
-                    @if ($laravel_ssh_setup_error ?? null)
-                        <p class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_ssh_setup_error }}</p>
-                    @endif
-                    <div class="flex flex-wrap gap-2">
-                        @foreach ($allowedSshActions as $action)
-                            @php
-                                $label = match ($action) {
-                                    \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_COMPOSER_INSTALL => __('Composer install (no dev)'),
-                                    \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_ARTISAN_OPTIMIZE => __('artisan optimize'),
-                                    \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_OCTANE_INSTALL => __('artisan octane:install'),
-                                    \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_REVERB_INSTALL => __('artisan reverb:install'),
-                                    default => \App\Models\SiteDeployStep::typeLabels()[$action] ?? $action,
-                                };
-                            @endphp
-                            <button
-                                type="button"
-                                wire:click="openLaravelSshSetupModal('{{ $action }}')"
-                                class="inline-flex rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                            >
-                                {{ $label }}
-                            </button>
-                        @endforeach
+                    <div class="px-5 py-5 sm:px-6">
+                        @if ($laravel_ssh_setup_error ?? null)
+                            <p class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_ssh_setup_error }}</p>
+                        @endif
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($allowedSshActions as $action)
+                                @php
+                                    $label = match ($action) {
+                                        \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_COMPOSER_INSTALL => __('Composer install (no dev)'),
+                                        \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_ARTISAN_OPTIMIZE => __('artisan optimize'),
+                                        \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_OCTANE_INSTALL => __('artisan octane:install'),
+                                        \App\Services\Sites\LaravelSiteSshSetupRunner::ACTION_REVERB_INSTALL => __('artisan reverb:install'),
+                                        default => \App\Models\SiteDeployStep::typeLabels()[$action] ?? $action,
+                                    };
+                                @endphp
+                                <button
+                                    type="button"
+                                    wire:click="openLaravelSshSetupModal('{{ $action }}')"
+                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                >
+                                    {{ $label }}
+                                </button>
+                            @endforeach
+                        </div>
                     </div>
-                    </div>
-                </div>
+                </section>
             @endif
         </div>
     @endif
 
     @if ($laravel_tab === 'octane')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div class="space-y-6 px-5 py-5 sm:px-6">
             @include('livewire.sites.settings.partials.laravel.octane-fields', ['site' => $site])
             @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowOctaneRuntimeUi())
                 <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
@@ -229,7 +237,7 @@
     @endif
 
     @if ($laravel_tab === 'reverb')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div class="space-y-6 px-5 py-5 sm:px-6">
             @include('livewire.sites.settings.partials.laravel.reverb-fields', ['site' => $site, 'server' => $server])
             @if ($site->shouldShowPhpOctaneRolloutSettings() && ($site->shouldShowLaravelReverbRuntimeUi() || $site->shouldProxyReverbInWebserver()))
                 <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-6">
@@ -249,12 +257,14 @@
     @endif
 
     @if ($laravel_tab === 'logs')
-        <div class="space-y-6">
+        <div class="min-w-0">
             @if ($laravel_console_error)
-                <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
+                <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+                    <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
+                </div>
             @endif
-            <div class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -264,20 +274,20 @@
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Streams `storage/logs/laravel.log` via SSH or your local container runtime.') }}</p>
                     </div>
                 </div>
-                <div class="px-6 py-6 sm:px-7">
-                <div class="flex flex-wrap items-end gap-3">
-                    <div>
-                        <x-input-label for="laravel_log_tail_lines" :value="__('Lines')" />
-                        <x-text-input id="laravel_log_tail_lines" type="number" wire:model="laravel_log_tail_lines" class="mt-1 block w-28 font-mono text-sm" min="50" max="5000" />
+                <div class="px-5 py-5 sm:px-6">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div>
+                            <x-input-label for="laravel_log_tail_lines" :value="__('Lines')" />
+                            <x-text-input id="laravel_log_tail_lines" type="number" wire:model="laravel_log_tail_lines" class="mt-1 block w-28 font-mono text-sm" min="50" max="5000" />
+                        </div>
+                        <x-primary-button type="button" wire:click="runLaravelApplicationLogTail">{{ __('Tail log') }}</x-primary-button>
                     </div>
-                    <x-primary-button type="button" wire:click="runLaravelApplicationLogTail">{{ __('Tail log') }}</x-primary-button>
                 </div>
-                </div>
-            </div>
+            </section>
 
             @if ($execProfile === 'vm_ssh')
-                <div class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -287,27 +297,28 @@
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Same viewer as Site logs — Laravel and Horizon files when available.') }}</p>
                         </div>
                     </div>
-                    <div class="px-6 py-6 sm:px-7">
-                    <div>
+                    <div class="px-5 py-5 sm:px-6">
                         <livewire:sites.site-log-viewer
                             :server="$server"
                             :site="$site"
                             :preferred-log-key="$laravelLogKey"
+                            :embedded="true"
                             wire:key="laravel-workspace-log-{{ $site->id }}"
                         />
                     </div>
-                    </div>
-                </div>
+                </section>
             @else
-                <p class="text-sm text-brand-moss">{{ __('SSH file-based log viewer is available on BYO VM sites. For local Docker/Kubernetes, use Tail above or your runtime diagnostics.') }}</p>
+                <div class="px-5 py-5 sm:px-6">
+                    <p class="text-sm text-brand-moss">{{ __('SSH file-based log viewer is available on BYO VM sites. For local Docker/Kubernetes, use Tail above or your runtime diagnostics.') }}</p>
+                </div>
             @endif
         </div>
     @endif
 
     @if ($laravel_tab === 'setup')
-        <div class="space-y-6">
-            <div class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="min-w-0">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -317,27 +328,29 @@
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Add a per-minute cron entry on the server for `php artisan schedule:run` when you use Laravel’s scheduler.') }}</p>
                     </div>
                 </div>
-                <div class="px-6 py-6 sm:px-7">
-                <a href="{{ $cronUrl }}" wire:navigate class="inline-flex text-sm font-medium text-brand-forest underline">{{ __('Cron jobs for this site') }}</a>
-                <a href="{{ $cronAllServerUrl }}" wire:navigate class="mt-2 ml-0 block text-xs font-medium text-brand-moss underline hover:text-brand-ink">{{ __('All cron jobs on server') }}</a>
+                <div class="px-5 py-5 sm:px-6">
+                    <a href="{{ $cronUrl }}" wire:navigate class="inline-flex text-sm font-medium text-brand-forest underline">{{ __('Cron jobs for this site') }}</a>
+                    <a href="{{ $cronAllServerUrl }}" wire:navigate class="mt-2 ml-0 block text-xs font-medium text-brand-moss underline hover:text-brand-ink">{{ __('All cron jobs on server') }}</a>
                 </div>
-            </div>
+            </section>
 
-            <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
-                @include('livewire.sites.settings.partials.laravel.horizon-pulse-fields', ['site' => $site, 'server' => $server])
-                <div class="flex justify-end border-t border-brand-ink/10 pt-6">
-                    <x-primary-button type="button" wire:click="saveLaravelSetupTab">{{ __('Save setup notes') }}</x-primary-button>
+            <section class="border-b border-brand-ink/10">
+                <div class="space-y-6 px-5 py-5 sm:px-6">
+                    @include('livewire.sites.settings.partials.laravel.horizon-pulse-fields', ['site' => $site, 'server' => $server])
+                    <div class="flex justify-end border-t border-brand-ink/10 pt-6">
+                        <x-primary-button type="button" wire:click="saveLaravelSetupTab">{{ __('Save setup notes') }}</x-primary-button>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+            <div class="grid gap-0 sm:grid-cols-2">
+                <div class="border-b border-brand-ink/10 px-5 py-5 sm:border-e sm:px-6">
                     <h4 class="text-sm font-semibold text-brand-ink">{{ __('Supervisor daemons') }}</h4>
                     <p class="mt-2 text-xs text-brand-moss">{{ __('Queue workers, Octane, Reverb, Horizon, and more.') }}</p>
                     <a href="{{ $daemonsUrl }}" wire:navigate class="mt-3 inline-flex text-sm font-medium text-brand-forest underline">{{ __('Queue workers for this site') }}</a>
                     <a href="{{ $daemonsAllServerUrl }}" wire:navigate class="mt-2 ml-0 block text-xs font-medium text-brand-moss underline hover:text-brand-ink">{{ __('All Supervisor programs on server') }}</a>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
                     <h4 class="text-sm font-semibold text-brand-ink">{{ __('Deploy') }}</h4>
                     <p class="mt-2 text-xs text-brand-moss">{{ __('Scheduler checkbox and Supervisor restart after deploy live under Runtime and Deploy.') }}</p>
                     <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="mt-3 inline-flex text-sm font-medium text-brand-forest underline">{{ __('Open Deploy') }}</a>

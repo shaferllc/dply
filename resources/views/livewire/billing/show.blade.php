@@ -72,15 +72,73 @@
              },
              fmt(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); }
          }">
-        <x-organization-shell :organization="$organization" section="billing" :breadcrumb="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('Billing & plan'), 'icon' => 'rectangle-stack'],
-        ]">
-            <x-livewire-validation-errors />
+        <x-organization-shell
+            :organization="$organization"
+            section="billing"
+            :title="__('Billing & plan')"
+            :description="__('Simple pricing for :org. One flat plan chosen by server count — your first server is free, any size on any cloud. Managed products bill per unit on top.', ['org' => $organization->name])"
+            icon="heroicon-o-credit-card"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Billing & plan'), 'icon' => 'credit-card'],
+            ]"
+        >
+            <x-slot:actions>
+                <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
+                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Analytics') }}
+                </x-outline-link>
+                @if ($this->canManageBilling)
+                    <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
+                        <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('All invoices') }}
+                    </x-outline-link>
+                @endif
+            </x-slot:actions>
+
+            <x-slot:stats>
+                <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Billing at a glance') }}">
+                    <x-fleet-stat :label="__('Status')" class="{{ $statusTiles[$statusTone] }}">
+                        <p class="mt-2 flex items-center gap-1.5">
+                            <span class="inline-block h-2 w-2 rounded-full {{ $statusDot[$statusTone] }}" aria-hidden="true"></span>
+                            <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
+                        </p>
+                        <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Servers')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $billableCount }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ __('billable') }}</span>
+                        </p>
+                        @if ($this->excludedServers->isNotEmpty())
+                            <p class="mt-1 text-[11px] text-brand-mist">+{{ $this->excludedServers->count() }} {{ __('excluded') }}</p>
+                        @else
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Counting toward plan') }}</p>
+                        @endif
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Current bill')">
+                        <p class="mt-2 flex items-baseline gap-1">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($monthlyCents / 100, 0) }}</span>
+                            <span class="text-[11px] text-brand-moss">/{{ __('mo') }}</span>
+                        </p>
+                        @if ($this->subscriptionInterval === 'year')
+                            <p class="mt-1 text-[11px] text-brand-mist">${{ number_format($this->yearlyTotalCents / 100, 0) }}/{{ __('yr') }}</p>
+                        @else
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ $intervalLabel }}</p>
+                        @endif
+                    </x-fleet-stat>
+                </dl>
+            </x-slot:stats>
+
+            @if ($errors->isNotEmpty())
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                </div>
+            @endif
 
             @if ($betaFeeWaived)
-                <div class="mb-6 rounded-2xl border border-brand-gold/30 bg-brand-gold/8 px-5 py-4">
+                <div class="border-b border-brand-ink/10 bg-brand-gold/8 px-5 py-4 sm:px-6">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div class="min-w-0">
                             <p class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
@@ -99,340 +157,274 @@
                 </div>
             @endif
 
-            {{-- Hero card: positioning + status / fleet / bill stat strip. --}}
-            <x-hero-card
-                icon="credit-card"
-                :eyebrow="__('Billing')"
-                :title="__('Billing & plan')"
-                :description="__('Simple pricing for :org. One flat plan chosen by server count — your first server is free, any size on any cloud. Managed products bill per unit on top.', ['org' => $organization->name])"
-            >
-                <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
-                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Analytics') }}
-                </x-outline-link>
-                @if ($this->canManageBilling)
-                    <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
-                        <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('All invoices') }}
-                    </x-outline-link>
-                @endif
-
-                <x-slot:stats>
-                    <dl class="grid grid-cols-3 gap-2">
-                        <div class="rounded-2xl border px-4 py-3 shadow-sm {{ $statusTiles[$statusTone] }}">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                            <dd class="mt-1 flex items-center gap-1.5">
-                                <span class="inline-block h-2 w-2 rounded-full {{ $statusDot[$statusTone] }}" aria-hidden="true"></span>
-                                <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
-                            </dd>
-                            <p class="mt-1 truncate text-[11px] text-brand-moss" title="{{ $statusSub }}">{{ $statusSub }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Servers') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $billableCount }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ __('billable') }}</span>
-                            </dd>
-                            @if ($this->excludedServers->isNotEmpty())
-                                <p class="mt-1 text-[11px] text-brand-mist">+{{ $this->excludedServers->count() }} {{ __('excluded') }}</p>
-                            @endif
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current bill') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">${{ number_format($monthlyCents / 100, 0) }}</span>
-                                <span class="text-[11px] text-brand-moss">/{{ __('mo') }}</span>
-                            </dd>
-                            @if ($this->subscriptionInterval === 'year')
-                                <p class="mt-1 text-[11px] text-brand-mist">${{ number_format($this->yearlyTotalCents / 100, 0) }}/{{ __('yr') }}</p>
-                            @endif
-                        </div>
-                    </dl>
-                </x-slot:stats>
-            </x-hero-card>
-
-            {{-- Inline alerts: Stripe Checkout, flash, errors. --}}
-            <div class="mt-4 space-y-3">
-                @if (request()->query('checkout') === 'success')
-                    <x-alert tone="success">{{ __('Subscription updated successfully.') }}</x-alert>
-                @endif
-                @if (session('billing_status'))
-                    <x-alert tone="success">{{ session('billing_status') }}</x-alert>
-                @endif
-                @if (session('billing_error'))
-                    <x-alert tone="error">{{ session('billing_error') }}</x-alert>
-                @endif
-                @if (request()->query('checkout') === 'cancelled')
-                    <x-alert tone="warning">{{ __('Checkout was cancelled.') }}</x-alert>
-                @endif
-                @error('plan')<x-alert tone="error">{{ $message }}</x-alert>@enderror
-                @error('billing')<x-alert tone="error">{{ $message }}</x-alert>@enderror
-
-                {{-- In-flight banner — visible after a confirmation modal closes
-                     while the Stripe call is still running. --}}
-                <div wire:loading.flex wire:target="switchInterval,cancelSubscription,resumeSubscription"
-                     class="hidden items-center gap-3 rounded-xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3">
-                    <x-spinner variant="ink" size="sm" />
-                    <span class="text-sm font-medium text-brand-ink">{{ __('Updating your subscription with Stripe…') }}</span>
+            @if (
+                request()->query('checkout') === 'success'
+                || session('billing_status')
+                || session('billing_error')
+                || request()->query('checkout') === 'cancelled'
+                || $errors->has('plan')
+                || $errors->has('billing')
+            )
+                <div class="space-y-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    @if (request()->query('checkout') === 'success')
+                        <x-alert tone="success">{{ __('Subscription updated successfully.') }}</x-alert>
+                    @endif
+                    @if (session('billing_status'))
+                        <x-alert tone="success">{{ session('billing_status') }}</x-alert>
+                    @endif
+                    @if (session('billing_error'))
+                        <x-alert tone="error">{{ session('billing_error') }}</x-alert>
+                    @endif
+                    @if (request()->query('checkout') === 'cancelled')
+                        <x-alert tone="warning">{{ __('Checkout was cancelled.') }}</x-alert>
+                    @endif
+                    @error('plan')<x-alert tone="error">{{ $message }}</x-alert>@enderror
+                    @error('billing')<x-alert tone="error">{{ $message }}</x-alert>@enderror
                 </div>
+            @endif
+
+            <div wire:loading.flex wire:target="switchInterval,cancelSubscription,resumeSubscription"
+                 class="hidden items-center gap-3 border-b border-brand-ink/10 bg-brand-gold/10 px-5 py-3 sm:px-6">
+                <x-spinner variant="ink" size="sm" />
+                <span class="text-sm font-medium text-brand-ink">{{ __('Updating your subscription with Stripe…') }}</span>
             </div>
 
-            @php
-                // Shared section-header chrome — icon tile + eyebrow + heading + lead.
-                // Mirrors the pattern on the automation page so org settings read as
-                // one family of screens.
-                $tonePalette = [
-                    'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-                    'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-                    'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-                    'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-                    'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-                ];
-            @endphp
+            @include('livewire.billing.partials.bill-hero')
+            @include('livewire.billing.partials.fleet-table')
+            @include('livewire.billing.partials.bill-preview')
 
-            <div class="mt-6 space-y-6">
-
-                {{-- Existing rich partials: bill hero, fleet table, calculator.
-                     These already bring their own dply-card framing, so we drop
-                     them in as-is. --}}
-                @include('livewire.billing.partials.bill-hero')
-                @include('livewire.billing.partials.fleet-table')
-                @include('livewire.billing.partials.bill-preview')
-
-                {{-- Bundled products (free tracely + Lookout). Hidden while the perk
-                     is dark or for orgs that don't participate — see getBundleProperty(). --}}
-                @if ($this->bundle !== null)
-                    @php
-                        $bundle = $this->bundle;
-                        $bundleActive = ($bundle['status'] ?? null) === \App\Models\OrganizationBundleEntitlement::STATUS_ACTIVE;
-                    @endphp
-                    <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-gift class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Included with your plan') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled products') }}</h3>
-                            </div>
-                            <span @class([
-                                'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide',
-                                'bg-brand-forest/10 text-brand-forest' => $bundleActive,
-                                'bg-amber-100 text-amber-800' => ! $bundleActive,
-                            ])>{{ $bundleActive ? __('Active') : ($bundle['entitled'] ? __('Provisioning') : __('Paused')) }}</span>
-                        </div>
-                        <div class="px-6 py-5 sm:px-7">
-                            <p class="text-sm leading-relaxed text-brand-moss">
-                                @if ($bundle['entitled'])
-                                    {{ __('Your annual plan includes free access to tracely (analytics) and Lookout (error tracking). Sign in to each with your dply account.') }}
-                                @else
-                                    {{ __('These were included with your annual plan. Access is paused now that the plan no longer qualifies — your data is retained and restored if you re-subscribe.') }}
-                                @endif
-                            </p>
-                            <div class="mt-3 flex flex-wrap gap-4 text-sm font-medium">
-                                <span class="inline-flex items-center gap-1.5 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full {{ $bundleActive ? 'bg-brand-forest' : 'bg-brand-mist' }}"></span>tracely</span>
-                                <span class="inline-flex items-center gap-1.5 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full {{ $bundleActive ? 'bg-brand-forest' : 'bg-brand-mist' }}"></span>Lookout</span>
-                            </div>
-                        </div>
-                    </section>
-                @endif
-
-                {{-- Payment method --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            {{-- Bundled products (free tracely + Lookout). Hidden while the perk
+                 is dark or for orgs that don't participate — see getBundleProperty(). --}}
+            @if ($this->bundle !== null)
+                @php
+                    $bundle = $this->bundle;
+                    $bundleActive = ($bundle['status'] ?? null) === \App\Models\OrganizationBundleEntitlement::STATUS_ACTIVE;
+                @endphp
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
-                            <x-heroicon-o-credit-card class="h-5 w-5" aria-hidden="true" />
+                            <x-heroicon-o-gift class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Payment') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Payment method') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Default card on file. Update from the Stripe portal.') }}</p>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Included with your plan') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled products') }}</h3>
+                        </div>
+                        <span @class([
+                            'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide',
+                            'bg-brand-forest/10 text-brand-forest' => $bundleActive,
+                            'bg-amber-100 text-amber-800' => ! $bundleActive,
+                        ])>{{ $bundleActive ? __('Active') : ($bundle['entitled'] ? __('Provisioning') : __('Paused')) }}</span>
+                    </div>
+                    <div class="px-5 py-5 sm:px-6">
+                        <p class="text-sm leading-relaxed text-brand-moss">
+                            @if ($bundle['entitled'])
+                                {{ __('Your annual plan includes free access to tracely (analytics) and Lookout (error tracking). Sign in to each with your dply account.') }}
+                            @else
+                                {{ __('These were included with your annual plan. Access is paused now that the plan no longer qualifies — your data is retained and restored if you re-subscribe.') }}
+                            @endif
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-4 text-sm font-medium">
+                            <span class="inline-flex items-center gap-1.5 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full {{ $bundleActive ? 'bg-brand-forest' : 'bg-brand-mist' }}"></span>tracely</span>
+                            <span class="inline-flex items-center gap-1.5 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full {{ $bundleActive ? 'bg-brand-forest' : 'bg-brand-mist' }}"></span>Lookout</span>
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3 p-6 sm:p-7">
-                        <p class="text-sm text-brand-ink">{{ $this->paymentSummary }}</p>
-                        @if ($this->canManageBilling)
-                            <x-secondary-button type="button" wire:click="portal">
-                                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Manage in Stripe') }}
-                            </x-secondary-button>
+                </section>
+            @endif
+
+            {{-- Payment method --}}
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                    <x-icon-badge>
+                        <x-heroicon-o-credit-card class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Payment') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Payment method') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Default card on file. Update from the Stripe portal.') }}</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-6">
+                    <p class="text-sm text-brand-ink">{{ $this->paymentSummary }}</p>
+                    @if ($this->canManageBilling)
+                        <x-secondary-button type="button" wire:click="portal">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Manage in Stripe') }}
+                        </x-secondary-button>
+                    @else
+                        <p class="text-sm text-brand-mist">{{ __('Subscribe above to add a payment method.') }}</p>
+                    @endif
+                </div>
+            </section>
+
+            {{-- Billing details. Org-scoped invoice email, VAT, currency,
+                 legal details — printed on Stripe invoices for this org's
+                 subscription. Migrated off the user-level profile page in
+                 2026-05 because subscriptions are org-scoped. --}}
+            @if ($this->canManageBilling)
+                @php
+                    $currencies = config('profile_options.currencies', []);
+                @endphp
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                        <x-icon-badge>
+                            <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Invoicing') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
+                        </div>
+                    </div>
+                    <form wire:submit="saveBillingDetails" class="space-y-5 px-5 py-5 sm:px-6">
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="org_invoice_email" :value="__('Invoice email')" />
+                                <x-text-input id="org_invoice_email" wire:model="invoice_email" type="email" class="mt-1 block w-full" autocomplete="email" />
+                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
+                                <x-input-error class="mt-2" :messages="$errors->get('invoice_email')" />
+                            </div>
+                            <div>
+                                <x-input-label for="org_vat_number" :value="__('VAT number')" />
+                                <x-text-input id="org_vat_number" wire:model="vat_number" type="text" class="mt-1 block w-full" placeholder="NL123456789B01" autocomplete="off" />
+                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
+                                <x-input-error class="mt-2" :messages="$errors->get('vat_number')" />
+                            </div>
+                        </div>
+                        <div>
+                            <x-input-label for="org_billing_currency" :value="__('Currency')" />
+                            <select
+                                id="org_billing_currency"
+                                wire:model="billing_currency"
+                                class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            >
+                                <option value="">{{ __('Select a currency') }}</option>
+                                @foreach ($currencies as $code => $label)
+                                    <option value="{{ $code }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
+                            <x-input-error class="mt-2" :messages="$errors->get('billing_currency')" />
+                        </div>
+                        <div>
+                            <x-input-label for="org_billing_details" :value="__('Legal details')" />
+                            <textarea
+                                id="org_billing_details"
+                                wire:model="billing_details"
+                                rows="4"
+                                class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
+                                placeholder="{{ __('Legal name, address, and other details to show on invoices') }}"
+                            ></textarea>
+                            <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
+                            <x-input-error class="mt-2" :messages="$errors->get('billing_details')" />
+                        </div>
+                        <div class="flex items-center justify-end border-t border-brand-ink/10 pt-4">
+                            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveBillingDetails">
+                                <span wire:loading.remove wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
+                                    <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Save billing details') }}
+                                </span>
+                                <span wire:loading wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="cream" size="sm" />
+                                    {{ __('Saving…') }}
+                                </span>
+                            </x-primary-button>
+                        </div>
+                    </form>
+                </section>
+            @endif
+
+            {{-- Subscription — cancel / resume --}}
+            @if ($this->canManageBilling)
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                        <x-icon-badge>
+                            @if ($this->onGracePeriod)
+                                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                            @else
+                                <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                            @endif
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Subscription') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cancel or resume') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
+                        </div>
+                    </div>
+                    <div class="px-5 py-5 sm:px-6">
+                        @if ($this->onGracePeriod)
+                            <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                                <p class="text-sm font-semibold text-amber-950">
+                                    {{ __('Subscription ends :date.', ['date' => $this->subscriptionEndsAt?->toFormattedDateString()]) }}
+                                </p>
+                                <p class="mt-0.5 text-sm text-amber-900/80">{{ __('You keep full access until then. Change your mind?') }}</p>
+                                <button type="button" wire:click="resumeSubscription"
+                                        wire:loading.attr="disabled" wire:target="resumeSubscription"
+                                        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                                    <span wire:loading.remove wire:target="resumeSubscription" class="inline-flex items-center gap-2">
+                                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {{ __('Resume subscription') }}
+                                    </span>
+                                    <span wire:loading wire:target="resumeSubscription" class="inline-flex items-center gap-2">
+                                        <x-spinner size="sm" variant="cream" />
+                                        {{ __('Resuming…') }}
+                                    </span>
+                                </button>
+                            </div>
                         @else
-                            <p class="text-sm text-brand-mist">{{ __('Subscribe above to add a payment method.') }}</p>
+                            <button type="button" x-on:click="$dispatch('open-modal', 'cancel-subscription')"
+                                    class="inline-flex items-center gap-1.5 text-sm font-semibold text-red-700 underline underline-offset-2 hover:text-red-900">
+                                <x-heroicon-o-x-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Cancel subscription') }}
+                            </button>
                         @endif
                     </div>
                 </section>
+            @endif
 
-                {{-- Billing details. Org-scoped invoice email, VAT, currency,
-                     legal details — printed on Stripe invoices for this org's
-                     subscription. Migrated off the user-level profile page in
-                     2026-05 because subscriptions are org-scoped. --}}
-                @if ($this->canManageBilling)
-                    @php
-                        $currencies = config('profile_options.currencies', []);
-                    @endphp
-                    <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Invoicing') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
-                            </div>
+            {{-- Invoices --}}
+            @if ($this->canManageBilling)
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                        <x-icon-badge>
+                            <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoices') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent invoices from Stripe.') }}</p>
                         </div>
-                        <form wire:submit="saveBillingDetails" class="space-y-5 p-6 sm:p-7">
-                            <div class="grid gap-5 sm:grid-cols-2">
-                                <div>
-                                    <x-input-label for="org_invoice_email" :value="__('Invoice email')" />
-                                    <x-text-input id="org_invoice_email" wire:model="invoice_email" type="email" class="mt-1 block w-full" autocomplete="email" />
-                                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
-                                    <x-input-error class="mt-2" :messages="$errors->get('invoice_email')" />
-                                </div>
-                                <div>
-                                    <x-input-label for="org_vat_number" :value="__('VAT number')" />
-                                    <x-text-input id="org_vat_number" wire:model="vat_number" type="text" class="mt-1 block w-full" placeholder="NL123456789B01" autocomplete="off" />
-                                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
-                                    <x-input-error class="mt-2" :messages="$errors->get('vat_number')" />
-                                </div>
-                            </div>
-                            <div>
-                                <x-input-label for="org_billing_currency" :value="__('Currency')" />
-                                <select
-                                    id="org_billing_currency"
-                                    wire:model="billing_currency"
-                                    class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                                >
-                                    <option value="">{{ __('Select a currency') }}</option>
-                                    @foreach ($currencies as $code => $label)
-                                        <option value="{{ $code }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
-                                <x-input-error class="mt-2" :messages="$errors->get('billing_currency')" />
-                            </div>
-                            <div>
-                                <x-input-label for="org_billing_details" :value="__('Legal details')" />
-                                <textarea
-                                    id="org_billing_details"
-                                    wire:model="billing_details"
-                                    rows="4"
-                                    class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
-                                    placeholder="{{ __('Legal name, address, and other details to show on invoices') }}"
-                                ></textarea>
-                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
-                                <x-input-error class="mt-2" :messages="$errors->get('billing_details')" />
-                            </div>
-                            <div class="flex items-center justify-end border-t border-brand-ink/10 pt-4">
-                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveBillingDetails">
-                                    <span wire:loading.remove wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
-                                        <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Save billing details') }}
-                                    </span>
-                                    <span wire:loading wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
-                                        <x-spinner variant="cream" size="sm" />
-                                        {{ __('Saving…') }}
-                                    </span>
-                                </x-primary-button>
-                            </div>
-                        </form>
-                    </section>
-                @endif
-
-                {{-- Subscription — cancel / resume --}}
-                @if ($this->canManageBilling)
-                    <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                @if ($this->onGracePeriod)
-                                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                                @else
-                                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                                @endif
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Subscription') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cancel or resume') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
-                            </div>
-                        </div>
-                        <div class="p-6 sm:p-7">
-                            @if ($this->onGracePeriod)
-                                <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
-                                    <p class="text-sm font-semibold text-amber-950">
-                                        {{ __('Subscription ends :date.', ['date' => $this->subscriptionEndsAt?->toFormattedDateString()]) }}
-                                    </p>
-                                    <p class="mt-0.5 text-sm text-amber-900/80">{{ __('You keep full access until then. Change your mind?') }}</p>
-                                    <button type="button" wire:click="resumeSubscription"
-                                            wire:loading.attr="disabled" wire:target="resumeSubscription"
-                                            class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
-                                        <span wire:loading.remove wire:target="resumeSubscription" class="inline-flex items-center gap-2">
-                                            <x-heroicon-o-arrow-uturn-left class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                            {{ __('Resume subscription') }}
-                                        </span>
-                                        <span wire:loading wire:target="resumeSubscription" class="inline-flex items-center gap-2">
-                                            <x-spinner size="sm" variant="cream" />
-                                            {{ __('Resuming…') }}
-                                        </span>
-                                    </button>
-                                </div>
-                            @else
-                                <button type="button" x-on:click="$dispatch('open-modal', 'cancel-subscription')"
-                                        class="inline-flex items-center gap-1.5 text-sm font-semibold text-red-700 underline underline-offset-2 hover:text-red-900">
-                                    <x-heroicon-o-x-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Cancel subscription') }}
-                                </button>
-                            @endif
-                        </div>
-                    </section>
-                @endif
-
-                {{-- Invoices --}}
-                @if ($this->canManageBilling)
-                    <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
+                        <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
+                    </div>
+                    @if ($this->invoices->isEmpty())
+                        <div class="px-5 py-10 text-center sm:px-6">
+                            <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoices') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent invoices from Stripe.') }}</p>
-                            </div>
-                            <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
+                            </span>
+                            <p class="mt-3 text-sm text-brand-moss">{{ __('No invoices yet.') }}</p>
                         </div>
-                        @if ($this->invoices->isEmpty())
-                            <div class="px-6 py-10 text-center sm:px-7">
-                                <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                    <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <p class="mt-3 text-sm text-brand-moss">{{ __('No invoices yet.') }}</p>
-                            </div>
-                        @else
-                            <ul class="divide-y divide-brand-ink/10">
-                                @foreach ($this->invoices as $invoice)
-                                    @php $hosted = $invoice->asStripeInvoice()->hosted_invoice_url ?? null; @endphp
-                                    <li class="flex items-center justify-between gap-4 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-7">
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $invoice->date()->toFormattedDateString() }}</p>
-                                            <p class="mt-0.5 font-mono text-[11px] text-brand-moss tabular-nums">{{ $invoice->total() }}</p>
-                                        </div>
-                                        @if ($hosted)
-                                            <a href="{{ $hosted }}" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-brand-sage hover:text-brand-ink">
-                                                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Open in Stripe') }}
-                                            </a>
-                                        @endif
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </section>
-                @endif
+                    @else
+                        <ul class="divide-y divide-brand-ink/10">
+                            @foreach ($this->invoices as $invoice)
+                                @php $hosted = $invoice->asStripeInvoice()->hosted_invoice_url ?? null; @endphp
+                                <li class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $invoice->date()->toFormattedDateString() }}</p>
+                                        <p class="mt-0.5 font-mono text-[11px] text-brand-moss tabular-nums">{{ $invoice->total() }}</p>
+                                    </div>
+                                    @if ($hosted)
+                                        <a href="{{ $hosted }}" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-brand-sage hover:text-brand-ink">
+                                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Open in Stripe') }}
+                                        </a>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </section>
+            @endif
 
-                {{-- How billing works (partial brings its own card). --}}
-                @include('livewire.billing.partials.how-billing-works')
-            </div>
+            @include('livewire.billing.partials.how-billing-works')
 
             {{-- Confirmation modals --}}
             @if ($this->subscription)

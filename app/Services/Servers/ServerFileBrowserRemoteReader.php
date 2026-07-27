@@ -39,13 +39,17 @@ class ServerFileBrowserRemoteReader
         $cap = (int) config('server_file_browser.listing_entry_cap', 2000);
         $timeout = (int) config('server_file_browser.ssh_timeout_seconds', 30);
 
+        // Resolved pass uses -L (not -H): -H only dereferences command-line
+        // arguments, so directory entries that are themselves symlinks (e.g.
+        // atomic `current` → `releases/<id>`) would stay type=link in both
+        // passes and never get linkTargetIsDir. -L dereferences listing rows.
         $listTarget = escapeshellarg($path);
-        $cmd = "ls -lAH --time-style=+%s --color=never -- {$listTarget} 2>/dev/null; echo __DPLY_LS_DONE__; ls -lA --time-style=+%s --color=never -- {$listTarget} 2>/dev/null";
+        $cmd = "ls -lAL --time-style=+%s --color=never -- {$listTarget} 2>/dev/null; echo __DPLY_LS_DONE__; ls -lA --time-style=+%s --color=never -- {$listTarget} 2>/dev/null";
 
         if ($filter !== null && $filter !== '') {
             $sanitized = $this->sanitizeFilter($filter);
             $globTarget = escapeshellarg(rtrim($path, '/').'/*'.$sanitized.'*');
-            $cmd = "ls -lAdH --time-style=+%s --color=never -- {$globTarget} 2>/dev/null; echo __DPLY_LS_DONE__; ls -lAd --time-style=+%s --color=never -- {$globTarget} 2>/dev/null";
+            $cmd = "ls -lAdL --time-style=+%s --color=never -- {$globTarget} 2>/dev/null; echo __DPLY_LS_DONE__; ls -lAd --time-style=+%s --color=never -- {$globTarget} 2>/dev/null";
         }
 
         $output = $this->runOnce($server, $loginUser, $cmd, $timeout);
@@ -264,11 +268,11 @@ class ServerFileBrowserRemoteReader
 
     /**
      * Merge the link-info pass (`ls -lA`, leaves links as `l`) with the resolved
-     * pass (`ls -lAH`, dereferences) so a symlink to a directory shows
-     * type=link with linkTargetIsDir=true.
+     * pass (`ls -lAL`, dereferences listing rows) so a symlink to a directory
+     * shows type=link with linkTargetIsDir=true.
      *
-     * @param  array<string, mixed> $resolved
-     * @param  array<string, mixed> $linkInfo
+     * @param  array<string, mixed>  $resolved
+     * @param  array<string, mixed>  $linkInfo
      * @return list<FileBrowserEntry>
      */
     protected function mergeListings(array $resolved, array $linkInfo): array

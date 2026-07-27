@@ -21,51 +21,70 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="realtime" :breadcrumb="$breadcrumbs">
-            <x-livewire-validation-errors />
-
-            {{-- Header: identity, status, tier/price, peak usage.
-                 Poll while provisioning — wrapped because @if can't live inside an <x-…> tag. --}}
-            <div @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
-            <x-hero-card
-                icon="signal"
-                iconSize="md"
-                :title="$app->name"
-                :description="$app->host()"
-            >
-                <x-slot:topAction>
-                    <div class="text-right">
-                        <p class="text-sm font-semibold text-brand-forest">{{ $tier['label'] }} · {{ $money($app->priceCents()) }}/{{ __('mo') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">
-                            {{ number_format((int) ($app->peak_connections ?? 0)) }} / {{ number_format($tier['max_connections']) }} {{ __('peak conns') }}
-                        </p>
-                        @if ($canManage)
-                            <div class="mt-3 flex items-center justify-end gap-2">
-                                <x-secondary-button type="button" wire:click="startTierChange" class="text-xs">
-                                    <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    {{ __('Change tier') }}
-                                </x-secondary-button>
-                                <button type="button" wire:click="confirmDelete" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700">
-                                    <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    {{ __('Delete') }}
-                                </button>
-                            </div>
-                        @endif
-                    </div>
-                </x-slot:topAction>
-
+        <x-organization-shell
+            :organization="$organization"
+            section="realtime"
+            :title="$app->name"
+            :description="$app->host()"
+            icon="heroicon-o-signal"
+            :breadcrumb="$breadcrumbs"
+        >
+            <x-slot:actions>
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
                     {{ ucfirst($app->status) }}
                 </span>
-                @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
-                    <p class="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
+                @if ($canManage)
+                    <x-secondary-button type="button" wire:click="startTierChange" class="text-xs">
+                        <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Change tier') }}
+                    </x-secondary-button>
+                    <button type="button" wire:click="confirmDelete" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700">
+                        <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Delete') }}
+                    </button>
                 @endif
-            </x-hero-card>
-            </div>
+            </x-slot:actions>
+
+            <x-slot:stats>
+                <div @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
+                    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="{{ __('App at a glance') }}">
+                        <x-fleet-stat :label="__('Tier')">
+                            <p class="mt-2 text-sm font-semibold text-brand-forest">{{ $tier['label'] }}</p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ $money($app->priceCents()) }}/{{ __('mo') }}</p>
+                        </x-fleet-stat>
+                        <x-fleet-stat :label="__('Peak')">
+                            <p class="mt-2 flex items-baseline gap-1">
+                                <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format((int) ($app->peak_connections ?? 0)) }}</span>
+                                <span class="text-[11px] text-brand-moss">/ {{ number_format($tier['max_connections']) }}</span>
+                            </p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('peak conns') }}</p>
+                        </x-fleet-stat>
+                        <x-fleet-stat :label="__('Status')">
+                            <p class="mt-2 text-sm font-semibold text-brand-ink">{{ ucfirst($app->status) }}</p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Relay state') }}</p>
+                        </x-fleet-stat>
+                        <x-fleet-stat :label="__('Sites')">
+                            <p class="mt-2 text-2xl font-semibold tabular-nums text-brand-ink">{{ number_format($sites->count()) }}</p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Attached') }}</p>
+                        </x-fleet-stat>
+                    </dl>
+                </div>
+            </x-slot:stats>
+
+            @if ($errors->isNotEmpty())
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                </div>
+            @endif
+
+            @if ($app->status === \App\Modules\Realtime\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
+                <div class="border-b border-brand-ink/10 bg-red-50 px-5 py-3 text-xs text-red-700 sm:px-6">{{ $app->error_message }}</div>
+            @endif
+
 
             {{-- Live stats: polls the relay while active so the current connection
                  count stays fresh; the peak high-water mark is persisted. --}}
-            <section class="dply-card mt-6 p-5 sm:p-6"
+            <section class="border-b border-brand-ink/10 px-5 py-5 sm:px-6"
                 @if (in_array($app->status, [\App\Modules\Realtime\Models\RealtimeApp::STATUS_ACTIVE, \App\Modules\Realtime\Models\RealtimeApp::STATUS_PROVISIONING], true)) wire:poll.30s="pollStats" @endif>
                 @php
                     $cap = max(1, (int) $tier['max_connections']);
@@ -128,7 +147,7 @@
             </section>
 
             {{-- App metadata + billing contribution. --}}
-            <section class="dply-card mt-6 p-5 sm:p-6">
+            <section class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Details') }}</h3>
                 <dl class="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
@@ -158,10 +177,10 @@
                 </dl>
             </section>
 
-            <div class="mt-6 grid gap-6 lg:grid-cols-3">
+            <div>
                 {{-- Credentials --}}
                 @if ($canManage)
-                    <section class="dply-card p-5 sm:p-6 lg:col-span-3">
+                    <section class="border-b border-brand-ink/10 px-5 py-5 sm:px-6 lg:col-span-3">
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Injected into a site at deploy as PUSHER_* / VITE_PUSHER_* when this app is attached.') }}</p>
                         <dl class="mt-4 space-y-2.5">
@@ -189,10 +208,9 @@
                         </dl>
                     </section>
                 @endif
-            </div>
 
             {{-- Connected sites --}}
-            <section class="dply-card mt-6 p-5 sm:p-6">
+            <section class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Connected sites') }}</h3>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                     @forelse ($sites as $binding)

@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
+use App\Models\OrganizationBundleEntitlement;
 use App\Models\Server;
 use App\Modules\Billing\Services\DesiredBillingState;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
@@ -16,6 +17,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Laravel\Cashier\Invoice;
 use Laravel\Cashier\Subscription;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use RuntimeException;
@@ -389,7 +391,7 @@ class Show extends Component
         }
 
         $entitled = $this->organization->qualifiesForBundledProducts();
-        $status = \App\Models\OrganizationBundleEntitlement::query()
+        $status = OrganizationBundleEntitlement::query()
             ->where('organization_id', $this->organization->id)
             ->value('status');
 
@@ -433,8 +435,13 @@ class Show extends Component
      * The bill dply *would* charge based on the current fleet — true
      * whether the org is on trial (estimate), subscribed (current invoice
      * basis), or paused (what subscribing would resume to).
+     *
+     * Request-memoised via {@see Computed} and
+     * {@see OrganizationBillingStateComputer::compute()} so hero / preview /
+     * line-item accessors share one DesiredBillingState.
      */
-    public function getBillingStateProperty(): DesiredBillingState
+    #[Computed]
+    public function billingState(): DesiredBillingState
     {
         return app(OrganizationBillingStateComputer::class)->compute($this->organization);
     }

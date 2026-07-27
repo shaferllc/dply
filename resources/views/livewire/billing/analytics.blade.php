@@ -1,123 +1,125 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="billing-analytics" :breadcrumb="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('Billing analytics'), 'icon' => 'chart-bar'],
-        ]">
-            @php
-                $interval = $summary['interval'] ?? 'month';
-                $monthlyCents = (int) ($summary['monthly_total_cents'] ?? 0);
-                $yearlyCents = (int) ($summary['yearly_total_cents'] ?? 0);
-                $displayCents = $interval === 'year' ? $yearlyCents : $monthlyCents;
-                $forecastMrrCents = (int) ($forecast['mrr_cents'] ?? 0);
-                $forecastArrCents = (int) ($forecast['arr_cents'] ?? 0);
-                $forecastProjectedMonthEndCents = (int) ($forecast['projected_month_end_cents'] ?? 0);
-                $forecastDeltaVsThirtyDays = $forecast['delta_vs_thirty_days_cents'] ?? null;
-                $spendTrendThirty = is_array($spendTrend['series_30'] ?? null) ? $spendTrend['series_30'] : [];
-                $spendTrendNinety = is_array($spendTrend['series_90'] ?? null) ? $spendTrend['series_90'] : [];
-                $totalBreakdownCents = max(1, collect($categoryBreakdown)->sum('cents'));
-                $maxSpendTrendCents = max(1, collect($spendTrendNinety)->max('total_cents') ?? 1);
-                $maxEdgeRequests = max(1, collect($edgeUsageDaily)->max('requests') ?? 1);
-                $maxInvoiceCents = max(1, collect($invoiceHistory)->max('total_cents') ?? 1);
+        @php
+            $interval = $summary['interval'] ?? 'month';
+            $monthlyCents = (int) ($summary['monthly_total_cents'] ?? 0);
+            $yearlyCents = (int) ($summary['yearly_total_cents'] ?? 0);
+            $displayCents = $interval === 'year' ? $yearlyCents : $monthlyCents;
+            $forecastMrrCents = (int) ($forecast['mrr_cents'] ?? 0);
+            $forecastArrCents = (int) ($forecast['arr_cents'] ?? 0);
+            $forecastProjectedMonthEndCents = (int) ($forecast['projected_month_end_cents'] ?? 0);
+            $forecastDeltaVsThirtyDays = $forecast['delta_vs_thirty_days_cents'] ?? null;
+            $spendTrendThirty = is_array($spendTrend['series_30'] ?? null) ? $spendTrend['series_30'] : [];
+            $spendTrendNinety = is_array($spendTrend['series_90'] ?? null) ? $spendTrend['series_90'] : [];
+            $totalBreakdownCents = max(1, collect($categoryBreakdown)->sum('cents'));
+            $maxSpendTrendCents = max(1, collect($spendTrendNinety)->max('total_cents') ?? 1);
+            $maxEdgeRequests = max(1, collect($edgeUsageDaily)->max('requests') ?? 1);
+            $maxInvoiceCents = max(1, collect($invoiceHistory)->max('total_cents') ?? 1);
 
-                // Surface flags — hide Edge / Cloud / Serverless lines and
-                // sections when those surfaces aren't enabled for this org.
-                // The numbers come from the controller (which doesn't know
-                // about flags), so we filter at render time and only show
-                // what's actually a product for this account.
-                $edgeOn = \Laravel\Pennant\Feature::active('surface.edge');
-                $cloudOn = \Laravel\Pennant\Feature::active('surface.cloud');
-                $serverlessOn = \Laravel\Pennant\Feature::active('surface.serverless');
-                $hasManagedSurfaces = $edgeOn || $cloudOn || $serverlessOn;
+            // Surface flags — hide Edge / Cloud / Serverless lines and
+            // sections when those surfaces aren't enabled for this org.
+            // The numbers come from the controller (which doesn't know
+            // about flags), so we filter at render time and only show
+            // what's actually a product for this account.
+            $edgeOn = \Laravel\Pennant\Feature::active('surface.edge');
+            $cloudOn = \Laravel\Pennant\Feature::active('surface.cloud');
+            $serverlessOn = \Laravel\Pennant\Feature::active('surface.serverless');
+            $hasManagedSurfaces = $edgeOn || $cloudOn || $serverlessOn;
 
-                // Resource-count parts the hero stat tile shows. We only
-                // include rows for surfaces the org actually has access to.
-                $resourceParts = [
-                    ['count' => $summary['server_count'] ?? 0, 'label' => __('VM'), 'visible' => true],
-                    ['count' => $summary['edge_count'] ?? 0, 'label' => __('Edge'), 'visible' => $edgeOn],
-                    ['count' => $summary['cloud_count'] ?? 0, 'label' => __('Cloud'), 'visible' => $cloudOn],
-                    ['count' => $summary['serverless_count'] ?? 0, 'label' => __('Fn'), 'visible' => $serverlessOn],
-                ];
-                $billableResources = collect($resourceParts)
-                    ->filter(fn (array $p) => $p['visible'])
-                    ->sum('count');
+            // Resource-count parts the hero stat tile shows. We only
+            // include rows for surfaces the org actually has access to.
+            $resourceParts = [
+                ['count' => $summary['server_count'] ?? 0, 'label' => __('VM'), 'visible' => true],
+                ['count' => $summary['edge_count'] ?? 0, 'label' => __('Edge'), 'visible' => $edgeOn],
+                ['count' => $summary['cloud_count'] ?? 0, 'label' => __('Cloud'), 'visible' => $cloudOn],
+                ['count' => $summary['serverless_count'] ?? 0, 'label' => __('Fn'), 'visible' => $serverlessOn],
+            ];
+            $billableResources = collect($resourceParts)
+                ->filter(fn (array $p) => $p['visible'])
+                ->sum('count');
 
-                // Trim category breakdown + line items to drop the off-
-                // surface rows. Match on labels rather than slugs because
-                // the controller emits plain labels — matches "Edge",
-                // "Cloud", "Serverless".
-                $categoryBreakdown = collect($categoryBreakdown)
-                    ->reject(function ($segment) use ($edgeOn, $cloudOn, $serverlessOn) {
-                        $label = strtolower((string) ($segment['label'] ?? ''));
-                        return (! $edgeOn && str_contains($label, 'edge'))
-                            || (! $cloudOn && str_contains($label, 'cloud'))
-                            || (! $serverlessOn && str_contains($label, 'serverless'));
-                    })
-                    ->values()
-                    ->all();
-                $lineItems = collect($lineItems)
-                    ->reject(function ($item) use ($edgeOn, $cloudOn, $serverlessOn) {
-                        $label = strtolower((string) ($item['label'] ?? ''));
-                        return (! $edgeOn && str_contains($label, 'edge'))
-                            || (! $cloudOn && str_contains($label, 'cloud'))
-                            || (! $serverlessOn && str_contains($label, 'serverless'));
-                    })
-                    ->values()
-                    ->all();
-                $totalBreakdownCents = max(1, collect($categoryBreakdown)->sum('cents'));
+            // Trim category breakdown + line items to drop the off-
+            // surface rows. Match on labels rather than slugs because
+            // the controller emits plain labels — matches "Edge",
+            // "Cloud", "Serverless".
+            $categoryBreakdown = collect($categoryBreakdown)
+                ->reject(function ($segment) use ($edgeOn, $cloudOn, $serverlessOn) {
+                    $label = strtolower((string) ($segment['label'] ?? ''));
+                    return (! $edgeOn && str_contains($label, 'edge'))
+                        || (! $cloudOn && str_contains($label, 'cloud'))
+                        || (! $serverlessOn && str_contains($label, 'serverless'));
+                })
+                ->values()
+                ->all();
+            $lineItems = collect($lineItems)
+                ->reject(function ($item) use ($edgeOn, $cloudOn, $serverlessOn) {
+                    $label = strtolower((string) ($item['label'] ?? ''));
+                    return (! $edgeOn && str_contains($label, 'edge'))
+                        || (! $cloudOn && str_contains($label, 'cloud'))
+                        || (! $serverlessOn && str_contains($label, 'serverless'));
+                })
+                ->values()
+                ->all();
+            $totalBreakdownCents = max(1, collect($categoryBreakdown)->sum('cents'));
 
-                // Subscription status palette mirrors billing.show — same
-                // tile/dot tokens so an admin reading both pages sees a
-                // consistent visual vocabulary.
-                if (! empty($summary['subscribed'])) {
-                    $statusTone = 'success';
-                    $statusLabel = ucfirst((string) ($summary['stripe_status'] ?? __('Active')));
-                    $statusSub = ! empty($summary['next_invoice_at'])
-                        ? __('Next invoice :date', ['date' => \Illuminate\Support\Carbon::parse($summary['next_invoice_at'])->toFormattedDateString()])
-                        : ($interval === 'year' ? __('Billed annually') : __('Billed monthly'));
-                } elseif (! empty($summary['on_trial'])) {
-                    $statusTone = 'info';
-                    $statusLabel = __('Trial');
-                    $days = (int) ($summary['trial_days_left'] ?? 0);
-                    $statusSub = trans_choice(':days day left|:days days left', $days, ['days' => $days]);
-                } else {
-                    $statusTone = 'neutral';
-                    $statusLabel = __('Not subscribed');
-                    $statusSub = __('Estimate only until you add a plan');
-                }
+            // Subscription status palette mirrors billing.show — same
+            // tile/dot tokens so an admin reading both pages sees a
+            // consistent visual vocabulary.
+            if (! empty($summary['subscribed'])) {
+                $statusTone = 'success';
+                $statusLabel = ucfirst((string) ($summary['stripe_status'] ?? __('Active')));
+                $statusSub = ! empty($summary['next_invoice_at'])
+                    ? __('Next invoice :date', ['date' => \Illuminate\Support\Carbon::parse($summary['next_invoice_at'])->toFormattedDateString()])
+                    : ($interval === 'year' ? __('Billed annually') : __('Billed monthly'));
+            } elseif (! empty($summary['on_trial'])) {
+                $statusTone = 'info';
+                $statusLabel = __('Trial');
+                $days = (int) ($summary['trial_days_left'] ?? 0);
+                $statusSub = trans_choice(':days day left|:days days left', $days, ['days' => $days]);
+            } else {
+                $statusTone = 'neutral';
+                $statusLabel = __('Not subscribed');
+                $statusSub = __('Estimate only until you add a plan');
+            }
 
-                $statusTile = [
-                    'success' => 'border-brand-sage/30 bg-brand-sage/8',
-                    'info' => 'border-sky-200 bg-sky-50',
-                    'warning' => 'border-amber-200 bg-amber-50',
-                    'neutral' => 'border-brand-ink/10 bg-white',
-                ][$statusTone];
-                $statusDot = [
-                    'success' => 'bg-brand-sage',
-                    'info' => 'bg-sky-500',
-                    'warning' => 'bg-amber-500',
-                    'neutral' => 'bg-brand-ink/15',
-                ][$statusTone];
+            $statusTile = [
+                'success' => 'border-brand-sage/30 bg-brand-sage/8',
+                'info' => 'border-sky-200 bg-sky-50',
+                'warning' => 'border-amber-200 bg-amber-50',
+                'neutral' => 'border-brand-ink/10 bg-white',
+            ][$statusTone];
+            $statusDot = [
+                'success' => 'bg-brand-sage',
+                'info' => 'bg-sky-500',
+                'warning' => 'bg-amber-500',
+                'neutral' => 'bg-brand-ink/15',
+            ][$statusTone];
 
-                // Shared section-header chrome (matches billing.show + automation).
-                $tonePalette = [
-                    'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-                    'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-                    'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-                    'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-                    'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-                    'forest' => 'bg-brand-forest/10 text-brand-forest ring-brand-forest/20',
-                ];
-            @endphp
+            // Shared section-header chrome (matches billing.show + automation).
+            $tonePalette = [
+                'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+                'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
+                'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+                'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
+                'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+                'forest' => 'bg-brand-forest/10 text-brand-forest ring-brand-forest/20',
+            ];
+        @endphp
 
-            {{-- Hero: positioning + at-a-glance stat strip. --}}
-            <x-hero-card
-                :eyebrow="__('Billing')"
-                :title="__('Billing analytics')"
-                :description="__('Live estimate, resource breakdown, Edge delivery meters, and Stripe invoice history for :org.', ['org' => $organization->name])"
-                icon="chart-bar"
-            >
+
+        <x-organization-shell
+            :organization="$organization"
+            section="billing-analytics"
+            :title="__('Billing analytics')"
+            :description="__('Live estimate, resource breakdown, Edge delivery meters, and Stripe invoice history for :org.', ['org' => $organization->name])"
+            icon="heroicon-o-chart-bar"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Billing analytics'), 'icon' => 'chart-bar'],
+            ]"
+        >
+            <x-slot:actions>
                 <x-outline-link href="{{ route('billing.show', $organization) }}" wire:navigate>
                     <x-heroicon-o-credit-card class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Billing & plan') }}
@@ -126,41 +128,38 @@
                     <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Invoices') }}
                 </x-outline-link>
+            </x-slot:actions>
 
-                <x-slot:stats>
-                    <dl class="grid grid-cols-3 gap-2">
-                        <div class="rounded-2xl border px-4 py-3 shadow-sm {{ $statusTile }}">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                            <dd class="mt-1 flex items-center gap-1.5">
-                                <span class="inline-block h-2 w-2 rounded-full {{ $statusDot }}" aria-hidden="true"></span>
-                                <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
-                            </dd>
-                            <p class="mt-1 truncate text-[11px] text-brand-moss" title="{{ $statusSub }}">{{ $statusSub }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Estimated') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">${{ number_format($displayCents / 100, 0) }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ $interval === 'year' ? '/'.__('yr') : '/'.__('mo') }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Daily run rate $:n', ['n' => number_format(($summary['daily_run_rate_cents'] ?? 0) / 100, 2)]) }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Resources') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $billableResources }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ __('billable') }}</span>
-                            </dd>
-                            <p class="mt-1 truncate text-[11px] text-brand-mist">
-                                @foreach (array_values(array_filter($resourceParts, fn ($p) => $p['visible'])) as $i => $part)
-                                    @if ($i > 0) <span aria-hidden="true">·</span> @endif
-                                    {{ $part['count'] }} {{ $part['label'] }}
-                                @endforeach
-                            </p>
-                        </div>
-                    </dl>
-                </x-slot:stats>
-            </x-hero-card>
+            <x-slot:stats>
+                <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Billing analytics at a glance') }}">
+                    <x-fleet-stat :label="__('Status')" class="{{ $statusTile }}">
+                        <p class="mt-2 flex items-center gap-1.5">
+                            <span class="inline-block h-2 w-2 rounded-full {{ $statusDot }}" aria-hidden="true"></span>
+                            <span class="text-sm font-semibold text-brand-ink">{{ $statusLabel }}</span>
+                        </p>
+                        <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ $statusSub }}">{{ $statusSub }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Estimated')">
+                        <p class="mt-2 flex items-baseline gap-1">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($displayCents / 100, 0) }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ $interval === 'year' ? '/'.__('yr') : '/'.__('mo') }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Daily run rate $:n', ['n' => number_format(($summary['daily_run_rate_cents'] ?? 0) / 100, 2)]) }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Resources')">
+                        <p class="mt-2 flex items-baseline gap-1">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $billableResources }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ __('billable') }}</span>
+                        </p>
+                        <p class="mt-1 truncate text-[11px] text-brand-mist">
+                            @foreach (array_values(array_filter($resourceParts, fn ($p) => $p['visible'])) as $i => $part)
+                                @if ($i > 0) <span aria-hidden="true">·</span> @endif
+                                {{ $part['count'] }} {{ $part['label'] }}
+                            @endforeach
+                        </p>
+                    </x-fleet-stat>
+                </dl>
+            </x-slot:stats>
 
             @if (cost_observatory_active($organization))
                 @php
@@ -176,8 +175,8 @@
                     $obsDelta = (int) ($obsComparison['delta_vs_forge_cents'] ?? 0);
                     $obsServers = is_array($costObservatory['servers'] ?? null) ? $costObservatory['servers'] : [];
                 @endphp
-                <section class="mt-6 dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-banknotes class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -187,7 +186,7 @@
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Dply platform fees, estimated provider infrastructure, and metered delivery — in one pane. We bill our work; you pay your cloud provider directly.') }}</p>
                         </div>
                     </div>
-                    <div class="grid gap-4 p-6 sm:grid-cols-2 sm:p-7 lg:grid-cols-4">
+                    <div class="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply platform') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($obsDplyCents / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span></p>
@@ -229,7 +228,7 @@
                     </div>
 
                     @if ($obsServers !== [])
-                        <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-7">
+                        <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
                             <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('BYO VM provider estimates') }}</p>
                             <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
                                 <table class="w-full text-sm">
@@ -295,13 +294,11 @@
                 </section>
             @endif
 
-            <div class="mt-6 space-y-6">
-
-                {{-- Recurring revenue / forecast row. Four compact tiles — a
+                            {{-- Recurring revenue / forecast row. Four compact tiles — a
                      dedicated section so MRR/ARR/projection/delta read as one
                      set instead of stacked next to operational KPIs. --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -311,7 +308,7 @@
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Normalized MRR / ARR, projected month-end, and the change versus 30 days ago.') }}</p>
                         </div>
                     </div>
-                    <div class="grid gap-3 p-6 sm:grid-cols-2 sm:p-7 xl:grid-cols-4">
+                    <div class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('MRR') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($forecastMrrCents / 100, 2) }}</p>
@@ -343,8 +340,8 @@
                 </section>
 
                 {{-- Spend trend --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-presentation-chart-line class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -354,7 +351,7 @@
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Daily billing snapshots for the last 90 days, with a focused 30-day table below.') }}</p>
                         </div>
                     </div>
-                    <div class="p-6 sm:p-7">
+                    <div class="px-5 py-5 sm:px-6">
                         @if ($spendTrendNinety === [])
                             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white/40 px-5 py-8 text-center">
                                 <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
@@ -408,8 +405,8 @@
                 </section>
 
                 {{-- Spend by category --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-chart-pie class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -419,7 +416,7 @@
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Current-cycle estimate — updates when your fleet changes.') }}</p>
                         </div>
                     </div>
-                    <div class="space-y-5 p-6 sm:p-7">
+                    <div class="space-y-5 px-5 py-5 sm:px-6">
                         <div class="flex h-4 w-full overflow-hidden rounded-full bg-brand-cream/80">
                             @foreach ($categoryBreakdown as $segment)
                                 @if (($segment['cents'] ?? 0) > 0)
@@ -481,8 +478,8 @@
 
                 @if ($edgeOn)
                 {{-- Edge sites --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -492,7 +489,7 @@
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Per-site platform fee, delivery usage (MTD), and daily request trends.') }}</p>
                         </div>
                     </div>
-                    <div class="p-6 sm:p-7">
+                    <div class="px-5 py-5 sm:px-6">
                         @if ($edgeSites === [])
                             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white/40 px-5 py-8 text-center">
                                 <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
@@ -530,8 +527,8 @@
 
                 @if ($hasManagedSurfaces)
                 {{-- Managed products --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -548,7 +545,7 @@
                             'serverless' => $serverlessOn ? ['title' => __('Serverless functions'), 'icon' => 'heroicon-o-bolt'] : null,
                         ]);
                     @endphp
-                    <div class="grid gap-4 p-6 sm:p-7 lg:grid-cols-3">
+                    <div class="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-3">
                         @foreach ($managedCatalog as $key => $meta)
                             @php $rows = $managedProducts[$key] ?? []; @endphp
                             <div class="rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
@@ -580,8 +577,8 @@
                 @endif
 
                 {{-- BYO fleet --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -592,7 +589,7 @@
                         </div>
                     </div>
                     @if ($billableServers === [] && $excludedServers === [])
-                        <div class="px-6 py-10 text-center sm:px-7">
+                        <div class="px-5 py-10 text-center sm:px-6">
                             <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                             </span>
@@ -602,24 +599,24 @@
                         <table class="w-full text-sm">
                             <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
-                                    <th class="px-6 py-2 text-left sm:px-7">{{ __('Server') }}</th>
+                                    <th class="px-5 py-2 text-left sm:px-6">{{ __('Server') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Tier / status') }}</th>
-                                    <th class="px-6 py-2 text-right sm:px-7">{{ __('Monthly') }}</th>
+                                    <th class="px-5 py-2 text-right sm:px-6">{{ __('Monthly') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-brand-ink/5">
                                 @foreach ($billableServers as $server)
                                     <tr class="transition-colors hover:bg-brand-sand/15">
-                                        <td class="px-6 py-3 font-medium text-brand-ink sm:px-7">{{ $server['name'] }}</td>
+                                        <td class="px-5 py-3 font-medium text-brand-ink sm:px-6">{{ $server['name'] }}</td>
                                         <td class="px-4 py-3 text-brand-moss">{{ $server['tier'] }}</td>
-                                        <td class="px-6 py-3 text-right font-mono tabular-nums text-brand-ink sm:px-7">${{ number_format($server['monthly_cents'] / 100, 2) }}</td>
+                                        <td class="px-5 py-3 text-right font-mono tabular-nums text-brand-ink sm:px-6">${{ number_format($server['monthly_cents'] / 100, 2) }}</td>
                                     </tr>
                                 @endforeach
                                 @foreach ($excludedServers as $row)
                                     <tr class="opacity-70 transition-colors hover:bg-brand-sand/15">
-                                        <td class="px-6 py-3 text-brand-ink sm:px-7">{{ $row['name'] }}</td>
+                                        <td class="px-5 py-3 text-brand-ink sm:px-6">{{ $row['name'] }}</td>
                                         <td class="px-4 py-3 text-brand-moss">{{ $row['reason'] }}</td>
-                                        <td class="px-6 py-3 text-right text-brand-mist sm:px-7">—</td>
+                                        <td class="px-5 py-3 text-right text-brand-mist sm:px-6">—</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -628,8 +625,8 @@
                 </section>
 
                 {{-- Stripe sync events --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -640,7 +637,7 @@
                         </div>
                     </div>
                     @if ($syncEvents === [])
-                        <div class="px-6 py-10 text-center sm:px-7">
+                        <div class="px-5 py-10 text-center sm:px-6">
                             <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                             </span>
@@ -650,11 +647,11 @@
                         <table class="w-full text-sm">
                             <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
-                                    <th class="px-6 py-2 text-left sm:px-7">{{ __('Time') }}</th>
+                                    <th class="px-5 py-2 text-left sm:px-6">{{ __('Time') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Trigger') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Status') }}</th>
                                     <th class="px-4 py-2 text-right">{{ __('Changes') }}</th>
-                                    <th class="px-6 py-2 text-right sm:px-7">{{ __('Monthly total') }}</th>
+                                    <th class="px-5 py-2 text-right sm:px-6">{{ __('Monthly total') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-brand-ink/5">
@@ -668,7 +665,7 @@
                                         };
                                     @endphp
                                     <tr class="transition-colors hover:bg-brand-sand/15">
-                                        <td class="px-6 py-3 text-brand-ink sm:px-7" title="{{ $event['created_at'] ?? '' }}">
+                                        <td class="px-5 py-3 text-brand-ink sm:px-6" title="{{ $event['created_at'] ?? '' }}">
                                             {{ ! empty($event['created_at']) ? \Illuminate\Support\Carbon::parse($event['created_at'])->diffForHumans() : '—' }}
                                         </td>
                                         <td class="px-4 py-3 text-brand-moss">{{ str_replace('_', ' ', $event['trigger'] ?? 'manual') }}</td>
@@ -681,7 +678,7 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-moss">{{ $event['change_count'] ?? 0 }}</td>
-                                        <td class="px-6 py-3 text-right font-mono tabular-nums text-brand-ink sm:px-7">${{ number_format(($event['monthly_total_cents'] ?? 0) / 100, 2) }}</td>
+                                        <td class="px-5 py-3 text-right font-mono tabular-nums text-brand-ink sm:px-6">${{ number_format(($event['monthly_total_cents'] ?? 0) / 100, 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -690,8 +687,8 @@
                 </section>
 
                 {{-- Invoice history --}}
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -703,14 +700,14 @@
                         <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('All invoices') }} →</a>
                     </div>
                     @if ($invoiceHistory === [])
-                        <div class="px-6 py-10 text-center sm:px-7">
+                        <div class="px-5 py-10 text-center sm:px-6">
                             <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <p class="mt-3 text-sm text-brand-moss">{{ __('No invoices yet — subscribe and complete checkout to see history here.') }}</p>
                         </div>
                     @else
-                        <div class="p-6 sm:p-7">
+                        <div class="px-5 py-5 sm:px-6">
                             <div class="flex h-24 items-end gap-2" aria-hidden="true">
                                 @foreach (array_slice($invoiceHistory, 0, 12) as $invoice)
                                     <div class="flex-1 min-w-0 group relative">
@@ -726,21 +723,21 @@
                         <table class="w-full border-t border-brand-ink/10 text-sm">
                             <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
                                 <tr>
-                                    <th class="px-6 py-2 text-left sm:px-7">{{ __('Date') }}</th>
+                                    <th class="px-5 py-2 text-left sm:px-6">{{ __('Date') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Number') }}</th>
                                     <th class="px-4 py-2 text-left">{{ __('Status') }}</th>
-                                    <th class="px-6 py-2 text-right sm:px-7">{{ __('Total') }}</th>
+                                    <th class="px-5 py-2 text-right sm:px-6">{{ __('Total') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-brand-ink/5">
                                 @foreach (array_slice($invoiceHistory, 0, 12) as $invoice)
                                     <tr class="transition-colors hover:bg-brand-sand/15">
-                                        <td class="px-6 py-3 text-brand-ink sm:px-7">
+                                        <td class="px-5 py-3 text-brand-ink sm:px-6">
                                             {{ $invoice['date'] !== '' ? \Illuminate\Support\Carbon::parse($invoice['date'])->toFormattedDateString() : '—' }}
                                         </td>
                                         <td class="px-4 py-3 font-mono text-xs text-brand-moss">{{ $invoice['number'] ?? '—' }}</td>
                                         <td class="px-4 py-3 capitalize text-brand-moss">{{ $invoice['status'] ?? '—' }}</td>
-                                        <td class="px-6 py-3 text-right font-mono tabular-nums font-semibold text-brand-ink sm:px-7">${{ number_format($invoice['total_cents'] / 100, 2) }}</td>
+                                        <td class="px-5 py-3 text-right font-mono tabular-nums font-semibold text-brand-ink sm:px-6">${{ number_format($invoice['total_cents'] / 100, 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -748,7 +745,6 @@
                     @endif
                 </section>
 
-            </div>
         </x-organization-shell>
     </div>
 </div>

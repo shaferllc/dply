@@ -31,40 +31,32 @@
     ];
 @endphp
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <x-breadcrumb-trail :items="$breadcrumbs" />
 
-    @if (session('success'))
-        <x-alert tone="success">{{ session('success') }}</x-alert>
-    @endif
-
-    {{ $alert ?? '' }}
-
-    <x-hero-card
-        icon="globe-alt"
-        iconSize="md"
-        :eyebrow="$eyebrow ?? ($isProductionSurface ? __('Production') : null)"
+    <x-profile-shell
         :title="__('Sites')"
         :description="$isProductionSurface
             ? __('Live sites from the connected control plane — Manage opens the real workspace with Production data.')
             : __('Every hostname routes through a server—search, filter, and open any site from one view.')"
+        icon="heroicon-o-globe-alt"
     >
-        <x-slot:top-action>
+        <x-slot:actions>
             <a
                 href="{{ $serversIndexUrl }}"
                 wire:navigate
-                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
                 <x-heroicon-o-server class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                 {{ __('Servers') }}
                 <span aria-hidden="true">→</span>
             </a>
-        </x-slot:top-action>
+        </x-slot:actions>
 
         <x-slot:stats>
             <dl class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 @foreach ($summaryStats as $stat)
-                    <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 shadow-sm">
+                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
                         <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
                             <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
                             <span class="truncate">{{ $stat['label'] }}</span>
@@ -74,11 +66,45 @@
                 @endforeach
             </dl>
         </x-slot:stats>
-    </x-hero-card>
 
-    @if ($hasSitesInScope)
-        <div class="dply-card overflow-hidden">
-            <div class="flex items-center gap-2 px-3 py-3 sm:px-5">
+        @if (session('success'))
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                <x-alert tone="success">{{ session('success') }}</x-alert>
+            </div>
+        @endif
+
+        @if (isset($alert) && filled(trim((string) $alert)))
+            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                {{ $alert }}
+            </div>
+        @endif
+
+        @unless ($hasSitesInScope)
+            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="sites-empty-heading">
+                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
+                </span>
+                <h2 id="sites-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">
+                    {{ $emptyState === 'production' ? __('No production sites') : __('No sites yet') }}
+                </h2>
+                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    {{ $emptyState === 'production'
+                        ? __('The connected control plane returned no BYO sites for this organization.')
+                        : __('Sites belong to servers. Open a server, then add the hostnames that should route through it.') }}
+                </p>
+                @if ($emptyState !== 'production')
+                    <a
+                        href="{{ route('servers.index') }}"
+                        wire:navigate
+                        class="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-server class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Go to servers') }}
+                    </a>
+                @endif
+            </div>
+        @else
+            <div class="flex items-center gap-2 border-b border-brand-ink/10 px-3 py-3 sm:px-5">
                 <div class="min-w-0 flex-1">
                     <label for="sites_search" class="sr-only">{{ __('Search') }}</label>
                     <x-text-input id="sites_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search sites, domains, or servers…') }}" autocomplete="off" />
@@ -130,61 +156,29 @@
                     </x-slot>
                 </x-dropdown>
             </div>
-        </div>
-    @endif
 
-    @unless ($hasSitesInScope)
-        <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]" aria-labelledby="sites-empty-heading">
-            <div class="px-6 py-12 text-center sm:px-10 sm:py-14">
-                <div class="mx-auto flex max-w-xl flex-col items-center">
-                    <span class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-sand/55 text-brand-forest ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-globe-alt class="h-9 w-9" aria-hidden="true" />
-                    </span>
-                    <h2 id="sites-empty-heading" class="mt-6 text-2xl font-semibold tracking-tight text-brand-ink">
-                        {{ $emptyState === 'production' ? __('No production sites') : __('No sites yet') }}
-                    </h2>
-                    <p class="mt-3 text-base leading-relaxed text-brand-moss">
-                        {{ $emptyState === 'production'
-                            ? __('The connected control plane returned no BYO sites for this organization.')
-                            : __('Sites belong to servers. Open a server, then add the hostnames that should route through it.') }}
-                    </p>
-                    @if ($emptyState !== 'production')
-                        <div class="mt-10 flex w-full flex-wrap items-center justify-center gap-3">
-                            <a
-                                href="{{ route('servers.index') }}"
-                                wire:navigate
-                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-3 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition hover:bg-brand-forest"
-                            >
-                                <x-heroicon-o-server class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Go to servers') }}
-                            </a>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </section>
-    @else
-        <div class="dply-card overflow-hidden rounded-[2rem]">
             @if ($rows->isEmpty())
-                <div class="px-6 py-14 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('No results') }}</p>
-                    <h3 class="mt-3 text-xl font-semibold text-brand-ink">{{ __('No sites match your current filters') }}</h3>
-                    <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-brand-moss">
+                <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No sites match your current filters') }}</p>
+                    <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
                         {{ __('Try widening the search, switching the status filter, or resetting to bring every site back into view.') }}
                     </p>
-                    <button type="button" wire:click="resetFilters" class="mt-5 inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink transition hover:bg-brand-cream">
+                    <button type="button" wire:click="resetFilters" class="mt-4 text-xs font-semibold text-brand-sage hover:text-brand-ink">
                         {{ __('Reset filters') }}
                     </button>
                 </div>
             @else
-                <ul class="overflow-hidden">
+                <ul>
                     @foreach ($rows as $site)
                         @include('components.partials.site-index-card', ['site' => $site])
                     @endforeach
                 </ul>
             @endif
-        </div>
-    @endunless
+        @endunless
+    </x-profile-shell>
 
     {{ $modals ?? '' }}
 </div>

@@ -27,6 +27,8 @@
         :show-mutations="false"
         :show-hero-actions="false"
         :eyebrow="__('Production')"
+        :sites-index-url="route('live.sites.index')"
+        empty-state="production"
         :breadcrumbs="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Production'), 'href' => route('live.servers.index'), 'icon' => 'exclamation-triangle'],
@@ -38,7 +40,7 @@
                 <x-alert tone="danger">{{ $error }}</x-alert>
             @endif
             @if ($legacyApi ?? false)
-                <div class="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3">
                     <p class="text-sm font-semibold text-amber-950">{{ __('Production API is missing fleet-card fields') }}</p>
                     <p class="mt-1 text-sm leading-relaxed text-amber-900/90">
                         {{ __('Connected host :host still returns the legacy servers list (name/status/IP only). Deploy this app’s enriched GET /api/v1/servers to that control plane, then hit Refresh — metrics, sites, services, insights, and group labels come from that payload.', ['host' => $connection->hostLabel()]) }}
@@ -48,12 +50,17 @@
         </x-slot:alert>
 
         <x-slot:empty>
-            <section class="rounded-[2rem] border-2 border-brand-sage/35 bg-brand-cream shadow-lg shadow-brand-ink/10 ring-1 ring-brand-ink/[0.07]">
-                <div class="px-6 py-12 text-center sm:px-10 sm:py-14">
-                    <p class="text-2xl font-semibold tracking-tight text-brand-ink">{{ __('No servers in production') }}</p>
-                    <p class="mt-3 text-base text-brand-moss">{{ __('This production organization has no servers yet. Manage them on the remote workspace.') }}</p>
-                </div>
-            </section>
+            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="servers-empty-heading">
+                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                </span>
+                <h2 id="servers-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">
+                    {{ __('No servers in production') }}
+                </h2>
+                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    {{ __('This production organization has no servers yet. Manage them on the remote workspace.') }}
+                </p>
+            </div>
         </x-slot:empty>
     </x-servers-index-page>
 
