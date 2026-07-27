@@ -7,6 +7,7 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Workspace;
 use App\Models\WorkspaceLabel;
 use App\Models\WorkspaceMember;
+use App\Support\Projects\ProjectIndexRow;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -136,15 +137,23 @@ class Index extends Component
                 ->get();
         }
 
+        $rows = $workspaces->map(
+            fn (Workspace $workspace): ProjectIndexRow => ProjectIndexRow::fromWorkspace($workspace, $user),
+        );
+
         return view('livewire.projects.index', [
-            'workspaces' => $workspaces,
+            'rows' => $rows,
             'hasOrganization' => $org !== null,
+            'hasProjectsInScope' => $projectsTotal > 0,
             'labels' => $labels,
             'workspaceRoles' => WorkspaceMember::roles(),
-            'projectsTotal' => $projectsTotal,
-            'serversTotal' => $serversTotal,
-            'sitesTotal' => $sitesTotal,
-            'membersTotal' => $membersTotal,
+            'summary' => [
+                'projects' => $projectsTotal,
+                'servers' => $serversTotal,
+                'sites' => $sitesTotal,
+                'members' => $membersTotal,
+            ],
+            'canCreateProject' => $org !== null && $user->can('create', Workspace::class),
         ]);
     }
 }

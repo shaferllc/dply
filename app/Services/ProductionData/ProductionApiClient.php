@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\ProductionData;
 
 use App\Models\ProductionDataConnection;
+use App\Support\Cloud\CloudIndexRow;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -174,6 +175,20 @@ class ProductionApiClient
         $payload = $this->getJson('/edge/sites');
 
         return array_values($payload['data'] ?? []);
+    }
+
+    /**
+     * Cloud apps inventory — container sites from the general sites index
+     * until a dedicated `/cloud/sites` control-plane surface exists.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function cloudSites(): array
+    {
+        return array_values(array_filter(
+            $this->sites(),
+            static fn (array $row): bool => CloudIndexRow::isCloudInventoryRow($row),
+        ));
     }
 
     /**

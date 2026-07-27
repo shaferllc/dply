@@ -236,7 +236,6 @@ final class SiteShowViewData
                 'avatar_image' => $site->logoUrl(),
             ];
         } elseif ($site->usesEdgeRuntime()) {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'];
             $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
             $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
         } else {

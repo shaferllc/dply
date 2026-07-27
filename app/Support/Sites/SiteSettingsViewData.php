@@ -573,7 +573,6 @@ final class SiteSettingsViewData
         if ($site->usesEdgeRuntime()) {
             $items = [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
                 ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
             ];
 

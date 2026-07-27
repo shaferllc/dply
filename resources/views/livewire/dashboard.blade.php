@@ -82,238 +82,238 @@
 
     $primaryHref = multi_surface_active() ? route('launches.create') : route('servers.create');
     $primaryLabel = multi_surface_active() ? __('Open launchpad') : __('Add a server');
+    $hasWorkspaceInsights = \Laravel\Pennant\Feature::active('workspace.insights');
+    $shellDescription = __('Run infrastructure, track fleet health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName]);
+    $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors';
+
+    $serversStatClass = $serverCount > 0
+        ? 'group relative rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-3 py-2 transition hover:border-brand-sage/50 focus-within:ring-2 focus-within:ring-brand-sage/40'
+        : 'group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40';
+    $findingsStatClass = $openFindings > 0
+        ? 'group relative rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 transition hover:border-amber-300 focus-within:ring-2 focus-within:ring-brand-sage/40'
+        : 'group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40';
+    $insightsGridClass = $hasWorkspaceInsights
+        ? 'grid gap-0 lg:grid-cols-[1.35fr_0.95fr] lg:divide-x lg:divide-brand-ink/10'
+        : 'grid gap-0';
 @endphp
 
-<div>
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        @if ($fleetAlert !== null)
-            <div class="mb-6 overflow-hidden rounded-2xl border border-rose-200 bg-rose-50 shadow-sm" role="alert">
-                <div class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge tone="rose">
-                            <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
-                            <p class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Fleet needs attention') }}</p>
-                            <p class="mt-1 text-xs leading-relaxed text-rose-800">
-                                @if ($fleetAlert['failed_latest'] > 0)
-                                    {{ trans_choice('{1} 1 site with a failed latest deploy.|[2,*] :count sites with a failed latest deploy.', $fleetAlert['failed_latest'], ['count' => $fleetAlert['failed_latest']]) }}
-                                @endif
-                                @if ($fleetAlert['long_running'] > 0)
-                                    {{ trans_choice('{1} 1 deploy running over 15 minutes.|[2,*] :count deploys running over 15 minutes.', $fleetAlert['long_running'], ['count' => $fleetAlert['long_running']]) }}
-                                @endif
-                                @if ($fleetAlert['drift_servers'] > 0)
-                                    {{ trans_choice('{1} 1 server with engine drift.|[2,*] :count servers with engine drift.', $fleetAlert['drift_servers'], ['count' => $fleetAlert['drift_servers']]) }}
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-                    @feature('surface.fleet')
-                        <a href="{{ route('fleet.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
-                            {{ __('View fleet health') }}
-                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        </a>
-                    @endfeature
-                </div>
-            </div>
-        @endif
-
-        {{-- Hero: greeting + at-a-glance fleet counts. --}}
-        @php $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors'; @endphp
-        <x-hero-card
-            icon="squares-2x2"
-            iconSize="md"
-            :eyebrow="__('Workspace')"
+<div class="contents">
+    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <x-profile-shell
             :title="__('Welcome back, :name', ['name' => $displayName])"
-            :description="__('Run infrastructure, track fleet health, and move from provider setup to production delivery for :organization.', ['organization' => $organizationName])"
+            :description="$shellDescription"
+            icon="heroicon-o-squares-2x2"
         >
-            {{-- All three actions share one sizing class so they render at
-                 identical height/padding; only color differs. --}}
-            <a
-                href="{{ route('credentials.index') }}"
-                wire:navigate
-                class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
-            >
-                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Provider credentials') }}
-            </a>
-            <button
-                type="button"
-                class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
-                x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.connect-provider' } }))"
-            >
-                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Setup guide') }}
-            </button>
-            <a
-                href="{{ $primaryHref }}"
-                wire:navigate
-                class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
-            >
-                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ $primaryLabel }}
-            </a>
+            <x-slot:actions>
+                <a
+                    href="{{ route('credentials.index') }}"
+                    wire:navigate
+                    class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Provider credentials') }}
+                </a>
+                <button
+                    type="button"
+                    class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+                    x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.connect-provider' } }))"
+                >
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Setup guide') }}
+                </button>
+                <a
+                    href="{{ $primaryHref }}"
+                    wire:navigate
+                    class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ $primaryLabel }}
+                </a>
+            </x-slot:actions>
 
             <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-2">
-                    <div @class([
-                        'group relative rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40',
-                        'border-brand-sage/30 bg-brand-sage/8 hover:border-brand-sage/50' => $serverCount > 0,
-                        'border-brand-ink/10 bg-white hover:border-brand-ink/20' => $serverCount === 0,
-                    ])>
-                        <a href="{{ $serversCardHref }}" wire:navigate class="absolute inset-0 rounded-2xl" aria-label="{{ __('View servers') }}"></a>
-                        <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                            {{ __('Servers') }}
+                <dl class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div class="{{ $serversStatClass }}">
+                        <a href="{{ $serversCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View servers') }}"></a>
+                        <dt class="flex items-center justify-between gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <span class="flex min-w-0 items-center gap-1.5">
+                                <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span class="truncate">{{ __('Servers') }}</span>
+                            </span>
                             <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                         </dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $serverCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('in scope|in scope', $serverCount) }}</span>
+                        <dd class="mt-0.5 flex items-baseline gap-1.5">
+                            <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $serverCount }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ __('in scope') }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across your org') }}</p>
                     </div>
-                    <div @class([
-                        'group relative rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40',
-                        'border-amber-200 bg-amber-50/60 hover:border-amber-300' => $openFindings > 0,
-                        'border-brand-ink/10 bg-white hover:border-brand-ink/20' => $openFindings === 0,
-                    ])>
-                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-2xl" aria-label="{{ __('Review open findings') }}"></a>
-                        <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                            {{ __('Open findings') }}
+                    <div class="{{ $findingsStatClass }}">
+                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('Review open findings') }}"></a>
+                        <dt class="flex items-center justify-between gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <span class="flex min-w-0 items-center gap-1.5">
+                                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span class="truncate">{{ __('Open findings') }}</span>
+                            </span>
                             <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                         </dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $openFindings }}</span>
+                        <dd class="mt-0.5 flex items-baseline gap-1.5">
+                            <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $openFindings }}</span>
                             <span class="text-[11px] text-brand-moss">{{ trans_choice('issue|issues', $openFindings) }}</span>
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Need triage') }}</p>
                     </div>
-                    <div class="group relative rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-ink/20 hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40">
-                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-2xl" aria-label="{{ __('View fleet health') }}"></a>
-                        <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                            {{ __('Health') }}
+                    <div class="group relative rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2 transition hover:border-brand-ink/20 focus-within:ring-2 focus-within:ring-brand-sage/40">
+                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-xl" aria-label="{{ __('View fleet health') }}"></a>
+                        <dt class="flex items-center justify-between gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <span class="flex min-w-0 items-center gap-1.5">
+                                <x-heroicon-o-heart class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span class="truncate">{{ __('Health') }}</span>
+                            </span>
                             <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                         </dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</span>
+                        <dd class="mt-0.5 flex items-baseline gap-1.5">
+                            <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</span>
                             @if ($avgHealthScore !== null)
                                 <span class="text-[11px] text-brand-moss">/ 100</span>
                             @endif
                         </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ $avgHealthScore !== null ? __('Higher is better') : __('Pending insights') }}</p>
                     </div>
                 </dl>
             </x-slot:stats>
-        </x-hero-card>
 
-        <div class="mt-6 space-y-6">
-            @unless ($hasProviderCredentials)
-                {{-- Provider connect: section card with amber tone. --}}
-                <section class="dply-card overflow-hidden border-amber-200">
-                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="flex items-start gap-3">
-                                <x-icon-badge tone="amber">
-                                    <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add provider credentials before you provision') }}</h3>
-                                    <p class="mt-1 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a supported infrastructure provider so this workspace can launch and manage real servers instead of stopping at setup.') }}</p>
-                                </div>
-                            </div>
-                            <div class="flex shrink-0 flex-wrap gap-2 sm:items-center">
-                                <a
-                                    href="{{ route('credentials.index') }}"
-                                    wire:navigate
-                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
-                                >
-                                    <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Connect provider') }}
-                                </a>
-                                <a
-                                    href="{{ route('docs.connect-provider') }}"
-                                    wire:navigate
-                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-m-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Setup guide') }}
-                                </a>
+            @if ($fleetAlert !== null)
+                <div class="border-b border-brand-ink/10 bg-rose-50/80 px-5 py-4 sm:px-6" role="alert">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-800 ring-1 ring-rose-200/80">
+                                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
+                                <h2 class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Fleet needs attention') }}</h2>
+                                <p class="mt-1 text-xs leading-relaxed text-rose-800">
+                                    @if ($fleetAlert['failed_latest'] > 0)
+                                        {{ trans_choice('{1} 1 site with a failed latest deploy.|[2,*] :count sites with a failed latest deploy.', $fleetAlert['failed_latest'], ['count' => $fleetAlert['failed_latest']]) }}
+                                    @endif
+                                    @if ($fleetAlert['long_running'] > 0)
+                                        {{ trans_choice('{1} 1 deploy running over 15 minutes.|[2,*] :count deploys running over 15 minutes.', $fleetAlert['long_running'], ['count' => $fleetAlert['long_running']]) }}
+                                    @endif
+                                    @if ($fleetAlert['drift_servers'] > 0)
+                                        {{ trans_choice('{1} 1 server with engine drift.|[2,*] :count servers with engine drift.', $fleetAlert['drift_servers'], ['count' => $fleetAlert['drift_servers']]) }}
+                                    @endif
+                                </p>
                             </div>
                         </div>
+                        @feature('surface.fleet')
+                            <a href="{{ route('fleet.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
+                                {{ __('View fleet health') }}
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            </a>
+                        @endfeature
                     </div>
-                </section>
+                </div>
+            @endif
+
+            @unless ($hasProviderCredentials)
+                <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-4 sm:px-6">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80">
+                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add provider credentials before you provision') }}</h2>
+                                <p class="mt-1 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a supported infrastructure provider so this workspace can launch and manage real servers instead of stopping at setup.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap gap-2 sm:items-center">
+                            <a
+                                href="{{ route('credentials.index') }}"
+                                wire:navigate
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
+                            >
+                                <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Connect provider') }}
+                            </a>
+                            <a
+                                href="{{ route('docs.connect-provider') }}"
+                                wire:navigate
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Setup guide') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
             @endunless
 
-            {{-- Platform surfaces + Quick actions side-by-side. --}}
-            <div class="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
+            {{-- Platform surfaces + Quick actions --}}
+            <div class="grid gap-0 border-b border-brand-ink/10 xl:grid-cols-[1.7fr_1fr] xl:divide-x xl:divide-brand-ink/10">
+                <section class="min-w-0" aria-labelledby="dashboard-platform-heading">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
+                        </span>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Platform') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Operate from one place') }}</h3>
+                            <h2 id="dashboard-platform-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Operate from one place') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Jump straight into the surface you need — every workspace lives next to the next.') }}</p>
                         </div>
                         @feature('surface.marketplace')
-                                <a
-                                    href="{{ route('marketplace.index') }}"
-                                    wire:navigate
-                                    class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Marketplace') }}
-                                </a>
-                            @endfeature
+                            <a
+                                href="{{ route('marketplace.index') }}"
+                                wire:navigate
+                                class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Marketplace') }}
+                            </a>
+                        @endfeature
                     </div>
-                    <div class="p-6 sm:p-7">
-                        <div class="grid gap-3 md:grid-cols-2">
-                            @foreach ($platformSurfaces as $surface)
-                                <a
-                                    href="{{ $surface['href'] }}"
-                                    wire:navigate
-                                    class="group flex items-start gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md"
-                                >
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                        @switch($surface['icon'])
-                                            @case('server-stack')
-                                                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                                                @break
-                                            @case('globe-alt')
-                                                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                                                @break
-                                            @case('rectangle-stack')
-                                                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                                                @break
-                                            @case('building-office-2')
-                                                <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
-                                                @break
-                                        @endswitch
-                                    </span>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center justify-between gap-2">
-                                            <span class="text-sm font-semibold text-brand-ink">{{ $surface['title'] }}</span>
-                                            <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-hover:text-brand-sage" aria-hidden="true" />
-                                        </div>
-                                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $surface['description'] }}</p>
+                    <div class="grid gap-3 p-5 sm:grid-cols-2 sm:px-6 sm:py-5">
+                        @foreach ($platformSurfaces as $surface)
+                            <a
+                                href="{{ $surface['href'] }}"
+                                wire:navigate
+                                class="group flex items-start gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md"
+                            >
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                                    @switch($surface['icon'])
+                                        @case('server-stack')
+                                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                                            @break
+                                        @case('globe-alt')
+                                            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                                            @break
+                                        @case('rectangle-stack')
+                                            <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                                            @break
+                                        @case('building-office-2')
+                                            <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
+                                            @break
+                                    @endswitch
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm font-semibold text-brand-ink">{{ $surface['title'] }}</span>
+                                        <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-hover:text-brand-sage" aria-hidden="true" />
                                     </div>
-                                </a>
-                            @endforeach
-                        </div>
+                                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $surface['description'] }}</p>
+                                </div>
+                            </a>
+                        @endforeach
                     </div>
                 </section>
 
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
+                <section class="min-w-0" aria-labelledby="dashboard-shortcuts-heading">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
+                        </span>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shortcuts') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Keep the workspace ready') }}</h3>
+                            <h2 id="dashboard-shortcuts-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Keep the workspace ready') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Setup tasks that unblock provisioning, access, and team ops.') }}</p>
                         </div>
                     </div>
@@ -323,7 +323,7 @@
                                 <a
                                     href="{{ $action['href'] }}"
                                     wire:navigate
-                                    class="group flex items-center justify-between gap-3 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-7"
+                                    class="group flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6"
                                 >
                                     <div class="flex min-w-0 items-start gap-3">
                                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette[$action['tone']] }}">
@@ -355,135 +355,132 @@
                 </section>
             </div>
 
-            {{-- Fleet insights + Recent servers. Insights is gated behind
-                 `workspace.insights`; when off, Recent servers occupies the
-                 full row instead of leaving an empty column. --}}
-            @php $hasWorkspaceInsights = \Laravel\Pennant\Feature::active('workspace.insights'); @endphp
-            <div @class([
-                'grid gap-6',
-                'lg:grid-cols-[1.35fr_0.95fr]' => $hasWorkspaceInsights,
-            ])>
+            {{-- Fleet insights + Recent servers --}}
+            <div class="{{ $insightsGridClass }}">
                 @if ($hasWorkspaceInsights)
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What needs attention first') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Severity rollup across your fleet plus the noisiest servers.') }}</p>
-                        </div>
-                        <a
-                            href="{{ route('servers.index') }}"
-                            wire:navigate
-                            class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                        >
-                            <x-heroicon-m-server-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Open servers') }}
-                        </a>
-                    </div>
-
-                    @if ($fleetInsights && ($openFindings > 0 || $avgHealthScore !== null))
-                        <div class="grid gap-2 px-6 py-5 sm:grid-cols-3 sm:px-7">
-                            <div @class([
-                                'rounded-2xl border px-4 py-3 shadow-sm',
-                                'border-red-200 bg-red-50/80' => $fleetInsights['open_by_severity']['critical'] > 0,
-                                'border-brand-ink/10 bg-white' => $fleetInsights['open_by_severity']['critical'] === 0,
-                            ])>
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Critical') }}</dt>
-                                <dd class="mt-1 flex items-baseline gap-1.5">
-                                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $fleetInsights['open_by_severity']['critical'] }}</span>
-                                    <span class="text-[11px] text-brand-moss">{{ trans_choice('open|open', $fleetInsights['open_by_severity']['critical']) }}</span>
-                                </dd>
-                            </div>
-                            <div @class([
-                                'rounded-2xl border px-4 py-3 shadow-sm',
-                                'border-amber-200 bg-amber-50/70' => $fleetInsights['open_by_severity']['warning'] > 0,
-                                'border-brand-ink/10 bg-white' => $fleetInsights['open_by_severity']['warning'] === 0,
-                            ])>
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Warning') }}</dt>
-                                <dd class="mt-1 flex items-baseline gap-1.5">
-                                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $fleetInsights['open_by_severity']['warning'] }}</span>
-                                    <span class="text-[11px] text-brand-moss">{{ trans_choice('open|open', $fleetInsights['open_by_severity']['warning']) }}</span>
-                                </dd>
-                            </div>
-                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Info') }}</dt>
-                                <dd class="mt-1 flex items-baseline gap-1.5">
-                                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $fleetInsights['open_by_severity']['info'] }}</span>
-                                    <span class="text-[11px] text-brand-moss">{{ trans_choice('open|open', $fleetInsights['open_by_severity']['info']) }}</span>
-                                </dd>
-                            </div>
-                        </div>
-
-                        @if (! empty($fleetInsights['worst_servers']))
-                            <ul class="divide-y divide-brand-ink/10 border-t border-brand-ink/10">
-                                @foreach ($fleetInsights['worst_servers'] as $row)
-                                    <li>
-                                        <a
-                                            href="{{ route('servers.insights', $row['id']) }}"
-                                            wire:navigate
-                                            class="flex items-center justify-between gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7"
-                                        >
-                                            <div class="min-w-0 flex-1">
-                                                <p class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</p>
-                                                <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
-                                                    <span class="inline-flex items-center gap-1">
-                                                        <span class="font-mono tabular-nums text-brand-ink">{{ $row['open'] }}</span>
-                                                        {{ trans_choice('open finding|open findings', $row['open']) }}
-                                                    </span>
-                                                    @if ($row['worst'])
-                                                        <span aria-hidden="true" class="text-brand-mist/60">·</span>
-                                                        <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $row['worst'] }}</span>
-                                                    @endif
-                                                </p>
-                                            </div>
-                                            <span class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-sage">
-                                                {{ __('Review') }}
-                                                <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            </span>
-                                        </a>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    @else
-                        <div class="px-6 py-12 text-center sm:px-7">
-                            <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                <x-heroicon-o-sparkles class="h-6 w-6" aria-hidden="true" />
+                    <section class="min-w-0 border-b border-brand-ink/10 lg:border-b-0" aria-labelledby="dashboard-insights-heading">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
                             </span>
-                            <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('A clean slate for new infrastructure') }}</p>
-                            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                                {{ __('Connect provider credentials, choose a launch path, and insights will start surfacing here as your infrastructure grows.') }}
-                            </p>
-                            <div class="mt-5 inline-flex flex-wrap items-center gap-2">
-                                <a
-                                    href="{{ route('credentials.index') }}"
-                                    wire:navigate
-                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Connect providers') }}
-                                </a>
-                                <x-docs-link doc-route="docs.connect-provider">
-                                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                    {{ __('Read the guide') }}
-                                </x-docs-link>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
+                                <h2 id="dashboard-insights-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('What needs attention first') }}</h2>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Severity rollup across your fleet plus the noisiest servers.') }}</p>
                             </div>
+                            <a
+                                href="{{ route('servers.index') }}"
+                                wire:navigate
+                                class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-server-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Open servers') }}
+                            </a>
                         </div>
-                    @endif
-                </section>
+
+                        @if ($fleetInsights && ($openFindings > 0 || $avgHealthScore !== null))
+                            @php
+                                $criticalCount = (int) ($fleetInsights['open_by_severity']['critical'] ?? 0);
+                                $warningCount = (int) ($fleetInsights['open_by_severity']['warning'] ?? 0);
+                                $infoCount = (int) ($fleetInsights['open_by_severity']['info'] ?? 0);
+                                $criticalClass = $criticalCount > 0
+                                    ? 'rounded-xl border border-red-200 bg-red-50/80 px-3 py-2'
+                                    : 'rounded-xl border border-brand-ink/10 bg-white px-3 py-2';
+                                $warningClass = $warningCount > 0
+                                    ? 'rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2'
+                                    : 'rounded-xl border border-brand-ink/10 bg-white px-3 py-2';
+                            @endphp
+                            <div class="grid gap-2 px-5 py-5 sm:grid-cols-3 sm:px-6">
+                                <div class="{{ $criticalClass }}">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Critical') }}</dt>
+                                    <dd class="mt-1 flex items-baseline gap-1.5">
+                                        <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $criticalCount }}</span>
+                                        <span class="text-[11px] text-brand-moss">{{ __('open') }}</span>
+                                    </dd>
+                                </div>
+                                <div class="{{ $warningClass }}">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Warning') }}</dt>
+                                    <dd class="mt-1 flex items-baseline gap-1.5">
+                                        <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $warningCount }}</span>
+                                        <span class="text-[11px] text-brand-moss">{{ __('open') }}</span>
+                                    </dd>
+                                </div>
+                                <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Info') }}</dt>
+                                    <dd class="mt-1 flex items-baseline gap-1.5">
+                                        <span class="font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $infoCount }}</span>
+                                        <span class="text-[11px] text-brand-moss">{{ __('open') }}</span>
+                                    </dd>
+                                </div>
+                            </div>
+
+                            @if (! empty($fleetInsights['worst_servers']))
+                                <ul class="divide-y divide-brand-ink/10 border-t border-brand-ink/10">
+                                    @foreach ($fleetInsights['worst_servers'] as $row)
+                                        <li>
+                                            <a
+                                                href="{{ route('servers.insights', $row['id']) }}"
+                                                wire:navigate
+                                                class="flex items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-brand-sand/15 sm:px-6"
+                                            >
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</p>
+                                                    <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                                        <span class="inline-flex items-center gap-1">
+                                                            <span class="font-mono tabular-nums text-brand-ink">{{ $row['open'] }}</span>
+                                                            {{ trans_choice('open finding|open findings', $row['open']) }}
+                                                        </span>
+                                                        @if ($row['worst'])
+                                                            <span aria-hidden="true" class="text-brand-mist/60">·</span>
+                                                            <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $row['worst'] }}</span>
+                                                        @endif
+                                                    </p>
+                                                </div>
+                                                <span class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-sage">
+                                                    {{ __('Review') }}
+                                                    <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                </span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        @else
+                            <div class="flex flex-col items-center justify-center px-5 py-12 text-center sm:px-6">
+                                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                                    <x-heroicon-o-sparkles class="h-6 w-6" aria-hidden="true" />
+                                </span>
+                                <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('A clean slate for new infrastructure') }}</p>
+                                <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                                    {{ __('Connect provider credentials, choose a launch path, and insights will start surfacing here as your infrastructure grows.') }}
+                                </p>
+                                <div class="mt-5 inline-flex flex-wrap items-center justify-center gap-2">
+                                    <a
+                                        href="{{ route('credentials.index') }}"
+                                        wire:navigate
+                                        class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {{ __('Connect providers') }}
+                                    </a>
+                                    <x-docs-link doc-route="docs.connect-provider">
+                                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                        {{ __('Read the guide') }}
+                                    </x-docs-link>
+                                </div>
+                            </div>
+                        @endif
+                    </section>
                 @endif
 
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
+                <section class="min-w-0" aria-labelledby="dashboard-recent-servers-heading">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
+                        </span>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent servers') }}</h3>
+                            <h2 id="dashboard-recent-servers-heading" class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Recent servers') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The five most recently added boxes in your workspace.') }}</p>
                         </div>
                         @if ($serverCount > 0)
@@ -492,8 +489,8 @@
                     </div>
 
                     @if ($servers->isEmpty())
-                        <div class="px-6 py-12 text-center sm:px-7">
-                            <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <div class="flex flex-col items-center justify-center px-5 py-12 text-center sm:px-6">
+                            <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
                             </span>
                             <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No servers yet') }}</p>
@@ -529,7 +526,7 @@
                                     <a
                                         href="{{ route('servers.show', $server) }}"
                                         wire:navigate
-                                        class="flex items-center justify-between gap-4 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-7"
+                                        class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6"
                                     >
                                         <div class="min-w-0 flex-1">
                                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -577,7 +574,7 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 text-right sm:px-7">
+                        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 text-right sm:px-6">
                             <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink">
                                 {{ __('View all servers') }}
                                 <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -586,6 +583,6 @@
                     @endif
                 </section>
             </div>
-        </div>
+        </x-profile-shell>
     </div>
 </div>

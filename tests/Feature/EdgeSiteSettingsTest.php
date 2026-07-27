@@ -70,13 +70,22 @@ test('edge overview shows live url redeploy and no nginx references', function (
         ->assertDontSee('PHP-FPM');
 });
 
-test('edge breadcrumbs use infrastructure and edge not servers path', function () {
+test('edge breadcrumbs use edge not servers or infrastructure path', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings();
+
+    $labels = array_column(
+        \App\Support\Sites\SiteWorkspaceBreadcrumbs::items($server, $site, __('Overview')),
+        'label'
+    );
+
+    expect($labels)
+        ->toContain(__('Edge'))
+        ->not->toContain(__('Infrastructure'))
+        ->not->toContain(__('Servers'));
 
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']))
         ->assertOk()
-        ->assertSee('Infrastructure')
         ->assertSee('Edge')
         ->assertSee('Edge site workspace');
 });

@@ -1,0 +1,153 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Edge;
+
+use App\Models\Site;
+use App\Models\User;
+
+/**
+ * View-model for the shared Edge index list UI — built from a local
+ * {@see Site} or a Production API row so both surfaces reuse the same Blade.
+ */
+final readonly class EdgeIndexRow
+{
+    public function __construct(
+        public string $id,
+        public string $name,
+        public ?string $manageHref,
+        public bool $manageEnabled,
+        public string $status,
+        public string $statusLabel,
+        public string $statusBadgeClass,
+        public ?string $sourceLabel,
+        public ?string $sourceRepo,
+        public ?string $sourceBranch,
+        public string $runtimeLabel,
+        public ?string $frameworkLabel,
+        public ?string $hostname,
+        public ?string $liveUrl,
+        public bool $isPreviewChild,
+        public ?string $previewBranch,
+        public ?int $previewPrNumber,
+        public bool $canDelete,
+        public bool $canQuickLook,
+    ) {}
+
+    public static function fromSite(Site $site, bool $isPreviewChild = false, ?User $user = null): self
+    {
+        $edgeMeta = $site->edgeMeta();
+        $sourceSpec = is_array($edgeMeta['source'] ?? null) ? $edgeMeta['source'] : null;
+        $buildSpec = is_array($edgeMeta['build'] ?? null) ? $edgeMeta['build'] : null;
+        $framework = trim((string) ($buildSpec['framework'] ?? ''));
+        $runtimeMode = (string) ($edgeMeta['runtime_mode'] ?? 'static');
+        $liveUrl = $site->edgeLiveUrl();
+        $hostname = is_string($liveUrl) && $liveUrl !== ''
+            ? (parse_url($liveUrl, PHP_URL_HOST) ?: null)
+            : null;
+        $repo = is_array($sourceSpec) ? ($sourceSpec['repo'] ?? null) : null;
+        $branch = is_array($sourceSpec) ? ($sourceSpec['branch'] ?? null) : null;
+        $repo = is_string($repo) && $repo !== '' ? $repo : null;
+        $branch = is_string($branch) && $branch !== '' ? $branch : null;
+        $previewPr = $edgeMeta['preview_pr_number'] ?? null;
+        $manageHref = $site->server
+            ? route('sites.show', ['server' => $site->server, 'site' => $site])
+            : null;
+
+        return new self(
+            id: (string) $site->id,
+            name: (string) $site->name,
+            manageHref: $manageHref,
+            manageEnabled: $manageHref !== null,
+            status: (string) $site->status,
+            statusLabel: self::statusLabel((string) $site->status),
+            statusBadgeClass: self::statusBadgeClass((string) $site->status),
+            sourceLabel: $repo !== null ? $repo.'@'.($branch ?? 'main') : null,
+            sourceRepo: $repo,
+            sourceBranch: $branch,
+            runtimeLabel: $runtimeMode === 'hybrid' ? __('Hybrid') : __('Static'),
+            frameworkLabel: ($framework !== '' && strtolower($framework) !== 'unknown')
+                ? (string) str($framework)->replace(['_', '-'], ' ')->title()
+                : null,
+            hostname: is_string($hostname) && $hostname !== '' ? $hostname : null,
+            liveUrl: is_string($liveUrl) && $liveUrl !== '' ? $liveUrl : null,
+            isPreviewChild: $isPreviewChild,
+            previewBranch: isset($edgeMeta['preview_branch']) && is_string($edgeMeta['preview_branch'])
+                ? $edgeMeta['preview_branch']
+                : null,
+            previewPrNumber: is_numeric($previewPr) ? (int) $previewPr : null,
+            canDelete: $user !== null && $user->can('delete', $site),
+            canQuickLook: true,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    public static function fromProductionApi(array $row, bool $isPreviewChild = false): self
+    {
+        $id = (string) ($row['id'] ?? '');
+        $status = (string) ($row['status'] ?? '');
+        $runtimeMode = (string) ($row['runtime_mode'] ?? 'static');
+        $liveUrl = isset($row['live_url']) && is_string($row['live_url']) && $row['live_url'] !== ''
+            ? $row['live_url']
+            : null;
+        $hostname = isset($row['hostname']) && is_string($row['hostname']) && $row['hostname'] !== ''
+            ? $row['hostname']
+            : null;
+        if ($hostname === null && $liveUrl !== null) {
+            $parsed = parse_url($liveUrl, PHP_URL_HOST);
+            $hostname = is_string($parsed) && $parsed !== '' ? $parsed : null;
+        }
+        $repo = isset($row['repository']) && is_string($row['repository']) && $row['repository'] !== ''
+            ? $row['repository']
+            : null;
+        $branch = isset($row['branch']) && is_string($row['branch']) && $row['branch'] !== ''
+            ? $row['branch']
+            : null;
+        $isPreview = (bool) ($row['is_preview'] ?? false);
+
+        return new self(
+            id: $id,
+            name: (string) ($row['name'] ?? $row['slug'] ?? '—'),
+            manageHref: $id !== '' ? route('live.sites.show', $id) : null,
+            manageEnabled: $id !== '',
+            status: $status,
+            statusLabel: self::statusLabel($status),
+            statusBadgeClass: self::statusBadgeClass($status),
+            sourceLabel: $repo !== null ? $repo.'@'.($branch ?? 'main') : null,
+            sourceRepo: $repo,
+            sourceBranch: $branch,
+            runtimeLabel: $runtimeMode === 'hybrid' ? __('Hybrid') : __('Static'),
+            frameworkLabel: null,
+            hostname: $hostname,
+            liveUrl: $liveUrl,
+            isPreviewChild: $isPreviewChild || $isPreview,
+            previewBranch: $isPreview ? ($branch ?? __('Preview')) : null,
+            previewPrNumber: null,
+            canDelete: false,
+            canQuickLook: false,
+        );
+    }
+
+    private static function statusLabel(string $status): string
+    {
+        return match ($status) {
+            Site::STATUS_EDGE_ACTIVE => __('Active'),
+            Site::STATUS_EDGE_PROVISIONING => __('Provisioning'),
+            Site::STATUS_EDGE_FAILED => __('Failed'),
+            default => str_replace('_', ' ', $status !== '' ? $status : '—'),
+        };
+    }
+
+    private static function statusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            Site::STATUS_EDGE_ACTIVE => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300',
+            Site::STATUS_EDGE_PROVISIONING => 'bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300',
+            Site::STATUS_EDGE_FAILED => 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300',
+            default => 'bg-brand-sand/60 text-brand-moss',
+        };
+    }
+}

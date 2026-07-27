@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;
+use App\Support\Cloud\CloudIndexRow;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
@@ -56,9 +57,10 @@ class Index extends Component
             ->get();
 
         $isSource = fn (Site $s) => is_array($s->meta['container']['source'] ?? null);
-        $isPreview = fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id'] ?? null);
+        $parentOf = fn (Site $s) => $s->meta['container']['preview_parent_site_id'] ?? null;
+        $isPreview = fn (Site $s) => ! empty($parentOf($s));
 
-        $sites = match ($this->filter) {
+        $filtered = match ($this->filter) {
             'failed' => $allSites->where('status', Site::STATUS_CONTAINER_FAILED)->values(),
             'provisioning' => $allSites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->values(),
             'source' => $allSites->filter($isSource)->values(),
@@ -67,23 +69,65 @@ class Index extends Component
             default => $allSites,
         };
 
+        // Nest previews under their parent (same tree read as Edge), except
+        // on the previews-only filter where parents are out of scope.
+        $previewChildIds = [];
+        if ($this->filter !== 'previews') {
+            $previewsByParent = $filtered->filter($isPreview)->groupBy(fn (Site $s) => (string) $parentOf($s));
+            $assignedChildIds = [];
+            $ordered = collect();
+
+            foreach ($filtered as $site) {
+                if ($isPreview($site)) {
+                    continue;
+                }
+                $ordered->push($site);
+                $children = $previewsByParent->get((string) $site->id, collect());
+                foreach ($children as $child) {
+                    $ordered->push($child);
+                    $previewChildIds[] = (string) $child->id;
+                    $assignedChildIds[$child->id] = true;
+                }
+            }
+
+            foreach ($filtered as $site) {
+                if (! $isPreview($site) || isset($assignedChildIds[$site->id])) {
+                    continue;
+                }
+                $ordered->push($site);
+            }
+
+            $sites = $ordered->values();
+        } else {
+            $sites = $filtered;
+        }
+
+        $previewChildLookup = array_flip($previewChildIds);
+        $rows = $sites->map(
+            fn (Site $site): CloudIndexRow => CloudIndexRow::fromSite(
+                $site,
+                isset($previewChildLookup[(string) $site->id]),
+            ),
+        );
+
         $hasAnyBackendCredential = ProviderCredential::query()
             ->where('organization_id', $org->id)
             ->whereIn('provider', CloudRouter::credentialProviderKeys())
             ->exists();
 
         return view('livewire.cloud.index', [
-            'org' => $org,
-            'sites' => $sites,
+            'rows' => $rows,
+            'hasAppsInScope' => $allSites->isNotEmpty(),
+            'hasAnyBackendCredential' => $hasAnyBackendCredential,
             'totals' => [
                 'all' => $allSites->count(),
+                'active' => $allSites->where('status', Site::STATUS_CONTAINER_ACTIVE)->count(),
                 'failed' => $allSites->where('status', Site::STATUS_CONTAINER_FAILED)->count(),
                 'provisioning' => $allSites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->count(),
                 'source' => $allSites->filter($isSource)->count(),
                 'image' => $allSites->reject($isSource)->count(),
                 'previews' => $allSites->filter($isPreview)->count(),
             ],
-            'hasAnyBackendCredential' => $hasAnyBackendCredential,
         ])->layout('layouts.app');
     }
 }

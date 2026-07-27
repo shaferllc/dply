@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Livewire;
 
-use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Site;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Modules\Edge\Services\EdgeSiteCanceller;
+use App\Support\Edge\EdgeIndexRow;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -166,11 +167,21 @@ class Index extends Component
             }
         }
 
+        $user = auth()->user();
+        $previewChildLookup = array_flip($previewChildIds);
+        $rows = $sites->map(
+            fn (Site $site): EdgeIndexRow => EdgeIndexRow::fromSite(
+                $site,
+                isset($previewChildLookup[(string) $site->id]),
+                $user,
+            ),
+        );
+
         return view('livewire.edge.index', [
             'org' => $org,
             'edgeEnabled' => true,
-            'sites' => $sites,
-            'previewChildIds' => array_flip($previewChildIds),
+            'rows' => $rows,
+            'hasSitesInScope' => $allSites->isNotEmpty(),
             'deleteCandidate' => $deleteCandidate,
             'quickLookSite' => $quickLookSite,
             'quickLookDeploymentId' => $quickLookDeploymentId,

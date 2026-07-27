@@ -94,7 +94,10 @@
                         </td>
                         <td class="px-4 py-3 text-brand-moss" title="{{ $report->created_at }}">{{ $report->created_at->diffForHumans() }}</td>
                         <td class="px-4 py-3 text-right">
-                            <button type="button" wire:click="openReport('{{ $report->id }}')" class="text-xs font-semibold text-brand-forest hover:underline">{{ __('View') }}</button>
+                            <div class="inline-flex items-center gap-3">
+                                <button type="button" wire:click="openReport('{{ $report->id }}')" class="text-xs font-semibold text-brand-forest hover:underline">{{ __('View') }}</button>
+                                <button type="button" wire:click="openDeleteModal('{{ $report->id }}')" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Delete') }}</button>
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -240,10 +243,50 @@
                             <button type="button" wire:click="saveTriage" class="w-full rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white hover:bg-brand-ink/90">
                                 {{ __('Save') }}
                             </button>
+
+                            <button
+                                type="button"
+                                wire:click="openDeleteModal('{{ $selected->id }}')"
+                                class="w-full rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100"
+                            >
+                                {{ __('Delete report') }}
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     @endif
+
+    <x-modal
+        name="admin-feedback-delete-confirmation"
+        :show="false"
+        maxWidth="md"
+        overlayClass="bg-brand-ink/50"
+        panelClass="dply-modal-panel overflow-hidden shadow-xl"
+        focusable
+    >
+        <div class="border-b border-brand-ink/10 px-6 py-5">
+            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Delete this report?') }}</h2>
+            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                @if ($deleteCandidate)
+                    {{ __('Permanently delete :ref (:title). The report text, triage notes, and any screenshots or attachments will be removed. This cannot be undone.', [
+                        'ref' => $deleteCandidate->reference,
+                        'title' => $deleteCandidate->title,
+                    ]) }}
+                @else
+                    {{ __('Permanently delete this feedback report. The report text, triage notes, and any screenshots or attachments will be removed. This cannot be undone.') }}
+                @endif
+            </p>
+        </div>
+        <div class="flex justify-end gap-3 px-6 py-4">
+            <x-secondary-button type="button" wire:click="closeDeleteModal">
+                {{ __('Cancel') }}
+            </x-secondary-button>
+            <x-danger-button type="button" wire:click="deleteReport" wire:loading.attr="disabled">
+                <span wire:loading.remove wire:target="deleteReport">{{ __('Delete report') }}</span>
+                <span wire:loading wire:target="deleteReport">{{ __('Deleting…') }}</span>
+            </x-danger-button>
+        </div>
+    </x-modal>
 </div>

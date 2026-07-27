@@ -99,9 +99,10 @@ class Index extends Component
             abort(403, __('Select an organization first.'));
         }
 
-        $query = Script::query()
-            ->where('organization_id', $org->id)
-            ->orderByDesc('updated_at');
+        $baseQuery = Script::query()->where('organization_id', $org->id);
+        $scriptsTotal = (clone $baseQuery)->count();
+
+        $query = (clone $baseQuery)->orderByDesc('updated_at');
 
         $term = trim($this->search);
         if ($term !== '') {
@@ -117,6 +118,7 @@ class Index extends Component
 
         return view('livewire.scripts.index', [
             'scripts' => $query->paginate(15),
+            'scriptsTotal' => $scriptsTotal,
             'organization' => $org,
             'vmServers' => $vmServers,
         ]);

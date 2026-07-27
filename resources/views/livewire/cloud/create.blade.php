@@ -5,93 +5,98 @@
 >
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
         ['label' => __('Cloud apps'), 'href' => route('cloud.index'), 'icon' => 'cloud'],
         ['label' => __('Deploy'), 'icon' => 'rocket-launch'],
     ]" />
 
-    <x-hero-card
-        class="mt-6"
-        icon="cloud"
-        :eyebrow="__('dply Cloud')"
-        :title="__('Deploy an app')"
-        :description="__('Point dply at a GitHub repository or a pre-built image. We build, ship, and run it on your cloud account — managed TLS, autoscaling, and zero-config health checks.')"
-    >
-        <x-slot:topAction>
-            <div class="flex flex-col items-stretch gap-3 sm:items-end">
-                <x-server-workspace-tablist :aria-label="__('View mode')" class="self-end !mb-0">
-                    <x-server-workspace-tab :subtab-key="'form'" icon="heroicon-o-bars-3-bottom-left" title="{{ __('Form view') }}">
-                        {{ __('Form') }}
-                    </x-server-workspace-tab>
-                    <x-server-workspace-tab :subtab-key="'canvas'" icon="heroicon-o-squares-2x2" title="{{ __('Canvas view') }}">
-                        {{ __('Canvas') }}
-                    </x-server-workspace-tab>
-                </x-server-workspace-tablist>
-                <div class="flex flex-wrap gap-3 text-xs text-brand-moss">
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
-                        <x-heroicon-o-lock-closed class="h-3.5 w-3.5 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                        {{ __('Auto TLS') }}
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
-                        <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5 text-brand-sage" aria-hidden="true" />
-                        {{ __('Autoscaling') }}
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
-                        <x-heroicon-o-cloud-arrow-up class="h-4 w-4 text-brand-gold" aria-hidden="true" />
-                        {{ __('Deploy on push') }}
-                    </span>
-                </div>
-            </div>
-        </x-slot:topAction>
-    </x-hero-card>
+    <x-livewire-validation-errors class="mt-4" />
 
-    @if ($connectedBackends->isEmpty() && ! $fakeCloudActive)
-        <section class="dply-card overflow-hidden border-amber-200 mt-6">
-            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge tone="amber">
-                            <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connect a cloud account to deploy') }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('dply needs a DigitalOcean or AWS account to run your app on. Connect once and we handle the rest.') }}</p>
+    <form wire:submit="deploy" class="mt-4">
+        <div x-show="subtab === 'form'" class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start">
+            <div class="min-w-0">
+                <x-profile-shell
+                    :title="__('Deploy an app')"
+                    :description="__('Point dply at a GitHub repo or image — we build, ship, and run it with TLS and autoscaling.')"
+                    icon="heroicon-o-cloud"
+                >
+                    <x-slot:actions>
+                        <x-outline-link href="{{ route('cloud.index') }}" wire:navigate>
+                            <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ __('Back to Cloud apps') }}
+                        </x-outline-link>
+                    </x-slot:actions>
+
+                    <x-slot:stats>
+                        <div class="flex flex-wrap gap-2 text-xs text-brand-moss">
+                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-2.5 py-1 dark:border-brand-mist/25 dark:bg-zinc-800/80">
+                                <x-heroicon-o-lock-closed class="h-3.5 w-3.5 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
+                                {{ __('Auto TLS') }}
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-2.5 py-1 dark:border-brand-mist/25 dark:bg-zinc-800/80">
+                                <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5 text-brand-sage" aria-hidden="true" />
+                                {{ __('Autoscaling') }}
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-2.5 py-1 dark:border-brand-mist/25 dark:bg-zinc-800/80">
+                                <x-heroicon-o-cloud-arrow-up class="h-3.5 w-3.5 text-brand-gold" aria-hidden="true" />
+                                {{ __('Deploy on push') }}
+                            </span>
                         </div>
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2 text-xs">
-                        <a href="{{ route('credentials.index', ['provider' => 'digitalocean']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 font-semibold text-brand-cream hover:bg-brand-ink/90">
-                            {{ __('Connect DigitalOcean') }}
-                        </a>
-                        <a href="{{ route('credentials.index', ['provider' => 'aws_app_runner']) }}" wire:navigate class="font-medium text-brand-moss hover:text-brand-ink">{{ __('Use AWS instead') }}</a>
-                    </div>
-                </div>
-            </div>
-        </section>
-    @elseif ($connectedBackends->isEmpty() && $fakeCloudActive)
-        <div data-testid="fake-cloud-active-notice" class="mt-6 flex gap-3 rounded-2xl border border-sky-200/80 bg-sky-50/70 px-5 py-4 text-sm text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200">
-            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" aria-hidden="true">
-                <x-heroicon-o-beaker class="h-5 w-5" />
-            </span>
-            <div>
-                <p class="font-semibold">{{ __('Sandbox mode is on — no real cloud account needed') }}</p>
-                <p class="mt-1 text-sky-900/80 dark:text-sky-200/80">{{ __('Deployments land on a local sandbox so you can explore the flow. Live URLs are synthetic until you connect a real cloud account.') }}</p>
-            </div>
-        </div>
-    @endif
+                    </x-slot:stats>
 
-    <form wire:submit="deploy" class="mt-8">
-        <div x-show="subtab === 'form'" class="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start">
-        <div class="min-w-0 space-y-6">
+                    <x-slot:tabs>
+                        <x-server-workspace-tablist :aria-label="__('View mode')" class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                            <x-server-workspace-tab :subtab-key="'form'" icon="heroicon-o-bars-3-bottom-left" title="{{ __('Form view') }}">
+                                {{ __('Form') }}
+                            </x-server-workspace-tab>
+                            <x-server-workspace-tab :subtab-key="'canvas'" icon="heroicon-o-squares-2x2" title="{{ __('Canvas view') }}">
+                                {{ __('Canvas') }}
+                            </x-server-workspace-tab>
+                        </x-server-workspace-tablist>
+                    </x-slot:tabs>
+
+                    @if ($connectedBackends->isEmpty() && ! $fakeCloudActive)
+                        <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-4 sm:px-6 dark:bg-amber-950/20">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex items-start gap-3">
+                                    <x-icon-badge tone="amber">
+                                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                                    </x-icon-badge>
+                                    <div class="min-w-0">
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connect a cloud account to deploy') }}</h3>
+                                        <p class="mt-1 max-w-2xl text-sm text-brand-moss">{{ __('Connect DigitalOcean or AWS once — dply handles the rest.') }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2 text-xs">
+                                    <a href="{{ route('credentials.index', ['provider' => 'digitalocean']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 font-semibold text-brand-cream hover:bg-brand-ink/90">
+                                        {{ __('Connect DigitalOcean') }}
+                                    </a>
+                                    <a href="{{ route('credentials.index', ['provider' => 'aws_app_runner']) }}" wire:navigate class="font-medium text-brand-moss hover:text-brand-ink">{{ __('Use AWS instead') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                    @elseif ($connectedBackends->isEmpty() && $fakeCloudActive)
+                        <div data-testid="fake-cloud-active-notice" class="flex gap-3 border-b border-brand-ink/10 bg-sky-50/70 px-5 py-3.5 text-sm text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200 sm:px-6">
+                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" aria-hidden="true">
+                                <x-heroicon-o-beaker class="h-5 w-5" />
+                            </span>
+                            <div>
+                                <p class="font-semibold">{{ __('Sandbox mode is on — no real cloud account needed') }}</p>
+                                <p class="mt-0.5 text-sky-900/80 dark:text-sky-200/80">{{ __('Deployments land on a local sandbox. Live URLs are synthetic until you connect a real account.') }}</p>
+                            </div>
+                        </div>
+                    @endif
+
             {{-- 01 Source --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
-                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">01</span>
-                    <div class="min-w-0 flex-1 space-y-5">
-                        <div>
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">01</span>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Source') }}</h2>
-                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Deploy from a Git repository or a pre-built image. Source mode rebuilds on every push.') }}</p>
-                        </div>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Git repository or pre-built image. Source mode rebuilds on push.') }}</p>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
 
                         <x-server-workspace-tablist :aria-label="__('Deployment source')" class="!mb-0">
                             <x-server-workspace-tab icon="heroicon-o-code-bracket" :active="$mode === 'source'" wire:click="$set('mode', 'source')">
@@ -104,7 +109,7 @@
 
                         <div>
                             <x-input-label for="name" :value="__('App name')" />
-                            <x-text-input id="name" wire:model="name" type="text" class="mt-1 block w-full" required placeholder="acme-api" />
+                            <x-text-input id="name" wire:model.live="name" type="text" class="mt-1 block w-full" required placeholder="acme-api" />
                             <p class="mt-1 text-xs text-brand-mist">{{ __('Used in the Cloud index, app workspace, and default subdomain.') }}</p>
                             <x-input-error :messages="$errors->get('name')" class="mt-2" />
                         </div>
@@ -124,20 +129,12 @@
                                 @if ($linkedSourceControlAccounts !== [])
                                     <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-1 text-xs dark:border-brand-mist/20 dark:bg-zinc-800/60">
                                         <button type="button" role="radio" aria-checked="{{ $repo_source === 'connected' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'connected')"
-                                            @class([
-                                                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition',
-                                                'bg-white text-brand-ink shadow-sm dark:bg-zinc-700' => $repo_source === 'connected',
-                                                'text-brand-moss hover:text-brand-ink' => $repo_source !== 'connected',
-                                            ])>
+                                            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition {{ $repo_source === 'connected' ? 'bg-white text-brand-ink shadow-sm dark:bg-zinc-700' : 'text-brand-moss hover:text-brand-ink' }}">
                                             <x-heroicon-m-link class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Pick from connected account') }}
                                         </button>
                                         <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
-                                            @class([
-                                                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition',
-                                                'bg-white text-brand-ink shadow-sm dark:bg-zinc-700' => $repo_source === 'manual',
-                                                'text-brand-moss hover:text-brand-ink' => $repo_source !== 'manual',
-                                            ])>
+                                            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition {{ $repo_source === 'manual' ? 'bg-white text-brand-ink shadow-sm dark:bg-zinc-700' : 'text-brand-moss hover:text-brand-ink' }}">
                                             <x-heroicon-m-pencil-square class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Enter manually') }}
                                         </button>
@@ -177,7 +174,7 @@
                                         <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist" aria-hidden="true">
                                             <x-heroicon-o-code-bracket class="h-4 w-4" />
                                         </span>
-                                        <x-text-input id="repo" wire:model.blur="repo" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="acme/api" />
+                                        <x-text-input id="repo" wire:model.live="repo" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="acme/api" />
                                     </div>
                                     <p class="mt-1 text-xs text-brand-mist">{{ __('owner/name or full GitHub URL. dply pulls and builds it for you.') }}</p>
                                     <x-input-error :messages="$errors->get('repo')" class="mt-2" />
@@ -191,7 +188,7 @@
                                         <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist" aria-hidden="true">
                                             <x-heroicon-o-arrow-trending-up class="h-4 w-4" />
                                         </span>
-                                        <x-text-input id="branch" wire:model="branch" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="main" />
+                                        <x-text-input id="branch" wire:model.live="branch" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="main" />
                                     </div>
                                     <x-input-error :messages="$errors->get('branch')" class="mt-2" />
                                 </div>
@@ -219,20 +216,19 @@
                                     <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist" aria-hidden="true">
                                         <x-heroicon-o-cube class="h-4 w-4" />
                                     </span>
-                                    <x-text-input id="image" wire:model="image" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="ghcr.io/acme/api:v1.2.3" />
+                                    <x-text-input id="image" wire:model.live="image" type="text" class="block w-full ps-10 font-mono text-sm" required placeholder="ghcr.io/acme/api:v1.2.3" />
                                 </div>
                                 <p class="mt-1 text-xs text-brand-mist">{{ __('Public registry images work out of the box. For private images, connect a registry credential first.') }}</p>
                                 <x-input-error :messages="$errors->get('image')" class="mt-2" />
                             </div>
                         @endif
-                    </div>
                 </div>
             </section>
 
             @if ($mode === 'source')
                 {{-- 02 Detect --}}
-                <section class="rounded-2xl border-2 border-brand-sage/20 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-sage/25 dark:bg-zinc-900">
-                    <div class="flex items-start gap-4">
+                <section class="border-b border-brand-ink/10">
+                    <div class="flex items-start gap-4 px-5 py-5 sm:px-6">
                         <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">02</span>
                         <div class="min-w-0 flex-1 space-y-4">
                             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -263,24 +259,24 @@
 
             {{-- Runtime --}}
             @php $runtimeStep = $mode === 'source' ? '03' : '02'; @endphp
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
-                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-sm font-bold text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">{{ $runtimeStep }}</span>
-                    <div class="min-w-0 flex-1 space-y-5">
-                        <div>
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-sm font-bold text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">{{ $runtimeStep }}</span>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Runtime') }}</h2>
-                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('How the container runs — HTTP port, instance count, size, and region.') }}</p>
-                        </div>
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('HTTP port, instances, size, and region.') }}</p>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="port" :value="__('HTTP port')" />
-                                <x-text-input id="port" wire:model="port" type="number" min="1" max="65535" class="mt-1 block w-full font-mono" required />
+                                <x-text-input id="port" wire:model.live="port" type="number" min="1" max="65535" class="mt-1 block w-full font-mono" required />
                                 <x-input-error :messages="$errors->get('port')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="instances" :value="__('Instances')" />
-                                <x-text-input id="instances" wire:model="instances" type="number" min="1" max="50" class="mt-1 block w-full font-mono" required />
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Adjust later from the app dashboard.') }}</p>
+                                <x-text-input id="instances" wire:model.live="instances" type="number" min="1" max="50" class="mt-1 block w-full font-mono" required />
                                 <x-input-error :messages="$errors->get('instances')" class="mt-2" />
                             </div>
                             <div>
@@ -299,27 +295,26 @@
                                         <option value="xlarge-pro">{{ __('XLarge Pro') }}</option>
                                     </optgroup>
                                 </select>
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Pro tiers cost more but unlock CPU-target autoscaling.') }}</p>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Pro unlocks CPU-target autoscaling.') }}</p>
                                 <x-input-error :messages="$errors->get('size_tier')" class="mt-2" />
                             </div>
+                            <div>
+                                <x-input-label for="region" :value="__('Region')" />
+                                <select id="region" wire:model.live="region" class="dply-input mt-1 block w-full" required>
+                                    @foreach ($regions as $r)
+                                        <option value="{{ $r['slug'] }}">{{ $r['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('region')" class="mt-2" />
+                            </div>
                         </div>
-                        <div>
-                            <x-input-label for="region" :value="__('Region')" />
-                            <select id="region" wire:model="region" class="dply-input mt-1 block w-full" required>
-                                @foreach ($regions as $r)
-                                    <option value="{{ $r['slug'] }}">{{ $r['label'] }}</option>
-                                @endforeach
-                            </select>
-                            <x-input-error :messages="$errors->get('region')" class="mt-2" />
-                        </div>
-                    </div>
                 </div>
             </section>
 
             {{-- Environment --}}
             @php $envStep = $mode === 'source' ? '04' : '03'; @endphp
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">{{ $envStep }}</span>
                     <div class="min-w-0 flex-1 space-y-3">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -335,11 +330,8 @@
                 </div>
             </section>
 
-            {{-- Configure (optional) divider --}}
-            <div class="flex items-center gap-3 pt-2">
-                <div class="h-px flex-1 bg-brand-ink/10 dark:bg-brand-mist/15"></div>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Configure (optional)') }}</span>
-                <div class="h-px flex-1 bg-brand-ink/10 dark:bg-brand-mist/15"></div>
+            <div class="border-b border-brand-ink/10 bg-brand-sand/10 px-5 py-2.5 sm:px-6">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Configure (optional)') }}</p>
             </div>
 
             {{-- Databases — one row per attached/created managed database.
@@ -347,16 +339,17 @@
                  Each row's env_prefix governs the connection env-var names
                  (DB_HOST, DB_2_HOST, REDIS_HOST, …) so multiple databases
                  of the same engine don't collide. --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-4 px-5 py-5 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1 space-y-4">
-                        <div>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Databases') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Attach managed databases — each row gets its own connection env vars under the chosen prefix.') }}</p>
-                        </div>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
 
                         @if ($databases !== [])
                             <div class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 dark:divide-brand-mist/15 dark:border-brand-mist/20">
@@ -449,22 +442,22 @@
                             </button>
                         </div>
                     </div>
-                </div>
             </section>
 
             {{-- Buckets — object-storage attachments. Records are created
                  in 'pending' status on deploy; real provider provisioning
                  (DO Spaces / S3 / R2) lands in a follow-up PR. --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1 space-y-4">
-                        <div>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Buckets') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Object storage — each row\'s env prefix governs the S3 connection env vars (e.g. S3_BUCKET, S3_2_BUCKET).') }}</p>
-                        </div>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
 
                         @if ($buckets !== [])
                             <div class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 dark:divide-brand-mist/15 dark:border-brand-mist/20">
@@ -519,20 +512,20 @@
                             </button>
                         </div>
                     </div>
-                </div>
             </section>
 
             {{-- Custom domains --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1 space-y-4">
-                        <div>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Hostnames you want pointed at this app. Each is attached automatically once provisioning finishes; DNS validation records appear on the app dashboard afterward.') }}</p>
-                        </div>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
                         @if (! empty($domains))
                             <ul class="divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10 dark:divide-brand-mist/15 dark:border-brand-mist/20">
                                 @foreach ($domains as $i => $hostname)
@@ -551,20 +544,20 @@
                             </button>
                         </div>
                     </div>
-                </div>
             </section>
 
             {{-- Background workers --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1 space-y-4">
-                        <div>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Background workers') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Queue workers and a Laravel scheduler. Each runs as a long-lived process inside the same image as your web service — the command you set has to be runnable in that image.') }}</p>
-                        </div>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
                         @unless ($backendSupportsWorkers)
                             <p class="rounded-lg bg-brand-gold/10 px-3 py-2 text-xs text-brand-ink">
                                 {{ __('Background workers aren\'t supported on your current cloud account. Connect DigitalOcean from the credentials page to enable them.') }}
@@ -624,20 +617,20 @@
                             </div>
                         @endunless
                     </div>
-                </div>
             </section>
 
             {{-- Deploy tasks --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1 space-y-4">
-                        <div>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Deploy tasks') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('One-shot commands tied to the deploy lifecycle. Migrations before traffic flips, cache warmers after, manual ops on demand. Each runs inside the same image as the web service.') }}</p>
-                        </div>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
                         @unless ($backendSupportsDeployTasks)
                             <p class="rounded-lg bg-brand-gold/10 px-3 py-2 text-xs text-brand-ink">
                                 {{ __('Deploy tasks aren\'t supported on your current cloud account. Connect DigitalOcean from the credentials page to enable them.') }}
@@ -726,12 +719,11 @@
                             </div>
                         @endunless
                     </div>
-                </div>
             </section>
 
             {{-- Autoscaling --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-arrows-up-down class="h-5 w-5" aria-hidden="true" />
                     </span>
@@ -773,8 +765,8 @@
             </section>
 
             {{-- Health check --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-4 px-5 py-5 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-heart class="h-5 w-5" aria-hidden="true" />
                     </span>
@@ -812,16 +804,17 @@
             </section>
 
             {{-- Alerts --}}
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900">
-                <div class="flex items-start gap-4">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-4 px-5 py-5 sm:px-6">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-cream">
                         <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1 space-y-4">
-                        <div>
+                    <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Alerts') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('All four rules default on. Org-level destinations apply unless this site overrides them.') }}</p>
-                        </div>
+                    </div>
+                </div>
+                <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
 
                         <label class="flex cursor-pointer items-start gap-3">
                             <input type="checkbox" wire:model.live="alert_deployment_failed_enabled" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40">
@@ -900,40 +893,86 @@
                             @endif
                         </div>
                     </div>
-                </div>
             </section>
 
-            {{-- Submit bar --}}
-            <div class="flex flex-col-reverse gap-3 border-t border-brand-ink/8 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-brand-mist/15">
-                <a href="{{ route('cloud.index') }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-brand-moss transition-colors hover:text-brand-ink">
-                    <x-heroicon-m-arrow-left class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Back to Cloud apps') }}
-                </a>
-                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                    <button
-                        type="submit"
-                        wire:loading.attr="disabled"
-                        wire:target="deploy"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-ink/90 disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
-                    >
-                        <span wire:loading.remove wire:target="deploy" class="inline-flex items-center gap-2 whitespace-nowrap">
-                            <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Deploy app') }}
-                        </span>
-                        <span wire:loading wire:target="deploy" class="inline-flex items-center gap-2 whitespace-nowrap">
-                            <x-spinner variant="cream" />
-                            {{ __('Deploying…') }}
-                        </span>
-                    </button>
-                </div>
+                    <x-slot:footer>
+                        <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <a
+                                href="{{ route('cloud.index') }}"
+                                wire:navigate
+                                class="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-brand-moss transition-colors hover:text-brand-ink"
+                            >
+                                <x-heroicon-m-arrow-left class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Back to Cloud apps') }}
+                            </a>
+                            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="deploy">
+                                    <span wire:loading.remove wire:target="deploy" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {{ __('Deploy app') }}
+                                    </span>
+                                    <span wire:loading wire:target="deploy" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                        <x-spinner variant="cream" />
+                                        {{ __('Deploying…') }}
+                                    </span>
+                                </x-primary-button>
+                            </div>
+                        </div>
+                    </x-slot:footer>
+                </x-profile-shell>
             </div>
+
+            @include('livewire.cloud.partials.create-sidebar', ['cloudFee' => $cloudFee, 'costPreview' => $costPreview, 'resourceEstimate' => $resourceEstimate])
         </div>
 
-        @include('livewire.cloud.partials.create-sidebar', ['cloudFee' => $cloudFee, 'costPreview' => $costPreview, 'resourceEstimate' => $resourceEstimate])
-        </div>
-
-        <div x-show="subtab === 'canvas'" x-cloak>
-            @include('livewire.cloud.partials.create-canvas')
+        <div x-show="subtab === 'canvas'" x-cloak class="min-w-0">
+            <x-profile-shell
+                :title="__('Deploy an app')"
+                :description="__('Canvas view — drag services onto the board, then deploy.')"
+                icon="heroicon-o-cloud"
+            >
+                <x-slot:actions>
+                    <x-outline-link href="{{ route('cloud.index') }}" wire:navigate>
+                        <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Back to Cloud apps') }}
+                    </x-outline-link>
+                </x-slot:actions>
+                <x-slot:tabs>
+                    <x-server-workspace-tablist :aria-label="__('View mode')" class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                        <x-server-workspace-tab :subtab-key="'form'" icon="heroicon-o-bars-3-bottom-left" title="{{ __('Form view') }}">
+                            {{ __('Form') }}
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab :subtab-key="'canvas'" icon="heroicon-o-squares-2x2" title="{{ __('Canvas view') }}">
+                            {{ __('Canvas') }}
+                        </x-server-workspace-tab>
+                    </x-server-workspace-tablist>
+                </x-slot:tabs>
+                <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+                    @include('livewire.cloud.partials.create-canvas')
+                </div>
+                <x-slot:footer>
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <a
+                            href="{{ route('cloud.index') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-brand-moss transition-colors hover:text-brand-ink"
+                        >
+                            <x-heroicon-m-arrow-left class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Back to Cloud apps') }}
+                        </a>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="deploy">
+                            <span wire:loading.remove wire:target="deploy" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Deploy app') }}
+                            </span>
+                            <span wire:loading wire:target="deploy" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" />
+                                {{ __('Deploying…') }}
+                            </span>
+                        </x-primary-button>
+                    </div>
+                </x-slot:footer>
+            </x-profile-shell>
         </div>
     </form>
 </div>

@@ -3,7 +3,6 @@
         <div class="dply-page-shell py-8">
             <x-breadcrumb-trail :items="[
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
                 ['label' => __('Serverless'), 'href' => route('serverless.index'), 'icon' => 'bolt'],
                 ['label' => __('Glue'), 'icon' => 'link'],
             ]" />

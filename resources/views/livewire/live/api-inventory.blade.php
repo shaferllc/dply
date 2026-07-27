@@ -13,15 +13,105 @@
     </x-production-data-banner>
     <x-production-data-nav :connection="$connection" />
 
-    <x-production-api-inventory
-        :title="$title"
-        :rows="$rows"
-        :error="$error"
-        :api-ready="$apiReady"
-        :breadcrumbs="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
-            ['label' => $title, 'icon' => 'rectangle-group'],
-        ]"
-    />
+    @if ($resource === 'projects' && $apiReady)
+        <x-projects-index-page
+            :rows="$projectRows"
+            :summary="$summary"
+            :has-projects-in-scope="$hasProjectsInScope"
+            :has-organization="true"
+            :show-filters="false"
+            :show-create-action="false"
+            empty-state="production"
+            :breadcrumbs="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
+                ['label' => __('Projects'), 'icon' => 'rectangle-group'],
+            ]"
+        >
+            @if ($error)
+                <x-slot:alert>
+                    <x-alert tone="danger">{{ $error }}</x-alert>
+                </x-slot:alert>
+            @endif
+        </x-projects-index-page>
+    @elseif ($resource === 'edge' && $apiReady)
+        <x-edge-index-page
+            :rows="$edgeRows"
+            :totals="$edgeTotals"
+            :has-sites-in-scope="$hasEdgeSitesInScope"
+            :edge-enabled="true"
+            :show-filters="false"
+            :show-create-action="false"
+            :show-secondary-actions="false"
+            empty-state="production"
+            :breadcrumbs="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
+                ['label' => __('Edge'), 'icon' => 'globe-alt'],
+            ]"
+        >
+            @if ($error)
+                <x-slot:alert>
+                    <x-alert tone="danger">{{ $error }}</x-alert>
+                </x-slot:alert>
+            @endif
+        </x-edge-index-page>
+    @elseif ($resource === 'cloud' && $apiReady)
+        <x-cloud-index-page
+            :rows="$cloudRows"
+            :totals="$cloudTotals"
+            :has-apps-in-scope="$hasCloudAppsInScope"
+            :cloud-enabled="true"
+            :api-ready="true"
+            :show-filters="false"
+            :show-create-action="false"
+            :show-databases-action="false"
+            empty-state="production"
+            :breadcrumbs="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
+                ['label' => __('Cloud apps'), 'icon' => 'cloud'],
+            ]"
+        >
+            @if ($error)
+                <x-slot:alert>
+                    <x-alert tone="danger">{{ $error }}</x-alert>
+                </x-slot:alert>
+            @endif
+        </x-cloud-index-page>
+    @elseif ($resource === 'serverless')
+        <x-serverless-index-page
+            :rows="$serverlessRows"
+            :totals="$serverlessTotals"
+            :has-functions-in-scope="$hasServerlessInScope"
+            :serverless-enabled="true"
+            :api-ready="$apiReady"
+            :show-create-action="false"
+            :show-secondary-actions="false"
+            empty-state="production"
+            :breadcrumbs="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
+                ['label' => __('Serverless'), 'icon' => 'bolt'],
+            ]"
+        >
+            @if ($error)
+                <x-slot:alert>
+                    <x-alert tone="danger">{{ $error }}</x-alert>
+                </x-slot:alert>
+            @endif
+        </x-serverless-index-page>
+    @else
+        <x-production-api-inventory
+            :title="$title"
+            :rows="$rows"
+            :error="$error"
+            :api-ready="$apiReady"
+            :breadcrumbs="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
+                ['label' => $title, 'icon' => 'rectangle-group'],
+            ]"
+        />
+    @endif
 </div>

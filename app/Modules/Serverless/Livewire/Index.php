@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Livewire;
 
 use App\Models\Site;
+use App\Support\Serverless\ServerlessIndexRow;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
@@ -38,8 +39,20 @@ class Index extends Component
             ->orderByDesc('created_at')
             ->get();
 
+        $rows = $functions->map(
+            fn (Site $site): ServerlessIndexRow => ServerlessIndexRow::fromSite($site),
+        );
+
+        $liveCount = $functions->where('status', Site::STATUS_FUNCTIONS_ACTIVE)->count();
+
         return view('livewire.serverless.index', [
-            'functions' => $functions,
+            'rows' => $rows,
+            'hasFunctionsInScope' => $functions->isNotEmpty(),
+            'totals' => [
+                'all' => $functions->count(),
+                'live' => $liveCount,
+                'deploying' => $functions->count() - $liveCount,
+            ],
         ]);
     }
 }

@@ -49,6 +49,12 @@ class Index extends Component
         }
     }
 
+    public function resetFilters(): void
+    {
+        $this->category = 'all';
+        $this->search = '';
+    }
+
     public function openDeployImport(string $itemId): void
     {
         $item = MarketplaceItem::query()->active()->findOrFail($itemId);
@@ -318,12 +324,14 @@ class Index extends Component
         }
 
         $items = $query->get();
+        $catalogTotal = MarketplaceItem::query()->active()->count();
         $servers = $this->serversForCurrentOrg();
         $workspaces = $this->workspacesForCurrentOrg();
         $canImportWebserver = $org && $org->hasAdminAccess($user);
 
         return view('livewire.marketplace.index', [
             'items' => $items,
+            'catalogTotal' => $catalogTotal,
             'categories' => MarketplaceItem::categories(),
             'servers' => $servers,
             'workspaces' => $workspaces,
