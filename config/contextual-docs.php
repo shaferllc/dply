@@ -114,6 +114,87 @@ return [
         ],
         [
             'route' => 'sites.show',
+            'slug' => 'edge-error-pages',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-error-pages',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-firewall',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-firewall',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-bot-protection',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-bot-protection',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-rate-limits',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-rate-limits',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-waiting-room',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-waiting-room',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-forms',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-forms',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-jobs',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-jobs',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-snippets',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-snippets',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-tags',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-tags',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
             'slug' => 'edge-previews',
             'group' => 'edge',
             'when' => 'edge_site',

@@ -3,6 +3,22 @@
 @endphp
 
 <div>
+    <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-error-pages',
+            'what' => __('Error pages and maintenance let you brand 404/500 responses and take the site offline with a 503 — all at the Edge, without touching your repo.'),
+            'steps' => [
+                __('Paste full HTML for 404 and/or 500, or leave blank to keep the built-in defaults.'),
+                __('Turn on Maintenance mode when you need a hard stop; visitors get 503 until you turn it off and Save.'),
+                __('Save to republish delivery. Changes apply on the next request — no rebuild required.'),
+            ],
+            'tips' => [
+                __('Keep error HTML self-contained (inline CSS). External assets may fail if the site is broken.'),
+                __('Repo dply.yaml can declare error pages too; dashboard values override for operators.'),
+            ],
+        ])
+    </section>
+
     {{-- Maintenance — primary ops control (live host-map republish). --}}
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <label class="flex items-start gap-3">

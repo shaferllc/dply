@@ -53,6 +53,7 @@ test('edge bot protection section renders without turnstile mode saved', functio
 
     Livewire::actingAs($user)
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-bot-protection'])
+        ->assertSee('How this works')
         ->assertSee('Enable bot protection')
-        ->assertSee('Site key');
+        ->assertSee('Site key (public)');
 });

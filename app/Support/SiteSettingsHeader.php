@@ -155,11 +155,6 @@ final class SiteSettingsHeader
                 'description' => __('Domains, redirects, rewrites, and headers.'),
                 'icon' => 'heroicon-o-arrows-right-left',
             ],
-            'edge-error-pages' => [
-                'title' => __('Error pages'),
-                'description' => __('Custom 404 / 500 HTML and maintenance mode.'),
-                'icon' => 'heroicon-o-exclamation-circle',
-            ],
             'edge-environment' => [
                 'title' => __('Environment'),
                 'description' => __('Set production env vars for builds and runtime.'),
@@ -192,43 +187,48 @@ final class SiteSettingsHeader
             ],
             'edge-firewall' => [
                 'title' => __('Firewall'),
-                'description' => __('Allow or block traffic by country.'),
+                'description' => __('Geo allow/block at the Edge — visitors outside your list never hit the app.'),
                 'icon' => 'heroicon-o-shield-check',
             ],
             'edge-bot-protection' => [
                 'title' => __('Bot protection'),
-                'description' => __('Challenge bots on forms or every page.'),
+                'description' => __('Add a challenge widget on forms or every HTML page. Paste site + secret keys, then Save.'),
                 'icon' => 'heroicon-o-finger-print',
             ],
             'edge-rate-limits' => [
                 'title' => __('Rate limits'),
-                'description' => __('Cap requests per IP; block or challenge.'),
+                'description' => __('Limit requests per IP on a path — block with 429 or challenge when bot protection is on.'),
                 'icon' => 'heroicon-o-no-symbol',
             ],
             'edge-waiting-room' => [
                 'title' => __('Waiting room'),
-                'description' => __('Queue visitors during high-traffic launches.'),
+                'description' => __('Queue excess visitors during launches so active traffic stays within a safe cap.'),
                 'icon' => 'heroicon-o-queue-list',
             ],
             'edge-forms' => [
                 'title' => __('Forms'),
-                'description' => __('Accept form POSTs and email the results.'),
+                'description' => __('POST to an Edge path; Dply emails the fields — no backend app required.'),
                 'icon' => 'heroicon-o-inbox',
             ],
             'edge-jobs' => [
                 'title' => __('Jobs'),
-                'description' => __('Background queues for Edge workers.'),
+                'description' => __('Point middleware/SSR at a queue binding so workers can enqueue background work.'),
                 'icon' => 'heroicon-o-rectangle-stack',
             ],
             'edge-snippets' => [
                 'title' => __('Snippets'),
-                'description' => __('Inject HTML into matching pages at the Edge.'),
+                'description' => __('Inject HTML into matching pages without rebuilding — banners, meta, small widgets.'),
                 'icon' => 'heroicon-o-code-bracket',
             ],
             'edge-tags' => [
                 'title' => __('Tags'),
-                'description' => __('Third-party scripts loaded from the Edge.'),
+                'description' => __('Load analytics and pixel scripts from the Edge; optional consent gate via your CMP.'),
                 'icon' => 'heroicon-o-tag',
+            ],
+            'edge-error-pages' => [
+                'title' => __('Error pages'),
+                'description' => __('Brand 404/500 HTML and flip maintenance (503) without a redeploy.'),
+                'icon' => 'heroicon-o-exclamation-circle',
             ],
             'edge-alerts' => [
                 'title' => __('Alerts'),

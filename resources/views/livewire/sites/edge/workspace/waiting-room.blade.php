@@ -1,7 +1,20 @@
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Waiting room') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Queue visitors during launches so your origin and Edge stay healthy.') }}</p>
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-waiting-room',
+            'what' => __('Waiting room queues excess visitors during launches or flash traffic so your site stays up instead of melting under a stampede.'),
+            'steps' => [
+                __('Set max active visitors (how many can browse at once) and how many new people to admit per minute.'),
+                __('Set session length — how long someone stays “active” before they may need to re-queue.'),
+                __('List paths that should use the room (one per line, e.g. / or /checkout/*). Leave empty only if you intend site-wide.'),
+                __('Enable and Save before the traffic spike; turn off when the event ends.'),
+            ],
+            'tips' => [
+                __('Start conservative (lower max active) and raise once you see the room drain cleanly.'),
+                __('Static marketing pages can stay outside the path list so the wait page itself stays snappy.'),
+            ],
+        ])
+
         @include('livewire.sites.edge.workspace.partials.managed-only-banner', ['managedDelivery' => $managedDelivery])
 
         <div class="mt-4 space-y-4">

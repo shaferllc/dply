@@ -6,8 +6,19 @@
 
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Geo firewall') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Allow or block countries by ISO code. Blocked visitors get 403.') }}</p>
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-firewall',
+            'what' => __('Geo firewall allows or blocks visitors by country at the Edge — before your app or origin sees the request.'),
+            'steps' => [
+                __('Choose Off (allow all), Allow listed only, or Block listed.'),
+                __('Search and add ISO country codes (e.g. US, DE). Remove chips to drop a country.'),
+                __('Save — blocked visitors receive HTTP 403 immediately after delivery republishes.'),
+            ],
+            'tips' => [
+                __('Allow listed only is a hard allowlist: every other country is denied.'),
+                __('Rules in dply.yaml can also declare countries; dashboard overrides show alongside repo config when present.'),
+            ],
+        ])
 
         <div class="mt-4 space-y-4">
             <div>

@@ -1,7 +1,19 @@
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Snippets') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Inject small HTML into every matching page without a redeploy of your app.') }}</p>
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-snippets',
+            'what' => __('Snippets inject small HTML into matching pages at the Edge — banners, pixels, or support widgets — without rebuilding or redeploying your app.'),
+            'steps' => [
+                __('Add a snippet: name it, choose head or body injection, and set a path pattern (/* for all pages).'),
+                __('Paste the HTML (script tags, meta, markup). Keep it small and trusted.'),
+                __('Enable and Save. Delivery republishes; visitors see the inject on the next request.'),
+            ],
+            'tips' => [
+                __('Prefer Tags for third-party https:// script URLs; use Snippets for inline markup or one-off HTML.'),
+                __('Path /* matches everything. Narrow paths (e.g. /blog/*) keep marketing scripts off app routes.'),
+            ],
+        ])
+
         @include('livewire.sites.edge.workspace.partials.managed-only-banner', ['managedDelivery' => $managedDelivery])
 
         <div class="mt-4 space-y-4">

@@ -1,7 +1,19 @@
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Tags') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Load third-party scripts (analytics, pixels) from the Edge without shipping them in your repo.') }}</p>
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-tags',
+            'what' => __('Tags load third-party scripts (analytics, ads, chat) from the Edge so you can add or remove them without a git deploy.'),
+            'steps' => [
+                __('Add each tool with a name and https:// script URL from the vendor.'),
+                __('Optional: turn on Consent helper so your CMP can gate scripts via window.__dplyTags.consent / localStorage dply_tag_consent.'),
+                __('Enable and Save. Scripts inject on subsequent page loads.'),
+            ],
+            'tips' => [
+                __('Only https:// sources are allowed. Prefer async for non-critical pixels.'),
+                __('For one-off HTML (not a remote script URL), use Snippets instead.'),
+            ],
+        ])
+
         @include('livewire.sites.edge.workspace.partials.managed-only-banner', ['managedDelivery' => $managedDelivery])
 
         <div class="mt-4 space-y-4">

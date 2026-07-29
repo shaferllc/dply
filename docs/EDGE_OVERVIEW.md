@@ -75,10 +75,35 @@ The workspace now splits that into **focused sections**. Each section has its ow
 
 | Section | What you do here |
 |---------|------------------|
-| **Domains** | Custom hostnames and DNS verification |
-| **Routing** | Read-only redirects / rewrites / headers from `dply.yaml` |
-| **Bindings** | Attach Cloudflare KV, R2, D1 for `dply.yaml` bindings |
-| **Delivery** | CDN backend (read-only), hybrid SSR origin, image optimization, cache purge |
+| **Routing** | Domains, redirects / rewrites / headers |
+| **Delivery** | CDN backend, hybrid SSR origin, image optimization, cache purge |
+
+**Site**
+
+| Section | What you do here |
+|---------|------------------|
+| **Error pages** | Brand 404/500 HTML and maintenance (503) |
+| **Forms** | POST endpoints that email submissions |
+| **Snippets** | Inject HTML into matching pages without a rebuild |
+| **Tags** | Load third-party analytics / pixel scripts |
+
+**Access**
+
+| Section | What you do here |
+|---------|------------------|
+| **Firewall** | Geo allow/block by country |
+| **Bot protection** | Challenge widget on forms or all HTML pages |
+| **Rate limits** | Cap requests per IP on a path |
+| **Waiting room** | Queue visitors during launches |
+| **Members** | Who can access this site (when enabled) |
+
+**Background**
+
+| Section | What you do here |
+|---------|------------------|
+| **Crons** | Scheduled worker invocations |
+| **Jobs** | Default queue binding for middleware/SSR |
+| **Bindings** | Attach KV, R2, D1, queues |
 
 **Observability**
 
@@ -87,12 +112,15 @@ The workspace now splits that into **focused sections**. Each section has its ow
 | **Traffic & analytics** | CDN stats and vitals (managed delivery) |
 | **Billing & usage** | Edge fees and usage for this site |
 | **Build & deploy logs** | CI output per deployment |
+| **Alerts** / **Audit log** | Thresholds and site activity (when enabled) |
 
 **Danger zone**
 
 | Section | What you do here |
 |---------|------------------|
 | **Danger zone** | Delete the site |
+
+Many **Site** / **Access** features require **Dply-hosted** delivery (not BYO). Each has its own guide under **Documentation → Edge**.
 
 Preview **child** sites show a reduced sidebar (Overview, Deploys, Domains, Build, Logs, Danger) — no fleet billing, previews list, or preview protection on the child.
 
@@ -107,6 +135,10 @@ Preview **child** sites show a reduced sidebar (Overview, Deploys, Domains, Buil
 | Point SSR routes at Cloud | **Delivery** |
 | Edit redirects in `dply.yaml` | Git + redeploy (view on **Routing**) |
 | Enable deploy on push to `main` | **Build** (toggle) + **Deploy triggers** (GitHub webhook) |
+| Stop bots on contact forms | **Bot protection** + **Forms** |
+| Cap API abuse per IP | **Rate limits** |
+| Soft-queue a launch | **Waiting room** |
+| Inject a banner without redeploy | **Snippets** |
 
 ## When to use Edge vs Cloud
 

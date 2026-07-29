@@ -1,7 +1,19 @@
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Rate limits') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Cap requests per IP. Optionally challenge instead of blocking when bot protection is on.') }}</p>
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-rate-limits',
+            'what' => __('Rate limits cap how many requests a single IP can make to a path in a time window — useful against scrapers, credential stuffing, and runaway clients.'),
+            'steps' => [
+                __('Add a rule: path pattern (e.g. /api/* or /*), max requests, and window in seconds.'),
+                __('Choose Block (HTTP 429) or Challenge (shows bot protection when that feature is enabled).'),
+                __('Enable and Save — rules apply on the Edge after delivery republishes.'),
+            ],
+            'tips' => [
+                __('More specific paths win clarity: protect /api/login tightly; leave static assets open.'),
+                __('Challenge needs Bot protection configured; otherwise prefer Block.'),
+            ],
+        ])
+
         @include('livewire.sites.edge.workspace.partials.managed-only-banner', ['managedDelivery' => $managedDelivery])
 
         <div class="mt-4 space-y-4">

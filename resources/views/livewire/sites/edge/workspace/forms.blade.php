@@ -1,7 +1,20 @@
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Forms') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Accept POSTs on your Edge site and email the results — no app server required.') }}</p>
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-forms',
+            'what' => __('Edge Forms turns a path on your site into a mail-backed form endpoint — visitors POST, Dply emails you the fields. No app server or serverless function required.'),
+            'steps' => [
+                __('Add an endpoint path (e.g. /api/contact) and the inbox that should receive submissions.'),
+                __('In your HTML, set form method="POST" action="https://your-site…/api/contact" (same path).'),
+                __('Include a hidden honeypot input (name must match below). Bots that fill it are discarded.'),
+                __('Optional: enable Bot protection and check “Require bot check”, then add the challenge token field to the form.'),
+            ],
+            'tips' => [
+                __('Paths are matched on your Edge hostname after Save republishes delivery.'),
+                __('Use one endpoint per form. Remove unused endpoints so they stop accepting mail.'),
+            ],
+        ])
+
         @include('livewire.sites.edge.workspace.partials.managed-only-banner', ['managedDelivery' => $managedDelivery])
 
         <div class="mt-4 space-y-4">
@@ -9,10 +22,6 @@
                 <input type="checkbox" wire:model.live="enabled" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage" @disabled(! $managedDelivery) />
                 <span class="text-sm font-medium text-brand-ink">{{ __('Enable Edge forms') }}</span>
             </label>
-
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-xs text-brand-moss dark:bg-brand-sand/10">
-                {{ __('Point your HTML form action at the path below (POST). Add a honeypot field and optional bot-protection token field `cf-turnstile-response`.') }}
-            </div>
 
             @foreach ($endpoints as $i => $endpoint)
                 <div class="space-y-3 rounded-xl border border-brand-ink/10 p-3" wire:key="form-{{ $i }}">
