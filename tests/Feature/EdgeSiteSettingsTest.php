@@ -189,13 +189,13 @@ test('edge traffic section shows request and bandwidth stats', function () {
     Livewire::actingAs($user)
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-traffic'])
         ->assertSee('Traffic & analytics')
-        ->assertSee('Requests (MTD)')
-        ->assertSee('Requests (7d)')
+        ->assertSee('Requests MTD')
+        ->assertSee('Requests 7d')
         ->assertSee('12,500')
         ->assertSee('Performance')
         ->assertSee('Core Web Vitals')
-        ->assertSee('HTTP access logs')
-        ->assertSee('Build & deploy logs');
+        ->assertSee('Recent requests')
+        ->assertSee('Build logs');
 });
 
 test('edge logs section clarifies build logs vs visitor traffic', function () {
@@ -205,8 +205,8 @@ test('edge logs section clarifies build logs vs visitor traffic', function () {
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-logs'])
         ->assertSee('Build & deploy logs')
         ->assertSee('not visitor HTTP logs')
-        ->assertSee('Traffic & analytics')
-        ->assertSee('Edge observability');
+        ->assertSee('Recent deploys')
+        ->assertSee('Live requests');
 });
 
 test('edge build settings can be updated on build settings section', function () {

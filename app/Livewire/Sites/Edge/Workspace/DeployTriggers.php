@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
@@ -17,6 +18,7 @@ use Livewire\Component;
 
 class DeployTriggers extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesEdgeBuildSettings;
     use MountsEdgeWorkspaceSection;

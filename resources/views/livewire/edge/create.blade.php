@@ -12,7 +12,7 @@
             <div class="min-w-0">
                 <x-profile-shell
                     :title="__('Deploy an edge app')"
-                    :description="__('Connect a Git repository — dply builds static or SSG output, publishes to global edge delivery, and optionally redeploys on push.')"
+                    :description="__('Connect a static/SSG (or hybrid JS SSR) repo — we build and publish to the edge.')"
                     icon="heroicon-o-globe-alt"
                 >
                     <x-slot:actions>
@@ -40,14 +40,56 @@
                     </x-slot:stats>
 
                     @if ($fakeEdgeActive)
-                        <div data-testid="fake-edge-active-notice" class="flex gap-3 border-b border-brand-ink/10 bg-sky-50/70 px-5 py-3.5 text-sm text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200 sm:px-6">
-                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" aria-hidden="true">
-                                <x-heroicon-o-beaker class="h-5 w-5" />
-                            </span>
-                            <div>
-                                <p class="font-semibold">{{ __('Sandbox mode is on — no real edge account needed') }}</p>
-                                <p class="mt-0.5 text-sky-900/80 dark:text-sky-200/80">{{ __('Builds land on a local sandbox with synthetic hostnames. Live delivery credentials are not required until you leave sandbox mode.') }}</p>
+                        <div data-testid="fake-edge-active-notice" class="flex flex-col gap-3 border-b border-brand-ink/10 bg-sky-50/70 px-5 py-3.5 text-sm text-sky-950 sm:flex-row sm:items-center sm:justify-between dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200 sm:px-6">
+                            <div class="flex gap-3">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" aria-hidden="true">
+                                    <x-heroicon-o-beaker class="h-5 w-5" />
+                                </span>
+                                <div>
+                                    <p class="font-semibold">{{ __('Sandbox mode is on — no real edge account needed') }}</p>
+                                    <p class="mt-0.5 text-sky-900/80 dark:text-sky-200/80">{{ __('Builds land on a local sandbox with synthetic hostnames.') }}</p>
+                                </div>
                             </div>
+                            @if ($localSampleAppAvailable)
+                                <button
+                                    type="button"
+                                    wire:click="loadSampleApp"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadSampleApp"
+                                    data-testid="load-sample-edge-app"
+                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-sky-900 px-3.5 py-2 text-sm font-semibold text-sky-50 transition-colors hover:bg-sky-800 disabled:opacity-60 dark:bg-sky-200 dark:text-sky-950 dark:hover:bg-sky-100"
+                                >
+                                    <x-heroicon-o-sparkles wire:loading.remove wire:target="loadSampleApp" class="h-4 w-4" aria-hidden="true" />
+                                    <x-spinner wire:loading wire:target="loadSampleApp" size="sm" variant="cream" />
+                                    <span wire:loading.remove wire:target="loadSampleApp">{{ __('Load sample app') }}</span>
+                                    <span wire:loading wire:target="loadSampleApp">{{ __('Loading…') }}</span>
+                                </button>
+                            @endif
+                        </div>
+                    @elseif ($localSampleAppAvailable)
+                        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:bg-brand-sand/10">
+                            <div class="flex gap-3">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest dark:text-brand-sage" aria-hidden="true">
+                                    <x-heroicon-o-beaker class="h-5 w-5" />
+                                </span>
+                                <div>
+                                    <p class="font-semibold text-brand-ink">{{ __('Local development') }}</p>
+                                    <p class="mt-0.5 text-brand-moss">{{ __('Prefill a public Eleventy blog to try create → detect → deploy.') }}</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="loadSampleApp"
+                                wire:loading.attr="disabled"
+                                wire:target="loadSampleApp"
+                                data-testid="load-sample-edge-app"
+                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest disabled:opacity-60"
+                            >
+                                <x-heroicon-o-sparkles wire:loading.remove wire:target="loadSampleApp" class="h-4 w-4" aria-hidden="true" />
+                                <x-spinner wire:loading wire:target="loadSampleApp" size="sm" variant="cream" />
+                                <span wire:loading.remove wire:target="loadSampleApp">{{ __('Load sample app') }}</span>
+                                <span wire:loading wire:target="loadSampleApp">{{ __('Loading…') }}</span>
+                            </button>
                         </div>
                     @endif
 
@@ -57,7 +99,7 @@
                             <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">01</span>
                             <div class="min-w-0">
                                 <h2 class="text-base font-semibold text-brand-ink">{{ __('Connect Git') }}</h2>
-                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('We clone, build, and publish from this repository on every deploy.') }}</p>
+                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Repo, branch, and app name.') }}</p>
                             </div>
                         </div>
                         <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
@@ -279,24 +321,11 @@
                                         </span>
                                         <x-text-input id="edge_branch_override" wire:model.live.debounce.500ms="branch" type="text" class="block w-full ps-10 font-mono text-sm" required />
                                     </div>
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Defaults to the repository\'s default branch — change if you deploy from another branch.') }}</p>
                                     <x-input-error :messages="$errors->get('branch')" class="mt-2" />
                                 </div>
                             @endif
-                        </div>
-                    </section>
 
-                    {{-- 02 Identity --}}
-                    <section class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-sm font-bold text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">02</span>
-                            <div class="min-w-0">
-                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Name your app') }}</h2>
-                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Used in the Edge index, site workspace, and preview URLs.') }}</p>
-                            </div>
-                        </div>
-                        <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
-                            <div>
+                            <div class="max-w-md">
                                 <x-input-label for="name" :value="__('App name')" />
                                 @php
                                     $nameTargets = 'repo,branch,repository_selection,source_control_account_id,repo_source,detectFromRepository';
@@ -319,234 +348,166 @@
                                         <x-spinner size="sm" variant="muted" />
                                     </div>
                                 </div>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Auto-filled from the repo name — edit anytime.') }}</p>
                                 <x-input-error :messages="$errors->get('form.name')" class="mt-2" />
                             </div>
                         </div>
                     </section>
 
-                    {{-- 03 Detect --}}
-                    <section class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-4 px-5 py-5 sm:px-6">
-                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">03</span>
-                            <div class="min-w-0 flex-1 space-y-4">
+                    @php
+                        $detectTargets = 'detectFromRepository,repo,branch,repository_selection,source_control_account_id,repo_source';
+                        $hasDetectionResult = $detectedPlan !== []
+                            && (
+                                ! empty($detectedPlan['error'])
+                                || ! empty($detectedPlan['no_match'])
+                                || ! empty($detectedPlan['runtime'])
+                                || ($detectedPlan['kind'] ?? '') === 'serverless'
+                            );
+                        $showDetectionPanel = $runtimeDetectionPending || $hasDetectionResult;
+                        $runtimeLabel = match ($form->runtime_mode) {
+                            'hybrid' => __('Hybrid'),
+                            'ssr' => __('Worker SSR'),
+                            default => __('Static / SSG'),
+                        };
+                        $buildSummary = trim((string) $form->build_command) !== ''
+                            ? $form->build_command
+                            : __('Detected / default');
+                        $outputSummary = trim((string) $form->output_dir) !== '' ? $form->output_dir : 'dist';
+                        $frameworkSummary = trim((string) ($detectedPlan['framework'] ?? $detectedPlan['runtime'] ?? ''));
+                        $advancedDefaultOpen = $form->delivery_mode === 'byo'
+                            || $errors->has('form.build_command')
+                            || $errors->has('form.output_dir')
+                            || $errors->has('form.edge_provider_credential_id');
+                    @endphp
+
+                    {{-- 02 Auto-detected settings --}}
+                    <section
+                        x-data="{ advancedOpen: @js($advancedDefaultOpen) }"
+                        class="border-b border-brand-ink/10"
+                        @if ($runtimeDetectionPending) wire:poll.2s="pollRuntimeDetection" @endif
+                    >
+                        <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
+                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">02</span>
+                            <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Detect build settings') }}</h2>
-                                        <p class="mt-0.5 text-sm text-brand-moss">{{ __('We scan the repo automatically when you paste a complete owner/name or URL. Use Detect runtime to retry.') }}</p>
+                                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Build & delivery') }}</h2>
+                                        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Detected from your repo. Override only if needed.') }}</p>
                                     </div>
-                                    @php
-                                        $detectTargets = 'detectFromRepository,repo,branch,repository_selection,source_control_account_id,repo_source';
-                                    @endphp
                                     <button
                                         type="button"
                                         wire:click="detectFromRepository"
                                         wire:loading.attr="disabled"
                                         wire:target="{{ $detectTargets }}"
-                                        class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-wait disabled:opacity-60 dark:shadow-none"
+                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-3 py-1.5 text-xs font-semibold text-brand-moss transition-colors hover:border-brand-sage/40 hover:text-brand-forest disabled:cursor-wait disabled:opacity-60 dark:border-brand-mist/25 dark:bg-zinc-800 dark:hover:text-brand-sage"
                                     >
-                                        <x-heroicon-o-sparkles wire:loading.remove wire:target="{{ $detectTargets }}" class="h-4 w-4" aria-hidden="true" />
-                                        <x-spinner wire:loading wire:target="{{ $detectTargets }}" size="sm" variant="cream" />
-                                        <span wire:loading.remove wire:target="{{ $detectTargets }}">{{ __('Detect runtime') }}</span>
+                                        <x-heroicon-o-arrow-path wire:loading.remove wire:target="{{ $detectTargets }}" class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-spinner wire:loading wire:target="{{ $detectTargets }}" size="sm" variant="muted" />
+                                        <span wire:loading.remove wire:target="{{ $detectTargets }}">{{ __('Re-detect') }}</span>
                                         <span wire:loading wire:target="{{ $detectTargets }}">{{ __('Detecting…') }}</span>
-                                    </button>
-                                </div>
-                                <div
-                                    class="relative rounded-xl border border-brand-ink/8 bg-brand-cream/40 p-4 dark:border-brand-mist/15 dark:bg-zinc-800/50"
-                                    @if ($runtimeDetectionPending) wire:poll.2s="pollRuntimeDetection" @endif
-                                >
-                                    <div
-                                        @if (! $runtimeDetectionPending)
-                                            wire:loading
-                                            wire:target="{{ $detectTargets }}"
-                                        @endif
-                                        class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-brand-cream/70 backdrop-blur-[1px] dark:bg-zinc-900/60 {{ $runtimeDetectionPending ? '' : 'hidden' }}"
-                                    >
-                                        <span class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-ink shadow-sm dark:border-brand-mist/20 dark:bg-zinc-800 dark:text-brand-cream">
-                                            <x-spinner size="sm" variant="ink" />
-                                            {{ $runtimeDetectionPending ? __('Scanning repository (this can take a moment for large repos)…') : __('Scanning repository…') }}
-                                        </span>
-                                    </div>
-                                    @include('livewire.partials._runtime-detection-panel')
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    @if ($monorepoDetected && $monorepoPackages !== [])
-                        <section class="border-b border-brand-ink/10">
-                            <div class="flex items-start gap-3 bg-brand-sage/10 px-5 py-3 sm:px-6">
-                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/20 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/30">↳</span>
-                                <div class="min-w-0">
-                                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Monorepo detected') }}</h2>
-                                    <p class="mt-0.5 text-sm text-brand-moss">
-                                        {{ __('This repository looks like a monorepo (:markers). Pick the package directory this Edge site should build from.', ['markers' => implode(', ', $monorepoMarkers) ?: __('multiple packages')]) }}
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
-                                <fieldset class="space-y-2">
-                                    <legend class="sr-only">{{ __('Package directory') }}</legend>
-                                    @foreach ($monorepoPackages as $package)
-                                        <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 text-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-                                            <input
-                                                type="radio"
-                                                wire:model="form.repo_root"
-                                                value="{{ $package['path'] }}"
-                                                class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40"
-                                            />
-                                            <span>
-                                                <span class="font-mono text-brand-ink">{{ $package['path'] !== '' ? $package['path'] : '/' }}</span>
-                                                <span class="mt-0.5 block text-xs text-brand-moss">{{ $package['label'] }}</span>
-                                            </span>
-                                        </label>
-                                    @endforeach
-                                </fieldset>
-                                <label class="block">
-                                    <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Or enter a custom path') }}</span>
-                                    <input
-                                        type="text"
-                                        wire:model.blur="form.repo_root"
-                                        placeholder="apps/marketing-site"
-                                        class="mt-1.5 w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
-                                    />
-                                </label>
-                            </div>
-                        </section>
-                    @endif
-
-                    {{-- 04 Build --}}
-                    <section
-                        x-data="{ advancedOpen: @js($form->build_command !== '' || $form->output_dir !== '' && $form->output_dir !== 'dist') }"
-                        class="border-b border-brand-ink/10"
-                    >
-                        <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">04</span>
-                            <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Build output') }}</h2>
-                                        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Override only when detection misses your setup.') }}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        x-on:click="advancedOpen = ! advancedOpen"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-3 py-1.5 text-xs font-semibold text-brand-moss transition-colors hover:border-brand-sage/40 hover:text-brand-forest dark:border-brand-mist/25 dark:bg-zinc-800 dark:hover:text-brand-sage"
-                                    >
-                                        <span x-text="advancedOpen ? '{{ __('Hide overrides') }}' : '{{ __('Show overrides') }}'"></span>
-                                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 transition-transform" x-bind:class="advancedOpen ? 'rotate-180' : ''" aria-hidden="true" />
                                     </button>
                                 </div>
                             </div>
                         </div>
                         <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
-                            <div x-show="advancedOpen" x-collapse class="space-y-4">
-                                <div>
-                                    <x-input-label for="build_command" :value="__('Build command override')" />
-                                    <x-text-input id="build_command" wire:model.live="form.build_command" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="npm ci && npm run build" />
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank to use the detected command or the default npm build.') }}</p>
-                                    <x-input-error :messages="$errors->get('form.build_command')" class="mt-2" />
+                            @if (trim($repo) === '')
+                                <p class="rounded-xl border border-dashed border-brand-ink/12 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-800/40">
+                                    {{ __('Connect a repository to auto-detect framework, build command, and delivery mode.') }}
+                                </p>
+                            @elseif ($runtimeDetectionPending)
+                                <div class="flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-3 text-sm text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-800/50">
+                                    <x-spinner size="sm" variant="ink" />
+                                    {{ __('Scanning repository…') }}
                                 </div>
-                                <div>
-                                    <x-input-label for="output_dir" :value="__('Output directory')" />
-                                    <x-text-input id="output_dir" wire:model.live="form.output_dir" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Folder containing the static assets after the build (e.g. dist, out, .output/public).') }}</p>
-                                    <x-input-error :messages="$errors->get('form.output_dir')" class="mt-2" />
-                                </div>
-                            </div>
-                            <p x-show="! advancedOpen" class="rounded-xl border border-dashed border-brand-ink/12 bg-brand-cream/30 px-4 py-3 text-xs text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-800/40">
-                                {{ __('Using detected or default build settings. Open overrides to customize the command and output folder.') }}
-                            </p>
-
-                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/25 p-4 dark:border-brand-mist/20 dark:bg-zinc-800/40">
-                                <p class="text-sm font-semibold text-brand-ink">{{ __('Delivery mode') }}</p>
-                                <p class="mt-1 text-xs text-brand-moss">{{ __('Static sites serve everything from Edge. Hybrid keeps static assets on Edge and proxies dynamic routes to a long-running origin (dply Cloud or external URL).') }}</p>
-                                @if ($ssrDetected && trim($form->origin_url) === '')
-                                    <div class="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-                                        <p class="font-semibold">{{ __('Server-rendered app detected') }}</p>
-                                        <p class="mt-1 leading-relaxed">
-                                            @if ($autoProvisionHybridOrigin)
-                                                {{ __('dply will create a Cloud SSR origin and Edge front automatically when you deploy — no manual origin URL needed.') }}
-                                            @elseif ($showHybridStackCta)
-                                                {{ __('Deploy a hybrid stack to create a dply Cloud SSR origin and Edge front from this repository in one step, or link an existing Cloud app below.') }}
-                                            @else
-                                                {{ __('Hybrid delivery needs an SSR origin. Link an existing Cloud app, enter a live URL, or connect a container backend to use one-click hybrid deploy.') }}
-                                            @endif
-                                        </p>
-                                    </div>
-                                @endif
-                                @php
-                                    $ssrAvailable = trim((string) config('edge.cloudflare.dispatch_namespace_name', '')) !== ''
-                                        && trim((string) config('edge.cloudflare.dispatch_namespace_id', '')) !== '';
-                                @endphp
-                                <div class="mt-3 flex flex-wrap gap-3">
-                                    <label class="inline-flex items-center gap-2 text-sm">
-                                        <input type="radio" wire:model.live="form.runtime_mode" value="static" class="text-brand-sage focus:ring-brand-sage/40" />
-                                        <span>{{ __('Static / SSG') }}</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm">
-                                        <input type="radio" wire:model.live="form.runtime_mode" value="hybrid" class="text-brand-sage focus:ring-brand-sage/40" />
-                                        <span>{{ __('Hybrid (static + origin SSR)') }}</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm {{ $ssrAvailable ? '' : 'opacity-60' }}" title="{{ $ssrAvailable ? __('Bundle the app for edge SSR.') : __('SSR is unavailable — contact support to enable worker-native SSR.') }}">
-                                        <input type="radio" wire:model.live="form.runtime_mode" value="ssr" class="text-brand-sage focus:ring-brand-sage/40" @disabled(! $ssrAvailable) />
-                                        <span>{{ __('Worker-native SSR (Next.js)') }}</span>
-                                    </label>
-                                </div>
-                                @if ($form->runtime_mode === 'ssr')
-                                    <div class="mt-4 rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-xs text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">
-                                        <p class="font-medium text-brand-ink">{{ __('Worker-native SSR') }}</p>
-                                        <p class="mt-1 leading-relaxed">
-                                            {{ __('dply bundles your Next.js app for edge SSR on each deploy and serves it from the same network that hosts your static assets. Your package.json must list "next" as a dependency.') }}
-                                        </p>
-                                    </div>
-                                @endif
-                                @if ($form->runtime_mode === 'hybrid')
-                                    @if ($ssrDetected)
-                                        <div class="mt-4 rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-xs text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">
-                                            {{ __('This repository looks server-rendered. Hybrid delivery is selected automatically — static assets on Edge, dynamic routes proxied to your origin.') }}
-                                        </div>
+                            @else
+                                <div class="flex flex-wrap items-center gap-2 text-sm">
+                                    @if ($frameworkSummary !== '')
+                                        <span class="inline-flex items-center rounded-lg border border-brand-sage/30 bg-brand-sage/10 px-2.5 py-1 text-xs font-semibold text-brand-forest dark:text-brand-sage">{{ $frameworkSummary }}</span>
                                     @endif
-                                    <div class="mt-4">
-                                        @if ($autoProvisionHybridOrigin)
-                                            <div class="rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-sm text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">
-                                                <p class="font-medium text-brand-ink">{{ __('SSR origin') }}</p>
-                                                <p class="mt-1 text-xs leading-relaxed">
-                                                    {{ __('A dply Cloud app will be provisioned from this repository as the SSR origin. The Edge site is created automatically when the origin is live.') }}
-                                                </p>
-                                            </div>
-                                        @else
-                                            <x-input-label for="origin_url" :value="__('SSR origin URL')" />
-                                            @if ($suggestedHybridOriginUrl !== '' && ! $originUrlTouched)
-                                                <p class="mt-1 text-xs text-brand-moss">
-                                                    {{ __('Suggested from a matching dply Cloud app in this organization.') }}
-                                                </p>
-                                            @elseif ($suggestedHybridOriginUrl === '' && ! $originUrlTouched)
-                                                <p class="mt-1 text-xs text-brand-moss">
-                                                    {{ __('Hybrid delivery needs a server-rendered origin — link an existing Cloud app below or enter its live URL.') }}
-                                                </p>
-                                            @endif
-                                            <x-text-input id="origin_url" wire:model.live="form.origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.example.com" required />
-                                            @if ($suggestedHybridOriginUrl !== '' && $form->origin_url === $suggestedHybridOriginUrl)
-                                                <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
-                                                    <x-heroicon-o-sparkles class="h-4 w-4" />
-                                                    {{ __('Auto-filled from Cloud app') }}
-                                                </p>
-                                            @endif
-                                            <p class="mt-2 text-xs text-brand-moss">
-                                                {{ __('Need a new origin?') }}
-                                                <a href="{{ route('cloud.create') }}" wire:navigate class="font-medium text-brand-forest hover:underline dark:text-brand-sage">{{ __('Create a Cloud app') }}</a>
-                                                {{ __('for server-rendered routes.') }}
-                                            </p>
-                                            <x-input-error :messages="$errors->get('form.origin_url')" class="mt-2" />
+                                    <span class="inline-flex items-center rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800">{{ $runtimeLabel }}</span>
+                                    <span class="font-mono text-xs text-brand-moss">{{ $buildSummary }}</span>
+                                    <span class="text-brand-mist" aria-hidden="true">→</span>
+                                    <span class="font-mono text-xs text-brand-moss">{{ $outputSummary }}</span>
+                                </div>
+                            @endif
+
+                            @if ($showDetectionPanel && (! empty($detectedPlan['error']) || ! empty($detectedPlan['no_match'])))
+                                <div class="relative">
+                                    @include('livewire.partials._runtime-detection-panel')
+                                </div>
+                            @endif
+
+                            @if (! $edgeEligible && filled($edgeIneligibleMessage))
+                                <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+                                    <p class="font-semibold">{{ __('Not an Edge workload') }}</p>
+                                    <p class="mt-1 leading-relaxed">{{ $edgeIneligibleMessage }}</p>
+                                    @if (filled($edgeAlternativeRoute) && \Illuminate\Support\Facades\Route::has($edgeAlternativeRoute))
+                                        <a
+                                            href="{{ route($edgeAlternativeRoute) }}"
+                                            wire:navigate
+                                            class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-amber-950 underline decoration-amber-700/40 underline-offset-2 transition-colors hover:text-amber-900 dark:text-amber-50 dark:hover:text-white"
+                                        >
+                                            {{ $edgeAlternativeLabel ?: __('Open alternative') }}
+                                            <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </a>
+                                    @endif
+                                </div>
+                            @endif
+
+                            @if ($monorepoDetected && $monorepoPackages !== [])
+                                <div class="rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-3 dark:border-brand-sage/20 dark:bg-brand-sage/10">
+                                    <p class="text-sm font-semibold text-brand-ink">{{ __('Monorepo detected') }}</p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Pick the package directory to build.') }}</p>
+                                    <fieldset class="mt-3 space-y-2">
+                                        <legend class="sr-only">{{ __('Package directory') }}</legend>
+                                        @foreach ($monorepoPackages as $package)
+                                            <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 text-sm dark:border-brand-mist/20 dark:bg-zinc-900">
+                                                <input
+                                                    type="radio"
+                                                    wire:model="form.repo_root"
+                                                    value="{{ $package['path'] }}"
+                                                    class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40"
+                                                />
+                                                <span>
+                                                    <span class="font-mono text-brand-ink">{{ $package['path'] !== '' ? $package['path'] : '/' }}</span>
+                                                    <span class="mt-0.5 block text-xs text-brand-moss">{{ $package['label'] }}</span>
+                                                </span>
+                                            </label>
+                                        @endforeach
+                                    </fieldset>
+                                </div>
+                            @endif
+
+                            @if ($form->runtime_mode === 'hybrid')
+                                <div class="rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 dark:border-brand-sage/25 dark:bg-brand-sage/10">
+                                    @if ($ssrDetected && trim($form->origin_url) === '' && $autoProvisionHybridOrigin)
+                                        <p class="text-sm font-medium text-brand-ink">{{ __('Hybrid SSR detected') }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Deploy will create a Cloud origin and Edge front automatically.') }}</p>
+                                    @elseif ($autoProvisionHybridOrigin)
+                                        <p class="text-sm font-medium text-brand-ink">{{ __('SSR origin') }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('A Cloud app will be provisioned from this repo; Edge starts when the origin is live.') }}</p>
+                                    @else
+                                        <x-input-label for="origin_url" :value="__('SSR origin URL')" />
+                                        @if ($ssrDetected)
+                                            <p class="mt-1 text-xs text-brand-moss">{{ __('Server-rendered app detected — link a Cloud app or enter its live URL.') }}</p>
                                         @endif
-                                    </div>
-                                    @if ($orgCloudSites !== [])
-                                        <details class="mt-4 rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3 dark:border-brand-mist/20 dark:bg-zinc-900/40">
-                                            <summary class="cursor-pointer text-sm font-medium text-brand-ink">{{ __('Link an existing Cloud app instead') }}</summary>
-                                            <div class="mt-3">
-                                                <x-input-label for="origin_cloud_site_id" :value="__('dply Cloud app')" />
+                                        <x-text-input id="origin_url" wire:model.live="form.origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.example.com" required />
+                                        @if ($suggestedHybridOriginUrl !== '' && $form->origin_url === $suggestedHybridOriginUrl)
+                                            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
+                                                <x-heroicon-o-sparkles class="h-4 w-4" />
+                                                {{ __('Auto-filled from Cloud app') }}
+                                            </p>
+                                        @endif
+                                        <p class="mt-2 text-xs text-brand-moss">
+                                            <a href="{{ route('cloud.create') }}" wire:navigate class="font-medium text-brand-forest hover:underline dark:text-brand-sage">{{ __('Create a Cloud app') }}</a>
+                                            {{ __('if you need a new origin.') }}
+                                        </p>
+                                        <x-input-error :messages="$errors->get('form.origin_url')" class="mt-2" />
+                                        @if ($orgCloudSites !== [])
+                                            <details class="mt-3">
+                                                <summary class="cursor-pointer text-xs font-semibold text-brand-ink">{{ __('Link an existing Cloud app') }}</summary>
                                                 <select id="origin_cloud_site_id" wire:model.live="form.origin_cloud_site_id" class="dply-input mt-2 block w-full text-sm">
-                                                    <option value="">{{ __('Use suggested URL from app name') }}</option>
+                                                    <option value="">{{ __('Use suggested URL') }}</option>
                                                     @foreach ($orgCloudSites as $cloudSite)
                                                         <option value="{{ $cloudSite['id'] }}">
                                                             {{ $cloudSite['label'] }}
@@ -558,83 +519,144 @@
                                                         </option>
                                                     @endforeach
                                                 </select>
-                                            </div>
-                                        </details>
-                                    @endif
-                                @endif
-                            </div>
-                        </div>
-                    </section>
-
-                    {{-- 05 Delivery --}}
-                    <section class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-3 sm:px-6">
-                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">05</span>
-                            <div class="min-w-0">
-                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h2>
-                                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Choose whether dply hosts delivery, or deploy into your own CDN account.') }}</p>
-                            </div>
-                        </div>
-                        <div class="min-w-0 space-y-5 px-5 py-4 sm:px-6">
-                            <div role="radiogroup" aria-label="{{ __('Edge delivery mode') }}" class="grid gap-3 sm:grid-cols-2">
-                                <label class="relative flex cursor-pointer rounded-xl border p-4 transition-colors {{ $form->delivery_mode === 'managed' ? 'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' : 'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' }}">
-                                    <input type="radio" wire:model.live="form.delivery_mode" value="managed" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
-                                    <span class="ms-3">
-                                        <span class="block text-sm font-semibold text-brand-ink">{{ __('Dply Edge (managed)') }}</span>
-                                        <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Default — global delivery on dply\'s network. Usage billed through your dply plan.') }}</span>
-                                    </span>
-                                </label>
-                                <label class="relative flex cursor-pointer rounded-xl border p-4 transition-colors {{ $form->delivery_mode === 'byo' ? 'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' : 'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' }}">
-                                    <input type="radio" wire:model.live="form.delivery_mode" value="byo" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
-                                    <span class="ms-3">
-                                        <span class="block text-sm font-semibold text-brand-ink">{{ __('Your own account') }}</span>
-                                        <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Deploy into a connected CDN account. That provider bills you for delivery usage.') }}</span>
-                                    </span>
-                                </label>
-                            </div>
-
-                            @if ($form->delivery_mode === 'byo')
-                                <div class="rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-4 dark:border-brand-sage/20 dark:bg-brand-sage/10">
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <x-input-label for="edge_provider_credential_id" :value="__('CDN account')" />
-                                        <x-add-provider-credential-link provider="cloudflare" class="text-brand-forest dark:text-brand-sage">
-                                            {{ __('Connect account') }} &rarr;
-                                        </x-add-provider-credential-link>
-                                    </div>
-                                    <select id="edge_provider_credential_id" wire:model="form.edge_provider_credential_id" class="dply-input mt-2 block w-full" required>
-                                        <option value="">{{ __('Select a connected account…') }}</option>
-                                        @foreach ($cloudflareCredentials as $credential)
-                                            <option value="{{ $credential->id }}">{{ $credential->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <x-input-error :messages="$errors->get('form.edge_provider_credential_id')" class="mt-2" />
-                                    @if ($cloudflareCredentials->isEmpty())
-                                        <p class="mt-2 text-xs text-brand-moss">{{ __('Connect a CDN account with Workers and object-storage permissions, then finish Edge bootstrap from your credentials page.') }}</p>
+                                            </details>
+                                        @endif
                                     @endif
                                 </div>
                             @endif
 
-                            <div class="grid gap-3 sm:grid-cols-2">
-                                <label class="group relative flex cursor-pointer rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 transition-colors has-[:checked]:border-brand-sage/40 has-[:checked]:bg-brand-sage/5 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40 dark:has-[:checked]:border-brand-sage/35 dark:has-[:checked]:bg-brand-sage/10">
-                                    <input type="checkbox" wire:model="form.spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
-                                    <span class="ms-3">
-                                        <span class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
-                                            <x-heroicon-o-arrows-right-left class="h-4 w-4 text-brand-sage" aria-hidden="true" />
-                                            {{ __('SPA fallback') }}
+                            <button
+                                type="button"
+                                x-on:click="advancedOpen = ! advancedOpen"
+                                class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-moss transition-colors hover:text-brand-forest dark:hover:text-brand-sage"
+                            >
+                                <span x-text="advancedOpen ? '{{ __('Hide advanced') }}' : '{{ __('Advanced settings') }}'"></span>
+                                <x-heroicon-m-chevron-down class="h-3.5 w-3.5 transition-transform" x-bind:class="advancedOpen ? 'rotate-180' : ''" aria-hidden="true" />
+                            </button>
+
+                            <div x-show="advancedOpen" x-collapse class="space-y-5 border-t border-brand-ink/10 pt-4 dark:border-brand-mist/15">
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="build_command" :value="__('Build command')" />
+                                        <x-text-input id="build_command" wire:model.live="form.build_command" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="npm ci && npm run build" />
+                                        <x-input-error :messages="$errors->get('form.build_command')" class="mt-2" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="output_dir" :value="__('Output directory')" />
+                                        <x-text-input id="output_dir" wire:model.live="form.output_dir" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
+                                        <x-input-error :messages="$errors->get('form.output_dir')" class="mt-2" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Delivery mode') }}</p>
+                                    @php
+                                        $deliveryModes = [
+                                            ['value' => 'static', 'label' => __('Static / SSG'), 'body' => __('CDN-only. Most sites.')],
+                                            ['value' => 'hybrid', 'label' => __('Hybrid'), 'body' => __('Static on Edge + Cloud/HTTPS origin for SSR.')],
+                                            [
+                                                'value' => 'ssr',
+                                                'label' => __('Worker SSR (Next.js)'),
+                                                'body' => $ssrAvailable
+                                                    ? __('Next.js on the edge — no origin.')
+                                                    : ($ssrUnavailableReason ?: __('Unavailable — use Hybrid.')),
+                                                'disabled' => ! $ssrAvailable,
+                                            ],
+                                        ];
+                                    @endphp
+                                    <div class="mt-2 grid gap-2" role="radiogroup" aria-label="{{ __('Delivery mode') }}">
+                                        @foreach ($deliveryModes as $mode)
+                                            <label
+                                                @class([
+                                                    'relative flex cursor-pointer gap-3 rounded-xl border px-3 py-2.5 transition-colors',
+                                                    'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' => $form->runtime_mode === $mode['value'],
+                                                    'border-brand-ink/10 bg-white/70 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-900/40' => $form->runtime_mode !== $mode['value'] && empty($mode['disabled']),
+                                                    'cursor-not-allowed opacity-60' => ! empty($mode['disabled']),
+                                                ])
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    wire:model.live="form.runtime_mode"
+                                                    value="{{ $mode['value'] }}"
+                                                    class="mt-0.5 text-brand-sage focus:ring-brand-sage/40"
+                                                    @disabled(! empty($mode['disabled']))
+                                                />
+                                                <span class="min-w-0">
+                                                    <span class="text-sm font-semibold text-brand-ink">{{ $mode['label'] }}</span>
+                                                    <span class="mt-0.5 block text-xs text-brand-moss">{{ $mode['body'] }}</span>
+                                                </span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Hosting') }}</p>
+                                    <div role="radiogroup" aria-label="{{ __('Edge delivery mode') }}" class="mt-2 grid gap-2 sm:grid-cols-2">
+                                        <label class="relative flex cursor-pointer rounded-xl border p-3 transition-colors {{ $form->delivery_mode === 'managed' ? 'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' : 'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' }}">
+                                            <input type="radio" wire:model.live="form.delivery_mode" value="managed" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
+                                            <span class="ms-3">
+                                                <span class="block text-sm font-semibold text-brand-ink">{{ __('Dply Edge (managed)') }}</span>
+                                                <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Default') }}</span>
+                                            </span>
+                                        </label>
+                                        <label class="relative flex cursor-pointer rounded-xl border p-3 transition-colors {{ $form->delivery_mode === 'byo' ? 'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' : 'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' }}">
+                                            <input type="radio" wire:model.live="form.delivery_mode" value="byo" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
+                                            <span class="ms-3">
+                                                <span class="block text-sm font-semibold text-brand-ink">{{ __('Your own account') }}</span>
+                                                <span class="mt-0.5 block text-xs text-brand-moss">{{ __('BYO CDN') }}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    @if ($form->delivery_mode === 'byo')
+                                        <div class="mt-3 rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-3 dark:border-brand-sage/20 dark:bg-brand-sage/10">
+                                            @if ($cloudflareCredentials->isEmpty())
+                                                <p class="text-sm font-semibold text-brand-ink">{{ __('No CDN account connected') }}</p>
+                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Add a Cloudflare API token with Workers and R2 permissions.') }}</p>
+                                                <button
+                                                    type="button"
+                                                    wire:click="openCloudflareCredentialModal"
+                                                    class="mt-3 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest"
+                                                >
+                                                    <x-heroicon-o-key class="h-4 w-4" aria-hidden="true" />
+                                                    {{ __('Add Cloudflare token') }}
+                                                </button>
+                                            @else
+                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <x-input-label for="edge_provider_credential_id" :value="__('CDN account')" />
+                                                    <button type="button" wire:click="openCloudflareCredentialModal" class="text-xs font-semibold text-brand-forest hover:underline dark:text-brand-sage">
+                                                        {{ __('Add another') }}
+                                                    </button>
+                                                </div>
+                                                <select id="edge_provider_credential_id" wire:model="form.edge_provider_credential_id" class="dply-input mt-2 block w-full" required>
+                                                    <option value="">{{ __('Select a connected account…') }}</option>
+                                                    @foreach ($cloudflareCredentials as $credential)
+                                                        <option value="{{ $credential->id }}">{{ $credential->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <x-input-error :messages="$errors->get('form.edge_provider_credential_id')" class="mt-2" />
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="grid gap-2 sm:grid-cols-2">
+                                    <label class="flex cursor-pointer gap-3 rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-3 dark:border-brand-mist/20 dark:bg-zinc-800/40">
+                                        <input type="checkbox" wire:model="form.spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                                        <span>
+                                            <span class="block text-sm font-semibold text-brand-ink">{{ __('SPA fallback') }}</span>
+                                            <span class="mt-0.5 block text-xs text-brand-moss">{{ __('index.html for unknown paths') }}</span>
                                         </span>
-                                        <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Serve index.html for unknown paths — typical for client-side routed SPAs.') }}</span>
-                                    </span>
-                                </label>
-                                <label class="group relative flex cursor-pointer rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 transition-colors has-[:checked]:border-brand-sage/40 has-[:checked]:bg-brand-sage/5 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40 dark:has-[:checked]:border-brand-sage/35 dark:has-[:checked]:bg-brand-sage/10">
-                                    <input type="checkbox" wire:model="form.deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
-                                    <span class="ms-3">
-                                        <span class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
-                                            <x-heroicon-o-bolt class="h-4 w-4 text-brand-gold" aria-hidden="true" />
-                                            {{ __('Deploy on push') }}
+                                    </label>
+                                    <label class="flex cursor-pointer gap-3 rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-3 dark:border-brand-mist/20 dark:bg-zinc-800/40">
+                                        <input type="checkbox" wire:model="form.deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                                        <span>
+                                            <span class="block text-sm font-semibold text-brand-ink">{{ __('Deploy on push') }}</span>
+                                            <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Rebuild on production-branch push') }}</span>
                                         </span>
-                                        <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('When a Git webhook is configured, pushes to the production branch trigger a rebuild.') }}</span>
-                                    </span>
-                                </label>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -656,7 +678,7 @@
                                     $missingName = trim($form->name) === '';
                                     $missingRepo = trim($repo) === '';
                                     $missingBranch = trim($branch) === '';
-                                    $edgeDeployDisabled = $deployBlocked || $hybridMissingOrigin
+                                    $edgeDeployDisabled = ! $edgeEligible || $deployBlocked || $hybridMissingOrigin
                                         || $missingName || $missingRepo || $missingBranch;
                                     $deployLabel = $autoProvisionHybridOrigin ? __('Deploy hybrid stack') : __('Deploy edge app');
                                     $detectTargets = 'deploy,deployHybridStack,detectFromRepository,repo,branch,repository_selection,source_control_account_id,repo_source';

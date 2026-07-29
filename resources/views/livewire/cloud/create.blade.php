@@ -120,7 +120,10 @@
                                     <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-brand-rust" aria-hidden="true" />
                                     <div class="space-y-1">
                                         <p class="font-semibold">{{ __('Repository builds need GitHub authorized on your cloud account') }}</p>
-                                        <p class="text-brand-moss">{{ __('Source-mode deploys to your connected cloud account require a GitHub connection that\'s missing right now. You can still deploy from a pre-built image, or finish the connection in your cloud account settings.') }}</p>
+                                        <p class="text-brand-moss">
+                                            {{ __('Source deploys on AWS App Runner need a GitHub connection ARN on your AWS credential. You can still deploy from a pre-built image.') }}
+                                            <a href="{{ route('credentials.index', ['provider' => 'aws_app_runner']) }}" wire:navigate class="font-medium text-brand-moss underline decoration-brand-ink/20 underline-offset-2 hover:text-brand-ink">{{ __('Add the connection ARN') }}</a>
+                                        </p>
                                     </div>
                                 </div>
                             @endif
@@ -346,16 +349,28 @@
                     </span>
                     <div class="min-w-0">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Databases') }}</h2>
-                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Attach managed databases — each row gets its own connection env vars under the chosen prefix.') }}</p>
+                            <p class="mt-0.5 text-sm text-brand-moss">
+                                @if ($backendSupportsManagedDatabases)
+                                    {{ __('Attach managed databases — each row gets its own connection env vars under the chosen prefix.') }}
+                                @else
+                                    {{ __('Connect an external Postgres/MySQL (RDS, Neon, etc.) reachable from App Runner. Connection env vars land under the chosen prefix.') }}
+                                @endif
+                            </p>
                     </div>
                 </div>
                 <div class="min-w-0 space-y-4 px-5 py-5 sm:px-6">
+
+                        @unless ($backendSupportsManagedDatabases)
+                            <div class="rounded-xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3 text-xs leading-relaxed text-brand-ink">
+                                {{ __('AWS App Runner does not provision managed databases in dply. Use a public endpoint (or your own VPC connector) and require SSL for production.') }}
+                            </div>
+                        @endunless
 
                         @if ($databases !== [])
                             <div class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 dark:divide-brand-mist/15 dark:border-brand-mist/20">
                                 @foreach ($databases as $i => $db)
                                     @php
-                                        $rowMode = (string) ($db['mode'] ?? 'create');
+                                        $rowMode = (string) ($db['mode'] ?? ($backendSupportsManagedDatabases ? 'create' : 'external'));
                                     @endphp
                                     <div class="space-y-3 p-4">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -368,7 +383,7 @@
                                         </div>
                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div>
-                                                <x-input-label :value="__('Name')" />
+                                                <x-input-label :value="__('Label')" />
                                                 <input type="text" wire:model.blur="databases.{{ $i }}.name" class="dply-input mt-1 block w-full font-mono text-sm" placeholder="postgres-1">
                                                 <x-input-error :messages="$errors->get('databases.'.$i.'.name')" class="mt-2" />
                                             </div>
@@ -380,7 +395,10 @@
                                             <div>
                                                 <x-input-label :value="__('Mode')" />
                                                 <select wire:model.live="databases.{{ $i }}.mode" class="dply-input mt-1 block w-full text-sm">
-                                                    <option value="create">{{ __('Create new') }}</option>
+                                                    @if ($backendSupportsManagedDatabases)
+                                                        <option value="create">{{ __('Create new') }}</option>
+                                                    @endif
+                                                    <option value="external">{{ __('Connect external') }}</option>
                                                     <option value="attach" @disabled($attachableDatabases->isEmpty())>{{ __('Attach existing') }}</option>
                                                 </select>
                                             </div>
@@ -394,6 +412,45 @@
                                                         @endforeach
                                                     </select>
                                                     <x-input-error :messages="$errors->get('databases.'.$i.'.cloud_database_id')" class="mt-2" />
+                                                </div>
+                                            @elseif ($rowMode === 'external')
+                                                <div>
+                                                    <x-input-label :value="__('Engine')" />
+                                                    <select wire:model.live="databases.{{ $i }}.engine" class="dply-input mt-1 block w-full text-sm">
+                                                        <option value="postgres">Postgres</option>
+                                                        <option value="mysql">MySQL</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <x-input-label :value="__('Host')" />
+                                                    <input type="text" wire:model.blur="databases.{{ $i }}.host" class="dply-input mt-1 block w-full font-mono text-sm" placeholder="db.example.com" autocomplete="off">
+                                                    <x-input-error :messages="$errors->get('databases.'.$i.'.host')" class="mt-2" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label :value="__('Port')" />
+                                                    <input type="number" wire:model.blur="databases.{{ $i }}.port" class="dply-input mt-1 block w-full font-mono text-sm" min="1" max="65535">
+                                                    <x-input-error :messages="$errors->get('databases.'.$i.'.port')" class="mt-2" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label :value="__('Database')" />
+                                                    <input type="text" wire:model.blur="databases.{{ $i }}.database" class="dply-input mt-1 block w-full font-mono text-sm" placeholder="app" autocomplete="off">
+                                                    <x-input-error :messages="$errors->get('databases.'.$i.'.database')" class="mt-2" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label :value="__('Username')" />
+                                                    <input type="text" wire:model.blur="databases.{{ $i }}.username" class="dply-input mt-1 block w-full font-mono text-sm" autocomplete="off">
+                                                    <x-input-error :messages="$errors->get('databases.'.$i.'.username')" class="mt-2" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label :value="__('Password')" />
+                                                    <input type="password" wire:model.blur="databases.{{ $i }}.password" class="dply-input mt-1 block w-full font-mono text-sm" autocomplete="new-password">
+                                                    <x-input-error :messages="$errors->get('databases.'.$i.'.password')" class="mt-2" />
+                                                </div>
+                                                <div class="sm:col-span-2">
+                                                    <label class="inline-flex items-center gap-2 text-sm text-brand-ink">
+                                                        <input type="checkbox" wire:model="databases.{{ $i }}.ssl" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage">
+                                                        {{ __('Require SSL') }}
+                                                    </label>
                                                 </div>
                                             @else
                                                 <div>
@@ -430,16 +487,18 @@
                         <div class="flex flex-wrap gap-2">
                             <button type="button" wire:click="addDatabase('postgres')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
                                 <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Add Postgres') }}
+                                {{ $backendSupportsManagedDatabases ? __('Add Postgres') : __('Connect Postgres') }}
                             </button>
                             <button type="button" wire:click="addDatabase('mysql')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
                                 <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Add MySQL') }}
+                                {{ $backendSupportsManagedDatabases ? __('Add MySQL') : __('Connect MySQL') }}
                             </button>
-                            <button type="button" wire:click="addDatabase('redis')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
-                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Add Redis') }}
-                            </button>
+                            @if ($backendSupportsManagedDatabases)
+                                <button type="button" wire:click="addDatabase('redis')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
+                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Add Redis') }}
+                                </button>
+                            @endif
                         </div>
                     </div>
             </section>

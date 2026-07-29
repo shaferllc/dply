@@ -6,6 +6,8 @@ namespace App\Modules\Cloud\Services;
 
 use App\Models\ProviderCredential;
 use Aws\AppRunner\AppRunnerClient;
+use Aws\CloudWatch\CloudWatchClient;
+use Aws\CloudWatchLogs\CloudWatchLogsClient;
 
 /**
  * Thin wrapper around AWS App Runner. Used by the dply cloud layer
@@ -21,12 +23,23 @@ use Aws\AppRunner\AppRunnerClient;
  * AWS region is set at credential-creation time (see
  * ManagesProviderCredentials::storeAwsAppRunner) and threaded
  * through to the client constructor here.
+ *
+ * Observability (CPU / memory / requests + application logs) is
+ * read from CloudWatch under the AWS/AppRunner namespace and
+ * /aws/apprunner/{name}/{id}/application log group.
  */
 class AwsAppRunnerService
 {
     protected AppRunnerClient $client;
 
+    protected ?CloudWatchClient $cloudWatch = null;
+
+    protected ?CloudWatchLogsClient $cloudWatchLogs = null;
+
     protected string $region;
+
+    /** @var array{key: string, secret: string} */
+    protected array $awsCredentials;
 
     public function __construct(ProviderCredential $credential, ?string $region = null)
     {
@@ -37,13 +50,14 @@ class AwsAppRunnerService
             throw new \InvalidArgumentException('AWS access key ID and secret access key are required.');
         }
         $this->region = $region ?? (string) ($creds['region'] ?? 'us-east-1');
+        $this->awsCredentials = [
+            'key' => $key,
+            'secret' => $secret,
+        ];
         $this->client = new AppRunnerClient([
             'region' => $this->region,
             'version' => 'latest',
-            'credentials' => [
-                'key' => $key,
-                'secret' => $secret,
-            ],
+            'credentials' => $this->awsCredentials,
         ]);
     }
 
@@ -396,6 +410,162 @@ class AwsAppRunnerService
     }
 
     /**
+     * Recent App Runner operations (deploys, updates, creates) for a
+     * service — used for deploy history in the dashboard / CLI.
+     *
+     * @return list<array{id: string, type: string, status: string, started_at: ?string, finished_at: ?string}>
+     */
+    public function listOperations(string $serviceArn, int $limit = 10): array
+    {
+        $result = $this->client->listOperations([
+            'ServiceArn' => $serviceArn,
+            'MaxResults' => max(1, min(20, $limit)),
+        ]);
+
+        $ops = [];
+        foreach (($result['OperationSummaryList'] ?? []) as $op) {
+            if (! is_array($op)) {
+                continue;
+            }
+            $ops[] = [
+                'id' => (string) ($op['Id'] ?? ''),
+                'type' => (string) ($op['Type'] ?? ''),
+                'status' => (string) ($op['Status'] ?? ''),
+                'started_at' => $this->awsTimestampToIso($op['StartedAt'] ?? null),
+                'finished_at' => $this->awsTimestampToIso($op['EndedAt'] ?? null),
+            ];
+        }
+
+        return $ops;
+    }
+
+    /**
+     * Stop an in-progress deployment. Returns true when AWS accepted
+     * the stop request.
+     */
+    public function stopDeployment(string $serviceArn, string $operationId): bool
+    {
+        if ($operationId === '') {
+            return false;
+        }
+
+        $result = $this->client->stopDeployment([
+            'ServiceArn' => $serviceArn,
+            'OperationId' => $operationId,
+        ]);
+
+        return is_string($result['OperationId'] ?? null) && $result['OperationId'] !== '';
+    }
+
+    /**
+     * CPU / memory / request series from CloudWatch (AWS/AppRunner).
+     * Points match the CloudBackend shape: list of {t, v}.
+     *
+     * @return array{cpu: list<array{t: int, v: float}>, memory: list<array{t: int, v: float}>, requests: list<array{t: int, v: float}>}
+     */
+    public function getServiceMetrics(string $serviceArn, int $start, int $end): array
+    {
+        $parsed = self::parseServiceArn($serviceArn);
+        if ($parsed === null) {
+            return ['cpu' => [], 'memory' => [], 'requests' => []];
+        }
+
+        $period = match (true) {
+            ($end - $start) <= 3600 => 60,
+            ($end - $start) <= 21600 => 300,
+            default => 900,
+        };
+
+        $queries = [];
+        foreach ([
+            'cpu' => 'CPUUtilization',
+            'memory' => 'MemoryUtilization',
+            'requests' => 'Requests',
+        ] as $id => $metricName) {
+            $queries[] = [
+                'Id' => $id,
+                'MetricStat' => [
+                    'Metric' => [
+                        'Namespace' => 'AWS/AppRunner',
+                        'MetricName' => $metricName,
+                        'Dimensions' => [
+                            ['Name' => 'ServiceName', 'Value' => $parsed['name']],
+                            ['Name' => 'ServiceId', 'Value' => $parsed['id']],
+                        ],
+                    ],
+                    'Period' => $period,
+                    'Stat' => $metricName === 'Requests' ? 'Sum' : 'Average',
+                ],
+                'ReturnData' => true,
+            ];
+        }
+
+        $result = $this->cloudWatch()->getMetricData([
+            'StartTime' => $start,
+            'EndTime' => $end,
+            'MetricDataQueries' => $queries,
+            'ScanBy' => 'TimestampAscending',
+        ]);
+
+        $series = ['cpu' => [], 'memory' => [], 'requests' => []];
+        foreach (($result['MetricDataResults'] ?? []) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $id = (string) ($row['Id'] ?? '');
+            if (! isset($series[$id])) {
+                continue;
+            }
+            $timestamps = is_array($row['Timestamps'] ?? null) ? $row['Timestamps'] : [];
+            $values = is_array($row['Values'] ?? null) ? $row['Values'] : [];
+            foreach ($timestamps as $i => $ts) {
+                $series[$id][] = [
+                    't' => $this->awsTimestampToUnix($ts),
+                    'v' => (float) ($values[$i] ?? 0),
+                ];
+            }
+        }
+
+        return $series;
+    }
+
+    /**
+     * Tail application log lines from CloudWatch Logs for the
+     * service. Returns newest-last lines, capped at $limit.
+     *
+     * @return list<string>
+     */
+    public function getApplicationLogLines(string $serviceArn, int $limit = 200): array
+    {
+        $parsed = self::parseServiceArn($serviceArn);
+        if ($parsed === null) {
+            return [];
+        }
+
+        $logGroup = sprintf('/aws/apprunner/%s/%s/application', $parsed['name'], $parsed['id']);
+        $limit = max(1, min(2000, $limit));
+
+        $result = $this->cloudWatchLogs()->filterLogEvents([
+            'logGroupName' => $logGroup,
+            'limit' => $limit,
+            'interleaved' => true,
+        ]);
+
+        $lines = [];
+        foreach (($result['events'] ?? []) as $event) {
+            if (! is_array($event)) {
+                continue;
+            }
+            $message = trim((string) ($event['message'] ?? ''));
+            if ($message !== '') {
+                $lines[] = $message;
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
      * Eight regions where App Runner is generally available, ordered
      * roughly by cost (cheapest first). Mirrors the official AWS
      * regional availability matrix.
@@ -426,5 +596,81 @@ class AwsAppRunnerService
         $this->client = $client;
 
         return $this;
+    }
+
+    public function withCloudWatchClient(CloudWatchClient $client): self
+    {
+        $this->cloudWatch = $client;
+
+        return $this;
+    }
+
+    public function withCloudWatchLogsClient(CloudWatchLogsClient $client): self
+    {
+        $this->cloudWatchLogs = $client;
+
+        return $this;
+    }
+
+    /**
+     * @return array{name: string, id: string}|null
+     */
+    public static function parseServiceArn(string $serviceArn): ?array
+    {
+        if (preg_match('#^arn:aws:apprunner:[^:]+:\d+:service/([^/]+)/([^/]+)$#', $serviceArn, $m) !== 1) {
+            return null;
+        }
+
+        return ['name' => $m[1], 'id' => $m[2]];
+    }
+
+    private function cloudWatch(): CloudWatchClient
+    {
+        return $this->cloudWatch ??= new CloudWatchClient([
+            'region' => $this->region,
+            'version' => 'latest',
+            'credentials' => $this->awsCredentials,
+        ]);
+    }
+
+    private function cloudWatchLogs(): CloudWatchLogsClient
+    {
+        return $this->cloudWatchLogs ??= new CloudWatchLogsClient([
+            'region' => $this->region,
+            'version' => 'latest',
+            'credentials' => $this->awsCredentials,
+        ]);
+    }
+
+    private function awsTimestampToIso(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTimeInterface::ATOM);
+        }
+        if (is_int($value) || is_float($value)) {
+            return gmdate(\DateTimeInterface::ATOM, (int) $value);
+        }
+        if (is_string($value) && $value !== '') {
+            return $value;
+        }
+
+        return null;
+    }
+
+    private function awsTimestampToUnix(mixed $value): int
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->getTimestamp();
+        }
+        if (is_int($value) || is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && $value !== '') {
+            $parsed = strtotime($value);
+
+            return $parsed !== false ? $parsed : 0;
+        }
+
+        return 0;
     }
 }

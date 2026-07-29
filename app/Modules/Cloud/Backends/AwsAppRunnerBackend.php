@@ -7,6 +7,7 @@ namespace App\Modules\Cloud\Backends;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Modules\Cloud\Services\AwsAppRunnerService;
+use Illuminate\Support\Facades\Cache;
 
 class AwsAppRunnerBackend implements CloudBackend
 {
@@ -43,11 +44,27 @@ class AwsAppRunnerBackend implements CloudBackend
 
     public function cancelInProgressDeployment(Site $site, ProviderCredential $credential): bool
     {
-        // App Runner does support StopDeployment but the request shape
-        // and idempotency story differ enough that dply hasn't wired
-        // it yet. Return false so the cancel UI surfaces a clear
-        // "not available on this backend" rather than silently
-        // succeeding without actually stopping the deploy.
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return false;
+        }
+
+        $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
+        foreach ($service->listOperations($site->container_backend_id, 5) as $op) {
+            $status = strtoupper($op['status']);
+            $type = strtoupper($op['type']);
+            if (! in_array($status, ['PENDING', 'IN_PROGRESS'], true)) {
+                continue;
+            }
+            if ($type !== '' && ! str_contains($type, 'DEPLOY')) {
+                continue;
+            }
+            if ($op['id'] === '') {
+                continue;
+            }
+
+            return $service->stopDeployment($site->container_backend_id, $op['id']);
+        }
+
         return false;
     }
 
@@ -170,11 +187,13 @@ class AwsAppRunnerBackend implements CloudBackend
     {
         $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
         [$cpu, $memory] = $this->cpuMemoryForSite($site);
+        $accessRoleArn = $this->accessRoleArn($credential);
         $result = $service->createService(
             serviceName: $this->backendServiceName($site),
             image: (string) $site->container_image,
             port: (int) ($site->container_port ?: 8080),
             envVars: $this->siteEnvVars($site),
+            authConfigArn: $accessRoleArn,
             cpu: $cpu,
             memory: $memory,
         );
@@ -244,6 +263,13 @@ class AwsAppRunnerBackend implements CloudBackend
         }
 
         return $arn;
+    }
+
+    private function accessRoleArn(ProviderCredential $credential): ?string
+    {
+        $arn = $credential->credentials['access_role_arn'] ?? null;
+
+        return is_string($arn) && $arn !== '' ? $arn : null;
     }
 
     /** @return array<string, mixed> */
@@ -355,19 +381,48 @@ class AwsAppRunnerBackend implements CloudBackend
         return AwsAppRunnerService::getRegions();
     }
 
-    /** @return list<array<string, string>>
-    /** @return list<array<string, string>>
     /**
-     * @return array<int, array<string, string|null>>
+     * @return list<array{id: string, phase: string, started_at: ?string, finished_at: ?string, cause: string}>
      */
     public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
     {
-        // App Runner exposes ListOperations on a service for full
-        // deploy history; we keep this minimal — the CLI surface is
-        // primarily used against DigitalOcean (where deployments are
-        // first-class). For AWS, return a single synthetic "latest"
-        // entry derived from local meta so the CLI / dashboard show
-        // something instead of an empty list.
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return $this->syntheticRecentDeployment($site);
+        }
+
+        try {
+            $ops = (new AwsAppRunnerService($credential, $site->container_region ?: null))
+                ->listOperations($site->container_backend_id, $limit);
+        } catch (\Throwable) {
+            return $this->syntheticRecentDeployment($site);
+        }
+
+        if ($ops === []) {
+            return $this->syntheticRecentDeployment($site);
+        }
+
+        $deployments = [];
+        foreach ($ops as $op) {
+            if ($op['id'] === '') {
+                continue;
+            }
+            $deployments[] = [
+                'id' => $op['id'],
+                'phase' => $op['status'] !== '' ? $op['status'] : 'UNKNOWN',
+                'started_at' => $op['started_at'],
+                'finished_at' => $op['finished_at'],
+                'cause' => $op['type'] !== '' ? $op['type'] : 'aws_app_runner',
+            ];
+        }
+
+        return $deployments !== [] ? $deployments : $this->syntheticRecentDeployment($site);
+    }
+
+    /**
+     * @return list<array{id: string, phase: string, started_at: ?string, finished_at: ?string, cause: string}>
+     */
+    private function syntheticRecentDeployment(Site $site): array
+    {
         $meta = is_array($site->meta) ? $site->meta : [];
         $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
         $startedAt = is_string($container['last_deploy_started_at'] ?? null) ? (string) $container['last_deploy_started_at'] : null;
@@ -386,74 +441,124 @@ class AwsAppRunnerBackend implements CloudBackend
         ]];
     }
 
-    /** @return array<int, array<string, string|null>>
-    /** @return array<int, array<string, string|null>>
     /**
-     * @return array<int, array<string, string|null>>
+     * @return array{content: ?string, url: ?string, message: ?string}
      */
     public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
     {
-        // App Runner streams logs to CloudWatch under
-        // /aws/apprunner/{service-name}/{revision}/{application,service}.
-        // We don't fetch them through the App Runner API (no equivalent
-        // of DO's signed-URL endpoint); the operator goes to CloudWatch
-        // directly. Surface the LogGroup hint instead.
-        $serviceName = $this->backendServiceName($site);
-
         return [
             'content' => null,
-            'url' => null,
-            'message' => sprintf(
-                'AWS App Runner streams logs to CloudWatch under /aws/apprunner/%s/<revision>/{application,service}. Open the AWS console for live tailing.',
-                $serviceName,
-            ),
+            'url' => $this->cloudWatchLogsUrl($site),
+            'message' => 'AWS App Runner streams deploy and application logs to CloudWatch. '
+                .'Open the CloudWatch console for live tailing, or use dply:cloud:logs --run for recent application lines.',
         ];
     }
 
     /**
-     * App Runner publishes CPU / memory / request metrics to
-     * CloudWatch under the AWS/AppRunner namespace, not over the App
-     * Runner API. v1 does not fetch them through the CloudWatch SDK —
-     * deep CloudWatch integration is deferred — so this returns the
-     * structured unavailable state with a CloudWatch console deep
-     * link the operator can open instead.
+     * Live-fetch CPU / memory / request metrics from CloudWatch
+     * (AWS/AppRunner). Cached 60s. Failures degrade to available:false
+     * with a CloudWatch console deep link.
+     *
+     * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function metrics(Site $site, ProviderCredential $credential, string $window): array
     {
         $window = $this->normalizeWindow($window);
+        $fallbackUrl = $this->cloudWatchMetricsUrl($site);
 
-        return [
-            'window' => $window,
-            'series' => ['cpu' => [], 'memory' => [], 'requests' => []],
-            'available' => false,
-            'note' => 'AWS App Runner publishes CPU, memory, and request metrics to CloudWatch '
-                .'under the AWS/AppRunner namespace. Open the CloudWatch console for live charts.',
-            'url' => $this->cloudWatchMetricsUrl($site),
-        ];
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [
+                'window' => $window,
+                'series' => ['cpu' => [], 'memory' => [], 'requests' => []],
+                'available' => false,
+                'note' => 'Site has not been provisioned on App Runner yet.',
+                'url' => $fallbackUrl,
+            ];
+        }
+
+        return Cache::remember(
+            self::metricsCacheKey($site, $window),
+            self::CACHE_TTL_SECONDS,
+            function () use ($site, $credential, $window, $fallbackUrl): array {
+                [$start, $end] = $this->windowBounds($window);
+
+                try {
+                    $series = (new AwsAppRunnerService($credential, $site->container_region ?: null))
+                        ->getServiceMetrics((string) $site->container_backend_id, $start, $end);
+                } catch (\Throwable $e) {
+                    return [
+                        'window' => $window,
+                        'series' => ['cpu' => [], 'memory' => [], 'requests' => []],
+                        'available' => false,
+                        'note' => 'Could not fetch CloudWatch metrics for App Runner: '.$e->getMessage(),
+                        'url' => $fallbackUrl,
+                    ];
+                }
+
+                $hasPoints = ($series['cpu'] ?? []) !== []
+                    || ($series['memory'] ?? []) !== []
+                    || ($series['requests'] ?? []) !== [];
+
+                return [
+                    'window' => $window,
+                    'series' => $series,
+                    'available' => $hasPoints,
+                    'note' => $hasPoints
+                        ? null
+                        : 'No CloudWatch metric datapoints yet for this App Runner service. Metrics appear after the service receives traffic.',
+                    'url' => $fallbackUrl,
+                ];
+            },
+        );
     }
 
     /**
-     * App Runner streams runtime (application) logs to CloudWatch
-     * Logs under /aws/apprunner/{service}/{revision}/application.
-     * v1 does not tail them through the CloudWatch Logs SDK — the
-     * operator opens the CloudWatch console via the returned link.
+     * Tail application logs from CloudWatch Logs. Failures degrade to
+     * available:false with a console deep link (same as metrics).
+     *
+     * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
-        $serviceName = $this->backendServiceName($site);
+        $lines = max(1, min(2000, $lines));
+        $fallbackUrl = $this->cloudWatchLogsUrl($site);
 
-        return [
-            'lines' => [],
-            'available' => false,
-            'url' => $this->cloudWatchLogsUrl($site),
-            'note' => sprintf(
-                'AWS App Runner streams runtime logs to CloudWatch under '
-                .'/aws/apprunner/%s/<revision>/application. Open the CloudWatch console for live tailing.',
-                $serviceName,
-            ),
-        ];
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [
+                'lines' => [],
+                'available' => false,
+                'url' => $fallbackUrl,
+                'note' => 'Site has not been provisioned on App Runner yet.',
+            ];
+        }
+
+        return Cache::remember(
+            self::runtimeLogsCacheKey($site, $lines),
+            self::CACHE_TTL_SECONDS,
+            function () use ($site, $credential, $lines, $fallbackUrl): array {
+                try {
+                    $logLines = (new AwsAppRunnerService($credential, $site->container_region ?: null))
+                        ->getApplicationLogLines((string) $site->container_backend_id, $lines);
+                } catch (\Throwable $e) {
+                    return [
+                        'lines' => [],
+                        'available' => false,
+                        'url' => $fallbackUrl,
+                        'note' => 'Could not fetch CloudWatch Logs for App Runner: '.$e->getMessage()
+                            .' Open the CloudWatch console for live tailing.',
+                    ];
+                }
+
+                return [
+                    'lines' => $logLines,
+                    'available' => $logLines !== [],
+                    'url' => $fallbackUrl,
+                    'note' => $logLines === []
+                        ? 'No application log events in CloudWatch yet for this App Runner service.'
+                        : null,
+                ];
+            },
+        );
     }
 
     /**
@@ -464,8 +569,13 @@ class AwsAppRunnerBackend implements CloudBackend
     private function cloudWatchLogsUrl(Site $site): string
     {
         $region = $site->container_region ?: 'us-east-1';
-        $serviceName = $this->backendServiceName($site);
-        $logGroup = '/aws/apprunner/'.$serviceName.'/application';
+        $parsed = is_string($site->container_backend_id) && $site->container_backend_id !== ''
+            ? AwsAppRunnerService::parseServiceArn($site->container_backend_id)
+            : null;
+
+        $logGroup = $parsed !== null
+            ? sprintf('/aws/apprunner/%s/%s/application', $parsed['name'], $parsed['id'])
+            : '/aws/apprunner/'.$this->backendServiceName($site);
 
         return sprintf(
             'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#logsV2:log-groups/log-group/%s',
@@ -556,9 +666,35 @@ class AwsAppRunnerBackend implements CloudBackend
     }
 
     /**
-     * Map the site's portable size_tier (small / medium / large /
-     * xlarge) to App Runner's [Cpu, Memory] pair (string slugs).
-     * Defaults to "small" → 256/512 (the smallest App Runner combo).
+     * Map a portable size_tier to App Runner compute.
+     *
+     * AWS App Runner has one compute axis (CPU + RAM combo) and no
+     * Basic/Pro split — the dply Pro suffix is a DO concept. Each
+     * `*-pro` value maps to the same CPU/RAM combo as its Basic peer
+     * so swapping backends doesn't accidentally change AWS sizing.
+     *
+     * @return array{cpu: string, memory: string, vcpu: float, memory_gb: float}
+     */
+    public static function computeForSizeTier(string $tier): array
+    {
+        [$cpu, $memory] = match ($tier) {
+            'medium', 'medium-pro' => ['512', '1024'],
+            'large', 'large-pro' => ['1024', '2048'],
+            'xlarge', 'xlarge-pro' => ['2048', '4096'],
+            default => ['256', '512'],
+        };
+
+        return [
+            'cpu' => $cpu,
+            'memory' => $memory,
+            'vcpu' => ((int) $cpu) / 1024.0,
+            'memory_gb' => ((int) $memory) / 1024.0,
+        ];
+    }
+
+    /**
+     * Map the site's portable size_tier to App Runner's [Cpu, Memory]
+     * pair (string slugs). Defaults to "small" → 256/512.
      *
      * @return array{0: string, 1: string}
      */
@@ -566,17 +702,9 @@ class AwsAppRunnerBackend implements CloudBackend
     {
         $meta = is_array($site->meta) ? $site->meta : [];
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
+        $compute = self::computeForSizeTier($tier);
 
-        // AWS App Runner has one compute axis (CPU + RAM combo) and no
-        // Basic/Pro split — the dply Pro suffix is a DO concept. We map
-        // each `*-pro` value to the same CPU/RAM combo as its Basic peer
-        // so swapping backends doesn't accidentally change AWS sizing.
-        return match ($tier) {
-            'medium', 'medium-pro' => ['512', '1024'],
-            'large', 'large-pro' => ['1024', '2048'],
-            'xlarge', 'xlarge-pro' => ['2048', '4096'],
-            default => ['256', '512'],
-        };
+        return [$compute['cpu'], $compute['memory']];
     }
 
     /**

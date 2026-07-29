@@ -18,8 +18,11 @@ use App\Models\EdgeSiteEnvVar;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Modules\Billing\Services\ManagedProductCostEstimator;
+use App\Modules\Edge\Services\EdgeTemplateRegistry;
 use App\Modules\Edge\Services\Frameworks\EdgeFrameworkPresetRegistry;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Modules\Edge\Support\EdgeEligibility;
+use App\Modules\Edge\Support\EdgeSsrAvailability;
 use App\Modules\Edge\Support\EdgeSsrDetection;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Contracts\View\View;
@@ -27,6 +30,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -149,6 +153,92 @@ class Create extends Component
         $this->applyQueryPrefills(request()->query());
     }
 
+    public function openCloudflareCredentialModal(): void
+    {
+        $this->dispatch('open-add-provider-credential-modal', provider: 'cloudflare');
+    }
+
+    #[On('provider-credential-created')]
+    public function applyStoredCloudflareCredential(?string $provider = null, mixed $credentialId = null): void
+    {
+        if ($provider !== 'cloudflare' || $credentialId === null || $credentialId === '') {
+            return;
+        }
+
+        $this->form->delivery_mode = 'byo';
+        $this->form->edge_provider_credential_id = (string) $credentialId;
+    }
+
+    /**
+     * Prefill a known public static template so local/sandbox operators can
+     * exercise create → detect → deploy without hunting for a repo.
+     * Gated to local/testing (and fake-edge sandbox) — never shown in prod.
+     */
+    public function loadSampleApp(): void
+    {
+        if (! $this->localSampleAppAvailable()) {
+            return;
+        }
+
+        $template = EdgeTemplateRegistry::find('eleventy-portfolio')
+            ?? EdgeTemplateRegistry::find('static-html');
+        if ($template === null) {
+            $this->toastError(__('No sample template is registered.'));
+
+            return;
+        }
+
+        $repo = EdgeCreateForm::normalizeRepo((string) ($template['clone_repo'] ?? $template['repo'] ?? ''));
+        if ($repo === '') {
+            $this->toastError(__('Sample template is missing a repository.'));
+
+            return;
+        }
+
+        $this->repo_source = 'manual';
+        $this->repository_selection = '';
+        $this->repo = $repo;
+        $this->branch = (string) ($template['branch'] ?? 'main');
+        $this->form->name = 'sample-edge-app';
+        $this->form->ref_kind = 'branch';
+        $this->form->delivery_mode = 'managed';
+        $this->form->spa_fallback = true;
+        $this->form->deploy_on_push = false;
+        $this->form->origin_url = '';
+        $this->form->origin_cloud_site_id = '';
+        $this->form->repo_root = '';
+        $this->runtimeModeTouched = false;
+        $this->originUrlTouched = false;
+        $this->buildOverridesTouched = false;
+        $this->repoRootTouched = false;
+        $this->monorepoDetected = false;
+        $this->monorepoPackages = [];
+        $this->monorepoMarkers = [];
+
+        $runtimeMode = strtolower((string) ($template['runtime_mode'] ?? 'static'));
+        $this->form->runtime_mode = in_array($runtimeMode, ['static', 'hybrid', 'ssr'], true)
+            ? $runtimeMode
+            : 'static';
+
+        $preset = EdgeFrameworkPresetRegistry::byDetectionPlan([
+            'framework' => (string) ($template['framework'] ?? ''),
+        ]);
+        $this->form->build_command = $preset->buildCommand;
+        $this->form->output_dir = $preset->outputDir !== '' ? $preset->outputDir : 'dist';
+
+        $this->toastSuccess(__('Loaded sample: :name', ['name' => (string) ($template['name'] ?? $repo)]));
+        $this->detectFromRepository();
+    }
+
+    private function localSampleAppAvailable(): bool
+    {
+        if (FakeEdgeProvision::enabled()) {
+            return true;
+        }
+
+        return app()->environment('local', 'testing');
+    }
+
     /**
      * Honor ?repo=…&branch=…&framework=…&runtime_mode=…&build_command=…&output_dir=…&name=…
      * query params on initial mount so the import wizard + template
@@ -265,14 +355,23 @@ class Create extends Component
                 ->get()
             : collect();
 
+        $eligibility = EdgeEligibility::evaluate($this->detectedPlan);
+
         return view('livewire.edge.create', [
             'fakeEdgeActive' => FakeEdgeProvision::enabled(),
+            'localSampleAppAvailable' => $this->localSampleAppAvailable(),
             'edgeFee' => app(ManagedProductCostEstimator::class)->edgeFee(),
             'edgeUsageBillingEnabled' => app(ManagedProductCostEstimator::class)->edgeUsageBillingEnabled(),
             'edgeUsageRates' => app(ManagedProductCostEstimator::class)->edgeUsageRates(),
             'cloudflareCredentials' => $cloudflareCredentials,
             'orgCloudSites' => $this->orgCloudSitesForPicker(),
             'ssrDetected' => $this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan),
+            'ssrAvailable' => EdgeSsrAvailability::isAvailable(),
+            'ssrUnavailableReason' => EdgeSsrAvailability::unavailableReason(),
+            'edgeEligible' => $eligibility['eligible'],
+            'edgeIneligibleMessage' => $eligibility['message'],
+            'edgeAlternativeRoute' => $eligibility['alternative_route'],
+            'edgeAlternativeLabel' => $eligibility['alternative_label'],
             'suggestedHybridOriginUrl' => $this->suggestedHybridOriginUrlForName(),
             'showHybridStackCta' => $this->showHybridStackCta(),
             'autoProvisionHybridOrigin' => $this->shouldAutoProvisionHybridOrigin(),
@@ -356,35 +455,32 @@ class Create extends Component
 
     protected function applyDetectedRuntimePrefills(): void
     {
-        if ($this->buildOverridesTouched) {
-            return;
+        if (! $this->buildOverridesTouched) {
+            // Detection ships its own build_command + output_dir when
+            // they're confident; we honor those verbatim. When either is
+            // missing we fall back to the framework preset registry —
+            // single source of truth shared with the build cache + import
+            // wizard.
+            $preset = EdgeFrameworkPresetRegistry::byDetectionPlan($this->detectedPlan);
+
+            $build = trim((string) ($this->detectedPlan['build_command'] ?? ''));
+            if ($build !== '') {
+                $this->form->build_command = $build;
+            } elseif ($preset->buildCommand !== '') {
+                $this->form->build_command = $preset->buildCommand;
+            }
+
+            $detectedOutput = trim((string) ($this->detectedPlan['output_dir'] ?? ''));
+            if ($detectedOutput !== '') {
+                $this->form->output_dir = $detectedOutput;
+            } elseif ($this->form->output_dir === '' || $this->form->output_dir === 'dist') {
+                $this->form->output_dir = $preset->outputDir !== '' ? $preset->outputDir : 'dist';
+            }
         }
 
-        // Detection ships its own build_command + output_dir when
-        // they're confident; we honor those verbatim. When either is
-        // missing we fall back to the framework preset registry —
-        // single source of truth shared with the build cache + import
-        // wizard.
-        $preset = EdgeFrameworkPresetRegistry::byDetectionPlan($this->detectedPlan);
-
-        $build = trim((string) ($this->detectedPlan['build_command'] ?? ''));
-        if ($build !== '') {
-            $this->form->build_command = $build;
-        } elseif ($preset->buildCommand !== '') {
-            $this->form->build_command = $preset->buildCommand;
-        }
-
-        $detectedOutput = trim((string) ($this->detectedPlan['output_dir'] ?? ''));
-        if ($detectedOutput !== '') {
-            $this->form->output_dir = $detectedOutput;
-
-            return;
-        }
-
-        if ($this->form->output_dir === '' || $this->form->output_dir === 'dist') {
-            $this->form->output_dir = $preset->outputDir !== '' ? $preset->outputDir : 'dist';
-        }
-
+        // Always apply delivery-mode prefills (hybrid for SSR, etc.) even
+        // when build fields were filled from detection — early-returning
+        // after output_dir used to skip this and leave mode stuck on static.
         $this->applyDetectedDeliveryPrefills();
     }
 }

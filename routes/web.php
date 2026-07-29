@@ -8,6 +8,7 @@ use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Modules\Docs\Http\Controllers\DocsController;
 use App\Modules\Edge\Http\Controllers\EdgeAuditLogExportController;
+use App\Modules\Edge\Http\Controllers\EdgeLiveAccessLogPollController;
 use App\Modules\Edge\Http\Controllers\EdgeLogCsvDownloadController;
 use App\Modules\Edge\Http\Controllers\EdgeRepoConfigYamlDownloadController;
 use App\Modules\Edge\Http\Controllers\EdgeDeployHookController;
@@ -755,10 +756,23 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // is `sites.show` section=routing → `/sites/{site}/routing`. Sharing that path
     // let this literal route shadow the wildcard for *every* site, so a VM site's
     // /routing hit ServerlessRouting, which redirects VM sites back to
-    // section=routing → the same URL → an infinite redirect loop. The dedicated
-    // `/edge-routing` path keeps the two surfaces separate (name unchanged, so
-    // callers using route('sites.routing') need no edits).
-    Route::livewire('servers/{server}/sites/{site}/edge-routing', ServerlessRouting::class)->name('sites.routing');
+    // section=routing → the same URL → an infinite redirect loop.
+    //
+    // Path is `/proxy-routing` (not `/edge-routing`): Edge product sites use
+    // `sites.show` section=edge-routing → `/…/edge-routing` for redirects /
+    // rewrites / headers in EdgeSettings. Reusing `/edge-routing` for this
+    // serverless surface stole that URL and redirected Edge sites to BYO
+    // `/routing` (404). Route name stays `sites.routing`.
+    Route::livewire('servers/{server}/sites/{site}/proxy-routing', ServerlessRouting::class)->name('sites.routing');
+    // Legacy serverless bookmark: `/edge-routing` → proxy routing. Edge sites
+    // fall through to the sites.show wildcard below (section=edge-routing).
+    Route::get('servers/{server}/sites/{site}/edge-routing', function (Server $server, Site $site) {
+        if ($site->usesEdgeRuntime()) {
+            return app(SiteWorkspaceController::class)($server, $site, 'edge-routing');
+        }
+
+        return redirect()->route('sites.routing', ['server' => $server, 'site' => $site]);
+    })->name('sites.routing.legacy-edge-path');
     // Repository now lives as the top-level "Repository" tab on the
     // Deployments page (it used to be the "Settings → Repository" section,
     // but Settings was split into the Webhook/Hooks tabs and Repository was
@@ -841,6 +855,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // dispatcher because the .csv extension wouldn't match.
     Route::get('servers/{server}/sites/{site}/edge/logs.csv', EdgeLogCsvDownloadController::class)
         ->name('sites.edge.logs.csv');
+
+    Route::get('servers/{server}/sites/{site}/edge/logs/live.json', EdgeLiveAccessLogPollController::class)
+        ->name('sites.edge.logs.live');
 
     // Per-site audit-log export (CSV/JSON) — session-authed, no row cap,
     // mirrors the on-screen Audit log panel filters.

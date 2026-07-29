@@ -6,15 +6,16 @@
     $outputDir = trim((string) ($form->output_dir ?? ''));
     $runtimeMode = (string) ($form->runtime_mode ?? 'static');
     $runtimeLabel = match ($runtimeMode) {
-        'hybrid' => __('Hybrid (static + origin)'),
-        'ssr' => __('Worker-native SSR'),
+        'hybrid' => __('Hybrid'),
+        'ssr' => __('Worker SSR'),
         default => __('Static / SSG'),
     };
     $deliveryLabel = ($form->delivery_mode ?? 'managed') === 'byo'
-        ? __('Your account (BYO)')
+        ? __('Your account')
         : __('Dply-hosted');
 @endphp
-<aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
+{{-- pb-24 clears the floating dock; max-h leaves room below sticky top so the cost row stays in view. --}}
+<aside class="space-y-4 pb-24 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
     <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
         <div class="border-b border-brand-ink/8 bg-gradient-to-br from-brand-sage/10 via-transparent to-brand-gold/10 px-5 py-3.5 dark:border-brand-mist/15">
             <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Deploy summary') }}</p>
@@ -47,77 +48,35 @@
                 <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Hosting') }}</dt>
                 <dd class="min-w-0 text-end text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ $deliveryLabel }}</dd>
             </div>
+            <div class="flex items-center justify-between gap-3 bg-brand-sand/20 px-5 py-3 dark:bg-brand-sand/10">
+                <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Est. cost') }}</dt>
+                <dd class="min-w-0 text-end">
+                    <p class="text-lg font-semibold tracking-tight text-brand-ink">
+                        ${{ number_format($edgeFee, 2) }}<span class="text-sm font-medium text-brand-moss">/mo</span>
+                    </p>
+                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                        @if ($edgeUsageBillingEnabled)
+                            {{ __('Per live site + overage. Previews free.') }}
+                        @else
+                            {{ __('Per live site. Previews free.') }}
+                        @endif
+                    </p>
+                </dd>
+            </div>
         </dl>
-    </div>
-
-    <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-        <div class="border-b border-brand-ink/8 bg-gradient-to-br from-brand-sage/10 via-transparent to-brand-gold/10 px-5 py-3.5 dark:border-brand-mist/15">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-sage">{{ __('Global delivery') }}</p>
-            <p class="mt-1 text-sm font-semibold text-brand-ink">{{ __('Git push to edge in minutes') }}</p>
+        <div class="border-t border-brand-ink/8 px-5 py-2.5 dark:border-brand-mist/15">
+            <x-docs-link doc-route="docs.markdown" doc-slug="edge-create" class="!border-0 !bg-transparent !px-0 !py-0 !shadow-none text-xs font-semibold text-brand-sage transition-colors hover:text-brand-forest dark:hover:text-brand-gold">
+                {{ __('Docs') }}
+                <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
+            </x-docs-link>
         </div>
-        <ol class="space-y-0 px-5 py-3.5">
-            @foreach ([
-                ['icon' => 'code-bracket', 'title' => __('Connect Git'), 'desc' => __('Point at your repo and production branch.')],
-                ['icon' => 'cpu-chip', 'title' => __('Build static output'), 'desc' => __('dply runs your build and collects dist/out assets.')],
-                ['icon' => 'globe-alt', 'title' => __('Publish globally'), 'desc' => __('HTTPS on the edge network with instant cache invalidation.')],
-            ] as $step)
-                <li class="relative flex gap-3 pb-3.5 last:pb-0">
-                    @if (! $loop->last)
-                        <span class="absolute start-[1.125rem] top-9 h-[calc(100%-1rem)] w-px bg-brand-ink/10 dark:bg-brand-mist/20" aria-hidden="true"></span>
-                    @endif
-                    <span class="relative z-10 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/20 dark:bg-brand-sage/20 dark:text-brand-sage dark:ring-brand-sage/30">
-                        @switch($step['icon'])
-                            @case('code-bracket')
-                                <x-heroicon-o-code-bracket class="h-4 w-4" aria-hidden="true" />
-                                @break
-                            @case('cpu-chip')
-                                <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
-                                @break
-                            @default
-                                <x-heroicon-o-globe-alt class="h-4 w-4" aria-hidden="true" />
-                        @endswitch
-                    </span>
-                    <div class="min-w-0 pt-0.5">
-                        <p class="text-sm font-semibold text-brand-ink">{{ $step['title'] }}</p>
-                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $step['desc'] }}</p>
-                    </div>
-                </li>
-            @endforeach
-        </ol>
     </div>
 
-    <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Works great with') }}</p>
-        <div class="mt-2.5 flex flex-wrap gap-1.5">
-            @foreach (['Vite', 'Next.js', 'Nuxt', 'Astro', 'React', 'Vue', 'Svelte', 'Hugo', 'Eleventy'] as $framework)
-                <span class="inline-flex items-center rounded-lg border border-brand-ink/10 bg-brand-cream/60 px-2 py-0.5 text-[11px] font-semibold text-brand-forest dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-sage">
-                    {{ $framework }}
-                </span>
-            @endforeach
-        </div>
-        <p class="mt-2.5 text-xs leading-relaxed text-brand-moss">{{ __('Static export and SSG — or hybrid with a Cloud origin for SSR. For long-lived apps, use Cloud.') }}</p>
-    </div>
-
-    <div class="rounded-2xl border border-brand-sage/25 bg-gradient-to-br from-brand-cream via-white to-brand-sand/30 p-4 shadow-sm dark:border-brand-sage/20 dark:from-zinc-900 dark:via-zinc-900 dark:to-brand-sand/10">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Estimated cost') }}</p>
-        <p class="mt-1.5 text-3xl font-semibold tracking-tight text-brand-ink">
-            ${{ number_format($edgeFee, 2) }}<span class="text-base font-medium text-brand-moss">/mo</span>
-        </p>
-        <p class="mt-1.5 text-xs leading-relaxed text-brand-moss">
-            @if ($edgeUsageBillingEnabled)
-                {{ __(':fee/mo platform fee per live site. Each site includes :requests requests, :egress GB egress, and :storage GB storage per month — usage beyond that is billed by the unit.', [
-                    'fee' => '$'.number_format($edgeFee, 2),
-                    'requests' => number_format($edgeUsageRates['included_requests_per_site']),
-                    'egress' => number_format($edgeUsageRates['included_egress_gb_per_site']),
-                    'storage' => number_format($edgeUsageRates['included_r2_storage_gb_per_site'] ?? 1),
-                ]) }}
-            @else
-                {{ __('Flat dply per-site fee once your edge app is live. Branch previews are free.') }}
-            @endif
-        </p>
-        <x-docs-link doc-route="docs.markdown" doc-slug="edge-create" class="mt-3 !border-0 !bg-transparent !px-0 !py-0 !shadow-none text-xs font-semibold text-brand-sage transition-colors hover:text-brand-forest dark:hover:text-brand-gold">
-            {{ __('Browse documentation') }}
-            <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-        </x-docs-link>
-    </div>
+    <p class="px-1 text-xs leading-relaxed text-brand-moss">
+        {{ __('Static/SSG JS and hybrid SSR — not Laravel, Rails, WordPress, or Nest/Express.') }}
+        @if (\Illuminate\Support\Facades\Route::has('cloud.create'))
+            <a href="{{ route('cloud.create') }}" wire:navigate class="font-semibold text-brand-sage underline decoration-brand-sage/30 underline-offset-2 hover:text-brand-forest dark:hover:text-brand-gold">{{ __('Use Cloud') }}</a>
+            {{ __('or BYO.') }}
+        @endif
+    </p>
 </aside>

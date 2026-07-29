@@ -394,8 +394,7 @@
         </section>
     </div>
 
-    @include('livewire.servers.partials._deploy-console')
-
+    {{-- Deploy console lives in the app shell (deploy-console-sidebar + dock). --}}
     @include('livewire.servers.partials.deploy-sites-modal')
 
     <x-slot name="modals">

@@ -19,9 +19,14 @@ final class EdgeSiteAccessAnalytics
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function forSite(Site $site): array
     {
+        $memoKey = 'edge.access.for_site.'.$site->id;
+        if (app()->bound('request') && request()->attributes->has($memoKey)) {
+            /** @var array<string, mixed> */
+            return request()->attributes->get($memoKey);
+        }
+
         $since = now()->subDays(7);
 
         $recentLogs = EdgeAccessLog::query()
@@ -50,7 +55,7 @@ final class EdgeSiteAccessAnalytics
             ->where('occurred_at', '>=', $since)
             ->get(['lcp_ms', 'cls', 'inp_ms', 'fcp_ms', 'ttfb_ms']);
 
-        return [
+        $payload = [
             'has_worker_logs' => $recentLogs->isNotEmpty() || $hourly->isNotEmpty(),
             'has_web_vitals' => $vitals->isNotEmpty(),
             'recent_logs' => $recentLogs->map(fn (EdgeAccessLog $log): array => [
@@ -79,6 +84,12 @@ final class EdgeSiteAccessAnalytics
                 'ttfb_p75_ms' => $this->percentile($vitals->pluck('ttfb_ms')->filter()->values(), 75),
             ],
         ];
+
+        if (app()->bound('request')) {
+            request()->attributes->set($memoKey, $payload);
+        }
+
+        return $payload;
     }
 
     /**

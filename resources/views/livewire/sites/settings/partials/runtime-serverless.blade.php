@@ -31,7 +31,7 @@
                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Function') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('App') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.') }}</p>
             </div>
@@ -105,7 +105,7 @@
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Limits') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('How much the function gets per invocation. These are pushed to the action on the next deploy.') }}</p>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('How much the app gets per request. These are pushed to the action on the next deploy.') }}</p>
             </div>
         </div>
 
@@ -196,7 +196,7 @@
     {{-- 4. CLI parity --}}
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
         <x-cli-snippet :commands="[
-            ['label' => __('Deploy / redeploy the function'), 'command' => 'dply sites:deploy '.$site->slug],
+            ['label' => __('Deploy / redeploy the app'), 'command' => 'dply sites:deploy '.$site->slug],
         ]" />
     </div>
 </div>

@@ -7,6 +7,7 @@ namespace App\Modules\Edge\Livewire\Concerns;
 use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
+use App\Modules\Edge\Support\EdgeEligibility;
 use App\Modules\Edge\Support\EdgeSsrDetection;
 
 /**
@@ -39,6 +40,13 @@ trait ManagesEdgeDeploy
 
         if (! $org->canCreateSite()) {
             $this->toastError($org->siteLimitMessage());
+
+            return;
+        }
+
+        $eligibility = EdgeEligibility::evaluate($this->detectedPlan);
+        if (! $eligibility['eligible']) {
+            $this->toastError((string) $eligibility['message']);
 
             return;
         }

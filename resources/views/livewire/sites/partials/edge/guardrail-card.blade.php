@@ -2,25 +2,19 @@
     $guardrail = $site->edgeGuardrail();
 @endphp
 
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quota') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Monthly usage quota') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Soft cap on requests and bandwidth per calendar month. You get a heads-up at :pct%; once you cross 100%, the dashboard flags the site as over quota.', ['pct' => $guardrail['warn_at_percent'] ?? config('edge.guardrail.warn_at_percent', 80)]) }}
-            </p>
+<section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Monthly quota') }}</p>
+            <p class="mt-1 text-xs text-brand-moss">{{ __('Soft cap — warn at :pct%, flag at 100%.', ['pct' => $guardrail['warn_at_percent'] ?? config('edge.guardrail.warn_at_percent', 80)]) }}</p>
         </div>
         @if ($guardrail !== null)
             @php
                 $state = $guardrail['state'] ?? 'ok';
                 $stateBadge = match ($state) {
-                    'over' => 'bg-red-100 text-red-800',
-                    'warn' => 'bg-amber-100 text-amber-800',
-                    default => 'bg-emerald-100 text-emerald-800',
+                    'over' => 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300',
+                    'warn' => 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
+                    default => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300',
                 };
                 $stateLabel = match ($state) {
                     'over' => __('Over'),
@@ -28,16 +22,12 @@
                     default => __('OK'),
                 };
             @endphp
-            <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $stateBadge }}">
-                {{ $stateLabel }}
-            </span>
+            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $stateBadge }}">{{ $stateLabel }}</span>
         @endif
     </div>
 
     @if ($guardrail === null)
-        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
-            {{ __('Quota status not evaluated yet — runs daily at 02:45 UTC.') }}
-        </div>
+        <p class="mt-3 text-sm text-brand-moss">{{ __('Not evaluated yet — checked daily.') }}</p>
     @else
         @php
             $requests = (int) ($guardrail['requests'] ?? 0);
@@ -46,7 +36,6 @@
             $bytesCap = (int) ($guardrail['bytes_egress_cap'] ?? 0);
             $reqPct = (int) ($guardrail['requests_percent'] ?? 0);
             $bytesPct = (int) ($guardrail['bytes_percent'] ?? 0);
-            $warnAt = (int) ($guardrail['warn_at_percent'] ?? 80);
             $evaluatedAt = $guardrail['evaluated_at'] ?? null;
 
             $humanBytes = static function (int $b): string {
@@ -59,53 +48,45 @@
                 return sprintf('%.1f %s', $b / (1024 ** $i), $units[$i]);
             };
 
-            $bar = static function (int $pct, string $state) {
-                $clamped = max(0, min(100, $pct));
-                $color = match (true) {
+            $barColor = static function (int $pct) use ($state): string {
+                return match (true) {
                     $pct >= 100 => 'bg-red-500',
                     $state === 'warn' && $pct >= 50 => 'bg-amber-500',
                     $pct >= 50 => 'bg-amber-400',
                     default => 'bg-emerald-500',
                 };
-
-                return [$clamped, $color];
             };
-
-            [$reqW, $reqColor] = $bar($reqPct, $state);
-            [$bytesW, $bytesColor] = $bar($bytesPct, $state);
         @endphp
-        <div class="grid gap-6 px-6 py-5 sm:px-8 sm:grid-cols-2">
+        <div class="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
                 <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Requests') }}</span>
-                    <span class="font-mono text-xs text-brand-moss">{{ $reqPct }}%</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Requests') }}</span>
+                    <span class="font-mono text-[11px] text-brand-moss">{{ $reqPct }}%</span>
                 </div>
-                <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-brand-sand/80">
-                    <div class="h-full rounded-full {{ $reqColor }} transition-[width]" style="width: {{ $reqW }}%"></div>
+                <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-brand-sand/80">
+                    <div class="h-full rounded-full {{ $barColor($reqPct) }}" style="width: {{ max(0, min(100, $reqPct)) }}%"></div>
                 </div>
-                <p class="mt-2 text-sm tabular-nums text-brand-ink">
+                <p class="mt-1.5 text-sm tabular-nums text-brand-ink">
                     {{ number_format($requests) }}
-                    <span class="text-xs text-brand-moss">/ {{ number_format($requestsCap) }}</span>
+                    <span class="text-xs text-brand-mist">/ {{ number_format($requestsCap) }}</span>
                 </p>
             </div>
             <div>
                 <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Bandwidth') }}</span>
-                    <span class="font-mono text-xs text-brand-moss">{{ $bytesPct }}%</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bandwidth') }}</span>
+                    <span class="font-mono text-[11px] text-brand-moss">{{ $bytesPct }}%</span>
                 </div>
-                <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-brand-sand/80">
-                    <div class="h-full rounded-full {{ $bytesColor }} transition-[width]" style="width: {{ $bytesW }}%"></div>
+                <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-brand-sand/80">
+                    <div class="h-full rounded-full {{ $barColor($bytesPct) }}" style="width: {{ max(0, min(100, $bytesPct)) }}%"></div>
                 </div>
-                <p class="mt-2 text-sm tabular-nums text-brand-ink">
+                <p class="mt-1.5 text-sm tabular-nums text-brand-ink">
                     {{ $humanBytes($bytes) }}
-                    <span class="text-xs text-brand-moss">/ {{ $humanBytes($bytesCap) }}</span>
+                    <span class="text-xs text-brand-mist">/ {{ $humanBytes($bytesCap) }}</span>
                 </p>
             </div>
         </div>
         @if ($evaluatedAt)
-            <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-2 text-right text-[11px] text-brand-moss sm:px-8">
-                {{ __('Evaluated :ts', ['ts' => \Illuminate\Support\Carbon::parse($evaluatedAt)->diffForHumans()]) }}
-            </div>
+            <p class="mt-2 text-right text-[11px] text-brand-mist">{{ __('Checked :ts', ['ts' => \Illuminate\Support\Carbon::parse($evaluatedAt)->diffForHumans()]) }}</p>
         @endif
     @endif
 </section>

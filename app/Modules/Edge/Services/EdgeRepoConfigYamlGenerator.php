@@ -6,6 +6,7 @@ namespace App\Modules\Edge\Services;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Modules\Edge\Support\EdgeEffectiveAlerts;
 use App\Modules\Edge\Support\EdgeEffectiveCrons;
 use App\Modules\Edge\Support\EdgeEffectiveErrorPages;
 use App\Modules\Edge\Support\EdgeEffectiveFirewall;
@@ -15,15 +16,10 @@ use App\Modules\Edge\Support\EdgeEffectiveRouting;
 
 /**
  * Generates a `dply.yaml` snippet from a site's most recent live
- * deployment's repo_config. Lets a user who set things up manually
- * (or imported from another provider) export the current state to
- * a file they can commit to their repo as the source of truth.
- *
- * Only the schema fields supported by EdgeRepoConfig round-trip
- * here: redirects, rewrites, headers, crons, spa_fallback. UI-only
- * dply features (firewall, alerts, error pages, maintenance) live
- * on edgeMeta and are NOT part of dply.yaml — they stay editable in
- * the dashboard.
+ * deployment's repo_config (plus dashboard overrides via the
+ * EdgeEffective* mergers). Lets a user who set things up manually
+ * export the current state to a file they can commit as the source
+ * of truth.
  */
 final class EdgeRepoConfigYamlGenerator
 {
@@ -87,6 +83,13 @@ final class EdgeRepoConfigYamlGenerator
         $effFirewall = EdgeEffectiveFirewall::for($site, $deployment);
         if ($effFirewall['country_mode'] !== 'off' && $effFirewall['countries'] !== []) {
             $sections[] = $this->renderFirewall($effFirewall);
+        }
+
+        // RUM alerts — emit when any metric is enabled (dashboard wins
+        // per metric over the repo declaration).
+        $effAlerts = EdgeEffectiveAlerts::for($site, $deployment);
+        if (EdgeEffectiveAlerts::anyEnabled($effAlerts)) {
+            $sections[] = $this->renderAlerts($effAlerts);
         }
 
         // Hybrid origin (P55-followup): emit a `origin:` block when the
@@ -309,6 +312,30 @@ final class EdgeRepoConfigYamlGenerator
         $lines[] = '  countries:';
         foreach ($firewall['countries'] as $code) {
             $lines[] = '    - '.$this->quote($code);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array{
+     *     lcp_p75_ms: array{enabled: bool, threshold: int},
+     *     error_rate: array{enabled: bool, threshold: float},
+     *     five_xx_count: array{enabled: bool, threshold: int}
+     * }  $alerts
+     */
+    private function renderAlerts(array $alerts): string
+    {
+        $lines = ['alerts:'];
+        foreach (EdgeEffectiveAlerts::KEYS as $key) {
+            $metric = is_array($alerts[$key] ?? null) ? $alerts[$key] : null;
+            if ($metric === null || ! ($metric['enabled'] ?? false)) {
+                continue;
+            }
+            $threshold = $metric['threshold'];
+            $lines[] = '  '.$key.':';
+            $lines[] = '    enabled: true';
+            $lines[] = '    threshold: '.($key === 'error_rate' ? (string) $threshold : (string) (int) $threshold);
         }
 
         return implode("\n", $lines);

@@ -150,30 +150,137 @@
             @unless ($hasSitesInScope)
                 @if (isset($empty) && ! $empty->isEmpty())
                     {{ $empty }}
-                @else
+                @elseif ($isProductionSurface)
                     <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="edge-empty-heading">
                         <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-rocket-launch class="h-6 w-6" aria-hidden="true" />
+                            <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
                         </span>
                         <h2 id="edge-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">
-                            {{ $isProductionSurface ? __('No production Edge sites') : __('No edge sites found') }}
+                            {{ __('No production Edge sites') }}
                         </h2>
                         <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
-                            {{ $isProductionSurface
-                                ? __('The connected control plane returned no Edge sites for this organization.')
-                                : __('Git-connected static and SSG apps you deploy via dply Edge will appear here.') }}
+                            {{ __('The connected control plane returned no Edge sites for this organization.') }}
                         </p>
-                        @if ($showCreateAction && ! $isProductionSurface)
-                            <a
-                                href="{{ $createUrl }}"
-                                wire:navigate
-                                class="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                            >
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Deploy your first edge app') }}
-                            </a>
-                        @endif
                     </div>
+                @else
+                    @php
+                        $emptyCapabilities = [
+                            [
+                                'icon' => 'heroicon-o-bolt',
+                                'title' => __('Global delivery'),
+                                'body' => __('Static and SSG assets ship to the edge — fast first paint without managing a CDN yourself.'),
+                            ],
+                            [
+                                'icon' => 'heroicon-o-eye',
+                                'title' => __('Preview every push'),
+                                'body' => __('Branch and PR previews with shareable URLs so review happens before production.'),
+                            ],
+                            [
+                                'icon' => 'heroicon-o-code-bracket',
+                                'title' => __('Git-connected builds'),
+                                'body' => __('Connect a repo, set build + output, and deploy — frameworks and plain static both welcome.'),
+                            ],
+                        ];
+                    @endphp
+
+                    <section class="relative overflow-hidden border-b border-brand-ink/10" aria-labelledby="edge-empty-heading">
+                        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(122,154,122,0.16),_transparent_55%),radial-gradient(ellipse_at_bottom_left,_rgba(212,175,122,0.14),_transparent_50%)]" aria-hidden="true"></div>
+                        <div class="relative flex flex-col gap-6 px-5 py-10 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:py-12">
+                            <div class="min-w-0 max-w-2xl">
+                                <div class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-sage shadow-sm backdrop-blur-sm dark:border-brand-mist/20 dark:bg-zinc-900/70">
+                                    <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Get started') }}
+                                </div>
+                                <h2 id="edge-empty-heading" class="mt-3 text-xl font-semibold tracking-tight text-brand-ink sm:text-2xl">
+                                    {{ __('Launch your first Edge site') }}
+                                </h2>
+                                <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('dply Edge is for JavaScript frameworks and static sites — git builds, preview URLs, and global delivery. Long-running PHP and Rails apps belong on Cloud.') }}
+                                </p>
+                            </div>
+                            <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+                                @if ($showCreateAction)
+                                    <a
+                                        href="{{ $createUrl }}"
+                                        wire:navigate
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                                    >
+                                        <x-heroicon-o-sparkles class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {{ __('Deploy an edge app') }}
+                                    </a>
+                                @endif
+                                @if ($showSecondaryActions)
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <a
+                                            href="{{ $templatesUrl }}"
+                                            wire:navigate
+                                            class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                                        >
+                                            <x-heroicon-o-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Browse templates') }}
+                                        </a>
+                                        <a
+                                            href="{{ $importUrl }}"
+                                            wire:navigate
+                                            class="inline-flex items-center gap-1.5 px-2 py-2.5 font-medium text-brand-moss transition hover:text-brand-ink"
+                                        >
+                                            {{ __('Import a site') }}
+                                        </a>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </section>
+
+                    <section aria-labelledby="edge-empty-capabilities-heading">
+                        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6 dark:bg-brand-sand/10">
+                            <h3 id="edge-empty-capabilities-heading" class="text-sm font-semibold text-brand-ink">{{ __('What Edge gives you') }}</h3>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('A Netlify-style path for frontends — not containers, not VMs.') }}</p>
+                        </div>
+                        <ul class="grid gap-0 sm:grid-cols-3">
+                            @foreach ($emptyCapabilities as $i => $capability)
+                                <li @class([
+                                    'flex gap-3 px-5 py-5 sm:px-6',
+                                    'border-b border-brand-ink/10 sm:border-b-0 sm:border-e dark:border-brand-mist/15' => $i < count($emptyCapabilities) - 1,
+                                ])>
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest shadow-sm ring-1 ring-brand-ink/10 dark:bg-zinc-800 dark:text-brand-sage dark:ring-brand-mist/25">
+                                        <x-dynamic-component :component="$capability['icon']" class="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $capability['title'] }}</p>
+                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $capability['body'] }}</p>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                        @if ($showCreateAction || $showSecondaryActions)
+                            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6 dark:border-brand-mist/15 dark:bg-brand-sand/10">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Ready when you are') }}</p>
+                                        <p class="mt-0.5 text-sm text-brand-moss">
+                                            {{ __('Point Edge at a repo, pick a template, or import an existing static site.') }}
+                                        </p>
+                                    </div>
+                                    <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs">
+                                        @if ($showCreateAction)
+                                            <a
+                                                href="{{ $createUrl }}"
+                                                wire:navigate
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 font-semibold text-brand-cream hover:bg-brand-ink/90"
+                                            >
+                                                {{ __('Open deploy wizard') }}
+                                                <x-heroicon-m-arrow-right class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            </a>
+                                        @endif
+                                        @if ($showSecondaryActions)
+                                            <a href="{{ $templatesUrl }}" wire:navigate class="font-medium text-brand-moss hover:text-brand-ink">{{ __('Templates') }}</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </section>
                 @endif
             @else
                 @if ($showFilters)

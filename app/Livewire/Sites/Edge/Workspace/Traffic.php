@@ -7,6 +7,7 @@ namespace App\Livewire\Sites\Edge\Workspace;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Sites\EdgeSiteViewData;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -18,21 +19,17 @@ class Traffic extends Component
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
-
-        $this->site->load([
-            'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(20),
-        ]);
     }
 
     public function render(): View
     {
-        return view('livewire.sites.edge.workspace.traffic', SiteSettingsViewData::for(
-            $this->server,
-            $this->site,
-            'edge-traffic',
-            null,
-            [],
-            auth()->user(),
+        return view('livewire.sites.edge.workspace.traffic', array_merge(
+            EdgeSiteViewData::context($this->site, 'edge-traffic'),
+            SiteSettingsViewData::edgeSectionAnalytics($this->site, 'edge-traffic'),
+            [
+                'server' => $this->server,
+                'site' => $this->site,
+            ],
         ));
     }
 }

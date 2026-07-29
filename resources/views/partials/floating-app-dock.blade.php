@@ -1,6 +1,6 @@
 @php
     /**
-     * Grouped bottom-right dock: Feedback + Console (when available).
+     * Grouped bottom-right dock: Deploys + Feedback + Console (when available).
      *
      * @var \App\Models\Server|null $routeServer
      * @var bool $hideDrawer
@@ -15,12 +15,18 @@
     x-data="{
         consoleOpen: false,
         feedbackOpen: false,
+        deployConsoleOpen: false,
         init() {
             this.consoleOpen = localStorage.getItem('dply.consoleDrawer.open') === '1';
             window.addEventListener('dply-console-drawer-opened', () => { this.consoleOpen = true; });
             window.addEventListener('dply-console-drawer-closed', () => { this.consoleOpen = false; });
             window.addEventListener('dply-feedback-opened', () => { this.feedbackOpen = true; });
             window.addEventListener('dply-feedback-closed', () => { this.feedbackOpen = false; });
+            window.addEventListener('dply-deploy-console-opened', () => { this.deployConsoleOpen = true; });
+            window.addEventListener('dply-deploy-console-closed', () => { this.deployConsoleOpen = false; });
+        },
+        openDeploys() {
+            window.dispatchEvent(new CustomEvent('dply-open-deploy-status'));
         },
         openFeedback() {
             window.dispatchEvent(new CustomEvent('dply-open-feedback'));
@@ -33,8 +39,8 @@
             @endif
         },
     }"
-    {{-- Hide while Feedback is open, and while Console covers this corner. --}}
-    x-show="!feedbackOpen && !consoleOpen"
+    {{-- Hide while any dock-related drawer covers this corner. --}}
+    x-show="!feedbackOpen && !consoleOpen && !deployConsoleOpen"
     x-cloak
 >
     <div
@@ -42,6 +48,18 @@
         role="toolbar"
         aria-label="{{ __('Quick actions') }}"
     >
+        <button
+            type="button"
+            x-on:click="openDeploys()"
+            class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40"
+            title="{{ __('Open deploy status') }}"
+        >
+            <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+            {{ __('Deploys') }}
+        </button>
+
+        <span class="mx-0.5 h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+
         <button
             type="button"
             x-on:click="openFeedback()"

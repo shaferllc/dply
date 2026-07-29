@@ -256,8 +256,9 @@ class ApplyCloudSiteExtras
         $database = match ($mode) {
             'attach' => $this->resolveExistingDatabase($site, $input),
             'create' => $this->createNewDatabase($site, $input),
+            'external' => $this->registerExternalDatabase($site, $input),
             default => throw new InvalidArgumentException(
-                'Unsupported database mode: '.$mode.' (use "attach" or "create").',
+                'Unsupported database mode: '.$mode.' (use "attach", "create", or "external").',
             ),
         };
 
@@ -377,6 +378,30 @@ class ApplyCloudSiteExtras
             'version' => (string) ($input['version'] ?? ''),
             'size' => (string) ($input['size'] ?? 'small'),
             'region' => (string) ($input['region'] ?? ''),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function registerExternalDatabase(Site $site, array $input): CloudDatabase
+    {
+        $organization = Organization::query()->find($site->organization_id);
+        if ($organization === null) {
+            throw new InvalidArgumentException('Site has no organization — cannot register a database for it.');
+        }
+
+        return (new RegisterExternalCloudDatabase)->handle($organization, [
+            'name' => (string) ($input['name'] ?? ''),
+            'engine' => (string) ($input['engine'] ?? CloudDatabase::ENGINE_POSTGRES),
+            'host' => (string) ($input['host'] ?? ''),
+            'port' => (int) ($input['port'] ?? 0),
+            'database' => (string) ($input['database'] ?? ''),
+            'username' => (string) ($input['username'] ?? ''),
+            'password' => (string) ($input['password'] ?? ''),
+            'ssl' => $input['ssl'] ?? true,
+            'version' => (string) ($input['version'] ?? ''),
+            'region' => (string) ($input['region'] ?? 'external'),
         ]);
     }
 

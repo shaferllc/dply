@@ -26,6 +26,7 @@ final class EdgeRepoConfig
      * @param  list<array{for: string, values: array<string, string>}>  $headers
      * @param  list<array{schedule: string, handler?: string}>  $crons
      * @param  array{country_mode?: string, countries?: list<string>}  $firewall
+     * @param  array<string, array{enabled?: bool, threshold?: float|int}>  $alerts
      * @param  array{url?: string, routes?: list<string>, failover_html?: string}  $origin
      * @param  array{allowed_hosts?: list<string>}  $images
      * @param  array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>, dply?: array<string, string>}  $bindings
@@ -46,6 +47,7 @@ final class EdgeRepoConfig
         public readonly array $headers = [],
         public readonly array $crons = [],
         public readonly array $firewall = [],
+        public readonly array $alerts = [],
         public readonly array $origin = [],
         public readonly array $images = [],
         public readonly array $bindings = [],
@@ -81,6 +83,7 @@ final class EdgeRepoConfig
             'headers' => $this->headers,
             'crons' => $this->crons,
             'firewall' => $this->firewall,
+            'alerts' => $this->alerts,
             'origin' => $this->origin,
             'images' => $this->images,
             'bindings' => $this->bindings,
@@ -116,6 +119,7 @@ final class EdgeRepoConfig
             && $this->headers === []
             && $this->crons === []
             && $this->firewall === []
+            && $this->alerts === []
             && $this->origin === []
             && $this->images === []
             && $this->bindings === []

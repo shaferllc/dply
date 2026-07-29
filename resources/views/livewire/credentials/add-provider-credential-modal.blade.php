@@ -10,10 +10,18 @@
         focusable
     >
         <div class="shrink-0 border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Server providers') }}</p>
-            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Connect a provider') }}</h2>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">
+                {{ $capability === 'cdn' ? __('CDN accounts') : __('Server providers') }}
+            </p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">
+                {{ $providerPickerLocked ? __('Connect :provider', ['provider' => $activeProviderLabel]) : __('Connect a provider') }}
+            </h2>
             <p class="mt-2 text-sm leading-6 text-brand-moss">
-                {{ __('Save an encrypted API token for this organization. We verify tokens when possible before storing them.') }}
+                @if (($capability ?? null) === 'cdn' && ($active_provider ?? '') === 'cloudflare')
+                    {{ __('Paste a Cloudflare API token with Workers and object-storage (R2) permissions. It’s saved encrypted for this organization — you stay on this page.') }}
+                @else
+                    {{ __('Save an encrypted API token for this organization. We verify tokens when possible before storing them.') }}
+                @endif
             </p>
         </div>
 

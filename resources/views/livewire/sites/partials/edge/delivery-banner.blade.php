@@ -16,7 +16,7 @@
     @endphp
     <div
         x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($edgeDeliveryBanner['message'])); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
-        class="rounded-2xl border px-4 py-3 text-sm {{ $bannerClass }}"
+        class="rounded-xl border px-3 py-2.5 text-sm {{ $bannerClass }}"
     >
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">

@@ -177,6 +177,10 @@
 
             @include('partials.docs-sidebar')
 
+            {{-- Global deploy-status sidebar. Launcher is the floating dock "Deploys" chip;
+                 fleet Deploy/Sync kickoffs focus it via deploy-console-focus. --}}
+            <livewire:deploy-console-sidebar :key="'global-deploy-console-sidebar'" />
+
             {{-- Global feedback / bug-report sidebar. Launcher is in the floating dock. --}}
             <livewire:feedback.sidebar :key="'global-feedback-sidebar'" />
         @endauth

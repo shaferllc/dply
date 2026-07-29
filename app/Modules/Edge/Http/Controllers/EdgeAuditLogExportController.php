@@ -46,6 +46,7 @@ class EdgeAuditLogExportController extends Controller
                         ->where('subject_id', $site->id);
                 })->orWhere(function ($q2) use ($site): void {
                     $q2->where('organization_id', $site->organization_id)
+                        ->where('subject_id', $site->id)
                         ->where('action', 'like', 'site.edge.%');
                 });
             })

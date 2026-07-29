@@ -109,6 +109,12 @@ trait ManagesProviderCredentials
 
     public string $aws_app_runner_region = 'us-east-1';
 
+    /** App Runner GitHub connection ARN — required for source/repo deploys. */
+    public string $aws_app_runner_github_connection_arn = '';
+
+    /** IAM role ARN App Runner assumes to pull private ECR images (optional). */
+    public string $aws_app_runner_access_role_arn = '';
+
     public string $ploi_name = '';
 
     public string $ploi_api_token = '';
@@ -391,10 +397,27 @@ trait ManagesProviderCredentials
             'aws_app_runner_access_key_id' => 'required|string|max:255',
             'aws_app_runner_secret_access_key' => 'required|string|max:255',
             'aws_app_runner_region' => 'required|string|max:50',
-        ], [], [
+            'aws_app_runner_github_connection_arn' => [
+                'nullable',
+                'string',
+                'max:512',
+                'regex:/^arn:aws:apprunner:[a-z0-9-]+:\d+:connection\/.+/',
+            ],
+            'aws_app_runner_access_role_arn' => [
+                'nullable',
+                'string',
+                'max:512',
+                'regex:/^arn:aws:iam::\d+:role\/.+/',
+            ],
+        ], [
+            'aws_app_runner_github_connection_arn.regex' => 'Enter a valid App Runner connection ARN (arn:aws:apprunner:…:connection/…).',
+            'aws_app_runner_access_role_arn.regex' => 'Enter a valid IAM role ARN (arn:aws:iam::…:role/…).',
+        ], [
             'aws_app_runner_access_key_id' => 'Access key ID',
             'aws_app_runner_secret_access_key' => 'Secret access key',
             'aws_app_runner_region' => 'Region',
+            'aws_app_runner_github_connection_arn' => 'GitHub connection ARN',
+            'aws_app_runner_access_role_arn' => 'ECR access role ARN',
         ]);
         $this->authorize('create', ProviderCredential::class);
         $org = auth()->user()->currentOrganization();
@@ -403,22 +426,36 @@ trait ManagesProviderCredentials
 
             return;
         }
+
+        $payload = [
+            'access_key_id' => $this->aws_app_runner_access_key_id,
+            'secret_access_key' => $this->aws_app_runner_secret_access_key,
+            'region' => $this->aws_app_runner_region,
+        ];
+        $connectionArn = trim($this->aws_app_runner_github_connection_arn);
+        if ($connectionArn !== '') {
+            $payload['github_connection_arn'] = $connectionArn;
+        }
+        $accessRoleArn = trim($this->aws_app_runner_access_role_arn);
+        if ($accessRoleArn !== '') {
+            $payload['access_role_arn'] = $accessRoleArn;
+        }
+
         auth()->user()->providerCredentials()->create([
             'organization_id' => $org->id,
             'provider' => 'aws_app_runner',
             'name' => trim($this->aws_app_runner_name) ?: 'AWS App Runner',
-            'credentials' => [
-                'access_key_id' => $this->aws_app_runner_access_key_id,
-                'secret_access_key' => $this->aws_app_runner_secret_access_key,
-                'region' => $this->aws_app_runner_region,
-            ],
+            'credentials' => $payload,
         ]);
         $this->toastSuccess('Provider connected.');
         $this->reset(
             'aws_app_runner_name',
             'aws_app_runner_access_key_id',
             'aws_app_runner_secret_access_key',
+            'aws_app_runner_github_connection_arn',
+            'aws_app_runner_access_role_arn',
         );
+        $this->aws_app_runner_region = 'us-east-1';
         $this->notifyProviderCredentialStored('aws_app_runner');
     }
 

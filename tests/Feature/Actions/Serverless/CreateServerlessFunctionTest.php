@@ -87,6 +87,22 @@ test('normalizes a full github url to owner repo', function () {
     expect($site->git_repository_url)->toBe('acme/widgets');
 });
 
+test('persists connected source control account and ref kind for private clones', function () {
+    Bus::fake();
+
+    $site = createFunction([
+        'repo_source' => 'provider',
+        'source_control_account_id' => '01HXTESTACCOUNTID000000000',
+        'git_ref_kind' => 'tag',
+        'branch' => 'v1.2.3',
+    ]);
+
+    expect($site->meta['serverless']['repo_source'])->toBe('provider');
+    expect($site->meta['serverless']['source_control_account_id'])->toBe('01HXTESTACCOUNTID000000000');
+    expect($site->gitRefKind())->toBe('tag');
+    expect($site->repositoryMeta()['git_source_control_account_id'] ?? null)->toBe('01HXTESTACCOUNTID000000000');
+});
+
 test('rejects an empty repository', function () {
     Bus::fake();
 

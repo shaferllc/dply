@@ -85,10 +85,13 @@ class EdgeSsrBundleUploader
 
         $context = $this->contextResolver->forSite($site);
         if (! $context->supportsSsr()) {
-            throw new RuntimeException('Dispatch namespace is not configured for this Edge scope. Run `php artisan dply:edge:infra:bootstrap` to provision it.');
+            throw new RuntimeException('Dispatch namespace is not configured for this Edge scope. Set DPLY_EDGE_CF_ACCOUNT_ID + DPLY_EDGE_CF_API_TOKEN (Workers for Platforms), or run `php artisan dply:edge:infra:bootstrap`.');
         }
 
         $client = $this->clientFor($context);
+        // Ensure the namespace exists even when only the name is configured
+        // (id may be absent from .env until first SSR deploy).
+        $client->ensureDispatchNamespace($context->dispatchNamespaceName);
         $client->uploadDispatchScript(
             namespace: $context->dispatchNamespaceName,
             scriptName: $scriptName,

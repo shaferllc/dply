@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\DeployConsoleSidebar;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -15,11 +16,11 @@ use Livewire\Attributes\Computed;
 
 /**
  * Deploy-console plumbing shared by any list surface that wants the fleet-style
- * "Deploy / Sync" buttons plus the live slide-over console (servers index, the
- * per-server sites workspace, …). Seeds the same optimistic deploy lock and
- * dispatches the same job as the per-site deploy sidebar so every surface shares
- * one "is a deploy running" source of truth, and points the console at the sites
- * just launched via the `deploy-console-open` window event.
+ * "Deploy / Sync" buttons (servers index, the per-server sites workspace, …).
+ * Seeds the same optimistic deploy lock and dispatches the same job as the
+ * per-site deploy sidebar so every surface shares one "is a deploy running"
+ * source of truth, and focuses the global app-shell deploy console
+ * ({@see \App\Livewire\DeployConsoleSidebar}) on the sites just launched.
  *
  * Requires the host component to also use {@see GuardsBilledDeploys} (for
  * blockedByDeployPause) and {@see DispatchesToastNotifications}.
@@ -260,9 +261,9 @@ trait WatchesSiteDeploys
     }
 
     /**
-     * Point the deploy console at the sites just launched and open it, so a
-     * deploy kicked off from a list row can be watched live without leaving the
-     * page. Mirrors DeployControl's `deploy-console-open` event wiring.
+     * Point the global deploy console at the sites just launched and open it,
+     * so a deploy kicked off from a list row is watched live from any page —
+     * focused on this new batch, not a stale finished run.
      *
      * @param  list<string>  $siteIds
      */
@@ -274,7 +275,8 @@ trait WatchesSiteDeploys
 
         $this->watchedSiteIds = array_values(array_map('strval', $siteIds));
         unset($this->watchedRows, $this->watchedInProgress);
-        $this->dispatch('deploy-console-open');
+        $this->dispatch('deploy-console-focus', siteIds: $this->watchedSiteIds)
+            ->to(DeployConsoleSidebar::class);
     }
 
     protected function reportBatchDeploy(int $queued, int $skipped): void

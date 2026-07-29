@@ -101,6 +101,7 @@ class EdgeRepoConfigLoader
             headers: $this->normalizeHeaders($parsed['headers'] ?? null, $warnings),
             crons: $this->normalizeCrons($parsed['crons'] ?? null, $warnings),
             firewall: $this->normalizeFirewall($parsed['firewall'] ?? null, $warnings),
+            alerts: $this->normalizeAlerts($parsed['alerts'] ?? null, $warnings),
             origin: $this->normalizeOrigin($parsed['origin'] ?? null, $warnings),
             images: $this->normalizeImages($parsed['images'] ?? null, $warnings),
             bindings: $this->normalizeBindings($parsed['bindings'] ?? null, $warnings),
@@ -831,6 +832,85 @@ class EdgeRepoConfigLoader
             }
         } elseif ($countries !== null) {
             $warnings[] = 'firewall.countries must be a list of ISO 3166 alpha-2 codes.';
+        }
+
+        return $out;
+    }
+
+    /**
+     * RUM alert thresholds declared in dply.yaml. Same shape as the
+     * dashboard `edgeMeta.alerts` block — per-metric enabled + threshold.
+     *
+     *   alerts:
+     *     lcp_p75_ms:
+     *       enabled: true
+     *       threshold: 2500
+     *     error_rate:
+     *       enabled: true
+     *       threshold: 5
+     *     five_xx_count:
+     *       enabled: true
+     *       threshold: 50
+     *
+     * @param  array<string, mixed> $warnings
+     * @return array<string, array{enabled: bool, threshold: float|int}>
+     */
+    private function normalizeAlerts(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'alerts: must be a map of metric thresholds.';
+
+            return [];
+        }
+
+        $limits = [
+            'lcp_p75_ms' => ['min' => 100, 'max' => 60000, 'int' => true],
+            'error_rate' => ['min' => 0.1, 'max' => 100, 'int' => false],
+            'five_xx_count' => ['min' => 1, 'max' => 1000000, 'int' => true],
+        ];
+
+        $out = [];
+        foreach ($value as $key => $entry) {
+            if (! is_string($key) || $key === '') {
+                continue;
+            }
+            if (! isset($limits[$key])) {
+                $warnings[] = "alerts.{$key}: unknown metric (supported: ".implode(', ', array_keys($limits)).').';
+
+                continue;
+            }
+            if (! is_array($entry)) {
+                $warnings[] = "alerts.{$key}: must be a map with enabled / threshold.";
+
+                continue;
+            }
+
+            $enabled = (bool) ($entry['enabled'] ?? false);
+            $rawThreshold = $entry['threshold'] ?? null;
+            if ($rawThreshold === null || ! is_numeric($rawThreshold)) {
+                if ($enabled) {
+                    $warnings[] = "alerts.{$key}.threshold: required when enabled.";
+                }
+
+                continue;
+            }
+
+            $threshold = $limits[$key]['int'] ? (int) $rawThreshold : (float) $rawThreshold;
+            $min = $limits[$key]['min'];
+            $max = $limits[$key]['max'];
+            if ($threshold < $min || $threshold > $max) {
+                $warnings[] = "alerts.{$key}.threshold: must be between {$min} and {$max}.";
+
+                continue;
+            }
+
+            $out[$key] = [
+                'enabled' => $enabled,
+                'threshold' => $threshold,
+            ];
         }
 
         return $out;

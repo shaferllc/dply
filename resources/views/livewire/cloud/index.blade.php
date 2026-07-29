@@ -5,6 +5,7 @@
         :rows="$rows"
         :totals="$totals"
         :has-apps-in-scope="$hasAppsInScope"
+        :has-any-backend-credential="$hasAnyBackendCredential"
         :cloud-enabled="true"
         :api-ready="true"
         :filter="$filter"
@@ -17,7 +18,9 @@
             ['label' => __('Cloud apps'), 'icon' => 'cloud'],
         ]"
     >
-        @unless ($hasAnyBackendCredential)
+        {{-- Credential nudge for orgs that already have apps but lost/never had a backend account.
+             Empty orgs get the same CTAs inside the empty dashboard instead. --}}
+        @if ($hasAppsInScope && ! $hasAnyBackendCredential)
             <x-slot:alert>
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex items-start gap-3">
@@ -37,6 +40,6 @@
                     </div>
                 </div>
             </x-slot:alert>
-        @endunless
+        @endif
     </x-cloud-index-page>
 </div>

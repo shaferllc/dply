@@ -124,10 +124,18 @@ trait DetectsRepositoryRuntime
      * @param  array<string, mixed>  $capabilities  target capability map from
      *                                              {@see ServerlessTargetCapabilityResolver}
      */
-    public function runServerlessDetection(string $url, string $branch, string $subdirectory, array $capabilities): void
-    {
+    public function runServerlessDetection(
+        string $url,
+        string $branch,
+        string $subdirectory,
+        array $capabilities,
+        ?string $sourceControlAccountId = null,
+        ?string $refKind = null,
+    ): void {
         $url = trim($url);
         $branch = trim($branch) !== '' ? trim($branch) : 'main';
+        $sourceControlAccountId = is_string($sourceControlAccountId) ? trim($sourceControlAccountId) : '';
+        $sourceControlAccountId = $sourceControlAccountId !== '' ? $sourceControlAccountId : null;
 
         if ($url === '') {
             $this->detectedPlan = [];
@@ -140,12 +148,13 @@ trait DetectsRepositoryRuntime
 
         try {
             $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
-                'preview-create-serverless-'.(string) auth()->id().'-'.md5($url.'|'.$branch.'|'.$subdirectory),
+                'preview-create-serverless-'.(string) auth()->id().'-'.md5($url.'|'.$branch.'|'.$subdirectory.'|'.($sourceControlAccountId ?? '')),
                 $url,
                 $branch,
                 $subdirectory,
                 auth()->id(),
-                null,
+                $sourceControlAccountId,
+                $refKind,
             );
 
             $detection = app(ServerlessRuntimeDetector::class)->detect(

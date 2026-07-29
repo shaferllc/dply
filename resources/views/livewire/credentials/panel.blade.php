@@ -377,7 +377,7 @@
             <div class="p-6 sm:p-8 space-y-6">
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect an IAM access key with apprunner:* scope. Dply uses this to deploy your container apps to AWS App Runner — managed containers with auto-scaling and built-in HTTPS.') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect an IAM access key with App Runner, CloudWatch, and (for private images) ECR permissions. Dply deploys managed containers with auto-scaling and built-in HTTPS.') }}</p>
                 </div>
                 <div class="space-y-5">
                     <div>
@@ -399,6 +399,32 @@
                         <x-text-input id="aws_app_runner_region" wire:model="aws_app_runner_region" type="text" class="mt-1 block w-full" placeholder="us-east-1" required />
                         <p class="{{ $hint }}">{{ __('App Runner is available in 8 regions; us-east-1, us-west-2, eu-west-1, ap-northeast-1 are the cheapest.') }}</p>
                         <x-input-error :messages="$errors->get('aws_app_runner_region')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_github_connection_arn" :value="__('GitHub connection ARN (for repo deploys)')" />
+                        <x-text-input
+                            id="aws_app_runner_github_connection_arn"
+                            wire:model="aws_app_runner_github_connection_arn"
+                            type="text"
+                            class="mt-1 block w-full font-mono text-sm"
+                            placeholder="arn:aws:apprunner:us-east-1:123456789012:connection/github/…"
+                            autocomplete="off"
+                        />
+                        <p class="{{ $hint }}">{!! __('Required for From repository. Create a GitHub connection in :link, authorize the App Runner GitHub app, then paste the connection ARN here.', ['link' => '<a href="https://console.aws.amazon.com/apprunner/home#/connections" target="_blank" rel="noopener" class="'.$link.'">AWS App Runner → Connections</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('aws_app_runner_github_connection_arn')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_access_role_arn" :value="__('ECR access role ARN (optional)')" />
+                        <x-text-input
+                            id="aws_app_runner_access_role_arn"
+                            wire:model="aws_app_runner_access_role_arn"
+                            type="text"
+                            class="mt-1 block w-full font-mono text-sm"
+                            placeholder="arn:aws:iam::123456789012:role/AppRunnerECRAccessRole"
+                            autocomplete="off"
+                        />
+                        <p class="{{ $hint }}">{{ __('Only needed for private ECR images. Public ECR / Docker Hub images work without this.') }}</p>
+                        <x-input-error :messages="$errors->get('aws_app_runner_access_role_arn')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeAwsAppRunner" wire:loading.attr="disabled" wire:target="storeAwsAppRunner">{{ __('Save credential') }}</x-primary-button>
                 </div>

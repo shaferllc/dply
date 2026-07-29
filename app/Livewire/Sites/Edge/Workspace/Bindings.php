@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeDeployment;
@@ -17,25 +18,13 @@ use Livewire\Component;
 use Throwable;
 
 /**
- * Cloudflare bindings editor — the interactive counterpart to the read-only
- * `runtime-bindings` panel (Wave D).
- *
- * Mirrors {@see Crons}: bindings declared in the repo's wrangler.toml are
- * read-only here (committing the file is the source of truth), while dashboard
- * rows live on edgeMeta and merge additively at deploy time via
- * {@see EdgeEffectiveBindings}. The worker uploaders read the merged list
- * through EdgeRepoBindingTranslator when pushing scripts to Cloudflare.
- *
- * Two ways to add a binding:
- *   - attach: point at an existing Cloudflare resource by identifier
- *   - create: provision the resource in the site's own CF account first
- *
- * Nothing here mutates a live Worker — bindings apply on the NEXT deploy, the
- * same contract as crons. That keeps this screen free of any long-running
- * Cloudflare work beyond the single create call.
+ * Bindings editor — interactive counterpart to the read-only runtime-bindings
+ * panel. Repo wrangler.toml rows are read-only; dashboard rows live on edgeMeta
+ * and merge at deploy time via {@see EdgeEffectiveBindings}.
  */
 class Bindings extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use MountsEdgeWorkspaceSection;
 
@@ -102,7 +91,7 @@ class Bindings extends Component
         if ($value === '') {
             $this->addError('new_value', $this->create_resource
                 ? __('Give the resource a name to create.')
-                : __('Enter the Cloudflare identifier to attach.'));
+                : __('Enter the resource identifier to attach.'));
 
             return;
         }
@@ -127,7 +116,7 @@ class Bindings extends Component
             try {
                 $value = $provisioner->create($this->site, $kind, $value);
             } catch (Throwable $e) {
-                $this->addError('new_value', __('Cloudflare rejected the create: :msg', ['msg' => $e->getMessage()]));
+                $this->addError('new_value', __('Could not create the resource: :msg', ['msg' => $e->getMessage()]));
 
                 return;
             }
@@ -139,14 +128,12 @@ class Bindings extends Component
         $this->new_name = '';
         $this->new_value = '';
         $this->create_resource = false;
-        $this->toastSuccess(__('Binding added — applied to the Worker on the next deploy.'));
+        $this->toastSuccess(__('Binding added — applied on the next deploy.'));
     }
 
     /**
-     * Detaches the binding from the site. The Cloudflare resource itself is
-     * deliberately left alone: it may hold data, and it may be shared with
-     * another site or another Worker. Deleting it is a separate, explicit act
-     * in the Cloudflare dashboard.
+     * Detaches the binding from the site. The underlying resource is left alone
+     * (it may hold data or be shared). Deleting the resource is a separate act.
      */
     public function removeBinding(int $index): void
     {
@@ -157,7 +144,7 @@ class Bindings extends Component
         }
         array_splice($this->dashboard_bindings, $index, 1);
         $this->persist();
-        $this->toastSuccess(__('Binding detached — the Cloudflare resource was left in place.'));
+        $this->toastSuccess(__('Binding detached — the resource was left in place.'));
     }
 
     private function persist(): void

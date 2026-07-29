@@ -7,6 +7,7 @@ namespace App\Modules\Edge\Console;
 use App\Models\EdgeAccessLog;
 use App\Models\EdgeWebVital;
 use App\Models\Site;
+use App\Modules\Edge\Support\EdgeEffectiveAlerts;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -15,12 +16,13 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * RUM alerting (P58). Hourly sweep across Edge sites with thresholds
- * configured in `site.meta.edge.alerts`. Compares the last hour's
- * data against each enabled threshold and publishes a notification
- * event when a breach is observed. Per-site dedupe via cache key so
- * a sustained breach doesn't pager-spam every hour.
+ * from dply.yaml `alerts:` merged with dashboard `edgeMeta.alerts`
+ * ({@see EdgeEffectiveAlerts}). Compares the last hour's data against
+ * each enabled threshold and publishes a notification event when a
+ * breach is observed. Per-site dedupe via cache key so a sustained
+ * breach doesn't pager-spam every hour.
  *
- * Threshold shape (under site.meta.edge.alerts):
+ * Threshold shape:
  *   {
  *     "lcp_p75_ms": { "enabled": true, "threshold": 2500 },
  *     "error_rate": { "enabled": true, "threshold": 5 },   // percent
@@ -47,8 +49,8 @@ class CheckEdgeRumAlertsCommand extends Command
             if (! $site->usesEdgeRuntime() || $site->isEdgePreview()) {
                 continue;
             }
-            $alerts = is_array($site->edgeMeta()['alerts'] ?? null) ? $site->edgeMeta()['alerts'] : [];
-            if ($alerts === []) {
+            $alerts = EdgeEffectiveAlerts::for($site);
+            if (! EdgeEffectiveAlerts::anyEnabled($alerts)) {
                 continue;
             }
 

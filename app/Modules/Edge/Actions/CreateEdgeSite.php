@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use App\Modules\Edge\Support\EdgeRepoRoot;
+use App\Modules\Edge\Support\EdgeSsrAvailability;
 use App\Modules\Edge\Support\EdgeTestingDomains;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -48,14 +49,10 @@ class CreateEdgeSite
             // Block before any of the per-site infra is created — once
             // the server + site rows exist the user has to tear them
             // down to recover. Failing here keeps the screen clean.
-            $dispatchNamespace = trim((string) config('edge.cloudflare.dispatch_namespace_name', ''));
-            $dispatchId = trim((string) config('edge.cloudflare.dispatch_namespace_id', ''));
-            if ($dispatchNamespace === '' || $dispatchId === '') {
-                throw new RuntimeException(
-                    'SSR Edge sites need a Workers for Platforms dispatch namespace. '
-                    .'Run `php artisan dply:edge:infra:bootstrap` (auto-creates it) before creating an SSR site.'
-                );
-            }
+            // Availability is credential-based; the dispatch namespace id
+            // is ensured via the Cloudflare API when missing from .env.
+            EdgeSsrAvailability::assertAvailable();
+            EdgeSsrAvailability::ensureDispatchNamespaceId();
         }
 
         $originConfig = null;

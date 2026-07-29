@@ -114,8 +114,7 @@
 
         @include('livewire.servers.partials.overview._danger-zone')
 
-        {{-- Deploy plumbing for the Sites card's Deploy button (WatchesSiteDeploys). --}}
-        @include('livewire.servers.partials._deploy-console')
+        {{-- Deploy console lives in the app shell; modal stays for multi-site pick. --}}
         @include('livewire.servers.partials.deploy-sites-modal')
     </div>
 

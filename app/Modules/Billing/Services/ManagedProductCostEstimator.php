@@ -29,6 +29,32 @@ class ManagedProductCostEstimator
     }
 
     /**
+     * Estimated monthly AWS App Runner compute (USD) for a size tier ×
+     * instance count. Customer pays AWS directly — not dply-metered.
+     *
+     * Floor assumes always-on provisioned compute for the instance count
+     * (use autoscaling min when the form has autoscaling enabled).
+     *
+     * Tier → vCPU/GB mirrors AwsAppRunnerBackend::computeForSizeTier
+     * (kept local so Billing does not depend on the Cloud module).
+     */
+    public function appRunnerMonthlyUsd(string $sizeTier, int $instances = 1): float
+    {
+        [$vcpu, $memoryGb] = match ($sizeTier) {
+            'medium', 'medium-pro' => [0.5, 1.0],
+            'large', 'large-pro' => [1.0, 2.0],
+            'xlarge', 'xlarge-pro' => [2.0, 4.0],
+            default => [0.25, 0.5],
+        };
+        $hours = max(1, (int) config('subscription.standard.app_runner_hours_per_month', 730));
+        $vcpuRate = max(0.0, (float) config('subscription.standard.app_runner_vcpu_usd_per_hour', 0.064));
+        $memoryRate = max(0.0, (float) config('subscription.standard.app_runner_memory_gb_usd_per_hour', 0.007));
+        $perInstance = ($vcpu * $vcpuRate + $memoryGb * $memoryRate) * $hours;
+
+        return round($perInstance * max(1, $instances), 2);
+    }
+
+    /**
      * Customer-facing (marked-up) monthly price in USD for a Cloud managed
      * database size tier.
      */
@@ -76,18 +102,32 @@ class ManagedProductCostEstimator
     }
 
     /**
-     * Customer-facing unit rates for Edge delivery usage (monthly).
+     * Customer-facing Edge usage rates (monthly), with markup baked into
+     * the displayed unit prices so create/billing copy matches the invoice.
      *
-     * @return array<string, float|int>
+     * @return array{
+     *     requests_per_million: float,
+     *     egress_per_gb: float,
+     *     storage_per_gb: float,
+     *     markup_percent: int,
+     *     included_requests_per_site: int,
+     *     included_egress_gb_per_site: int,
+     *     included_r2_storage_gb_per_site: int,
+     * }
      */
-    /** @return array<string, mixed> */
     public function edgeUsageRates(): array
     {
+        $markup = max(0, (int) config('dply.edge.usage_billing.markup_percent', 0));
+        $multiplier = (100 + $markup) / 100;
+
         return [
-            'requests_per_million' => ((int) config('dply.edge.usage_billing.requests_cents_per_million', 0)) / 100,
-            'egress_per_gb' => ((int) config('dply.edge.usage_billing.egress_cents_per_gb', 0)) / 100,
+            'requests_per_million' => round(((int) config('dply.edge.usage_billing.requests_cents_per_million', 0)) / 100 * $multiplier, 2),
+            'egress_per_gb' => round(((int) config('dply.edge.usage_billing.egress_cents_per_gb', 0)) / 100 * $multiplier, 2),
+            'storage_per_gb' => round(((int) config('dply.edge.usage_billing.r2_storage_cents_per_gb_month', 0)) / 100 * $multiplier, 2),
+            'markup_percent' => $markup,
             'included_requests_per_site' => (int) config('dply.edge.usage_billing.included_requests_per_site', 0),
             'included_egress_gb_per_site' => (int) config('dply.edge.usage_billing.included_egress_gb_per_site', 0),
+            'included_r2_storage_gb_per_site' => (int) config('dply.edge.usage_billing.included_r2_storage_gb_per_site', 0),
         ];
     }
 

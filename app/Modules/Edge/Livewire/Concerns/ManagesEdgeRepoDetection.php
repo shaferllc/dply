@@ -433,7 +433,7 @@ trait ManagesEdgeRepoDetection
         // Framework lookup: dep name → [framework, default build, default output]
         $frameworkMap = [
             'astro' => ['astro', 'npm run build', 'dist'],
-            'next' => ['nextjs', 'npm run build', 'out'],
+            'next' => ['next', 'npm run build', 'out'],
             'nuxt' => ['nuxt', 'npm run generate', '.output/public'],
             'gatsby' => ['gatsby', 'npm run build', 'public'],
             '@sveltejs/kit' => ['sveltekit', 'npm run build', 'build'],

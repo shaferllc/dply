@@ -83,7 +83,11 @@ final readonly class EdgeDeliveryContext
 
     public function supportsSsr(): bool
     {
-        return $this->dispatchNamespaceName !== '' && $this->dispatchNamespaceId !== '';
+        // Namespace id may be resolved lazily via the Cloudflare API when
+        // account + token are present — uploaders call ensureDispatchNamespace.
+        return $this->dispatchNamespaceName !== ''
+            && $this->accountId !== ''
+            && $this->apiToken !== '';
     }
 
     public static function fromProviderCredential(ProviderCredential $credential): self

@@ -542,7 +542,7 @@
                         $managedCatalog = array_filter([
                             'edge' => $edgeOn ? ['title' => __('Edge sites'), 'icon' => 'heroicon-o-globe-alt'] : null,
                             'cloud' => $cloudOn ? ['title' => __('Cloud apps'), 'icon' => 'heroicon-o-cube'] : null,
-                            'serverless' => $serverlessOn ? ['title' => __('Serverless functions'), 'icon' => 'heroicon-o-bolt'] : null,
+                            'serverless' => $serverlessOn ? ['title' => __('Serverless apps'), 'icon' => 'heroicon-o-bolt'] : null,
                         ]);
                     @endphp
                     <div class="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-3">

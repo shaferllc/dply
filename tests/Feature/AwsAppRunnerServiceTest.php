@@ -128,6 +128,73 @@ test('get regions returns known apprunner set', function () {
     expect($slugs)->toContain('eu-west-1');
     expect($slugs)->toContain('ap-northeast-1');
 });
+test('parse service arn extracts name and id', function () {
+    expect(AwsAppRunnerService::parseServiceArn('arn:aws:apprunner:us-east-1:1234:service/api-acme/abc'))
+        ->toBe(['name' => 'api-acme', 'id' => 'abc']);
+    expect(AwsAppRunnerService::parseServiceArn('bogus'))->toBeNull();
+});
+test('list operations returns normalized rows', function () {
+    $client = Mockery::mock(AppRunnerClient::class);
+    $client->shouldReceive('listOperations')
+        ->once()
+        ->with(['ServiceArn' => 'arn:test', 'MaxResults' => 10])
+        ->andReturn(new Result([
+            'OperationSummaryList' => [[
+                'Id' => 'op-1',
+                'Type' => 'START_DEPLOYMENT',
+                'Status' => 'SUCCEEDED',
+                'StartedAt' => new \DateTimeImmutable('2026-01-01T00:00:00Z'),
+                'EndedAt' => new \DateTimeImmutable('2026-01-01T00:05:00Z'),
+            ]],
+        ]));
+
+    $ops = service($client)->listOperations('arn:test');
+    expect($ops)->toHaveCount(1);
+    expect($ops[0]['id'])->toBe('op-1');
+    expect($ops[0]['type'])->toBe('START_DEPLOYMENT');
+    expect($ops[0]['status'])->toBe('SUCCEEDED');
+});
+test('stop deployment calls api', function () {
+    $client = Mockery::mock(AppRunnerClient::class);
+    $client->shouldReceive('stopDeployment')
+        ->once()
+        ->with(['ServiceArn' => 'arn:test', 'OperationId' => 'op-1'])
+        ->andReturn(new Result(['OperationId' => 'op-1']));
+
+    expect(service($client)->stopDeployment('arn:test', 'op-1'))->toBeTrue();
+});
+test('get service metrics maps cloudwatch series', function () {
+    $cw = Mockery::mock(\Aws\CloudWatch\CloudWatchClient::class);
+    $cw->shouldReceive('getMetricData')
+        ->once()
+        ->andReturn(new Result([
+            'MetricDataResults' => [
+                [
+                    'Id' => 'cpu',
+                    'Timestamps' => [new \DateTimeImmutable('@1700000000')],
+                    'Values' => [12.5],
+                ],
+                [
+                    'Id' => 'memory',
+                    'Timestamps' => [new \DateTimeImmutable('@1700000000')],
+                    'Values' => [40.0],
+                ],
+                [
+                    'Id' => 'requests',
+                    'Timestamps' => [new \DateTimeImmutable('@1700000000')],
+                    'Values' => [3.0],
+                ],
+            ],
+        ]));
+
+    $series = service(Mockery::mock(AppRunnerClient::class))
+        ->withCloudWatchClient($cw)
+        ->getServiceMetrics('arn:aws:apprunner:us-east-1:1:service/edge/x', 1700000000 - 3600, 1700000000);
+
+    expect($series['cpu'])->toBe([['t' => 1700000000, 'v' => 12.5]]);
+    expect($series['memory'][0]['v'])->toBe(40.0);
+    expect($series['requests'][0]['v'])->toBe(3.0);
+});
 test('create service from source uses code repository', function () {
     $client = Mockery::mock(AppRunnerClient::class);
     $client->shouldReceive('createService')

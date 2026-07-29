@@ -91,15 +91,52 @@
                         @if ($row['is_worker'])
                             <span class="rounded-md bg-brand-ink/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-ink">{{ __('worker') }}</span>
                         @endif
-                        @if ($row['server'])
-                            <span class="inline-flex items-center gap-1 truncate text-[11px] text-brand-mist">
-                                <x-heroicon-o-server class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                {{ $row['server'] }}
-                            </span>
-                        @endif
                     </span>
 
-                    <span class="mt-1 flex flex-wrap items-center gap-2">
+                    {{-- Deploy context: server / branch / commit — always visible, not buried in the expanded timeline. --}}
+                    @if ($row['server'] || $row['branch'] || $row['short_sha'])
+                        <span class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-brand-moss">
+                            @if ($row['server'])
+                                <span class="inline-flex min-w-0 items-center gap-1">
+                                    <x-heroicon-o-server class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    <span class="truncate font-medium text-brand-ink/80">{{ $row['server'] }}</span>
+                                    @if ($row['server_ip'])
+                                        <span class="truncate font-mono text-brand-mist">{{ $row['server_ip'] }}</span>
+                                    @endif
+                                </span>
+                            @endif
+                            @if ($row['branch'])
+                                <span class="inline-flex min-w-0 items-center gap-1">
+                                    <x-heroicon-o-tag class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    <span class="truncate font-mono text-brand-ink/80">{{ $row['branch'] }}</span>
+                                </span>
+                            @endif
+                            @if ($row['short_sha'])
+                                <span class="inline-flex min-w-0 items-center gap-1">
+                                    <x-heroicon-o-code-bracket class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    @if ($row['commit_url'])
+                                        <a
+                                            href="{{ $row['commit_url'] }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            x-on:click.stop
+                                            class="truncate font-mono font-semibold text-brand-forest hover:underline"
+                                            title="{{ $row['git_sha'] }}"
+                                        >{{ $row['short_sha'] }}</a>
+                                    @else
+                                        <span class="truncate font-mono font-semibold text-brand-ink/80" title="{{ $row['git_sha'] }}">{{ $row['short_sha'] }}</span>
+                                    @endif
+                                </span>
+                            @elseif ($row['in_progress'] || ($row['starting_fresh'] ?? false))
+                                <span class="inline-flex items-center gap-1 text-brand-mist">
+                                    <x-heroicon-o-code-bracket class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                    {{ __('Commit pending…') }}
+                                </span>
+                            @endif
+                        </span>
+                    @endif
+
+                    <span class="mt-1.5 flex flex-wrap items-center gap-2">
                         <span @class([
                             'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-inset',
                             'bg-emerald-50 text-emerald-800 ring-emerald-200/80' => $rs === 'success' && ! $row['in_progress'],
@@ -135,17 +172,32 @@
 
             <div x-show="open" x-cloak class="border-t border-brand-ink/10 px-4 pb-4 pt-3">
                 @if ($row['phases'] === [])
-                    <div class="flex items-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-3.5 py-4">
-                        <x-spinner size="sm" />
-                        <div>
-                            <p class="text-xs font-semibold text-brand-ink">
-                                {{ $row['starting_fresh'] ? __('Starting deploy') : __('Queued') }}
-                            </p>
-                            <p class="mt-0.5 text-[11px] text-brand-moss">
-                                {{ $row['starting_fresh'] ? __('Clearing the previous run and handing off to a worker…') : __('Waiting for a worker to pick this up…') }}
-                            </p>
+                    @if ($row['in_progress'] || ($row['starting_fresh'] ?? false))
+                        <div class="flex items-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-3.5 py-4">
+                            <x-spinner size="sm" />
+                            <div>
+                                <p class="text-xs font-semibold text-brand-ink">
+                                    {{ $row['starting_fresh'] ? __('Starting deploy') : __('Queued') }}
+                                </p>
+                                <p class="mt-0.5 text-[11px] text-brand-moss">
+                                    {{ $row['starting_fresh'] ? __('Clearing the previous run and handing off to a worker…') : __('Waiting for a worker to pick this up…') }}
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    @else
+                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-3.5 py-4">
+                            <p class="text-xs font-semibold text-brand-ink">{{ __('Deploy finished') }}</p>
+                            <p class="mt-0.5 text-[11px] text-brand-moss">
+                                {{ __('Phase details stay on the site deploy page — this sidebar keeps the list light.') }}
+                            </p>
+                            @if ($row['latest'] && $row['server_id'])
+                                <a href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
+                                    {{ __('Open deploy log') }}
+                                    <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                </a>
+                            @endif
+                        </div>
+                    @endif
                 @else
                     @if ($rs === 'failed')
                         @php
@@ -173,8 +225,8 @@
                                     @if ($failOutput !== '')
                                         <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failOutput }}</pre>
                                     @endif
-                                    @if ($row['latest'] && $row['latest']->server_id)
-                                        <a href="{{ route('sites.deployments.show', ['server' => $row['latest']->server_id, 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-800 hover:underline">
+                                    @if ($row['latest'] && $row['server_id'])
+                                        <a href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-800 hover:underline">
                                             {{ __('Open full deploy log') }}
                                             <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
                                         </a>
@@ -265,9 +317,9 @@
                         @endforeach
                     </ol>
 
-                    @if ($rs !== 'failed' && $row['latest'] && $row['latest']->server_id)
+                    @if ($rs !== 'failed' && $row['latest'] && $row['server_id'])
                         <a
-                            href="{{ route('sites.deployments.show', ['server' => $row['latest']->server_id, 'site' => $row['id'], 'deployment' => $row['latest']]) }}"
+                            href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}"
                             wire:navigate
                             class="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-forest hover:underline"
                         >

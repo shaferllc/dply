@@ -14,10 +14,10 @@ use Illuminate\Queue\SerializesModels;
 use Throwable;
 
 /**
- * Tears down the DigitalOcean Managed Database cluster behind a
- * CloudDatabase, then deletes the row. Idempotent — safe to retry if
- * the backend rejects (e.g. the cluster was already removed
- * out-of-band): a 404 from DO is treated as success.
+ * Tears down a CloudDatabase: for DigitalOcean managed clusters, delete
+ * the provider resource; for external (operator-supplied) connections,
+ * only drop the control-plane row (never touch the customer's DB).
+ * Idempotent — a 404 from DO is treated as success.
  */
 class TeardownCloudDatabaseJob implements ShouldQueue
 {
@@ -39,7 +39,9 @@ class TeardownCloudDatabaseJob implements ShouldQueue
 
         $database->forceFill(['status' => CloudDatabase::STATUS_DELETING])->save();
 
-        if (is_string($database->backend_id) && $database->backend_id !== '') {
+        if (! $database->isExternal()
+            && is_string($database->backend_id)
+            && $database->backend_id !== '') {
             $database->loadMissing('providerCredential');
             $credential = $database->providerCredential;
             if ($credential !== null) {

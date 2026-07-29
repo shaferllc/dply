@@ -255,7 +255,6 @@ final class SiteSettingsSidebar
         $items = [
             ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
             ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
-            ['id' => 'edge-domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
             ['id' => 'edge-build', 'label' => __('Build'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
             ['id' => 'edge-environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'deploy'],
             ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],

@@ -45,9 +45,21 @@ class BuildJourney extends Component
     /** Flips to false once the deployment is no longer in flight. */
     public bool $polling = true;
 
+    /**
+     * Per-request memo so wire:poll's tail() + render() share one
+     * deployment/site/server load instead of querying twice.
+     */
+    private ?EdgeDeployment $resolvedDeployment = null;
+
+    private bool $resolvedDeploymentLoaded = false;
+
+    private bool $viewAuthorized = false;
+
     public function mount(string $deploymentId): void
     {
         $this->deploymentId = $deploymentId;
+        // tail() loads once, authorizes, and seeds the log; render()
+        // reuses the same request-memoized deployment row.
         $this->tail();
     }
 
@@ -58,9 +70,7 @@ class BuildJourney extends Component
      */
     public function confirmRestartFrozenBuild(): void
     {
-        $deployment = EdgeDeployment::query()
-            ->with('site')
-            ->find($this->deploymentId);
+        $deployment = $this->deployment();
 
         if ($deployment === null || $deployment->site === null) {
             $this->polling = false;
@@ -115,9 +125,8 @@ class BuildJourney extends Component
      */
     public function restartFrozenBuild(): void
     {
-        $deployment = EdgeDeployment::query()
-            ->with('site')
-            ->find($this->deploymentId);
+        $this->forgetResolvedDeployment();
+        $deployment = $this->deployment();
 
         if ($deployment === null || $deployment->site === null) {
             $this->polling = false;
@@ -149,9 +158,11 @@ class BuildJourney extends Component
 
     public function tail(): void
     {
-        $deployment = EdgeDeployment::query()
-            ->with('site')
-            ->find($this->deploymentId);
+        // Fresh status/log each poll tick — clear the request memo so we
+        // don't reuse a stale deployment row from an earlier call in the
+        // same request (mount → authorize → tail).
+        $this->forgetResolvedDeployment();
+        $deployment = $this->deployment();
 
         if ($deployment === null) {
             $this->polling = false;
@@ -159,9 +170,7 @@ class BuildJourney extends Component
             return;
         }
 
-        if ($deployment->site !== null) {
-            Gate::authorize('view', $deployment->site);
-        }
+        $this->authorizeView();
 
         $isInProgress = in_array($deployment->status, [
             EdgeDeployment::STATUS_BUILDING,
@@ -186,9 +195,7 @@ class BuildJourney extends Component
 
     public function render(): View
     {
-        $deployment = EdgeDeployment::query()
-            ->with('site.server')
-            ->find($this->deploymentId);
+        $deployment = $this->deployment();
 
         if ($deployment === null) {
             return view('livewire.edge.build-journey', [
@@ -228,6 +235,44 @@ class BuildJourney extends Component
             'site' => $deployment->site,
             'server' => $deployment->site?->server,
         ]);
+    }
+
+    /**
+     * Load the deployment once per request with site+server eager-loaded
+     * so SitePolicy::view does not fire a second servers query.
+     */
+    private function deployment(): ?EdgeDeployment
+    {
+        if ($this->resolvedDeploymentLoaded) {
+            return $this->resolvedDeployment;
+        }
+
+        $this->resolvedDeploymentLoaded = true;
+        $this->resolvedDeployment = EdgeDeployment::query()
+            ->with('site.server')
+            ->find($this->deploymentId);
+
+        return $this->resolvedDeployment;
+    }
+
+    private function forgetResolvedDeployment(): void
+    {
+        $this->resolvedDeployment = null;
+        $this->resolvedDeploymentLoaded = false;
+    }
+
+    private function authorizeView(): void
+    {
+        if ($this->viewAuthorized) {
+            return;
+        }
+
+        $deployment = $this->deployment();
+        if ($deployment?->site !== null) {
+            Gate::authorize('view', $deployment->site);
+        }
+
+        $this->viewAuthorized = true;
     }
 
     /**

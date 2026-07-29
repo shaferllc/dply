@@ -65,21 +65,28 @@ trait ValidatesCloudCreateForm
 
         if ($this->databases !== []) {
             // Common per-row constraints. Mode-specific extras (attach
-            // needs cloud_database_id; create needs the engine/size knobs)
-            // are layered on below per entry — Laravel's array-rule syntax
-            // can't express "field X required only when sibling Y equals Z"
-            // declaratively, so we fan out the index-keyed rules.
-            $rules['databases.*.mode'] = ['required', 'in:attach,create'];
+            // needs cloud_database_id; create needs the engine/size knobs;
+            // external needs host/creds) are layered on below per entry.
+            $rules['databases.*.mode'] = ['required', 'in:attach,create,external'];
             $rules['databases.*.name'] = ['required', 'string', 'min:3', 'max:60'];
-            $rules['databases.*.engine'] = ['required', 'in:postgres,mysql,redis'];
-            $rules['databases.*.size'] = ['required', 'in:small,medium,large'];
-            $rules['databases.*.version'] = ['nullable', 'string', 'max:20'];
             $rules['databases.*.env_prefix'] = ['required', 'string', 'regex:/^[A-Z][A-Z0-9_]*$/', 'max:40'];
 
             foreach ($this->databases as $i => $row) {
                 $mode = (string) ($row['mode'] ?? '');
                 if ($mode === 'attach') {
                     $rules['databases.'.$i.'.cloud_database_id'] = ['required', 'string'];
+                } elseif ($mode === 'external') {
+                    $rules['databases.'.$i.'.engine'] = ['required', 'in:postgres,mysql'];
+                    $rules['databases.'.$i.'.host'] = ['required', 'string', 'max:253'];
+                    $rules['databases.'.$i.'.port'] = ['required', 'integer', 'min:1', 'max:65535'];
+                    $rules['databases.'.$i.'.database'] = ['required', 'string', 'max:128'];
+                    $rules['databases.'.$i.'.username'] = ['required', 'string', 'max:128'];
+                    $rules['databases.'.$i.'.password'] = ['required', 'string', 'max:512'];
+                    $rules['databases.'.$i.'.ssl'] = ['nullable', 'boolean'];
+                } else {
+                    $rules['databases.'.$i.'.engine'] = ['required', 'in:postgres,mysql,redis'];
+                    $rules['databases.'.$i.'.size'] = ['required', 'in:small,medium,large'];
+                    $rules['databases.'.$i.'.version'] = ['nullable', 'string', 'max:20'];
                 }
             }
 

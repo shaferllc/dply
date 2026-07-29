@@ -81,6 +81,7 @@ class EdgeMiddlewareBundleUploader
         }
 
         $client = new EdgeCloudflareClient($context->accountId, $context->apiToken);
+        $client->ensureDispatchNamespace($context->dispatchNamespaceName);
         $client->uploadDispatchScript(
             namespace: $context->dispatchNamespaceName,
             scriptName: $scriptName,

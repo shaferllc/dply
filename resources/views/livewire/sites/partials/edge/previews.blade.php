@@ -2,18 +2,7 @@
     $previews = $edgeIsPreviewChild ? collect() : \App\Modules\Edge\Actions\CreateEdgePreviewSite::listForParent($site);
 @endphp
 
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Branch previews') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pull request previews deploy automatically from the GitHub webhook. Create a one-off preview from any branch tip or commit below — each commit gets its own Edge URL.') }}</p>
-        </div>
-    </div>
-
+<section class="border-b border-brand-ink/10">
     @unless ($edgeIsPreviewChild)
         @can('update', $site)
             @php
@@ -167,7 +156,7 @@
                                     </ol>
                                 @endif
 
-                                <p class="mt-3 text-[11px] text-brand-moss">{{ __('Auto-refreshes every 5 seconds. The Create button unlocks once the URL is safe to open (after Cloudflare\'s KV cache window).') }}</p>
+                                <p class="mt-3 text-[11px] text-brand-moss">{{ __('Auto-refreshes every 5 seconds. Create unlocks once the URL is safe to open.') }}</p>
                             </div>
                         @endif
                     @elseif ($edge_deploy_commit_branch !== null)
@@ -181,7 +170,7 @@
                             </span>
                         </p>
                     @else
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Hitting Create with the same SHA returns the existing preview — different SHAs each get their own URL. Ad-hoc previews don\'t auto-redeploy on push.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Same SHA reuses the preview; different SHAs get their own URL.') }}</p>
                     @endif
                     @if ($edge_deploy_ref_picker_open)
                         @include('livewire.sites.partials.edge.deploy-ref-picker')

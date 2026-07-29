@@ -7,6 +7,7 @@ namespace App\Modules\Edge\Livewire\Concerns;
 use App\Modules\Edge\Actions\CreateHybridEdgeStack;
 use App\Models\Site;
 use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Edge\Support\EdgeEligibility;
 use App\Modules\Edge\Support\EdgeSsrDetection;
 use App\Modules\Edge\Support\HybridEdgeOriginMatcher;
 use App\Support\Servers\FakeCloudProvision;
@@ -164,6 +165,13 @@ trait ManagesEdgeHybridOrigin
         }
 
         $this->validateCreateForm();
+
+        $eligibility = EdgeEligibility::evaluate($this->detectedPlan);
+        if (! $eligibility['eligible']) {
+            $this->toastError((string) $eligibility['message']);
+
+            return;
+        }
 
         if ($this->detectedPlan !== [] && ! EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)) {
             $this->toastError(__('Hybrid stack deploy is only available for server-rendered JavaScript frameworks.'));

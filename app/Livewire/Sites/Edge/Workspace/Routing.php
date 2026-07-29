@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\Edge\ManagesEdgeDomains;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
@@ -13,19 +15,23 @@ use App\Modules\Edge\Services\EdgeHostMapPublisher;
 use App\Modules\Edge\Support\EdgeEffectiveRouting;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Routing editor — same pattern as Crons / Firewall. Repo-declared
- * redirects/rewrites/headers (from dply.yaml) are read-only; dashboard
- * rows store on edgeMeta.routing_overrides and merge additively at
- * deploy time via EdgeEffectiveRouting. Saving immediately republishes
- * the host map so dashboard edits go live without a redeploy.
+ * Edge Routing — Domains + path rules (redirects / rewrites / headers).
+ * Repo-declared rows are read-only; dashboard overrides merge at deploy time
+ * (routing) or attach live (domains). Host-map republish on routing saves.
  */
 class Routing extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesEdgeDomains;
     use MountsEdgeWorkspaceSection;
+
+    #[Url(as: 'tab', except: 'domains')]
+    public string $tab = 'domains';
 
     /** @var list<array{from: string, to: string, status: int}> */
     public array $dashboard_redirects = [];
@@ -55,6 +61,19 @@ class Routing extends Component
     {
         $this->mountEdgeWorkspaceSection($server, $site);
         $this->refreshFromMeta();
+
+        if (! in_array($this->tab, ['domains', 'redirects', 'rewrites', 'headers'], true)) {
+            $this->tab = 'domains';
+        }
+    }
+
+    public function setTab(string $tab): void
+    {
+        if (! in_array($tab, ['domains', 'redirects', 'rewrites', 'headers'], true)) {
+            return;
+        }
+
+        $this->tab = $tab;
     }
 
     private function refreshFromMeta(): void
@@ -291,6 +310,7 @@ class Routing extends Component
         $repoRedirects = array_values(array_filter($effective['redirects'], static fn (array $r): bool => $r['source'] === 'repo'));
         $repoRewrites = array_values(array_filter($effective['rewrites'], static fn (array $r): bool => $r['source'] === 'repo'));
         $repoHeaders = array_values(array_filter($effective['headers'], static fn (array $r): bool => $r['source'] === 'repo'));
+        $repoDomains = is_array($latest?->repo_config['domains'] ?? null) ? $latest->repo_config['domains'] : [];
 
         $sourcePath = is_array($latest?->repo_config) && is_string($latest->repo_config['source_path'] ?? null)
             ? (string) $latest->repo_config['source_path']
@@ -301,6 +321,7 @@ class Routing extends Component
             [
                 'server' => $this->server,
                 'site' => $this->site,
+                'repoDomains' => $repoDomains,
                 'repoRedirects' => $repoRedirects,
                 'repoRewrites' => $repoRewrites,
                 'repoHeaders' => $repoHeaders,

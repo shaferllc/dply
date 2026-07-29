@@ -7,6 +7,7 @@ namespace App\Livewire\Sites\Edge\Workspace;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Sites\EdgeSiteViewData;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -22,13 +23,13 @@ class Billing extends Component
 
     public function render(): View
     {
-        return view('livewire.sites.edge.workspace.billing', SiteSettingsViewData::for(
-            $this->server,
-            $this->site,
-            'edge-billing',
-            null,
-            [],
-            auth()->user(),
+        return view('livewire.sites.edge.workspace.billing', array_merge(
+            EdgeSiteViewData::context($this->site, 'edge-billing'),
+            SiteSettingsViewData::edgeSectionAnalytics($this->site, 'edge-billing'),
+            [
+                'server' => $this->server,
+                'site' => $this->site,
+            ],
         ));
     }
 }

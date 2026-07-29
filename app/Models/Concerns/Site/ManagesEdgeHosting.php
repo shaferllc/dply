@@ -32,8 +32,8 @@ trait ManagesEdgeHosting
     public function edgeBackendLabel(): string
     {
         return match ($this->edge_backend) {
-            'org_cloudflare' => __('Your Cloudflare account'),
-            'dply_edge' => __('Dply Edge (managed)'),
+            'org_cloudflare' => __('Your connected account'),
+            'dply_edge' => __('Managed Edge'),
             default => (string) ($this->edge_backend ?: __('Unknown')),
         };
     }

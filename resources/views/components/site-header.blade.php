@@ -225,14 +225,14 @@
                                                 </x-coming-soon-dropdown-link>
                                             @endfeature
                                             @feature('surface.serverless')
-                                                <x-dropdown-link :href="route('serverless.index')" :description="__('Functions, no servers')">
+                                                <x-dropdown-link :href="route('serverless.index')" :description="__('Laravel apps, no servers')">
                                                     <x-slot name="icon">
                                                         <x-heroicon-o-bolt class="{{ $hi }}" />
                                                     </x-slot>
                                                     {{ __('Serverless') }}
                                                 </x-dropdown-link>
                                             @else
-                                                <x-coming-soon-dropdown-link :description="__('Functions, no servers')">
+                                                <x-coming-soon-dropdown-link :description="__('Laravel apps, no servers')">
                                                     <x-slot name="icon">
                                                         <x-heroicon-o-bolt class="{{ $hi }}" />
                                                     </x-slot>

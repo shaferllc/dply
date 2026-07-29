@@ -40,7 +40,7 @@ test('dashboard shows fake edge banner when fake mode enabled', function () {
     Livewire::actingAs($user)
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertSee('Fake edge — local mode')
-        ->assertSee('Dply Edge (local fake backend)');
+        ->assertSee('Managed Edge (local)');
 });
 
 test('dashboard shows cloudflare delivery label when platform configured', function () {
@@ -57,7 +57,7 @@ test('dashboard shows cloudflare delivery label when platform configured', funct
 
     Livewire::actingAs($user)
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-        ->assertSee('Dply Edge (managed)')
+        ->assertSee('Managed Edge')
         ->assertDontSee('Fake edge — local mode');
 });
 

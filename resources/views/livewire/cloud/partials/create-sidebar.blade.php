@@ -96,16 +96,23 @@
     </div>
 
     <div class="rounded-2xl border border-brand-sage/25 bg-gradient-to-br from-brand-cream via-white to-brand-sand/30 p-4 shadow-sm dark:border-brand-sage/20 dark:from-zinc-900 dark:via-zinc-900 dark:to-brand-sand/10">
-        @php($resourceEstimate = $resourceEstimate ?? 0)
+        @php
+            $resourceEstimate = $resourceEstimate ?? 0;
+            $isAwsAppRunner = ($backend ?? '') === 'aws_app_runner';
+        @endphp
         <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Estimated cost') }}</p>
         <p class="mt-1.5 text-3xl font-semibold tracking-tight text-brand-ink">
             ${{ number_format($cloudFee + $resourceEstimate, 2) }}<span class="text-base font-medium text-brand-moss">/mo</span>
         </p>
         <p class="mt-1.5 text-xs leading-relaxed text-brand-moss">
             {{ __('Platform fee') }} <span class="font-mono text-brand-ink">${{ number_format($cloudFee, 2) }}</span>
-            + {{ __('resources') }} <span class="font-mono text-brand-ink">${{ number_format($resourceEstimate, 2) }}</span>{{ __('/mo') }}.
+            + {{ $isAwsAppRunner ? __('AWS compute') : __('resources') }} <span class="font-mono text-brand-ink">${{ number_format($resourceEstimate, 2) }}</span>{{ __('/mo') }}.
         </p>
-        <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('Container, workers, and databases scale with size + instances. Previews are free.') }}</p>
+        @if ($isAwsAppRunner)
+            <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('AWS compute is billed by AWS on your account (vCPU + memory × hours). dply bills the platform fee only. Always-on floor; actual may be lower with scale-to-zero idle.') }}</p>
+        @else
+            <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('Container, workers, and databases scale with size + instances. Previews are free.') }}</p>
+        @endif
 
         @if (is_string($costPreview['error'] ?? null) && $costPreview['error'] !== '')
             <div class="mt-3 rounded-xl border border-rose-200/80 bg-rose-50/80 px-3 py-2 text-xs leading-relaxed text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
@@ -123,7 +130,7 @@
         >
             <x-heroicon-o-calculator class="h-4 w-4" aria-hidden="true" />
             <span wire:loading.remove wire:target="recomputeCostPreview">{{ __('Re-estimate cost') }}</span>
-            <span wire:loading wire:target="recomputeCostPreview">{{ __('Calling cloud…') }}</span>
+            <span wire:loading wire:target="recomputeCostPreview">{{ $isAwsAppRunner ? __('Estimating…') : __('Calling cloud…') }}</span>
         </button>
     </div>
 </aside>

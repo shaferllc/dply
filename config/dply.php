@@ -262,17 +262,23 @@ return [
     | config/subscription.php) plus metered delivery usage on top. Snapshots
     | are collected by `dply:edge:collect-usage` (scheduled daily).
     |
-    | Unit rates are customer-facing and should embed margin over Cloudflare
-    | list pricing. Per-site included allowances absorb typical small-site
-    | traffic so the base fee covers quiet sites.
+    | Unit rates are ~Cloudflare list (cost floor). `markup_percent` is applied
+    | on the metered subtotal (same pattern as Cloud/Serverless — default 40%)
+    | so overage is profitable. Per-site included allowances keep quiet sites
+    | on the flat $2 fee only.
+    |
+    | Approx CF list (2026): Workers requests ~$0.30/M, R2 storage ~$0.015/GB-mo,
+    | Class A $4.50/M, Class B $0.36/M. Egress is charged as CDN delivery.
     */
     'edge' => [
         'usage_billing' => [
-            'enabled' => true,
-            'markup_percent' => (int) env('DPLY_EDGE_USAGE_MARKUP_PERCENT', 0),
-            'requests_cents_per_million' => (int) env('DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION', 30),
-            'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 2),
-            'r2_storage_cents_per_gb_month' => (int) env('DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH', 2),
+            'enabled' => filter_var(env('DPLY_EDGE_USAGE_BILLING_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            // Blanket margin on overage (aligned with cloud_markup_percent).
+            'markup_percent' => (int) env('DPLY_EDGE_USAGE_MARKUP_PERCENT', 40),
+            // Cost-floor unit rates (cents). Customer pays rate × (1 + markup%).
+            'requests_cents_per_million' => (int) env('DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION', 50),
+            'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 5),
+            'r2_storage_cents_per_gb_month' => (int) env('DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH', 3),
             'r2_class_a_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_A_CENTS_PER_MILLION', 450),
             // Cloudflare R2 Class B (reads) list price is $0.36 / million = 36
             // cents. The previous default of 360 was a 10x typo that billed

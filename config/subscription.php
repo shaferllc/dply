@@ -196,6 +196,23 @@ return [
         'cloud_bucket_cents' => 500,
         // Metered Cloud resources are billed in 1-cent Stripe units (quantity = cents).
         'cloud_usage_unit_cents' => 1,
+
+        /*
+        |----------------------------------------------------------------------
+        | AWS App Runner — create-flow cost estimate (customer-paid AWS)
+        |----------------------------------------------------------------------
+        |
+        | App Runner runs on the customer's AWS account (BYO credential), so
+        | these rates are for the Cloud create sidebar estimate only — they
+        | are NOT pushed into CloudResourceCostCalculator / Stripe cloud_usage.
+        | dply still bills the flat `cloud_cents` platform fee.
+        |
+        | Defaults are us-east-1 provisioned-compute list rates (USD/hour).
+        | Monthly floor ≈ (vCPU×rate + GB×rate) × hours × instances.
+        */
+        'app_runner_hours_per_month' => (int) env('SUBSCRIPTION_APP_RUNNER_HOURS_PER_MONTH', 730),
+        'app_runner_vcpu_usd_per_hour' => (float) env('SUBSCRIPTION_APP_RUNNER_VCPU_USD_PER_HOUR', 0.064),
+        'app_runner_memory_gb_usd_per_hour' => (float) env('SUBSCRIPTION_APP_RUNNER_MEMORY_GB_USD_PER_HOUR', 0.007),
         // --- Legacy size-tier keys (being retired in the plan migration) ---
         // Retained so the not-yet-migrated billing dashboard, analytics, and
         // cost cards keep functioning until each is moved onto the plan model.

@@ -21,6 +21,9 @@ beforeEach(function () {
     $this->org = Organization::factory()->create();
     $this->org->users()->attach($this->user->id, ['role' => 'owner']);
     session(['current_organization_id' => $this->org->id]);
+
+    // Auto-detect now runs on repo/branch changes — keep create tests off the network.
+    fakeServerlessCheckout(fn (string $dir) => null);
 });
 
 function withCredential(User $user, Organization $org): void
@@ -37,7 +40,32 @@ function withCredential(User $user, Organization $org): void
 test('shows a warning when no digitalocean credential exists', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
-        ->assertSee('Connect a DigitalOcean credential');
+        ->assertSee('Connect a DigitalOcean credential')
+        ->assertSee('Add credentials');
+});
+
+test('happy path persists connected git account on create', function () {
+    Bus::fake();
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('name', 'Private App')
+        ->set('repo_source', 'provider')
+        ->set('source_control_account_id', '01HXTESTACCOUNTID000000000')
+        ->set('repository_selection', 'https://github.com/acme/private.git')
+        ->set('git_repository_url', 'https://github.com/acme/private.git')
+        ->set('git_branch', 'main')
+        ->set('git_ref_kind', 'branch')
+        ->set('runtime', 'php:8.4')
+        ->set('region', 'nyc1')
+        ->call('create')
+        ->assertHasNoErrors()
+        ->assertRedirect();
+
+    $site = Site::query()->where('organization_id', $this->org->id)->firstOrFail();
+    expect($site->meta['serverless']['source_control_account_id'])->toBe('01HXTESTACCOUNTID000000000');
+    expect($site->meta['serverless']['repo_source'])->toBe('provider');
 });
 
 test('load php demo prefills the form', function () {
@@ -46,8 +74,9 @@ test('load php demo prefills the form', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
         ->call('loadPhpDemo')
-        ->assertSet('repo', 'shaferllc/dply-demo-php-function')
-        ->assertSet('branch', 'master')
+        ->assertSet('git_repository_url', 'shaferllc/dply-demo-php-function')
+        ->assertSet('git_branch', 'master')
+        ->assertSet('repo_source', 'manual')
         ->assertSet('runtime', 'php:8.3')
         ->assertSet('name', 'PHP demo');
 });
@@ -58,8 +87,9 @@ test('load laravel demo prefills the form', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
         ->call('loadLaravelDemo')
-        ->assertSet('repo', 'shaferllc/dply-demo-laravel-function')
-        ->assertSet('branch', 'master')
+        ->assertSet('git_repository_url', 'shaferllc/dply-demo-laravel-function')
+        ->assertSet('git_branch', 'master')
+        ->assertSet('repo_source', 'manual')
         ->assertSet('runtime', 'php:8.4')
         ->assertSet('name', 'Laravel demo');
 });
@@ -78,9 +108,10 @@ test('validation rejects empty name and repo', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
         ->set('name', '')
-        ->set('repo', '')
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', '')
         ->call('create')
-        ->assertHasErrors(['name', 'repo']);
+        ->assertHasErrors(['name', 'git_repository_url']);
 });
 
 test('happy path creates function and redirects', function () {
@@ -90,8 +121,9 @@ test('happy path creates function and redirects', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
         ->set('name', 'Orders API')
-        ->set('repo', 'acme/orders')
-        ->set('branch', 'main')
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', 'acme/orders')
+        ->set('git_branch', 'main')
         ->set('runtime', 'nodejs:20')
         ->set('region', 'nyc1')
         ->call('create')
@@ -121,8 +153,9 @@ test('auto detect creates a function with an unset runtime', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
         ->set('name', 'Detected Fn')
-        ->set('repo', 'acme/detected')
-        ->set('branch', 'main')
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', 'acme/detected')
+        ->set('git_branch', 'main')
         ->set('runtime', 'auto')
         ->set('region', 'nyc1')
         ->call('create')
@@ -139,7 +172,8 @@ test('validation rejects an unknown runtime', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
         ->set('name', 'Bad Runtime')
-        ->set('repo', 'acme/api')
+        ->set('repo_source', 'manual')
+        ->set('git_repository_url', 'acme/api')
         ->set('runtime', 'cobol:74')
         ->call('create')
         ->assertHasErrors(['runtime']);
@@ -153,8 +187,8 @@ test('detect from repository renders panel', function () {
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
-        ->set('repo', 'acme/api')
-        ->set('branch', 'main')
+        ->set('git_repository_url', 'acme/api')
+        ->set('git_branch', 'main')
         ->call('detectFromRepository')
         ->assertSee('php:8.3')
         ->assertSee('raw');
@@ -168,8 +202,8 @@ test('detect from repository prefills runtime dropdown', function () {
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
-        ->set('repo', 'acme/api')
-        ->set('branch', 'main')
+        ->set('git_repository_url', 'acme/api')
+        ->set('git_branch', 'main')
         ->call('detectFromRepository')
         ->assertSet('runtime', 'php:8.3');
 });
@@ -184,8 +218,8 @@ test('detect from repository does not overwrite picked runtime', function () {
         ->test(ServerlessCreate::class)
         // Picking a runtime first marks it touched — detect must not stomp it.
         ->set('runtime', 'go:1.22')
-        ->set('repo', 'acme/api')
-        ->set('branch', 'main')
+        ->set('git_repository_url', 'acme/api')
+        ->set('git_branch', 'main')
         ->call('detectFromRepository')
         ->assertSet('runtime', 'go:1.22');
 });
@@ -198,8 +232,8 @@ test('detect from repository leaves dropdown on auto when nothing detected', fun
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
-        ->set('repo', 'acme/empty')
-        ->set('branch', 'main')
+        ->set('git_repository_url', 'acme/empty')
+        ->set('git_branch', 'main')
         ->call('detectFromRepository')
         ->assertSet('runtime', 'auto')
         ->assertSee('No runtime detected');
@@ -222,14 +256,21 @@ function fakeServerlessCheckout(callable $populate): string
         /**
          * @return array<string, string>
          */
-        public function checkout(): array
-        {
+        public function checkout(
+            string $workspaceKey = '',
+            string $repositoryUrl = '',
+            string $branch = 'main',
+            string $subdirectory = '',
+            int|string|null $userId = null,
+            ?string $sourceControlAccountId = null,
+            ?string $refKind = null,
+        ): array {
             return [
                 'workspace_path' => $this->dir,
                 'repository_path' => $this->dir,
                 'working_directory' => $this->dir,
                 'output' => '',
-                'branch' => 'main',
+                'branch' => $branch !== '' ? $branch : 'main',
             ];
         }
 

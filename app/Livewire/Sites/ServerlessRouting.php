@@ -32,10 +32,9 @@ use Livewire\Component;
  *   - invocation:  read-only list of the three URL families this function
  *                  is reachable at (raw DO Functions / dply edge / custom).
  *
- * Distinct from the VM `routing` (which edits nginx server blocks) — this
- * is the edge proxy's surface, hence the sidebar item lives under the
- * `networking` group with a dedicated `sites.routing` route rather than
- * piggy-backing on the wildcard `section` router.
+ * Distinct from the VM `routing` (which edits nginx server blocks) and from
+ * Edge product Routing rules (`/…/edge-routing` in EdgeSettings). This
+ * serverless/container surface lives at `/proxy-routing` (`sites.routing`).
  */
 #[Layout('layouts.app')]
 class ServerlessRouting extends Component
@@ -86,12 +85,23 @@ class ServerlessRouting extends Component
         $this->server = $server;
         $this->site = $site;
 
-        // This page is the dply EDGE proxy surface (edge hostname, path
-        // redirects, response headers/CORS, invocation URLs) — it only applies
-        // to serverless / container workspaces that sit behind the edge. A VM
-        // site routes through its own nginx/caddy server block, managed on the
-        // Settings → Routing surface, so send VM sites there instead of showing
-        // them edge concepts that don't apply.
+        // This page is the dply edge-proxy surface for serverless / container
+        // workspaces. Edge product sites have their own redirects/rewrites UI
+        // at EdgeSettings section=edge-routing. BYO VM sites use Settings →
+        // Routing (nginx/caddy). Edge sites often report runtimeTargetMode=vm
+        // (no separate family yet), so check usesEdgeRuntime() before the VM
+        // redirect — otherwise Edge /proxy-routing (and the old /edge-routing
+        // path) bounced to BYO /routing and 404'd.
+        if ($site->usesEdgeRuntime()) {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'edge-routing',
+            ]), navigate: true);
+
+            return;
+        }
+
         if ($site->runtimeTargetMode() === 'vm') {
             $this->redirect(route('sites.show', [
                 'server' => $server,

@@ -1,60 +1,63 @@
-<div class="space-y-6">
-    @include('livewire.sites.partials.edge.observability-nav', ['activeObservabilitySection' => 'logs'])
+@php
+    use App\Models\EdgeDeployment;
 
-    @include('livewire.sites.partials.edge.logs-callout')
+    $hasBuilding = $edgeDeployments->contains(fn ($d) => in_array($d->status, [EdgeDeployment::STATUS_BUILDING, EdgeDeployment::STATUS_PUBLISHING], true));
+@endphp
 
-    @include('livewire.sites.partials.edge.live-request-tail')
-
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Build & deploy logs') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Recent Edge deployments and build output. For CDN visitor traffic, open Traffic & analytics.') }}</p>
-        </div>
+<div>
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+        <p class="text-xs text-brand-moss">
+            {{ __('Build and deploy output — not visitor HTTP logs.') }}
+            <a
+                href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-traffic']) }}"
+                wire:navigate
+                class="font-medium text-brand-sage hover:underline"
+            >{{ __('Traffic') }}</a>
+        </p>
+        <a
+            href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-deploys']) }}"
+            wire:navigate
+            class="text-xs font-medium text-brand-sage hover:underline"
+        >
+            {{ __('Full history') }}
+        </a>
     </div>
 
-    @php
-        $hasBuilding = $edgeDeployments->contains(fn ($d) => in_array($d->status, [\App\Models\EdgeDeployment::STATUS_BUILDING, \App\Models\EdgeDeployment::STATUS_PUBLISHING], true));
-    @endphp
+    <section class="border-b border-brand-ink/10" @if ($hasBuilding) wire:poll.5s="refreshEdgeLogDeployments" @endif>
+        <div class="flex items-center justify-between gap-2 px-5 py-3 sm:px-6">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent deploys') }}</p>
+        </div>
 
-    <div @if ($hasBuilding) wire:poll.5s="refreshEdgeLogDeployments" @endif>
         @if ($edgeDeployments->isEmpty())
-            <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
-                {{ __('No activity yet — trigger a deploy from Overview.') }}
-            </div>
+            <p class="px-5 pb-8 text-center text-sm text-brand-moss sm:px-6">{{ __('No activity yet — trigger a deploy from Overview.') }}</p>
         @else
-            <ul class="divide-y divide-brand-ink/8">
+            <ul class="divide-y divide-brand-ink/8 border-t border-brand-ink/8">
                 @foreach ($edgeDeployments as $deployment)
                     @php
                         $depBadge = match ($deployment->status) {
-                            \App\Models\EdgeDeployment::STATUS_LIVE => 'text-emerald-700 dark:text-emerald-400',
-                            \App\Models\EdgeDeployment::STATUS_FAILED => 'text-rose-700 dark:text-rose-400',
+                            EdgeDeployment::STATUS_LIVE => 'text-emerald-700 dark:text-emerald-400',
+                            EdgeDeployment::STATUS_FAILED => 'text-rose-700 dark:text-rose-400',
                             default => 'text-brand-moss',
                         };
                         $failureReason = $deployment->failure_reason;
                         $buildLogLoaded = isset($edgeDeploymentBuildLogsLoaded[$deployment->id]);
                         $loadedBuildLog = $buildLogLoaded ? $this->edgeDeploymentBuildLog($deployment->id) : null;
+                        $statusLabel = str_replace('_', ' ', (string) $deployment->status);
                     @endphp
-                    <li class="px-6 py-4 sm:px-8" wire:key="edge-log-{{ $deployment->id }}">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="font-mono text-xs text-brand-ink">{{ $deployment->id }}</p>
-                                <p class="mt-1 text-sm capitalize {{ $depBadge }}">{{ str_replace('_', ' ', (string) $deployment->status) }}</p>
-                                <p class="mt-0.5 text-xs text-brand-moss">
-                                    {{ $deployment->created_at?->timezone(config('app.timezone'))->format('M j, Y g:i A') ?? '—' }}
-                                    @if ($deployment->git_commit)
-                                        · <span class="font-mono">{{ \Illuminate\Support\Str::limit($deployment->git_commit, 8, '') }}</span>
-                                    @endif
-                                </p>
-                            </div>
-                            @if ($deployment->status === \App\Models\EdgeDeployment::STATUS_FAILED && is_string($failureReason) && $failureReason !== '')
-                                <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">{{ __('Failed') }}</span>
-                            @endif
+                    <li class="px-5 py-3 sm:px-6" wire:key="edge-log-{{ $deployment->id }}">
+                        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <p class="text-sm capitalize {{ $depBadge }}">
+                                <span class="font-semibold">{{ $statusLabel }}</span>
+                                @if ($deployment->git_commit)
+                                    <span class="font-mono text-xs text-brand-mist">· {{ \Illuminate\Support\Str::limit($deployment->git_commit, 7, '') }}</span>
+                                @endif
+                            </p>
+                            <time class="shrink-0 text-[11px] text-brand-mist">
+                                {{ $deployment->created_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
+                            </time>
                         </div>
+                        <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist" title="{{ $deployment->id }}">{{ $deployment->id }}</p>
+
                         @if (is_string($failureReason) && $failureReason !== '')
                             @include('livewire.sites.partials.edge.build-log-lint-callout', [
                                 'buildLog' => $buildLogLoaded ? $loadedBuildLog : null,
@@ -64,23 +67,27 @@
                                 'deployment' => $deployment,
                             ])
                             @if (! str_contains($failureReason, 'dply config lint failed'))
-                                <pre class="mt-3 max-h-48 overflow-auto rounded-xl border border-rose-200/60 bg-rose-50/50 p-3 font-mono text-[11px] text-rose-900 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-200">{{ $failureReason }}</pre>
+                                <pre class="mt-2 max-h-40 overflow-auto rounded-lg border border-rose-200/60 bg-rose-50/50 p-2.5 font-mono text-[11px] text-rose-900 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-200">{{ $failureReason }}</pre>
                             @endif
                         @endif
 
                         @if ($deployment->build_log_path || (is_string($failureReason) && $failureReason !== ''))
                             <details
-                                class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 dark:border-brand-mist/20 dark:bg-zinc-900/40"
+                                wire:ignore.self
+                                class="mt-2 group"
                                 x-on:toggle="if ($el.open) $wire.loadEdgeDeploymentBuildLog(@js($deployment->id))"
                             >
-                                <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-brand-moss">{{ __('Build log') }}</summary>
-                                <div class="border-t border-brand-ink/8 p-3">
+                                <summary class="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-brand-sage hover:underline [&::-webkit-details-marker]:hidden">
+                                    <x-heroicon-m-chevron-right class="h-3.5 w-3.5 transition group-open:rotate-90" />
+                                    {{ __('Build log') }}
+                                </summary>
+                                <div class="mt-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 p-2.5 dark:border-brand-mist/20">
                                     <div wire:loading wire:target="loadEdgeDeploymentBuildLog('{{ $deployment->id }}')" class="text-xs text-brand-moss">
-                                        {{ __('Loading build log…') }}
+                                        {{ __('Loading…') }}
                                     </div>
                                     @if ($buildLogLoaded)
                                         @if ($loadedBuildLog !== null && $loadedBuildLog !== '')
-                                            @if ($deployment->status !== \App\Models\EdgeDeployment::STATUS_FAILED || ! is_string($failureReason) || $failureReason === '')
+                                            @if ($deployment->status !== EdgeDeployment::STATUS_FAILED || ! is_string($failureReason) || $failureReason === '')
                                                 @include('livewire.sites.partials.edge.build-log-lint-callout', [
                                                     'buildLog' => $loadedBuildLog,
                                                     'failureReason' => null,
@@ -101,12 +108,7 @@
                 @endforeach
             </ul>
         @endif
-    </div>
-</section>
+    </section>
 
-    <p class="text-right text-xs text-brand-moss">
-        <a href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-deploys']) }}" wire:navigate class="font-semibold text-brand-sage hover:underline">
-            {{ __('View full deploy history →') }}
-        </a>
-    </p>
+    @include('livewire.sites.partials.edge.live-request-tail')
 </div>

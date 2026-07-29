@@ -31,7 +31,7 @@ return [
         'cli' => ['label' => 'CLI'],
         'danger' => ['label' => 'Danger zone'],
         'edge-deploys' => ['label' => 'Deploys'],
-        'edge-domains' => ['label' => 'Domains'],
+        'edge-domains' => ['label' => 'Routing'],
         'edge-build' => ['label' => 'Build'],
         'edge-deploy-triggers' => ['label' => 'Deploy triggers'],
         'edge-environment' => ['label' => 'Environment'],

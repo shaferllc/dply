@@ -130,7 +130,7 @@ test('aws backend runtime logs return cloudwatch link', function () {
     expect($result['available'])->toBeFalse();
     expect($result['lines'])->toBe([]);
     $this->assertStringContainsString('cloudwatch', $result['url']);
-    $this->assertStringContainsString('apprunner', $result['note']);
+    $this->assertStringContainsString('CloudWatch', $result['note']);
 });
 test('fake backend returns deterministic metrics', function () {
     [$site, $credential] = doSite();

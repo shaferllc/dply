@@ -77,6 +77,10 @@ class CloudLogsCommand extends Command
             return self::SUCCESS;
         }
 
+        if (is_string($logs['message'] ?? null) && $logs['message'] !== '') {
+            $this->line($logs['message']);
+        }
+
         if (is_string($logs['url'] ?? null) && $logs['url'] !== '') {
             $this->line('Latest deployment logs available at:');
             $this->line($logs['url']);
@@ -85,8 +89,6 @@ class CloudLogsCommand extends Command
         }
 
         if (is_string($logs['message'] ?? null) && $logs['message'] !== '') {
-            $this->line($logs['message']);
-
             return self::SUCCESS;
         }
 

@@ -33,12 +33,54 @@ test('authenticated user can load edge create form', function () {
         ->get(route('edge.create'))
         ->assertOk()
         ->assertSee('Deploy an edge app')
-        ->assertSee('Git repository')
-        ->assertSee('Build command override')
+        ->assertSee('Connect Git')
+        ->assertSee('Build & delivery')
+        ->assertSee('Advanced settings')
+        ->assertSee('Est. cost')
         ->assertSee('SPA fallback')
         ->assertSee('Deploy on push')
-        ->assertSee('Dply Edge (managed)')
-        ->assertSee('Your Cloudflare account');
+        ->assertSee('Managed Edge')
+        ->assertSee('Your own account')
+        ->assertSee('Load sample app')
+        ->assertSee('data-testid="load-sample-edge-app"', false);
+});
+
+test('load sample app prefills public eleventy template in local development', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->call('loadSampleApp')
+        ->assertSet('repo_source', 'manual')
+        ->assertSet('repo', '11ty/eleventy-base-blog')
+        ->assertSet('branch', 'main')
+        ->assertSet('form.name', 'sample-edge-app')
+        ->assertSet('form.runtime_mode', 'static')
+        ->assertSet('form.output_dir', '_site');
+});
+
+test('byo delivery without credentials offers in page cloudflare token modal', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.delivery_mode', 'byo')
+        ->assertSee('No CDN account connected')
+        ->assertSee('Add Cloudflare token')
+        ->assertDontSee('Select a connected account…')
+        ->call('openCloudflareCredentialModal')
+        ->assertDispatched('open-add-provider-credential-modal');
+});
+
+test('newly saved cloudflare credential is selected for byo delivery', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.delivery_mode', 'managed')
+        ->call('applyStoredCloudflareCredential', 'cloudflare', 'cred-123')
+        ->assertSet('form.delivery_mode', 'byo')
+        ->assertSet('form.edge_provider_credential_id', 'cred-123');
 });
 
 test('returns 404 when surface edge inactive', function () {
@@ -72,6 +114,49 @@ test('ssr detection auto selects hybrid and name from repo when no cloud app', f
         ->assertSet('form.runtime_mode', 'hybrid')
         ->assertSet('form.name', 'next-app')
         ->assertSet('form.origin_url', '');
+});
+
+test('ssr detection still selects hybrid when output_dir is present', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+            'output_dir' => '.next',
+        ])
+        ->tap(function ($component): void {
+            $method = new ReflectionMethod($component->instance(), 'applyDetectedRuntimePrefills');
+            $method->setAccessible(true);
+            $method->invoke($component->instance());
+        })
+        ->assertSet('form.runtime_mode', 'hybrid')
+        ->assertSet('form.output_dir', '.next');
+});
+
+test('hybrid framework preset selects hybrid without start command', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('repo', 'acme/kit-app')
+        ->set('branch', 'main')
+        ->set('detectedPlan', [
+            'framework' => 'sveltekit',
+            'build_command' => 'npm run build',
+            'output_dir' => 'build',
+        ])
+        ->tap(function ($component): void {
+            $method = new ReflectionMethod($component->instance(), 'applyDetectedRuntimePrefills');
+            $method->setAccessible(true);
+            $method->invoke($component->instance());
+        })
+        ->assertSet('form.runtime_mode', 'hybrid')
+        ->assertSet('form.output_dir', 'build');
 });
 
 test('ssr detection auto fills origin from matching cloud app repo', function () {
@@ -114,6 +199,48 @@ test('rejects ssr-looking detection on deploy when hybrid origin missing', funct
             'framework' => 'next',
             'start_command' => 'next start',
             'build_command' => 'npm run build',
+        ])
+        ->call('deploy')
+        ->assertNoRedirect();
+
+    expect(Site::query()->count())->toBe(0);
+});
+
+test('rejects laravel detection on edge deploy', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'Laravel App')
+        ->set('repo', 'acme/laravel-app')
+        ->set('branch', 'main')
+        ->set('form.runtime_mode', 'static')
+        ->set('detectedPlan', [
+            'runtime' => 'php',
+            'framework' => 'laravel',
+            'build_command' => 'composer install',
+        ])
+        ->assertSee('Not an Edge workload')
+        ->assertSee('Deploy on Cloud')
+        ->call('deploy')
+        ->assertNoRedirect();
+
+    expect(Site::query()->count())->toBe(0);
+});
+
+test('rejects nest api detection on edge deploy', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'API')
+        ->set('repo', 'acme/nest-api')
+        ->set('branch', 'main')
+        ->set('form.runtime_mode', 'static')
+        ->set('detectedPlan', [
+            'runtime' => 'node',
+            'framework' => 'nest',
+            'start_command' => 'node dist/main',
         ])
         ->call('deploy')
         ->assertNoRedirect();

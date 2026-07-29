@@ -17,8 +17,8 @@ use Illuminate\Console\Command;
  * Backend behavior:
  *   - DigitalOcean App Platform: live-fetches the monitoring API
  *     (/v2/monitoring/metrics/apps/{cpu,memory,restart}) — 60s cached.
- *   - AWS App Runner: returns the unavailable state plus a CloudWatch
- *     console deep link (CloudWatch holds App Runner metrics).
+ *   - AWS App Runner: live-fetches CloudWatch AWS/AppRunner metrics
+ *     (CPU / memory / requests); falls back to a console deep link.
  *   - FakeCloudBackend: returns deterministic synthetic series.
  */
 class CloudMetricsCommand extends Command

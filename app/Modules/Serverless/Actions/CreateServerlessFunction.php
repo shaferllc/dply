@@ -46,6 +46,20 @@ class CreateServerlessFunction
         }
 
         $branch = trim((string) ($payload['branch'] ?? 'main')) ?: 'main';
+        $refKind = trim((string) ($payload['git_ref_kind'] ?? 'branch'));
+        if (! in_array($refKind, ['branch', 'tag', 'commit'], true)) {
+            $refKind = 'branch';
+        }
+
+        $repoSource = trim((string) ($payload['repo_source'] ?? 'manual'));
+        if (! in_array($repoSource, ['manual', 'provider'], true)) {
+            $repoSource = 'manual';
+        }
+
+        $sourceControlAccountId = trim((string) ($payload['source_control_account_id'] ?? ''));
+        if ($repoSource !== 'provider') {
+            $sourceControlAccountId = '';
+        }
 
         // `auto` (or an empty value) leaves the runtime unset so the
         // deploy-time ServerlessRuntimeDetector picks it from the repo. An
@@ -126,13 +140,18 @@ class CreateServerlessFunction
             'webhook_secret' => Str::random(48),
             'meta' => [
                 'runtime_profile' => 'digitalocean_functions_web',
+                'git_ref_kind' => $refKind,
+                'repository' => array_filter([
+                    'git_source_control_account_id' => $sourceControlAccountId !== '' ? $sourceControlAccountId : null,
+                ]),
                 'serverless' => [
                     'runtime' => $runtime,
                     // OpenWhisk `exec.main` — the handler *function* name,
                     // not a file. dply's runtimes export `main`.
                     'entrypoint' => 'main',
                     'function_name' => $slug,
-                    'repo_source' => 'manual',
+                    'repo_source' => $repoSource,
+                    'source_control_account_id' => $sourceControlAccountId !== '' ? $sourceControlAccountId : null,
                 ],
             ],
         ]);

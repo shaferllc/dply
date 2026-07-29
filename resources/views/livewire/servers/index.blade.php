@@ -193,11 +193,7 @@
         </x-slot:empty>
 
         <x-slot:modals>
-            @include('livewire.servers.partials._deploy-console', [
-                'keyPrefix' => 'fleet',
-                'emptyMessage' => __('Hit Deploy or Sync on a server to watch it here.'),
-            ])
-
+            {{-- Deploy console lives in the app shell (deploy-console-sidebar + dock). --}}
             @include('livewire.servers.partials.deploy-sites-modal')
 
             @include('livewire.servers.partials.remove-server-modal', [

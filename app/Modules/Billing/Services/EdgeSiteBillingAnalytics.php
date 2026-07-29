@@ -64,11 +64,21 @@ final class EdgeSiteBillingAnalytics
      */
     public function forSite(Site $site, int $dailyDays = 30): ?array
     {
+        $memoKey = 'edge.billing.for_site.'.$site->id.'.'.$dailyDays;
+        if (app()->bound('request') && request()->attributes->has($memoKey)) {
+            /** @var array<string, mixed>|null */
+            return request()->attributes->get($memoKey);
+        }
+
         if (
             $site->status !== Site::STATUS_EDGE_ACTIVE
             || $site->edge_backend !== 'dply_edge'
             || $site->isEdgePreview()
         ) {
+            if (app()->bound('request')) {
+                request()->attributes->set($memoKey, null);
+            }
+
             return null;
         }
 
@@ -79,13 +89,19 @@ final class EdgeSiteBillingAnalytics
         $mtd = $mtdBySite[$siteId] ?? EdgeUsageTotals::empty();
         $usageEstimate = $this->usageCostCalculator->estimate($mtd, 1);
 
-        return $this->formatSiteRow(
+        $payload = $this->formatSiteRow(
             site: $site,
             platformCents: (int) config('subscription.standard.edge_cents', 200),
             mtd: $mtd,
             usageEstimate: $usageEstimate,
             daily: $dailyBySite[$siteId] ?? [],
         );
+
+        if (app()->bound('request')) {
+            request()->attributes->set($memoKey, $payload);
+        }
+
+        return $payload;
     }
 
     /**

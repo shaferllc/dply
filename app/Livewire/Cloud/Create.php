@@ -160,7 +160,7 @@ class Create extends Component
      *
      * @var list<array{
      *     _id: string,
-     *     mode: 'attach'|'create',
+     *     mode: 'attach'|'create'|'external',
      *     cloud_database_id?: string,
      *     name: string,
      *     engine: 'postgres'|'mysql'|'redis',
@@ -408,6 +408,7 @@ class Create extends Component
             'attachableDatabases' => $databases,
             'backendSupportsWorkers' => $this->backend !== 'aws_app_runner',
             'backendSupportsDeployTasks' => $this->backend !== 'aws_app_runner',
+            'backendSupportsManagedDatabases' => $this->backend !== 'aws_app_runner',
         ])->layout('layouts.app');
     }
 }

@@ -86,7 +86,11 @@ return [
     */
     'log_ingest' => [
         'key' => env('DPLY_EDGE_LOG_INGEST_KEY'),
-        'base_url' => env('DPLY_EDGE_LOG_INGEST_BASE_URL', env('APP_URL')),
+        // Workers run on the public internet — prefer the tunnel/public URL
+        // over APP_URL (often a local *.test host that Edge cannot reach).
+        'base_url' => env('DPLY_EDGE_LOG_INGEST_BASE_URL')
+            ?: env('DPLY_PUBLIC_APP_URL')
+            ?: env('APP_URL'),
     ],
 
     /*

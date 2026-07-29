@@ -163,7 +163,7 @@ final class StandbyBlueprintPlanner
                 'domain' => (string) $domain->hostname,
                 'site_name' => $site !== null ? (string) $site->name : __('Unknown site'),
                 'is_primary' => (bool) $domain->is_primary,
-                'href' => $site !== null ? $this->siteHref($site, $site->usesEdgeRuntime() ? 'edge-domains' : 'routing') : null,
+                'href' => $site !== null ? $this->siteHref($site, $site->usesEdgeRuntime() ? 'edge-routing' : 'routing') : null,
             ];
         }
 

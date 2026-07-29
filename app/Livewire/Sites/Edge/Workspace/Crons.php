@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeDeployment;
@@ -24,6 +25,7 @@ use Livewire\Component;
  */
 class Crons extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use MountsEdgeWorkspaceSection;
 
@@ -74,7 +76,7 @@ class Crons extends Component
         $this->persist();
         $this->new_schedule = '';
         $this->new_handler = '';
-        $this->toastSuccess(__('Cron added — pushed to Cloudflare on the next deploy.'));
+        $this->toastSuccess(__('Schedule added — applied on the next deploy.'));
     }
 
     public function removeCron(int $index): void

@@ -82,7 +82,8 @@ return [
         'oracle' => env('FEATURE_PROVIDER_ORACLE', false),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
         'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', false),
-        // exit: ship once container-on-AppRunner architecture lands per dply cloud memo
+        // exit: dogfood with DPLY_SERVER_PROVIDER_AWS_APP_RUNNER=true + this flag; App Runner
+        // web path is live (image + GitHub source via connection ARN). Workers/deploy-tasks stay DO-only.
         'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', false),
         // exit: keep gated indefinitely; EKS is enterprise-only positioning
         'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', false),

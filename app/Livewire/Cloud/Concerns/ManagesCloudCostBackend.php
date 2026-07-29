@@ -28,19 +28,43 @@ trait ManagesCloudCostBackend
         if ($regions !== [] && ($this->region === '' || ! in_array($this->region, array_column($regions, 'slug'), true))) {
             $this->region = $regions[0]['slug'];
         }
+
+        // App Runner has no DO managed-DB create path — convert pending
+        // "create" rows to external connection mode (and back on DO).
+        foreach ($this->databases as $i => $row) {
+            $mode = (string) ($row['mode'] ?? '');
+            if ($value === 'aws_app_runner' && $mode === 'create') {
+                $this->databases[$i]['mode'] = 'external';
+                $this->databases[$i]['ssl'] = $row['ssl'] ?? true;
+                $this->databases[$i]['port'] = $row['port'] ?? (($row['engine'] ?? '') === 'mysql' ? 3306 : 5432);
+            } elseif ($value !== 'aws_app_runner' && $mode === 'external') {
+                $this->databases[$i]['mode'] = 'create';
+                $this->databases[$i]['size'] = $row['size'] ?? 'small';
+            }
+        }
     }
 
     /**
-     * Live cost preview + spec validation via DO /apps/propose. Called
-     * by the form's "Estimate" button and by the deploy() pre-flight
-     * gate. Stores the estimate or the error on $costPreview so the
-     * blade can show either a price or an inline diagnostic.
+     * Live cost preview + (for DO) spec validation via /apps/propose.
+     * Called by the form's "Estimate" button and by the deploy()
+     * pre-flight gate. Stores the estimate or the error on
+     * $costPreview so the blade can show either a price or an inline
+     * diagnostic.
      *
-     * Only meaningful when the resolved backend is DO App Platform —
-     * App Runner doesn't expose a propose endpoint so we no-op for it.
+     * DO App Platform: POST /apps/propose (validation + provider cost).
+     * AWS App Runner: local vCPU/GB-hour estimate (no propose API).
      */
     public function recomputeCostPreview(): void
     {
+        if ($this->backend === 'aws_app_runner') {
+            $this->costPreview = [
+                'value' => $this->dplyResourceEstimateUsd(),
+                'error' => null,
+            ];
+
+            return;
+        }
+
         if ($this->backend !== 'digitalocean_app_platform') {
             $this->costPreview = ['value' => null, 'error' => null];
 
@@ -110,15 +134,26 @@ trait ManagesCloudCostBackend
     }
 
     /**
-     * dply's metered monthly charge (USD) for the resources described in the
-     * form: the marked-up container (× instances), any workers, databases, and
-     * buckets. This is what dply bills on top of the flat platform fee — shown
-     * in the sidebar so the estimate matches the invoice, not the raw provider
-     * cost from DO's propose endpoint.
+     * Monthly resource estimate (USD) for the form — shown next to the
+     * flat platform fee in the create sidebar.
+     *
+     * DO App Platform: dply-metered marked-up container/workers/DBs
+     * (matches the invoice; not DO's raw propose cost).
+     *
+     * AWS App Runner: estimated AWS compute the customer pays AWS
+     * directly (vCPU/GB-hour × hours × instances). Not dply-metered.
      */
     public function dplyResourceEstimateUsd(): float
     {
         $estimator = app(ManagedProductCostEstimator::class);
+
+        if ($this->backend === 'aws_app_runner') {
+            $instances = $this->autoscaling_enabled
+                ? max(1, (int) $this->autoscaling_min)
+                : max(1, (int) $this->instances);
+
+            return $estimator->appRunnerMonthlyUsd($this->size_tier, $instances);
+        }
 
         $total = $estimator->cloudContainerPrice($this->size_tier) * max(1, $this->instances);
 
@@ -242,6 +277,19 @@ trait ManagesCloudCostBackend
                     $base['cloud_database_id'] = (string) ($row['cloud_database_id'] ?? '');
 
                     return $base;
+                }
+                if ($mode === 'external') {
+                    return $base + [
+                        'engine' => (string) ($row['engine'] ?? 'postgres'),
+                        'host' => (string) ($row['host'] ?? ''),
+                        'port' => (int) ($row['port'] ?? 0),
+                        'database' => (string) ($row['database'] ?? ''),
+                        'username' => (string) ($row['username'] ?? ''),
+                        'password' => (string) ($row['password'] ?? ''),
+                        'ssl' => filter_var($row['ssl'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'version' => (string) ($row['version'] ?? ''),
+                        'region' => 'external',
+                    ];
                 }
 
                 return $base + [

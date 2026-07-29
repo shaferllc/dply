@@ -121,7 +121,22 @@ class ErrorPages extends Component
             'maintenance' => $this->maintenance_html = $html,
             default => null,
         };
-        $this->toastSuccess(__('Template applied — review and click Save to publish.'));
+        $this->toastSuccess(__('Template applied — review and Save.'));
+    }
+
+    public function applyAllTemplates(string $key): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tpl = self::templates()[$key] ?? null;
+        if ($tpl === null) {
+            return;
+        }
+
+        $this->error_404_html = (string) ($tpl['html_404'] ?? '');
+        $this->error_500_html = (string) ($tpl['html_500'] ?? '');
+        $this->maintenance_html = (string) ($tpl['maintenance'] ?? '');
+        $this->toastSuccess(__('Starter applied to 404, 500, and maintenance — review and Save.'));
     }
 
     public function render(): View

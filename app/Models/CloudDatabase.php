@@ -67,6 +67,9 @@ class CloudDatabase extends Model
 
     public const BACKEND_UPSTASH = 'upstash_serverless';
 
+    /** Operator-supplied connection (RDS, Neon, etc.) — no provider provision. */
+    public const BACKEND_EXTERNAL = 'external';
+
     /**
      * Portable size tier → DO Managed Database size slug. Mirrors the
      * container size_tier mapping in DigitalOceanAppPlatformBackend.
@@ -195,7 +198,7 @@ class CloudDatabase extends Model
             ];
         }
 
-        return [
+        $vars = [
             $prefix.'_CONNECTION' => $this->engine === self::ENGINE_MYSQL ? 'mysql' : 'pgsql',
             $prefix.'_HOST' => $host,
             $prefix.'_PORT' => $port,
@@ -203,6 +206,14 @@ class CloudDatabase extends Model
             $prefix.'_USERNAME' => (string) ($connection['username'] ?? ''),
             $prefix.'_PASSWORD' => $password,
         ];
+
+        $ssl = ($connection['ssl'] ?? false) === true
+            || in_array((string) ($connection['sslmode'] ?? ''), ['require', 'verify-full', 'verify-ca'], true);
+        if ($ssl && $this->engine === self::ENGINE_POSTGRES) {
+            $vars[$prefix.'_SSLMODE'] = (string) ($connection['sslmode'] ?? 'require');
+        }
+
+        return $vars;
     }
 
     /**
@@ -219,6 +230,16 @@ class CloudDatabase extends Model
             return [$prefix.'_HOST', $prefix.'_PORT', $prefix.'_PASSWORD'];
         }
 
-        return [$prefix.'_CONNECTION', $prefix.'_HOST', $prefix.'_PORT', $prefix.'_DATABASE', $prefix.'_USERNAME', $prefix.'_PASSWORD'];
+        $keys = [$prefix.'_CONNECTION', $prefix.'_HOST', $prefix.'_PORT', $prefix.'_DATABASE', $prefix.'_USERNAME', $prefix.'_PASSWORD'];
+        if ($this->engine === self::ENGINE_POSTGRES) {
+            $keys[] = $prefix.'_SSLMODE';
+        }
+
+        return $keys;
+    }
+
+    public function isExternal(): bool
+    {
+        return $this->backend === self::BACKEND_EXTERNAL;
     }
 }

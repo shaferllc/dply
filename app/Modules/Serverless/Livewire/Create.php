@@ -7,15 +7,20 @@ namespace App\Modules\Serverless\Livewire;
 use App\Modules\Serverless\Actions\CreateServerlessFunction;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
+use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Models\ProviderCredential;
 use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
 use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
+use App\Modules\Serverless\Livewire\Concerns\ManagesServerlessCreateGit;
 use App\Modules\Serverless\Services\ServerlessCostEstimator;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
 
@@ -28,8 +33,17 @@ use Throwable;
 #[Layout('layouts.app')]
 class Create extends Component
 {
+    use ConfiguresGitRepository;
     use DetectsRepositoryRuntime;
     use DispatchesToastNotifications;
+    use ManagesServerlessCreateGit {
+        // Shared picker ships empty on* hooks; serverless create owns them
+        // (auto-detect + app-name seeding).
+        ManagesServerlessCreateGit::onRepositorySelected insteadof ConfiguresGitRepository;
+        ManagesServerlessCreateGit::onRepositoryAutoselected insteadof ConfiguresGitRepository;
+        ManagesServerlessCreateGit::onManualRepoUrlChanged insteadof ConfiguresGitRepository;
+    }
+    use RefreshesLinkedSourceControlAccounts;
 
     public string $provider_credential_id = '';
 
@@ -48,11 +62,12 @@ class Create extends Component
      * without one. Default to managed when it's available and the org has no
      * DigitalOcean credential of its own.
      */
-    public function mount(): void
+    public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         abort_unless(Feature::active('surface.serverless'), 404);
 
-        $org = auth()->user()?->currentOrganization();
+        $user = auth()->user();
+        $org = $user?->currentOrganization();
         if ($org === null) {
             return;
         }
@@ -66,6 +81,40 @@ class Create extends Component
             $this->provider_credential_id = $first;
         } elseif ($this->managedAvailable()) {
             $this->delivery_mode = 'managed';
+        }
+
+        // Shared Git picker — connected accounts first, else paste a URL.
+        $this->linkedSourceControlAccounts = $user ? $repositoryBrowser->accountsForUser($user) : [];
+        if ($this->linkedSourceControlAccounts !== []) {
+            $this->repo_source = 'provider';
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+            $this->refreshRepositories($repositoryBrowser);
+        }
+    }
+
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        if ($this->linkedSourceControlAccounts === []) {
+            return;
+        }
+
+        $this->repo_source = 'provider';
+        if ($this->source_control_account_id === '') {
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+        }
+        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
+    }
+
+    #[On('provider-credential-created')]
+    public function applyStoredProviderCredential(?string $provider = null, mixed $credentialId = null): void
+    {
+        if ($provider !== 'digitalocean' || $credentialId === null || $credentialId === '') {
+            return;
+        }
+
+        $this->provider_credential_id = (string) $credentialId;
+        if ($this->delivery_mode !== 'managed') {
+            $this->delivery_mode = 'byo';
         }
     }
 
@@ -82,10 +131,6 @@ class Create extends Component
     public string $region = 'nyc1';
 
     public string $name = '';
-
-    public string $repo = '';
-
-    public string $branch = 'main';
 
     /**
      * Runtime selection. Defaults to `auto` — the deploy-time
@@ -112,8 +157,7 @@ class Create extends Component
     public function loadPhpDemo(): void
     {
         $this->name = 'PHP demo';
-        $this->repo = self::PHP_DEMO_REPO;
-        $this->branch = self::PHP_DEMO_BRANCH;
+        $this->applyDemoRepository(self::PHP_DEMO_REPO, self::PHP_DEMO_BRANCH);
         $this->runtime = 'php:8.3';
         // The demo pins a deliberate runtime — don't let a later Detect run
         // stomp it.
@@ -129,12 +173,28 @@ class Create extends Component
     public function loadLaravelDemo(): void
     {
         $this->name = 'Laravel demo';
-        $this->repo = self::LARAVEL_DEMO_REPO;
-        $this->branch = self::LARAVEL_DEMO_BRANCH;
+        $this->applyDemoRepository(self::LARAVEL_DEMO_REPO, self::LARAVEL_DEMO_BRANCH);
         // Laravel 13 requires PHP >= 8.4 — running it on php:8.3 trips
         // composer's platform check before the app can even autoload.
         $this->runtime = 'php:8.4';
         $this->runtimeOverridesTouched = true;
+    }
+
+    /**
+     * Switch the shared Git picker to paste-URL mode and seed owner/repo + branch
+     * without hitting the public scan API (owner/repo shorthand skips the scan).
+     */
+    private function applyDemoRepository(string $ownerRepo, string $branch): void
+    {
+        $this->repo_source = 'manual';
+        $this->source_control_account_id = '';
+        $this->repository_selection = '';
+        $this->availableRepositories = [];
+        $this->git_repository_url = $ownerRepo;
+        $this->git_branch = $branch;
+        $this->git_ref_kind = 'branch';
+        $this->repoScanState = 'idle';
+        $this->refPickerOpen = false;
     }
 
     /**
@@ -144,11 +204,17 @@ class Create extends Component
      */
     public function detectFromRepository(): void
     {
+        $accountId = $this->repo_source === 'provider' && $this->source_control_account_id !== ''
+            ? $this->source_control_account_id
+            : null;
+
         $this->runServerlessDetection(
-            $this->normalizeToCloneUrl($this->repo),
-            $this->branch,
+            $this->normalizeToCloneUrl($this->git_repository_url),
+            $this->git_branch,
             '',
             app(ServerlessTargetCapabilityResolver::class)->forDigitalOceanFunctions(),
+            $accountId,
+            $this->git_ref_kind,
         );
     }
 
@@ -206,12 +272,18 @@ class Create extends Component
         // dply's namespace, so they need no customer credential.
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'repo' => ['required', 'string', 'max:255'],
-            'branch' => ['required', 'string', 'max:255'],
+            'repo_source' => ['required', 'in:manual,provider'],
+            'git_repository_url' => ['required', 'string', 'max:500'],
+            'git_branch' => ['required', 'string', 'max:255'],
+            'git_ref_kind' => ['nullable', 'in:branch,tag,commit'],
             'runtime' => ['required', 'string', Rule::in(array_keys($this->runtimeOptions()))],
             'region' => ['required', 'string', 'max:32'],
             'delivery_mode' => ['required', 'string', Rule::in(['byo', 'managed'])],
         ];
+        if ($this->repo_source === 'provider') {
+            $rules['source_control_account_id'] = ['required', 'string', 'max:26'];
+            $rules['repository_selection'] = ['required', 'string', 'max:500'];
+        }
         if (! $managed) {
             $rules['provider_credential_id'] = [
                 'required',
@@ -230,20 +302,23 @@ class Create extends Component
         try {
             $site = $action->handle(auth()->user(), $org, [
                 'name' => $this->name,
-                'repo' => $this->repo,
-                'branch' => $this->branch,
+                'repo' => $this->git_repository_url,
+                'branch' => $this->git_branch,
+                'git_ref_kind' => $this->git_ref_kind ?: 'branch',
+                'repo_source' => $this->repo_source,
+                'source_control_account_id' => $this->repo_source === 'provider' ? $this->source_control_account_id : null,
                 'runtime' => $this->runtime,
                 'region' => $this->region,
                 'delivery_mode' => $this->delivery_mode,
                 'provider_credential_id' => $this->provider_credential_id,
             ]);
         } catch (Throwable $e) {
-            $this->toastError(__('Could not create the function: :msg', ['msg' => $e->getMessage()]));
+            $this->toastError(__('Could not create the app: :msg', ['msg' => $e->getMessage()]));
 
             return null;
         }
 
-        $this->toastSuccess(__('Serverless function created — deploying now.'));
+        $this->toastSuccess(__('Serverless app created — deploying now.'));
 
         return $this->redirect(route('serverless.journey', [$site->server_id, $site->id]), navigate: true);
     }
