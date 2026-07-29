@@ -129,6 +129,14 @@ return [
         // with DPLY_EDGE_BUILD_IMAGE if you need to pin older Node for a
         // specific deploy.
         'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
+        // Images pre-pulled on worker boot / schedule (skip per-deploy pull when present).
+        'warm_images' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('DPLY_EDGE_BUILD_WARM_IMAGES', 'node:20-bookworm,node:22-bookworm')),
+        ))),
+        'warm_images_on_schedule' => filter_var(env('DPLY_EDGE_BUILD_WARM_IMAGES_SCHEDULE', true), FILTER_VALIDATE_BOOLEAN),
+        // Skip `docker pull` when `docker image inspect` succeeds locally.
+        'skip_pull_if_present' => filter_var(env('DPLY_EDGE_BUILD_SKIP_PULL_IF_PRESENT', true), FILTER_VALIDATE_BOOLEAN),
         // Long-running clone/build/publish — Horizon supervisor-heavy.
         'queue' => env('DPLY_EDGE_BUILD_QUEUE', 'dply-provision'),
         'timeout_seconds' => 900,
@@ -156,6 +164,18 @@ return [
         // when debugging a stale cache).
         'git_cache_enabled' => filter_var(env('DPLY_EDGE_BUILD_GIT_CACHE', true), FILTER_VALIDATE_BOOLEAN),
         'git_cache_dir' => env('DPLY_EDGE_BUILD_GIT_CACHE_DIR', storage_path('app/edge-git-cache')),
+        // Host-side npm/pnpm/yarn caches bind-mounted into every build
+        // container so installs reuse downloaded tarballs across deploys.
+        'package_store_enabled' => filter_var(env('DPLY_EDGE_BUILD_PACKAGE_STORE', true), FILTER_VALIDATE_BOOLEAN),
+        'package_store_dir' => env('DPLY_EDGE_BUILD_PACKAGE_STORE_DIR', storage_path('app/edge-pkg-store')),
+        // Upload node_modules cache to R2 after publish (off the deploy
+        // critical path). When false, snapshot runs inline after build.
+        'async_cache_snapshot' => filter_var(env('DPLY_EDGE_BUILD_ASYNC_CACHE_SNAPSHOT', true), FILTER_VALIDATE_BOOLEAN),
+        // Sparse-checkout when a monorepo repo_root is set (shallow + cone).
+        'sparse_checkout' => filter_var(env('DPLY_EDGE_BUILD_SPARSE_CHECKOUT', true), FILTER_VALIDATE_BOOLEAN),
+        // Prefer filtered workspace installs (`pnpm --filter`, `npm -w`) when
+        // building a single package inside a monorepo.
+        'monorepo_filter_install' => filter_var(env('DPLY_EDGE_BUILD_MONOREPO_FILTER', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*

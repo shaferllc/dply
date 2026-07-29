@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\EdgeDeployment;
-use App\Services\DeployContract\DeployContractPolicyLoader;
 use App\Modules\Edge\Services\Config\EdgeRepoConfigLinter;
 use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
 use App\Modules\Edge\Services\Ssr\EdgeSsrFrameworkRegistry;
 use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use App\Modules\Edge\Support\EdgeRepoRoot;
 use App\Modules\Edge\Support\FakeEdgeProvision;
+use App\Services\DeployContract\DeployContractPolicyLoader;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -39,7 +39,7 @@ class EdgeBuildRunner
     private const SSR_SCRIPT_MAX_BYTES = 9 * 1024 * 1024;
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      * @return array{
      *     artifact_dir: string,
      *     build_log: string,
@@ -90,6 +90,8 @@ class EdgeBuildRunner
         $checkoutRoot = $checkout;
         $artifactDir = $workRoot.'/out';
         $buildLog = $workRoot.'/build.log';
+        $preserveCheckoutForCache = false;
+        $normalizedRepoRoot = EdgeRepoRoot::normalize($repoRoot);
         $header = '=== dply Edge build '.$deployment->id." ===\n";
         File::put($buildLog, $header);
 
@@ -145,7 +147,13 @@ class EdgeBuildRunner
             // (skips re-downloading the whole history on repeat builds) and
             // retry-on-transient-failure (TCP timeouts no longer kill the
             // build outright).
-            $cloneLog = app(EdgeRepoCloner::class)->clone($repoUrl, $branch, $checkout, $commitOverride);
+            $cloneLog = app(EdgeRepoCloner::class)->clone(
+                $repoUrl,
+                $branch,
+                $checkout,
+                $commitOverride,
+                $normalizedRepoRoot !== '' ? $normalizedRepoRoot : null,
+            );
             foreach ($cloneLog as $line) {
                 $this->appendBuildLog($buildLog, $line."\n");
             }
@@ -155,7 +163,7 @@ class EdgeBuildRunner
 
             $checkout = EdgeRepoRoot::applyToCheckout(
                 $checkout,
-                $repoRoot,
+                $normalizedRepoRoot !== '' ? $normalizedRepoRoot : $repoRoot,
                 fn (string $line) => $this->appendBuildLog($buildLog, $line."\n"),
             );
 
@@ -443,17 +451,21 @@ class EdgeBuildRunner
                 $this->appendBuildLog($buildLog, sprintf("SSR mode (%s) — adapter detected, build = %s\n", $ssrProfile->label, $buildCommand));
             }
 
-            // Build cache restore — best-effort. Cache key is derived
-            // from the lockfile contents in the resolved checkout so
-            // monorepo subdirs + dply.yaml root overrides hash the
-            // right file. Cache miss is silent; failures only print
-            // to the build log and the deploy continues cold.
+            // Build cache restore — best-effort. For workspace monorepos
+            // key + restore from the git root (lockfile + node_modules
+            // live there after filtered installs).
             $site = $deployment->site;
             $cacheKey = null;
+            $cacheTarget = ($normalizedRepoRoot !== '' && $this->isWorkspaceRoot($checkoutRoot))
+                ? $checkoutRoot
+                : $checkout;
             if ($site !== null) {
                 try {
+                    // Key off the package checkout (package.json / local lock);
+                    // restore into the workspace root when filtered installs
+                    // place node_modules there.
                     $cacheKey = app(EdgeBuildCache::class)->cacheKey($checkout, null);
-                    $restoreResult = app(EdgeBuildCache::class)->restore($checkout, null, $cacheKey, $site);
+                    $restoreResult = app(EdgeBuildCache::class)->restore($cacheTarget, null, $cacheKey, $site);
                     $this->appendBuildLog(
                         $buildLog,
                         '[cache] '.$restoreResult['message'].' (key '.$cacheKey.')'."\n",
@@ -491,31 +503,26 @@ class EdgeBuildRunner
             // BuildJourney UI.
             $this->appendBuildLog($buildLog, "[dply:step] build\n");
 
-            $script = $this->composeBuildScript($checkout, $buildCommand);
+            $script = $this->composeBuildScript($checkout, $buildCommand, $checkoutRoot, $normalizedRepoRoot);
 
-            // Pre-pull the image as its own step so the first build (cold
-            // Docker cache) shows pull progress live in the log instead of
-            // sitting silent for 30-90s while docker run does the implicit
-            // pull. `--quiet` would hide layer progress; we want it visible.
-            $this->appendBuildLog($buildLog, "Pulling image {$dockerImage}…\n");
-            $pull = Process::timeout(900)
-                ->run(
-                    ['docker', 'pull', $dockerImage],
-                    fn (string $type, string $chunk) => $this->appendBuildLog($buildLog, $chunk),
-                );
-            if (! $pull->successful()) {
-                $detail = trim($pull->errorOutput()) !== '' ? trim($pull->errorOutput()) : trim($pull->output());
-                $detail = $detail !== '' ? $detail : 'no output from docker pull (exit '.$pull->exitCode().')';
-                throw new RuntimeException('Docker pull failed for '.$dockerImage.': '.$detail);
-            }
+            // Skip pull when the image is already local (warm workers /
+            // repeat deploys). Cold miss still pulls with live progress.
+            $this->ensureDockerImage($dockerImage, $buildLog);
+
+            // Mount the git root so workspace lockfiles + filtered installs
+            // see the whole monorepo; workdir is the selected package.
+            $containerWorkdir = $normalizedRepoRoot !== ''
+                ? '/src/'.$normalizedRepoRoot
+                : '/src';
 
             $this->appendBuildLog($buildLog, "Running build in {$dockerImage}: {$script}\n");
             $build = Process::timeout((int) config('edge.build.timeout_seconds', 900))
                 ->run(
                     [
                         'docker', 'run', '--rm',
-                        '-v', $checkout.':/src',
-                        '-w', '/src',
+                        '-v', $checkoutRoot.':/src',
+                        '-w', $containerWorkdir,
+                        ...$this->packageStoreVolumeFlags(),
                         ...$this->dockerEnvFlags($env),
                         $dockerImage,
                         'bash', '-lc', $script,
@@ -548,22 +555,33 @@ class EdgeBuildRunner
                 }
             }
 
-            // Cache snapshot — runs inline after the Docker build
-            // succeeds. ~5–30s on a typical Next.js build; acceptable
-            // for v1, can move to a background queue later if it
-            // becomes a deploy-time hotspot.
+            // Cache snapshot — async by default (after publish) so tar+R2
+            // upload doesn't sit on the deploy critical path. Inline when
+            // async_cache_snapshot is disabled.
+            $cacheAsync = null;
             if ($site !== null && $cacheKey !== null) {
-                try {
-                    $snapResult = app(EdgeBuildCache::class)->snapshot($checkout, null, $cacheKey, $site);
-                    $this->appendBuildLog($buildLog, '[cache] '.$snapResult['message']."\n");
-                    if ($snapResult['ok']) {
-                        $deleted = app(EdgeBuildCache::class)->prune($site);
-                        if ($deleted > 0) {
-                            $this->appendBuildLog($buildLog, '[cache] pruned '.$deleted.' old cache entr(ies).'."\n");
+                if ((bool) config('edge.build.async_cache_snapshot', true)) {
+                    $preserveCheckoutForCache = true;
+                    $cacheAsync = [
+                        'site_id' => (string) $site->id,
+                        'checkout' => $cacheTarget,
+                        'cache_key' => $cacheKey,
+                        'checkout_root' => $checkoutRoot,
+                    ];
+                    $this->appendBuildLog($buildLog, "[cache] Snapshot deferred until after publish.\n");
+                } else {
+                    try {
+                        $snapResult = app(EdgeBuildCache::class)->snapshot($cacheTarget, null, $cacheKey, $site);
+                        $this->appendBuildLog($buildLog, '[cache] '.$snapResult['message']."\n");
+                        if ($snapResult['ok']) {
+                            $deleted = app(EdgeBuildCache::class)->prune($site);
+                            if ($deleted > 0) {
+                                $this->appendBuildLog($buildLog, '[cache] pruned '.$deleted.' old cache entr(ies).'."\n");
+                            }
                         }
+                    } catch (\Throwable $e) {
+                        $this->appendBuildLog($buildLog, '[cache] snapshot error: '.$e->getMessage()."\n");
                     }
-                } catch (\Throwable $e) {
-                    $this->appendBuildLog($buildLog, '[cache] snapshot error: '.$e->getMessage()."\n");
                 }
             }
 
@@ -587,7 +605,7 @@ class EdgeBuildRunner
                     $totalBytes,
                 ));
 
-                return [
+                $result = [
                     'artifact_dir' => $artifactDir,
                     'build_log' => $buildLog,
                     'git_commit' => $resolvedCommit,
@@ -597,6 +615,11 @@ class EdgeBuildRunner
                     'ssr_entry_module' => $entryModule,
                     'ssr_modules' => $modules,
                 ];
+                if ($cacheAsync !== null) {
+                    $result['cache_async'] = $cacheAsync;
+                }
+
+                return $result;
             }
 
             $this->assertArtifactContents($artifactDir, $outputDir);
@@ -618,9 +641,13 @@ class EdgeBuildRunner
                 $result['middleware_source_path'] = (string) ($middlewareBundle['source_path'] ?? '');
             }
 
+            if ($cacheAsync !== null) {
+                $result['cache_async'] = $cacheAsync;
+            }
+
             return $result;
         } finally {
-            if (is_dir($checkoutRoot)) {
+            if (is_dir($checkoutRoot) && ! $preserveCheckoutForCache) {
                 File::deleteDirectory($checkoutRoot);
             }
         }
@@ -842,14 +869,47 @@ class EdgeBuildRunner
      *      (`pnpm run X` / `yarn run X`) so the build script finds the
      *      binaries that pnpm/yarn put in their own bin paths.
      */
-    private function composeBuildScript(string $checkout, string $buildCommand): string
-    {
+    private function composeBuildScript(
+        string $checkout,
+        string $buildCommand,
+        string $checkoutRoot = '',
+        string $repoRoot = '',
+    ): string {
         $install = $this->detectInstallCommand($checkout);
+        $pmName = $this->detectPackageManagerName(
+            ($checkoutRoot !== '' && $this->isWorkspaceRoot($checkoutRoot))
+                ? $checkoutRoot
+                : $checkout,
+        );
+
+        if (
+            $install !== null
+            && $checkoutRoot !== ''
+            && $repoRoot !== ''
+            && (bool) config('edge.build.monorepo_filter_install', true)
+            && $this->isWorkspaceRoot($checkoutRoot)
+        ) {
+            $filtered = $this->detectFilteredInstallCommand($checkoutRoot, $checkout, $repoRoot, $pmName);
+            if ($filtered !== null) {
+                $install = $filtered;
+            }
+        }
+
+        // Prefer workspace-root lockfile install when the package dir has
+        // package.json but no lockfile (typical monorepo leaf).
+        if ($install === null && $checkoutRoot !== '' && $this->isWorkspaceRoot($checkoutRoot)) {
+            $install = $this->detectInstallCommand($checkoutRoot);
+            if ($install !== null && $repoRoot !== '' && (bool) config('edge.build.monorepo_filter_install', true)) {
+                $filtered = $this->detectFilteredInstallCommand($checkoutRoot, $checkout, $repoRoot, $pmName);
+                if ($filtered !== null) {
+                    $install = $filtered;
+                }
+            }
+        }
+
         if ($install === null) {
             return $buildCommand;
         }
-
-        $pmName = $this->detectPackageManagerName($checkout);
 
         // Strip a leading install prefix added by the create-form default
         // (`npm ci && X`, `pnpm install && X`, etc.) so we don't run install
@@ -959,9 +1019,16 @@ class EdgeBuildRunner
      * When the repo pins `packageManager`, honor it — that's the most
      * explicit signal we have and a repo author knows their lockfile.
      */
-    private function corepackPnpmInstall(string $checkout): string
+    /**
+     * @param  ?string  $filterSpec  pnpm filter (e.g. "./apps/web...") run from /src
+     */
+    private function corepackPnpmInstall(string $checkout, ?string $filterSpec = null): string
     {
         $env = 'export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_DEFAULT_TO_LATEST=0';
+        $filterFlag = $filterSpec !== null && $filterSpec !== ''
+            ? ' --filter '.escapeshellarg($filterSpec)
+            : '';
+        $cdPrefix = $filterFlag !== '' ? 'cd /src && ' : '';
 
         // Run install with two pnpm-11-specific safety nets:
         //
@@ -994,9 +1061,9 @@ class EdgeBuildRunner
         // applied at command time only, no on-disk state. The previous
         // ERR_PNPM_IGNORED_BUILDS case still gets suppressed.
         $allowlistScript = 'echo "[pnpm] dangerouslyAllowAllBuilds enabled via CLI flag"';
-        $pnpmFlags = '--config.dangerouslyAllowAllBuilds=true';
+        $pnpmFlags = '--config.dangerouslyAllowAllBuilds=true'.$filterFlag;
 
-        $install = '{ set -o pipefail; '.$allowlistScript.'; PNPM_LOG=$(mktemp);'
+        $install = $cdPrefix.'{ set -o pipefail; '.$allowlistScript.'; PNPM_LOG=$(mktemp);'
             .' if pnpm install --frozen-lockfile '.$pnpmFlags.' 2>&1 | tee "$PNPM_LOG"; then :;'
             .' elif grep -q ERR_PNPM_LOCKFILE_BREAKING_CHANGE "$PNPM_LOG"; then'
             .' echo "[pnpm] lockfile is newer than the installed pnpm — falling back to --no-frozen-lockfile";'
@@ -1061,6 +1128,128 @@ class EdgeBuildRunner
         }
 
         return is_string($decoded['packageManager'] ?? null) && $decoded['packageManager'] !== '';
+    }
+
+    /**
+     * Pull the build image only when it is not already present locally.
+     * Warm workers (and repeat deploys) skip a 30–90s no-op pull.
+     */
+    private function ensureDockerImage(string $dockerImage, string $buildLog): void
+    {
+        if ((bool) config('edge.build.skip_pull_if_present', true)) {
+            $inspect = Process::timeout(30)->run([
+                'docker', 'image', 'inspect', $dockerImage,
+                '--format', '{{.Id}}',
+            ]);
+            if ($inspect->successful()) {
+                $this->appendBuildLog($buildLog, "Using local image {$dockerImage} (skip pull).\n");
+
+                return;
+            }
+        }
+
+        $this->appendBuildLog($buildLog, "Pulling image {$dockerImage}…\n");
+        $pull = Process::timeout(900)
+            ->run(
+                ['docker', 'pull', $dockerImage],
+                fn (string $type, string $chunk) => $this->appendBuildLog($buildLog, $chunk),
+            );
+        if (! $pull->successful()) {
+            $detail = trim($pull->errorOutput()) !== '' ? trim($pull->errorOutput()) : trim($pull->output());
+            $detail = $detail !== '' ? $detail : 'no output from docker pull (exit '.$pull->exitCode().')';
+            throw new RuntimeException('Docker pull failed for '.$dockerImage.': '.$detail);
+        }
+    }
+
+    /**
+     * Host-side npm/pnpm/yarn caches bind-mounted into the build container.
+     *
+     * @return list<string>
+     */
+    private function packageStoreVolumeFlags(): array
+    {
+        if (! (bool) config('edge.build.package_store_enabled', true)) {
+            return [];
+        }
+
+        $root = rtrim((string) config('edge.build.package_store_dir', storage_path('app/edge-pkg-store')), '/');
+        File::ensureDirectoryExists($root.'/npm');
+        File::ensureDirectoryExists($root.'/pnpm');
+        File::ensureDirectoryExists($root.'/yarn');
+
+        return [
+            '-v', $root.'/npm:/npm-cache',
+            '-v', $root.'/pnpm:/pnpm-store',
+            '-v', $root.'/yarn:/yarn-cache',
+        ];
+    }
+
+    private function isWorkspaceRoot(string $root): bool
+    {
+        if (is_file($root.'/pnpm-workspace.yaml') || is_file($root.'/pnpm-workspace.yml')) {
+            return true;
+        }
+
+        $pkgPath = $root.'/package.json';
+        if (! is_file($pkgPath) || ! is_readable($pkgPath)) {
+            return false;
+        }
+
+        $decoded = json_decode((string) file_get_contents($pkgPath), true);
+        if (! is_array($decoded)) {
+            return false;
+        }
+
+        return isset($decoded['workspaces']);
+    }
+
+    /**
+     * Filtered install so a monorepo package does not install every workspace.
+     */
+    private function detectFilteredInstallCommand(
+        string $workspaceRoot,
+        string $packageDir,
+        string $repoRoot,
+        string $pmName,
+    ): ?string {
+        $filterPath = './'.trim($repoRoot, '/').'...';
+
+        if ($pmName === 'pnpm' || is_file($workspaceRoot.'/pnpm-lock.yaml') || is_file($workspaceRoot.'/pnpm-workspace.yaml')) {
+            return $this->corepackPnpmInstall($workspaceRoot, $filterPath);
+        }
+
+        $packageName = $this->packageJsonName($packageDir);
+
+        if (($pmName === 'npm' || is_file($workspaceRoot.'/package-lock.json')) && $packageName !== null) {
+            return 'cd /src && (npm ci -w '.escapeshellarg($packageName)
+                .' || npm install -w '.escapeshellarg($packageName).')';
+        }
+
+        if (($pmName === 'yarn' || is_file($workspaceRoot.'/yarn.lock')) && $packageName !== null) {
+            // yarn workspaces focus needs Yarn Berry; fall back to full install.
+            return '('.$this->corepackYarnInstall($workspaceRoot)
+                .' && (yarn workspaces focus '.escapeshellarg($packageName)
+                .' || true))';
+        }
+
+        return null;
+    }
+
+    private function packageJsonName(string $dir): ?string
+    {
+        $path = $dir.'/package.json';
+        if (! is_file($path) || ! is_readable($path)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $name = $decoded['name'] ?? null;
+
+        return is_string($name) && $name !== '' ? $name : null;
     }
 
     private function assertDockerAvailable(string $buildLog): void
@@ -1199,19 +1388,28 @@ SH;
     }
 
     /**
-     * @param  array<string, mixed> $env
+     * @param  array<string, mixed>  $env
      * @return list<string>
      */
     private function dockerEnvFlags(array $env): array
     {
         // Defaults encourage npm/pnpm/vite to emit progress instead of
         // buffering quietly in a non-TTY docker run. Site env wins on conflict.
+        $storeDefaults = [];
+        if ((bool) config('edge.build.package_store_enabled', true)) {
+            $storeDefaults = [
+                'npm_config_cache' => '/npm-cache',
+                'PNPM_STORE_DIR' => '/pnpm-store',
+                'YARN_CACHE_FOLDER' => '/yarn-cache',
+            ];
+        }
+
         $merged = array_merge([
             'FORCE_COLOR' => '1',
             'NPM_CONFIG_PROGRESS' => 'true',
             'NPM_CONFIG_LOGLEVEL' => 'info',
             'PNPM_LOG_LEVEL' => 'info',
-        ], $env);
+        ], $storeDefaults, $env);
 
         $flags = [];
         foreach ($merged as $key => $value) {

@@ -3,8 +3,10 @@
 namespace Tests\Unit\EdgeBuildRootCleanupTest;
 
 use App\Modules\Edge\Jobs\PublishEdgeDeploymentJob;
+use App\Modules\Edge\Jobs\SnapshotEdgeBuildCacheJob;
 use App\Modules\Edge\Services\EdgeBuildRunner;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Queue;
 
 /**
  * Regression cover for two coupled invariants that silently drifted apart once.
@@ -59,6 +61,38 @@ test('cleanup removes a workdir that lives under buildRoot', function () {
     invokeCleanup(new PublishEdgeDeploymentJob('deploy-id', $artifactDir));
 
     expect(is_dir($workRoot))->toBeFalse();
+});
+
+test('cleanup with cache_async keeps checkout and deletes out only', function () {
+    Queue::fake();
+
+    $workRoot = EdgeBuildRunner::buildRoot().'/dply-edge-build-unit-test';
+    $src = $workRoot.'/src';
+    $artifactDir = $workRoot.'/out';
+    File::ensureDirectoryExists($src.'/node_modules');
+    File::put($src.'/node_modules/.keep', '1');
+    File::ensureDirectoryExists($artifactDir);
+    File::put($artifactDir.'/index.html', 'hi');
+    File::put($workRoot.'/build.log', 'log');
+
+    invokeCleanup(new PublishEdgeDeploymentJob(
+        'deploy-id',
+        $artifactDir,
+        null,
+        null,
+        [
+            'site_id' => 'site-1',
+            'checkout' => $src,
+            'cache_key' => 'abc123',
+            'checkout_root' => $src,
+        ],
+    ));
+
+    expect(is_dir($src))->toBeTrue()
+        ->and(is_dir($artifactDir))->toBeFalse()
+        ->and(is_file($workRoot.'/build.log'))->toBeFalse();
+
+    Queue::assertPushed(SnapshotEdgeBuildCacheJob::class);
 });
 
 test('cleanup refuses to delete a directory outside buildRoot', function () {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Services;
 
 use App\Models\Site;
+use App\Modules\Edge\Jobs\SnapshotEdgeBuildCacheJob;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Process;
@@ -22,8 +23,10 @@ use Illuminate\Support\Facades\Storage;
  *      cache/{site_id}/{cache_key}.tar.gz from R2 and extracts into
  *      the build directory.
  *   2. After a successful Docker build: {@see snapshot()} re-tars the
- *      cache paths and uploads. Runs inline (synchronous) in v1; can
- *      move to a background queue later if it becomes a deploy-time hotspot.
+ *      cache paths and uploads. By default this runs via
+ *      {@see SnapshotEdgeBuildCacheJob} after
+ *      publish (off the deploy critical path); set
+ *      `edge.build.async_cache_snapshot=false` for inline snapshot.
  *   3. {@see prune()} keeps total per-site cache bytes under the cap
  *      via LRU eviction.
  *

@@ -45,6 +45,8 @@ final readonly class DplyManifest
     public const KNOWN_TOP_LEVEL_KEYS = [
         // code-shape (stored on this DTO)
         'runtime', 'version', 'build', 'release', 'processes', 'healthcheck',
+        // control-plane supervisor templates (SelfSupervisorSync; not code-shape)
+        'supervisor',
         // repeatable config (owned by ByoRepoConfigLoader / EdgeRepoConfig)
         'crons', 'server_crons', 'redirects', 'rewrites', 'headers',
         'deploy_hooks', 'env', 'env_declarations', 'domains',
@@ -54,10 +56,10 @@ final readonly class DplyManifest
     ];
 
     /**
-     * @param  array<string, mixed> $build
-     * @param  array<string, mixed> $release
-     * @param  array<string, mixed> $processes
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $build
+     * @param  array<string, mixed>  $release
+     * @param  array<string, mixed>  $processes
+     * @param  array<string, mixed>  $warnings
      */
     public function __construct(
         public ?string $runtime,

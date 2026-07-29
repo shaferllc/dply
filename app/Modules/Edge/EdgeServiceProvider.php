@@ -18,6 +18,14 @@ use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
 use App\Modules\Edge\Console\MigrateEdgeHostnamesCommand;
 use App\Modules\Edge\Console\PruneEdgeAnalyticsCommand;
 use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
+use App\Modules\Edge\Console\WarmEdgeBuildImagesCommand;
+use App\Modules\Edge\Livewire\BuildJourney;
+use App\Modules\Edge\Livewire\BuildLogStream;
+use App\Modules\Edge\Livewire\Create;
+use App\Modules\Edge\Livewire\Import;
+use App\Modules\Edge\Livewire\Index;
+use App\Modules\Edge\Livewire\Templates;
+use App\Modules\Edge\Livewire\Usage;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -51,18 +59,19 @@ class EdgeServiceProvider extends ServiceProvider
                 MigrateEdgeHostnamesCommand::class,
                 PruneEdgeAnalyticsCommand::class,
                 RollupEdgeAnalyticsEngineCommand::class,
+                WarmEdgeBuildImagesCommand::class,
             ]);
         }
     }
 
     public function boot(): void
     {
-        Livewire::component('edge.index', \App\Modules\Edge\Livewire\Index::class);
-        Livewire::component('edge.create', \App\Modules\Edge\Livewire\Create::class);
-        Livewire::component('edge.import', \App\Modules\Edge\Livewire\Import::class);
-        Livewire::component('edge.templates', \App\Modules\Edge\Livewire\Templates::class);
-        Livewire::component('edge.usage', \App\Modules\Edge\Livewire\Usage::class);
-        Livewire::component('edge.build-journey', \App\Modules\Edge\Livewire\BuildJourney::class);
-        Livewire::component('edge.build-log-stream', \App\Modules\Edge\Livewire\BuildLogStream::class);
+        Livewire::component('edge.index', Index::class);
+        Livewire::component('edge.create', Create::class);
+        Livewire::component('edge.import', Import::class);
+        Livewire::component('edge.templates', Templates::class);
+        Livewire::component('edge.usage', Usage::class);
+        Livewire::component('edge.build-journey', BuildJourney::class);
+        Livewire::component('edge.build-log-stream', BuildLogStream::class);
     }
 }

@@ -127,7 +127,7 @@ class DplyManifestParser
     }
 
     /**
-     * @param  array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function parseArray(array $data): DplyManifest
     {
@@ -321,24 +321,118 @@ class DplyManifestParser
         $scale = 1;
         if (array_key_exists('scale', $entry)) {
             $rawScale = $entry['scale'];
-            if (! is_int($rawScale) || $rawScale < 1) {
+            if ((! is_int($rawScale) && ! is_float($rawScale)) || (int) $rawScale < 1) {
                 throw DplyManifestException::invalidField(
                     fieldPath: "processes.{$name}.scale",
                     detail: 'must be a positive integer',
                 );
             }
-            $scale = $rawScale;
+            $scale = (int) $rawScale;
+        }
+
+        $roles = [];
+        if (array_key_exists('roles', $entry)) {
+            $rawRoles = $entry['roles'];
+            if (! is_array($rawRoles) || ! array_is_list($rawRoles)) {
+                throw DplyManifestException::invalidField(
+                    fieldPath: "processes.{$name}.roles",
+                    detail: 'must be a list of role strings (e.g. worker, worker:primary, web)',
+                );
+            }
+            foreach ($rawRoles as $i => $role) {
+                if (! is_string($role) || trim($role) === '') {
+                    throw DplyManifestException::invalidField(
+                        fieldPath: "processes.{$name}.roles.{$i}",
+                        detail: 'must be a non-empty string',
+                    );
+                }
+                $roles[] = strtolower(trim($role));
+            }
+        }
+
+        $oneshot = false;
+        if (array_key_exists('oneshot', $entry)) {
+            $rawOneshot = $entry['oneshot'];
+            if (! is_bool($rawOneshot)) {
+                throw DplyManifestException::invalidField(
+                    fieldPath: "processes.{$name}.oneshot",
+                    detail: 'must be a boolean',
+                );
+            }
+            $oneshot = $rawOneshot;
+        }
+
+        $loopSeconds = null;
+        if (array_key_exists('loop_seconds', $entry)) {
+            $rawLoop = $entry['loop_seconds'];
+            if ((! is_int($rawLoop) && ! is_float($rawLoop)) || (int) $rawLoop < 1) {
+                throw DplyManifestException::invalidField(
+                    fieldPath: "processes.{$name}.loop_seconds",
+                    detail: 'must be a positive integer',
+                );
+            }
+            $loopSeconds = (int) $rawLoop;
+        }
+
+        $stopwaitsecs = null;
+        if (array_key_exists('stopwaitsecs', $entry)) {
+            $rawStop = $entry['stopwaitsecs'];
+            if ((! is_int($rawStop) && ! is_float($rawStop)) || (int) $rawStop < 0) {
+                throw DplyManifestException::invalidField(
+                    fieldPath: "processes.{$name}.stopwaitsecs",
+                    detail: 'must be a non-negative integer',
+                );
+            }
+            $stopwaitsecs = (int) $rawStop;
+        }
+
+        $type = null;
+        if (array_key_exists('type', $entry)) {
+            $rawType = $entry['type'];
+            if (! is_string($rawType) || trim($rawType) === '') {
+                throw DplyManifestException::invalidField(
+                    fieldPath: "processes.{$name}.type",
+                    detail: 'must be a non-empty string',
+                );
+            }
+            $type = strtolower(trim($rawType));
+        }
+
+        $env = [];
+        if (array_key_exists('env', $entry)) {
+            $rawEnv = $entry['env'];
+            if (! is_array($rawEnv) || array_is_list($rawEnv)) {
+                throw DplyManifestException::invalidField(
+                    fieldPath: "processes.{$name}.env",
+                    detail: 'must be a map of string keys to string values',
+                );
+            }
+            foreach ($rawEnv as $envKey => $envValue) {
+                if (! is_string($envKey) || $envKey === '' || ! is_scalar($envValue)) {
+                    throw DplyManifestException::invalidField(
+                        fieldPath: "processes.{$name}.env",
+                        detail: 'must be a map of string keys to string values',
+                    );
+                }
+                $env[$envKey] = (string) $envValue;
+            }
         }
 
         return new DplyManifestProcess(
             name: $name,
             command: trim($command),
             scale: $scale,
+            roles: $roles,
+            oneshot: $oneshot,
+            loopSeconds: $loopSeconds,
+            stopwaitsecs: $stopwaitsecs,
+            type: $type,
+            env: $env,
         );
     }
 
     /**
-     * @param  array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return list<string>
      */
     private function collectWarnings(array $data): array

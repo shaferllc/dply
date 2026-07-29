@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Services;
 
+use App\Modules\Edge\Support\EdgeRepoRoot;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -35,18 +36,21 @@ final class EdgeRepoCloner
 
     /**
      * Clone `$repoUrl` into `$checkout`, checking out `$branch` (and
-     * optionally `$commitOverride`). Returns a list of log lines so the
-     * caller can stream them into the build log.
+     * optionally `$commitOverride`). When `$sparseRoot` is set (monorepo
+     * package path), use a shallow + cone sparse-checkout so we don't
+     * materialize every workspace package on disk.
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
-    public function clone(string $repoUrl, string $branch, string $checkout, ?string $commitOverride = null): array
-    {
+    public function clone(
+        string $repoUrl,
+        string $branch,
+        string $checkout,
+        ?string $commitOverride = null,
+        ?string $sparseRoot = null,
+    ): array {
         $log = [];
+        $sparseRoot = EdgeRepoRoot::normalize($sparseRoot);
 
         // Always start from an empty checkout. Retries (and mirror→direct
         // fallback) otherwise hit "destination path already exists".
@@ -54,22 +58,28 @@ final class EdgeRepoCloner
 
         if ($this->cacheEnabled()) {
             try {
-                return $this->cloneViaMirror($repoUrl, $branch, $checkout, $commitOverride, $log);
+                return $this->cloneViaMirror($repoUrl, $branch, $checkout, $commitOverride, $sparseRoot, $log);
             } catch (\Throwable $e) {
                 $log[] = '[git-cache] mirror path failed, falling back to direct clone: '.$e->getMessage();
                 $this->ensureEmptyCheckout($checkout);
             }
         }
 
-        return $this->cloneDirect($repoUrl, $branch, $checkout, $commitOverride, $log);
+        return $this->cloneDirect($repoUrl, $branch, $checkout, $commitOverride, $sparseRoot, $log);
     }
 
     /**
-     * @param  array<string, mixed> $log
+     * @param  list<string>  $log
      * @return list<string>
      */
-    private function cloneViaMirror(string $repoUrl, string $branch, string $checkout, ?string $commitOverride, array $log): array
-    {
+    private function cloneViaMirror(
+        string $repoUrl,
+        string $branch,
+        string $checkout,
+        ?string $commitOverride,
+        string $sparseRoot,
+        array $log,
+    ): array {
         $mirror = $this->mirrorPath($repoUrl);
         $cacheRoot = dirname($mirror);
         if (! is_dir($cacheRoot) && ! mkdir($cacheRoot, 0755, true) && ! is_dir($cacheRoot)) {
@@ -111,6 +121,8 @@ final class EdgeRepoCloner
                     throw new RuntimeException('Build failed: commit "'.$commitOverride.'" not found in repository.');
                 }
             }
+
+            $this->applySparseCheckout($checkout, $sparseRoot, $log);
         } finally {
             $this->releaseLock($lockHandle);
         }
@@ -119,12 +131,19 @@ final class EdgeRepoCloner
     }
 
     /**
-     * @param  array<string, mixed> $log
+     * @param  list<string>  $log
      * @return list<string>
      */
-    private function cloneDirect(string $repoUrl, string $branch, string $checkout, ?string $commitOverride, array $log): array
-    {
+    private function cloneDirect(
+        string $repoUrl,
+        string $branch,
+        string $checkout,
+        ?string $commitOverride,
+        string $sparseRoot,
+        array $log,
+    ): array {
         $this->ensureEmptyCheckout($checkout);
+        $useSparse = $sparseRoot !== '' && (bool) config('edge.build.sparse_checkout', true);
 
         if ($commitOverride !== null) {
             $log[] = "Cloning {$repoUrl} (full history) for commit {$commitOverride}";
@@ -134,12 +153,51 @@ final class EdgeRepoCloner
             if (! $result->successful()) {
                 throw new RuntimeException('Build failed: commit "'.$commitOverride.'" not found in repository.');
             }
+            $this->applySparseCheckout($checkout, $sparseRoot, $log);
+        } elseif ($useSparse) {
+            $log[] = "Cloning {$repoUrl} @ {$branch} (shallow + sparse: {$sparseRoot})";
+            $this->runWithRetry([
+                'git', 'clone',
+                '--depth', '1',
+                '--filter=blob:none',
+                '--sparse',
+                '--branch', $branch,
+                $repoUrl,
+                $checkout,
+            ], $log, $checkout);
+            $this->applySparseCheckout($checkout, $sparseRoot, $log);
         } else {
             $log[] = "Cloning {$repoUrl} @ {$branch}";
             $this->runWithRetry(['git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout], $log, $checkout);
         }
 
         return array_values(array_filter($log, static fn ($line) => $line !== ''));
+    }
+
+    /**
+     * Cone sparse-checkout keeps root files (lockfiles, workspace yaml)
+     * plus the selected package tree — enough for filtered installs.
+     *
+     * @param  list<string>  $log
+     */
+    private function applySparseCheckout(string $checkout, string $sparseRoot, array &$log): void
+    {
+        if ($sparseRoot === '' || ! (bool) config('edge.build.sparse_checkout', true)) {
+            return;
+        }
+
+        $log[] = "[git] Sparse-checkout cone: {$sparseRoot}";
+        $init = Process::timeout(60)->path($checkout)->run(['git', 'sparse-checkout', 'init', '--cone']);
+        $log[] = trim($init->output().$init->errorOutput());
+        if (! $init->successful()) {
+            throw new RuntimeException('git sparse-checkout init failed: '.$init->errorOutput());
+        }
+
+        $set = Process::timeout(120)->path($checkout)->run(['git', 'sparse-checkout', 'set', $sparseRoot]);
+        $log[] = trim($set->output().$set->errorOutput());
+        if (! $set->successful()) {
+            throw new RuntimeException('git sparse-checkout set failed: '.$set->errorOutput());
+        }
     }
 
     /**
@@ -151,8 +209,8 @@ final class EdgeRepoCloner
      * attempts so a partial clone doesn't poison the next try with
      * "destination path already exists".
      *
-     * @param  list<string> $command
-     * @param  list<string> $log
+     * @param  list<string>  $command
+     * @param  list<string>  $log
      */
     private function runWithRetry(array $command, array &$log, ?string $cleanPathOnRetry = null): void
     {

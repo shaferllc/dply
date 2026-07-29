@@ -96,7 +96,7 @@
                                                     'deployment' => $deployment,
                                                 ])
                                             @endif
-                                            <pre class="max-h-64 overflow-auto font-mono text-[11px] text-brand-ink">{{ $loadedBuildLog }}</pre>
+                                            <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-brand-ink">{!! \App\Modules\Edge\Support\AnsiHtml::toHtml((string) $loadedBuildLog) !!}</pre>
                                         @else
                                             <p class="text-xs text-brand-moss">{{ __('No build log stored for this deployment.') }}</p>
                                         @endif

@@ -109,8 +109,10 @@ return [
         'production' => [
             'supervisor-heavy' => [
                 'queue' => $heavyQueues,
-                'minProcesses' => 1,
-                'maxProcesses' => 4,
+                // Edge builds + provision are CPU/IO heavy — keep at least two
+                // processes ready so a long Astro build doesn't stall the queue.
+                'minProcesses' => (int) env('HORIZON_HEAVY_MIN_PROCESSES', 2),
+                'maxProcesses' => (int) env('HORIZON_HEAVY_MAX_PROCESSES', 8),
                 'timeout' => 7320,
             ],
             'supervisor-fast' => [
@@ -125,8 +127,8 @@ return [
             'supervisor-heavy' => [
                 'queue' => $heavyQueues,
                 'balance' => 'simple',
-                'minProcesses' => 1,
-                'maxProcesses' => 3,
+                'minProcesses' => (int) env('HORIZON_HEAVY_MIN_PROCESSES', 1),
+                'maxProcesses' => (int) env('HORIZON_HEAVY_MAX_PROCESSES', 5),
                 'timeout' => 7320,
             ],
             'supervisor-fast' => [

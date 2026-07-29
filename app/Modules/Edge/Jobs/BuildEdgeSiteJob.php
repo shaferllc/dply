@@ -161,11 +161,16 @@ class BuildEdgeSiteJob implements ShouldQueue
                 ], JSON_THROW_ON_ERROR));
             }
 
+            $cacheAsync = is_array($buildResult['cache_async'] ?? null)
+                ? $buildResult['cache_async']
+                : null;
+
             PublishEdgeDeploymentJob::dispatch(
                 $deployment->id,
                 $artifactDir,
                 $ssrSidecarPath,
                 $middlewareSidecarPath,
+                $cacheAsync,
             );
         } catch (Throwable $e) {
             // build() throws before returning — $buildResult stays null for the

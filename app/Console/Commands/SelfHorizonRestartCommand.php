@@ -61,6 +61,20 @@ class SelfHorizonRestartCommand extends Command
             $waited += $poll;
         }
 
+        // Fail-soft: template merge + DPLY_ROOT patch must not block Horizon restart.
+        try {
+            $exit = Artisan::call('dply:self:sync-supervisor');
+            $output = trim(Artisan::output());
+            if ($output !== '') {
+                $this->line($output);
+            }
+            if ($exit !== self::SUCCESS) {
+                $this->warn('[dply] supervisor sync reported failure — continuing with horizon:terminate.');
+            }
+        } catch (Throwable $e) {
+            $this->warn('[dply] supervisor sync skipped: '.$e->getMessage());
+        }
+
         try {
             Artisan::call('horizon:terminate');
             $this->info('[dply] horizon:terminate signalled; supervisor (Restart=always) relaunches it on the new release.');

@@ -5,75 +5,76 @@ declare(strict_types=1);
 namespace App\Console\Scheduling;
 
 use App\Console\Commands\CdnSyncMetricsCommand;
-use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
 use App\Console\Commands\CheckGitProviderTokensCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
-use App\Modules\Cloud\Console\CloudPollStatusCommand;
-use App\Modules\Edge\Console\CollectEdgeUsageCommand;
-use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
-use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
 use App\Console\Commands\DispatchReleaseHygieneScansCommand;
 use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchServerHealthChecksCommand;
-use App\Modules\Insights\Console\DispatchServerInsightsCommand;
-use App\Modules\Insights\Console\DispatchSiteInsightsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
 use App\Console\Commands\DispatchSystemdInventorySyncCommand;
-use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
 use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
-use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
-use App\Modules\Deploy\Console\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
-use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
-use App\Modules\Logs\Console\MeterServerLogUsageCommand;
-use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
-use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
-use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
-use App\Console\Commands\ReapStuckConsoleActionsCommand;
-use App\Console\Commands\ReconcileTenantDnsCommand;
-use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
-use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneNotificationInboxItemsCommand;
 use App\Console\Commands\PruneOrphanedSiteDataCommand;
 use App\Console\Commands\PruneQuickDownloadsCommand;
-use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
-use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
+use App\Console\Commands\ReapStuckConsoleActionsCommand;
+use App\Console\Commands\ReconcileTenantDnsCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
-use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
-use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
-use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
-use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
-use App\Modules\Secrets\Console\SecretsEscrowCommand;
-use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
-use App\Modules\Serverless\Console\ServerlessTickCommand;
-use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
-use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
-use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
 use App\Console\Commands\SweepSiteHttpErrorsCommand;
-use App\Modules\TaskRunner\Commands\SweepStalledTasksCommand;
-use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
-use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
 use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
+use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
+use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
+use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
+use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
+use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
+use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
+use App\Modules\Cloud\Console\CloudPollStatusCommand;
+use App\Modules\Deploy\Console\FlushDeployDigestCommand;
+use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
+use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
+use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
+use App\Modules\Edge\Console\CollectEdgeUsageCommand;
+use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
+use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
+use App\Modules\Edge\Console\WarmEdgeBuildImagesCommand;
 use App\Modules\Edge\Jobs\VerifyEdgeCustomDomainsJob;
+use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
+use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
+use App\Modules\Insights\Console\DispatchServerInsightsCommand;
+use App\Modules\Insights\Console\DispatchSiteInsightsCommand;
+use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
+use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
+use App\Modules\Logs\Console\MeterServerLogUsageCommand;
+use App\Modules\Logs\Console\PruneAppLogsCommand;
+use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
+use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
+use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
+use App\Modules\Secrets\Console\SecretsEscrowCommand;
+use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
+use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
+use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
+use App\Modules\Serverless\Console\ServerlessTickCommand;
+use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
+use App\Modules\TaskRunner\Commands\SweepStalledTasksCommand;
 use App\Support\DplyRuntime;
 use Illuminate\Console\Scheduling\Schedule;
 
@@ -188,6 +189,15 @@ final class DplySchedule
         $schedule->command(CollectEdgeUsageCommand::class, ['--today' => true])
             ->hourly()
             ->name('edge-usage-today');
+
+        // Keep Node build images warm on workers so Edge deploys skip cold pulls.
+        if ((bool) config('edge.build.warm_images_on_schedule', true)) {
+            $schedule->command(WarmEdgeBuildImagesCommand::class)
+                ->everySixHours()
+                ->name('edge-warm-build-images')
+                ->withoutOverlapping()
+                ->onOneServer();
+        }
 
         $schedule->command(CollectServerlessUsageCommand::class)
             ->hourly()

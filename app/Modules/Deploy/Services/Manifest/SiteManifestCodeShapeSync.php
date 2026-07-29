@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services\Manifest;
 
+use App\Jobs\ControlWorkerDaemonJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
@@ -125,16 +126,22 @@ final class SiteManifestCodeShapeSync
     {
         $pipeline = $this->pipelines->ensureDefaultPipeline($site);
 
+        $processes = $this->reconcileProcesses($site, $manifest->processes);
+        if ($processes > 0) {
+            // Close the loop: SiteProcess rows alone do not provision daemons.
+            ControlWorkerDaemonJob::dispatch((string) $site->id, 'ensure');
+        }
+
         return [
             'build' => $this->reconcilePhase($site, (string) $pipeline->id, SiteDeployStep::PHASE_BUILD, $manifest->build),
             'release' => $this->reconcilePhase($site, (string) $pipeline->id, SiteDeployStep::PHASE_RELEASE, $manifest->release),
-            'processes' => $this->reconcileProcesses($site, $manifest->processes),
+            'processes' => $processes,
             'runtime_change' => $this->detectRuntimeChange($site, $manifest),
         ];
     }
 
     /**
-     * @param  array<string, mixed> $commands
+     * @param  array<string, mixed>  $commands
      */
     private function reconcilePhase(Site $site, string $pipelineId, string $phase, array $commands): int
     {
@@ -171,7 +178,7 @@ final class SiteManifestCodeShapeSync
     }
 
     /**
-     * @param  array<string, mixed> $processes
+     * @param  array<string, DplyManifestProcess>  $processes
      */
     private function reconcileProcesses(Site $site, array $processes): int
     {
@@ -187,15 +194,20 @@ final class SiteManifestCodeShapeSync
         $known = [SiteProcess::TYPE_WEB, SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER];
         $count = 0;
         foreach ($processes as $name => $process) {
-            $type = in_array($name, $known, true) ? $name : SiteProcess::TYPE_CUSTOM;
+            $type = $process->type !== null && in_array($process->type, $known, true)
+                ? $process->type
+                : (in_array($name, $known, true) ? $name : SiteProcess::TYPE_CUSTOM);
+
             SiteProcess::query()->create([
                 'site_id' => $site->id,
                 'type' => $type,
                 'name' => $name,
                 'command' => $process->command,
                 'scale' => $process->scale,
+                'env_vars' => $process->env !== [] ? $process->env : null,
                 'is_active' => true,
                 'managed_by_manifest' => true,
+                'meta' => $process->meta() !== [] ? $process->meta() : null,
             ]);
             $count++;
         }

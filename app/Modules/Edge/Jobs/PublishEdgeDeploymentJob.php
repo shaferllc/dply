@@ -36,6 +36,9 @@ class PublishEdgeDeploymentJob implements ShouldQueue
 
     public int $tries = 3;
 
+    /**
+     * @param  array{site_id?: string, checkout?: string, cache_key?: string, checkout_root?: string}|null  $cacheAsync
+     */
     public function __construct(
         public string $deploymentId,
         public string $localArtifactDir,
@@ -51,6 +54,13 @@ class PublishEdgeDeploymentJob implements ShouldQueue
          * runtime is SSR (the SSR Worker handles middleware itself).
          */
         public ?string $middlewareBundlePath = null,
+        /**
+         * When set, leave the checkout on disk and queue an R2 cache
+         * snapshot after cleanup so tar+upload is off the deploy path.
+         *
+         * @var array{site_id?: string, checkout?: string, cache_key?: string, checkout_root?: string}|null
+         */
+        public ?array $cacheAsync = null,
     ) {
         $this->onQueue((string) config('edge.build.queue', 'dply-provision'));
     }
@@ -264,8 +274,36 @@ class PublishEdgeDeploymentJob implements ShouldQueue
         // sys_get_temp_dir() a hardcoded temp-dir check here silently stopped
         // matching, and every successful deploy leaked its workdir (src/ is
         // pruned mid-build, but out/ and build.log survived).
-        if (is_dir($this->localArtifactDir) && str_starts_with($this->localArtifactDir, EdgeBuildRunner::buildRoot())) {
-            File::deleteDirectory(dirname($this->localArtifactDir));
+        $buildRoot = EdgeBuildRunner::buildRoot();
+        $workRoot = dirname($this->localArtifactDir);
+
+        if (is_dir($this->localArtifactDir) && str_starts_with($this->localArtifactDir, $buildRoot)) {
+            $cacheAsync = $this->cacheAsync;
+            $checkout = is_array($cacheAsync) ? ($cacheAsync['checkout'] ?? null) : null;
+            $cacheKey = is_array($cacheAsync) ? ($cacheAsync['cache_key'] ?? null) : null;
+            $siteId = is_array($cacheAsync) ? ($cacheAsync['site_id'] ?? null) : null;
+            $checkoutRoot = is_array($cacheAsync) ? ($cacheAsync['checkout_root'] ?? $checkout) : null;
+
+            if (
+                is_string($checkout) && $checkout !== ''
+                && is_string($cacheKey) && $cacheKey !== ''
+                && is_string($siteId) && $siteId !== ''
+                && is_dir($checkout)
+            ) {
+                // Keep src/ for SnapshotEdgeBuildCacheJob; drop publish artifacts.
+                File::deleteDirectory($this->localArtifactDir);
+                if (is_file($workRoot.'/build.log')) {
+                    @unlink($workRoot.'/build.log');
+                }
+                SnapshotEdgeBuildCacheJob::dispatch(
+                    $siteId,
+                    $checkout,
+                    $cacheKey,
+                    is_string($checkoutRoot) ? $checkoutRoot : $checkout,
+                );
+            } else {
+                File::deleteDirectory($workRoot);
+            }
         }
         if ($this->ssrBundlePath !== null && is_file($this->ssrBundlePath)) {
             @unlink($this->ssrBundlePath);
