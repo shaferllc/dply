@@ -11,6 +11,7 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\SshConnection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
 
@@ -204,25 +205,52 @@ final class SiteManifestCodeShapeSync
                 ? $process->type
                 : (in_array($name, $known, true) ? $name : SiteProcess::TYPE_CUSTOM);
 
-            SiteProcess::query()->updateOrCreate(
-                [
-                    'site_id' => $site->id,
-                    'name' => $name,
-                ],
-                [
-                    'type' => $type,
-                    'command' => $process->command,
-                    'scale' => $process->scale,
-                    'env_vars' => $process->env !== [] ? $process->env : null,
-                    'is_active' => true,
-                    'managed_by_manifest' => true,
-                    'meta' => $process->meta() !== [] ? $process->meta() : null,
-                ],
-            );
+            $this->upsertManifestProcess($site, $name, [
+                'type' => $type,
+                'command' => $process->command,
+                'scale' => $process->scale,
+                'env_vars' => $process->env !== [] ? $process->env : null,
+                'is_active' => true,
+                'managed_by_manifest' => true,
+                'meta' => $process->meta() !== [] ? $process->meta() : null,
+            ]);
             $count++;
         }
 
         return $count;
+    }
+
+    /**
+     * Adopt or create a process by (site_id, name). Retries via the model when
+     * a concurrent writer wins the unique race (updateOrCreate SELECT → INSERT)
+     * so encrypted casts (env_vars) still apply.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function upsertManifestProcess(Site $site, string $name, array $attributes): void
+    {
+        $keys = [
+            'site_id' => $site->id,
+            'name' => $name,
+        ];
+
+        try {
+            SiteProcess::query()->updateOrCreate($keys, $attributes);
+        } catch (UniqueConstraintViolationException) {
+            $existing = SiteProcess::query()->where($keys)->first();
+            if ($existing !== null) {
+                $existing->fill($attributes)->save();
+
+                return;
+            }
+
+            try {
+                SiteProcess::query()->create($keys + $attributes);
+            } catch (UniqueConstraintViolationException) {
+                $retry = SiteProcess::query()->where($keys)->firstOrFail();
+                $retry->fill($attributes)->save();
+            }
+        }
     }
 
     /**
