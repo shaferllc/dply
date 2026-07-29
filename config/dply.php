@@ -7,13 +7,10 @@ return [
     | Coming-soon gate
     |--------------------------------------------------------------------------
     | Redirect logged-out visitors to the marketing "coming soon" page.
-    | COMING_SOON=true forces it on (even locally, for preview); =false turns it
-    | fully off; unset falls back to the legacy behavior (on in any non-local
-    | environment). See App\Http\Middleware\RedirectGuestsToComingSoon.
+    | COMING_SOON=true forces it on (even locally, for preview). Default is off
+    | — the public site is live. See App\Http\Middleware\RedirectGuestsToComingSoon.
     */
-    'coming_soon' => env('COMING_SOON') !== null
-        ? filter_var(env('COMING_SOON'), FILTER_VALIDATE_BOOLEAN)
-        : null,
+    'coming_soon' => filter_var(env('COMING_SOON', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
     | IP allow-list for the coming-soon gate. These addresses (and any logged-in
@@ -32,6 +29,19 @@ return [
             ],
             explode(',', (string) env('COMING_SOON_ALLOWED_IPS', '')),
         )
+    )))),
+
+    /*
+    | IP allow-list for the Lookout debug page. These addresses (and any
+    | platform admin) may see the interactive stack-trace/debug page for a
+    | production 500; everyone else gets the branded error. Kept separate from
+    | the coming-soon list on purpose. Merged: the base list below + the
+    | comma-separated DEBUG_ALLOWED_IPS env var + the admin-managed rows
+    | (debug_allowed_ips table). Supports IPv4, IPv6, and CIDR ranges.
+    */
+    'debug_allowed_ips' => array_values(array_unique(array_filter(array_map(
+        static fn ($v): string => trim((string) $v),
+        explode(',', (string) env('DEBUG_ALLOWED_IPS', '')),
     )))),
 
     /*
@@ -85,6 +95,11 @@ return [
     'site_health_check_enabled' => filter_var(env('DPLY_SITE_HEALTH_CHECK', true), FILTER_VALIDATE_BOOL),
 
     'deploy_notifications' => filter_var(env('DPLY_DEPLOY_NOTIFICATIONS', true), FILTER_VALIDATE_BOOL),
+
+    // Queued notifications (UniversalEventNotification, deploy mail, …) —
+    // Horizon supervisor-fast. Keep off dply / dply-provision so Edge builds
+    // never block the notification backlog.
+    'notification_queue' => env('DPLY_NOTIFICATION_QUEUE', 'default'),
 
     /*
     |--------------------------------------------------------------------------
@@ -248,21 +263,28 @@ return [
     | Edge: usage-based billing (pass-through + margin)
     |--------------------------------------------------------------------------
     |
-    | When enabled, live Edge sites keep the flat platform fee (edge_cents in
-    | config/subscription.php) plus metered delivery usage on top. Snapshots
-    | are collected by `dply:edge:collect-usage` (scheduled daily).
+    | When enabled, live Edge sites keep the flat platform fee (edge_cents /
+    | edge_ssr_cents in config/subscription.php) plus metered delivery usage
+    | on top. Snapshots are collected by `dply:edge:collect-usage` (scheduled
+    | daily).
     |
-    | Unit rates are customer-facing and should embed margin over Cloudflare
-    | list pricing. Per-site included allowances absorb typical small-site
-    | traffic so the base fee covers quiet sites.
+    | Unit rates are ~Cloudflare list (cost floor). `markup_percent` is applied
+    | on the metered subtotal (same pattern as Cloud/Serverless — default 40%)
+    | so overage is profitable. Per-site included allowances keep quiet sites
+    | on the flat platform fee only ($2 static/hybrid, $7 Worker SSR).
+    |
+    | Approx CF list (2026): Workers requests ~$0.30/M, R2 storage ~$0.015/GB-mo,
+    | Class A $4.50/M, Class B $0.36/M. Egress is charged as CDN delivery.
     */
     'edge' => [
         'usage_billing' => [
-            'enabled' => true,
-            'markup_percent' => (int) env('DPLY_EDGE_USAGE_MARKUP_PERCENT', 0),
-            'requests_cents_per_million' => (int) env('DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION', 30),
-            'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 2),
-            'r2_storage_cents_per_gb_month' => (int) env('DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH', 2),
+            'enabled' => filter_var(env('DPLY_EDGE_USAGE_BILLING_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            // Blanket margin on overage (aligned with cloud_markup_percent).
+            'markup_percent' => (int) env('DPLY_EDGE_USAGE_MARKUP_PERCENT', 40),
+            // Cost-floor unit rates (cents). Customer pays rate × (1 + markup%).
+            'requests_cents_per_million' => (int) env('DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION', 50),
+            'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 5),
+            'r2_storage_cents_per_gb_month' => (int) env('DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH', 3),
             'r2_class_a_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_A_CENTS_PER_MILLION', 450),
             // Cloudflare R2 Class B (reads) list price is $0.36 / million = 36
             // cents. The previous default of 360 was a 10x typo that billed
@@ -328,9 +350,10 @@ return [
     */
     'quick_login_enabled' => filter_var(env('DPLY_QUICK_LOGIN_ENABLED', false), FILTER_VALIDATE_BOOL),
 
-    // Path to the dply CLI binary for the in-browser CLI console.
-    // Defaults to a sibling dply-cli repo in dev; set DPLY_CLI_BINARY in prod.
+    // Optional override for the in-browser CLI console. When unset, CliConsole
+    // uses packages/dply-cli/bin/dply.mjs via Node. Point at a .mjs or binary.
     'cli_binary' => env('DPLY_CLI_BINARY'),
+
 
     'local_workspace_prune' => [
         'enabled' => filter_var(env('DPLY_LOCAL_WORKSPACE_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
@@ -370,5 +393,25 @@ return [
     | against silently discarding manual edits.
     */
     'nginx_overwrite_guard' => env('DPLY_NGINX_OVERWRITE_GUARD', 'warn'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Production data mirror (local APP_ENV only)
+    |--------------------------------------------------------------------------
+    | Local Livewire UI that proxies the remote control-plane API so operators
+    | can inspect live org inventory (and deploy / edit BYO env) from localhost
+    | with persistent Production chrome. Hard-gated to APP_ENV=local — never
+    | exposed on staging/production hosts even if a token row exists.
+    */
+    'production_data_mirror' => [
+        'enabled' => env('APP_ENV', 'production') === 'local',
+        'default_base_url' => rtrim((string) env(
+            'DPLY_LIVE_API_BASE_URL',
+            env('DPLY_CLI_DEFAULT_BASE_URL', 'https://dply.dev')
+        ), '/'),
+        'cache_ttl_seconds' => max(5, (int) env('DPLY_LIVE_API_CACHE_TTL', 20)),
+        'http_timeout_seconds' => max(5, (int) env('DPLY_LIVE_API_TIMEOUT', 30)),
+        'token_name' => 'dply Production mirror',
+    ],
 
 ];

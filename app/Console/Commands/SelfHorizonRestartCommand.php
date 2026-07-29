@@ -13,7 +13,7 @@ use Throwable;
  * Restart this box's Horizon AFTER the deploy queue has drained — the safe way
  * for dply's control-plane to bounce its OWN Horizon during a self-deploy.
  *
- * The problem: deploys run as {@see App\Jobs\RunSiteDeploymentJob} on the `dply`
+ * The problem: deploys run as {@see App\Modules\Deploy\Jobs\RunSiteDeploymentJob} on the `dply`
  * queue, processed by the control-plane Horizon. A self-deploy's restart step
  * runs `horizon:terminate` on that same box; the master exits and systemd
  * (KillMode=mixed) reaps the cgroup, SIGKILLing every IN-FLIGHT deploy worker —
@@ -59,6 +59,20 @@ class SelfHorizonRestartCommand extends Command
             $this->line("[dply] {$inFlight} deploy(s) still in-flight on '{$queue}' — waiting {$poll}s (waited {$waited}s).");
             sleep($poll);
             $waited += $poll;
+        }
+
+        // Fail-soft: template merge + DPLY_ROOT patch must not block Horizon restart.
+        try {
+            $exit = Artisan::call('dply:self:sync-supervisor');
+            $output = trim(Artisan::output());
+            if ($output !== '') {
+                $this->line($output);
+            }
+            if ($exit !== self::SUCCESS) {
+                $this->warn('[dply] supervisor sync reported failure — continuing with horizon:terminate.');
+            }
+        } catch (Throwable $e) {
+            $this->warn('[dply] supervisor sync skipped: '.$e->getMessage());
         }
 
         try {

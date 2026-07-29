@@ -8,7 +8,7 @@ use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\EdgeSiteTrafficAnalytics;
+use App\Modules\Billing\Services\EdgeSiteTrafficAnalytics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 

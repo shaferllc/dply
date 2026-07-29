@@ -22,10 +22,21 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Server') }}</p>
                     <h1 class="mt-1 truncate text-xl font-semibold tracking-tight text-brand-ink">{{ $server->name }}</h1>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
-                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-ink/10 bg-white px-2 py-0.5">
-                            <span class="h-1.5 w-1.5 rounded-full {{ $healthDot }}"></span>
-                            {{ $healthLabel }}
-                        </span>
+                        @php $healthRecheckPending = $healthSummary['recheck_pending'] ?? false; @endphp
+                        <button type="button"
+                                wire:click="recheckHealth"
+                                @if ($healthRecheckPending) wire:poll.4s @endif
+                                @disabled($healthRecheckPending)
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-ink/10 bg-white px-2 py-0.5 transition hover:border-brand-ink/25 hover:bg-brand-sand/40 disabled:cursor-default disabled:hover:border-brand-ink/10 disabled:hover:bg-white"
+                                title="{{ __('Re-run the reachability check now') }}">
+                            @if ($healthRecheckPending)
+                                <x-heroicon-m-arrow-path class="h-3 w-3 shrink-0 animate-spin text-brand-mist" aria-hidden="true" />
+                                {{ __('Checking…') }}
+                            @else
+                                <span class="h-1.5 w-1.5 rounded-full {{ $healthDot }}"></span>
+                                {{ $healthLabel }}
+                            @endif
+                        </button>
                         <span class="inline-flex items-center gap-1 font-mono">
                             <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">SSH</span>
                             <span class="break-all text-brand-ink">{{ $server->getSshConnectionString() }}</span>

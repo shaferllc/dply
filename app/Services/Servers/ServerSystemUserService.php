@@ -497,7 +497,7 @@ BASH;
 
     private function writeOperationMeta(Site $site, string $status, string $message): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['system_user_operation'] = [
             'status' => $status,
             'message' => $message,

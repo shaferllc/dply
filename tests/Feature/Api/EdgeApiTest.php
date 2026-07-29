@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
-use App\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
 use App\Models\ApiToken;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;

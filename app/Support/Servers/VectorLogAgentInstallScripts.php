@@ -27,6 +27,19 @@ class VectorLogAgentInstallScripts
 {
     use InstallsVectorBinary;
 
+    /**
+     * Version of the rendered EDGE config (the agent vector.toml pipeline) — NOT the
+     * Vector binary version ({@see parseVersion}). BUMP THIS whenever renderVectorToml()
+     * changes in a way that needs a re-sync to take effect on the box. Stamped into the
+     * config header + persisted on the {@see ServerLogAgent} row, so the platform can
+     * detect a server running a stale agent config and prompt to re-sync.
+     *
+     * History:
+     *   1 — initial agent pipeline (sources → tag_<source> → enrich → ship); the
+     *       source-tagging + edge redaction that this build renders.
+     */
+    public const CONFIG_VERSION = 1;
+
     public const BINARY_PATH = '/usr/local/bin/dply-vector';
 
     public const CONFIG_DIR = '/etc/dply-logship';
@@ -184,6 +197,14 @@ class VectorLogAgentInstallScripts
     }
 
     /**
+     * The edge config version this code renders — what a freshly re-synced box runs.
+     */
+    public function configVersion(): int
+    {
+        return self::CONFIG_VERSION;
+    }
+
+    /**
      * Render vector.toml for this agent's enabled sources. Pure string — no IO.
      */
     public function renderVectorToml(ServerLogAgent $agent): string
@@ -193,6 +214,7 @@ class VectorLogAgentInstallScripts
 
         $blocks = [
             '# Rendered by dply — do not edit by hand. Managed by the dply Logs add-on.',
+            '# dply-config-version: '.self::CONFIG_VERSION,
             'data_dir = "'.$this->dataDir().'"',
             '',
         ];

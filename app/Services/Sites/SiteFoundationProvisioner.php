@@ -7,7 +7,7 @@ namespace App\Services\Sites;
 use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Site;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 /**
  * Provisions a bare site's *foundation* — system user, deploy dir, webserver

@@ -1,5 +1,5 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
     $labelCls = 'block text-xs font-semibold uppercase tracking-wide text-brand-moss mb-1';
     $inputCls = 'block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest';
     $presets = [
@@ -53,13 +53,21 @@
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-hero-card
-                :eyebrow="__('CDN / Edge')"
-                :title="__('Edge cache & proxy')"
-                :description="__('Put a CDN / edge network in front of this site\'s origin. Manages the proxied DNS record, cache aggressiveness, and one-click hostname purges.')"
-                icon="globe-alt"
-            />
+        <main class="min-w-0 lg:col-span-9">
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('CDN / Edge') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('Edge proxy, cache presets, and one-click purges for this site.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
             @if (empty($credentials))
                 <section class="{{ $card }}">
@@ -82,7 +90,7 @@
                     </div>
                 </section>
             @else
-                <form wire:submit.prevent="save" class="space-y-6">
+                <form wire:submit.prevent="save">
                     {{-- Master toggle --}}
                     <section class="{{ $card }}">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -319,7 +327,7 @@
                         </section>
                     @endif
 
-                    <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
                         <x-primary-button size="sm" type="submit">{{ __('Save and sync') }}</x-primary-button>
                         <x-secondary-button size="sm" type="button" wire:click="purge" @disabled(! $enabled)>
                             {{ __('Purge cache') }}
@@ -331,10 +339,13 @@
                 </form>
             @endif
 
-            <x-cli-snippet :commands="[
-                ['label' => __('Show site CDN'), 'command' => 'dply sites:cdn:show '.$site->slug],
-                ['label' => __('Purge cache'), 'command' => 'dply sites:cdn:purge '.$site->slug],
-            ]" />
+            <div class="px-5 py-5 sm:px-6">
+                <x-cli-snippet :commands="[
+                    ['label' => __('Show site CDN'), 'command' => 'dply sites:cdn:show '.$site->slug],
+                    ['label' => __('Purge cache'), 'command' => 'dply sites:cdn:purge '.$site->slug],
+                ]" />
+            </div>
+            </section>
         </main>
     </div>
 </div>

@@ -3,7 +3,7 @@
      leg (v1) — each leg's secret is entered inline. --}}
 @php
     $legProvider = (string) ($bindingForm['legs'][$legIndex]['provider'] ?? 'smtp');
-    $legPackage = \App\Services\Deploy\SiteBindingManager::MAIL_TRANSPORT_PACKAGES[$legProvider] ?? null;
+    $legPackage = \App\Modules\Deploy\Services\SiteBindingManager::MAIL_TRANSPORT_PACKAGES[$legProvider] ?? null;
     $legCanRemove = count($bindingForm['legs'] ?? []) > 2;
 @endphp
 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">

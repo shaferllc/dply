@@ -511,23 +511,25 @@ trait RunsCacheServiceActions
             return;
         }
 
-        // Per-instance systemd unit: `valkey-server` for the legacy `default`
-        // instance, `valkey-server@<name>` for templated instances. Using
-        // systemdServiceFor() alone was a bug — Stop on a named instance
-        // would silently target the default unit and stop the wrong instance.
-        $service = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
-        $serviceShell = escapeshellarg($service);
+        // Resolve the unit ON the host rather than trusting the canonical name —
+        // distro packages disagree (`valkey.service` vs `valkey-server.service`),
+        // and the installer's `systemctl enable --now a || b` fallback means a row
+        // can be healthy under a unit name the hard-coded map doesn't know. Without
+        // this, Restart failed with "Unit valkey-server.service not found" on a box
+        // the installer just set up via the `valkey` unit.
+        $resolveUnit = CacheServiceInstallScripts::resolveUnitSnippet($row->engine);
         // Wrap the bare `systemctl <verb>` with a follow-up status print so the console panel
         // shows what actually happened. `systemctl <verb>` is silent on success and only stderrs
         // on failure; the trailing status (always run via `|| true`) gives the operator real-time
         // confirmation without a second click.
         $script = <<<BASH
-echo "═══ systemctl {$verb} {$service} ═══"
-systemctl {$verb} {$serviceShell}
+{$resolveUnit}
+echo "═══ systemctl {$verb} \$UNIT ═══"
+systemctl {$verb} "\$UNIT"
 verb_exit=\$?
 echo
 echo "═══ systemctl status (post-{$verb}) ═══"
-systemctl status --no-pager --lines=15 {$serviceShell} 2>&1 || true
+systemctl status --no-pager --lines=15 "\$UNIT" 2>&1 || true
 exit \$verb_exit
 BASH;
         // Caller-provided label (e.g. "Disable" for `disable --now`) takes precedence so the

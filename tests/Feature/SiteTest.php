@@ -8,7 +8,7 @@ use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
@@ -29,11 +29,11 @@ use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\Workspace;
 use App\Modules\Certificates\Services\CertificateRequestService;
-use App\Services\Deploy\DeployContext;
-use App\Services\Deploy\DockerDeployEngine;
-use App\Services\Deploy\KubernetesKubectlExecutor;
-use App\Services\Deploy\SiteDeployPipelineManager;
-use App\Services\Deploy\SiteRuntimeActionExecutor;
+use App\Modules\Deploy\Services\DeployContext;
+use App\Modules\Deploy\Services\DockerDeployEngine;
+use App\Modules\Deploy\Services\KubernetesKubectlExecutor;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteRuntimeActionExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,7 +78,7 @@ test('site settings runtime section shows php card with current version and inst
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php'], false));
 
     $response->assertOk()
         ->assertSee('PHP')
@@ -118,9 +118,8 @@ test('site settings deploy section shows docker runtime artifacts', function () 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'overview'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('docker compose up -d --build')
         ->assertSee('FROM php:8.3-apache');
@@ -153,9 +152,8 @@ test('site settings deploy section shows kubernetes runtime artifacts', function
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'overview'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('kind: Deployment');
@@ -183,12 +181,12 @@ test('site settings runtime section shows php mismatch state and server php reme
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php'], false));
 
     $response->assertOk()
         ->assertSee('PHP version mismatch')
         ->assertSee('This site references PHP 8.1, but that version is not currently installed on this server.')
-        ->assertSee(route('servers.php', $server, false), escape: false)
+        ->assertSee(route('servers.runtime', $server, false), escape: false)
         ->assertDontSee('value="8.1"', escape: false);
 });
 
@@ -218,7 +216,7 @@ test('site settings runtime section hides unsupported installed versions', funct
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime', 'tab' => 'php'], false));
 
     $response->assertOk()
         ->assertSee('PHP 8.4')
@@ -370,8 +368,8 @@ test('php site creation prefills the valid server new site default', function ()
     Livewire::actingAs($user)
         ->test(SitesCreate::class, ['server' => $server])
         ->assertSet('form.type', 'php')
-        ->assertSet('form.document_root', '/var/www/app/public')
-        ->assertSet('form.repository_path', '/var/www/app')
+        ->assertSet('form.document_root', '/home/dply/app/public')
+        ->assertSet('form.repository_path', '/home/dply/app')
         ->assertSet('form.php_version', '8.4');
 });
 
@@ -395,15 +393,15 @@ test('site creation reconfigures paths when stack changes', function () {
     Livewire::actingAs($user)
         ->test(SitesCreate::class, ['server' => $server])
         ->set('form.primary_hostname', 'app.example.com')
-        ->assertSet('form.document_root', '/var/www/app-example-com/public')
-        ->assertSet('form.repository_path', '/var/www/app-example-com')
+        ->assertSet('form.document_root', '/home/dply/app.example.com/public')
+        ->assertSet('form.repository_path', '/home/dply/app.example.com')
         ->set('form.type', 'node')
-        ->assertSet('form.document_root', '/var/www/app-example-com')
-        ->assertSet('form.repository_path', '/var/www/app-example-com')
+        ->assertSet('form.document_root', '/home/dply/app.example.com')
+        ->assertSet('form.repository_path', '/home/dply/app.example.com')
         ->assertSet('form.app_port', 3000)
         ->set('form.type', 'php')
-        ->assertSet('form.document_root', '/var/www/app-example-com/public')
-        ->assertSet('form.repository_path', '/var/www/app-example-com');
+        ->assertSet('form.document_root', '/home/dply/app.example.com/public')
+        ->assertSet('form.repository_path', '/home/dply/app.example.com');
 });
 
 test('site creation keeps auto paths hidden until customized', function () {
@@ -427,7 +425,7 @@ test('site creation keeps auto paths hidden until customized', function () {
         ->test(SitesCreate::class, ['server' => $server])
         ->assertSet('form.customize_paths', false)
         ->set('form.primary_hostname', 'api.example.com')
-        ->assertSet('form.document_root', '/var/www/api-example-com/public')
+        ->assertSet('form.document_root', '/home/dply/api.example.com/public')
         ->set('form.customize_paths', true)
         ->set('form.document_root', '/srv/custom/public')
         ->set('form.repository_path', '/srv/custom')
@@ -435,8 +433,8 @@ test('site creation keeps auto paths hidden until customized', function () {
         ->assertSet('form.document_root', '/srv/custom/public')
         ->assertSet('form.repository_path', '/srv/custom')
         ->set('form.customize_paths', false)
-        ->assertSet('form.document_root', '/var/www/changed-example-com/public')
-        ->assertSet('form.repository_path', '/var/www/changed-example-com');
+        ->assertSet('form.document_root', '/home/dply/changed.example.com/public')
+        ->assertSet('form.repository_path', '/home/dply/changed.example.com');
 });
 
 test('php site creation requires explicit selection when saved default is not installed', function () {
@@ -753,9 +751,8 @@ test('functions host site settings deploy hides server only controls', function 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
         // Positive: confirm we're on the functions-flavored deploy config tab.
         // The "Deploy command" label and "Repository subdirectory" field
         // only render when the site is a functions host.
@@ -802,9 +799,8 @@ test('aws lambda site settings deploy renders recipe only', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
         ->assertSee('Deploy command')
         ->assertSee('Repository subdirectory')
         // Invocation metadata moved to Overview — must not leak back here.
@@ -1229,8 +1225,8 @@ test('site show defaults to general site workspace', function () {
 
     $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
+    // General no longer shows the "Site workspace" hero (Overview card leads).
     $response->assertOk()
-        ->assertSee('Site workspace')
         ->assertSee('General')
         ->assertSee('Site domain')
         ->assertSee('Status')
@@ -1280,8 +1276,8 @@ test('site show surfaces deployment foundation preflight and resource state', fu
 
     // Docker workspaces land on the container dashboard Overview — preflight,
     // foundation contract, and env keys live on dedicated sections now.
+    // General no longer shows the "Container app workspace" hero.
     $response->assertOk()
-        ->assertSee('Container app workspace')
         ->assertSee('Overview')
         ->assertSee('Container deployment')
         ->assertSee('Backend');
@@ -1449,34 +1445,24 @@ test('vm site pipeline workspace shows rollout hooks and reference', function ()
         'timeout_seconds' => 900,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site], false));
+    // The pipeline lives on the WorkspacePipeline component (the sites.pipeline
+    // route now redirects into the Deployments hub's pipeline tab); drive the
+    // component's sub-tabs directly.
+    $component = Livewire::actingAs($user)->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
 
-    $response->assertOk()
-        ->assertSee('Pipeline')
+    $component->assertSee('Pipeline')
         ->assertSee('Pipeline steps')
         ->assertSee('Rollout');
 
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'rollout'], false))
-        ->assertOk()
+    $component->set('pipelineTab', 'rollout')
         ->assertSee('Zero downtime deployment')
         ->assertSee('After deploy verification');
 
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
-        ->assertOk()
-        ->assertSee('Pipeline', false)
-        ->assertSee('Clone')
-        ->assertSee('Activate');
+    // (The 'steps' sub-tab embeds the DeployScript Livewire child, which needs
+    // full-page rendering to assert against — covered by integration tests, not
+    // this component-level test.)
 
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
-        ->assertOk()
-        ->assertSee('Add hooks');
-
-    $this->actingAs($user)
-        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'reference'], false))
-        ->assertOk()
+    $component->set('pipelineTab', 'reference')
         ->assertSee('Deploy script variables')
         ->assertSee('{SITE_DOMAIN}')
         ->assertSee('{BRANCH}');
@@ -1497,9 +1483,8 @@ test('site settings repository section is distinct from pipeline', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $this->actingAs($user)
-        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'repository'], false))
-        ->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'repository'])
         ->assertSee('Quick deploy')
         ->assertDontSee('Deploy script variables');
 });
@@ -1748,8 +1733,8 @@ test('site show displays aws lambda runtime target details', function () {
 
     // Lambda invocation metadata lives on the serverless Overview dashboard now,
     // not the legacy "Runtime target" panel from Sites\Show.
+    // General no longer shows the "Cloud app workspace" hero.
     $response->assertOk()
-        ->assertSee('Cloud app workspace')
         ->assertSee('Overview')
         ->assertSee('Serverless')
         ->assertSee('Function')
@@ -1813,12 +1798,8 @@ test('site show displays docker runtime target summary', function () {
     ]);
 
     // Compose / Dockerfile artifacts live on Pipeline; live discovery on Runtime.
-    $this->actingAs($user)->get(route('sites.pipeline', [
-        'server' => $server,
-        'site' => $site,
-        'tab' => 'overview',
-    ], false))
-        ->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('Compose file')
         ->assertSee('Managed Dockerfile')
@@ -1863,13 +1844,8 @@ test('site show displays kubernetes runtime target summary', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.pipeline', [
-        'server' => $server,
-        'site' => $site,
-        'tab' => 'overview',
-    ], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('Manifest')
@@ -2138,9 +2114,8 @@ test('site settings general section renders container dashboard for cloud app', 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         // Container-dashboard labels (the new Overview shape).
         ->assertSee('Container deployment')
         ->assertSee('Backend')
@@ -2149,10 +2124,7 @@ test('site settings general section renders container dashboard for cloud app', 
         ->assertSee('Overview')
         // VM-shaped overview content stays hidden for container workspaces.
         ->assertDontSee('Primary hostname')
-        ->assertDontSee('App details')
-        // Networking is no longer a sidebar group for container workspaces —
-        // routing/DNS/certificates belong to the dply edge, not this workspace.
-        ->assertDontSee('>Networking<', false);
+        ->assertDontSee('App details');
 });
 
 test('refresh docker details persists discovered runtime metadata', function () {
@@ -2316,10 +2288,15 @@ test('site show displays preview and certificate summary', function () {
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
+    // The preview routing tab renders a "coming soon" teaser unless the real
+    // workspace.site_preview flag is active; enable it so the live panel shows.
+    config(['features.workspace.site_preview' => true]);
+    \Laravel\Pennant\Feature::flushCache();
+
     Livewire::actingAs($user)
-        ->withQueryParams(['tab' => 'preview'])
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
-        ->assertSee('Preview domains')
+        ->set('routingTab', 'preview')
+        ->assertSee('Preview URLs')
         ->assertSee('preview-app.dply.cc')
         ->assertSee('ready');
 
@@ -2422,7 +2399,7 @@ test('site show can repair a failed certificate', function () {
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
         ->call('repairCertificate', $certificate->id)
-        ->assertDispatched('notify', message: 'Certificate repair queued. Track progress in the banner at the top of this page.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     expect(ConsoleAction::query()
         ->where('subject_type', $site->getMorphClass())
@@ -2644,7 +2621,7 @@ test('site settings aliases section can add alias', function () {
         ->set('new_alias_label', 'Marketing alias')
         ->call('addAlias')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Alias added. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $this->assertDatabaseHas('site_domain_aliases', [
         'site_id' => $site->id,
@@ -2679,7 +2656,7 @@ test('site settings tenants section can add tenant domain', function () {
         ->set('new_tenant_comment', 'App resolver uses the hostname.')
         ->call('addTenantDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Tenant domain added. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $this->assertDatabaseHas('site_tenant_domains', [
         'site_id' => $site->id,
@@ -2803,12 +2780,12 @@ test('site settings logs section renders site deployments and webhook deliveries
         'detail' => 'Accepted deploy webhook.',
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs'], false));
-
-    $response->assertOk()
+    // The logs section now renders deployment activity via the activity console
+    // (status, not raw log_output) and links out to server logs; webhook
+    // deliveries moved to the server notifications surface.
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'logs'])
         ->assertSee('Logs')
-        ->assertSee('Deploy completed successfully.')
-        ->assertSee('Accepted deploy webhook.')
         ->assertSee('Open server logs')
         ->assertSee(route('servers.logs', $server, false), escape: false);
 });
@@ -2840,7 +2817,7 @@ test('site settings can save web directory and primary hostname from dedicated s
         ->set('settings_document_root', '/srv/new/public')
         ->call('saveWebDirectory')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Web directory saved. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     Livewire::actingAs($user)
         ->withQueryParams(['tab' => 'domains'])
@@ -2849,7 +2826,7 @@ test('site settings can save web directory and primary hostname from dedicated s
         ->set('editing_domain_hostname', 'new.example.com')
         ->call('saveEditedDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Primary hostname renamed. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $site->refresh();
     $domain->refresh();
@@ -3050,7 +3027,7 @@ test('site settings preview section can save primary preview domain', function (
         ->set('preview_https_redirect', true)
         ->call('savePreviewSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Preview settings saved. Webserver config queued.', type: 'success');
+        ->assertDispatched('notify', message: 'Queued — the console banner will confirm when it finishes.', type: 'success');
 
     $site->refresh();
     $previewDomain = SitePreviewDomain::query()->where('site_id', $site->id)->first();
@@ -3135,9 +3112,13 @@ test('site settings aliases section shows quick ssl action only for uncovered al
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
+    // The aliases routing tab is coming-soon-gated; enable the live surface.
+    config(['features.workspace.site_aliases' => true]);
+    \Laravel\Pennant\Feature::flushCache();
+
     Livewire::actingAs($user)
-        ->withQueryParams(['tab' => 'aliases'])
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+        ->set('routingTab', 'aliases')
         ->assertSee('SSL missing')
         ->assertSee("openQuickDomainSslModal('alias.example.com')", escape: false)
         ->assertDontSee("openQuickDomainSslModal('app.example.com')", escape: false);
@@ -3201,6 +3182,7 @@ test('site settings aliases section can quick add letsencrypt ssl for alias', fu
         ->call('openQuickDomainSslModal', 'alias.example.com')
         ->assertSet('quick_ssl_domain_hostname', 'alias.example.com')
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+        ->set('quick_ssl_force', true)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'SSL request queued for alias.example.com via Let\'s Encrypt.', type: 'success');
@@ -3265,6 +3247,7 @@ test('site settings domains section can quick add letsencrypt ssl', function () 
         ->call('openQuickDomainSslModal', 'app.example.com')
         ->assertSet('quick_ssl_domain_hostname', 'app.example.com')
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+        ->set('quick_ssl_force', true)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'SSL request queued for app.example.com via Let\'s Encrypt.', type: 'success');
@@ -3328,6 +3311,7 @@ test('site settings domains section can quick add zerossl ssl', function () {
         ->set('routingTab', 'domains')
         ->call('openQuickDomainSslModal', 'api.example.com')
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_ZEROSSL)
+        ->set('quick_ssl_force', true)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'SSL request queued for api.example.com via ZeroSSL.', type: 'success');

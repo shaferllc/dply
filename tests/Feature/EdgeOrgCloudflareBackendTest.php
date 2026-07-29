@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\EdgeOrgCloudflareBackendTest;
 
-use App\Actions\Edge\CreateEdgeSite;
+use App\Modules\Edge\Actions\CreateEdgeSite;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Edge\EdgeRouter;
-use App\Services\Edge\OrgCloudflareEdgeBackend;
-use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Modules\Edge\Services\EdgeRouter;
+use App\Modules\Edge\Services\OrgCloudflareEdgeBackend;
+use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 

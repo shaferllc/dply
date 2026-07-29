@@ -6,7 +6,7 @@ namespace App\Modules\Backups\Observers;
 
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerDatabaseBackup;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
 use Illuminate\Support\Facades\Notification;
 

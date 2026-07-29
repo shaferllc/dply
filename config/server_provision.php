@@ -206,6 +206,24 @@ return [
 
     'install_fail2ban' => true,
 
+    // Install Docker on application/worker boxes so they can run Edge builds
+    // (each build compiles the customer repo in a throwaway container on the
+    // queue-draining worker). Off by default — only dply's own control-plane
+    // workers build Edge sites, so customer boxes don't get a container
+    // runtime. Enable on dply's own workers to guarantee Docker is present
+    // instead of leaning on the deploy-time self-heal in EdgeBuildRunner.
+    'edge_build_docker' => (bool) env('DPLY_PROVISION_EDGE_BUILD_DOCKER', false),
+
+    // Lock SSH down to key-only auth at the end of provisioning: disable
+    // password authentication and reduce root to prohibit-password (key login
+    // only). dply always connects as root via an SSH key, and the deploy user
+    // is key + NOPASSWD-sudo, so this never affects dply — it just shuts the
+    // door on the constant root-password brute force every public box gets.
+    // Writes a managed snippet under /etc/ssh/sshd_config.d/ (the same file the
+    // Insights ssh_security_posture fix owns), validated with `sshd -t` before
+    // reload. Toggle off via DPLY_HARDEN_SSH=false if you rely on passwords.
+    'harden_ssh' => (bool) env('DPLY_HARDEN_SSH', true),
+
     // Configure and enable OS-native automatic security updates
     // (unattended-upgrades) at the end of provisioning. The base bootstrap
     // preempts cloud-init's copy to avoid apt-lock contention during install;

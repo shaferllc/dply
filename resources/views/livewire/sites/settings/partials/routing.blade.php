@@ -1,7 +1,7 @@
 @php
     use App\Models\SiteCertificate;
 
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
 
     // Helper: does this hostname have an active SSL certificate covering it?
     // Used in the Domains and Aliases lists to show the SSL coverage chip.
@@ -19,37 +19,9 @@
     };
 @endphp
 
-{{-- Top intro card + standalone tab strip, mirroring the SSH keys workspace:
-     a dply-card heading with icon pill, then the shared underlined tablist
-     between the intro and the per-tab content cards. --}}
-<section class="{{ $card }}">
-    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Inbound + outbound traffic') : __('Domains, DNS, aliases & redirects') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    @if ($site->usesDockerRuntime())
-                        {{ __('Manage published hostnames, custom domains, redirects, and preview endpoints from one networking workspace.') }}
-                    @else
-                        {{ __('Manage customer domains, DNS automation, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
-                    @endif
-                </p>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                    <span class="inline-flex items-center gap-1">
-                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                        {{ __('Routing changes auto-apply the active webserver config — no manual save needed.') }}
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
-<x-server-workspace-tablist :aria-label="__('Routing sections')" class="mt-6">
+<div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+<x-server-workspace-tablist :aria-label="__('Routing sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
     @foreach ($routingTabs as $tab)
         <x-server-workspace-tab
             as="a"
@@ -61,12 +33,13 @@
         >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}@if (in_array($tab, ['aliases', 'redirects', 'preview', 'tenants'], true) && workspace_surface_coming_soon('site_'.$tab))<span class="ml-1.5 rounded-full bg-brand-sage/20 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-brand-forest">{{ __('Soon') }}</span>@endif</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
+</div>
 
 @if ($routingTab === 'domains')
     @php $domainCount = $site->domains->count(); @endphp
 
     {{-- Domains: slim header card with count pill + Add CTA --}}
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -152,8 +125,68 @@
         </div>
     </x-modal>
 
+    {{-- Testing host (managed wildcard TLS). The generated *.on-dply.* hostname
+         is secured by a per-(server, zone) wildcard cert, not a per-site cert —
+         so its status (and any issuance failure) lives nowhere else in this UI. --}}
+    @php
+        $testingZone = $site->testingZone();
+        $testingHost = $site->primaryPreviewDomain()?->hostname;
+        $wildcard = $testingZone ? $this->testingWildcardCertificate() : null;
+        $wildcardInstalled = $wildcard?->isInstalled() ?? false;
+    @endphp
+    @if ($testingZone)
+        <div class="{{ $card }}">
+            <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $wildcardInstalled ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-amber-50 text-amber-700 ring-amber-200/70' }}">
+                        <x-heroicon-o-shield-check class="h-4 w-4" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed testing host') }}</p>
+                        <p class="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
+                            <span>{{ $testingHost ?? '*.'.$testingZone }}</span>
+                            @if ($wildcardInstalled)
+                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('TLS active') }}</span>
+                            @elseif ($wildcard)
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('Wildcard :status', ['status' => $wildcard->status]) }}</span>
+                            @else
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('No wildcard yet') }}</span>
+                            @endif
+                        </p>
+                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Secured by the shared *.:zone wildcard certificate on this server (DNS-01).', ['zone' => $testingZone]) }}
+                            @if ($wildcardInstalled && $wildcard?->not_after)
+                                {{ __('Renews automatically — expires :date.', ['date' => $wildcard->not_after->toFormattedDateString()]) }}
+                            @endif
+                        </p>
+                        @unless ($wildcardInstalled)
+                            <p class="mt-2 text-xs leading-relaxed text-amber-800">
+                                {{ __('TLS is not active on the testing host yet. This usually means the *.:zone wildcard failed to issue — most often because no DNS API token controls the :zone zone. Reissue to retry, and check the output below for the exact certbot/DNS error.', ['zone' => $testingZone]) }}
+                            </p>
+                        @endunless
+                        @if ($wildcard && trim((string) $wildcard->last_output) !== '')
+                            <details class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
+                                <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last issuance output') }}</summary>
+                                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-brand-ink">{{ $wildcard->last_output }}</pre>
+                            </details>
+                        @endif
+                    </div>
+                </div>
+                @can('update', $site)
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <button type="button" wire:click="reissueTestingWildcard" wire:loading.attr="disabled" wire:target="reissueTestingWildcard" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="reissueTestingWildcard" />
+                            <span wire:loading.remove wire:target="reissueTestingWildcard">{{ $wildcard ? __('Reissue TLS') : __('Issue TLS') }}</span>
+                            <span wire:loading wire:target="reissueTestingWildcard">{{ __('Queuing…') }}</span>
+                        </button>
+                    </div>
+                @endcan
+            </div>
+        </div>
+    @endif
+
     {{-- Domains list --}}
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($domainCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-globe-alt class="h-6 w-6" /></span>
@@ -165,6 +198,10 @@
                 @foreach ($site->domains as $domain)
                     @php
                         $hasSsl = $coversWithSsl($domain->hostname);
+                        // Cloudflare-fronted domains already serve HTTPS at the edge, so a
+                        // bare "SSL missing" badge is a false alarm. Detection is site-level
+                        // (primary host only), so only soften the primary row's badge.
+                        $behindCloudflare = ! $hasSsl && $domain->is_primary && $site->cloudflareTerminatesTls();
                         $isEditing = $editing_domain_id === (string) $domain->id;
                     @endphp
                     <li class="px-6 py-3 sm:px-8" wire:key="domain-row-{{ $domain->id }}">
@@ -204,6 +241,10 @@
                                             @endif
                                             @if ($hasSsl)
                                                 <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('SSL configured') }}</span>
+                                            @elseif ($behindCloudflare)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70" title="{{ __('Cloudflare terminates HTTPS at its edge for this hostname — an origin certificate here is optional.') }}">
+                                                    <x-heroicon-o-cloud class="h-3 w-3" aria-hidden="true" /> {{ __('Cloudflare edge') }}
+                                                </span>
                                             @else
                                                 <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('SSL missing') }}</span>
                                             @endif
@@ -238,12 +279,14 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:domains:add '.$site->slug.' new.example.com --primary'],
         ['label' => __('Remove'), 'command' => 'dply sites:domains:remove '.$site->slug.' old.example.com'],
         ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
         ['label' => __('Find by hostname'), 'command' => 'dply fleet:domains:find example.com'],
     ]" />
+</div>
 
 @elseif ($routingTab === 'dns')
     @include('livewire.sites.settings.partials.routing._tab-dns')
@@ -271,7 +314,7 @@
 @elseif ($routingTab === 'aliases')
     @php $aliasCount = $site->domainAliases->count(); @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -376,7 +419,7 @@
         </div>
     </x-modal>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($aliasCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-link class="h-6 w-6" /></span>
@@ -462,11 +505,13 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:aliases:add '.$site->slug.' alt.example.com --label=Marketing'],
         ['label' => __('Remove'), 'command' => 'dply sites:aliases:remove '.$site->slug.' alt.example.com'],
         ['label' => __('List'), 'command' => 'dply sites:aliases:list '.$site->slug],
     ]" />
+</div>
 
 @elseif ($routingTab === 'redirects' && workspace_surface_coming_soon('site_redirects'))
     <x-workspace-coming-soon
@@ -491,7 +536,7 @@
 @elseif ($routingTab === 'redirects')
     @php $redirectCount = $site->redirects->count(); @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -633,7 +678,7 @@
         </div>
     </x-modal>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($redirectCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-arrow-uturn-right class="h-6 w-6" /></span>
@@ -766,13 +811,15 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:redirects:add '.$site->slug.' /old /new --code=301'],
         ['label' => __('Remove'), 'command' => 'dply sites:redirects:remove '.$site->slug.' /old'],
         ['label' => __('List'), 'command' => 'dply sites:redirects:list '.$site->slug],
         ['label' => __('Bulk import'), 'command' => 'dply sites:redirects:import '.$site->slug.' --file=redirects.csv'],
         ['label' => __('Export CSV'), 'command' => 'dply sites:redirects:export '.$site->slug.' --to=redirects.csv'],
     ]" />
+</div>
 
 @elseif ($routingTab === 'preview' && workspace_surface_coming_soon('site_preview'))
     <x-workspace-coming-soon
@@ -795,9 +842,16 @@
         ]"
     />
 @elseif ($routingTab === 'preview')
-    @php $previewCount = $site->previewDomains->count(); @endphp
+    @php
+        $site->loadMissing('previewDomains.certificates');
+        $previewCount = $site->previewDomains->count();
+        // *.testing-zone hosts ride the shared per-server wildcard, not per-host
+        // certs — resolve it once so the SSL badge reflects the real mechanism.
+        $coveringWildcard = $site->coveringServerWildcard();
+        $previewTestingZone = $site->testingZone();
+    @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}" x-data="{ addOpen: false }">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -805,20 +859,50 @@
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview domains') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Keep preview hostnames separate so reachability, auto-SSL, and cleanup stay scoped to testing traffic.') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview URLs') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Shareable, auto-SSL hostnames that point at this live site — hand out a working link before the real domain’s DNS is live. dply provisions the DNS and certificate for each one.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no preview hosts|{1} :count host|[2,*] :count hosts', $previewCount, ['count' => $previewCount]) }}
+                            {{ trans_choice('{0} no preview URLs|{1} :count URL|[2,*] :count URLs', $previewCount, ['count' => $previewCount]) }}
                         </span>
                     </div>
                 </div>
             </div>
+            @can('update', $site)
+                @if ($this->canAddManagedPreview())
+                    <div class="flex shrink-0 items-center">
+                        <button type="button" x-on:click="addOpen = ! addOpen"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90"
+                            title="{{ __('Provision another dply-managed preview URL (DNS + auto-SSL).') }}">
+                            <x-heroicon-o-plus class="h-4 w-4 transition-transform" x-bind:class="addOpen && 'rotate-45'" />
+                            {{ __('Add preview URL') }}
+                        </button>
+                    </div>
+                @endif
+            @endcan
         </div>
+
+        {{-- Inline expansion (not a floating popover) so the card's overflow-hidden
+             doesn't clip it; the card just grows when open. --}}
+        @can('update', $site)
+            @if ($this->canAddManagedPreview())
+                <div x-show="addOpen" x-cloak class="flex flex-col gap-3 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-end sm:px-7">
+                    <div class="min-w-0 flex-1">
+                        <x-input-label for="new_preview_label" :value="__('Label (optional)')" />
+                        <input id="new_preview_label" type="text" wire:model="newPreviewLabel" maxlength="255" placeholder="{{ __('e.g. Client review') }}" class="dply-input mt-1 w-full text-sm" />
+                    </div>
+                    <button type="button" wire:click="addManagedPreviewDomain" x-on:click="addOpen = false" wire:loading.attr="disabled" wire:target="addManagedPreviewDomain"
+                        class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
+                        <span wire:loading.remove wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-heroicon-o-plus class="h-4 w-4" />{{ __('Provision preview URL') }}</span>
+                        <span wire:loading wire:target="addManagedPreviewDomain" class="inline-flex items-center gap-1.5"><x-spinner variant="cream" size="sm" />{{ __('Provisioning…') }}</span>
+                    </button>
+                </div>
+            @endif
+        @endcan
     </div>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <form wire:submit="savePreviewSettings" class="space-y-5 px-6 py-6 sm:px-8">
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -860,10 +944,38 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Known preview hosts') }}</p>
                 <ul class="mt-3 space-y-2">
                     @foreach ($site->previewDomains as $previewDomain)
+                        @php
+                            $pdOnWildcard = $previewDomain->managed_by_dply
+                                && $coveringWildcard !== null
+                                && $previewTestingZone !== null
+                                && strtolower((string) $previewDomain->zone) === strtolower($previewTestingZone);
+                            if ($pdOnWildcard) {
+                                // Secured by the shared *.zone wildcard (DNS-01), not a per-host cert.
+                                $pdCert = null;
+                                $pdSsl = ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'];
+                            } else {
+                                // Per-host certificate (the model where this server has no wildcard).
+                                $pdCert = $previewDomain->relationLoaded('certificates') ? $previewDomain->certificates->sortByDesc('updated_at')->first() : null;
+                                $pdSsl = match ($pdCert?->status) {
+                                    \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],
+                                    \App\Models\SiteCertificate::STATUS_INSTALLING, \App\Models\SiteCertificate::STATUS_ISSUED, \App\Models\SiteCertificate::STATUS_PENDING => ['label' => __('SSL pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'],
+                                    \App\Models\SiteCertificate::STATUS_FAILED => ['label' => __('SSL failed'), 'cls' => 'bg-rose-50 text-rose-800 ring-rose-200/70', 'icon' => 'heroicon-o-exclamation-triangle'],
+                                    default => ['label' => __('No SSL yet'), 'cls' => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10', 'icon' => 'heroicon-o-lock-open'],
+                                };
+                            }
+                        @endphp
                         <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
                             <div class="min-w-0">
-                                <p class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('DNS: :dns · SSL: :ssl', ['dns' => $previewDomain->dns_status, 'ssl' => $previewDomain->ssl_status]) }}</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</span>
+                                    @if ($previewDomain->is_primary)
+                                        <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Primary') }}</span>
+                                    @endif
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $pdSsl['cls'] }}" @if ($pdCert?->status === \App\Models\SiteCertificate::STATUS_FAILED) title="{{ \Illuminate\Support\Str::limit((string) $pdCert->last_output, 240) }}" @endif>
+                                        <x-dynamic-component :component="$pdSsl['icon']" class="h-3 w-3" /> {{ $pdSsl['label'] }}
+                                    </span>
+                                </div>
+                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ $previewDomain->label ? $previewDomain->label.' · ' : '' }}{{ __('DNS: :dns', ['dns' => $previewDomain->dns_status]) }}</p>
                             </div>
                             @if (! $previewDomain->is_primary)
                                 <button type="button" wire:click="confirmRemovePreviewDomain('{{ $previewDomain->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -877,10 +989,12 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Set preview'), 'command' => 'dply sites:preview:set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
         ['label' => __('Remove preview'), 'command' => 'dply sites:preview:remove '.$site->slug.' preview.example.dply.cc'],
     ]" />
+</div>
 
 @elseif ($routingTab === 'tenants' && workspace_surface_coming_soon('site_tenants'))
     <x-workspace-coming-soon
@@ -903,9 +1017,24 @@
         ]"
     />
 @elseif ($routingTab === 'tenants')
-    @php $tenantCount = $site->tenantDomains->count(); @endphp
+    @php
+        $tenantCount = $site->tenantDomains->count();
+        // Per-tenant SSL: map each hostname to its best certificate status so the
+        // row can show a badge + offer "Add SSL". Built once to avoid N+1.
+        $site->loadMissing('certificates');
+        $tenantCertRank = ['active' => 0, 'installing' => 1, 'issued' => 1, 'pending' => 1, 'failed' => 2];
+        $tenantCertStatus = [];
+        foreach ($site->certificates as $tc) {
+            foreach ($tc->domainHostnames() as $tch) {
+                $tch = strtolower($tch);
+                if (! isset($tenantCertStatus[$tch]) || ($tenantCertRank[$tc->status] ?? 3) < ($tenantCertRank[$tenantCertStatus[$tch]] ?? 3)) {
+                    $tenantCertStatus[$tch] = $tc->status;
+                }
+            }
+        }
+    @endphp
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -1016,7 +1145,7 @@
         </div>
     </x-modal>
 
-    <div class="{{ $card }} mt-6">
+    <div class="{{ $card }}">
         @if ($tenantCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-building-office-2 class="h-6 w-6" /></span>
@@ -1026,7 +1155,16 @@
         @else
             <ul class="divide-y divide-brand-ink/8">
                 @foreach ($site->tenantDomains as $tenantDomain)
-                    @php $isEditing = $editing_tenant_id === (string) $tenantDomain->id; @endphp
+                    @php
+                        $isEditing = $editing_tenant_id === (string) $tenantDomain->id;
+                        $tCertStatus = $tenantCertStatus[strtolower((string) $tenantDomain->hostname)] ?? null;
+                        $tSsl = match ($tCertStatus) {
+                            \App\Models\SiteCertificate::STATUS_ACTIVE => ['label' => __('SSL active'), 'cls' => 'bg-emerald-50 text-emerald-800 ring-emerald-200/70', 'icon' => 'heroicon-o-lock-closed'],
+                            \App\Models\SiteCertificate::STATUS_INSTALLING, \App\Models\SiteCertificate::STATUS_ISSUED, \App\Models\SiteCertificate::STATUS_PENDING => ['label' => __('SSL pending'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-clock'],
+                            \App\Models\SiteCertificate::STATUS_FAILED => ['label' => __('SSL failed'), 'cls' => 'bg-rose-50 text-rose-800 ring-rose-200/70', 'icon' => 'heroicon-o-exclamation-triangle'],
+                            default => ['label' => __('SSL missing'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-lock-open'],
+                        };
+                    @endphp
                     <li class="px-6 py-3 sm:px-8" wire:key="tenant-row-{{ $tenantDomain->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedTenantDomain" class="space-y-3">
@@ -1066,6 +1204,9 @@
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $tenantDomain->hostname }}</span>
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $tSsl['cls'] }}">
+                                                <x-dynamic-component :component="$tSsl['icon']" class="h-3 w-3" /> {{ $tSsl['label'] }}
+                                            </span>
                                             @if ($tenantDomain->tenant_key)
                                                 <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('key: :key', ['key' => $tenantDomain->tenant_key]) }}</span>
                                             @endif
@@ -1103,6 +1244,12 @@
                                             {{ __('Create testing URL') }}
                                         </button>
                                     @endif
+                                    @if (in_array($tCertStatus, [null, \App\Models\SiteCertificate::STATUS_FAILED], true))
+                                        <button type="button" wire:click="issueTenantCertificate('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="issueTenantCertificate('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Issue a Let’s Encrypt certificate for this tenant’s domain (point its DNS here first).') }}">
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
+                                            {{ $tCertStatus === \App\Models\SiteCertificate::STATUS_FAILED ? __('Retry SSL') : __('Add SSL') }}
+                                        </button>
+                                    @endif
                                     <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
@@ -1119,11 +1266,13 @@
         @endif
     </div>
 
-    <x-cli-snippet class="mt-6" :commands="[
+    <div class="px-5 py-5 sm:px-6">
+    <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:tenants:add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
         ['label' => __('Remove'), 'command' => 'dply sites:tenants:remove '.$site->slug.' acme.example.com'],
         ['label' => __('List'), 'command' => 'dply sites:tenants:list '.$site->slug],
     ]" />
+</div>
 
 @endif
 

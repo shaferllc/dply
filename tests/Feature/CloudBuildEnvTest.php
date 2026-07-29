@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudBuildEnvTest;
 
 use App\Enums\SiteType;
-use App\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Livewire\Sites\Settings as SitesSettings;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
-use App\Services\DigitalOceanAppPlatformService;
+use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
+use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;

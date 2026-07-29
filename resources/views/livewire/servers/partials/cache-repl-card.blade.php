@@ -5,7 +5,7 @@
     'replInput',
     'replHistory',
     'replUnlocked',
-    'card' => 'dply-card overflow-hidden',
+    'card' => 'border-b border-brand-ink/10',
 ])
 
 @php
@@ -19,7 +19,7 @@
      input) so it appears "hidden behind" neighboring cards. Strip it so the
      dropdown can paint past the card boundary while keeping the rounded
      header/footer visuals intact. --}}
-<div class="{{ str_replace('overflow-hidden', 'overflow-visible', $card) }}" wire:key="cache-repl-{{ $engine }}">
+<div class="{{ $card }} overflow-visible" wire:key="cache-repl-{{ $engine }}">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />

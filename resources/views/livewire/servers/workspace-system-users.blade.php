@@ -1,5 +1,5 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
     $opsReady = $server->isReady() && filled($server->ssh_private_key);
     $consoleActionRun = \App\Models\ConsoleAction::query()
         ->where('subject_type', $server->getMorphClass())
@@ -16,45 +16,67 @@
     active="system-users"
     :title="__('System users')"
     :description="__('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user; create the account here, then assign it to a site from the site\'s System user section.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @if (! $opsReady)
-        <section class="dply-card overflow-hidden border-amber-200">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <x-icon-badge tone="amber">
-                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('System users') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user; create the account here, then assign it to a site from the site\'s System user section.') }}
+                        </p>
+                    </div>
                 </div>
             </div>
-        </section>
+        </div>
+
+    @if (! $opsReady)
+        <div class="flex items-start gap-3 border-b border-amber-200/80 bg-amber-50/60 px-5 py-5 sm:px-6">
+            <x-icon-badge tone="amber">
+                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
+            </div>
+        </div>
     @else
+        @if ($consoleActionRun)
+            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+                {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
+                     system_user run (create, remove) for this server. --}}
+                @include('livewire.partials.console-action-banner-static', [
+                    'run' => $consoleActionRun,
+                    'kindLabels' => (array) config('console_actions.kinds', []),
+                ])
+            </div>
+        @endif
+
         {{-- In-page sub-tabs: the /etc/passwd account list vs. notification routing
              for this server's system_user.* events. Keeps "set up alerts" one click
              away instead of bouncing the operator out to global settings. --}}
-        <x-server-workspace-tablist :aria-label="__('System users sections')">
-            <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="$set('activeTab', 'accounts')">
-                {{ __('Accounts') }}
-            </x-server-workspace-tab>
-            <x-server-workspace-tab icon="heroicon-o-bell" :active="$activeTab === 'notifications'" wire:click="$set('activeTab', 'notifications')">
-                {{ __('Notifications') }}
-            </x-server-workspace-tab>
-        </x-server-workspace-tablist>
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('System users sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="$set('activeTab', 'accounts')">
+                    {{ __('Accounts') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab icon="heroicon-o-bell" :active="$activeTab === 'notifications'" wire:click="$set('activeTab', 'notifications')">
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
 
-        <div @class(['space-y-6', 'hidden' => $activeTab !== 'accounts'])>
-            {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
-                 system_user run (create, remove) for this server. --}}
-            @include('livewire.partials.console-action-banner-static', [
-                'run' => $consoleActionRun,
-                'kindLabels' => (array) config('console_actions.kinds', []),
-            ])
-
-            <section class="{{ $card }} overflow-hidden">
+        <div @class(['min-w-0', 'hidden' => $activeTab !== 'accounts'])>
+            <section class="{{ $card }}">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
                         <x-icon-badge>
@@ -314,9 +336,8 @@
             </section>
         </div>
 
-        <div @class(['space-y-6', 'hidden' => $activeTab !== 'notifications'])>
+        <div @class(['min-w-0', 'hidden' => $activeTab !== 'notifications'])>
             @include('livewire.servers.partials.system-users.notifications-tab', [
-                'card' => $card,
                 'notifChannels' => $notifChannels,
                 'notifSubscriptions' => $notifSubscriptions,
                 'notifEventLabels' => $notifEventLabels,
@@ -476,4 +497,5 @@
 
         @include('livewire.partials.confirm-action-modal')
     @endif
+    </section>
 </x-server-workspace-layout>

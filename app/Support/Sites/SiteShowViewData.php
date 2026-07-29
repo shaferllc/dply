@@ -207,8 +207,35 @@ final class SiteShowViewData
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
         ];
 
-        if ($site->usesEdgeRuntime()) {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'];
+        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
+            && function_exists('production_data_mirror_connected')
+            && production_data_mirror_connected();
+
+        if ($isProductionMirror) {
+            $siteHeaderBreadcrumbs[] = [
+                'label' => __('Production'),
+                'href' => route('live.sites.index'),
+                'icon' => 'exclamation-triangle',
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => __('Sites'),
+                'href' => route('live.sites.index'),
+                'icon' => 'globe-alt',
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $server->name,
+                'href' => route('live.servers.index'),
+                'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $site->name,
+                'icon' => 'globe-alt',
+                'avatar' => $site->name ?: (string) $site->id,
+                'avatar_image' => $site->logoUrl(),
+            ];
+        } elseif ($site->usesEdgeRuntime()) {
             $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
             $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
         } else {
@@ -481,13 +508,17 @@ final class SiteShowViewData
     private static function resolveEdgeProvisioningError(Site $site, ?EdgeDeployment $deployment): ?string
     {
         $metaError = $site->edgeMeta()['last_error'] ?? null;
-        if (is_string($metaError) && $metaError !== '') {
-            return $metaError;
-        }
-
         $deploymentError = $deployment?->failure_reason;
-        if (is_string($deploymentError) && $deploymentError !== '') {
-            return $deploymentError;
+
+        // This "Last error" box is rendered *alongside* the BuildJourney
+        // component, which already shows the deployment failure_reason in its
+        // own "Reason" box. So only surface the site-meta last_error here when
+        // it *differs* — i.e. an infra-level failure (R2/KV perms) that never
+        // reached the deployment row. When it matches, or when the only error
+        // is the deployment one, stay null and let BuildJourney be the single
+        // source of truth instead of double-printing the same string.
+        if (is_string($metaError) && $metaError !== '' && $metaError !== $deploymentError) {
+            return $metaError;
         }
 
         return null;

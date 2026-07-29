@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\VultrService;
 
 class VultrDnsProvider implements DnsProvider
 {
@@ -31,5 +31,14 @@ class VultrDnsProvider implements DnsProvider
         }
 
         $this->service->deleteDomainRecord($zone, $recordId);
+    }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->domainExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

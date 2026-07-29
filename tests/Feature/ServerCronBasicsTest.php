@@ -199,7 +199,7 @@ test('loading crontab populates inspect body', function () {
 
     $reader = Mockery::mock(ServerCrontabReader::class);
     $reader->shouldReceive('readForUser')
-        ->once()
+        ->twice()
         ->andReturn([
             'body' => '* * * * * php artisan schedule:run',
             'exit_code' => 0,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Secrets\Livewire;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ExternalSecretStore;
 use App\Models\Organization;
@@ -24,6 +25,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Secrets extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public Organization $organization;

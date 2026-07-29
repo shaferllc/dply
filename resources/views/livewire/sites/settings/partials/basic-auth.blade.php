@@ -1,5 +1,5 @@
+{{-- Nested inside Settings Authentication merged card — hairline strips, no nested dply-cards. --}}
 @php
-    $card = 'dply-card overflow-hidden';
     $supportsBA = $site->supportsBasicAuthProvisioning();
     $supportsFormGate = $site->webserverSupportsFormPasswordGate();
     $accessMethod = $access_gate_method !== '' ? $access_gate_method : $site->resolvedAccessGateMethod();
@@ -27,38 +27,36 @@
     $primaryHost = $site->primaryDomain()?->hostname ?? 'example.com';
 @endphp
 
-<section class="space-y-6">
-    {{-- Webserver apply / sync progress streams to the console banner at the top of
-         this page (auto-scrolled into view when you add, remove, or rotate a credential). --}}
+<div class="min-w-0">
+    {{-- Webserver apply / sync progress streams to the embedded console banner
+         above this strip (auto-scrolled into view when you add, remove, or rotate). --}}
 
     @if (! $supportsBA)
-        <section class="dply-card overflow-hidden border-amber-200">
-            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Basic auth unavailable on this runtime') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Basic authentication applies to VM sites with managed web server configuration. Container and serverless runtimes use their own access controls.') }}</p>
-                    </div>
+        <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-5 sm:px-6">
+            <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200">
+                    <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Basic auth unavailable on this runtime') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Basic authentication applies to VM sites with managed web server configuration. Container and serverless runtimes use their own access controls.') }}</p>
                 </div>
             </div>
-        </section>
+        </div>
     @else
-        <div class="{{ $card }}">
-            <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <section class="border-b border-brand-ink/10">
+            <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Method') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How visitors authenticate') }}</h2>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How visitors authenticate') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Only one method can be active. Changes apply through the webserver config job shown in the banner above.') }}</p>
                 </div>
             </div>
-            <div class="grid gap-3 p-6 sm:grid-cols-3 sm:px-7">
+            <div class="grid gap-3 px-5 py-5 sm:grid-cols-3 sm:px-6">
                 <button
                     type="button"
                     wire:click="selectAccessGateMethod('off')"
@@ -107,7 +105,7 @@
                     </p>
                 </button>
             </div>
-        </div>
+        </section>
 
         @if ($accessMethod === 'form_password' && $supportsFormGate)
             @php
@@ -115,15 +113,15 @@
                 $activeGatePasswords = $gatePasswords->reject(fn ($row) => $row->isPendingRemoval());
                 $gatePasswordCount = $activeGatePasswords->count();
             @endphp
-            <div class="{{ $card }}">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
                     <div class="flex min-w-0 items-start gap-3">
                         <x-icon-badge>
                             <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Password gate') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Named gate passwords') }}</h2>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Named gate passwords') }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Add one or more labeled passwords so you can see who logged in. After a successful login, a secure cookie lasts 24 hours.') }}
                             </p>
@@ -165,7 +163,7 @@
                 @if ($gatePasswords->isNotEmpty())
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($gatePasswords as $gatePassword)
-                            <li @class(['px-6 py-4 sm:px-7', 'opacity-60' => $gatePassword->isPendingRemoval()])>
+                            <li @class(['px-5 py-4 sm:px-6', 'opacity-60' => $gatePassword->isPendingRemoval()])>
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <p class="text-sm font-semibold text-brand-ink">{{ $gatePassword->label }}</p>
@@ -196,31 +194,31 @@
                         @endforeach
                     </ul>
                 @else
-                    <div class="px-6 py-8 sm:px-7">
+                    <div class="px-5 py-8 sm:px-6">
                         <p class="text-sm text-brand-moss">{{ __('No gate passwords yet. Add one to enable the login form — until then the site will not require the gate on apply.') }}</p>
                     </div>
                 @endif
-            </div>
+            </section>
 
-            <div class="{{ $card }}">
-                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <section class="border-b border-brand-ink/10">
+                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login log') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent gate logins') }}</h2>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent gate logins') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Successful logins are recorded on the server with the credential label, IP, and time.') }}</p>
                     </div>
                 </div>
 
                 @if (! $form_gate_login_log_loaded)
-                    <div wire:init="loadFormGateLoginLog" class="flex items-center justify-center gap-2 px-6 py-12 text-sm text-brand-moss">
+                    <div wire:init="loadFormGateLoginLog" class="flex items-center justify-center gap-2 px-5 py-12 text-sm text-brand-moss sm:px-6">
                         <x-spinner variant="forest" size="sm" />
                         {{ __('Reading login log…') }}
                     </div>
                 @elseif ($form_gate_login_log === [])
-                    <div class="px-6 py-10 text-center">
+                    <div class="px-5 py-10 text-center sm:px-6">
                         <p class="text-sm text-brand-moss">{{ __('No logins recorded yet.') }}</p>
                     </div>
                 @else
@@ -232,7 +230,7 @@
                                     <button
                                         type="button"
                                         @click="selected = @js(array_merge($entry, ['at_human' => $at->diffForHumans(), 'at_full' => $at->toDayDateTimeString(), 'at_iso' => $at->toIso8601String()]))"
-                                        class="flex w-full items-center justify-between gap-4 px-6 py-3 text-left hover:bg-brand-sand/20 sm:px-7"
+                                        class="flex w-full items-center justify-between gap-4 px-5 py-3 text-left hover:bg-brand-sand/20 sm:px-6"
                                     >
                                         <div class="min-w-0 flex-1">
                                             <p class="text-sm font-semibold text-brand-ink">{{ $entry['label'] }}</p>
@@ -325,7 +323,7 @@
                         </div>
                     </div>
                 @endif
-            </div>
+            </section>
 
             <x-modal name="add-form-gate-modal" maxWidth="md">
                 <form wire:submit="addFormGatePassword" class="space-y-4 p-6">
@@ -381,18 +379,16 @@
                 </form>
             </x-modal>
         @elseif ($accessMethod === 'basic_auth')
-        {{-- Slim header card: icon, title, count + freshness, and the primary CTAs.
-             Inspired by the SSH keys workspace — keeps the page from being dominated by a
-             big inline form when the operator just wants to add or rotate one credential. --}}
-        <div class="{{ $card }}">
-            <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+        {{-- Slim header strip: icon, title, count + freshness, and the primary CTAs. --}}
+        <section class="border-b border-brand-ink/10">
+            <div class="flex flex-col gap-4 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
                 <div class="flex min-w-0 items-start gap-3">
                     <x-icon-badge>
                         <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h2>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Username and password pairs that the webserver checks before letting a request through.') }}
                             <a href="https://datatracker.ietf.org/doc/html/rfc7617" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Learn more') }}</a>
@@ -446,7 +442,7 @@
                     </button>
                 </div>
             </div>
-        </div>
+        </section>
 
         {{-- Add credential modal: single entry form on top, bulk-import disclosure underneath.
              Mirrors the "Add SSH key" modal pattern (Profile / Paste / Generate). --}}
@@ -651,16 +647,15 @@
             </div>
         </x-modal>
 
-        {{-- List of credentials, grouped by path. Each row carries username + path chip,
-             added/updated timestamps, and per-row Rotate / Delete actions. --}}
-        <div class="{{ $card }}">
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+        {{-- Credentials list, grouped by path. --}}
+        <section class="border-b border-brand-ink/10">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                    <x-icon-badge>
                         <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Rotate or remove credentials — applied on the next webserver config write.') }}</p>
                     </div>
@@ -672,7 +667,7 @@
             </div>
 
             @if ($entryCount === 0)
-                <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
+                <div class="flex flex-col items-center justify-center gap-2 px-5 py-12 text-center sm:px-6">
                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
                         <x-heroicon-o-lock-closed class="h-6 w-6" />
                     </span>
@@ -694,7 +689,7 @@
                             );
                         @endphp
                         <div wire:key="ba-path-{{ md5($pathKey) }}">
-                            <div class="flex flex-wrap items-center justify-between gap-2 bg-brand-sand/15 px-6 py-2.5 sm:px-8">
+                            <div class="flex flex-wrap items-center justify-between gap-2 bg-brand-sand/15 px-5 py-2.5 sm:px-6">
                                 <div class="flex items-center gap-2 text-xs">
                                     <x-heroicon-m-folder class="h-3.5 w-3.5 text-brand-moss" />
                                     <span class="font-mono font-semibold text-brand-ink">{{ $pathKey }}</span>
@@ -735,9 +730,9 @@
                             <ul class="divide-y divide-brand-ink/8">
                                 @foreach ($usersForPath->sortBy('username') as $authUser)
                                     @php $pending = $authUser->isPendingRemoval(); @endphp
-                                    <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8 {{ $pending ? 'opacity-60' : '' }}" wire:key="ba-user-{{ $authUser->id }}">
+                                    <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6 {{ $pending ? 'opacity-60' : '' }}" wire:key="ba-user-{{ $authUser->id }}">
                                         <div class="flex min-w-0 items-center gap-3">
-                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
+                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
                                                 <x-heroicon-o-user-circle class="h-4 w-4" />
                                             </span>
                                             <div class="min-w-0">
@@ -833,15 +828,17 @@
                     @endforeach
                 </div>
             @endif
-        </div>
+        </section>
 
         @include('livewire.sites.settings.partials.basic-auth-password-reveal-modal')
         @endif
     @endif
 
-    <x-cli-snippet :commands="[
-        ['label' => __('List users'), 'command' => 'dply sites:basic-auth:list '.$site->slug],
-        ['label' => __('Add user'), 'command' => 'dply sites:basic-auth:add '.$site->slug.' <user> <password>'],
-        ['label' => __('Remove user'), 'command' => 'dply sites:basic-auth:remove '.$site->slug.' <user>'],
-    ]" />
-</section>
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['label' => __('List users'), 'command' => 'dply sites:basic-auth:list '.$site->slug],
+            ['label' => __('Add user'), 'command' => 'dply sites:basic-auth:add '.$site->slug.' <user> <password>'],
+            ['label' => __('Remove user'), 'command' => 'dply sites:basic-auth:remove '.$site->slug.' <user>'],
+        ]" />
+    </div>
+</div>

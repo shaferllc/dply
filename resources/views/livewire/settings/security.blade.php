@@ -1,12 +1,4 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-    ];
-
     $u = auth()->user();
     $twoFactorOn = $u->hasTwoFactorEnabled();
     $passkeyCount = $passkeys->count();
@@ -62,26 +54,25 @@
         ]" />
     @endpush
 
-    {{-- Hero: posture + at-a-glance counts. --}}
-    <x-hero-card
-        :eyebrow="__('Account')"
+    <x-profile-shell
         :title="__('Security')"
         :description="__('Password, passkeys, OAuth sign-in, and two-factor authentication. Layer at least two of these so a stolen credential alone can\'t reach your account.')"
-        icon="shield-check"
-        iconSize="md"
+        icon="heroicon-o-shield-check"
     >
-        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Back to profile') }}
-        </x-outline-link>
-        <x-outline-link href="{{ route('two-factor.setup') }}" wire:navigate>
-            <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Two-factor') }}
-        </x-outline-link>
+        <x-slot:actions>
+            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Back to profile') }}
+            </x-outline-link>
+            <x-outline-link href="{{ route('two-factor.setup') }}" wire:navigate>
+                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Two-factor') }}
+            </x-outline-link>
+        </x-slot:actions>
 
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-2xl border px-4 py-3 shadow-sm {{ $postureTile }}">
+                <div class="rounded-xl border px-4 py-3 {{ $postureTile }}">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Posture') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
                         <span class="inline-block h-2 w-2 rounded-full {{ $postureDot }}" aria-hidden="true"></span>
@@ -89,7 +80,7 @@
                     </dd>
                     <p class="mt-1 truncate text-[11px] text-brand-moss" title="{{ $postureSub }}">{{ $postureSub }}</p>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Passkeys') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $passkeyCount }}</span>
@@ -98,7 +89,7 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Device PIN / fingerprint') }}</p>
                 </div>
                 <div @class([
-                    'rounded-2xl border px-4 py-3 shadow-sm',
+                    'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $twoFactorOn,
                     'border-amber-200 bg-amber-50' => ! $twoFactorOn,
                 ])>
@@ -116,19 +107,15 @@
                 </div>
             </dl>
         </x-slot:stats>
-    </x-hero-card>
-
-    <div class="mt-6 space-y-6">
 
         {{-- Password --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credential') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use a long, random password and store it in a password manager. Saving here only updates the fields below.') }}</p>
                 </div>
                 <p x-show="passwordSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
@@ -151,7 +138,7 @@
                         tabindex="-1"
                     />
                 </div>
-                <div class="space-y-5 p-6 sm:p-7">
+                <div class="space-y-5 px-5 py-5 sm:px-6">
                     <div class="grid gap-5 sm:grid-cols-2">
                         <div class="sm:col-span-2">
                             <x-input-label for="security_current_password" :value="__('Current password')" />
@@ -171,7 +158,7 @@
                     </div>
                 </div>
             </form>
-        </section>
+        </div>
 
         <x-unsaved-changes-bar
             :message="__('You have unsaved changes to your password.')"
@@ -182,21 +169,20 @@
         />
 
         {{-- Passkeys --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Passwordless') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Passkeys') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Passkeys') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sign in with your device PIN, fingerprint, or a security key. Multiple passkeys per account are supported.') }}</p>
                 </div>
                 @if ($passkeyCount > 0)
                     <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $passkeyCount }}</span>
                 @endif
             </div>
-            <div class="p-6 sm:p-7">
+            <div class="px-5 py-5 sm:px-6">
                 @error('passkey')
                     <p class="mb-3 text-sm text-red-600">{{ $message }}</p>
                 @enderror
@@ -225,11 +211,11 @@
                 <p id="dply-passkey-register-error" class="mt-2 hidden text-sm text-red-700" role="alert"></p>
             </div>
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/35 px-6 py-2.5 sm:px-7">
+            <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
                 <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Registered') }}</p>
             </div>
             @if ($passkeys->isEmpty())
-                <div class="px-6 py-10 text-center sm:px-7">
+                <div class="px-5 py-8 text-center sm:px-6">
                     <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                         <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
                     </span>
@@ -238,7 +224,7 @@
             @else
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($passkeys as $cred)
-                        <li class="flex items-center justify-between gap-4 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-7">
+                        <li class="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6">
                             <div class="min-w-0 flex-1 space-y-1">
                                 <label class="sr-only" for="passkey-alias-{{ $cred->getKey() }}">{{ __('Passkey name') }}</label>
                                 <input
@@ -269,25 +255,24 @@
                     @endforeach
                 </ul>
             @endif
-        </section>
+        </div>
 
         {{-- OAuth sign-in --}}
         @if (! empty($oauthProviders))
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-arrow-top-right-on-square class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Single sign-on') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('OAuth sign-in') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('OAuth sign-in') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link GitHub, GitLab, or Bitbucket so you can sign in with the same account you use for Git.') }}</p>
                     </div>
                     @if ($linkedOAuth > 0)
                         <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $linkedOAuth }}</span>
                     @endif
                 </div>
-                <div class="space-y-3 p-6 sm:p-7">
+                <div class="space-y-3 px-5 py-5 sm:px-6">
                     @error('unlink')
                         <p class="text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -335,18 +320,17 @@
                         </div>
                     @endforeach
                 </div>
-            </section>
+            </div>
         @endif
 
         {{-- Two-factor authentication --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div>
+            <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Step-up') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Require a code from your authenticator app when signing in. A stolen password alone won\'t reach your account.') }}</p>
                 </div>
                 <span @class([
@@ -362,7 +346,7 @@
                     {{ $twoFactorOn ? __('Enabled') : __('Disabled') }}
                 </span>
             </div>
-            <div class="p-6 sm:p-7">
+            <div class="px-5 py-5 sm:px-6">
                 @if (session('status') === 'two-factor-enabled' && session('recovery_codes'))
                     <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
                         <p class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-900">
@@ -394,8 +378,8 @@
                     </a>
                 @endif
             </div>
-        </section>
-    </div>
+        </div>
+    </x-profile-shell>
 
     @include('livewire.partials.confirm-action-modal')
 </div>

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\ServerlessTargetCapabilityResolverTest;
 
 use App\Models\Server;
-use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
 
 test('digitalocean functions advertises all four openwhisk runtimes', function () {
     $server = (new Server)->forceFill([

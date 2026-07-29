@@ -4,31 +4,26 @@ namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
 use App\Enums\ServerProvider;
-use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
+use App\Livewire\Concerns\WatchesSiteDeploys;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
-use App\Models\SiteDeployment;
 use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Support\Servers\ProvisioningDigest;
+use App\Support\Servers\ServerIndexRow;
 use App\Support\Servers\ServerTags;
-use App\Support\Sites\DeployConsoleRows;
 use App\Support\Sites\SiteSyncPeers;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -39,6 +34,7 @@ class Index extends Component
     use DispatchesToastNotifications;
     use GuardsBilledDeploys;
     use ManagesServerRemovalForm;
+    use WatchesSiteDeploys;
 
     public string $search = '';
 
@@ -63,9 +59,6 @@ class Index extends Component
     public string $removeMode = 'now';
 
     public string $scheduledRemovalDate = '';
-
-    /** Site ids launched from a fleet card, driving the global deploy console. */
-    public array $watchedSiteIds = [];
 
     public function resetFilters(): void
     {
@@ -273,175 +266,6 @@ class Index extends Component
     }
 
     /**
-     * Deploy a single site from its server card — the fleet twin of the deploy
-     * sidebar's "Deploy" button. Seeds the same optimistic deploy lock and
-     * dispatches the same job so both surfaces share one "is a deploy running"
-     * source of truth.
-     */
-    public function deploySite(string $siteId): void
-    {
-        $site = Site::query()->with('server')->find($siteId);
-        if ($site === null || ! $this->siteIsDeployable($site)) {
-            return;
-        }
-        if ($this->blockedByDeployPause($site)) {
-            return;
-        }
-        Gate::authorize('update', $site);
-
-        $this->queueSiteDeploy($site);
-        $this->watchDeploys([(string) $site->id]);
-        $this->toastSuccess(__('Deployment queued for :name.', ['name' => $site->name]));
-    }
-
-    /**
-     * Deploy a site together with its synced peers — the fleet twin of the
-     * sidebar's "Sync" button. Peers are this site plus any sharing its Git
-     * repository (or the same server when no repo is set), resolved by the same
-     * {@see SiteSyncPeers} the sidebar uses.
-     */
-    public function deploySyncedSites(string $siteId): void
-    {
-        $site = Site::query()->with('server')->find($siteId);
-        if ($site === null) {
-            return;
-        }
-        if ($this->blockedByDeployPause($site)) {
-            return;
-        }
-
-        [$queuedIds, $skipped] = $this->queueDeploys(SiteSyncPeers::forSite($site));
-        $this->watchDeploys($queuedIds);
-        $this->reportBatchDeploy(count($queuedIds), $skipped);
-    }
-
-    /** Deploy every deployable site on one server (multi-site card "Deploy all"). */
-    public function deployServerSites(string $serverId): void
-    {
-        $server = Server::query()->with('sites')->find($serverId);
-        if ($server === null) {
-            return;
-        }
-
-        $deployable = $server->sites->filter(function (Site $site) use ($server): bool {
-            $site->setRelation('server', $server);
-
-            return $this->siteIsDeployable($site);
-        });
-        if ($deployable->isEmpty()) {
-            return;
-        }
-        if ($this->blockedByDeployPause($deployable->first())) {
-            return;
-        }
-
-        [$queuedIds, $skipped] = $this->queueDeploys($deployable);
-        $this->watchDeploys($queuedIds);
-        $this->reportBatchDeploy(count($queuedIds), $skipped);
-    }
-
-    /**
-     * Queue deploys for an authorised, deployable subset of the given sites.
-     *
-     * @param  Collection<int, Site>  $sites
-     * @return array{0:list<string>,1:int} [queuedSiteIds, skipped]
-     */
-    protected function queueDeploys(Collection $sites): array
-    {
-        $queuedIds = [];
-        $skipped = 0;
-        foreach ($sites as $site) {
-            if (! $this->siteIsDeployable($site)) {
-                $skipped++;
-
-                continue;
-            }
-            $this->queueSiteDeploy($site);
-            $queuedIds[] = (string) $site->id;
-        }
-
-        return [$queuedIds, $skipped];
-    }
-
-    /** Seed the optimistic deploy lock and dispatch the deployment job. */
-    protected function queueSiteDeploy(Site $site): void
-    {
-        Cache::put('site-deploy-active:'.$site->id, [
-            'started_at' => now()->toIso8601String(),
-            'deployment_id' => null,
-        ], 600);
-        RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
-    }
-
-    /**
-     * Point the global deploy console at the sites just launched and open it, so
-     * a deploy kicked off from a fleet card can be watched live without leaving
-     * the page. Mirrors DeployControl's `deploy-console-open` event wiring.
-     *
-     * @param  list<string>  $siteIds
-     */
-    protected function watchDeploys(array $siteIds): void
-    {
-        if ($siteIds === []) {
-            return;
-        }
-
-        $this->watchedSiteIds = array_values(array_map('strval', $siteIds));
-        unset($this->watchedRows, $this->watchedInProgress);
-        $this->dispatch('deploy-console-open');
-    }
-
-    /**
-     * Live per-site rows for the global deploy console — the sites launched from
-     * a fleet card, with their phase timelines and in-flight state.
-     *
-     * @return list<array<string, mixed>>
-     */
-    #[Computed]
-    public function watchedRows(): array
-    {
-        return DeployConsoleRows::forSiteIds($this->watchedSiteIds);
-    }
-
-    #[Computed]
-    public function watchedInProgress(): bool
-    {
-        return DeployConsoleRows::anyInProgress($this->watchedRows);
-    }
-
-    protected function reportBatchDeploy(int $queued, int $skipped): void
-    {
-        if ($queued === 0) {
-            $this->toastError(__('No deployable sites to queue.'));
-
-            return;
-        }
-
-        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', $queued, ['count' => $queued]);
-        if ($skipped > 0) {
-            $msg .= ' '.__(':n skipped.', ['n' => $skipped]);
-        }
-        $this->toastSuccess($msg);
-    }
-
-    /**
-     * Whether a site can be VM-deployed by the current user. Mirrors
-     * {@see \App\Livewire\Sites\DeployControl::canDeploy()} — VM host, not a
-     * functions/edge runtime, and the user may update it. Expects the site's
-     * `server` relation to be loaded.
-     */
-    protected function siteIsDeployable(Site $site): bool
-    {
-        $server = $site->server;
-
-        return $server !== null
-            && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
-            && ! $site->usesEdgeRuntime()
-            && Gate::allows('update', $site);
-    }
-
-    /**
      * Per-server deploy targets for the fleet Deploy / Sync buttons. For each
      * server with at least one deployable site, returns the deployable sites, an
      * anchor (the first), and the anchor's sync-peer count for the "Sync N"
@@ -458,7 +282,10 @@ class Index extends Component
         }
 
         // Org-wide repo → count, so a single-site server still shows "Sync N"
-        // when its repository is deployed on other servers too.
+        // when its repository is deployed on other servers too. Grouped by
+        // CANONICAL repo identity (same as SiteSyncPeers) so the badge count
+        // can't disagree with the peer set that actually deploys — a repo
+        // registered as git@… on one box and https://… on another counts once.
         $repoCounts = collect();
         if ($org) {
             $repoCounts = Site::query()
@@ -466,7 +293,7 @@ class Index extends Component
                 ->whereNotNull('git_repository_url')
                 ->where('git_repository_url', '!=', '')
                 ->pluck('git_repository_url')
-                ->groupBy(fn (string $repo): string => trim($repo))
+                ->groupBy(fn (string $repo): string => SiteSyncPeers::canonicalRepo($repo))
                 ->map->count();
         }
 
@@ -485,7 +312,7 @@ class Index extends Component
             }
 
             $anchor = $deployable->first();
-            $repo = trim((string) $anchor->git_repository_url);
+            $repo = SiteSyncPeers::canonicalRepo((string) $anchor->git_repository_url);
             $syncCount = $repo !== ''
                 ? (int) ($repoCounts[$repo] ?? 1)
                 : (int) $server->sites->count();
@@ -623,17 +450,17 @@ class Index extends Component
     {
         $base = $this->baseQuery();
         $org = auth()->user()->currentOrganization();
-        $allInScope = $base !== null ? (clone $base)->get() : collect();
+        $allInScope = $base !== null
+            ? (clone $base)->with(['organization', 'team', 'workspace'])->withCount('sites')->get()
+            : collect();
         $tagOptions = ServerTags::collectFromServers($allInScope);
-        $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
+        $hasServersInScope = $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)
                 ->with(['sites', 'organization', 'team', 'workspace', 'databaseEngines', 'cacheServices'])
                 ->withCount('sites')
                 ->get()
             : collect();
-
-        $groupedServers = $this->groupedServers($servers);
 
         // Per-server Deploy / Sync targets for the fleet card action buttons.
         $deployTargets = $this->buildDeployTargets($servers, $org);
@@ -650,13 +477,10 @@ class Index extends Component
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
 
-        // Live metric pulse per server — latest CPU/Mem/Disk for fleet
-        // glance. One distinct subquery joining the latest captured_at
-        // per server, keyed by id for the blade.
         $latestSnapshots = collect();
         if ($servers->isNotEmpty()) {
             $serverIds = $servers->pluck('id')->all();
-            $latestPerServer = ServerMetricSnapshot::query()
+            $latestSnapshots = ServerMetricSnapshot::query()
                 ->whereIn('server_id', $serverIds)
                 ->whereIn('id', function ($q) use ($serverIds): void {
                     $q->from('server_metric_snapshots')
@@ -664,36 +488,35 @@ class Index extends Component
                         ->whereIn('server_id', $serverIds)
                         ->groupBy('server_id');
                 })
-                ->get(['id', 'server_id', 'captured_at', 'payload']);
-            $latestSnapshots = $latestPerServer->keyBy('server_id');
+                ->get(['id', 'server_id', 'captured_at', 'payload'])
+                ->keyBy('server_id');
         }
 
-        $summary = [
-            'total' => $servers->count(),
-            'ready' => $servers->where('status', Server::STATUS_READY)->count(),
-            'attention' => $servers->filter(function (Server $server): bool {
-                if ($server->scheduled_deletion_at !== null) {
-                    return true;
-                }
+        /** @var Collection<int, ServerIndexRow> $rows */
+        $rows = $servers->map(function (Server $server) use ($latestSnapshots, $insightRollup, $relatedServers, $deployTargets): ServerIndexRow {
+            $insights = $insightRollup[$server->id] ?? ['open' => 0, 'worst' => null];
 
-                if (in_array($server->status, [Server::STATUS_ERROR, Server::STATUS_DISCONNECTED], true)) {
-                    return true;
-                }
+            $target = $deployTargets[$server->id] ?? null;
 
-                return $server->status === Server::STATUS_READY
-                    && $server->health_status === Server::HEALTH_UNREACHABLE;
-            })->count(),
-            'sites' => (int) $servers->sum('sites_count'),
-        ];
+            return ServerIndexRow::fromServer(
+                $server,
+                $latestSnapshots->get($server->id),
+                (int) ($insights['open'] ?? 0),
+                isset($insights['worst']) ? (string) $insights['worst'] : null,
+                $relatedServers[$server->id] ?? [],
+                $target !== null,
+                auth()->user()?->can('delete', $server) ?? false,
+                deploySyncCount: (int) ($target['sync_count'] ?? 0),
+                deployAnchorSiteId: isset($target['anchor']) ? (string) $target['anchor']->id : null,
+            );
+        });
 
-        $openInsights = (int) $insightRollup->sum(fn (array $row): int => (int) ($row['open'] ?? 0));
+        $allRows = $allInScope->map(fn (Server $server): ServerIndexRow => ServerIndexRow::fromServer($server));
+
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
-        // Q19 onboarding empty state: surface per-source "Migrate from {X}" CTAs
-        // alongside Create Server when matching inventory-import credentials are
-        // connected for the current org. Keeps Ploi and Forge as separate buttons
-        // so an empty page doesn't push a user toward a source they aren't on.
+
         $importSources = collect();
         if ($org) {
             $importSources = ProviderCredential::query()
@@ -703,7 +526,6 @@ class Index extends Component
                 ->unique()
                 ->values();
         }
-        $hasImportCredentials = $importSources->isNotEmpty();
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -714,40 +536,36 @@ class Index extends Component
 
         $serverCreateDraft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
 
-        // Per-server "what's happening right now" digest. Returns null for
-        // servers that aren't mid-provision; the blade only renders the
-        // detail row when there's something to show.
-        $provisioningDigests = $servers
-            ->mapWithKeys(static fn (Server $server) => [$server->id => ProvisioningDigest::forServer($server)])
-            ->filter();
-
-        // Servers whose provision step flipped to failed. Surfaced as a
-        // page-level banner above the fleet list so a stalled provision is
-        // visible without scrolling — pairs with the per-card "Setup failed"
-        // chip rendered by displayStatus().
-        $failedSetups = $servers
+        $failedSetups = $allInScope
             ->where('setup_status', Server::SETUP_STATUS_FAILED)
             ->values();
 
+        $needsPoll = $allInScope->contains(function (Server $server): bool {
+            return $server->setup_status !== Server::SETUP_STATUS_DONE
+                && $server->setup_status !== Server::SETUP_STATUS_FAILED
+                && in_array($server->status, [
+                    Server::STATUS_PENDING,
+                    Server::STATUS_PROVISIONING,
+                    Server::STATUS_READY,
+                ], true);
+        });
+
         return view('livewire.servers.index', [
             'hasServersInScope' => $hasServersInScope,
-            'servers' => $servers,
-            'groupedServers' => $groupedServers,
-            'deployTargets' => $deployTargets,
-            'relatedServers' => $relatedServers,
-            'insightRollup' => $insightRollup,
-            'latestSnapshots' => $latestSnapshots,
-            'provisioningDigests' => $provisioningDigests,
+            'groupedRows' => ServerIndexRow::group($rows),
+            'summary' => ServerIndexRow::summarize($allRows),
             'failedSetups' => $failedSetups,
-            'summary' => $summary,
-            'openInsights' => $openInsights,
+            'needsPoll' => $needsPoll,
             'hasProviderCredentials' => $hasProviderCredentials,
-            'hasImportCredentials' => $hasImportCredentials,
             'importSources' => $importSources,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'serverCreateDraft' => $serverCreateDraft,
-            'sortOptions' => config('user_preferences.server_sort_options', []),
+            'sortOptions' => config('user_preferences.server_sort_options', [
+                'created_at' => 'Newest first',
+                'name' => 'Name (A–Z)',
+                'status' => 'Status',
+            ]),
             'statusOptions' => [
                 '' => __('All statuses'),
                 Server::STATUS_PENDING => __('Pending'),

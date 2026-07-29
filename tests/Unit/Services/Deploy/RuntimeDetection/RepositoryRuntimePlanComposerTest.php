@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\RepositoryRuntimePlanComposerTest;
 
 use App\Models\SiteProcess;
-use App\Services\Deploy\Manifest\DplyManifestParser;
-use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\PythonRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlanComposer;
-use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
-use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
+use App\Modules\Deploy\Services\Manifest\DplyManifestParser;
+use App\Modules\Deploy\Services\RuntimeDetection\GoRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\NodeRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\PhpRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\PythonRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlanComposer;
+use App\Modules\Deploy\Services\RuntimeDetection\RubyRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\RuntimeDetectionEngine;
+use App\Modules\Deploy\Services\RuntimeDetection\StaticRuntimeDetector;
 
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-plan-composer-'.uniqid();

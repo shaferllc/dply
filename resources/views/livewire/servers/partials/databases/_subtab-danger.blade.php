@@ -1,5 +1,5 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} overflow-hidden border-rose-200 px-6 py-6 sm:px-8">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <x-empty-state
             borderless
             icon="heroicon-o-exclamation-triangle"
@@ -19,8 +19,8 @@
         </x-empty-state>
     </div>
 @elseif ($engineDatabases->isEmpty())
-    <div class="{{ $card }} overflow-hidden border-rose-200">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
+    <div class="{{ $card }} border-rose-200/80">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-5 py-5 sm:px-6">
             <x-icon-badge tone="danger">
                 <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
@@ -29,7 +29,7 @@
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Destructive actions') }}</h3>
             </div>
         </div>
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-5 sm:px-6">
             <x-empty-state
                 borderless
                 icon="heroicon-o-shield-check"

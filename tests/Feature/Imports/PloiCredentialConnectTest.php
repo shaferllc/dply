@@ -14,6 +14,10 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    config(['server_providers.enabled.ploi' => true]);
+});
+
 function userWithOrganization(): User
 {
     $user = User::factory()->create();

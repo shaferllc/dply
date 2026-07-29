@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Support\Sites\SiteIndexAssembler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -19,21 +20,12 @@ class SiteController extends Controller
 
         $sites = Site::query()
             ->whereHas('server', fn ($q) => $q->where('organization_id', $organization->id))
-            ->with(['server:id,name'])
+            ->with(['server:id,name', 'domains', 'workspace:id,name'])
             ->orderBy('name')
-            ->get(['id', 'server_id', 'name', 'deploy_strategy', 'status', 'document_root', 'created_at']);
+            ->get();
 
         return response()->json([
-            'data' => $sites->map(fn (Site $s) => [
-                'id' => $s->id,
-                'server_id' => $s->server_id,
-                'server_name' => $s->server?->name,
-                'name' => $s->name,
-                'deploy_strategy' => $s->deploy_strategy,
-                'status' => $s->status,
-                'document_root' => $s->document_root,
-                'created_at' => $s->created_at->toIso8601String(),
-            ]),
+            'data' => $sites->map(fn (Site $s) => SiteIndexAssembler::toArray($s))->values(),
         ]);
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Support\Edge;
 
-use App\Support\Edge\EdgeSsrDetection;
+use App\Modules\Edge\Support\EdgeSsrDetection;
 
 test('detects ssr frameworks with start command', function () {
     expect(EdgeSsrDetection::planLooksLikeSsr([
@@ -27,4 +27,12 @@ test('non ssr frameworks are ignored', function () {
         'framework' => 'vite',
         'start_command' => 'vite preview',
     ]))->toBeFalse();
+});
+
+test('keel is always treated as ssr', function () {
+    expect(EdgeSsrDetection::planLooksLikeSsr([
+        'framework' => 'keel',
+        'start_command' => '',
+        'build_command' => 'npx wrangler deploy --dry-run --outdir=.dply-keel-bundle',
+    ]))->toBeTrue();
 });

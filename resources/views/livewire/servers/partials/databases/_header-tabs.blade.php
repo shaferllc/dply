@@ -11,7 +11,7 @@
 <x-server-workspace-tablist
     :aria-label="__(':engine workspace sections', ['engine' => $engineLabels[$engine] ?? $engine])"
     scroll
-    class="mb-4 w-full"
+    class="!mb-0 w-full border-0 border-b border-brand-ink/10 bg-transparent p-0 px-3 py-2.5 shadow-none sm:px-4"
 >
     <x-server-workspace-tab
         :id="'db-subtab-'.$engine.'-overview'"

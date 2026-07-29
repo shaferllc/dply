@@ -1,6 +1,8 @@
 @props([
     'checks',
     'compact' => false,
+    /** When true, render as a hairline strip (merged chrome) instead of a nested amber card. */
+    'embedded' => false,
     'title' => null,
     'description' => null,
     'sectionId' => 'site-preflight-issues',
@@ -14,9 +16,12 @@
     <section
         id="{{ $sectionId }}"
         @class([
-            'scroll-mt-24 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/90 to-white',
-            'px-4 py-4 sm:px-5 sm:py-5' => $compact,
-            'px-6 py-6 sm:px-7' => ! $compact,
+            'scroll-mt-24',
+            'border-b border-amber-200/80 bg-amber-50/40' => $embedded,
+            'rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/90 to-white' => ! $embedded,
+            'px-4 py-4 sm:px-5 sm:py-5' => $compact && ! $embedded,
+            'px-5 py-5 sm:px-6' => $embedded,
+            'px-6 py-6 sm:px-7' => ! $compact && ! $embedded,
         ])
     >
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -31,7 +36,11 @@
             </span>
         </div>
 
-        <ul class="mt-4 space-y-3">
+        <ul @class([
+            'mt-4',
+            'divide-y divide-amber-200/70 border-t border-amber-200/70' => $embedded,
+            'space-y-3' => ! $embedded,
+        ])>
             @foreach ($issues as $issue)
                 @php
                     $level = (string) ($issue['level'] ?? 'warning');
@@ -39,9 +48,10 @@
                     $fix = is_array($issue['fix'] ?? null) ? $issue['fix'] : null;
                 @endphp
                 <li @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-red-200 bg-red-50/80' => $isError,
-                    'border-amber-200 bg-white/80' => ! $isError,
+                    'px-0 py-3.5' => $embedded,
+                    'rounded-xl border px-4 py-3' => ! $embedded,
+                    'border-red-200 bg-red-50/80' => ! $embedded && $isError,
+                    'border-amber-200 bg-white/80' => ! $embedded && ! $isError,
                 ])>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0 flex-1">

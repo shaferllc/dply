@@ -7,19 +7,21 @@ use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Modules\Docs\Http\Controllers\DocsController;
-use App\Http\Controllers\Edge\EdgeAuditLogExportController;
-use App\Http\Controllers\Edge\EdgeLogCsvDownloadController;
-use App\Http\Controllers\Edge\EdgeRepoConfigYamlDownloadController;
-use App\Http\Controllers\EdgeDeployHookController;
-use App\Http\Controllers\EdgeLogIngestController;
-use App\Http\Controllers\EdgeLogpushIngestController;
-use App\Http\Controllers\EdgePreviewAccessController;
-use App\Http\Controllers\EdgePreviewCommentsController;
-use App\Http\Controllers\EdgeVitalsIngestController;
+use App\Modules\Edge\Http\Controllers\EdgeAuditLogExportController;
+use App\Modules\Edge\Http\Controllers\EdgeLiveAccessLogPollController;
+use App\Modules\Edge\Http\Controllers\EdgeLogCsvDownloadController;
+use App\Modules\Edge\Http\Controllers\EdgeRepoConfigYamlDownloadController;
+use App\Modules\Edge\Http\Controllers\EdgeDeployHookController;
+use App\Modules\Edge\Http\Controllers\EdgeFormIngestController;
+use App\Modules\Edge\Http\Controllers\EdgeLogIngestController;
+use App\Modules\Edge\Http\Controllers\EdgeLogpushIngestController;
+use App\Modules\Edge\Http\Controllers\EdgePreviewAccessController;
+use App\Modules\Edge\Http\Controllers\EdgePreviewCommentsController;
+use App\Modules\Edge\Http\Controllers\EdgeVitalsIngestController;
 use App\Http\Controllers\EnvoyAdminProxyController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
-use App\Http\Controllers\GithubEdgeWebhookController;
+use App\Modules\Edge\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\OrganizationComplianceExportController;
 use App\Http\Controllers\QuickDownloadController;
@@ -37,6 +39,7 @@ use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
 use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
 use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
+use App\Livewire\Admin\Flags\AllFlags as AdminAllFlags;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
 use App\Livewire\Admin\Operations as AdminOperations;
@@ -47,9 +50,9 @@ use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
-use App\Livewire\Billing\Analytics as BillingAnalytics;
-use App\Livewire\Billing\Invoices as BillingInvoices;
-use App\Livewire\Billing\Show as BillingShow;
+use App\Modules\Billing\Livewire\Analytics as BillingAnalytics;
+use App\Modules\Billing\Livewire\Invoices as BillingInvoices;
+use App\Modules\Billing\Livewire\Show as BillingShow;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
@@ -57,11 +60,11 @@ use App\Livewire\Cloud\DeployDetail;
 use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
-use App\Livewire\Edge\Create as EdgeCreate;
-use App\Livewire\Edge\Import;
-use App\Livewire\Edge\Index as EdgeIndex;
-use App\Livewire\Edge\Templates;
-use App\Livewire\Edge\Usage;
+use App\Modules\Edge\Livewire\Create as EdgeCreate;
+use App\Modules\Edge\Livewire\Import;
+use App\Modules\Edge\Livewire\Index as EdgeIndex;
+use App\Modules\Edge\Livewire\Templates;
+use App\Modules\Edge\Livewire\Usage;
 use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
 use App\Livewire\Fleet\DeployContracts as FleetDeployContracts;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
@@ -203,7 +206,13 @@ use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Files;
+use App\Livewire\Live\ApiInventory as LiveApiInventory;
+use App\Livewire\Live\Connect as LiveConnect;
+use App\Livewire\Live\Servers\Index as LiveServersIndex;
+use App\Livewire\Live\Sites\Index as LiveSitesIndex;
+use App\Livewire\Live\Sites\Show as LiveSitesShow;
 use App\Livewire\Sites\Index as SitesIndex;
+use App\Services\ProductionData\ProductionDataMirror;
 use App\Livewire\Sites\Logs as SitesLogs;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
@@ -278,6 +287,10 @@ Route::post('/hooks/edge/{site}/log', EdgeLogIngestController::class)
 Route::post('/hooks/edge/{site}/vitals', EdgeVitalsIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.edge.vitals');
+
+Route::post('/hooks/edge/{site}/forms', EdgeFormIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.edge.forms');
 
 Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
@@ -436,6 +449,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::get('/feedback/{report}/screenshot', \App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController::class)->name('feedback.screenshot');
             Route::livewire('/users', \App\Livewire\Admin\Users\Index::class)->name('users.index');
             Route::post('/impersonate/{user}', [\App\Http\Controllers\Admin\ImpersonationController::class, 'start'])->name('impersonate.start');
+            Route::livewire('/flags/all', AdminAllFlags::class)->name('flags.all');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');
@@ -529,6 +543,24 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
+
+    // Local-only Production data mirror — proxies remote /api/v1 into Livewire UI.
+    Route::middleware('production.mirror')->prefix('live')->name('live.')->group(function (): void {
+        Route::get('/', function () {
+            $connected = app(ProductionDataMirror::class)->connectionFor(auth()->user()) !== null;
+
+            return redirect()->route($connected ? 'live.sites.index' : 'live.connect');
+        })->name('index');
+        Route::livewire('/connect', LiveConnect::class)->name('connect');
+        Route::livewire('/sites', LiveSitesIndex::class)->name('sites.index');
+        Route::livewire('/sites/{remoteSite}', LiveSitesShow::class)->name('sites.show');
+        Route::livewire('/servers', LiveServersIndex::class)->name('servers.index');
+        Route::livewire('/projects', LiveApiInventory::class)->name('projects.index');
+        Route::livewire('/edge', LiveApiInventory::class)->name('edge.index');
+        Route::livewire('/cloud', LiveApiInventory::class)->name('cloud.index');
+        Route::livewire('/serverless', LiveApiInventory::class)->name('serverless.index');
+    });
+
     Route::middleware('feature:surface.cloud')->group(function (): void {
         Route::livewire('cloud', CloudIndex::class)->name('cloud.index');
         Route::livewire('cloud/create', CloudCreate::class)->name('cloud.create');
@@ -729,10 +761,23 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // is `sites.show` section=routing → `/sites/{site}/routing`. Sharing that path
     // let this literal route shadow the wildcard for *every* site, so a VM site's
     // /routing hit ServerlessRouting, which redirects VM sites back to
-    // section=routing → the same URL → an infinite redirect loop. The dedicated
-    // `/edge-routing` path keeps the two surfaces separate (name unchanged, so
-    // callers using route('sites.routing') need no edits).
-    Route::livewire('servers/{server}/sites/{site}/edge-routing', ServerlessRouting::class)->name('sites.routing');
+    // section=routing → the same URL → an infinite redirect loop.
+    //
+    // Path is `/proxy-routing` (not `/edge-routing`): Edge product sites use
+    // `sites.show` section=edge-routing → `/…/edge-routing` for redirects /
+    // rewrites / headers in EdgeSettings. Reusing `/edge-routing` for this
+    // serverless surface stole that URL and redirected Edge sites to BYO
+    // `/routing` (404). Route name stays `sites.routing`.
+    Route::livewire('servers/{server}/sites/{site}/proxy-routing', ServerlessRouting::class)->name('sites.routing');
+    // Legacy serverless bookmark: `/edge-routing` → proxy routing. Edge sites
+    // fall through to the sites.show wildcard below (section=edge-routing).
+    Route::get('servers/{server}/sites/{site}/edge-routing', function (Server $server, Site $site) {
+        if ($site->usesEdgeRuntime()) {
+            return app(SiteWorkspaceController::class)($server, $site, 'edge-routing');
+        }
+
+        return redirect()->route('sites.routing', ['server' => $server, 'site' => $site]);
+    })->name('sites.routing.legacy-edge-path');
     // Repository now lives as the top-level "Repository" tab on the
     // Deployments page (it used to be the "Settings → Repository" section,
     // but Settings was split into the Webhook/Hooks tabs and Repository was
@@ -816,6 +861,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/sites/{site}/edge/logs.csv', EdgeLogCsvDownloadController::class)
         ->name('sites.edge.logs.csv');
 
+    Route::get('servers/{server}/sites/{site}/edge/logs/live.json', EdgeLiveAccessLogPollController::class)
+        ->name('sites.edge.logs.live');
+
     // Per-site audit-log export (CSV/JSON) — session-authed, no row cap,
     // mirrors the on-screen Audit log panel filters.
     Route::get('servers/{server}/sites/{site}/edge/audit.export', EdgeAuditLogExportController::class)
@@ -881,7 +929,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.services')->group(function (): void {
         Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     });
-    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
+    Route::livewire('servers/{server}/runtime', WorkspacePhp::class)->name('servers.runtime');
+    Route::get('servers/{server}/php', function (Server $server) {
+        return redirect()->route('servers.runtime', $server);
+    })->name('servers.php');
     Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/edge-proxy', WorkspaceEdgeProxy::class)->name('servers.edge-proxy');
     Route::get('servers/{server}/webserver/caddy/admin-api/{path?}', CaddyAdminApiProxyController::class)

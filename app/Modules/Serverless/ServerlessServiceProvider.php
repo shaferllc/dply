@@ -18,8 +18,8 @@ use Livewire\Livewire;
  * Re-registers the commands and all 11 Livewire components (4 full-page route
  * components + 7 embedded panels) under their original serverless.* names.
  *
- * The serverless DEPLOY adapters (App\Services\Deploy\Serverless*) and BILLING
- * usage services (App\Services\Billing\Serverless*) stay in those hub domains;
+ * The serverless DEPLOY adapters (App\Modules\Deploy\Services\Serverless*) and BILLING
+ * usage services (App\Modules\Billing\Services\Serverless*) stay in those hub domains;
  * they reference this module's contract/services via repointed imports. The
  * function models stay in app/Models per the model rule.
  */
@@ -31,6 +31,8 @@ class ServerlessServiceProvider extends ServiceProvider
             $this->commands([
                 Console\CollectServerlessUsageCommand::class,
                 Console\ServerlessTickCommand::class,
+                Console\BackfillFunctionActionsCommand::class,
+                Console\PruneFunctionInvocationsCommand::class,
             ]);
         }
     }

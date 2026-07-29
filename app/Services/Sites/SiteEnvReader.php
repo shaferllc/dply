@@ -24,7 +24,15 @@ class SiteEnvReader
 {
     public function __construct() {}
 
-    public function read(Site $site): string
+    /**
+     * @param  ?string  $pathOverride  Absolute path to read instead of the site's
+     *   current {@see Site::effectiveEnvFilePath()}. Used when a deploy-layout
+     *   switch has already flipped the effective path but we still need the env
+     *   from the PRE-switch location (e.g. capturing the flat <root>/.env before
+     *   the first atomic deploy creates <root>/current/.env). Trusted absolute;
+     *   callers derive it from effectiveEnvFilePath().
+     */
+    public function read(Site $site, ?string $pathOverride = null): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -35,7 +43,8 @@ class SiteEnvReader
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $path = $site->effectiveEnvFilePath();
+        $override = trim((string) ($pathOverride ?? ''));
+        $path = $override !== '' ? $override : $site->effectiveEnvFilePath();
         $ssh = new SshConnection($server);
 
         // Always sudo — the .env file is written by the pusher as

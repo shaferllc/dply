@@ -6,7 +6,7 @@ namespace App\Observers;
 
 use App\Events\Servers\ServerStateUpdated;
 use App\Modules\Imports\Jobs\RunMigrationStepJob;
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\Server;
@@ -205,7 +205,7 @@ class ServerObserver
             'status' => $server->status,
             'setup_status' => $server->setup_status,
             'ip_address' => $server->ip_address,
-            'provider' => $server->provider->value,
+            'provider' => $server->provider?->value,
             'team_id' => $server->team_id,
             'health_status' => $server->health_status,
             'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),

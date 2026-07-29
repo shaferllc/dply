@@ -93,8 +93,11 @@ class InstallCacheServiceJob implements ShouldQueue
             // Use the row-aware composer so non-default-named instances get the
             // template unit + per-instance config scaffolding before the
             // systemctl enable. For the legacy `default` instance this is
-            // identical to the old installScript path.
+            // identical to the old installScript path. The marker echoed between
+            // install and probe fences the version parse to the probe's output —
+            // apt's byte counts are full of version-shaped numbers.
             $script = CacheServiceInstallScripts::installScriptForRow($row).
+                "\necho ".CacheServiceInstallScripts::VERSION_PROBE_MARKER.
                 "\n".CacheServiceInstallScripts::versionProbeScript($row->engine);
 
             // Stream stdout/stderr chunks back to the row so the workspace's 4s poll can show
@@ -151,7 +154,7 @@ class InstallCacheServiceJob implements ShouldQueue
                 return;
             }
 
-            $version = CacheServiceInstallScripts::parseVersionFromBuffer($output->buffer);
+            $version = CacheServiceInstallScripts::parseVersionFromProbeOutput($output->buffer);
 
             // Don't overwrite `port` — the row was created with the correct value at dispatch
             // time (default for the legacy single-instance install, autopicked or operator-chosen

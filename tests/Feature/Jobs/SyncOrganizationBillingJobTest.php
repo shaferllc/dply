@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Jobs\SyncOrganizationBillingJobTest;
 
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
-use App\Models\Subscription;
-use App\Services\Billing\BillingSubscriptionSyncEventRecorder;
-use App\Services\Billing\DesiredBillingState;
-use App\Services\Billing\OrganizationBillingStateComputer;
-use App\Services\Billing\StripeSubscriptionSyncer;
+use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Services\BillingSubscriptionSyncEventRecorder;
+use App\Modules\Billing\Services\BundleEntitlementSynchronizer;
+use App\Modules\Billing\Services\DesiredBillingState;
+use App\Modules\Billing\Services\OrganizationBillingStateComputer;
+use App\Modules\Billing\Services\StripeSubscriptionSyncer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
@@ -29,6 +30,7 @@ test('handle is a no op when organization does not exist', function () {
         app(OrganizationBillingStateComputer::class),
         $fake,
         app(BillingSubscriptionSyncEventRecorder::class),
+        app(BundleEntitlementSynchronizer::class),
     );
 
     expect($fake->calls)->toBeEmpty();
@@ -42,6 +44,7 @@ test('handle is a no op when organization has no standard subscription', functio
         app(OrganizationBillingStateComputer::class),
         $fake,
         app(BillingSubscriptionSyncEventRecorder::class),
+        app(BundleEntitlementSynchronizer::class),
     );
 
     expect($fake->calls)->toBeEmpty();
@@ -60,6 +63,7 @@ test('invokes syncer when organization has active standard subscription', functi
         app(OrganizationBillingStateComputer::class),
         $fake,
         app(BillingSubscriptionSyncEventRecorder::class),
+        app(BundleEntitlementSynchronizer::class),
     );
 
     expect($fake->calls)->toHaveCount(1);
@@ -80,6 +84,7 @@ test('skips when subscription is canceled', function () {
         app(OrganizationBillingStateComputer::class),
         $fake,
         app(BillingSubscriptionSyncEventRecorder::class),
+        app(BundleEntitlementSynchronizer::class),
     );
 
     expect($fake->calls)->toBeEmpty();

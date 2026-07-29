@@ -35,4 +35,21 @@ return [
 
     // Which app DB connection IS the control-plane DB (defaults to the app default).
     'db_connection' => env('SELF_MANAGE_DB_CONNECTION'),
+
+    /*
+     * Phase-1 supervisor template sync (dply:self:sync-supervisor).
+     * Prefer root dply.yaml `supervisor:` when present; these are fallbacks.
+     * Set use_templates=false once dply-sv-* from processes: owns the box.
+     */
+    'supervisor' => [
+        'use_templates' => filter_var(env('DPLY_SELF_SUPERVISOR_TEMPLATES', true), FILTER_VALIDATE_BOOLEAN),
+        'conf_d' => env('DPLY_SELF_SUPERVISOR_CONF_D', '/etc/supervisor/conf.d'),
+        'install_as' => env('DPLY_SELF_SUPERVISOR_INSTALL_AS', 'dply-platform.conf'),
+        'supervisord_conf' => env('DPLY_SELF_SUPERVISORD_CONF', '/etc/supervisor/supervisord.conf'),
+        'roles' => [
+            'worker.primary' => 'deploy/supervisor/dply-worker-primary.conf',
+            'worker.replica' => 'deploy/supervisor/dply-worker.conf',
+            'web' => 'deploy/supervisor/dply-web.conf',
+        ],
+    ],
 ];

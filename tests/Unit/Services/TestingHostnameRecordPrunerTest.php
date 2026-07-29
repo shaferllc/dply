@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\TestingHostnameRecordPrunerTest;
 
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Services\Sites\TestingHostnameRecordPruner;
 use Mockery;

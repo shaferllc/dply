@@ -3,19 +3,19 @@
      Each card links to its dedicated workspace; the unit-level view stays
      below for operators who need to drill into a specific systemd unit. --}}
 @if ($managedTiles->isNotEmpty())
-        <div class="{{ $card }} p-6 sm:p-8">
+        <div class="{{ $card }} px-5 py-5 sm:px-6">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Managed services') }}</h2>
-                <p class="text-xs text-brand-mist">{{ __('dply-managed abstractions on this server. Jump to their dedicated workspaces.') }}</p>
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Managed services') }}</h3>
+                <p class="text-xs text-brand-mist">{{ __('Jump to dedicated workspaces.') }}</p>
             </div>
-            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($managedTiles as $tile)
-                    <a href="{{ $tile['href'] }}" wire:navigate class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white p-4 transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/10">
-                        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10">
+                    <a href="{{ $tile['href'] }}" wire:navigate class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-3 transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30">
+                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest ring-1 ring-brand-ink/10">
                             <x-dynamic-component :component="$tile['icon']" class="h-4 w-4" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="font-semibold text-brand-ink">{{ $tile['label'] }}</p>
+                            <p class="text-sm font-semibold text-brand-ink">{{ $tile['label'] }}</p>
                             <p class="mt-0.5 break-words text-xs text-brand-moss">{{ $tile['detail'] }}</p>
                         </div>
                         <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0 text-brand-mist transition-colors group-hover:text-brand-forest" />
@@ -26,11 +26,11 @@
     @endif
 
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-            <div>
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('System services') }}</h2>
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('System services') }}</h3>
                 @if ($systemdInventoryFetchedAt && ($snapHuman ?? null))
-                    <p class="mt-2 text-xs text-brand-moss">{{ __('Last inventory sync: :time', ['time' => $snapHuman]) }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Last inventory sync: :time', ['time' => $snapHuman]) }}</p>
                 @endif
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -63,7 +63,7 @@
         </div>
 
         @if ($selectedCount > 0 && ! ($deployerSystemdLocked ?? true) && $opsReady)
-            <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <p class="text-sm font-medium text-brand-ink">
                     {{ __(':count selected', ['count' => $selectedCount]) }}
                 </p>
@@ -99,7 +99,7 @@
             </div>
         @endif
 
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4 sm:px-8">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4 sm:px-6">
             <div class="min-w-[12rem] flex-1">
                 <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Search') }}</label>
                 <input

@@ -146,6 +146,30 @@ trait ResolvesWebserverConfig
     }
 
     /**
+     * How a deploy hands PHP-FPM the new release (meta `deploy.php_fpm_strategy`):
+     *
+     *  - `flush` (default): reload FPM, then opcache_reset() inside a live
+     *    worker; if the flush can't reach the pool the deploy restarts the FPM
+     *    service as break-glass, so the box never silently keeps serving the
+     *    prior release's bytecode.
+     *  - `flush_only`: reload + flush, never restart — for boxes where a full
+     *    FPM restart (which bounces every pool on that PHP version) is worse
+     *    than a possibly-stale OPcache.
+     *  - `restart`: skip the reload/flush dance and `systemctl restart` FPM on
+     *    every deploy — OPcache starts empty, at the cost of a brief
+     *    cross-pool blip.
+     *
+     * Unknown values fall back to `flush` so a stale meta write can never turn
+     * the managed restart into a no-op.
+     */
+    public function phpFpmDeployStrategy(): string
+    {
+        $strategy = (string) data_get($this->meta, 'deploy.php_fpm_strategy', 'flush');
+
+        return in_array($strategy, ['flush', 'flush_only', 'restart'], true) ? $strategy : 'flush';
+    }
+
+    /**
      * The pool name == the on-disk pool conf basename == the vhost basename, so
      * the three always agree and an operator can grep one to find the others.
      */
@@ -568,6 +592,35 @@ trait ResolvesWebserverConfig
     public function laravelLogPath(): string
     {
         return rtrim($this->effectiveEnvDirectory(), '/').'/storage/logs/laravel.log';
+    }
+
+    /**
+     * Ordered candidate absolute paths for a file under storage/logs — newest
+     * layout first, with fallbacks so a reader finds the file wherever it
+     * actually is. For atomic (no-downtime) deploys the live log lives under the
+     * active release (<root>/current/storage → shared/storage), but during the
+     * first or a failed atomic deploy `current` doesn't exist yet while the app
+     * still logs at the flat <root>/storage; a freshly switched site can also be
+     * mid-migration with its logs only under <root>/shared/storage. Listing all
+     * three means the log viewer no longer 404s ("File not found") on the
+     * not-yet-present current/ path on a no-downtime site.
+     *
+     * @return list<string>
+     */
+    public function storageLogCandidates(string $file): array
+    {
+        $file = ltrim($file, '/');
+        $root = rtrim($this->effectiveProjectRoot(), '/');
+
+        if (! $this->isAtomicDeploys()) {
+            return [$root.'/storage/logs/'.$file];
+        }
+
+        return [
+            $root.'/current/storage/logs/'.$file,
+            $root.'/shared/storage/logs/'.$file,
+            $root.'/storage/logs/'.$file,
+        ];
     }
 
     /** This site's webserver error log on the host. */

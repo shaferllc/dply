@@ -6,7 +6,7 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\Notifications\Services\ServerBackupNotificationDispatcher;

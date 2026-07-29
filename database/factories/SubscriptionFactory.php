@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Models\Subscription;
+use App\Modules\Billing\Models\Subscription;
 use Laravel\Cashier\Database\Factories\SubscriptionFactory as CashierSubscriptionFactory;
 
 class SubscriptionFactory extends CashierSubscriptionFactory

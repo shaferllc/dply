@@ -62,6 +62,21 @@ class WorkspaceHealth extends Component
         $this->notif_channel_id = $channelId;
     }
 
+    /**
+     * Merged Health card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-health-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(ServerHealthCockpit $cockpit): View
     {
         if (in_array('health', config('server_workspace.coming_soon_keys', []), true)) {

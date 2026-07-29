@@ -251,7 +251,7 @@ class PlaceholderDnsManager
     private function persistAssignment(Site $site, array $assignment): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         data_set($meta, self::META_PATH, $assignment);
         $site->meta = $meta;
         $site->save();
@@ -260,7 +260,7 @@ class PlaceholderDnsManager
     private function forgetAssignment(Site $site): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         unset($meta['scaffold']['placeholder_dns']);
         $site->meta = $meta;
         $site->save();

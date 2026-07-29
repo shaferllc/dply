@@ -9,6 +9,7 @@
     active="console"
     :title="__('Console')"
     :description="__('Quick read-only SSH console for inspecting the server. For saved scripts or longer jobs use Run.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -123,79 +124,102 @@
                  absolute-positioned above the prompt and must be allowed to
                  paint outside the card boundary. We round the top/bottom
                  inner elements themselves so the card corners stay clean. --}}
-            <div class="dply-card p-0 min-w-0">
-                {{-- Quick action chips + sidebar toggle --}}
-                <div class="flex flex-wrap items-center gap-2 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                    <span class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Quick') }}</span>
-                    @foreach ($quickActions as $i => $action)
-                        <button
-                            type="button"
-                            wire:click="runQuickAction({{ $i }})"
-                            wire:loading.attr="disabled"
-                            class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
-                            title="{{ $action['cmd'] }}"
-                        >
-                            {{ $action['label'] }}
-                        </button>
-                    @endforeach
-                    <div class="ml-auto flex items-center gap-2">
-                        @if ($cliState === 'ok')
-                            <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-medium text-brand-ink" title="{{ __('Run `dply --help` on the box for subcommands.') }}">
-                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                                dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
-                            </span>
-                        @elseif ($cliState === 'partial')
-                            <span class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900" title="{{ __('dply CLI install is incomplete — see banner above.') }}">
-                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
-                                dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }} ({{ __('needs repair') }})
-                            </span>
-                        @endif
-                        @if (! empty($history))
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('{1} :count entry|[2,*] :count entries', count($history), ['count' => count($history)]) }}</span>
+            <div class="dply-card min-w-0 overflow-hidden p-0">
+                {{-- Title + quick actions + chrome in one header --}}
+                <div class="rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2.5">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Console') }}</h2>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                                        {{ __('Quick SSH for this server. Saved recipes live on Run.') }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            @if ($cliState === 'ok')
+                                <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-medium text-brand-ink" title="{{ __('Run `dply --help` on the box for subcommands.') }}">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                                    dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
+                                </span>
+                            @elseif ($cliState === 'partial')
+                                <span class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900" title="{{ __('dply CLI install is incomplete — see banner above.') }}">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+                                    dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }} ({{ __('needs repair') }})
+                                </span>
+                            @endif
+                            @if (! empty($history))
+                                <button
+                                    type="button"
+                                    wire:click="clearHistory"
+                                    class="text-xs font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
+                                >
+                                    {{ __('Clear') }}
+                                </button>
+                            @endif
                             <button
                                 type="button"
-                                wire:click="clearHistory"
-                                class="text-xs font-medium text-brand-moss hover:text-brand-ink underline-offset-2 hover:underline"
+                                x-on:click="toggle()"
+                                x-bind:aria-pressed="open ? 'true' : 'false'"
+                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
+                                title="{{ __('Toggle help sidebar') }}"
                             >
-                                {{ __('Clear') }}
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="10" cy="10" r="7.5"/>
+                                    <path d="M8 7.5a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5V11"/>
+                                    <circle cx="10" cy="13.5" r="0.5" fill="currentColor"/>
+                                </svg>
+                                <span x-text="open ? @js(__('Hide help')) : @js(__('Show help'))"></span>
                             </button>
-                        @endif
-                        <button
-                            type="button"
-                            x-on:click="toggle()"
-                            x-bind:aria-pressed="open ? 'true' : 'false'"
-                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                            :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
-                            title="{{ __('Toggle help sidebar') }}"
-                        >
-                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <circle cx="10" cy="10" r="7.5"/>
-                                <path d="M8 7.5a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5V11"/>
-                                <circle cx="10" cy="13.5" r="0.5" fill="currentColor"/>
-                            </svg>
-                            <span x-text="open ? @js(__('Hide help')) : @js(__('Show help'))"></span>
-                        </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                        <span class="me-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Quick') }}</span>
+                        @foreach ($quickActions as $i => $action)
+                            <button
+                                type="button"
+                                wire:click="runQuickAction({{ $i }})"
+                                wire:loading.attr="disabled"
+                                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink shadow-sm transition hover:border-brand-ink/20 hover:bg-brand-sand/40 disabled:opacity-50"
+                                title="{{ $action['cmd'] }}"
+                            >
+                                {{ $action['label'] }}
+                            </button>
+                        @endforeach
                     </div>
                 </div>
 
                 {{-- Terminal-style scrollback --}}
                 <x-console-terminal-shell
+                    tone="dark"
                     :prompt-user="$promptUser"
                     :prompt-host="$promptHost"
                     class="rounded-none border-0 shadow-none ring-0"
                     max-height="520px"
                 >
                     <x-slot:toolbar>
-                        <div class="flex items-center gap-1.5">
-                            <span class="inline-flex h-2 w-2 rounded-full bg-red-400/80" aria-hidden="true"></span>
-                            <span class="inline-flex h-2 w-2 rounded-full bg-amber-300/80" aria-hidden="true"></span>
-                            <span class="inline-flex h-2 w-2 rounded-full bg-brand-sage/80" aria-hidden="true"></span>
+                        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+                            <div class="flex items-center gap-1.5" aria-hidden="true">
+                                <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#ff5f57]"></span>
+                                <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
+                                <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
+                            </div>
+                            <span class="truncate font-mono text-[11px] font-medium text-slate-300">{{ $promptUser.'@'.$promptHost }}</span>
+                            <span class="inline-flex items-center gap-1.5 text-emerald-300/90">
+                                <span class="relative flex h-1.5 w-1.5">
+                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/50 opacity-75"></span>
+                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                                </span>
+                                {{ __('Live') }}
+                            </span>
                         </div>
-                        <span class="font-mono text-[11px] font-medium text-brand-forest">{{ $promptUser.'@'.$promptHost }}</span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/30 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-semibold text-brand-forest">
-                            <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
-                            {{ __('Live') }}
-                        </span>
                     </x-slot:toolbar>
 
                     <x-slot:body>
@@ -210,30 +234,29 @@
                             @endif
 
                             @foreach ($history as $entry)
-                                <div>
+                                <div class="space-y-1.5">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                        <span class="text-brand-sage">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-500">:~$</span>
+                                        <span class="select-none text-emerald-400/90">$</span>
+                                        <span class="select-none text-slate-500">{{ $promptUser.'@'.$promptHost }}</span>
                                         <span class="break-all text-slate-100">{{ $entry['cmd'] }}</span>
                                     </div>
                                     @if ($entry['error'])
-                                        <pre class="mt-1 whitespace-pre-wrap break-words text-rose-300">{{ $entry['error'] }}</pre>
+                                        <pre class="whitespace-pre-wrap break-words text-rose-300/95">{{ $entry['error'] }}</pre>
                                     @else
                                         @if ($entry['out'] !== '')
-                                            <pre class="mt-1 whitespace-pre-wrap break-words text-slate-200">{{ $entry['out'] }}</pre>
+                                            <pre class="whitespace-pre-wrap break-words text-slate-300">{{ $entry['out'] }}</pre>
                                         @endif
                                         @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                                            <p class="mt-1 text-[11px] text-amber-300">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                                            <p class="text-[11px] text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
                                         @endif
                                     @endif
                                 </div>
                             @endforeach
 
-                            <div wire:loading wire:target="run,runQuickAction" class="text-slate-400">
-                                <span class="text-brand-sage">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-500">:~$</span>
-                                <span class="ml-1 inline-flex items-center gap-1.5 animate-pulse">
-                                    <x-spinner variant="slate" size="sm" />
-                                    {{ __('running…') }}
-                                </span>
+                            <div wire:loading wire:target="run,runQuickAction" class="flex items-center gap-2 text-slate-400">
+                                <span class="select-none text-emerald-400/90">$</span>
+                                <x-spinner variant="slate" size="sm" />
+                                <span class="animate-pulse">{{ __('running…') }}</span>
                             </div>
                         </div>
                     </x-slot:body>
@@ -304,33 +327,35 @@
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2 font-mono text-[12px] sm:text-[12.5px]">
-                                <span class="hidden shrink-0 text-brand-sage sm:inline">{{ $promptUser.'@'.$promptHost }}</span>
-                                <span class="shrink-0 text-slate-500">:~$</span>
-                                <input
-                                    type="text"
-                                    wire:model="command"
-                                    x-ref="prompt"
-                                    x-on:input="acOpen && refreshGroups()"
-                                    x-on:keydown.enter.prevent="onEnter($event)"
-                                    autocomplete="off"
-                                    autocorrect="off"
-                                    spellcheck="false"
-                                    placeholder="{{ __('type a command, Tab for suggestions, Enter to run') }}"
-                                    class="min-w-0 flex-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-slate-100 placeholder-slate-500 caret-brand-sage focus:border-brand-sage/40 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                    wire:loading.attr="disabled"
-                                    wire:target="run,runQuickAction"
-                                />
+                            <div class="flex items-center gap-2.5">
+                                <div class="flex min-w-0 flex-1 items-center gap-2 font-mono text-[12px]">
+                                    <span class="shrink-0 select-none text-emerald-400/90">$</span>
+                                    <span class="hidden shrink-0 select-none text-slate-500 sm:inline">{{ $promptUser.'@'.$promptHost }}</span>
+                                    <input
+                                        type="text"
+                                        wire:model="command"
+                                        x-ref="prompt"
+                                        x-on:input="acOpen && refreshGroups()"
+                                        x-on:keydown.enter.prevent="onEnter($event)"
+                                        autocomplete="off"
+                                        autocorrect="off"
+                                        spellcheck="false"
+                                        placeholder="{{ __('type a command, Tab for suggestions, Enter to run') }}"
+                                        class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[12px] text-slate-100 caret-emerald-300 placeholder:text-slate-600 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-40"
+                                        wire:loading.attr="disabled"
+                                        wire:target="run,runQuickAction"
+                                    />
+                                </div>
                                 <button
                                     type="submit"
                                     wire:loading.attr="disabled"
                                     wire:target="run,runQuickAction"
-                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-40"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     <span wire:loading.remove wire:target="run,runQuickAction">{{ __('Run') }}</span>
                                     <span wire:loading wire:target="run,runQuickAction" class="inline-flex items-center gap-1.5">
-                                        <x-spinner variant="cream" size="sm" />
-                                        {{ __('Running') }}
+                                        <x-spinner variant="ink" size="sm" />
+                                        {{ __('…') }}
                                     </span>
                                 </button>
                             </div>
@@ -404,9 +429,9 @@
             </aside>
         </div>
 
-        <p class="mt-3 text-xs text-brand-moss">
-            {{ __('Need to save and re-run? Promote a command into a saved recipe on the') }}
-            <a href="{{ route('servers.run', $server) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Run page') }}</a>.
+        <p class="mt-3 text-center text-xs text-brand-moss">
+            {{ __('Need to save and re-run?') }}
+            <a href="{{ route('servers.run', $server) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Open Run') }}</a>
         </p>
     @else
         <section class="dply-card overflow-hidden border-amber-200">

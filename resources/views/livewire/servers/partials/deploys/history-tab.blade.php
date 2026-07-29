@@ -1,39 +1,33 @@
-<section class="mt-6 dply-card overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment history') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ trans_choice('{0} No deployments yet|{1} :count deployment|[2,*] :count deployments', $deployments->total(), ['count' => $deployments->total()]) }}
-                </p>
+{{-- Nested inside the merged Deploys card — no second outer card/header. --}}
+<div>
+    <div class="flex flex-wrap items-end justify-between gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deployment history') }}</p>
+            <p class="mt-0.5 text-xs text-brand-moss">
+                {{ trans_choice('{0} No deployments yet|{1} :count deployment|[2,*] :count deployments', $deployments->total(), ['count' => $deployments->total()]) }}
+            </p>
+        </div>
+        <div class="flex flex-wrap items-end gap-3">
+            <div>
+                <label for="status_filter" class="block text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Status') }}</label>
+                <select id="status_filter" wire:model.live="statusFilter" class="mt-1 rounded-lg border border-brand-ink/15 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
+                    <option value="">{{ __('Any') }}</option>
+                    @foreach ($statuses as $s)
+                        <option value="{{ $s }}">{{ $s }}</option>
+                    @endforeach
+                </select>
             </div>
+            @if ($statusFilter !== '')
+                <button type="button" wire:click="clearFilters" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                    <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Clear filter') }}
+                </button>
+            @endif
         </div>
-    </div>
-
-    <div class="flex flex-wrap items-end gap-3 border-b border-brand-ink/10 bg-white px-6 py-4 sm:px-8">
-        <div>
-            <label for="status_filter" class="block text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Status') }}</label>
-            <select id="status_filter" wire:model.live="statusFilter" class="mt-1 rounded-lg border border-brand-ink/15 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
-                <option value="">{{ __('Any') }}</option>
-                @foreach ($statuses as $s)
-                    <option value="{{ $s }}">{{ $s }}</option>
-                @endforeach
-            </select>
-        </div>
-        @if ($statusFilter !== '')
-            <button type="button" wire:click="clearFilters" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Clear filter') }}
-            </button>
-        @endif
     </div>
 
     @if ($deployments->isEmpty())
-        <div class="px-6 py-12 text-center text-sm text-brand-moss sm:px-8">
+        <div class="px-5 py-12 text-center text-sm text-brand-moss sm:px-6">
             @if ($statusFilter !== '')
                 {{ __('No deployments match the current filter.') }}
             @else
@@ -41,7 +35,7 @@
             @endif
         </div>
     @else
-        {{-- Vertical timeline: one card per deploy. The whole row navigates to
+        {{-- Vertical timeline: one row per deploy. The whole row navigates to
              the deploy detail via a stretched link; the inner site link sits
              above it with relative z-index. --}}
         <ol class="divide-y divide-brand-ink/10">
@@ -68,7 +62,7 @@
                         ></a>
                     @endif
 
-                    <div class="flex items-start gap-3 px-6 py-4 sm:gap-4 sm:px-8">
+                    <div class="flex items-start gap-3 px-5 py-4 sm:gap-4 sm:px-6">
                         {{-- Status dot on the rail --}}
                         <span @class([
                             'mt-1 flex h-2.5 w-2.5 shrink-0 rounded-full ring-4',
@@ -169,12 +163,14 @@
         </ol>
 
         @if ($deployments->hasPages())
-            <div class="border-t border-brand-ink/10 bg-white px-6 py-4 sm:px-8">
+            <div class="border-t border-brand-ink/10 bg-white px-5 py-4 sm:px-6">
                 {{ $deployments->links() }}
             </div>
         @endif
     @endif
-</section>
 
-@php($runningDeploysSnippet = "dply fleet:deploys:running --json | jq '.deployments[] | select(.server_id==\"{$server->id}\")'")
-<x-cli-snippet class="mt-8" :command="$runningDeploysSnippet" />
+    @php($runningDeploysSnippet = "dply fleet:deploys:running --json | jq '.deployments[] | select(.server_id==\"{$server->id}\")'")
+    <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
+        <x-cli-snippet :command="$runningDeploysSnippet" />
+    </div>
+</div>

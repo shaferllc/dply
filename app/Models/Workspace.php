@@ -206,11 +206,16 @@ class Workspace extends Model
 
     public function userCanView(User $user): bool
     {
-        if ($this->organization_id !== $user->currentOrganization()?->id) {
+        $current = $user->currentOrganization();
+        if ($this->organization_id !== $current?->id) {
             return false;
         }
 
-        return $this->organization->hasAdminAccess($user) || $this->hasMember($user);
+        // We just confirmed this workspace's org IS the user's current org, which
+        // is already memoized with the member role primed — reuse it instead of
+        // lazy-loading $this->organization (another `organizations where id = ?`
+        // plus a role lookup).
+        return $current->hasAdminAccess($user) || $this->hasMember($user);
     }
 
     public function userCanUpdate(User $user): bool
@@ -219,7 +224,9 @@ class Workspace extends Model
             return false;
         }
 
-        if ($this->organization->hasAdminAccess($user)) {
+        // userCanView confirmed this workspace's org is the user's current org —
+        // reuse the memoized instance rather than re-loading $this->organization.
+        if ($user->currentOrganization()?->hasAdminAccess($user)) {
             return true;
         }
 

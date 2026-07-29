@@ -21,7 +21,7 @@ final class CacheWorkspaceViewData
      */
     public static function for(Server $server, WorkspaceCaches $component, Collection $cacheServices): array
     {
-        $card = 'dply-card overflow-hidden';
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ssh_private_key;
         $engines = ['redis', 'valkey', 'memcached', 'keydb', 'dragonfly'];
 

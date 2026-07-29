@@ -7,7 +7,7 @@ use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Insights\Services\Contracts\InsightRunnerInterface;
 use App\Modules\Insights\Services\InsightCandidate;
 use Carbon\CarbonInterface;

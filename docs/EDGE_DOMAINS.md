@@ -37,7 +37,12 @@ Use **Copy** next to the CNAME target for quick paste into DNS panels.
 
 ### SSL
 
-HTTPS is provided when traffic is proxied through Cloudflare on your zone (BYO delivery) or via the managed dply Edge zone.
+| Delivery | How TLS works |
+|----------|---------------|
+| **Managed (`dply_edge`)** | Custom Hostnames (SSL for SaaS) on the dply Edge zone. After attach, the Domains row shows **Issuing certificate** → **TLS active**. Some hostnames also need a one-time ownership TXT record (shown on the row until TLS is active). |
+| **BYO Cloudflare** | Terminate TLS on your zone with an orange-cloud (proxied) record. |
+
+A scheduled job re-checks pending DNS and pending certificates every 15 minutes.
 
 ## Remove a domain
 

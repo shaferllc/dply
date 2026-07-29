@@ -24,6 +24,14 @@ return [
                 'server.provision_failed' => 'Server provisioning failed (action required)',
             ],
         ],
+        'source_control' => [
+            'label' => 'Source control notifications',
+            'events' => [
+                // Account-scoped (routed to the credential's owner directly,
+                // not via a server/site subscription target).
+                'account.git_token.unhealthy' => 'Git credential expired or rejected (action required)',
+            ],
+        ],
         'system_user' => [
             'label' => 'System user notifications',
             'events' => [
@@ -75,6 +83,12 @@ return [
             'events' => [
                 'server.errors.deploy_failed' => 'Deployment failed',
                 'server.errors.operation_failed' => 'Server operation failed',
+            ],
+        ],
+        'logs' => [
+            'label' => 'dply Logs notifications',
+            'events' => [
+                'server.logs.alert_triggered' => 'Log alert triggered',
             ],
         ],
         'deploy_window' => [
@@ -204,6 +218,7 @@ return [
             'events' => [
                 'edge.deploy.succeeded' => 'Edge deploy succeeded',
                 'edge.deploy.failed' => 'Edge deploy failed (action required)',
+                'edge.deploy.duration_regressed' => 'Edge deploy got noticeably slower',
                 'edge.domain.verified' => 'Custom domain verified',
                 'edge.domain.failing' => 'Custom domain verification failing (action required)',
                 'edge.usage.over_budget' => 'Edge usage over budget (action required)',

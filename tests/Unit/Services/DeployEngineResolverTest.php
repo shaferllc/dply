@@ -6,8 +6,8 @@ use App\Contracts\DeployEngine;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\DeployContext;
-use App\Services\Deploy\DeployEngineResolver;
+use App\Modules\Deploy\Services\DeployContext;
+use App\Modules\Deploy\Services\DeployEngineResolver;
 
 test('resolver uses docker engine for docker runtime sites', function () {
     ['resolver' => $resolver, 'docker' => $docker] = makeResolver();

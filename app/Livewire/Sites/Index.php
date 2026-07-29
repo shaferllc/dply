@@ -3,6 +3,8 @@
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
+use App\Support\Sites\SiteIndexRow;
+use App\Support\Sites\SiteIndexSummary;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -93,40 +95,6 @@ class Index extends Component
         };
     }
 
-    /**
-     * @param  Collection<int, Site>  $sites
-     * @return array<string, int>
-     */
-    protected function summarize(Collection $sites): array
-    {
-        $provisioningStatuses = [
-            Site::STATUS_PENDING,
-            Site::STATUS_CONTAINER_PROVISIONING,
-            Site::STATUS_EDGE_PROVISIONING,
-            Site::STATUS_SCAFFOLDING,
-        ];
-        $failedStatuses = [
-            Site::STATUS_ERROR,
-            Site::STATUS_CONTAINER_FAILED,
-            Site::STATUS_EDGE_FAILED,
-            Site::STATUS_SCAFFOLD_FAILED,
-        ];
-
-        return [
-            'total' => $sites->count(),
-            'active' => $sites->filter(fn (Site $s): bool => $s->isReadyForTraffic())->count(),
-            'provisioning' => $sites->filter(
-                fn (Site $s): bool => $s->isProvisioning() || in_array($s->status, $provisioningStatuses, true)
-            )->count(),
-            'attention' => $sites->filter(
-                fn (Site $s): bool => in_array($s->status, $failedStatuses, true)
-                    || $s->provisioningState() === 'failed'
-            )->count(),
-            'secured' => $sites->filter(fn (Site $s): bool => $s->ssl_status === Site::SSL_ACTIVE)->count(),
-            'servers' => $sites->pluck('server_id')->unique()->count(),
-        ];
-    }
-
     public function render(): View
     {
         $org = auth()->user()->currentOrganization();
@@ -145,17 +113,20 @@ class Index extends Component
                 ->get()
             : collect();
 
-        // Summary reflects the full in-scope set, not the filtered view, so
-        // the stat strip stays a stable "here's your estate" overview.
         $summarySource = $base
-            ? (clone $base)->with(['server', 'domains'])->get()
+            ? (clone $base)->with(['server', 'domains', 'workspace'])->get()
             : collect();
 
+        /** @var Collection<int, SiteIndexRow> $rows */
+        $rows = $sites->map(fn (Site $site): SiteIndexRow => SiteIndexRow::fromSite($site));
+        /** @var Collection<int, SiteIndexRow> $summaryRows */
+        $summaryRows = $summarySource->map(fn (Site $site): SiteIndexRow => SiteIndexRow::fromSite($site));
+
         return view('livewire.sites.index', [
-            'sites' => $sites,
+            'rows' => $rows,
             'organization' => $org,
             'hasSitesInScope' => $hasSitesInScope,
-            'summary' => $this->summarize($summarySource),
+            'summary' => SiteIndexSummary::fromRows($summaryRows),
             'statusOptions' => [
                 '' => __('All statuses'),
                 'active' => __('Active'),

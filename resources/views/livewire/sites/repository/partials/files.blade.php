@@ -1,5 +1,5 @@
-<section class="space-y-6">
-    <div class="dply-card overflow-hidden">
+<section>
+    <div class="border-b border-brand-ink/10">
         <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -49,7 +49,7 @@
             {{ __('Empty directory.') }}
         </div>
     @else
-        <ul class="dply-card divide-y divide-brand-ink/10 overflow-hidden">
+        <ul class="divide-y divide-brand-ink/10 border-b border-brand-ink/10">
             @foreach ($filesTree['entries'] as $entry)
                 <li class="flex items-center justify-between gap-3 px-4 py-2 hover:bg-brand-sand/20" wire:key="entry-{{ $entry['path'] }}">
                     @if ($entry['type'] === 'dir')
@@ -73,7 +73,7 @@
     @endif
 
     @if ($filesView !== null)
-        <div class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10">
             <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
                 <div class="min-w-0">
                     <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $filesOpenFile }}</p>

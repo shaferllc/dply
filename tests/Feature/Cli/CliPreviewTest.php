@@ -54,7 +54,18 @@ test('nav includes cli preview link when preview active', function (): void {
     $server = readyServer($user);
     $this->actingAs($user);
 
-    $cli = collect(server_workspace_nav_for_server($server))->firstWhere('key', 'cli');
+    $nav = collect(server_workspace_nav_for_server($server));
+    $cli = $nav->firstWhere('key', 'cli');
+    if ($cli === null) {
+        $cluster = $nav->firstWhere('key', 'automation');
+        $cliTab = collect($cluster['tabs'] ?? [])->firstWhere('key', 'cli');
+
+        expect($cliTab)->not->toBeNull()
+            ->and($cliTab['preview_only'] ?? false)->toBeTrue()
+            ->and($cliTab['url'] ?? null)->toBe(route('servers.cli-preview', $server));
+
+        return;
+    }
 
     expect($cli)->not->toBeNull()
         ->and($cli['preview_only'] ?? false)->toBeTrue()

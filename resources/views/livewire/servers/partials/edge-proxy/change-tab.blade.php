@@ -1,4 +1,4 @@
-<div class="{{ $card }} p-6 sm:p-8">
+<div class="{{ $card }} px-5 py-5 sm:px-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="max-w-2xl">
             <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge proxy') }}</h3>
@@ -19,11 +19,11 @@
         $inflightSwitch = $this->hasInflightWebserverSwitch();
     @endphp
     @if ($inflightEdge)
-        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+        <div class="mt-4 border border-amber-200/80 bg-amber-50/60 px-4 py-3 text-sm text-amber-900">
             {{ __('An edge proxy action is currently running. Buttons are disabled until it settles — watch the progress banner at the top of this page.') }}
         </div>
     @elseif ($inflightSwitch)
-        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+        <div class="mt-4 border border-amber-200/80 bg-amber-50/60 px-4 py-3 text-sm text-amber-900">
             {{ __('A webserver switch is currently running. Wait for it to finish before changing the edge proxy.') }}
         </div>
     @endif

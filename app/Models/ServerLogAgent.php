@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Jobs\InstallLogAgentJob;
+use App\Support\Servers\VectorLogAgentInstallScripts;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $server_id
  * @property string $status
  * @property string $version
+ * @property ?int $config_version
  * @property-read ?Server $server
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
@@ -54,6 +56,7 @@ class ServerLogAgent extends Model
         'server_id',
         'status',
         'version',
+        'config_version',
         'enabled_sources',
         'client_cert_fingerprint',
         'last_seen_at',
@@ -67,6 +70,7 @@ class ServerLogAgent extends Model
     {
         return [
             'enabled_sources' => 'array',
+            'config_version' => 'integer',
             'last_seen_at' => 'datetime',
             'cancel_requested_at' => 'datetime',
         ];
@@ -135,5 +139,35 @@ class ServerLogAgent extends Model
     public function isBusy(): bool
     {
         return in_array($this->status, [self::STATUS_INSTALLING, self::STATUS_UNINSTALLING], true);
+    }
+
+    /**
+     * The edge config version this build of dply renders (the target a re-sync installs).
+     */
+    public static function currentConfigVersion(): int
+    {
+        return VectorLogAgentInstallScripts::CONFIG_VERSION;
+    }
+
+    /**
+     * The agent config the box is actually running, as last recorded by an install.
+     * Null = predates versioning / never re-synced since → treat as stale.
+     */
+    public function installedConfigVersion(): ?int
+    {
+        return $this->config_version;
+    }
+
+    /**
+     * True when the box is running an older config than this build renders — the
+     * operator should re-sync to pick it up. Only meaningful for a running agent.
+     */
+    public function isConfigStale(): bool
+    {
+        if (! $this->isRunning()) {
+            return false;
+        }
+
+        return ($this->config_version ?? 0) < self::currentConfigVersion();
     }
 }

@@ -1,7 +1,7 @@
 {{-- Engine information card: label, description, license/maintainer/protocol/year metadata,
      "best for" callout, and homepage/docs links. Used on the per-engine Overview subtab and
      on the not-installed / in-flight states (where there are no subtabs). --}}
-<div class="{{ $card }} p-6 sm:p-8">
+<div class="{{ $card }} px-5 py-5 sm:px-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
             <h2 class="text-xl font-semibold text-brand-ink">{{ $info['label'] }}</h2>
@@ -36,13 +36,10 @@
         </div>
     </dl>
 
-    <div class="mt-4 flex items-start gap-3 rounded-xl border border-brand-forest/15 bg-brand-forest/5 p-3">
-        <x-heroicon-o-light-bulb class="mt-0.5 h-4 w-4 shrink-0 text-brand-forest" />
-        <p class="text-xs leading-relaxed text-brand-ink">
-            <span class="font-semibold">{{ __('Best for:') }}</span>
-            {{ $info['best_for'] }}
-        </p>
-    </div>
+    <p class="mt-4 border-t border-brand-ink/10 pt-4 text-xs leading-relaxed text-brand-moss">
+        <span class="font-semibold text-brand-ink">{{ __('Best for:') }}</span>
+        {{ $info['best_for'] }}
+    </p>
 
     <div class="mt-4 flex flex-wrap items-center gap-2">
         <a href="{{ $info['homepage_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">

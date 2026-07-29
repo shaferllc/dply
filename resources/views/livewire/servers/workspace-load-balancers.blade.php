@@ -3,6 +3,7 @@
     active="load-balancers"
     :title="__('Load Balancers')"
     :description="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
+    hide-hero
 >
     @if (in_array('load-balancers', config('server_workspace.coming_soon_keys', []), true))
         <x-workspace-coming-soon
@@ -30,21 +31,40 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Load balancers') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Load balancers that target this server. Manage all load balancers from the Networking section.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     {{-- In-page sub-tabs: the load-balancer list vs. notification routing for this
          server's load_balancer.* events. Mirrors the system-users page. --}}
-    <x-server-workspace-tablist :aria-label="__('Load balancer sections')">
-        <x-server-workspace-tab icon="heroicon-o-arrows-right-left" :active="$lb_workspace_tab === 'load_balancers'" wire:click="setLbWorkspaceTab('load_balancers')">
-            {{ __('Load balancers') }}
-        </x-server-workspace-tab>
-        <x-server-workspace-tab icon="heroicon-o-bell" :active="$lb_workspace_tab === 'notifications'" wire:click="setLbWorkspaceTab('notifications')">
-            {{ __('Notifications') }}
-        </x-server-workspace-tab>
-    </x-server-workspace-tablist>
+    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <x-server-workspace-tablist :aria-label="__('Load balancer sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tab icon="heroicon-o-arrows-right-left" :active="$lb_workspace_tab === 'load_balancers'" wire:click="setLbWorkspaceTab('load_balancers')">
+                {{ __('Load balancers') }}
+            </x-server-workspace-tab>
+            <x-server-workspace-tab icon="heroicon-o-bell" :active="$lb_workspace_tab === 'notifications'" wire:click="setLbWorkspaceTab('notifications')">
+                {{ __('Notifications') }}
+            </x-server-workspace-tab>
+        </x-server-workspace-tablist>
+    </div>
 
-    <div @class(['space-y-6', 'hidden' => $lb_workspace_tab !== 'load_balancers'])>
+    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'load_balancers'])>
 
         {{-- ─── SECTION HEADER (always shown) ──────────────────────────────── --}}
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-center gap-3">
                     <x-icon-badge>
@@ -84,7 +104,7 @@
                     default => ['dot' => 'bg-brand-mist', 'text' => 'text-brand-mist', 'label' => ucfirst($lb->status)],
                 };
             @endphp
-            <section class="dply-card overflow-hidden" wire:key="lb-{{ $lb->id }}">
+            <section class="border-b border-brand-ink/10" wire:key="lb-{{ $lb->id }}">
                 {{-- Card header --}}
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-center gap-3">
@@ -235,9 +255,10 @@
 
     </div>
 
-    <div @class(['space-y-6', 'hidden' => $lb_workspace_tab !== 'notifications'])>
+    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'notifications'])>
         @include('livewire.servers.partials.load-balancers.notifications-tab')
     </div>
+    </section>
 
     {{-- ─── CREATE SOFTWARE (HAPROXY) LOAD BALANCER MODAL ────────────────────── --}}
     <x-modal name="create-haproxy-lb-modal" max-width="2xl" focusable>

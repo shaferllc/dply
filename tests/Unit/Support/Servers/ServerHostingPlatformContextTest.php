@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Support\Servers\ServerHostingPlatformContextTest;
 
 use App\Enums\ServerProvider;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\VultrService;
 use App\Support\Servers\ServerHostingPlatformContext;
 
 test('fromConfig defaults to the hetzner backend and its catalog', function () {

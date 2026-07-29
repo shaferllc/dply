@@ -43,7 +43,7 @@ final class ServerSystemdNotificationDispatcher
             return;
         }
 
-        $label = (string) ($event['label']);
+        $label = (string) ($event['label'] ?? $unit);
         $detail = isset($event['detail']) && is_string($event['detail']) ? $event['detail'] : null;
         $subject = '['.config('app.name').'] '.$server->name.' — '.$label.' — '.$kind;
         $lines = [

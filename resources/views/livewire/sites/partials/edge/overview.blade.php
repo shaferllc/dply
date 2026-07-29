@@ -104,7 +104,7 @@
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Hostnames routed to this Edge site.') }}</p>
             </div>
-            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-domains']) }}" wire:navigate class="shrink-0 text-xs font-medium text-brand-sage hover:underline">
+            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-routing', 'tab' => 'domains']) }}" wire:navigate class="shrink-0 text-xs font-medium text-brand-sage hover:underline">
                 {{ __('Manage') }}
             </a>
         </div>

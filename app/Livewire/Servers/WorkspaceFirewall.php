@@ -82,6 +82,21 @@ class WorkspaceFirewall extends Component
     /** A queued/running apply older than this is treated as stuck so the operator can re-dispatch. */
     public const APPLY_STALE_THRESHOLD_SECONDS = 300;
 
+    /**
+     * Merged Firewall card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-firewall-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         // Backwards compatibility: the History and Audit tabs were merged into a single

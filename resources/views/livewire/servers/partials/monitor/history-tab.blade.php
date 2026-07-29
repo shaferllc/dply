@@ -15,10 +15,10 @@
         }
     @endphp
 
-    <div class="{{ $card }} p-6 sm:p-8" wire:key="metrics-chart-{{ $metricsRange }}">
+    <div class="px-5 py-5 sm:px-6" wire:key="metrics-chart-{{ $metricsRange }}">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent usage') }}</h2>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent usage') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">
                     {{ __('Per-metric history across the selected window. Filled band shows the min/max for each bucket; line is the average.') }}
                 </p>
@@ -73,7 +73,13 @@
         </div>
 
         @if ($rangeSampleCount === 0)
-            <p class="mt-6 text-sm text-brand-mist">{{ __('No history in this range yet. Once samples come in, panels will populate automatically.') }}</p>
+            <x-empty-state
+                class="mt-6"
+                borderless
+                icon="heroicon-o-chart-bar"
+                :title="__('No history in this range yet')"
+                :description="__('Once the monitor agent reports samples, these panels populate automatically — try a wider window like 24H or 7D.')"
+            />
         @else
             <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {{-- CPU --}}

@@ -241,9 +241,20 @@ trait BuildsProvisionRuntimes
      */
     private function installAppCache(string $cache, ?DedicatedCacheServerProvisionConfig $config = null): array
     {
-        $redisConf = $config?->configFileContent('redis') ?? "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
-        $valkeyConf = $config?->configFileContent('valkey') ?? "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
-        $keydbConf = $config?->configFileContent('keydb') ?? "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n";
+        // The local-cache fallback (no dedicated cache server) MUST emit an
+        // explicit `dir` and disable RDB persistence. Without `dir`, redis/valkey/
+        // keydb fall back to `./` which under systemd hardening resolves to `/` —
+        // a read-only filesystem. BGSAVE then fails every few seconds, and with the
+        // package-default `stop-writes-on-bgsave-error yes` it freezes ALL writes
+        // (SET/SETEX), so cache+session writes throw `MISCONF ... unable to persist
+        // to disk`. On shutdown redis tries a final save, fails, and refuses to exit
+        // — wedging the unit in `deactivating (stop-sigterm)`. We hit exactly that on
+        // lookout. A local app cache needs no RDB, so `save ""` makes it a pure cache
+        // and `stop-writes ... no` is the belt-and-suspenders. Mirrors the dedicated
+        // template in DedicatedCacheServerProvisionConfig.
+        $redisConf = $config?->configFileContent('redis') ?? "bind 127.0.0.1 -::1\ndir /var/lib/redis\nsave \"\"\nstop-writes-on-bgsave-error no\nappendonly no\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
+        $valkeyConf = $config?->configFileContent('valkey') ?? "bind 127.0.0.1 ::1\ndir /var/lib/valkey\nsave \"\"\nstop-writes-on-bgsave-error no\nappendonly no\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
+        $keydbConf = $config?->configFileContent('keydb') ?? "bind 127.0.0.1 ::1\nprotected-mode yes\ndir /var/lib/keydb\nsave \"\"\nstop-writes-on-bgsave-error no\nappendonly no\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n";
         $memcachedConf = $config?->configFileContent('memcached') ?? "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n";
 
         // `systemctl enable --now` is a no-op when the unit is already running
@@ -260,6 +271,7 @@ trait BuildsProvisionRuntimes
                 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
                 'if command -v redis-cli >/dev/null 2>&1; then echo "[dply] redis-cli already available."; else apt-get install -y --no-install-recommends redis-tools || true; fi',
                 $this->writeFileWithRollback('/etc/valkey/valkey.conf', $valkeyConf),
+                'install -d -m 0750 -o valkey -g valkey /var/lib/valkey || true',
                 'systemctl enable valkey-server 2>/dev/null || systemctl enable valkey 2>/dev/null || true',
                 'systemctl restart valkey-server 2>/dev/null || systemctl restart valkey 2>/dev/null || true',
             ]),
@@ -279,6 +291,7 @@ trait BuildsProvisionRuntimes
                     .'dply_apt_update && '
                     .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
                 $this->writeFileWithRollback('/etc/keydb/keydb.conf', $keydbConf),
+                'install -d -m 0750 -o keydb -g keydb /var/lib/keydb || true',
                 'systemctl enable keydb-server 2>/dev/null || systemctl enable keydb 2>/dev/null || true',
                 'systemctl restart keydb-server 2>/dev/null || systemctl restart keydb 2>/dev/null || true',
             ]),
@@ -289,6 +302,10 @@ trait BuildsProvisionRuntimes
                     '[dply] redis-server already installed; skipping package install.'
                 ),
                 $this->writeFileWithRollback('/etc/redis/redis.conf', $redisConf),
+                // Guarantee the `dir` we just wrote exists and is writable by the
+                // daemon — the package usually creates it, but if it's wrong redis
+                // wedges (see the redisConf comment above).
+                'install -d -m 0750 -o redis -g redis /var/lib/redis || true',
                 'systemctl enable redis-server',
                 'systemctl restart redis-server',
             ]),

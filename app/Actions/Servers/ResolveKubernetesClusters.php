@@ -6,8 +6,8 @@ namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
 use App\Models\ProviderCredential;
-use App\Services\AwsEksService;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\AwsEksService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use Throwable;
 
 /**

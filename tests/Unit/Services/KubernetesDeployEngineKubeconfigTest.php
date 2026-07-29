@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\KubernetesDeployEngineKubeconfigTest;
 
-use App\Services\Deploy\KubernetesDeployEngine;
+use App\Modules\Deploy\Services\KubernetesDeployEngine;
 use ReflectionMethod;
 
 test('materialise kubeconfig writes yaml to a secure temp file', function () {

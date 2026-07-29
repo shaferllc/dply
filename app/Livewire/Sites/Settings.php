@@ -28,8 +28,8 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\Workspace;
-use App\Services\Deploy\DeploymentContractBuilder;
-use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Modules\Deploy\Services\DeploymentContractBuilder;
+use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\SiteDeploySyncGroupManager;
@@ -311,7 +311,7 @@ class Settings extends Show
         $section = $this->section;
 
         $this->site->loadMissing($this->relationsForSettingsSection($section));
-        $this->server->loadMissing('workspace');
+        $this->hydrateServerWorkspace();
 
         $org = $this->site->organization;
         $needsDeploymentSurface = $this->sectionNeedsDeploymentSurface($section);

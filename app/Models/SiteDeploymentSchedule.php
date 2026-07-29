@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Console\Commands\RunDueDeploymentSchedulesCommand;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Concerns\DescribesCronExpression;
 use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

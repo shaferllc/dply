@@ -39,8 +39,49 @@ trait BuildsProvisionRoles
         if (! $miseParallel) {
             $lines = array_merge($lines, $this->maybeInstallMise());
         }
+        $lines = array_merge($lines, $this->maybeInstallEdgeBuildDocker());
         $lines = array_merge($lines, $this->writeRenderedConfigs('application', $web, $php, $layout));
         $lines = array_merge($lines, $this->installComposerIfNeeded($php));
+
+        return $lines;
+    }
+
+    /**
+     * Docker for the box that runs Edge builds. Edge builds compile the
+     * customer repo inside a throwaway container on whichever worker drains
+     * the queue (dply's own control-plane worker, not a customer server), so
+     * that box needs Docker present and the deploy user in the docker group.
+     *
+     * Off by default — customer application/worker boxes never build Edge
+     * sites, so we don't want to install a container runtime on them. dply
+     * enables it (DPLY_PROVISION_EDGE_BUILD_DOCKER=true) on its own control-
+     * plane workers so Docker is guaranteed there instead of relying on the
+     * deploy-time self-heal in EdgeBuildRunner::installDocker().
+     *
+     * @return list<string>
+     */
+    private function maybeInstallEdgeBuildDocker(): array
+    {
+        if (! config('server_provision.edge_build_docker', false)) {
+            return [];
+        }
+
+        $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
+
+        $lines = $this->withStep('Installing Docker for Edge builds', [
+            ...$this->ensurePackagesInstalled(
+                ['docker.io', 'docker-compose-v2'],
+                '[dply] docker packages already installed; skipping package install.'
+            ),
+            'systemctl enable --now docker',
+            // Let the queue worker talk to the daemon socket without sudo. The
+            // group change applies on the worker's next login/restart; the
+            // runtime self-heal (setfacl on the socket) covers the very first
+            // build if the worker hasn't been recycled yet.
+            'id '.escapeshellarg($deployUser).' >/dev/null 2>&1 && usermod -aG docker '.escapeshellarg($deployUser).' || true',
+        ]);
+
+        $lines[] = 'echo '.escapeshellarg(self::VERIFY_PREFIX.'edge_build_docker :: ok :: Docker present for Edge builds');
 
         return $lines;
     }
@@ -108,6 +149,7 @@ trait BuildsProvisionRoles
         if (! $miseParallel) {
             $lines = array_merge($lines, $this->maybeInstallMise());
         }
+        $lines = array_merge($lines, $this->maybeInstallEdgeBuildDocker());
         $lines = array_merge($lines, $this->writeRenderedConfigs('worker', $web, $php, $layout));
         $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 

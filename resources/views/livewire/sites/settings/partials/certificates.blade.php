@@ -1,7 +1,7 @@
 @php
     use App\Models\SiteCertificate;
 
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
 
     $certificateCount = $site->certificates->count();
     $activeCertificateCount = $site->certificates->where('status', SiteCertificate::STATUS_ACTIVE)->count();
@@ -45,13 +45,15 @@
     };
 @endphp
 
-{{-- Always-on trigger: probe the primary domain for Cloudflare-edge TLS so the
-     panel below can appear without the operator doing anything. Polls only while
-     a probe is in flight. --}}
-<div
-    wire:init="loadCloudflareTlsStatus"
-    @if ($cloudflare_tls_checking) wire:poll.3s="pollCloudflareTlsStatus" @endif
-></div>
+{{-- Cloudflare-edge TLS detection. The panel below renders from the cached
+     meta result; a fresh probe is operator-triggered via the "Recheck" button
+     (refreshCloudflareTlsStatus) rather than auto-fired on load. An always-on
+     wire:init here POSTed an update for every site on every cert-page load, and
+     when that round-trip 419'd it put the page in a refresh loop. Poll only
+     while a manually-started probe is in flight. --}}
+@if ($cloudflare_tls_checking)
+    <div wire:poll.3s="pollCloudflareTlsStatus"></div>
+@endif
 
 @if ($site->cloudflareTerminatesTls())
     {{-- =================================================================
@@ -62,7 +64,7 @@
          request-a-certificate UI stays below for operators who want an
          origin cert to enable Cloudflare's Full (Strict) SSL mode.
          ================================================================= --}}
-    <section class="{{ $card }} mb-6 overflow-hidden">
+    <section class="{{ $card }}">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -105,7 +107,7 @@
          the live cert straight from Caddy's data dir over SSH (lazy, cached
          60s) so the operator can still see the real issuer + expiry.
          ================================================================= --}}
-    <section class="{{ $card }} mb-6 overflow-hidden" wire:init="loadCaddyManagedCerts">
+    <section class="{{ $card }}" wire:init="loadCaddyManagedCerts">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge>
@@ -351,7 +353,7 @@
     </form>
 </section>
 
-<section class="{{ $card }} mt-6">
+<section class="{{ $card }}">
     <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
             <x-icon-badge>
@@ -473,7 +475,7 @@
         </ul>
     @endif
 
-    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+    <div class="px-5 py-5 sm:px-6">
         <x-cli-snippet :commands="[
             ['label' => __('Check status'), 'command' => 'dply sites:ssl:status '.$site->slug],
             ['label' => __('Issue cert'), 'command' => 'dply sites:ssl:issue '.$site->slug],

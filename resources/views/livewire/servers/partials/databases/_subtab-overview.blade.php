@@ -11,8 +11,8 @@
 @endphp
 
 @if ($isManageable)
-    <div class="{{ $card }} overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+    <div class="{{ $card }}">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
             <div class="flex items-center gap-3">
                 <x-icon-badge>
                     <x-dynamic-component :component="$engineIcon" class="h-5 w-5 text-brand-forest" aria-hidden="true" />
@@ -47,7 +47,7 @@
             @endif
         </div>
 
-        <div class="px-6 py-6 sm:px-8">
+        <div class="px-5 py-5 sm:px-6">
             {{-- Gated "coming soon" engines never reach this panel — the engine
                  dispatcher routes all their tabs (bar Info) to the shared
                  <x-workspace-coming-soon> teaser. This branch handles available
@@ -131,6 +131,24 @@
                     \App\Models\ServerDatabaseEngine::STATUS_STOPPED,
                 ], true))
                     <div class="mt-5 flex flex-wrap gap-2">
+                        @if ($engineRow->is_default)
+                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/20 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest">
+                                <x-heroicon-o-check-badge class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Primary engine') }}
+                            </span>
+                        @else
+                            <button
+                                type="button"
+                                wire:click="setPrimaryEngine('{{ $engine }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="setPrimaryEngine"
+                                title="{{ __('Make :engine the default engine for new sites on this server.', ['engine' => $dbEngineInfoForTab['label']]) }}"
+                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                            >
+                                <x-heroicon-o-star class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Make primary') }}
+                            </button>
+                        @endif
                         @if ($engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_RUNNING)
                             <button
                                 type="button"
@@ -177,7 +195,7 @@
 
     {{-- Remote access is managed per-database on the Networking tab. --}}
 @elseif ($engine === 'sqlite' && ($capabilities['sqlite'] ?? false))
-    <div class="{{ $card }} overflow-hidden px-6 py-6 sm:px-8">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="max-w-2xl">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>

@@ -1,6 +1,8 @@
 @php
     $functionsHost = $functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy();
-    $card = 'dply-card overflow-hidden';
+    $rolloutNested = (bool) ($isEmbedded ?? false);
+    // Nested inside Deployments merged card — hairline strips, not second page cards.
+    $card = $rolloutNested ? 'border-b border-brand-ink/10' : 'dply-card overflow-hidden';
     // The raw server-block snippet is Nginx-specific. Caddy (and other engines)
     // don't take an Nginx `location` block, so only surface it on Nginx hosts.
     $isNginx = $site->webserver() === 'nginx';
@@ -26,7 +28,7 @@
 @endphp
 
 @if (! $functionsHost)
-    <div class="space-y-6">
+    <div @class(['space-y-6' => ! $rolloutNested, 'min-w-0' => $rolloutNested])>
         <div class="{{ $card }}">
             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7 lg:border-b-0 lg:border-r">
@@ -82,7 +84,7 @@
             </div>
         @endif
 
-        <div class="space-y-6">
+        <div @class(['space-y-6' => ! $rolloutNested, 'min-w-0' => $rolloutNested])>
             @if ($zero_downtime_enabled)
                 <section class="{{ $card }}">
                     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">

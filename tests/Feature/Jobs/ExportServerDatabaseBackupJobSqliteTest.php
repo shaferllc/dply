@@ -9,6 +9,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\User;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
+use App\Modules\Notifications\Services\ServerBackupNotificationDispatcher;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
@@ -69,7 +70,11 @@ test('sqlite backup is stored on the remote server by default', function () {
     ]);
 
     (new ExportServerDatabaseBackupJob($backup->id))
-        ->handle(app(DatabaseBackupExporter::class), app(ServerDatabaseAuditLogger::class));
+        ->handle(
+            app(DatabaseBackupExporter::class),
+            app(ServerDatabaseAuditLogger::class),
+            app(ServerBackupNotificationDispatcher::class),
+        );
 
     $backup->refresh();
     expect($backup->status)->toBe(ServerDatabaseBackup::STATUS_COMPLETED);
@@ -101,7 +106,11 @@ test('control plane storage requires explicit config flag', function () {
     ]);
 
     (new ExportServerDatabaseBackupJob($backup->id))
-        ->handle(app(DatabaseBackupExporter::class), app(ServerDatabaseAuditLogger::class));
+        ->handle(
+            app(DatabaseBackupExporter::class),
+            app(ServerDatabaseAuditLogger::class),
+            app(ServerBackupNotificationDispatcher::class),
+        );
 
     $backup->refresh();
     expect($backup->disk_path)->toBe('database-backups/'.$server->id.'/'.$backup->id.'.db');
@@ -132,7 +141,11 @@ test('retention prunes older remote backups', function () {
             'created_at' => now()->addSeconds($i),
         ]);
         (new ExportServerDatabaseBackupJob($b->id))
-            ->handle(app(DatabaseBackupExporter::class), app(ServerDatabaseAuditLogger::class));
+            ->handle(
+                app(DatabaseBackupExporter::class),
+                app(ServerDatabaseAuditLogger::class),
+                app(ServerBackupNotificationDispatcher::class),
+            );
         $backups[] = $b->fresh();
     }
 

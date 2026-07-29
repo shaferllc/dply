@@ -9,7 +9,7 @@ use App\Models\ServerBackupSchedule;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;

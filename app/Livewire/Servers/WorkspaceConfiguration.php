@@ -379,6 +379,21 @@ class WorkspaceConfiguration extends Component
         $this->toastSuccess(__('Restore queued — progress shows in the banner above.'));
     }
 
+    /**
+     * Merged Configuration card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-configuration-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         // No $this->server->refresh(): route binding (first load) and Livewire's

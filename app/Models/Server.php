@@ -4,8 +4,9 @@ namespace App\Models;
 
 use App\Enums\ServerProvider;
 use App\Enums\ServerTier;
+use App\Enums\SiteType;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
-use App\Services\Billing\ServerTierClassifier;
+use App\Modules\Billing\Services\ServerTierClassifier;
 use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
@@ -203,7 +204,8 @@ class Server extends Model
     /**
      * Public URL of the server's custom logo, or null when none is set —
      * callers fall back to the generated gradient + initials avatar. Stored on
-     * the `public` disk. Mirrors {@see Site::logoUrl()}.
+     * the durable `site_assets` disk so it survives a redeploy. Mirrors
+     * {@see Site::logoUrl()}.
      */
     public function logoUrl(): ?string
     {
@@ -211,7 +213,7 @@ class Server extends Model
             return null;
         }
 
-        return Storage::disk('public')->url($this->logo_path);
+        return Storage::disk('site_assets')->url($this->logo_path);
     }
 
     public function hasLogo(): bool
@@ -400,7 +402,9 @@ class Server extends Model
     /** @return HasMany<Site, $this> */
     public function sites(): HasMany
     {
-        return $this->hasMany(Site::class);
+        // Explicit FK: anonymous Server subclasses (unit fixtures) otherwise
+        // make Eloquent guess a broken parent key like `server@anonymous_…_id`.
+        return $this->hasMany(Site::class, 'server_id');
     }
 
     /**
@@ -521,7 +525,7 @@ class Server extends Model
      *
      * When this is non-null, dply runs Caddy as the per-site backend on
      * ephemeral high ports and the edge proxy on :80 — see
-     * `App\Jobs\AddEdgeProxyJob` for the install flow.
+     * `App\Modules\Edge\Jobs\AddEdgeProxyJob` for the install flow.
      */
     public function edgeProxy(): ?string
     {
@@ -576,6 +580,17 @@ class Server extends Model
     public function logAgent(): HasOne
     {
         return $this->hasOne(ServerLogAgent::class);
+    }
+
+    /**
+     * The dply Logs Vector AGGREGATOR running on this server, if this box is the
+     * designated ingest tier (at most one). See {@see ServerLogAggregator}.
+     *
+     * @return HasOne<ServerLogAggregator, $this>
+     */
+    public function logAggregator(): HasOne
+    {
+        return $this->hasOne(ServerLogAggregator::class);
     }
 
     /** @return HasMany<ServerDatabaseAuditEvent, $this> */
@@ -920,6 +935,42 @@ class Server extends Model
     public function isKubernetesCluster(): bool
     {
         return $this->hostKind() === self::HOST_KIND_KUBERNETES;
+    }
+
+    /**
+     * Primary site type for workspace UI — container hosts always report
+     * container; VM hosts infer from existing sites or default to PHP.
+     */
+    public function siteType(): string
+    {
+        if ($this->isDockerHost() || $this->isKubernetesCluster()) {
+            return SiteType::Container->value;
+        }
+
+        $sites = $this->relationLoaded('sites')
+            ? $this->sites
+            : $this->sites()->get(['type']);
+
+        if ($sites->isEmpty()) {
+            return SiteType::Php->value;
+        }
+
+        /** @var array<string, int> $counts */
+        $counts = [];
+
+        foreach ($sites as $site) {
+            $type = $site->type instanceof SiteType ? $site->type->value : (string) $site->type;
+            $counts[$type] = ($counts[$type] ?? 0) + 1;
+        }
+
+        arsort($counts);
+
+        return match (array_key_first($counts)) {
+            SiteType::Container->value => SiteType::Container->value,
+            SiteType::Static->value => SiteType::Static->value,
+            SiteType::Node->value => SiteType::Node->value,
+            default => SiteType::Php->value,
+        };
     }
 
     public function providerDisplayLabel(): string

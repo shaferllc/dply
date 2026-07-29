@@ -107,8 +107,14 @@ test('commits route ok', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
+    // Commits were merged into the Repository page as a tab; the old route is
+    // kept alive purely as a redirect (see routes/web.php). Assert the redirect
+    // rather than a 200 — the page itself is covered by the repository tests.
     $this->actingAs($user)
         ->get(route('sites.commits', [$server, $site]))
-        ->assertOk()
-        ->assertSee('Commits');
+        ->assertRedirect(route('sites.repository', [
+            'server' => $server,
+            'site' => $site,
+            'repo_tab' => 'commits',
+        ]));
 });

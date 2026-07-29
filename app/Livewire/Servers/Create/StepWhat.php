@@ -14,7 +14,7 @@ use App\Models\Server;
 use App\Models\ServerBlueprint;
 use App\Models\ServerCacheService;
 use App\Models\ServerCreateDraft;
-use App\Services\AwsEksService;
+use App\Modules\Cloud\Services\AwsEksService;
 use App\Services\Servers\Blueprint\ServerBlueprintApplier;
 use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use App\Services\Servers\ServerCreatePresetCatalog;

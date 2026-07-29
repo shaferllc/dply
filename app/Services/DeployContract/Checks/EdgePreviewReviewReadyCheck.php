@@ -7,7 +7,7 @@ namespace App\Services\DeployContract\Checks;
 use App\Services\DeployContract\Contracts\DeployContractCheck;
 use App\Services\DeployContract\DeployContractCheckResult;
 use App\Services\DeployContract\DeployContractContext;
-use App\Services\Edge\EdgePreviewReviewState;
+use App\Modules\Edge\Services\EdgePreviewReviewState;
 
 final class EdgePreviewReviewReadyCheck implements DeployContractCheck
 {

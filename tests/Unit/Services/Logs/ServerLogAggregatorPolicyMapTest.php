@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Logs\ServerLogAggregatorPolicyMapTest;
 
-use App\Services\Logs\ServerLogAggregatorPolicyMap;
-use App\Services\Logs\ServerLogEntitlement;
+use App\Modules\Logs\Services\ServerLogAggregatorPolicyMap;
+use App\Modules\Logs\Services\ServerLogEntitlement;
 
 const GB = 1073741824; // 1024^3
 

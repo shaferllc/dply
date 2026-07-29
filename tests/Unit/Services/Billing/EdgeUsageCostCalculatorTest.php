@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Billing\EdgeUsageCostCalculatorTest;
 
-use App\Services\Billing\EdgeUsageCostCalculator;
-use App\Services\Billing\EdgeUsageTotals;
+use App\Modules\Billing\Services\EdgeUsageCostCalculator;
+use App\Modules\Billing\Services\EdgeUsageTotals;
 use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {

@@ -28,7 +28,10 @@ class Build extends Component
         $this->mountEdgeWorkspaceSection($server, $site);
 
         $this->site->load([
-            'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(20),
+            'edgeDeployments' => fn ($query) => $query
+                ->whereNotNull('repo_config')
+                ->orderByDesc('created_at')
+                ->limit(5),
         ]);
 
         $this->mountEdgeBuildSettings($site);

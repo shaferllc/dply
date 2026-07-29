@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineSafetyPresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -71,5 +71,5 @@ test('migrate pretend step type produces runnable command', function () {
         'step_type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND,
     ]);
 
-    expect($step->commandFor())->toBe('php artisan migrate --pretend --no-interaction');
+    expect($step->commandFor())->toBe('php artisan migrate --pretend --force');
 });

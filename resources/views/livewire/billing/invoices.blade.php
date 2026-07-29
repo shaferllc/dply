@@ -6,31 +6,28 @@
         'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
         'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
     ];
+
+    $total = $rows->total();
+    $currentPage = $rows->currentPage();
+    $lastPage = max(1, $rows->lastPage());
+    $perPage = (int) ($perPage ?? $rows->perPage());
 @endphp
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="invoices" :breadcrumb="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('Invoices'), 'icon' => 'document-text'],
-        ]">
-            <x-livewire-validation-errors />
-
-            {{-- Hero: positioning + at-a-glance counts. Cross-links into the
-                 sibling billing screens so an admin can pivot quickly. --}}
-            @php
-                $total = $rows->total();
-                $currentPage = $rows->currentPage();
-                $lastPage = max(1, $rows->lastPage());
-                $perPage = (int) ($perPage ?? $rows->perPage());
-            @endphp
-            <x-hero-card
-                :eyebrow="__('Billing')"
-                :title="__('Invoices')"
-                :description="__('Stripe invoices for :org. Search, sort, and open the PDF for any line item.', ['org' => $organization->name])"
-                icon="document-text"
-            >
+        <x-organization-shell
+            :organization="$organization"
+            section="invoices"
+            :title="__('Invoices')"
+            :description="__('Stripe invoices for :org. Search, sort, and open the PDF for any line item.', ['org' => $organization->name])"
+            icon="heroicon-o-document-text"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Invoices'), 'icon' => 'document-text'],
+            ]"
+        >
+            <x-slot:actions>
                 <x-outline-link href="{{ route('billing.show', $organization) }}" wire:navigate>
                     <x-heroicon-o-credit-card class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Billing & plan') }}
@@ -39,50 +36,56 @@
                     <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Analytics') }}
                 </x-outline-link>
+            </x-slot:actions>
 
-                <x-slot:stats>
-                    <dl class="grid grid-cols-3 gap-2">
-                        <div @class([
-                            'rounded-2xl border px-4 py-3 shadow-sm',
+            <x-slot:stats>
+                <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Invoices at a glance') }}">
+                    <x-fleet-stat
+                        :label="__('Stripe')"
+                        @class([
                             'border-brand-sage/30 bg-brand-sage/8' => $hasStripeCustomer,
-                            'border-brand-ink/10 bg-white' => ! $hasStripeCustomer,
-                        ])>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Stripe') }}</dt>
-                            <dd class="mt-1 flex items-center gap-1.5">
-                                @if ($hasStripeCustomer)
-                                    <span class="inline-block h-2 w-2 rounded-full bg-brand-sage" aria-hidden="true"></span>
-                                    <span class="text-sm font-semibold text-brand-ink">{{ __('Linked') }}</span>
-                                @else
-                                    <span class="inline-block h-2 w-2 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
-                                    <span class="text-sm font-semibold text-brand-ink">{{ __('No customer') }}</span>
-                                @endif
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Customer record') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Invoices') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $total }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $total) }}</span>
-                            </dd>
-                            @if ($total > 0 && $search !== '')
-                                <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ __('Filtered by :q', ['q' => $search]) }}">{{ __('Filtered') }}</p>
+                        ])
+                    >
+                        <p class="mt-2 flex items-center gap-1.5">
+                            @if ($hasStripeCustomer)
+                                <span class="inline-block h-2 w-2 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                <span class="text-sm font-semibold text-brand-ink">{{ __('Linked') }}</span>
+                            @else
+                                <span class="inline-block h-2 w-2 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
+                                <span class="text-sm font-semibold text-brand-ink">{{ __('No customer') }}</span>
                             @endif
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Page') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $currentPage }}</span>
-                                <span class="text-[11px] text-brand-moss">/ {{ $lastPage }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n per page|:n per page', $perPage, ['n' => $perPage]) }}</p>
-                        </div>
-                    </dl>
-                </x-slot:stats>
-            </x-hero-card>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Customer record') }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Invoices')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $total }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $total) }}</span>
+                        </p>
+                        @if ($total > 0 && $search !== '')
+                            <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ __('Filtered by :q', ['q' => $search]) }}">{{ __('Filtered') }}</p>
+                        @else
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('From Stripe') }}</p>
+                        @endif
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Page')">
+                        <p class="mt-2 flex items-baseline gap-1">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $currentPage }}</span>
+                            <span class="text-[11px] text-brand-moss">/ {{ $lastPage }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n per page|:n per page', $perPage, ['n' => $perPage]) }}</p>
+                    </x-fleet-stat>
+                </dl>
+            </x-slot:stats>
+
+            @if ($errors->isNotEmpty())
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                </div>
+            @endif
 
             @unless ($hasStripeCustomer)
-                <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div class="border-b border-brand-ink/10 bg-amber-50 px-5 py-4 text-sm text-amber-900 sm:px-6">
                     <span class="inline-flex items-center gap-2">
                         <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('No Stripe customer is linked to this organization yet.') }}
@@ -94,8 +97,8 @@
             @endunless
 
             @if ($hasStripeCustomer)
-                <section class="dply-card mt-6 overflow-hidden" x-data="{ showColumns: false }">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <section class="border-b border-brand-ink/10 last:border-b-0" x-data="{ showColumns: false }">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                         <x-icon-badge>
                             <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
@@ -109,7 +112,7 @@
                     {{-- Toolbar: search + column toggle. Same sandy strip
                          tone the activity / member-directory pages use, so
                          the page reads as part of the same family. --}}
-                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-6 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                         <div class="relative">
                             <button
                                 type="button"
@@ -154,7 +157,7 @@
                     </div>
 
                     @if ($rows->isEmpty())
-                        <div class="px-6 py-12 text-center sm:px-7">
+                        <div class="px-5 py-12 text-center sm:px-6">
                             <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                                 <x-heroicon-o-inbox class="h-5 w-5" aria-hidden="true" />
                             </span>
@@ -171,7 +174,7 @@
                                 <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
                                         @if ($columns['number'])
-                                            <th scope="col" class="px-6 py-2 sm:px-7">
+                                            <th scope="col" class="px-5 py-2 sm:px-6">
                                                 <button type="button" wire:click="sortBy('number')" class="inline-flex items-center gap-1 font-semibold text-brand-moss hover:text-brand-ink">
                                                     {{ __('Number') }}
                                                     <span aria-hidden="true" class="opacity-70">⇅</span>
@@ -223,7 +226,7 @@
                                         @endphp
                                         <tr class="transition-colors hover:bg-brand-sand/15">
                                             @if ($columns['number'])
-                                                <td class="whitespace-nowrap px-6 py-3 font-mono text-xs text-brand-ink sm:px-7">{{ $row['number'] }}</td>
+                                                <td class="whitespace-nowrap px-5 py-3 font-mono text-xs text-brand-ink sm:px-6">{{ $row['number'] }}</td>
                                             @endif
                                             @if ($columns['description'])
                                                 <td class="max-w-md px-4 py-3 text-brand-ink">{{ $row['description'] }}</td>
@@ -242,7 +245,7 @@
                                                 <td class="whitespace-nowrap px-4 py-3 font-mono tabular-nums text-brand-moss">{{ $row['date']->format('Y-m-d H:i') }}</td>
                                             @endif
                                             @if ($columns['actions'])
-                                                <td class="whitespace-nowrap px-6 py-3 text-end sm:px-7">
+                                                <td class="whitespace-nowrap px-5 py-3 text-end sm:px-6">
                                                     @if (! empty($row['pdf_url']))
                                                         <a
                                                             href="{{ $row['pdf_url'] }}"
@@ -272,7 +275,7 @@
                         {{-- Pagination footer. Sandy strip mirroring the
                              toolbar — page selector on the left, page count
                              centered, pagination links on the right. --}}
-                        <div class="flex flex-col items-stretch gap-4 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-7">
+                        <div class="flex flex-col items-stretch gap-4 border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-6">
                             <label class="inline-flex items-center gap-2 text-xs text-brand-moss" for="per-page">
                                 <span class="whitespace-nowrap">{{ __('Rows per page') }}</span>
                                 <select

@@ -1,5 +1,5 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = 'border-b border-brand-ink/10';
     $repoGroup = $repositorySyncGroup ?? null;
     $orgSites = $organizationSites ?? collect();
     $hasDeployKey = ! $server->hostCapabilities()->supportsFunctionDeploy() && $site->git_deploy_key_public;
@@ -11,7 +11,7 @@
     };
 @endphp
 
-<div class="space-y-6">
+<div>
     {{-- Repository configuration: branch, provider, source-control account, URL. --}}
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
@@ -75,6 +75,39 @@
                             </select>
                             <x-input-error :messages="$errors->get('git_source_control_account_id')" class="mt-1" />
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Only accounts matching the selected provider are listed.') }}</p>
+
+                            {{-- Credential health for the identity THIS SITE deploys
+                                 with (stamped by the daily check) — a dead token is
+                                 shown where the repo is configured, not just at the
+                                 next failed deploy. --}}
+                            @php
+                                $repoIdentity = null;
+                                try {
+                                    $repoIdentity = $this->site->user
+                                        ? app(\App\Modules\SourceControl\Services\GitIdentityResolver::class)->forSite($this->site, $this->site->user, $git_provider_kind)
+                                        : null;
+                                } catch (\Throwable) {
+                                    $repoIdentity = null;
+                                }
+                                $repoIdentityError = $repoIdentity->validation_error ?? null;
+                                $repoIdentityExpiry = $repoIdentity->expires_at ?? null;
+                                $repoIdentityExpiring = $repoIdentityExpiry !== null && $repoIdentityExpiry->lte(now()->addDays(7));
+                            @endphp
+                            @if ($repoIdentity && ($repoIdentityError || $repoIdentityExpiring))
+                                <div class="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                    <x-heroicon-m-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                                    <p class="text-xs leading-relaxed text-amber-900">
+                                        @if ($repoIdentityError)
+                                            {{ __('This site deploys with :label, which the provider is rejecting (:error). Deploys will fail at clone until it is fixed.', ['label' => $repoIdentity->displayLabel(), 'error' => $repoIdentityError]) }}
+                                        @elseif ($repoIdentityExpiry->isPast())
+                                            {{ __('This site deploys with :label, which expired :time. Deploys will fail at clone until it is fixed.', ['label' => $repoIdentity->displayLabel(), 'time' => $repoIdentityExpiry->diffForHumans()]) }}
+                                        @else
+                                            {{ __('This site deploys with :label, which expires :time.', ['label' => $repoIdentity->displayLabel(), 'time' => $repoIdentityExpiry->diffForHumans()]) }}
+                                        @endif
+                                        <a href="{{ route('profile.source-control') }}" wire:navigate class="font-semibold underline hover:text-amber-950">{{ __('Fix it in Source control settings') }}</a>
+                                    </p>
+                                </div>
+                            @endif
                         </div>
                     @endif
                 </div>
@@ -170,6 +203,8 @@
                             </span>
                         @endif
                     </div>
+
+                    <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="mt-2 text-[11px] leading-relaxed text-brand-mist" />
                 </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
@@ -418,7 +453,7 @@
     </section>
 
     {{-- Danger zone. --}}
-    <section class="dply-card overflow-hidden border-rose-200">
+    <section class="border-b border-rose-200">
         <div class="flex flex-col gap-4 border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
                 <x-icon-badge tone="danger">
@@ -443,9 +478,11 @@
         </div>
     </section>
 
+    <div class="px-5 py-5 sm:px-6">
     <x-cli-snippet :commands="[
         ['label' => __('Update remote / branch'), 'command' => 'dply sites:repo:set '.$site->slug.' --url=git@github.com:org/repo.git --branch=main'],
         ['label' => __('Switch monorepo path'), 'command' => 'dply sites:repo:set '.$site->slug.' --path=apps/web'],
         ['label' => __('Trigger redeploy after change'), 'command' => 'dply sites:deploy '.$site->slug],
     ]" />
+</div>
 </div>

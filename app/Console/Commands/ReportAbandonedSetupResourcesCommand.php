@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * auto-dropped (see {@see \App\Support\Sites\SiteRelationPurger}). This command
  * only reports candidates for an operator to review.
  *
- * Provenance is stamped by {@see \App\Services\Deploy\SiteBindingManager::stampSetupProvenance}
+ * Provenance is stamped by {@see \App\Modules\Deploy\Services\SiteBindingManager::stampSetupProvenance}
  * (config.provisioned_during_setup + _at).
  */
 class ReportAbandonedSetupResourcesCommand extends Command

@@ -72,11 +72,18 @@ class SiteSystemdUnitBuilder
 
         $description = "Dply site {$site->slug} ({$process->name})";
 
+        // A per-process working_directory (fillable on SiteProcess) overrides the
+        // site-level resolution. Needed when the daemon must run from a path the
+        // site-level heuristic gets wrong — e.g. a worker that must execute from
+        // the atomic `current` symlink while the site row itself isn't flagged
+        // atomic (legacy flat checkout coexisting with releases/ on the box).
+        $override = trim((string) ($process->working_directory ?? ''));
+
         return $this->renderUnit(
             description: $description,
             execStart: $command,
             user: $deployUser,
-            workingDirectory: $this->resolveWorkingDirectory($site),
+            workingDirectory: $override !== '' ? rtrim($override, '/') : $this->resolveWorkingDirectory($site),
             port: null,
         );
     }

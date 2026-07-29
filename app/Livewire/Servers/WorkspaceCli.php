@@ -23,8 +23,6 @@ class WorkspaceCli extends Component
 
     protected string $requiredFeature = 'workspace.cli';
 
-    public Server $server;
-
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);

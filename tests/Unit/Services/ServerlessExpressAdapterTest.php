@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessExpressAdapterTest;
 
-use App\Services\Deploy\ServerlessExpressAdapter;
+use App\Modules\Deploy\Services\ServerlessExpressAdapter;
 use Illuminate\Support\Facades\File;
 
 function repo(array $files): string

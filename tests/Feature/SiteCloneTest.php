@@ -17,6 +17,12 @@ uses(RefreshDatabase::class);
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
+beforeEach(function (): void {
+    // Sites are capped per flat plan (resolved from billable server count).
+    // Zero the billable-age floor so freshly factory-created servers count.
+    config(['subscription.standard.min_billable_age_days' => 0]);
+});
+
 function userWithOrganization(string $role = 'owner'): User
 {
     $user = User::factory()->create();
@@ -54,6 +60,9 @@ test('clone page renders for authorized user', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = readyServer($user, $org);
+    // Second billable server → Starter plan (10 sites) so clone isn't blocked
+    // by the Free plan's 1-site ceiling.
+    readyServer($user, $org);
     $site = Site::factory()->create([
         'server_id' => $server->id,
         'user_id' => $user->id,
@@ -66,6 +75,7 @@ test('clone page renders for authorized user', function () {
     ]);
 
     $this->actingAs($user)
+        ->withSession(['current_organization_id' => $org->id])
         ->get(route('sites.clone', [$server, $site]))
         ->assertOk()
         ->assertSee('Clone site', false);

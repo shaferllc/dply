@@ -6,8 +6,8 @@ use App\Enums\DeploymentMethod;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\DeployResumePlan;
-use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
+use App\Modules\Deploy\Services\DeployResumePlan;
+use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
@@ -143,7 +143,7 @@ class SiteGitDeployer
         }
 
         $gitSsh = $privateKey
-            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o StrictHostKeyChecking=accept-new').' && '
+            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new').' && '
             : '';
 
         // For HTTPS repos with no deploy key, inject the stored OAuth/PAT token

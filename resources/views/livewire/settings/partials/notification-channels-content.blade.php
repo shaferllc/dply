@@ -1,19 +1,7 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-    ];
-
-    $channelTotal = $channels->count();
-    $orgChannelCount = isset($organizationChannels) ? $organizationChannels->count() : 0;
-    $teamChannelCount = ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count());
     $hasChannelSearch = trim($search ?? '') !== '';
+    $channelTotal = $channels->count();
 @endphp
-
-<x-livewire-validation-errors />
 
 {{-- On the settings layout the trail is hoisted above the nav + grid via the
      stack; in the org shell it's passed to x-organization-shell's :breadcrumb. --}}
@@ -24,199 +12,118 @@
 @endif
 
 @if (! empty($backUrl))
-    <p class="mb-4">
+    <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
         <a href="{{ $backUrl }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-brand-sage hover:text-brand-ink">
             <x-heroicon-m-chevron-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {{ $backLabel ?? __('Back') }}
         </a>
-    </p>
+    </div>
 @endif
 
-{{-- Shared hero header so this page matches the rest of the app
-     (was a hand-rolled card with different padding/title sizing). --}}
-<x-hero-card
-    :eyebrow="__('Routing')"
-    :title="$pageTitle"
-    :description="$intro"
-    icon="bell-alert"
->
-    @if (! empty($showBulkAssign ?? false))
-        <x-outline-link href="{{ route('profile.notification-channels.bulk-assign') }}" wire:navigate>
-            <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Bulk assign') }}
-        </x-outline-link>
-    @endif
-    @if ($canManage && count($types) > 0)
-        <button
-            type="button"
-            wire:click="openCreateChannelModal"
-            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-        >
-            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-            {{ __('Add channel') }}
-        </button>
-    @endif
+@if ($errors->isNotEmpty())
+    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <x-livewire-validation-errors />
+    </div>
+@endif
 
-    <x-slot:stats>
-        <dl class="grid grid-cols-3 gap-2">
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Personal') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $channelTotal }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('channel|channels', $channelTotal) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('You own') }}</p>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organization') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgChannelCount }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', $orgChannelCount) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('No current org') }}</p>
-            </div>
-            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $teamChannelCount }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', $teamChannelCount) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n team|:n teams', ($teamChannelGroups ?? collect())->count(), ['n' => ($teamChannelGroups ?? collect())->count()]) }}</p>
-            </div>
-        </dl>
-    </x-slot:stats>
-</x-hero-card>
-
-<div class="mt-6 space-y-6">
-
-    {{-- "Available beyond your personal channels" — shown only on the
-         personal /settings/notification-channels page, where the user
-         can also see org + team-owned channels that target them. --}}
-    @if (empty($useOrgShell) && (($currentOrganization ?? null) || ($teamChannelGroups ?? collect())->isNotEmpty()))
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inherited') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Available beyond your personal channels') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Organization- and team-owned channels can be assigned too. Manage them from their own settings pages.') }}</p>
-                </div>
-            </div>
-
-            <div class="space-y-5 p-6 sm:p-7">
-                @if (($currentOrganization ?? null) && isset($organizationChannels))
-                    <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
-                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
-                            <div class="min-w-0">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Organization') }}</p>
-                                <p class="truncate text-sm font-semibold text-brand-ink">{{ $currentOrganization->name }}</p>
-                            </div>
-                            @can('viewNotificationChannels', $currentOrganization)
-                                <a href="{{ route('organizations.notification-channels', $currentOrganization) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">
-                                    {{ __('Manage') }} →
-                                </a>
-                            @endcan
-                        </div>
-                        @if ($organizationChannels->isEmpty())
-                            <p class="px-4 py-4 text-sm text-brand-mist">{{ __('No organization channels yet.') }}</p>
-                        @else
-                            <ul class="divide-y divide-brand-ink/10">
-                                @foreach ($organizationChannels as $channel)
-                                    <li class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/15">
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $channel->label }}</p>
-                                            <p class="text-[11px] text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
-                                        </div>
-                                        <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </div>
-                @endif
-
-                @if (($teamChannelGroups ?? collect())->isNotEmpty())
-                    @foreach ($teamChannelGroups as $entry)
-                        <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
-                            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
-                                <div class="min-w-0">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Team') }}</p>
-                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $entry['team']->name }}</p>
-                                </div>
-                                <a href="{{ route('teams.notification-channels', [$entry['team']->organization, $entry['team']]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">
-                                    {{ __('Manage') }} →
-                                </a>
-                            </div>
-                            <ul class="divide-y divide-brand-ink/10">
-                                @foreach ($entry['channels'] as $channel)
-                                    <li class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/15">
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $channel->label }}</p>
-                                            <p class="text-[11px] text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
-                                        </div>
-                                        <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endforeach
-                @endif
-            </div>
-        </section>
-    @endif
-
-    @if ($canManage && count($types) === 0)
-        <section class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-7">
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-5 py-6 text-center">
-                    <p class="text-sm font-medium text-brand-ink">{{ __('No notification channel types are enabled.') }}</p>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Add types via DPLY_NOTIFICATION_CHANNEL_TYPES when ready.') }}</p>
-                </div>
-            </div>
-        </section>
-    @elseif (! $canManage)
-        <section class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-7">
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-5 py-6 text-center">
-                    <p class="text-sm font-medium text-brand-ink">{{ __('You can view channels here.') }}</p>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Ask an admin to add or change destinations.') }}</p>
-                </div>
-            </div>
-        </section>
-    @endif
-
-    {{-- My channels --}}
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+{{-- "Available beyond your personal channels" — shown only on the personal
+     /settings/notification-channels page, where the user can also see org +
+     team-owned channels that target them. --}}
+@if (empty($useOrgShell) && (($currentOrganization ?? null) || ($teamChannelGroups ?? collect())->isNotEmpty()))
+    <div class="border-b border-brand-ink/10">
+        <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
             <x-icon-badge>
-                <x-heroicon-o-megaphone class="h-5 w-5" aria-hidden="true" />
+                <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Channels') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('My channels') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Search, edit, test, or remove destinations.') }}</p>
-            </div>
-            <div class="flex shrink-0 items-center gap-2">
-                @if ($channelTotal > 0)
-                    <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $channelTotal }}</span>
-                @endif
-                @if ($canManage && count($types) > 0)
-                    <button
-                        type="button"
-                        wire:click="openCreateChannelModal"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add channel') }}
-                    </button>
-                @endif
+            <div class="min-w-0">
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Available beyond your personal channels') }}</h3>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Organization- and team-owned channels can be assigned too. Manage them from their own settings pages.') }}</p>
             </div>
         </div>
 
-        {{-- Toolbar: search box. --}}
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-6 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-7">
+        <div class="space-y-5 px-5 py-5 sm:px-6">
+            @if (($currentOrganization ?? null) && isset($organizationChannels))
+                <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Organization') }}</p>
+                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $currentOrganization->name }}</p>
+                        </div>
+                        @can('viewNotificationChannels', $currentOrganization)
+                            <a href="{{ route('organizations.notification-channels', $currentOrganization) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                {{ __('Manage') }} →
+                            </a>
+                        @endcan
+                    </div>
+                    @if ($organizationChannels->isEmpty())
+                        <p class="px-4 py-4 text-sm text-brand-mist">{{ __('No organization channels yet.') }}</p>
+                    @else
+                        <ul class="divide-y divide-brand-ink/10">
+                            @foreach ($organizationChannels as $channel)
+                                <li class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/15">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ $channel->label }}</p>
+                                        <p class="text-[11px] text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
+                                    </div>
+                                    <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            @endif
+
+            @if (($teamChannelGroups ?? collect())->isNotEmpty())
+                @foreach ($teamChannelGroups as $entry)
+                    <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-4 py-2.5">
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Team') }}</p>
+                                <p class="truncate text-sm font-semibold text-brand-ink">{{ $entry['team']->name }}</p>
+                            </div>
+                            <a href="{{ route('teams.notification-channels', [$entry['team']->organization, $entry['team']]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                {{ __('Manage') }} →
+                            </a>
+                        </div>
+                        <ul class="divide-y divide-brand-ink/10">
+                            @foreach ($entry['channels'] as $channel)
+                                <li class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/15">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ $channel->label }}</p>
+                                        <p class="text-[11px] text-brand-moss">{{ \App\Models\NotificationChannel::labelForType($channel->type) }}</p>
+                                    </div>
+                                    <span class="shrink-0 rounded-md bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ trans_choice(':n use|:n uses', $channel->subscriptions_count, ['n' => $channel->subscriptions_count]) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
+            @endif
+        </div>
+    </div>
+@endif
+
+@if ($canManage && count($types) === 0)
+    <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-5 py-6 text-center">
+            <p class="text-sm font-medium text-brand-ink">{{ __('No notification channel types are enabled.') }}</p>
+            <p class="mt-1 text-xs text-brand-mist">{{ __('Add types via DPLY_NOTIFICATION_CHANNEL_TYPES when ready.') }}</p>
+        </div>
+    </div>
+@elseif (! $canManage)
+    <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-5 py-6 text-center">
+            <p class="text-sm font-medium text-brand-ink">{{ __('You can view channels here.') }}</p>
+            <p class="mt-1 text-xs text-brand-mist">{{ __('Ask an admin to add or change destinations.') }}</p>
+        </div>
+    </div>
+@endif
+
+{{-- Channel list. No second identity strip and no duplicate Add — shell
+     header (when list has items) or empty-state CTA (when empty). --}}
+<div class="border-b border-brand-ink/10 last:border-b-0">
+    @if ($channelTotal > 0 || $hasChannelSearch)
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
             <div class="w-full sm:max-w-sm">
                 <label for="nc_my_channels_search" class="sr-only">{{ __('Search') }}</label>
                 <div class="relative">
@@ -234,130 +141,131 @@
                 </div>
             </div>
         </div>
+    @endif
 
-        @if ($channels->isEmpty())
-            <div class="px-6 py-12 text-center sm:px-7">
-                <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                    <x-heroicon-o-bell-slash class="h-6 w-6" aria-hidden="true" />
-                </span>
-                <p class="mt-4 text-sm font-semibold text-brand-ink">
-                    {{ $hasChannelSearch ? __('No channels match this search.') : __('No notification channels yet') }}
+    @if ($channels->isEmpty())
+        <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                <x-heroicon-o-bell-slash class="h-6 w-6" aria-hidden="true" />
+            </span>
+            <p class="mt-4 text-sm font-semibold text-brand-ink">
+                {{ $hasChannelSearch ? __('No channels match this search.') : __('No notification channels yet') }}
+            </p>
+            @if (! $hasChannelSearch)
+                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    {{ __('Add a destination so alerts have somewhere to go — chat, email, webhook, or mobile.') }}
                 </p>
-                @if (! $hasChannelSearch)
-                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                        {{ __('Add a destination so alerts have somewhere to go — chat, email, webhook, mobile.') }}
-                    </p>
-                @endif
-                @if ($hasChannelSearch)
-                    <button type="button" wire:click="$set('search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
-                @elseif ($canManage && count($types) > 0)
-                    <button
-                        type="button"
-                        wire:click="openCreateChannelModal"
-                        class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add channel') }}
-                    </button>
-                @endif
-            </div>
-        @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-brand-ink/5 text-left text-sm">
-                    <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                        <tr>
-                            <th scope="col" class="px-6 py-2 sm:px-7">{{ __('Label') }}</th>
-                            <th scope="col" class="px-4 py-2">{{ __('Type') }}</th>
-                            <th scope="col" class="px-4 py-2 text-right">{{ __('Usages') }}</th>
-                            <th scope="col" class="px-6 py-2 text-right sm:px-7">{{ __('Actions') }}</th>
+            @endif
+            @if ($hasChannelSearch)
+                <button type="button" wire:click="$set('search', '')" class="mt-3 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
+            @elseif ($canManage && count($types) > 0)
+                {{-- Empty list: this is the only Add CTA (shell header omits it). --}}
+                <button
+                    type="button"
+                    wire:click="openCreateChannelModal"
+                    class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add channel') }}
+                </button>
+            @endif
+        </div>
+    @else
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-brand-ink/5 text-left text-sm">
+                <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    <tr>
+                        <th scope="col" class="px-5 py-2 sm:px-6">{{ __('Label') }}</th>
+                        <th scope="col" class="px-4 py-2">{{ __('Type') }}</th>
+                        <th scope="col" class="px-4 py-2 text-right">{{ __('Usages') }}</th>
+                        <th scope="col" class="px-6 py-2 text-right sm:px-7">{{ __('Actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-brand-ink/5 bg-white">
+                    @foreach ($channels as $channel)
+                        <tr wire:key="nc-{{ $channel->id }}" class="transition-colors hover:bg-brand-sand/15">
+                            @if ($editing_id === $channel->id)
+                                <td colspan="4" class="bg-brand-sand/20 px-5 py-4 sm:px-6">
+                                    <form wire:submit="saveEdit" class="space-y-4">
+                                        <div class="grid gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="edit_type" :value="__('Type')" />
+                                                <x-select id="edit_type" wire:model.live="edit_type">
+                                                    @foreach ($typesForEdit as $t)
+                                                        <option value="{{ $t }}">{{ \App\Models\NotificationChannel::labelForType($t) }}</option>
+                                                    @endforeach
+                                                </x-select>
+                                                @error('edit_type')
+                                                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                                @enderror
+                                            </div>
+                                            <div>
+                                                <x-input-label for="edit_label" :value="__('Label')" />
+                                                <x-text-input id="edit_label" type="text" wire:model="edit_label" />
+                                                @error('edit_label')
+                                                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                                @enderror
+                                            </div>
+                                        </div>
+                                        @include('livewire.settings.partials.notification-channel-fields', ['prefix' => 'edit_', 'type' => $edit_type])
+                                        <div class="flex flex-wrap gap-2">
+                                            <x-primary-button type="submit">
+                                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Save changes') }}
+                                            </x-primary-button>
+                                            <x-secondary-button type="button" wire:click="cancelEdit">{{ __('Cancel') }}</x-secondary-button>
+                                        </div>
+                                    </form>
+                                </td>
+                            @else
+                                <td class="px-5 py-3 font-semibold text-brand-ink sm:px-6">{{ $channel->label }}</td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                        {{ \App\Models\NotificationChannel::labelForType($channel->type) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-moss">{{ $channel->subscriptions_count }}</td>
+                                <td class="px-5 py-3 text-right sm:px-6">
+                                    @if ($canManage)
+                                        <div class="flex flex-wrap items-center justify-end gap-2">
+                                            <x-secondary-button
+                                                size="xs"
+                                                type="button"
+                                                wire:click="sendTest('{{ $channel->id }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendTest"
+                                            >
+                                                <span wire:loading.remove wire:target="sendTest" class="inline-flex items-center gap-2">
+                                                    <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                    {{ __('Test') }}
+                                                </span>
+                                                <span wire:loading wire:target="sendTest" class="inline-flex items-center gap-2">
+                                                    <x-spinner variant="forest" size="sm" />
+                                                    {{ __('Sending…') }}
+                                                </span>
+                                            </x-secondary-button>
+                                            <x-secondary-button size="xs" type="button" wire:click="startEdit('{{ $channel->id }}')">
+                                                <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Edit') }}
+                                            </x-secondary-button>
+                                            <button
+                                                type="button"
+                                                wire:click="openConfirmActionModal('deleteChannel', ['{{ $channel->id }}'], @js(__('Delete notification channel')), @js(__('Remove this channel?')), @js(__('Delete')), true)"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                            >
+                                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                {{ __('Delete') }}
+                                            </button>
+                                        </div>
+                                    @endif
+                                </td>
+                            @endif
                         </tr>
-                    </thead>
-                    <tbody class="divide-y divide-brand-ink/5 bg-white">
-                        @foreach ($channels as $channel)
-                            <tr wire:key="nc-{{ $channel->id }}" class="transition-colors hover:bg-brand-sand/15">
-                                @if ($editing_id === $channel->id)
-                                    <td colspan="4" class="bg-brand-sand/20 px-6 py-4 sm:px-7">
-                                        <form wire:submit="saveEdit" class="space-y-4">
-                                            <div class="grid gap-4 sm:grid-cols-2">
-                                                <div>
-                                                    <x-input-label for="edit_type" :value="__('Type')" />
-                                                    <x-select id="edit_type" wire:model.live="edit_type">
-                                                        @foreach ($typesForEdit as $t)
-                                                            <option value="{{ $t }}">{{ \App\Models\NotificationChannel::labelForType($t) }}</option>
-                                                        @endforeach
-                                                    </x-select>
-                                                    @error('edit_type')
-                                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                                    @enderror
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="edit_label" :value="__('Label')" />
-                                                    <x-text-input id="edit_label" type="text" wire:model="edit_label" />
-                                                    @error('edit_label')
-                                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                                    @enderror
-                                                </div>
-                                            </div>
-                                            @include('livewire.settings.partials.notification-channel-fields', ['prefix' => 'edit_', 'type' => $edit_type])
-                                            <div class="flex flex-wrap gap-2">
-                                                <x-primary-button type="submit">
-                                                    <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                    {{ __('Save changes') }}
-                                                </x-primary-button>
-                                                <x-secondary-button type="button" wire:click="cancelEdit">{{ __('Cancel') }}</x-secondary-button>
-                                            </div>
-                                        </form>
-                                    </td>
-                                @else
-                                    <td class="px-6 py-3 font-semibold text-brand-ink sm:px-7">{{ $channel->label }}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded-md bg-brand-sand/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                                            {{ \App\Models\NotificationChannel::labelForType($channel->type) }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-moss">{{ $channel->subscriptions_count }}</td>
-                                    <td class="px-6 py-3 text-right sm:px-7">
-                                        @if ($canManage)
-                                            <div class="flex flex-wrap items-center justify-end gap-2">
-                                                <x-secondary-button
-                                                    size="xs"
-                                                    type="button"
-                                                    wire:click="sendTest('{{ $channel->id }}')"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="sendTest"
-                                                >
-                                                    <span wire:loading.remove wire:target="sendTest" class="inline-flex items-center gap-2">
-                                                        <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                        {{ __('Test') }}
-                                                    </span>
-                                                    <span wire:loading wire:target="sendTest" class="inline-flex items-center gap-2">
-                                                        <x-spinner variant="forest" size="sm" />
-                                                        {{ __('Sending…') }}
-                                                    </span>
-                                                </x-secondary-button>
-                                                <x-secondary-button size="xs" type="button" wire:click="startEdit('{{ $channel->id }}')">
-                                                    <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                    {{ __('Edit') }}
-                                                </x-secondary-button>
-                                                <button
-                                                    type="button"
-                                                    wire:click="openConfirmActionModal('deleteChannel', ['{{ $channel->id }}'], @js(__('Delete notification channel')), @js(__('Remove this channel?')), @js(__('Delete')), true)"
-                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
-                                                >
-                                                    <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                    {{ __('Delete') }}
-                                                </button>
-                                            </div>
-                                        @endif
-                                    </td>
-                                @endif
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
-    </section>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 </div>
 
 @if ($canManage && count($types) > 0)

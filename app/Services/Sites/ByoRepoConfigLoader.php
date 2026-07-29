@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Services\Edge\Config\EdgeRepoConfig;
-use App\Services\Edge\Config\EdgeRepoConfigLoader;
+use App\Modules\Edge\Services\Config\EdgeRepoConfig;
+use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
 use Symfony\Component\Yaml\Yaml;
 
 /**

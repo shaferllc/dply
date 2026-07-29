@@ -1,5 +1,5 @@
     @if ($parserErrors !== [])
-        <div class="dply-card overflow-hidden">
+        <div class="{{ $card }}">
             <div class="flex items-start gap-3 bg-rose-50 px-5 py-4">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-100 text-rose-700 ring-rose-200">
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />

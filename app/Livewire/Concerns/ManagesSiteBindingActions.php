@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
@@ -12,13 +13,22 @@ use App\Models\LogDrainCredential;
 use App\Models\OauthCredential;
 use App\Models\ObjectStorageCredential;
 use App\Models\PaymentCredential;
+use App\Models\ProviderCredential;
 use App\Models\SearchCredential;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Models\SmsCredential;
-use App\Services\Deploy\SiteBindingManager;
+use App\Modules\Database\Actions\CreateDedicatedDatabaseVm;
+use App\Modules\Database\Actions\CreateDedicatedDockerDatabaseVm;
+use App\Modules\Database\Backends\DatabaseRouter;
+use App\Modules\Database\Support\DedicatedDatabaseVm;
+use App\Modules\Database\Support\DockerDatabase;
+use App\Modules\Database\Support\ServerlessDatabaseVendors;
+use App\Modules\Deploy\Services\LookoutProvisioner;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -30,8 +40,6 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSiteBindingActions
 {
-
-
     public function openBindingModal(string $type, string $mode = 'attach', ?string $bindingId = null): void
     {
         Gate::authorize('update', $this->site);
@@ -50,13 +58,211 @@ trait ManagesSiteBindingActions
         }
 
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $type);
+
+        // A dedicated-DB-VM placement needs a size list (provider/region
+        // specific); fetch it up front so the modal can render the picker.
+        $this->dedicatedVmSizes = [];
+        if ($type === 'database' && $this->bindingModalMode === 'provision') {
+            $this->loadDedicatedVmSizes();
+        }
+
         $this->dispatch('open-modal', 'site-binding-modal');
     }
 
     /**
+     * Populate {@see $dedicatedVmSizes} from the customer-connected create
+     * catalog for the app server's provider + region. Best-effort: a provider
+     * API failure just leaves the list empty (the dedicated card shows
+     * unavailable) rather than breaking the modal.
+     */
+    private function loadDedicatedVmSizes(): void
+    {
+        $server = $this->site->server;
+        if ($server === null || ! DedicatedDatabaseVm::eligible($server) || $this->site->organization === null) {
+            return;
+        }
+
+        try {
+            $catalog = app(ResolveServerCreateCatalog::class)->handle(
+                $this->site->organization,
+                $server->provider->value,
+                (string) $server->provider_credential_id,
+                (string) $server->region,
+            );
+            $this->dedicatedVmSizes = collect($catalog['sizes'] ?? [])
+                ->map(fn ($s): array => [
+                    'value' => (string) ($s['value'] ?? ''),
+                    'label' => (string) ($s['label'] ?? ($s['value'] ?? '')),
+                ])
+                ->filter(fn (array $s): bool => $s['value'] !== '')
+                ->values()
+                ->all();
+
+            // Preselect the first size so the dedicated card has a valid value
+            // the moment it's chosen (the field is shared via bindingForm).
+            if ($this->dedicatedVmSizes !== [] && ($this->bindingForm['vm_size'] ?? '') === '') {
+                $this->bindingForm['vm_size'] = $this->dedicatedVmSizes[0]['value'];
+            }
+        } catch (\Throwable $e) {
+            $this->dedicatedVmSizes = [];
+        }
+    }
+
+    /**
+     * Provision a brand-new database server on the customer's connected
+     * provider and attach it. Runs in the component layer because the
+     * customer-connected create pipeline is driven by a Livewire Form object.
+     */
+    public function provisionDedicatedDatabaseVm(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        try {
+            app(CreateDedicatedDatabaseVm::class)->handle($this, $this->site, $this->bindingForm);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->toastSuccess(__('Provisioning a dedicated database server — this can take several minutes.'));
+    }
+
+    public function provisionDedicatedDockerDatabaseVm(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        try {
+            app(CreateDedicatedDockerDatabaseVm::class)->handle($this, $this->site, $this->bindingForm);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site = $this->site->fresh() ?? $this->site;
+        $this->dispatch('close-modal', 'site-binding-modal');
+        $this->toastSuccess(__('Provisioning a dedicated Docker database server — this can take several minutes.'));
+    }
+
+    /**
+     * Placement options for the "Provision new database" modal: always
+     * on-box, plus a co-located managed cluster when the server's provider
+     * offers one (DigitalOcean today). Each option carries the engines it
+     * supports so the modal can filter as the operator picks an engine, and
+     * an `available` flag (false when the managed backend exists but no
+     * provider credential is connected). Region/cost are display-only.
+     *
+     * @return list<array{key: string, label: string, sublabel: string, available: bool, note: ?string, engines: list<string>}>
+     */
+    public function databasePlacements(): array
+    {
+        $options = [[
+            'key' => 'on_box',
+            'label' => __('On this server'),
+            'sublabel' => __('Free · shares the box'),
+            'available' => true,
+            'note' => null,
+            'engines' => ['mysql', 'postgres', 'clickhouse', 'sqlite'],
+        ]];
+
+        $server = $this->site->server;
+        if ($server === null) {
+            return $options;
+        }
+
+        $options[] = [
+            'key' => 'docker',
+            'label' => __('Docker container on this server'),
+            'sublabel' => __('Isolated · uses Docker Engine'),
+            'available' => $server->dockerEnginePresent(),
+            'note' => $server->dockerEnginePresent()
+                ? null
+                : __('Install Docker from Server → Manage → Tools first.'),
+            'engines' => DockerDatabase::supportedEngines(),
+        ];
+
+        // Co-located managed cluster — only when the server's provider offers
+        // one (DO / Vultr). Hetzner & co. skip this card but still get the
+        // dedicated-VM and serverless options below.
+        $backend = app(DatabaseRouter::class)->colocatedBackendFor($server);
+        if ($backend !== null) {
+            $region = $backend->regionForServer($server);
+            $cost = $backend->estimatedMonthlyCost((string) ($this->bindingForm['size'] ?? 'small'));
+            $hasCredential = $server->provider_credential_id !== null
+                || ProviderCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', $server->provider->value)
+                    ->exists();
+
+            $sublabel = implode(' · ', array_filter([
+                $region,
+                $cost !== null ? '~$'.$cost.'/mo' : null,
+                __('isolated, billed by :provider', ['provider' => $server->provider->label()]),
+            ]));
+
+            $options[] = [
+                'key' => 'managed',
+                'label' => $server->provider->label().' '.__('Managed'),
+                'sublabel' => $sublabel,
+                'available' => $hasCredential && $region !== null,
+                'note' => $hasCredential ? null : __('Connect a :provider credential first', ['provider' => $server->provider->label()]),
+                'engines' => $backend->supportedEngines(),
+            ];
+        }
+
+        // Dedicated DB VM: a brand-new server on the customer's provider whose
+        // only job is this database. Needs a size list (loaded on modal open).
+        if (DedicatedDatabaseVm::eligible($server)) {
+            $sizesReady = $this->dedicatedVmSizes !== [];
+            $options[] = [
+                'key' => 'dedicated_vm',
+                'label' => __('Dedicated database server'),
+                'sublabel' => implode(' · ', array_filter([
+                    (string) $server->region,
+                    __('new :provider VM · isolated host', ['provider' => $server->provider->label()]),
+                ])),
+                'available' => $sizesReady,
+                'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
+                'engines' => DedicatedDatabaseVm::supportedEngines(),
+            ];
+            $options[] = [
+                'key' => 'docker_vm',
+                'label' => __('Dedicated Docker database server'),
+                'sublabel' => implode(' · ', array_filter([
+                    (string) $server->region,
+                    __('new :provider VM · Docker container', ['provider' => $server->provider->label()]),
+                ])),
+                'available' => $sizesReady,
+                'note' => $sizesReady ? null : __('No sizes available for this provider/region.'),
+                'engines' => DockerDatabase::supportedEngines(),
+            ];
+        }
+
+        // BYO serverless vendors (Neon …): region-agnostic, always offered.
+        foreach (ServerlessDatabaseVendors::all() as $vendor) {
+            $options[] = [
+                'key' => $vendor['key'],
+                'label' => $vendor['label'],
+                'sublabel' => __('serverless · bring your own account'),
+                'available' => true,
+                'note' => null,
+                'engines' => $vendor['engines'],
+                'serverless' => true,
+                'regions' => $vendor['regions'],
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
      * Pre-fill {@see $bindingForm} from an existing binding row for editing.
-     * Currently only `storage` supports multiple rows per site; other types
-     * already round-trip via their own default-form prefill.
+     * Multi-instance types (storage, database) support several rows per site, so
+     * editing one re-seeds its non-secret fields; other types round-trip via
+     * their own default-form prefill.
      */
     private function seedBindingFormForEdit(string $type, string $bindingId): void
     {
@@ -71,6 +277,40 @@ trait ManagesSiteBindingActions
         }
 
         $this->bindingModalBindingId = (string) $binding->id;
+
+        // Multi-instance types (database, redis, …; not storage) re-select the
+        // underlying target + the connection name so the form opens on the exact
+        // instance being edited (secrets are never echoed).
+        if (SiteBinding::isMultiInstance($type) && $type !== 'storage') {
+            $config = (array) $binding->config;
+            $this->bindingForm['target_id'] = (string) ($binding->target_id ?? '');
+            $this->bindingForm['connection'] = (string) ($config['connection'] ?? '');
+            // Provider-keyed types (ai/oauth/sms/captcha) open on the provider
+            // being edited; secrets aren't echoed, so the operator re-supplies
+            // the key (or reuses a saved credential).
+            if (($config['provider'] ?? '') !== '') {
+                $this->bindingForm['provider'] = (string) $config['provider'];
+            }
+            if (($config['redirect'] ?? '') !== '') {
+                $this->bindingForm['redirect'] = (string) $config['redirect'];
+            }
+            // Mail's per-site from-address/name aren't secret, so re-seed them.
+            foreach (['from_address', 'from_name'] as $k) {
+                if (($config[$k] ?? '') !== '') {
+                    $this->bindingForm[$k] = (string) $config[$k];
+                }
+            }
+        }
+
+        if ($type === 'database') {
+            $config = (array) $binding->config;
+            foreach (['read_replica_type', 'read_replica_id', 'read_replica_host', 'read_replica_port', 'read_replica_username',
+                'db_prefix', 'db_charset', 'db_collation', 'db_strict', 'db_engine', 'db_socket', 'db_schema', 'db_sslmode', 'db_timezone'] as $k) {
+                if (($config[$k] ?? '') !== '') {
+                    $this->bindingForm[$k] = (string) $config[$k];
+                }
+            }
+        }
 
         if ($type === 'storage') {
             $config = (array) $binding->config;
@@ -103,12 +343,39 @@ trait ManagesSiteBindingActions
         $this->bindingModalMode = $mode;
         $this->bindingForm = $this->defaultBindingForm($this->bindingModalType, $mode);
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $this->bindingModalType);
+
+        // Toggling into "Provision new" for a database must load the dedicated-VM
+        // size catalog too, or that placement card stays disabled.
+        $this->dedicatedVmSizes = [];
+        if ($this->bindingModalType === 'database' && $mode === 'provision') {
+            $this->loadDedicatedVmSizes();
+        }
+
         $this->resetErrorBag();
     }
 
     public function saveBinding(SiteBindingManager $manager): void
     {
         Gate::authorize('update', $this->site);
+
+        // The dedicated-DB-VM placement provisions a whole new server, which
+        // means driving the customer-connected create pipeline (a Livewire Form
+        // object) — handled in the component layer, not the binding manager.
+        if ($this->bindingModalType === 'database'
+            && $this->bindingModalMode === 'provision'
+            && ($this->bindingForm['placement'] ?? '') === 'dedicated_vm') {
+            $this->provisionDedicatedDatabaseVm();
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'database'
+            && $this->bindingModalMode === 'provision'
+            && ($this->bindingForm['placement'] ?? '') === 'docker_vm') {
+            $this->provisionDedicatedDockerDatabaseVm();
+
+            return;
+        }
 
         // Auto-provision Redis on connect: when there's no Redis to attach AND
         // none is installed on the box, kick the install right from the connect
@@ -124,8 +391,17 @@ trait ManagesSiteBindingActions
         // can update that row instead of rejecting it as a duplicate disk name.
         $params = $this->bindingForm + ['binding_id' => $this->bindingModalBindingId];
 
+        // Error tracking is a single-mode ("Configure") form, but Lookout offers
+        // an in-form toggle between minting a project (provision) and pasting a
+        // DSN (attach). Route on that sub-mode rather than the modal's mode.
+        $useProvision = $this->bindingModalMode === 'provision';
+        if ($this->bindingModalType === 'error_tracking'
+            && ($this->bindingForm['provider'] ?? '') === 'lookout') {
+            $useProvision = (($this->bindingForm['lookout_mode'] ?? 'provision') === 'provision');
+        }
+
         try {
-            $binding = $this->bindingModalMode === 'provision'
+            $binding = $useProvision
                 ? $manager->provisionNew($this->site, $this->bindingModalType, $params)
                 : $manager->attachExisting($this->site, $this->bindingModalType, $params);
         } catch (\Throwable $e) {
@@ -150,15 +426,57 @@ trait ManagesSiteBindingActions
             $this->toastSuccess(__('Connected :name.', ['name' => $name]));
         }
 
-        $this->validateBindingConnectivity($binding);
+        // A freshly provisioned database is still being CREATEd on the host by a
+        // queued job, so its endpoint isn't up yet — skip the connectivity probe
+        // now (it would race and report "unreachable"); it gets validated once
+        // the provision job flips the binding to configured.
+        if ($binding->status !== SiteBinding::STATUS_PROVISIONING) {
+            $this->validateBindingConnectivity($binding);
+        }
 
         // Connecting Redis must "just work": the app now dials phpredis (and may
-        // use redis for cache/sessions/queue), so guarantee the PHP redis client
-        // extension exists on the box rather than letting it 500 at runtime with
-        // `Class "Redis" not found`. Dispatched after the connectivity probe so
-        // it's the run the page-top banner surfaces; no-ops when already present.
-        if ($binding->type === 'redis' && method_exists($this, 'ensurePhpRedisExtension')) {
-            $this->ensurePhpRedisExtension($binding);
+        // use redis for cache/sessions/queue), so the box needs the PHP redis
+        // client extension or it 500s at runtime with `Class "Redis" not found`.
+        // That guarantee now lives in the deploy resource-verify gate
+        // ({@see \App\Services\Sites\DeployResourceVerifier}) — it checks and
+        // idempotently installs the extension pre-cutover whenever a redis binding
+        // is present, so it runs once per deploy alongside the reachability probes
+        // instead of as a standalone console-action banner that lingered on the
+        // deploy hub after every attach. The new env (REDIS_CLIENT=phpredis) only
+        // goes live on that same deploy/restart anyway, so the timing lines up.
+
+        // Connecting Lookout must "just work": the injected LOOKOUT_DSN only does
+        // anything if the app requires the lookout/tracing SDK. dply can't edit
+        // the app's composer.json, so add the dependency on the box now (no-op
+        // when already present) — the next deploy's composer install picks it up.
+        if ($binding->type === 'error_tracking'
+            && (((array) $binding->config)['provider'] ?? '') === 'lookout'
+            && method_exists($this, 'ensureComposerPackage')) {
+            $this->ensureComposerPackage($binding, 'lookout/tracing');
+        }
+
+        // Connecting a mail transport must "just work" too: API-based providers
+        // (Cloudflare, Mailgun, Postmark, Resend, SendGrid, SES) ship their
+        // Symfony transport — and its HTTP client — as separate Composer packages.
+        // Without them the app (and a test-send) dies with `Class "…HttpClient"
+        // not found`. Mirror the Lookout path — add each leg's package on the box
+        // now (no-op when present) — so the binding sends instead of fataling.
+        if ($binding->type === 'mail' && method_exists($this, 'ensureComposerPackage')) {
+            $mailConfig = (array) $binding->config;
+            $mailProviders = array_merge(
+                [(string) ($mailConfig['provider'] ?? '')],
+                array_map(strval(...), (array) ($mailConfig['legs'] ?? [])),
+            );
+            $packages = [];
+            foreach ($mailProviders as $mailProvider) {
+                $package = SiteBindingManager::MAIL_TRANSPORT_PACKAGES[strtolower(trim($mailProvider))] ?? null;
+                if ($package !== null) {
+                    $packages[$package] = true;
+                }
+            }
+            foreach (array_keys($packages) as $package) {
+                $this->ensureComposerPackage($binding, $package);
+            }
         }
     }
 
@@ -199,7 +517,49 @@ trait ManagesSiteBindingActions
         return true;
     }
 
-    public function detachBinding(string $bindingId, SiteBindingManager $manager): void
+    /**
+     * Resolve the Lookout organizations a pasted API token can create projects
+     * under, so the provision form can show a picker instead of a raw ULID.
+     * Best-effort: a bad token or older Lookout just leaves the list empty and
+     * the operator types the org id by hand. Preselects the only org when there
+     * is exactly one.
+     */
+    public function loadLookoutOrganizations(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $token = trim((string) ($this->bindingForm['lookout_token'] ?? ''));
+        if ($token === '') {
+            $this->lookoutOrganizations = [];
+            $this->toastError(__('Paste your Lookout API token first.'));
+
+            return;
+        }
+
+        $orgs = app(LookoutProvisioner::class)->organizations($token);
+        $this->lookoutOrganizations = $orgs;
+
+        if ($orgs === []) {
+            $this->toastError(__('Could not load organizations — check the token, or enter the organization ID manually.'));
+
+            return;
+        }
+
+        if (count($orgs) === 1) {
+            $this->bindingForm['lookout_org'] = $orgs[0]['id'];
+        }
+    }
+
+    /**
+     * Detach a binding. When $deleteResource is true AND dply provisioned the
+     * underlying resource, its infra is torn down too (managed cluster deleted,
+     * dedicated DB VM destroyed, on-box database dropped, provisioned bucket
+     * emptied). BYO/attached-existing resources the customer owns are never
+     * deleted — the flag is a no-op for them (see SiteBinding::provisionedResource()).
+     * The delete flag is supplied by the confirm modal's opt-in toggle, so it
+     * arrives as the trailing argument (no DI-typed parameter after it).
+     */
+    public function openDetachBindingConfirmModal(string $bindingId, ?string $label = null): void
     {
         Gate::authorize('update', $this->site);
 
@@ -212,9 +572,133 @@ trait ManagesSiteBindingActions
             return;
         }
 
-        $manager->detach($binding);
+        $label = filled($label) ? $label : Str::headline($binding->type);
+        $title = __('Detach :label?', ['label' => $label]);
+        $message = __('Remove this resource binding? Its injected variables will no longer be applied at deploy.');
+
+        $toggleLabel = $binding->deleteOnDetachLabel();
+        if ($toggleLabel !== null) {
+            $this->openConfirmActionModal(
+                'detachBinding',
+                [$bindingId],
+                $title,
+                $message,
+                __('Detach'),
+                true,
+                null,
+                $toggleLabel,
+                $binding->deleteOnDetachHint(),
+                false,
+            );
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'detachBinding',
+            [$bindingId],
+            $title,
+            $message,
+            __('Detach'),
+            true,
+        );
+    }
+
+    public function detachBinding(string $bindingId, bool $deleteResource = false): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $offeredDelete = $binding->canOfferDeleteOnDetach();
+
+        try {
+            app(SiteBindingManager::class)->detach($binding, $deleteResource);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not delete the resource: :error', ['error' => $e->getMessage()]));
+
+            return;
+        }
+
         $this->site = $this->site->fresh() ?? $this->site;
-        $this->toastSuccess(__('Binding detached.'));
+        $this->toastSuccess($deleteResource && $offeredDelete
+            ? __('Binding detached and the resource is being deleted.')
+            : __('Binding detached.'));
+    }
+
+    /**
+     * Open a read-only modal describing a binding's connection: the variables it
+     * injects at deploy (secrets masked), its reachability/status, and where it
+     * points. Pure inspection — no SSH, no mutation — so it's gated on `view`.
+     */
+    public function openBindingInfoModal(string $bindingId): void
+    {
+        Gate::authorize('view', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $config = is_array($binding->config) ? $binding->config : [];
+        $env = is_array($binding->injected_env) ? $binding->injected_env : [];
+
+        $vars = [];
+        foreach ($env as $key => $value) {
+            $sensitive = (bool) preg_match('/(PASSWORD|SECRET|TOKEN|KEY|DSN|URL|PASS)/i', (string) $key);
+            $vars[] = [
+                'key' => (string) $key,
+                'value' => $sensitive ? $this->maskBindingSecret((string) $value) : (string) $value,
+                'sensitive' => $sensitive,
+            ];
+        }
+
+        $conn = is_array($binding->connectivity ?? null) ? $binding->connectivity : null;
+
+        $this->bindingInfo = [
+            'type' => (string) $binding->type,
+            'name' => $binding->name,
+            'status' => (string) $binding->status,
+            'provider' => $config['provider'] ?? null,
+            'private_network' => ! empty($config['source_server_id']),
+            'needs_remote_access' => ! empty($config['needs_remote_access']),
+            'last_error' => $config['last_error'] ?? null,
+            'reachable' => is_array($conn) ? ($conn['ok'] ?? null) : null,
+            'reachable_detail' => is_array($conn) ? ($conn['detail'] ?? null) : null,
+            'checked_at' => is_array($conn) ? ($conn['checked_at'] ?? null) : null,
+            'vars' => $vars,
+        ];
+
+        $this->dispatch('open-modal', 'binding-info-modal');
+    }
+
+    /**
+     * Mask a secret for display: keep a 3-char head/tail on longer values so the
+     * operator can sanity-check it's the right credential without revealing it;
+     * fully bullet short values where head/tail would leak most of the string.
+     */
+    private function maskBindingSecret(string $value): string
+    {
+        $len = mb_strlen($value);
+        if ($len === 0) {
+            return '';
+        }
+        if ($len <= 10) {
+            return str_repeat('•', min($len, 12));
+        }
+
+        return mb_substr($value, 0, 3).' •••••• '.mb_substr($value, -3);
     }
 
     /**
@@ -316,12 +800,20 @@ trait ManagesSiteBindingActions
             // from the previous provider can't leak into the new one. The shared
             // from-address/name persist across the switch.
             if ($key === 'provider') {
-                foreach (['host', 'username', 'password', 'secret', 'domain', 'token', 'access_key_id', 'secret_access_key', 'region', 'key', 'credential_id'] as $f) {
+                foreach (['host', 'username', 'password', 'secret', 'domain', 'token', 'access_key_id', 'secret_access_key', 'region', 'key', 'account_id', 'credential_id'] as $f) {
                     $this->bindingForm[$f] = '';
                 }
                 $this->bindingForm['port'] = $value === 'smtp' ? '587' : '';
                 $this->bindingForm['encryption'] = 'tls';
                 $this->bindingForm['endpoint'] = $value === 'mailgun' ? 'api.mailgun.net' : '';
+
+                // Cloudflare is the one provider with a guided/verified panel;
+                // reset its transient state and default the sending domain to the
+                // site's primary when switching to it.
+                $this->resetCloudflareEmailGuidance();
+                if ($value === 'cloudflare') {
+                    $this->bindingForm['cf_domain'] = (string) ($this->site->primaryDomain()?->hostname ?? '');
+                }
 
                 // Entering a chain mode seeds two legs; leaving it drops them.
                 if (in_array($value, ['failover', 'roundrobin'], true)) {
@@ -489,9 +981,16 @@ trait ManagesSiteBindingActions
 
         if ($this->bindingModalType === 'error_tracking') {
             if ($key === 'provider') {
-                foreach (['credential_id', 'dsn', 'traces_sample_rate', 'api_key', 'key'] as $f) {
+                foreach (['credential_id', 'dsn', 'traces_sample_rate', 'api_key', 'key', 'lookout_token', 'lookout_org'] as $f) {
                     $this->bindingForm[$f] = '';
                 }
+                $this->lookoutOrganizations = [];
+            }
+
+            // A new token invalidates any orgs loaded for the previous one.
+            if ($key === 'lookout_token') {
+                $this->lookoutOrganizations = [];
+                $this->bindingForm['lookout_org'] = '';
             }
 
             if ($key === 'credential_id' && is_string($value) && $value !== '') {
@@ -508,6 +1007,10 @@ trait ManagesSiteBindingActions
                     $this->bindingForm['traces_sample_rate'] = (string) ($credentials['traces_sample_rate'] ?? '');
                     $this->bindingForm['api_key'] = (string) ($credentials['api_key'] ?? '');
                     $this->bindingForm['key'] = (string) ($credentials['key'] ?? '');
+                    // A saved Lookout credential is the API token (+ its org), not
+                    // a DSN — reusing it lets a new site mint its own project.
+                    $this->bindingForm['lookout_token'] = (string) ($credentials['token'] ?? '');
+                    $this->bindingForm['lookout_org'] = (string) ($credentials['organization_id'] ?? '');
                 }
             }
 

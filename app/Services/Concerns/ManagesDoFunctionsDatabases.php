@@ -171,6 +171,22 @@ trait ManagesDoFunctionsDatabases
     }
 
     /**
+     * Replace a cluster's trusted sources (firewall). Passing the app server
+     * as the only rule closes the cluster to the public internet while keeping
+     * it reachable from the box that uses it. Each rule is
+     * {type: 'droplet'|'ip_addr'|'tag'|'k8s', value: string}.
+     *
+     * @param  list<array{type: string, value: string}>  $rules
+     */
+    public function setDatabaseTrustedSources(string $clusterId, array $rules): void
+    {
+        $response = $this->request('put', '/databases/'.$clusterId.'/firewall', [
+            'rules' => array_values($rules),
+        ]);
+        $this->assertSuccess($response, 'set database trusted sources');
+    }
+
+    /**
      * Delete a DigitalOcean Managed Database cluster. Returns true on a
      * successful delete (204), false on a 404 (already gone) so teardown
      * is idempotent — mirrors {@see deleteKubernetesCluster()}.

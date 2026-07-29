@@ -8,7 +8,7 @@ use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\CloudflareEdgeDelivery;
+use App\Modules\Edge\Services\CloudflareEdgeDelivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;

@@ -21,11 +21,12 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\DeploymentContractBuilder;
-use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Modules\Deploy\Services\DeploymentContractBuilder;
+use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteDeployCoordinator;
+use App\Support\Sites\DomainDerivedEnvDefaults;
 use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\Sites\SiteSyncPeers;
@@ -33,6 +34,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -44,6 +47,8 @@ use Livewire\WithPagination;
  * detail) so operators can browse historic deploys without
  * scrolling through the recent-deployments collapsibles.
  */
+#[Lazy]
+#[Layout('layouts.app')]
 class DeploymentsList extends Component
 {
     use ConfirmsActionWithModal;
@@ -168,6 +173,37 @@ class DeploymentsList extends Component
         SiteDeployment::STATUS_FAILED,
         SiteDeployment::STATUS_SKIPPED,
     ];
+
+    /**
+     * Merged Deployments card skeleton so lazy load matches the page chrome
+     * (identity + tabs + strip panel) instead of flashing the old hero layout.
+     */
+    public function placeholder(): View
+    {
+        if (! isset($this->server, $this->site)) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        $tabs = [
+            ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
+            ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
+            ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
+            ['id' => self::TAB_WEBHOOK, 'label' => __('Webhook'), 'icon' => 'heroicon-o-bolt'],
+            ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
+            ['id' => self::TAB_HISTORY, 'label' => __('History'), 'icon' => 'heroicon-o-clock'],
+        ];
+
+        return view('livewire.sites.partials.site-workspace-chrome-placeholder', [
+            'server' => $this->server,
+            'site' => $this->site,
+            'title' => __('Deployments'),
+            'description' => __('Deploy, review history, and manage release settings.'),
+            'icon' => 'heroicon-o-rocket-launch',
+            'section' => 'deploy',
+            'tabs' => $tabs,
+            'activeTab' => $this->tab !== '' ? $this->tab : self::TAB_DEPLOY,
+        ]);
+    }
 
     public function mount(Server $server, Site $site): void
     {
@@ -385,11 +421,59 @@ class DeploymentsList extends Component
 
         $seed = [];
         foreach ($this->deployBlockedEnvKeys() as $entry) {
-            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+            $key = (string) $entry['key'];
+            // Pre-fill keys dply can derive from the site's own domain
+            // (SESSION_DOMAIN, APP_URL, …) so the operator just confirms instead
+            // of hunting for a value we already know. Falls back to the
+            // .env.example sample for everything else.
+            $seed[$key] = DomainDerivedEnvDefaults::for($this->site, $key)
+                ?? (string) ($entry['example'] ?? '');
         }
         $this->blocked_env_values = $seed;
 
         $this->dispatch('open-modal', 'deploy-missing-env-modal');
+    }
+
+    /**
+     * One-click fix for the deploy-gate banner: fill every blocked key dply can
+     * derive from the site's domain (primary domain, or the testing hostname
+     * when no primary is set yet), write them, and push — no typing, no modal.
+     */
+    public function autofillBlockedEnvFromDomain(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $keys = array_map(static fn ($e): string => (string) ($e['key'] ?? ''), $this->deployBlockedEnvKeys());
+        $derived = DomainDerivedEnvDefaults::resolve($this->site, $keys);
+
+        if ($derived === []) {
+            $this->toastError(__('Nothing to auto-fill yet — add a domain (or testing hostname) to this site first.'));
+
+            return;
+        }
+
+        // Reuse the writer/push/clear-block path so the banner clears and the
+        // values land on the server exactly as a manual add would.
+        $this->blocked_env_values = array_merge($this->blocked_env_values, $derived);
+        $this->addBlockedEnvVars($parser, $writer);
+    }
+
+    /**
+     * Fill a single blocked input from the site's domain — the per-key sibling
+     * of generateBlockedAppKey(), shown next to derivable keys in the modal.
+     */
+    public function fillBlockedEnvFromDomain(string $key): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $value = DomainDerivedEnvDefaults::for($this->site, $key);
+        if ($value === null) {
+            $this->toastError(__('Add a domain (or testing hostname) to this site first.'));
+
+            return;
+        }
+
+        $this->blocked_env_values[$key] = $value;
     }
 
     /**

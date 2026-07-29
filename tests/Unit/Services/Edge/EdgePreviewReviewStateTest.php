@@ -9,8 +9,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\EdgePreviewReviewState;
-use App\Support\Edge\EdgePreviewPullRequestLink;
+use App\Modules\Edge\Services\EdgePreviewReviewState;
+use App\Modules\Edge\Support\EdgePreviewPullRequestLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

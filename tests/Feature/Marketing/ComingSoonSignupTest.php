@@ -17,6 +17,9 @@ test('coming soon page can be rendered', function () {
 });
 
 test('guest public pages redirect to coming soon', function () {
+    // Gate is off for localhost unless forced — tests run on localhost.
+    config(['dply.coming_soon' => true]);
+
     $this->get('/')
         ->assertRedirect(route('coming-soon', absolute: false));
 

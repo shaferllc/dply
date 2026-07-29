@@ -10,7 +10,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Deploy\ServerlessEnvironmentPreparer;
+use App\Modules\Deploy\Services\ServerlessEnvironmentPreparer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

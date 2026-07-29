@@ -6,7 +6,7 @@ namespace App\Support\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 /**
  * Applies a full pipeline starter (Rollout + replace steps/hooks on a pipeline).
@@ -82,7 +82,7 @@ final class DeployPipelineStarterApplier
     public function applyRollout(Site $site, string $starterKey): void
     {
         $changes = $this->catalog->rolloutChangesFor($site, $starterKey);
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         $meta['deploy_health_enabled'] = $changes['deploy_health_enabled'];
         $meta['deploy_health_auto_rollback'] = $changes['deploy_health_auto_rollback'];

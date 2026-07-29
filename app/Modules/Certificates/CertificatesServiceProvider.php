@@ -6,6 +6,7 @@ namespace App\Modules\Certificates;
 
 use App\Modules\Certificates\Console\BackfillCaddyManagedCertificatesCommand;
 use App\Modules\Certificates\Console\BackfillServerWildcardCertificatesCommand;
+use App\Modules\Certificates\Console\DiagnoseSiteSslCommand;
 use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,6 +27,7 @@ class CertificatesServiceProvider extends ServiceProvider
             $this->commands([
                 BackfillCaddyManagedCertificatesCommand::class,
                 BackfillServerWildcardCertificatesCommand::class,
+                DiagnoseSiteSslCommand::class,
                 RenewServerWildcardCertificatesCommand::class,
             ]);
         }

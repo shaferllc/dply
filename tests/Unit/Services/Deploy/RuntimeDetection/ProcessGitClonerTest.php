@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\ProcessGitClonerTest;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\ProcessGitCloner;
 use Symfony\Component\Process\Process;
 
 beforeEach(function () {
@@ -36,14 +36,17 @@ test('clones local bare repo', function () {
     expect($dest.'/.git')->toBeDirectory();
     expect($dest.'/README.md')->toBeFile();
 });
-test('throws with nonexistent branch', function () {
+test('falls back to remote HEAD when branch is missing', function () {
+    // Stale/wrong branch (form pre-filled `main` for a repo whose default is
+    // actually something else) must not hard-fail — ProcessGitCloner retries
+    // without --branch so runtime detection still has a checkout to inspect.
     $bare = makeLocalBareRepo($this->workDir);
     $dest = $this->workDir.'/dest';
 
-    $this->expectException(GitCloneException::class);
-    $this->expectExceptionMessageMatches('/branch nonexistent/');
-
     (new ProcessGitCloner)->shallowClone($bare, 'nonexistent', $dest);
+
+    expect($dest.'/.git')->toBeDirectory();
+    expect($dest.'/README.md')->toBeFile();
 });
 test('redacts credentials from error message', function () {
     $dest = $this->workDir.'/dest';

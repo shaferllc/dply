@@ -68,7 +68,7 @@ class FileBrowserPathPolicy
     }
 
     /**
-     * @param  array<string, mixed> $patterns
+     * @param  array<string, mixed>  $patterns
      */
     public static function matchesSensitiveGlob(string $path, array $patterns): bool
     {
@@ -111,5 +111,53 @@ class FileBrowserPathPolicy
         }
 
         return $path === $root || str_starts_with($path, $root.'/');
+    }
+
+    /**
+     * Resolve a symlink's stored target to an absolute path relative to the
+     * link's location. Collapses `.` / `..` segments. Does not touch the
+     * remote filesystem — callers must still enforce site/server roots.
+     */
+    public static function resolveLinkTarget(string $linkPath, string $target): string
+    {
+        $linkPath = self::normalize($linkPath);
+        $target = trim($target);
+
+        if ($target === '' || str_contains($target, "\0")) {
+            throw new \InvalidArgumentException('File browser symlink target is invalid.');
+        }
+
+        if ($target[0] === '/') {
+            return self::canonicalize($target);
+        }
+
+        $base = self::parent($linkPath);
+
+        return self::canonicalize(($base === '/' ? '' : $base).'/'.$target);
+    }
+
+    /**
+     * Collapse `.` / `..` in an absolute path without resolving remote symlinks.
+     */
+    public static function canonicalize(string $path): string
+    {
+        $path = self::normalize($path);
+        $stack = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($stack);
+
+                continue;
+            }
+
+            $stack[] = $segment;
+        }
+
+        return $stack === [] ? '/' : '/'.implode('/', $stack);
     }
 }

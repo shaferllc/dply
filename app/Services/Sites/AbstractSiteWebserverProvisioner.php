@@ -396,7 +396,7 @@ BASH;
 
     protected function updateSiteMeta(Site $site, string $key, string $output): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta[$key] = $output;
 
         $site->meta = $meta;

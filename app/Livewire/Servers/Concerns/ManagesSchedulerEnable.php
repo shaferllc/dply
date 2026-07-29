@@ -53,7 +53,7 @@ trait ManagesSchedulerEnable
 
         $this->enable_framework = '';
         if (trim($this->enable_custom_command) === '') {
-            $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+            $directory = $site->effectiveEnvDirectory();
             $this->enable_custom_command = 'cd '.$directory.' && ';
         }
     }
@@ -86,7 +86,7 @@ trait ManagesSchedulerEnable
 
     protected function resolveBareSchedulerCommand(Site $site, string $kind): ?string
     {
-        $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+        $directory = $site->effectiveEnvDirectory();
 
         return match ($kind) {
             ServerSchedulerHeartbeat::KIND_LARAVEL => 'cd '.$directory.' && php artisan schedule:run',

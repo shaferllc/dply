@@ -78,6 +78,9 @@ return [
     /** Rolling audit rows per server in {@see ServerSystemdServiceAuditEvent}. */
     'systemd_services_activity_max_events' => (int) env('SERVER_SERVICES_SYSTEMD_ACTIVITY_MAX_EVENTS', 75),
 
+    /** Page size for the Services → Activity event list. */
+    'systemd_services_activity_per_page' => (int) env('SERVER_SERVICES_SYSTEMD_ACTIVITY_PER_PAGE', 20),
+
     /** Master switch for {@see SyncServerSystemdServicesJob}. */
     'systemd_inventory_job_enabled' => (bool) env('SERVER_SYSTEMD_INVENTORY_JOB_ENABLED', true),
 

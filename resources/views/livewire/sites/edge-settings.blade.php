@@ -7,85 +7,94 @@
                 :items="$settingsBreadcrumbs"
                 doc-contextual
                 :contextual-doc-slug="$contextualDocSlug"
+                class="mb-6"
             />
 
-            <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
-                @if ($site->edgeLiveUrl())
-                    <div class="flex flex-wrap items-center gap-2">
-                        <a
-                            href="{{ $site->edgeLiveUrl() }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[11px] text-brand-ink hover:bg-brand-sand/40"
-                            title="{{ __('Open the live edge site in a new tab') }}"
-                        >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
-                            {{ preg_replace('#^https?://#', '', $site->edgeLiveUrl()) }}
-                        </a>
-                        @can('update', $site)
-                            <button
-                                type="button"
-                                wire:click="redeployEdge"
-                                wire:loading.attr="disabled"
-                                wire:target="redeployEdge"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                            >
-                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
-                                <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
-                                <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
-                            </button>
-                        @endcan
+            {{-- Merged chrome: one outer card, sand identity header, children as strips.
+                 Matches BYO site Settings — Overview owns its own identity strip
+                 (like general-tab); other sections get the shell sand header. --}}
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                @if ($section !== 'general')
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    @svg($sectionHeader['icon'], 'h-5 w-5')
+                                </span>
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
+                                        @if ($headerRoleLabel !== null)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                                                  title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                                                @if ($headerIsDeployer)
+                                                    <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                                                @elseif ($headerCanUpdateSite)
+                                                    <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                                @else
+                                                    <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                                                @endif
+                                                {{ $headerRoleLabel }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        {{ $sectionDescription }}
+                                    </p>
+                                </div>
+                            </div>
+                            @if ($site->edgeLiveUrl())
+                                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                    <a
+                                        href="{{ $site->edgeLiveUrl() }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 font-mono text-[11px] text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800"
+                                        title="{{ __('Open the live edge site in a new tab') }}"
+                                    >
+                                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
+                                        {{ preg_replace('#^https?://#', '', $site->edgeLiveUrl()) }}
+                                    </a>
+                                    @can('update', $site)
+                                        <button
+                                            type="button"
+                                            wire:click="redeployEdge"
+                                            wire:loading.attr="disabled"
+                                            wire:target="redeployEdge"
+                                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                                        >
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
+                                            <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
+                                            <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
+                                        </button>
+                                    @endcan
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 @endif
-            </div>
 
-            @if ($headerRoleLabel !== null)
-                <div class="mt-3 flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                          title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                        @if ($headerIsDeployer)
-                            <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                        @elseif ($headerCanUpdateSite)
-                            <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                        @else
-                            <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                        @endif
-                        {{ $headerRoleLabel }}
-                    </span>
-                </div>
-            @endif
-
-            <x-hero-card
-                :eyebrow="__('Edge')"
-                :title="$sectionHeader['title']"
-                :description="$sectionDescription"
-                class="mt-3"
-            >
-                <x-slot:leading>
-                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                        @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
-                    </span>
-                </x-slot:leading>
-            </x-hero-card>
-
-            <main class="min-w-0 space-y-6 mt-8">
                 @include('livewire.sites.partials.edge.guardrail-banner')
 
                 @if ($sectionConsoleActionKinds !== [])
-                    @include('livewire.partials.console-action-banner-static', [
-                        'run' => $sectionConsoleActionRun,
-                        'kindLabels' => (array) config('console_actions.kinds', []),
-                    ])
+                    <div class="border-b border-brand-ink/10">
+                        @include('livewire.partials.console-action-banner-static', [
+                            'run' => $sectionConsoleActionRun,
+                            'kindLabels' => (array) config('console_actions.kinds', []),
+                        ])
+                    </div>
                 @endif
 
-                <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
+                <div
+                    role="tabpanel"
+                    id="site-settings-panel"
+                    aria-labelledby="site-settings-sidebar"
+                    class="min-w-0 [&_.space-y-6]:space-y-0 [&_.dply-card]:my-0 [&_.dply-card]:rounded-none [&_.dply-card]:border-0 [&_.dply-card]:border-b [&_.dply-card]:border-brand-ink/10 [&_.dply-card]:shadow-none [&_.dply-card]:last:border-b-0"
+                >
                     @if ($section === 'general')
                         @livewire('sites.edge.workspace.overview', ['server' => $server, 'site' => $site], key('edge-section-overview-'.$site->id))
                     @elseif ($section === 'edge-deploys')
                         @livewire('sites.edge.workspace.deploys', ['server' => $server, 'site' => $site], key('edge-section-deploys-'.$site->id))
-                    @elseif ($section === 'edge-domains')
-                        @livewire('sites.edge.workspace.domains', ['server' => $server, 'site' => $site], key('edge-section-domains-'.$site->id))
                     @elseif ($section === 'edge-build')
                         @livewire('sites.edge.workspace.build', ['server' => $server, 'site' => $site], key('edge-section-build-'.$site->id))
                     @elseif ($section === 'edge-environment')
@@ -98,18 +107,32 @@
                         @livewire('sites.edge.workspace.routing', ['server' => $server, 'site' => $site], key('edge-section-routing-'.$site->id))
                     @elseif ($section === 'edge-error-pages')
                         @livewire('sites.edge.workspace.error-pages', ['server' => $server, 'site' => $site], key('edge-section-error-pages-'.$site->id))
+                    @elseif ($section === 'edge-bindings')
+                        @livewire('sites.edge.workspace.bindings', ['server' => $server, 'site' => $site], key('edge-section-bindings-'.$site->id))
                     @elseif ($section === 'edge-crons')
                         @livewire('sites.edge.workspace.crons', ['server' => $server, 'site' => $site], key('edge-section-crons-'.$site->id))
                     @elseif ($section === 'edge-firewall')
                         @livewire('sites.edge.workspace.firewall', ['server' => $server, 'site' => $site], key('edge-section-firewall-'.$site->id))
+                    @elseif ($section === 'edge-bot-protection')
+                        @livewire('sites.edge.workspace.bot-protection', ['server' => $server, 'site' => $site], key('edge-section-bot-protection-'.$site->id))
+                    @elseif ($section === 'edge-rate-limits')
+                        @livewire('sites.edge.workspace.rate-limits', ['server' => $server, 'site' => $site], key('edge-section-rate-limits-'.$site->id))
+                    @elseif ($section === 'edge-waiting-room')
+                        @livewire('sites.edge.workspace.waiting-room', ['server' => $server, 'site' => $site], key('edge-section-waiting-room-'.$site->id))
+                    @elseif ($section === 'edge-forms')
+                        @livewire('sites.edge.workspace.forms', ['server' => $server, 'site' => $site], key('edge-section-forms-'.$site->id))
+                    @elseif ($section === 'edge-jobs')
+                        @livewire('sites.edge.workspace.jobs', ['server' => $server, 'site' => $site], key('edge-section-jobs-'.$site->id))
+                    @elseif ($section === 'edge-snippets')
+                        @livewire('sites.edge.workspace.snippets', ['server' => $server, 'site' => $site], key('edge-section-snippets-'.$site->id))
+                    @elseif ($section === 'edge-tags')
+                        @livewire('sites.edge.workspace.tags', ['server' => $server, 'site' => $site], key('edge-section-tags-'.$site->id))
                     @elseif ($section === 'edge-members')
                         @livewire('sites.edge.workspace.members', ['server' => $server, 'site' => $site], key('edge-section-members-'.$site->id))
                     @elseif ($section === 'edge-alerts')
                         @livewire('sites.edge.workspace.alerts', ['server' => $server, 'site' => $site], key('edge-section-alerts-'.$site->id))
                     @elseif ($section === 'edge-audit')
-                        <div class="space-y-6">
-                            @include('livewire.sites.partials.edge.audit-log')
-                        </div>
+                        @include('livewire.sites.partials.edge.audit-log')
                     @elseif ($section === 'edge-previews')
                         @livewire('sites.edge.workspace.previews', ['server' => $server, 'site' => $site], key('edge-section-previews-'.$site->id))
                     @elseif ($section === 'edge-billing')
@@ -122,7 +145,7 @@
                         @livewire('sites.edge.workspace.danger', ['server' => $server, 'site' => $site], key('edge-section-danger-'.$site->id))
                     @endif
                 </div>
-            </main>
+            </section>
         </div>
     </div>
 

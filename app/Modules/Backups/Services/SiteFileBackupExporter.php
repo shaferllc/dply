@@ -6,7 +6,7 @@ namespace App\Modules\Backups\Services;
 
 use App\Services\Servers\ServerDatabaseRemoteExec;
 
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;

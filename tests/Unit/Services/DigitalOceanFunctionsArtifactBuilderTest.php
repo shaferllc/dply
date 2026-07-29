@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\DigitalOceanFunctionsArtifactBuilderTest;
 
 use App\Models\Site;
-use App\Services\Deploy\DigitalOceanFunctionsArtifactBuilder;
+use App\Modules\Deploy\Services\DigitalOceanFunctionsArtifactBuilder;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 use ZipArchive;

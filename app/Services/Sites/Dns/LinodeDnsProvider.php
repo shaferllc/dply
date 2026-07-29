@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\LinodeService;
+use App\Modules\Cloud\Services\LinodeService;
 
 class LinodeDnsProvider implements DnsProvider
 {
@@ -31,5 +31,14 @@ class LinodeDnsProvider implements DnsProvider
         }
 
         $this->service->deleteDomainRecord($zone, (int) $recordId);
+    }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->domainExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

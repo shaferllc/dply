@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Deploy\RuntimeDetection\GitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloner;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteEnvRequirementScanner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;

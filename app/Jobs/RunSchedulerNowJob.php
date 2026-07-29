@@ -98,7 +98,7 @@ class RunSchedulerNowJob implements ShouldQueue
             return;
         }
 
-        $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+        $directory = $site->effectiveEnvDirectory();
         $command = $this->commandFor($heartbeat->scheduler_kind, $directory);
         if ($command === null) {
             $this->store('failed', 'No canonical run command for this scheduler kind. Use a long-running worker instead.');

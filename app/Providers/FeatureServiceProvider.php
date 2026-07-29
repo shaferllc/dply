@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Admin\PlatformFeatureDefaults;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 
@@ -11,12 +12,12 @@ use Laravel\Pennant\Feature;
  * Naming convention is dot-namespaced: "{namespace}.{leaf}" where the two
  * levels come straight from the config keys.
  *
- * Resolution model is config-first:
- * - config/features.php is the single global default for every scope.
- * - The features table holds only explicit per-org overrides, which Pennant
- *   applies before the resolver runs (an org row beats the config default).
- * - There is no null-scope "platform default" layer; admins change the global
- *   default via config/env, not by writing DB rows.
+ * Resolution precedence (highest wins):
+ * - An explicit per-org row in the `features` table (Pennant applies it
+ *   before the resolver even runs).
+ * - A platform override (feature_platform_overrides table), managed from
+ *   /admin/flags/all — beats the config default for every scope.
+ * - config/features.php (env) — the global default of last resort.
  *
  * Default scope: auth()->user()?->currentOrganization().
  */
@@ -36,9 +37,17 @@ class FeatureServiceProvider extends ServiceProvider
             foreach (array_keys($flags) as $leaf) {
                 $name = "$namespace.$leaf";
 
-                // Resolve from config at check time so the global default always
-                // reflects current config/env (and stays overridable in tests).
-                Feature::define($name, fn () => (bool) config("features.{$namespace}.{$leaf}", false));
+                // Resolve at check time: a platform override (set from the admin
+                // flags UI) beats config; otherwise fall back to the config/env
+                // default so it stays overridable in tests.
+                Feature::define($name, function () use ($name, $namespace, $leaf): bool {
+                    $override = PlatformFeatureDefaults::get($name);
+                    if ($override !== null) {
+                        return $override;
+                    }
+
+                    return (bool) config("features.{$namespace}.{$leaf}", false);
+                });
             }
         }
     }

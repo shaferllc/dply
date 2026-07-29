@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Livewire\Serverless\LogsPanelTest;
 
 use App\Modules\Serverless\Livewire\LogsPanel;
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 /** @return array{0: User, 1: Site} */
 function functionSite(): array

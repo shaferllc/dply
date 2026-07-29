@@ -104,9 +104,12 @@ test('create_site_database creates the row and queues the provision job', functi
     Queue::fake();
     [, $site] = envDbContext();
 
-    // mysql is installed on the server.
+    // mysql is installed and listening on the server.
     test()->mock(ServerDatabaseHostCapabilities::class, function ($m) {
         $m->shouldReceive('forServer')->andReturn(['mysql' => true]);
+    });
+    test()->mock(\App\Services\Servers\ServerDatabaseRemoteExec::class, function ($m) {
+        $m->shouldReceive('engineListeningOnLoopback')->andReturn(true);
     });
 
     DplyServer::tool(CreateSiteDatabase::class, [

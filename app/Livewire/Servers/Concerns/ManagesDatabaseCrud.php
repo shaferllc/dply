@@ -22,6 +22,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -38,6 +39,9 @@ trait ManagesDatabaseCrud
 
     /** When the create-database modal is open, whether the engine is fixed (per-engine tab) or selectable (Basics tab). */
     public bool $create_lock_engine = false;
+
+    /** Target database for the enriched "Drop on server" confirmation modal. */
+    public ?string $drop_confirm_db_id = null;
 
     public string $new_db_username = '';
 
@@ -485,9 +489,79 @@ trait ManagesDatabaseCrud
             if ($this->credentials_modal_db_id === $id) {
                 $this->credentials_modal_db_id = null;
             }
+            if ($this->drop_confirm_db_id === $id) {
+                $this->closeDropConfirm();
+            }
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
+    }
+
+    /**
+     * Open the enriched "Drop on server" confirmation — it surfaces the sites
+     * attached to this database (warn-and-proceed), offers a backup+download
+     * first, and flags a primary-database reassignment before the irreversible
+     * drop. Replaces the generic confirm modal for the drop action only.
+     */
+    public function openDropConfirm(string $databaseId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $exists = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($databaseId)
+            ->exists();
+        if (! $exists) {
+            return;
+        }
+
+        $this->drop_confirm_db_id = $databaseId;
+        $this->dispatch('open-modal', 'drop-database-modal');
+    }
+
+    public function closeDropConfirm(): void
+    {
+        $this->dispatch('close-modal', 'drop-database-modal');
+        $this->drop_confirm_db_id = null;
+    }
+
+    /**
+     * The database targeted by the drop-confirmation modal, eager-loaded with
+     * its owning site and most recent backups so the modal can list dependents
+     * and offer an immediate download of an existing copy.
+     */
+    #[Computed]
+    public function dropConfirmDatabase(): ?ServerDatabase
+    {
+        if (! $this->drop_confirm_db_id) {
+            return null;
+        }
+
+        return ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->drop_confirm_db_id)
+            ->with(['site', 'backups' => fn ($q) => $q->latest()->limit(5)])
+            ->first();
+    }
+
+    /**
+     * Sites that bind to the drop target (via SiteBinding) — the consumers that
+     * will be orphaned. Reuses the tab's "Used by" lookup for one db id.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function dropConfirmConsumers(): array
+    {
+        if (! $this->drop_confirm_db_id) {
+            return [];
+        }
+
+        return $this->buildBindingConsumers(
+            'server_database',
+            [$this->drop_confirm_db_id],
+            $this->server->id,
+        )[$this->drop_confirm_db_id] ?? [];
     }
 
     protected function friendlyDatabaseWorkspaceError(\Throwable $e, string $defaultMessage): string

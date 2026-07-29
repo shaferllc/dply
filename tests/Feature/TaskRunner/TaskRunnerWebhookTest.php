@@ -231,6 +231,8 @@ test('webhook url uses dply public app url when configured', function () {
 
     $url = $task->webhookUrl('updateOutput');
 
-    expect($url)->toStartWith('https://tunnel.example.test/');
+    // Root host comes from DPLY_PUBLIC_APP_URL; scheme follows the forced root
+    // (tests often run under http://localhost, so accept either scheme).
+    expect($url)->toMatch('#^https?://tunnel\.example\.test/#');
     $this->assertStringContainsString('/webhook/task/update-output/'.$task->id, $url);
 });

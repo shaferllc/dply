@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessFlaskAdapterTest;
 
-use App\Services\Deploy\ServerlessFlaskAdapter;
+use App\Modules\Deploy\Services\ServerlessFlaskAdapter;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 

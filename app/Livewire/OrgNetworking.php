@@ -14,7 +14,7 @@ use App\Models\LoadBalancerTarget;
 use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;

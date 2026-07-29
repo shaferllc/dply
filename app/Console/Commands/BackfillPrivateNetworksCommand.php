@@ -8,9 +8,9 @@ use App\Enums\ServerProvider;
 use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Servers\ServerPrivateNetworkRecorder;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\VultrService;
 use Illuminate\Console\Command;
 
 /**

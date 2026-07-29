@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudWorkerCommandsTest;
 
 use App\Enums\SiteType;
-use App\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;

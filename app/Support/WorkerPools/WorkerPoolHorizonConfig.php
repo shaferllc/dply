@@ -13,8 +13,9 @@ use App\Models\WorkerPool;
  * timeout / tries. Stored on `pool->meta['horizon_config']`; auto-defaulted from
  * the primary server's spec so a fresh pool is configured without user input.
  *
- * {@see config/horizon.php} reads the projected HORIZON_* env vars, and
- * {@see PushWorkerPoolHorizonConfigJob} writes them to each box.
+ * {@see PushWorkerPoolHorizonConfigJob} writes HORIZON_* env vars to each box.
+ * Control-plane queue lists live in {@see config/horizon.php}; pool members
+ * still get REDIS_QUEUE pinned so their jobs stay off the control-plane lists.
  */
 final class WorkerPoolHorizonConfig
 {

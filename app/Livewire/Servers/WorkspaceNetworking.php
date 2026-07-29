@@ -18,10 +18,11 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
-use App\Services\LinodeService;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Cloud\Services\VultrService;
+use App\Services\Servers\ServerNetworkMap;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
@@ -51,8 +52,6 @@ class WorkspaceNetworking extends Component
     use ManagesNetworkingNotifications;
     use RendersWorkspacePlaceholder;
     use SurfacesBindingConsumers;
-
-    public Server $server;
 
     /** @var list<string> */
     public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes', 'notifications'];
@@ -520,6 +519,21 @@ class WorkspaceNetworking extends Component
         return true;
     }
 
+    /**
+     * Merged Networking card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-networking-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         // All ready servers in this org except the current one — potential network peers.
@@ -584,8 +598,20 @@ class WorkspaceNetworking extends Component
             }
         }
 
+        // Servers → services → exposure node-link graph for the Servers tab header.
+        // Fresh collection — Collection::prepend mutates in place, and the blade
+        // builds its own $allServers off the untouched $peerServers.
+        $networkMap = app(ServerNetworkMap::class)->build(
+            $this->server,
+            collect([$this->server])->merge($peerServers),
+            $databaseEnginesByServer,
+            $databasesByServer,
+            $cacheServicesByServer,
+        );
+
         return view('livewire.servers.workspace-networking', [
             'peerServers' => $peerServers,
+            'networkMap' => $networkMap,
             'databaseEnginesByServer' => $databaseEnginesByServer,
             'databasesByServer' => $databasesByServer,
             'cacheServicesByServer' => $cacheServicesByServer,

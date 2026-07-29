@@ -342,9 +342,10 @@ final class ContextualDocResolver
         $siteRouteSlugs = config('contextual-docs.site_route_slugs', []);
         $siteRouteSlug = is_array($siteRouteSlugs) ? ($siteRouteSlugs[$currentRoute] ?? null) : null;
         if (is_string($siteRouteSlug) && $siteRouteSlug !== '') {
+            // Docs front-matter uses `group: sites` (see DocsManifest::groups).
             return [
                 'slug' => $siteRouteSlug,
-                'group' => 'byo-sites',
+                'group' => 'sites',
             ];
         }
 

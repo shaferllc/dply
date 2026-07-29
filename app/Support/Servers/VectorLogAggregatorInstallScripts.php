@@ -11,7 +11,7 @@ use App\Support\Servers\Concerns\InstallsVectorBinary;
  * Builds the bash that installs/uninstalls the dply Logs Vector AGGREGATOR on the
  * designated log box, plus the rendered aggregator vector.toml. Sibling to
  * {@see VectorLogAgentInstallScripts} (the edge side); pure string builders, no SSH
- * — {@see \App\Jobs\InstallLogAggregatorJob} runs the output.
+ * — {@see \App\Modules\Logs\Jobs\InstallLogAggregatorJob} runs the output.
  *
  * Pipeline it stands up: `vector` source on the listen port (mTLS, verify the edge
  * client cert) → remap that maps the edge-stamped fields onto the ClickHouse columns
@@ -26,6 +26,19 @@ use App\Support\Servers\Concerns\InstallsVectorBinary;
 class VectorLogAggregatorInstallScripts
 {
     use InstallsVectorBinary;
+
+    /**
+     * Version of the rendered aggregator CONFIG (the vector.toml pipeline) — NOT the
+     * Vector binary version ({@see parseVersion}). BUMP THIS whenever renderVectorToml()
+     * changes in a way that needs a re-sync to take effect on the box. The installer
+     * stamps it into the config header + persists it on the {@see ServerLogAggregator}
+     * row, so the platform can detect a box running a stale config and prompt to re-sync.
+     *
+     * History:
+     *   1 — initial aggregator pipeline (edges → normalize → clickhouse).
+     *   2 — copy/derive the `source` column; per-org policy + hard-cap quota gate.
+     */
+    public const CONFIG_VERSION = 2;
 
     public const BINARY_PATH = '/usr/local/bin/dply-vector';
 
@@ -63,7 +76,7 @@ class VectorLogAggregatorInstallScripts
         $chDb = (string) config('server_logs.clickhouse.database', 'dply_logs');
         $chUser = (string) config('server_logs.clickhouse.username', 'default');
         $defaultRetention = max(1, (int) config('server_logs.clickhouse.retention_days', 7));
-        $policyHeader = \App\Services\Logs\ServerLogAggregatorPolicyMap::HEADER;
+        $policyHeader = \App\Modules\Logs\Services\ServerLogAggregatorPolicyMap::HEADER;
 
         return <<<BASH
         # --- fetch + verify Vector ----------------------------------------------
@@ -210,8 +223,9 @@ class VectorLogAggregatorInstallScripts
      */
     public function renderVectorToml(): string
     {
-        return <<<'TOML'
+        $toml = <<<'TOML'
         # Rendered by dply — do not edit by hand. Managed by the dply Logs aggregator installer.
+        # dply-config-version: __CONFIG_VERSION__
         data_dir = "/var/lib/dply-aggregator"
 
         [sources.edges]
@@ -331,6 +345,16 @@ class VectorLogAggregatorInstallScripts
         max_size = 1073741824
         when_full = "block"
         TOML;
+
+        return str_replace('__CONFIG_VERSION__', (string) self::CONFIG_VERSION, $toml);
+    }
+
+    /**
+     * The config version this code renders — what a freshly re-synced box runs.
+     */
+    public function configVersion(): int
+    {
+        return self::CONFIG_VERSION;
     }
 
     public function renderSystemdUnit(): string
@@ -390,7 +414,7 @@ class VectorLogAggregatorInstallScripts
     /**
      * Bash that writes the shipped policy CSV to the box and reloads the
      * aggregator so Vector reloads the enrichment table. Run by
-     * {@see \App\Jobs\SyncLogAggregatorPolicyJob}; $csvB64 is the rendered CSV.
+     * {@see \App\Modules\Logs\Jobs\SyncLogAggregatorPolicyJob}; $csvB64 is the rendered CSV.
      */
     public function syncPolicyScript(string $csvB64): string
     {

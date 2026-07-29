@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
 use App\Modules\Roadmap\Mail\RoadmapSuggestionStatusMail;
 use App\Models\Organization;
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use App\Models\User;

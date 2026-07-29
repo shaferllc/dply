@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Modules\Realtime\Models\RealtimeApp;
+use AppModulesRealtimeModelsRealtimeApp;
+
 use App\Models\Concerns\ManagesOrganizationBeta;
 use App\Models\Concerns\ManagesOrganizationMembership;
 use App\Models\Concerns\ManagesOrganizationPreferences;
@@ -212,6 +215,12 @@ class Organization extends Model
     public function realtimeApps(): HasMany
     {
         return $this->hasMany(RealtimeApp::class);
+    }
+
+    /** @return HasMany<LookoutProject, $this> */
+    public function lookoutProjects(): HasMany
+    {
+        return $this->hasMany(LookoutProject::class);
     }
 
     /** @return HasMany<OrganizationBillingSnapshot, $this> */

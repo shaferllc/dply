@@ -110,4 +110,16 @@ return [
         /** null = org has no extra cap (use app import_max_bytes). Set in org JSON to lower the limit. */
         'import_max_bytes' => null,
     ],
+
+    /**
+     * Defaults for databases provisioned as Docker containers on a BYO server.
+     */
+    'docker' => [
+        'mysql_image' => env('SERVER_DATABASE_DOCKER_MYSQL_IMAGE', 'mysql:8.0'),
+        'postgres_image' => env('SERVER_DATABASE_DOCKER_POSTGRES_IMAGE', 'postgres:16-alpine'),
+        'redis_image' => env('SERVER_DATABASE_DOCKER_REDIS_IMAGE', 'redis:7-alpine'),
+        'mysql_port_base' => (int) env('SERVER_DATABASE_DOCKER_MYSQL_PORT_BASE', 33060),
+        'postgres_port_base' => (int) env('SERVER_DATABASE_DOCKER_POSTGRES_PORT_BASE', 54320),
+        'redis_port_base' => (int) env('SERVER_DATABASE_DOCKER_REDIS_PORT_BASE', 63790),
+    ],
 ];

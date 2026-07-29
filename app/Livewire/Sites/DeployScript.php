@@ -9,7 +9,8 @@ use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Models\SiteDeployStep;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelinePalette;
 use App\Support\Sites\DeployScriptComposer;
 use Illuminate\Contracts\View\View;
@@ -63,6 +64,25 @@ class DeployScript extends Component
      */
     public bool $managed_restart_enabled = true;
 
+    /**
+     * Mirrors {@see Site::phpFpmDeployStrategy()} (meta `deploy.php_fpm_strategy`):
+     * how the managed restart hands PHP-FPM the new release — reload + OPcache
+     * flush with a restart break-glass (`flush`, default), flush-only
+     * (`flush_only`), or a full FPM restart every deploy (`restart`).
+     */
+    public string $php_fpm_strategy = 'flush';
+
+    /** The values {@see $php_fpm_strategy} may take, in display order. */
+    public const PHP_FPM_STRATEGIES = ['flush', 'flush_only', 'restart'];
+
+    // --- Inline editing of a locked builder/pinned step ---
+
+    /** The locked step currently being edited inline, or null. */
+    public ?string $editing_step_id = null;
+
+    /** The command being edited for {@see $editing_step_id}. */
+    public string $editing_step_command = '';
+
     // --- Shell deploy hook form (lean; shell-only, positional anchors) ---
 
     public bool $hook_form_open = false;
@@ -104,6 +124,7 @@ class DeployScript extends Component
         $this->restart = $rendered['restart'] ?? '';
         $this->atomic_release = (string) ($this->site->deploy_strategy ?? 'simple') === 'atomic';
         $this->managed_restart_enabled = ! (bool) data_get($this->site->meta, 'deploy.skip_managed_restart', false);
+        $this->php_fpm_strategy = $this->site->phpFpmDeployStrategy();
     }
 
     /** Discard unsaved textarea / toggle edits — reload persisted state. */
@@ -118,26 +139,38 @@ class DeployScript extends Component
      * Restart card is honest about it. `items` lists each managed restart in
      * run order; mirrors {@see SiteDeployPipelineRunner::runManagedRestart()}.
      *
-     * @return array{has: bool, items: list<string>, label: string}
+     * @return array{has: bool, items: list<string>, label: string, fpm_strategy_selectable: bool}
      */
     public function managedRestartInfo(): array
     {
         if ($this->site->isCustom()) {
-            return ['has' => false, 'items' => [], 'label' => __('Container apps are restarted by their runtime — dply runs no extra restart here.')];
+            return ['has' => false, 'items' => [], 'label' => __('Container apps are restarted by their runtime — dply runs no extra restart here.'), 'fpm_strategy_selectable' => false];
         }
 
         $runtime = $this->site->runtimeKey();
 
         if ($runtime === 'static') {
-            return ['has' => false, 'items' => [], 'label' => __('Static sites need no restart — the new files are served the moment the release activates.')];
+            return ['has' => false, 'items' => [], 'label' => __('Static sites need no restart — the new files are served the moment the release activates.'), 'fpm_strategy_selectable' => false];
         }
 
         $items = [];
+        $isOctane = $this->site->usesOctaneRuntime();
+        $fpmStrategySelectable = false;
 
-        if ((bool) $this->site->octane_port || $this->site->resolvedLaravelPackageFlag('octane')) {
+        if ($isOctane) {
             $items[] = __('Octane workers — php artisan octane:reload');
         } elseif ($runtime === 'php') {
-            $items[] = __('PHP-FPM — reloaded so it serves the new release');
+            $fpmStrategySelectable = true;
+            $flushes = $this->site->usesDedicatedPhpFpmPool();
+            $items[] = match ($this->php_fpm_strategy) {
+                'restart' => __('PHP-FPM — fully restarted so OPcache starts empty on the new release'),
+                'flush_only' => $flushes
+                    ? __('PHP-FPM — reloaded and OPcache flushed so it serves the new release')
+                    : __('PHP-FPM — reloaded so it serves the new release'),
+                default => $flushes
+                    ? __('PHP-FPM — reloaded and OPcache flushed (restarted automatically if the flush can’t reach the pool)')
+                    : __('PHP-FPM — reloaded so it serves the new release'),
+            };
         } else {
             $items[] = __('the app service — restarted onto the new release');
         }
@@ -154,6 +187,22 @@ class DeployScript extends Component
             'has' => true,
             'items' => $items,
             'label' => __('After every deploy, dply automatically restarts:'),
+            'fpm_strategy_selectable' => $fpmStrategySelectable,
+        ];
+    }
+
+    /**
+     * Display labels for the PHP-FPM & OPcache strategy select, keyed by
+     * {@see $php_fpm_strategy} value, in display order.
+     *
+     * @return array<string, string>
+     */
+    public function phpFpmStrategyOptions(): array
+    {
+        return [
+            'flush' => __('Reload + flush OPcache — restart FPM only if the flush fails (recommended)'),
+            'flush_only' => __('Reload + flush OPcache — never restart FPM'),
+            'restart' => __('Restart PHP-FPM on every deploy — OPcache starts empty'),
         ];
     }
 
@@ -193,11 +242,51 @@ class DeployScript extends Component
 
         $preset = $presets[$key];
         $scripts = app(DeployScriptComposer::class)->preset((string) $preset['runtime'], $preset['framework']);
+        $scripts = $this->dropCommandsAlreadyLocked($scripts);
         $this->build = $scripts['build'] ?? '';
         $this->release = $scripts['release'] ?? '';
         $this->restart = $scripts['restart'] ?? '';
         $this->dispatch('deploy-script-blocks-changed');
         $this->toastSuccess(__(':preset preset loaded — review and save.', ['preset' => $preset['label']]));
+    }
+
+    /**
+     * Strip preset lines a locked builder/pinned step already runs in that phase.
+     *
+     * A preset is the full canonical pipeline rendered to text. When the site
+     * also carries those commands as typed builder steps (shown locked above the
+     * textarea), seeding them into the freeform block would run each one TWICE
+     * per deploy — e.g. loading the Laravel preset onto a site that already has
+     * typed Migrate + Optimize steps. Both the locked steps and the preset lines
+     * derive from the same {@see SiteDeployStep::commandFor()}, so an exact
+     * whitespace-normalized match is a true duplicate and is safe to drop.
+     *
+     * @param  array<string, string>  $scripts  phase => text
+     * @return array<string, string>
+     */
+    private function dropCommandsAlreadyLocked(array $scripts): array
+    {
+        $locked = app(DeployScriptComposer::class)->lockedSteps($this->site);
+        $normalize = static fn (string $c): string => trim((string) preg_replace('/\s+/', ' ', $c));
+
+        foreach ($scripts as $phase => $text) {
+            $existing = collect($locked[$phase] ?? [])
+                ->map(fn (SiteDeployStep $s): string => $normalize((string) ($s->commandFor() ?? '')))
+                ->filter()
+                ->all();
+
+            if ($existing === [] || trim($text) === '') {
+                continue;
+            }
+
+            $kept = collect(preg_split('/\r?\n/', $text) ?: [])
+                ->reject(fn (string $line): bool => trim($line) !== '' && in_array($normalize($line), $existing, true))
+                ->implode("\n");
+
+            $scripts[$phase] = trim($kept);
+        }
+
+        return $scripts;
     }
 
     /**
@@ -256,6 +345,11 @@ class DeployScript extends Component
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         data_set($meta, 'deploy.skip_managed_restart', ! $this->managed_restart_enabled);
 
+        if (! in_array($this->php_fpm_strategy, self::PHP_FPM_STRATEGIES, true)) {
+            $this->php_fpm_strategy = 'flush';
+        }
+        data_set($meta, 'deploy.php_fpm_strategy', $this->php_fpm_strategy);
+
         $this->site->update([
             'deploy_strategy' => $this->atomic_release ? 'atomic' : 'simple',
             'meta' => $meta,
@@ -263,6 +357,92 @@ class DeployScript extends Component
 
         $this->loadFromSite();
         $this->toastSuccess(__('Deploy script saved.'));
+    }
+
+    // --- Locked builder/pinned steps: inline edit + remove ---
+
+    /** Resolve a step that belongs to this site, or null. */
+    private function ownStep(string $id): ?SiteDeployStep
+    {
+        return SiteDeployStep::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($id)
+            ->first();
+    }
+
+    /** Open inline editing for a locked step, seeding the field with its resolved command. */
+    public function editStep(string $id): void
+    {
+        Gate::authorize('update', $this->site);
+        $step = $this->ownStep($id);
+        if (! $step) {
+            return;
+        }
+
+        $this->editing_step_id = (string) $step->id;
+        $this->editing_step_command = (string) ($step->commandFor() ?? '');
+        $this->resetErrorBag();
+    }
+
+    public function cancelStepEdit(): void
+    {
+        $this->editing_step_id = null;
+        $this->editing_step_command = '';
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Persist an edit to a locked step. A typed builder step is converted to a
+     * TYPE_CUSTOM step IN PLACE (same sort_order / phase / pipeline) so the
+     * deploy runner uses the edited command verbatim and the step keeps its
+     * position relative to the other builder steps. A pinned custom step just
+     * has its command updated.
+     */
+    public function saveStep(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if ($this->editing_step_id === null) {
+            return;
+        }
+
+        $this->validate([
+            'editing_step_command' => 'required|string|max:16000',
+        ]);
+
+        $step = $this->ownStep($this->editing_step_id);
+        if (! $step) {
+            $this->cancelStepEdit();
+
+            return;
+        }
+
+        $step->update([
+            'step_type' => SiteDeployStep::TYPE_CUSTOM,
+            'custom_command' => trim($this->editing_step_command),
+        ]);
+
+        $this->cancelStepEdit();
+        $this->loadFromSite();
+        $this->toastSuccess(__('Step updated.'));
+    }
+
+    /** Remove a locked builder/pinned step from the pipeline. */
+    public function removeStep(string $id): void
+    {
+        Gate::authorize('update', $this->site);
+        $step = $this->ownStep($id);
+        if (! $step) {
+            return;
+        }
+
+        if ($this->editing_step_id === (string) $step->id) {
+            $this->cancelStepEdit();
+        }
+
+        $step->delete();
+        $this->loadFromSite();
+        $this->toastSuccess(__('Step removed.'));
     }
 
     // --- Deploy hooks (shell, positional anchors) ---
@@ -387,6 +567,7 @@ class DeployScript extends Component
             'hookAnchorLabels' => SiteDeployHook::anchorLabels(),
             'hookAnchorOptions' => self::HOOK_ANCHORS,
             'managedRestart' => $this->managedRestartInfo(),
+            'phpFpmStrategyOptions' => $this->phpFpmStrategyOptions(),
         ]);
     }
 }

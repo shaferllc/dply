@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Realtime\Actions;
 
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Support\Facades\Log;
 

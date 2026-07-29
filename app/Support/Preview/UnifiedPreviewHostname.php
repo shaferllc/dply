@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Preview;
 
 use App\Models\Site;
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 use Illuminate\Support\Str;
 
 /**

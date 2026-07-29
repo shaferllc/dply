@@ -13,7 +13,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
-use App\Services\Deploy\DockerImageReleaseRollback;
+use App\Modules\Deploy\Services\DockerImageReleaseRollback;
 use App\Services\Sites\SecretResidencyResolver;
 use App\Services\Sites\SiteDeployCoordinator;
 use App\Services\Sites\SiteDeploySyncCoordinator;

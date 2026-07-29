@@ -29,8 +29,10 @@ return [
     */
     'nav' => [
         ['key' => 'cluster', 'route' => 'servers.cluster', 'icon' => 'server-stack', 'label' => 'Cluster', 'group' => 'overview', 'only_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cluster'],
-        ['key' => 'console', 'route' => 'servers.console', 'preview_route' => 'servers.console-preview', 'icon' => 'command-line', 'label' => 'Console', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.console', 'preview_feature' => 'workspace.console_preview'],
+        // Overview leads its group — it's the workspace landing page; Console
+        // (feature-gated / "Soon" preview) must not sit above it.
         ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Overview', 'group' => 'overview', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'console', 'route' => 'servers.console', 'preview_route' => 'servers.console-preview', 'icon' => 'command-line', 'label' => 'Console', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.console', 'preview_feature' => 'workspace.console_preview'],
         ['key' => 'run', 'route' => 'servers.run', 'preview_route' => 'servers.run-preview', 'icon' => 'play-circle', 'label' => 'Run', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.run', 'preview_feature' => 'workspace.run_preview'],
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites', 'group' => 'overview'],
         // monitor — standalone items (Deploys, Errors) lead, then the cluster
@@ -53,7 +55,7 @@ return [
         ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases', 'group' => 'stacks', 'requires_any_tags' => ['postgres', 'mysql'], 'except_host_kinds' => ['kubernetes']],
         ['key' => 'caches', 'route' => 'servers.caches', 'icon' => 'bolt', 'label' => 'Caches', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.caches'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.services'],
-        ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'php', 'route' => 'servers.runtime', 'icon' => 'command-line', 'label' => 'Runtime', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
         ['key' => 'configuration', 'route' => 'servers.configuration', 'icon' => 'document-text', 'label' => 'Configuration', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'tools', 'route' => 'servers.tools', 'icon' => 'wrench-screwdriver', 'label' => 'Tools', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'webserver', 'route' => 'servers.webserver', 'icon' => 'globe-alt', 'label' => 'Webserver', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
@@ -73,8 +75,8 @@ return [
         ['key' => 'networking', 'route' => 'servers.networking', 'icon' => 'share', 'label' => 'Networking', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'system-users', 'route' => 'servers.system-users', 'icon' => 'user-group', 'label' => 'System users', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.system_users'],
-        // admin — standalone (Logs, Files) lead, then the Settings
-        // (settings/notifications/maintenance) and Automation (blueprint/cli) clusters.
+        // admin — standalone (Logs, Files, Blueprint, CLI) lead, then the
+        // Settings (settings/notifications/maintenance) cluster.
         // Deploy windows merged into the Deploys page (servers.deploys?tab=deploy-windows).
         // 'manage' nav entry retired: the Manage workspace was dissolved. Tools is
         // now its own Stacks entry (servers.tools); Updates lives on Patches,
@@ -227,6 +229,9 @@ return [
             'label' => 'Runtime',
             'icon' => 'command-line',
             'members' => ['php', 'configuration', 'tools'],
+            // Leaf nav label is also "Runtime"; keep the cluster sub-tab as PHP
+            // so the strip reads Runtime → PHP | Configuration | Tools.
+            'tab_labels' => ['php' => 'PHP'],
         ],
         'settings' => [
             'label' => 'Settings',
@@ -234,11 +239,9 @@ return [
             'members' => ['settings', 'notifications', 'maintenance'],
             'tab_labels' => ['settings' => 'General'],
         ],
-        'automation' => [
-            'label' => 'Automation',
-            'icon' => 'document-duplicate',
-            'members' => ['blueprint', 'cli'],
-        ],
+        // Blueprint + CLI used to share an "automation / Blueprints" cluster, but
+        // CLI is the dply terminal client (install / coming soon) — unrelated to
+        // golden-server blueprints — so both stay as standalone admin leaves.
     ],
 
     /*

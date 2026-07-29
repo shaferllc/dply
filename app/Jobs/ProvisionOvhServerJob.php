@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Services\OvhService;
+use App\Modules\Cloud\Services\OvhService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\Queue\ShouldQueue;

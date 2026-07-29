@@ -30,7 +30,7 @@
     $metricsAt = isset($report['capacity']['metrics_at']) ? \Illuminate\Support\Carbon::parse($report['capacity']['metrics_at']) : null;
 @endphp
 
-<div id="settings-cost-estimate" class="space-y-6 scroll-mt-24">
+<div id="settings-cost-estimate" class="scroll-mt-24">
     <div class="{{ $card }} overflow-hidden p-0">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">

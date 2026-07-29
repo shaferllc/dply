@@ -143,7 +143,7 @@ class ServerlessTriggerProvisioner implements ServerlessTriggerBackend
      */
     private function cronExpression(FunctionAction $action): ?string
     {
-        $trigger = ($action->trigger );
+        $trigger = is_array($action->trigger) ? $action->trigger : [];
         $cron = trim((string) ($trigger['cron'] ?? ''));
 
         if ($cron === '' || ($trigger['enabled'] ?? false) !== true) {

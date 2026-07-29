@@ -23,7 +23,8 @@
                         $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
                     @endphp
 
-                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])">
+                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"
                             :active="$activeSubtab === 'overview'"
@@ -45,6 +46,7 @@
                             </span>
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>
+                    </div>
 
                     @if ($activeSubtab === 'info')
                         @include('livewire.servers.partials.cache-engine-info-card', [
@@ -57,7 +59,7 @@
                              installable; this engine shows a teaser instead of the install
                              affordance until platform admin flips the flag on. The Info tab
                              still describes the engine so operators can evaluate it now. --}}
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6">
                             <div class="flex items-start gap-3">
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/60 text-brand-moss ring-1 ring-brand-ink/10">
                                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
@@ -91,7 +93,7 @@
                             $unsupportedReason = $engineUnsupportedReasons[$engine] ?? null;
                         @endphp
                         {{-- Overview when not installed: the install affordance. --}}
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6">
                             <h3 class="text-base font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
                             @if ($unsupportedReason)
@@ -141,7 +143,7 @@
                     @else
                         {{-- Overview when in-flight: small status note pointing at the
                              top-of-page console banner for live details. --}}
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6">
                             <h3 class="text-base font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
                                 {{ __(':engine is changing — see the progress banner above for live status and output.', ['engine' => $engineLabels[$engine]]) }}
@@ -166,7 +168,8 @@
                          still shown in the status grid below. --}}
 
                     {{-- Sub-tab strip — group the per-engine cards so the page isn't a 9-card scroll. --}}
-                    <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])">
+                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"
                             icon="heroicon-o-presentation-chart-line"
@@ -210,6 +213,7 @@
                             {{ __('Configure') }}
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>
+                    </div>
 
                     @if ($activeSubtab === 'info')
                     {{-- Engine info — what this engine is, license, links, "best for".
@@ -224,7 +228,7 @@
 
                     @if ($activeSubtab === 'overview')
                     {{-- Installed and idle: status grid + action row. --}}
-                    <div class="{{ $card }} p-6 sm:p-8">
+                    <div class="{{ $card }} px-5 py-5 sm:px-6">
                         <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
                         <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                             <div>
@@ -411,6 +415,23 @@
                                 <p class="{{ $groupLabel }}">{{ __('Lifecycle') }}</p>
                                 <div class="{{ $groupButtons }}">
                                     @if ($lifecycleAvailable)
+                                        {{-- Failed rows (typically "not installed" — no systemd unit
+                                             found by Recheck) get Reinstall as the primary action.
+                                             installCacheService() already re-runs on a FAILED row;
+                                             this button just surfaces that path on the card instead
+                                             of making the operator force-remove and hunt for the
+                                             Install button. --}}
+                                        @if ($row->status === \App\Models\ServerCacheService::STATUS_FAILED)
+                                            <button
+                                                type="button"
+                                                wire:click="openConfirmActionModal('installCacheService', ['{{ $engine }}'], @js(__('Reinstall :engine?', ['engine' => $engineLabels[$engine]])), @js(__('Re-runs the full install on this server (apt install, systemctl enable, verify ping). Existing config and data directories on the box are left in place. This row will track the new install\'s progress.')), @js(__('Reinstall')), true)"
+                                                class="{{ $btnLifecycle }}"
+                                                title="{{ __('Run the install again — use this when the engine never actually landed on the box.') }}"
+                                            >
+                                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
+                                                {{ __('Reinstall') }}
+                                            </button>
+                                        @endif
                                         <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="{{ $btnLifecycle }}">
                                             <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
@@ -520,7 +541,7 @@
 
                     {{-- Port card (Configure subtab, all engines). Restarts the unit. --}}
                     @if ($activeSubtab === 'configure')
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6">
                             <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — listen port', ['engine' => $engineLabels[$engine]]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
                                 {{ __('Change the TCP port :engine listens on. The systemd unit will restart and connections drop briefly while the new port comes up. If the engine fails to bind, the previous config is restored automatically.', ['engine' => $engineLabels[$engine]]) }}
@@ -558,7 +579,7 @@
                     {{-- AUTH password card (redis-family only, Configure subtab). --}}
                     @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine))
                         @if ($activeSubtab === 'configure')
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6">
                             <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — AUTH password', ['engine' => $engineLabels[$engine]]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
                                 @if (filled($row->auth_password))
@@ -663,7 +684,7 @@
                             $exposedRule = $cacheExposure['rule'];
                             $hasAuth = filled($row->auth_password ?? null);
                         @endphp
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0">
                                     <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — network exposure', ['engine' => $engineLabels[$engine]]) }}</h3>
@@ -781,7 +802,7 @@
                              wire:poll attributes were unreliable — Livewire
                              didn't always re-register the timer after the
                              attribute reappeared post-re-render. --}}
-                        <div class="{{ $card }} p-6 sm:p-8" wire:poll.2s="pollCacheMemorySettings">
+                        <div class="{{ $card }} px-5 py-5 sm:px-6" wire:poll.2s="pollCacheMemorySettings">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — memory limits', ['engine' => $engineLabels[$engine]]) }}</h3>
@@ -939,7 +960,7 @@
                                     return rtrim(rtrim(number_format($val, $val < 10 ? 1 : 0), '0'), '.').' '.$units[$i];
                                 };
                             @endphp
-                            <div class="{{ $card }} p-6 sm:p-8">
+                            <div class="{{ $card }} px-5 py-5 sm:px-6">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div class="max-w-2xl">
                                         <h3 class="text-base font-semibold text-brand-ink">{{ __('System INFO snapshot') }}</h3>
@@ -1303,7 +1324,7 @@
                          subtab off-screen on long config files. --}}
                     @if ($activeSubtab === 'configure')
                     @php $configModalName = 'cache-config-modal-'.$engine; @endphp
-                    <div class="{{ $card }} p-6 sm:p-8">
+                    <div class="{{ $card }} px-5 py-5 sm:px-6">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h3>

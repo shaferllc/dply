@@ -38,8 +38,10 @@ return [
     |   STRIPE_PRICE_STANDARD_CLOUD=price_...              (flat dply Cloud platform fee, monthly)
     |   STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_...
     |   STRIPE_PRICE_STANDARD_CLOUD_USAGE=price_...         (metered Cloud resources, per-cent unit)
-    |   STRIPE_PRICE_STANDARD_EDGE=price_...               (flat per dply Edge site, monthly)
+    |   STRIPE_PRICE_STANDARD_EDGE=price_...               (flat per static/hybrid Edge site, monthly)
     |   STRIPE_PRICE_STANDARD_EDGE_YEARLY=price_...
+    |   STRIPE_PRICE_STANDARD_EDGE_SSR=price_...           (Worker-native SSR Edge site, monthly)
+    |   STRIPE_PRICE_STANDARD_EDGE_SSR_YEARLY=price_...
     |
     |   STRIPE_PRICE_ENTERPRISE=price_...              (manual Stripe sub for sales-led deals)
     */
@@ -140,11 +142,16 @@ return [
         // moment an app attaches a database (DO Postgres is $15+/mo). See the
         // managed-product billing investigation memo.
         'cloud_cents' => 500,
-        // Flat per-site fee for first-party dply Edge (static/SSG delivery).
-        // Edge is genuinely flat-eligible: Cloudflare Workers Paid is $5/mo per
-        // *account* (amortized across the whole fleet) and R2/Pages egress is
-        // free, so the marginal cost of another static site is ~$0.
+        // Flat per-site fee for first-party dply Edge (static/SSG + hybrid).
+        // Edge static is genuinely flat-eligible: Cloudflare Workers Paid is
+        // $5/mo per *account* (amortized across the whole fleet) and R2/Pages
+        // egress is free, so the marginal cost of another static site is ~$0.
+        // Hybrid stays on this fee — the Cloud origin bills separately.
         'edge_cents' => 200,
+        // Worker-native SSR Edge sites (dispatch namespace / Workers for
+        // Platforms). Higher platform fee than static/hybrid; hybrid remains
+        // on edge_cents because Cloud already covers the origin compute.
+        'edge_ssr_cents' => 700,
         // Edge delivery usage is billed in 1-cent Stripe units (quantity = cents).
         'edge_usage_unit_cents' => 1,
         // LEGACY fallback only. Managed Realtime now bills per connection-tier;
@@ -196,6 +203,23 @@ return [
         'cloud_bucket_cents' => 500,
         // Metered Cloud resources are billed in 1-cent Stripe units (quantity = cents).
         'cloud_usage_unit_cents' => 1,
+
+        /*
+        |----------------------------------------------------------------------
+        | AWS App Runner — create-flow cost estimate (customer-paid AWS)
+        |----------------------------------------------------------------------
+        |
+        | App Runner runs on the customer's AWS account (BYO credential), so
+        | these rates are for the Cloud create sidebar estimate only — they
+        | are NOT pushed into CloudResourceCostCalculator / Stripe cloud_usage.
+        | dply still bills the flat `cloud_cents` platform fee.
+        |
+        | Defaults are us-east-1 provisioned-compute list rates (USD/hour).
+        | Monthly floor ≈ (vCPU×rate + GB×rate) × hours × instances.
+        */
+        'app_runner_hours_per_month' => (int) env('SUBSCRIPTION_APP_RUNNER_HOURS_PER_MONTH', 730),
+        'app_runner_vcpu_usd_per_hour' => (float) env('SUBSCRIPTION_APP_RUNNER_VCPU_USD_PER_HOUR', 0.064),
+        'app_runner_memory_gb_usd_per_hour' => (float) env('SUBSCRIPTION_APP_RUNNER_MEMORY_GB_USD_PER_HOUR', 0.007),
         // --- Legacy size-tier keys (being retired in the plan migration) ---
         // Retained so the not-yet-migrated billing dashboard, analytics, and
         // cost cards keep functioning until each is moved onto the plan model.
@@ -243,6 +267,8 @@ return [
             'cloud_usage' => env('STRIPE_PRICE_STANDARD_CLOUD_USAGE', ''),
             'edge' => env('STRIPE_PRICE_STANDARD_EDGE', ''),
             'edge_yearly' => env('STRIPE_PRICE_STANDARD_EDGE_YEARLY', ''),
+            'edge_ssr' => env('STRIPE_PRICE_STANDARD_EDGE_SSR', ''),
+            'edge_ssr_yearly' => env('STRIPE_PRICE_STANDARD_EDGE_SSR_YEARLY', ''),
             'edge_usage' => env('STRIPE_PRICE_STANDARD_EDGE_USAGE', ''),
             // dply Logs ingest overage — metered per-cent quantity, monthly only.
             // Unset by default: the usage line never reconciles until a price id
@@ -263,6 +289,19 @@ return [
                 'starter' => env('STRIPE_PRICE_STANDARD_REALTIME_STARTER_YEARLY', ''),
                 'growth' => env('STRIPE_PRICE_STANDARD_REALTIME_GROWTH_YEARLY', ''),
                 'scale' => env('STRIPE_PRICE_STANDARD_REALTIME_SCALE_YEARLY', ''),
+            ],
+            // Managed Lookout error-tracking — one metered line per project tier.
+            // Tier definitions/prices live in config('lookout.tiers'); these are
+            // the Stripe price IDs the syncer drives to the active project count.
+            'lookout_tiers' => [
+                'starter' => env('STRIPE_PRICE_STANDARD_LOOKOUT_STARTER', ''),
+                'growth' => env('STRIPE_PRICE_STANDARD_LOOKOUT_GROWTH', ''),
+                'scale' => env('STRIPE_PRICE_STANDARD_LOOKOUT_SCALE', ''),
+            ],
+            'lookout_tiers_yearly' => [
+                'starter' => env('STRIPE_PRICE_STANDARD_LOOKOUT_STARTER_YEARLY', ''),
+                'growth' => env('STRIPE_PRICE_STANDARD_LOOKOUT_GROWTH_YEARLY', ''),
+                'scale' => env('STRIPE_PRICE_STANDARD_LOOKOUT_SCALE_YEARLY', ''),
             ],
             // --- Legacy size-tier Stripe prices (retired with the migration) ---
             'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),

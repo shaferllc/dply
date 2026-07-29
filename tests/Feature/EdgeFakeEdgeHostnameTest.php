@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\SiteType;
-use App\Http\Middleware\ResolveEdgeCustomDomain;
+use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;

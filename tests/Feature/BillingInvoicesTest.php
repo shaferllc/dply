@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\BillingInvoicesTest;
 
-use App\Livewire\Billing\Invoices;
+use App\Modules\Billing\Livewire\Invoices;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

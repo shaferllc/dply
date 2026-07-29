@@ -2,7 +2,7 @@
 
 namespace App\Modules\Marketplace\Services;
 
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerRecipe;

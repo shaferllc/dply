@@ -19,7 +19,7 @@ return [
 
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', true), // https://aws.amazon.com/ec2/
         'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
-        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', false), // https://www.cloudflare.com/
+        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/ — DNS + CDN (no compute)
         'gandi' => env('DPLY_SERVER_PROVIDER_GANDI', false), // https://www.gandi.net/
         'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', false), // https://www.namecheap.com/
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/

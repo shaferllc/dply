@@ -68,9 +68,13 @@ final class SiteFixers
                 // Match the live PHP version. Prefer the apt package; if it doesn't
                 // exist for this version (e.g. very new PHP from a PPA), build the
                 // extension from PECL and enable it for that version.
-                'command' => 'V=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;"); export DEBIAN_FRONTEND=noninteractive; apt-get update -y >/dev/null 2>&1; '
-                    .'if apt-get install -y "php$V-redis"; then :; '
-                    .'else apt-get install -y "php$V-dev" php-pear build-essential autoconf pkg-config && (yes "" | pecl install -f redis) && echo "extension=redis.so" > "/etc/php/$V/mods-available/redis.ini" && phpenmod -v "$V" redis; fi; '
+                // DPkg::Lock::Timeout bounds the wait when unattended-upgrades (or
+                // any apt run) holds the dpkg lock — without it apt blocks
+                // indefinitely and the whole check+install hangs behind a single
+                // SSH exec, so the console banner sits on "Checking…" for minutes.
+                'command' => 'V=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;"); export DEBIAN_FRONTEND=noninteractive; APT="apt-get -o DPkg::Lock::Timeout=120"; $APT update -y >/dev/null 2>&1; '
+                    .'if $APT install -y "php$V-redis"; then :; '
+                    .'else $APT install -y "php$V-dev" php-pear build-essential autoconf pkg-config && (yes "" | pecl install -f redis) && echo "extension=redis.so" > "/etc/php/$V/mods-available/redis.ini" && phpenmod -v "$V" redis; fi; '
                     .'systemctl restart "php$V-fpm" 2>/dev/null || true',
                 'sudo' => true, 'cwd' => false, 'timeout' => 600,
                 'detect' => '/Class ["\']Redis["\'] not found|PhpRedisConnector|ext-redis|the redis extension/i',
@@ -81,7 +85,7 @@ final class SiteFixers
                 'label' => 'Install the Postgres client (psql)',
                 'reason' => 'psql is not installed — migrate uses it to load the schema dump.',
                 'kind' => 'shell',
-                'command' => 'apt-get update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client',
+                'command' => 'apt-get -o DPkg::Lock::Timeout=120 update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y postgresql-client',
                 'sudo' => true, 'cwd' => false, 'timeout' => 300,
                 'detect' => '/psql: (not found|command not found)/i',
             ],
@@ -89,7 +93,7 @@ final class SiteFixers
                 'label' => 'Install the MySQL client',
                 'reason' => 'The mysql client is not installed.',
                 'kind' => 'shell',
-                'command' => 'apt-get update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get install -y default-mysql-client',
+                'command' => 'apt-get -o DPkg::Lock::Timeout=120 update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y default-mysql-client',
                 'sudo' => true, 'cwd' => false, 'timeout' => 300,
                 'detect' => '/(mysql|mysqldump): (not found|command not found)/i',
             ],
@@ -99,7 +103,7 @@ final class SiteFixers
                 'label' => 'Install Node.js & npm',
                 'reason' => 'npm/node is not installed — needed to build front-end assets.',
                 'kind' => 'shell',
-                'command' => 'apt-get update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm',
+                'command' => 'apt-get -o DPkg::Lock::Timeout=120 update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y nodejs npm',
                 'sudo' => true, 'cwd' => false, 'timeout' => 420,
                 'detect' => '/\b(npm|node): (not found|command not found)|sh: \d+: (npm|node): not found/i',
             ],

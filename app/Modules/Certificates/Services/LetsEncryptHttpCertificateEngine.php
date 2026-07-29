@@ -107,7 +107,14 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
             app(OpenLiteSpeedTlsConfigurator::class)->syncServer($server->fresh());
         }
 
-        if (LetsEncryptCertbotCommandBuilder::usesWebrootChallenge($site)) {
+        // certbot certonly only OBTAINS the cert — dply must now install it into
+        // the managed vhost and reload. The vhost was written pointing at the
+        // substitute (shared-wildcard) cert when the per-host cert was still
+        // absent; re-applying re-points it at the now-present cert. (Apache/--nginx
+        // installer plugins wire it in themselves; OpenLiteSpeed is handled by the
+        // TLS configurator above.) Without this, plain-nginx custom domains serve
+        // the wildcard cert and fail TLS SAN verification for the custom host.
+        if (LetsEncryptCertbotCommandBuilder::usesCertonly($site) && $site->webserver() !== 'openlitespeed') {
             ApplySiteWebserverConfigJob::dispatch((string) $site->id);
         }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\ApplyCloudSiteExtrasTest;
 
-use App\Actions\Cloud\ApplyCloudSiteExtras;
+use App\Modules\Cloud\Actions\ApplyCloudSiteExtras;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Organization;
@@ -12,8 +12,8 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\CloudScalingConfig;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\CloudScalingConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 

@@ -50,6 +50,11 @@ trait AsAction
     use AsObject {
         AsObject::make as objectMake;
         AsFactory::make insteadof AsObject;
+        // AsCompensatable itself `use AsObject`, so it re-exposes make() and
+        // collides with AsFactory independently of the exclusion above. Without
+        // this line, loading AsAction is a hard fatal — and AbstractCreate,
+        // AbstractEdit and Actions all use it.
+        AsFactory::make insteadof AsCompensatable;
     }
     use AsObservable {
         AsObservable::observe as observeEvents;

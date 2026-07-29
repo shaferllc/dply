@@ -41,9 +41,9 @@
                         </button>
                         <button
                             type="button"
-                            wire:click="openConfirmActionModal('dropDatabaseOnServer', ['{{ $db->id }}'], @js($db->engine === 'sqlite' ? __('Delete SQLite file on server') : __('Drop database on server')), @js($db->engine === 'sqlite' ? __('Permanently delete this database file on the server? This cannot be undone.') : __('Permanently drop this database and user on the server? This cannot be undone.')), @js($db->engine === 'sqlite' ? __('Delete file') : __('Drop database')), true)"
+                            wire:click="openDropConfirm(@js($db->id))"
                             wire:loading.attr="disabled"
-                            wire:target="dropDatabaseOnServer"
+                            wire:target="openDropConfirm,dropDatabaseOnServer"
                             class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {{ __('Drop on server') }}

@@ -11,6 +11,7 @@ use App\Models\WorkerPool;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Services\Sites\SiteSystemdProvisioner;
 use App\Services\Sites\SiteSystemdUnitBuilder;
+use App\Support\DplyRuntime;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -138,9 +139,16 @@ class WorkerDaemonBackend
         $user = $site->effectiveSystemUser($server);
         $dir = $site->effectiveEnvDirectory();
 
+        [$runtimeMode, $workerRole] = $this->hostRuntimeFor($site);
+
         $keptSlugs = [];
         foreach ($site->processes as $process) {
             if ($process->type === SiteProcess::TYPE_WEB || ! $process->is_active) {
+                continue;
+            }
+            // Manifest roles (worker / worker:primary / web) filter which hosts
+            // get the program. Empty roles = apply on every host (BYO default).
+            if (! $process->matchesRuntimeRole($runtimeMode, $workerRole)) {
                 continue;
             }
             $command = trim((string) $process->command);
@@ -148,8 +156,23 @@ class WorkerDaemonBackend
                 continue;
             }
 
+            $loopSeconds = $process->loopSeconds();
+            if ($loopSeconds !== null) {
+                $command = sprintf(
+                    '/bin/bash -c %s',
+                    escapeshellarg(sprintf(
+                        'while true; do %s || true; sleep %d; done',
+                        $command,
+                        $loopSeconds,
+                    )),
+                );
+            }
+
             $slug = $this->programSlug($site, $process);
             $keptSlugs[] = $slug;
+
+            $oneshot = $process->isOneshot();
+            $stopwait = $process->stopwaitsecs();
 
             SupervisorProgram::updateOrCreate(
                 ['server_id' => $server->id, 'slug' => $slug],
@@ -162,11 +185,12 @@ class WorkerDaemonBackend
                     'numprocs' => max(1, (int) $process->scale),
                     'is_active' => true,
                     'env_vars' => $process->env_vars ?: null,
-                    'autorestart' => true,
+                    'autorestart' => $oneshot ? 'false' : 'true',
+                    'startsecs' => $oneshot ? 0 : 1,
                     'redirect_stderr' => true,
                     // Horizon traps SIGTERM and drains in-flight jobs; give it
-                    // room before supervisor SIGKILLs it.
-                    'stopwaitsecs' => 3660,
+                    // room before supervisor SIGKILLs it unless the manifest pins.
+                    'stopwaitsecs' => $stopwait ?? 3660,
                 ],
             );
         }
@@ -236,8 +260,32 @@ class WorkerDaemonBackend
 
     private function programSlug(Site $site, SiteProcess $process): string
     {
-        $name = preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) $process->name) ?: 'worker';
+        $name = preg_replace('/[^a-zA-Z0-9_-]+/', '-', (string) $process->name) ?: 'worker';
 
         return $this->slugPrefix($site).Str::lower($name);
+    }
+
+    /**
+     * Runtime role of the HOST that will run these daemons.
+     * Local control-plane dogfood uses this process's DplyRuntime; remote BYO
+     * servers use server meta when present, otherwise `all` (no role filter).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function hostRuntimeFor(Site $site): array
+    {
+        $dir = $site->effectiveEnvDirectory();
+        $localRoot = base_path();
+        if ($dir !== '' && @realpath($dir) !== false && @realpath($localRoot) !== false
+            && realpath($dir) === realpath($localRoot)) {
+            return [DplyRuntime::mode(), DplyRuntime::workerRole()];
+        }
+
+        $meta = is_array($site->server?->meta) ? $site->server->meta : [];
+        $runtime = is_array($meta['dply_runtime'] ?? null) ? $meta['dply_runtime'] : [];
+        $mode = is_string($runtime['mode'] ?? null) ? strtolower($runtime['mode']) : 'all';
+        $role = is_string($runtime['worker_role'] ?? null) ? strtolower($runtime['worker_role']) : 'primary';
+
+        return [$mode, $role];
     }
 }

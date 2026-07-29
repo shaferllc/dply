@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Roadmap\Livewire;
 
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use Illuminate\Contracts\View\View;

@@ -7,7 +7,7 @@ namespace App\Services\Servers;
 use App\Enums\ServerTier;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\OrganizationCostObservatory;
+use App\Modules\Billing\Services\OrganizationCostObservatory;
 
 /**
  * Per-server true cost card — provider estimate, dply tier fee, site count,
@@ -39,7 +39,7 @@ final class ServerCostCard
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
         $hardware = $this->hardware($server, $tier);
-        $providerCents = (int) ($provider['monthly_usd_cents']);
+        $providerCents = (int) ($provider['monthly_usd_cents'] ?? 0);
         $stackCents = $providerCents + $dplyCents;
         $providerKnown = ($provider['source'] ?? '') !== 'unknown';
 

@@ -16,9 +16,9 @@
         return $symbol.$amount;
     };
 @endphp
-<x-server-workspace-tab-panel id="snapshots-panel-images" labelled-by="snapshots-tab-images" panel-class="space-y-8">
+<x-server-workspace-tab-panel id="snapshots-panel-images" labelled-by="snapshots-tab-images" panel-class="min-w-0">
     {{-- Capture a new image. --}}
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-camera class="h-5 w-5" aria-hidden="true" />
@@ -66,7 +66,7 @@
     </section>
 
     {{-- History. Polls while a capture is still running, then goes quiet. --}}
-    <section class="dply-card overflow-hidden" @if ($imagesInFlight) wire:poll.10s @endif>
+    <section class="border-b border-brand-ink/10" @if ($imagesInFlight) wire:poll.10s @endif>
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />

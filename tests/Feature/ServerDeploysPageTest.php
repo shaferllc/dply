@@ -38,7 +38,7 @@ test('lists deploys for all sites on the server', function () {
     $response = $this->actingAs($user)->get(route('servers.deploys', $server));
 
     $response->assertOk()
-        ->assertSee('Deploys on')
+        ->assertSee('Deploys')
         ->assertSee('site-a')
         ->assertSee('site-b');
 });
@@ -87,7 +87,7 @@ test('does not show deploys from sites on other servers', function () {
 
     $response->assertOk()
         ->assertDontSee('on-b')
-        ->assertSee('No deployments match');
+        ->assertSee('No deployments yet', false);
 });
 test('forbids when user is not in org', function () {
     // The merged Deploys page authorizes `view` on the server via

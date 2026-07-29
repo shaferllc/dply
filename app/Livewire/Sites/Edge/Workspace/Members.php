@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeSiteMember;
@@ -21,6 +22,7 @@ use Livewire\Component;
  */
 class Members extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use MountsEdgeWorkspaceSection;
 
@@ -139,9 +141,9 @@ class Members extends Component
                 'members' => $members,
                 'eligibleUsers' => $eligibleUsers,
                 'roleOptions' => [
-                    EdgeSiteMember::ROLE_VIEWER => __('Viewer — read-only'),
-                    EdgeSiteMember::ROLE_DEPLOYER => __('Deployer — deploy + env'),
-                    EdgeSiteMember::ROLE_ADMIN => __('Admin — full site control'),
+                    EdgeSiteMember::ROLE_VIEWER => __('Viewer'),
+                    EdgeSiteMember::ROLE_DEPLOYER => __('Deployer'),
+                    EdgeSiteMember::ROLE_ADMIN => __('Admin'),
                 ],
             ],
         ));

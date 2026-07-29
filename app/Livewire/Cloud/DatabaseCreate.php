@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Actions\Cloud\CreateCloudDatabase;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use App\Models\ProviderCredential;

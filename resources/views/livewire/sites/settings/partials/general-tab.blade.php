@@ -1,6 +1,7 @@
 {{-- Services-first: a live site with no app yet. Configure services here, then
-     connect a repo — the bindings wire into the first deploy automatically. --}}
-@if ($site->canRechooseApp())
+     connect a repo — the bindings wire into the first deploy automatically.
+     Stays outside the merged General card (see settings.blade.php). --}}
+@if ($site->canRechooseApp() && ! ($generalTabSkipChooseApp ?? false))
     @php
         // Each option is a shortcut that deep-links into the picker pre-selected
         // (?app=<key>) so the click lands on the exact action. "Install an app"
@@ -55,16 +56,15 @@
     </section>
 @endif
 
-@include('livewire.sites.settings.partials.logo')
-
+@unless ($generalTabChooseAppOnly ?? false)
 {{-- Read-only overview. Edit affordances live elsewhere:
      primary hostname → Routing > Domains (pencil on the row);
-     everything else → Settings tab. --}}
-<section class="dply-card overflow-hidden">
+     everything else → Settings tab. The header badge doubles as the
+     site-logo control (click the avatar for upload/pull/remove) — it used
+     to be a full-width card above this one. --}}
+<div class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
+        <livewire:sites.logo-menu :site="$site" :key="'overview-logo-menu-'.$site->id" />
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overview') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
@@ -74,92 +74,105 @@
         </div>
     </div>
 
-    <div class="px-6 py-6 sm:px-7">
-        @if ($testingHostname !== '')
-            @php
-                $testingUrl = 'http://'.$testingHostname;
-            @endphp
-            <div
-                x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($testingUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
-                class="mb-5 rounded-xl border border-brand-ink/10 bg-white p-4"
-            >
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
-                <div class="mt-2 flex min-w-0 items-center gap-1.5 font-mono text-sm text-brand-ink">
-                    <span
-                        class="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap"
-                        title="{{ $testingUrl }}"
-                    >{{ $testingHostname }}</span>
-                    <a
-                        href="{{ $testingUrl }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="{{ __('Open URL') }}"
-                        class="shrink-0 text-brand-mist hover:text-brand-sage"
-                    >
-                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
-                    </a>
-                    <button
-                        type="button"
-                        x-on:click.stop="copy()"
-                        :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
-                        class="shrink-0 text-brand-mist hover:text-brand-sage"
-                    >
+    {{-- Compact fact grid: joined hairline tiles (gap-px trick — the tinted
+         wrapper shows through 1px gaps as the grid lines), two per row, label
+         over value. The long testing URL spans the full width; boolean states
+         render as tinted pills. Mirrors the server hero facts card. --}}
+    <div class="px-6 py-5 sm:px-7">
+        <dl class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-brand-ink/10 bg-brand-ink/[0.07] shadow-sm sm:grid-cols-2">
+            @if ($testingHostname !== '')
+                @php $testingUrl = 'http://'.$testingHostname; @endphp
+                <div
+                    x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($testingUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
+                    class="group flex items-center justify-between gap-3 bg-white px-4 py-3 transition-colors hover:bg-brand-sand/[0.15] sm:col-span-2 sm:px-5"
+                >
+                    <div class="min-w-0">
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</dt>
+                        <dd class="mt-1.5 min-w-0">
+                            <a href="{{ $testingUrl }}" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex max-w-full items-center gap-1 truncate font-mono text-sm font-medium text-brand-ink decoration-brand-sage/40 underline-offset-4 hover:text-brand-forest hover:underline"
+                                title="{{ $testingUrl }}">{{ $testingHostname }}<x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" /></a>
+                        </dd>
+                    </div>
+                    <button type="button" x-on:click.stop="copy()" :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
+                        class="shrink-0 rounded-lg border border-brand-ink/10 bg-white p-1.5 text-brand-mist shadow-sm transition hover:border-brand-ink/20 hover:text-brand-ink">
                         <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
                         <x-heroicon-s-check x-show="copied" x-cloak class="h-4 w-4 text-brand-sage" aria-hidden="true" />
                     </button>
                 </div>
-            </div>
-        @endif
-        <div class="grid gap-5">
-                @unless ($site->isHeadless())
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $primaryHostnameLabel }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_primary_domain !== '' ? $settings_primary_domain : '—' }}</span>
-                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
-                            <x-heroicon-o-pencil-square class="h-3 w-3" />
-                            {{ __('Edit in Routing') }}
-                        </a>
+            @endif
+
+            @unless ($site->isHeadless())
+                <div class="group flex items-center justify-between gap-3 bg-white px-4 py-3 transition-colors hover:bg-brand-sand/[0.15] sm:px-5">
+                    <div class="min-w-0">
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $primaryHostnameLabel }}</dt>
+                        <dd class="mt-1.5 min-w-0">
+                            @if ($settings_primary_domain !== '')
+                                <a href="https://{{ $settings_primary_domain }}" target="_blank" rel="noopener noreferrer"
+                                    class="inline-flex max-w-full items-center gap-1 truncate font-mono text-sm font-medium text-brand-ink decoration-brand-sage/40 underline-offset-4 hover:text-brand-forest hover:underline"
+                                    title="https://{{ $settings_primary_domain }}">{{ $settings_primary_domain }}<x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" /></a>
+                            @else
+                                <span class="font-mono text-sm font-medium text-brand-ink">—</span>
+                            @endif
+                        </dd>
                     </div>
+                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate
+                        title="{{ __('Edit in Routing') }}"
+                        class="shrink-0 rounded-lg border border-transparent p-1.5 text-brand-mist opacity-0 transition hover:border-brand-ink/15 hover:bg-white hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100">
+                        <x-heroicon-o-pencil-square class="h-4 w-4" aria-hidden="true" />
+                    </a>
                 </div>
-                @endunless
+            @endunless
 
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $documentRootLabel }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</span>
-                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
-                            <x-heroicon-o-pencil-square class="h-3 w-3" />
-                            {{ __('Edit in Settings') }}
-                        </a>
-                    </div>
+            <div class="group flex items-center justify-between gap-3 bg-white px-4 py-3 transition-colors hover:bg-brand-sand/[0.15] sm:px-5">
+                <div class="min-w-0">
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $documentRootLabel }}</dt>
+                    <dd class="mt-1.5 truncate font-mono text-sm font-medium text-brand-ink" title="{{ $settings_document_root }}">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</dd>
                 </div>
-
-                <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    @foreach ($summaryCards as $card)
-                        @php
-                            $cardValue = trim((string) $card['value']);
-                            $cardValueLower = strtolower($cardValue);
-                            $cardIsPositive = \Illuminate\Support\Str::contains($cardValueLower, ['active', 'enabled', 'running', 'ready', 'healthy', 'published']);
-                            $cardIsNegative = \Illuminate\Support\Str::contains($cardValueLower, ['disabled', 'failed', 'inactive', 'error', 'down', 'not ', 'never', 'unhealthy']);
-                            $cardIsPath = \Illuminate\Support\Str::startsWith($cardValue, '/');
-                        @endphp
-                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm">
-                            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $card['label'] }}</dt>
-                            <dd class="mt-1.5 flex items-center gap-2">
-                                @if ($cardIsPositive || $cardIsNegative)
-                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full {{ $cardIsNegative ? 'bg-rose-500' : 'bg-emerald-500' }} ring-4 {{ $cardIsNegative ? 'ring-rose-500/15' : 'ring-emerald-500/15' }}" aria-hidden="true"></span>
-                                @endif
-                                <span class="break-all {{ $cardIsPath ? 'font-mono text-xs' : 'text-sm' }} font-semibold text-brand-ink">{{ $cardValue !== '' ? $cardValue : '—' }}</span>
-                            </dd>
-                        </div>
-                    @endforeach
-                </dl>
+                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate
+                    title="{{ __('Edit in Settings') }}"
+                    class="shrink-0 rounded-lg border border-transparent p-1.5 text-brand-mist opacity-0 transition hover:border-brand-ink/15 hover:bg-white hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100">
+                    <x-heroicon-o-pencil-square class="h-4 w-4" aria-hidden="true" />
+                </a>
             </div>
-        </div>
-</section>
 
-<section class="dply-card overflow-hidden">
+            @php
+                // Half-width tiles rendered above the cards (domain + web dir);
+                // used to span the final card across both columns when the
+                // overall tile count is odd, so the grid never ends on a hole.
+                $overviewTileOffset = ($site->isHeadless() ? 0 : 1) + 1;
+            @endphp
+            @foreach ($summaryCards as $card)
+                @php
+                    $cardValue = trim((string) $card['value']);
+                    $cardValueLower = strtolower($cardValue);
+                    $cardIsPositive = \Illuminate\Support\Str::contains($cardValueLower, ['active', 'enabled', 'running', 'ready', 'healthy', 'published']);
+                    $cardIsNegative = \Illuminate\Support\Str::contains($cardValueLower, ['disabled', 'failed', 'inactive', 'error', 'down', 'not ', 'never', 'unhealthy']);
+                    $cardIsPath = \Illuminate\Support\Str::startsWith($cardValue, '/');
+                @endphp
+                <div class="bg-white px-4 py-3 transition-colors hover:bg-brand-sand/[0.15] sm:px-5 @if ($loop->last && ($overviewTileOffset + $loop->iteration) % 2 !== 0) sm:col-span-2 @endif">
+                    <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $card['label'] }}</dt>
+                    <dd class="mt-1.5 flex min-w-0 items-center">
+                        @if ($cardIsPositive || $cardIsNegative)
+                            <span class="inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold leading-none ring-1 ring-inset {{ $cardIsNegative ? 'bg-rose-50 text-rose-800 ring-rose-600/15' : 'bg-emerald-50 text-emerald-800 ring-emerald-600/15' }}">
+                                <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $cardIsNegative ? 'bg-rose-500' : 'bg-emerald-500' }}" aria-hidden="true"></span>
+                                <span class="truncate">{{ ucfirst($cardValue) }}</span>
+                            </span>
+                        @else
+                            <span class="min-w-0 truncate {{ $cardIsPath ? 'font-mono' : '' }} text-sm font-medium text-brand-ink" title="{{ $cardValue }}">{{ $cardValue !== '' ? $cardValue : '—' }}</span>
+                        @endif
+                    </dd>
+                </div>
+            @endforeach
+        </dl>
+    </div>
+</div>
+
+{{-- Console-action banner sits BELOW the Overview card on General (it renders
+     at the top of <main> on every other section). --}}
+@include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+
+<div class="border-b border-brand-ink/10">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
             <x-icon-badge>
@@ -293,9 +306,9 @@
             </div>
         @endif
     </div>
-</section>
+</div>
 
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
@@ -426,10 +439,10 @@
             </div>
         </dl>
     </div>
-</section>
+</div>
 
 @if (data_get($site->meta, 'notes'))
-    <section class="dply-card overflow-hidden">
+    <div class="border-b border-brand-ink/10">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
@@ -446,14 +459,9 @@
         <div class="px-6 py-6 sm:px-7">
             <p class="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{{ data_get($site->meta, 'notes') }}</p>
         </div>
-    </section>
+    </div>
 @endif
 
-<x-cli-snippet :commands="[
-    ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
-    ['label' => __('Diagnose site'), 'command' => 'dply sites:doctor '.$site->slug],
-    ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
-    ['label' => __('Export full config'), 'command' => 'dply sites:export:config '.$site->slug.' --to=site.json'],
-    ['label' => __('Export deploy manifest'), 'command' => 'dply sites:export:manifest '.$site->slug.' --to=manifest.json'],
-    ['label' => __('List all sites'), 'command' => 'dply sites:list'],
-]" />
+{{-- The General CLI snippet renders in settings.blade.php AFTER the
+     recent-deployments block, so it always sits at the very bottom of the page. --}}
+@endunless

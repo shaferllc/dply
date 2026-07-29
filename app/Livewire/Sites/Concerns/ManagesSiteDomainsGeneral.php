@@ -9,13 +9,16 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SitePreviewDomain;
 use App\Models\Workspace;
-use App\Services\AzureDnsService;
-use App\Services\Cloudflare\CloudflareDnsService;
-use App\Services\DigitalOceanService;
-use App\Services\GcpDnsService;
-use App\Services\HetznerService;
-use App\Services\LinodeService;
-use App\Services\Route53Service;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Services\Sites\TestingHostnameProvisioner;
+use App\Modules\Cloud\Services\AzureDnsService;
+use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\GcpDnsService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Cloud\Services\Route53Service;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
 
@@ -45,6 +48,9 @@ trait ManagesSiteDomainsGeneral
     public bool $preview_auto_ssl = true;
 
     public bool $preview_https_redirect = true;
+
+    /** Optional label captured in the "Add preview URL" popover. */
+    public string $newPreviewLabel = '';
 
     /** Selected org DigitalOcean credential for DNS automation; empty string = organization default. */
     public string $settings_dns_provider_credential_id = '';
@@ -417,6 +423,10 @@ trait ManagesSiteDomainsGeneral
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation('Preview settings saved.');
+
+        // Secure the primary preview host if auto-SSL is on and it isn't covered
+        // yet — otherwise it serves whatever per-host cert is the vhost default.
+        $this->queuePreviewCertificate($this->site->primaryPreviewDomain());
     }
 
     public function confirmRemovePreviewDomain(string $previewDomainId): void
@@ -437,10 +447,95 @@ trait ManagesSiteDomainsGeneral
         $this->authorize('update', $this->site);
 
         $previewDomain = $this->site->previewDomains()->findOrFail($previewDomainId);
+
+        // Drop the managed provider DNS record too, so removing an added preview
+        // URL doesn't leave an orphaned A record behind.
+        app(TestingHostnameProvisioner::class)->deleteManagedPreviewRecord($this->site, $previewDomain);
+
         $previewDomain->delete();
 
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation('Preview domain removed.');
+    }
+
+    /**
+     * Whether dply can mint another managed preview URL here — managed testing
+     * hostnames must be enabled and the server must have an IP to point at.
+     */
+    public function canAddManagedPreview(): bool
+    {
+        return trim((string) ($this->site->server?->ip_address ?? '')) !== ''
+            && app(TestingHostnameProvisioner::class)->isEnabledForSite($this->site);
+    }
+
+    /**
+     * "Add preview URL" — provision an additional dply-managed hostname on the
+     * site's testing zone (its own DNS record) and wire it into the live vhost.
+     *
+     * TLS is NOT per-host here: every `*.<testing-zone>` hostname is secured by
+     * the shared per-server wildcard certificate, so a new preview URL is covered
+     * the moment that wildcard is installed — no per-host cert to queue. If the
+     * wildcard isn't up yet, the managed-testing-host card's "Issue TLS" brings it
+     * up and this (and every) preview host inherits it.
+     */
+    public function addManagedPreviewDomain(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $domain = app(TestingHostnameProvisioner::class)->provisionAdditional($this->site, $this->newPreviewLabel);
+        if ($domain === null) {
+            $this->toastError(__('Could not provision a preview URL — make sure managed DNS is connected and the server has an IP address.'));
+
+            return;
+        }
+
+        $this->newPreviewLabel = '';
+
+        // Add the hostname to the live webserver config (server_name). Managed
+        // hosts ride the shared *.zone wildcard for TLS; if that wildcard isn't
+        // installed yet they have no HTTPS until it's issued.
+        $this->site->load('previewDomains');
+        $this->syncPreviewSettingsForm();
+        $this->finalizeRoutingMutation(__('Preview URL added: :host', ['host' => $domain->hostname]));
+
+        $this->queuePreviewCertificate($domain->fresh());
+
+        if (! $this->site->isCoveredByServerWildcard()) {
+            $this->toastWarning(__('Added — but the :zone wildcard certificate isn’t installed yet, so HTTPS won’t work until it’s issued (use “Issue TLS” on the managed testing host).', ['zone' => $this->site->testingZone() ?? 'testing']));
+        }
+    }
+
+    /**
+     * Issue a preview host's certificate when it isn't already covered. Hosts on
+     * a server that carries the shared *.testing-zone wildcard need nothing
+     * (the wildcard secures them); everywhere else each preview host gets its own
+     * HTTP-01 certificate, or its testing cert never matches and the browser
+     * serves whichever per-host cert happens to be the vhost default.
+     */
+    private function queuePreviewCertificate(?SitePreviewDomain $domain): void
+    {
+        if ($domain === null || ! $domain->auto_ssl || trim((string) $domain->hostname) === '') {
+            return;
+        }
+
+        // dply-managed hosts live on the testing zone and are secured by the
+        // shared *.zone wildcard — issuing a per-host cert here is not just
+        // redundant, it shadows the wildcard as the block's ssl_certificate and
+        // breaks sibling hostnames. Only genuinely custom preview domains (BYO,
+        // off the testing zone) take a per-host certificate.
+        if ($domain->managed_by_dply || $this->site->isCoveredByServerWildcard()) {
+            return;
+        }
+
+        $cert = app(CertificateRequestService::class)->queuePrimaryPreviewAutoSsl(
+            $this->site->fresh(['previewDomains']) ?? $this->site,
+            $domain,
+        );
+        if ($cert !== null) {
+            // Brief delay so the webserver apply (server_name) and the DNS record
+            // settle before the HTTP-01 challenge; failures self-heal on retry.
+            ExecuteSiteCertificateJob::dispatch((string) $cert->id)->delay(now()->addSeconds(15));
+        }
     }
 }

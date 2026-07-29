@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudSiteTest;
 
-use App\Actions\Cloud\CreateCloudSite;
+use App\Modules\Cloud\Actions\CreateCloudSite;
 use App\Enums\SiteType;
-use App\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;

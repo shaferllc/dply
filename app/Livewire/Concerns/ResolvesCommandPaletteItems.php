@@ -62,7 +62,7 @@ trait ResolvesCommandPaletteItems
                 ['New launch', 'create launch wizard stack', 'launches.create', 'plus-circle'],
                 ['New cloud app', 'create cloud paas deploy', 'cloud.create', 'cube', [], 'surface.cloud'],
                 ['New cloud database', 'create database postgres mysql redis', 'cloud.databases.create', 'circle-stack', [], 'surface.cloud'],
-                ['New serverless function', 'create function faas', 'serverless.create', 'bolt', [], 'surface.serverless'],
+                ['New serverless app', 'create serverless laravel app faas', 'serverless.create', 'bolt', [], 'surface.serverless'],
                 ['New edge app', 'create edge worker', 'edge.create', 'globe-alt', [], 'surface.edge'],
                 ['New project', 'create project workspace', 'projects.index', 'rectangle-stack', [], 'surface.projects'],
                 ['New organization', 'create organization team', 'organizations.create', 'building-office-2'],
@@ -217,6 +217,20 @@ trait ResolvesCommandPaletteItems
         }
     }
 
+    /**
+     * Per-request memo for org-scoped site lookups. Palette groups often
+     * resolve the same site (context seed, deploy-sync, recent) more than
+     * once in a single render.
+     *
+     * @var array<string, Site|null>
+     */
+    private array $scopedSiteMemo = [];
+
+    /**
+     * @var array<string, Server|null>
+     */
+    private array $scopedServerMemo = [];
+
     /** Org-scoped site lookup (eager-loads the server for deep links). */
     private function scopedSite(?Organization $org, ?string $id): ?Site
     {
@@ -224,7 +238,12 @@ trait ResolvesCommandPaletteItems
             return null;
         }
 
-        return Site::query()
+        $key = (string) $org->getKey().'|'.$id;
+        if (array_key_exists($key, $this->scopedSiteMemo)) {
+            return $this->scopedSiteMemo[$key];
+        }
+
+        return $this->scopedSiteMemo[$key] = Site::query()
             ->whereIn('server_id', $org->serverIds())
             ->with('server')
             ->find($id);
@@ -237,7 +256,12 @@ trait ResolvesCommandPaletteItems
             return null;
         }
 
-        return $org->servers()->find($id);
+        $key = (string) $org->getKey().'|'.$id;
+        if (array_key_exists($key, $this->scopedServerMemo)) {
+            return $this->scopedServerMemo[$key];
+        }
+
+        return $this->scopedServerMemo[$key] = $org->servers()->find($id);
     }
 
     /** Build an escaped LIKE pattern for a free-text query. */

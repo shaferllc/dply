@@ -50,6 +50,101 @@ final class SiteOpcacheManager
     }
 
     /**
+     * Flush OPcache after a deploy cutover, returning a one-line deploy-log
+     * message describing the outcome.
+     *
+     * An FPM *reload* (the deploy's managed restart) re-reads pool config but
+     * leaves the OPcache shared memory intact. On dply boxes
+     * `opcache.revalidate_path` is off, so workers keep serving the PRIOR
+     * release's cached bytecode AND its resolved `current/public/index.php`
+     * realpath even after the atomic symlink swap — the classic "deployed but
+     * still serving old code" failure (e.g. a stale Vite asset hash 404'ing
+     * because the manifest the app reads is the old release's). {@see reset()}
+     * runs `opcache_reset()` inside a live worker, which is what actually clears
+     * it — no full `systemctl restart`, no cross-pool blip.
+     *
+     * Best-effort by contract: never throws, and a no-op (empty string) for
+     * shared-pool sites (Apache/OpenLiteSpeed), so a flush can never fail an
+     * otherwise-healthy deploy.
+     */
+    public function flushForDeploy(Site $site): string
+    {
+        if (! $site->usesDedicatedPhpFpmPool()) {
+            return '';
+        }
+
+        try {
+            $result = $this->reset($site);
+        } catch (\Throwable $e) {
+            return $this->flushFailed($site, $e->getMessage());
+        }
+
+        if ($result === null || ($result['ok'] ?? false) !== true) {
+            $reason = is_array($result) ? (string) ($result['error'] ?? 'pool unreachable') : 'pool unreachable';
+
+            return $this->flushFailed($site, $reason);
+        }
+
+        if (($result['reset'] ?? null) === false) {
+            return "[dply] OPcache not enabled for {$site->phpFpmPoolName()} — nothing to flush.\n";
+        }
+
+        return "[dply] OPcache flushed for {$site->phpFpmPoolName()} — new release live.\n";
+    }
+
+    /**
+     * The flush couldn't run inside a worker (agent unreachable, socket perms,
+     * no sudo…). Under the default `flush` strategy that escalates to a full
+     * FPM restart — the break-glass that used to be manual: a sub-second blip
+     * beats silently serving the prior release's bytecode. `flush_only` keeps
+     * the old warn-and-continue. Never throws.
+     */
+    private function flushFailed(Site $site, string $reason): string
+    {
+        $log = "[dply] OPcache flush failed ({$reason})";
+
+        if ($site->phpFpmDeployStrategy() !== 'flush') {
+            return $log." — continuing; new release picked up on next FPM restart.\n";
+        }
+
+        return $this->restartFpmService($site)
+            ? $log." — restarted PHP-FPM instead; OPcache starts empty on the new release.\n"
+            : $log." — FPM restart fallback also failed; the site may keep serving the prior release until FPM restarts.\n";
+    }
+
+    /**
+     * `systemctl restart` the FPM service that owns this site's pool — the
+     * `restart`-strategy / break-glass path. Restarting the versioned service
+     * bounces every pool of that PHP version on the box, which is exactly why
+     * the flush is preferred and this is the fallback. exec() never surfaces
+     * exit codes, so the script prints an explicit DPLY_FPM_RESTART marker.
+     */
+    public function restartFpmService(Site $site): bool
+    {
+        $server = $site->server;
+        if ($server === null) {
+            return false;
+        }
+
+        $service = sprintf('php%s-fpm', $site->resolvedPhpFpmVersion());
+        // `if` guards the runner's `set -e`; the marker always prints.
+        $script = sprintf(
+            "if sudo -n systemctl restart %s 2>&1; then echo 'DPLY_FPM_RESTART=ok'; else echo 'DPLY_FPM_RESTART=failed'; fi",
+            escapeshellarg($service),
+        );
+
+        try {
+            $out = $this->remote->runInlineBash($server, 'site-fpm-restart', $script, 60, false);
+
+            return str_contains((string) $out->getBuffer(), 'DPLY_FPM_RESTART=ok');
+        } catch (\Throwable $e) {
+            Log::warning('sites.fpm_restart_failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function run(Site $site, string $action): ?array
@@ -64,6 +159,11 @@ final class SiteOpcacheManager
         $agentPath = '/tmp/.dply-opcache-'.Str::lower(Str::random(24)).'.php';
 
         $b64 = base64_encode($this->agentScript());
+        // The FPM pool socket is owned by the pool user with listen.mode 0660,
+        // so the `dply` SSH user can't connect to it directly ("Permission
+        // denied") — root can (it bypasses the socket's perms). Try `sudo -n`
+        // first and fall back to a direct run on boxes without passwordless
+        // sudo, so a permission-only failure never blanks the whole probe.
         $script = sprintf(
             <<<'BASH'
 AGENT=%s
@@ -72,14 +172,24 @@ chmod 644 "$AGENT"
 PHPBIN=%s
 if [ ! -x "$PHPBIN" ]; then PHPBIN="$(command -v php || true)"; fi
 if [ -z "$PHPBIN" ]; then echo '{"ok":false,"error":"no php binary"}'; rm -f "$AGENT"; exit 0; fi
-"$PHPBIN" "$AGENT" %s %s 2>/dev/null
+SOCK=%s
+ACTION=%s
+OUT="$(sudo -n "$PHPBIN" "$AGENT" "$SOCK" "$ACTION" 2>/dev/null)"
+case "$OUT" in
+  *'"ok":true'*) : ;;
+  *) OUT="$("$PHPBIN" "$AGENT" "$SOCK" "$ACTION" 2>/dev/null)" ;;
+esac
+printf '%%s' "$OUT"
 rm -f "$AGENT"
+CURREL="$(readlink -f %s 2>/dev/null)"; CURREL="${CURREL##*/}"
+printf '\nDPLY_CURRENT=%%s\n' "$CURREL"
 BASH,
             escapeshellarg($agentPath),
             escapeshellarg($b64),
             escapeshellarg("/usr/bin/php{$version}"),
             escapeshellarg($socket),
             escapeshellarg($action),
+            escapeshellarg(rtrim($site->effectiveRepositoryPath(), '/').'/current'),
         );
 
         try {
@@ -98,8 +208,19 @@ BASH,
         }
 
         $decoded = json_decode($m[0], true);
+        if (! is_array($decoded)) {
+            return null;
+        }
 
-        return is_array($decoded) ? $decoded : null;
+        // The `current` symlink target folder — the ground truth for "what
+        // should be live". Compared against `serving_release`, a mismatch is the
+        // real worker pin (the DB SiteRelease row can lag actual deploys, so it
+        // is NOT a reliable baseline). Captured in the same round-trip.
+        if (preg_match('/DPLY_CURRENT=(\S+)/', $buffer, $cm) && $cm[1] !== '') {
+            $decoded['current_release'] = $cm[1];
+        }
+
+        return $decoded;
     }
 
     /**
@@ -175,15 +296,29 @@ if ($action === 'reset') {
     echo json_encode(['ok' => true, 'reset' => (bool) $did]);
     exit;
 }
-$s = @opcache_get_status(false);
+$s = @opcache_get_status(true);
 if ($s === false) { echo json_encode(['ok' => true, 'enabled' => false, 'reason' => 'disabled-in-fpm']); exit; }
 $mem = $s['memory_usage'] ?? [];
 $stats = $s['opcache_statistics'] ?? [];
 $hits = (int) ($stats['hits'] ?? 0);
 $misses = (int) ($stats['misses'] ?? 0);
 $total = $hits + $misses;
+// Which release are the LIVE workers actually booted from? The cached-script
+// realpaths carry the atomic-deploy `releases/<folder>/…` segment; the most
+// common one is the release these workers serve. Compared against the `current`
+// symlink target, a mismatch IS the "deployed but serving old code" pin. Derived
+// here so only the short folder string crosses the wire, never the script map.
+$servingRelease = null;
+if (isset($s['scripts']) && is_array($s['scripts'])) {
+    $counts = [];
+    foreach ($s['scripts'] as $path => $info) {
+        if (preg_match('#/releases/([^/]+)/#', (string) $path, $mm)) { $counts[$mm[1]] = ($counts[$mm[1]] ?? 0) + 1; }
+    }
+    if ($counts) { arsort($counts); $servingRelease = (string) array_key_first($counts); }
+}
 echo json_encode([
     'ok' => true,
+    'serving_release' => $servingRelease,
     'enabled' => (bool) ($s['opcache_enabled'] ?? false),
     'full' => (bool) ($s['cache_full'] ?? false),
     'restart_pending' => (bool) ($s['restart_pending'] ?? false),

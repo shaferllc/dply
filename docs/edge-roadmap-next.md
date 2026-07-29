@@ -1,10 +1,19 @@
 # dply Edge roadmap — next phases
 
-Status: **Wave A closed ✅** · **Wave B complete ✅** (2026-05-25) · Waves C–E next.
+Status: **Waves A–E all complete ✅** (Wave E closed 2026-07-09).
 
 Continuation of [edge-roadmap.md](edge-roadmap.md). Phases 0–4 shipped the core deploy loop, custom domains, and hybrid SSR. The phases below take Edge from "works" to "feels finished" and competitive with Vercel / Netlify / Cloudflare Pages.
 
-Ordering is roughly by dependency, not strict priority. The top-5 must-haves (P5, P6, P7, P9, P14) close the "feels finished" gap. P14 is the single biggest acquisition lever.
+Ordering is roughly by dependency, not strict priority. The must-haves that closed the "feels finished" gap were P5, P6, P7 and P9.
+
+> **Doc-drift warning.** This file has repeatedly lagged the code. Wave E was
+> listed as "next" for six weeks after both its phases had shipped, and P9b/P9c
+> shipped built on *existing* primitives rather than the new tables proposed
+> below — so grepping for `edge_notification_rules` / `edge_audit_log` finds
+> nothing and makes shipped work look missing. Check the code before believing a
+> phase is unbuilt. An earlier "P14" was referenced here as "the single biggest
+> acquisition lever" but was never defined anywhere in this document; the
+> reference has been removed rather than left dangling.
 
 ## Wave A — closed ✅ (2026-05-25)
 
@@ -35,7 +44,7 @@ Scope: P7c, P8a, P8b, P9a — day-2 table stakes (preview gates, monorepo, build
 
 **Wave B follow-ups (nice-to-have, not blockers):** dedicated `EdgeLogs` filter bar + CSV export; CLI WebSocket tail (poll ships today); `EdgeBuildCache` feature tests.
 
-**Deferred to Wave E:** P9b deploy notifications, P9c audit log (see sequencing table).
+**Wave E (P9b deploy notifications, P9c audit log) — complete ✅ (see below).**
 
 ## Wave C — complete ✅ (2026-05-25)
 
@@ -47,7 +56,9 @@ Scope: P11b, P11a, P11c — acquisition: framework presets, import from incumben
 | P11a Import wizard | `EdgeImporter` interface + `ImportedEdgeProject` DTO + `NetlifyImporter` / `VercelImporter` / `CloudflarePagesImporter` (all three real implementations, all PAT-based). New `/edge/import` Livewire wizard walks provider → credential → project list → preview → hand-off to `/edge/create` with the build/repo/framework/env-var-count prefilled. Tokens stay in-memory; nothing persists until the user confirms in Create. |
 | P11c Template gallery | `EdgeTemplateRegistry` (8 curated starters), `/edge/templates` Livewire gallery with tag filter. "Deploy" button pre-fills `/edge/create` via query params. New Templates + Import buttons on the Edge index header. |
 
-**Wave C remaining (deferred):** DNS swap instructions per provider, real template screenshots (hero emoji placeholder for now), env var transfer (waits on env-var storage feature), automatic `dply.yaml` PR-open against the source repo on import.
+**Wave C remaining (deferred):** real template screenshots (SVG heroes ship today; photo screenshots optional), automatic `dply.yaml` PR-open against the source repo on import.
+
+**Wave C landed (doc catch-up):** DNS swap runbook in `/edge/import` preview + migration docs; env var transfer on import → create (`persistImportedEnvVars`).
 
 ## Wave D — complete ✅ (2026-05-25)
 
@@ -60,7 +71,17 @@ Scope: P10a, P10d, P10b, P10c — edge compute moat: middleware, A/B split, depl
 | P10b Deploy hooks | `edge_deploy_hooks` table + `EdgeDeployHook` model (sha256 token storage, plaintext shown once). Public `POST|GET /hooks/edge/deploy/{token}` (rate-limited, no auth) triggers `RedeployEdgeSite`. UI on Build Settings tab to mint + revoke; last-fired timestamps audited. |
 | P10c Bindings declarations | `dply.yaml` now parses a `bindings:` block (`kv` / `r2` / `d1` / `queues`). `EdgeRepoBindingTranslator` converts the snapshot into Cloudflare binding descriptors; both middleware + SSR uploaders inject them into the per-deployment Worker (reserved-name list prevents overwriting HOST_MAP/ASSETS/etc). Read-only panel on Build Settings shows what's declared. |
 
-**Wave D remaining (deferred):** Cron triggers on per-site Workers (needs CF cron API wiring), interactive create/attach/detach UI for bindings (declarations work today), proper service-bindings for middleware → SSR (today they coexist; dispatch overhead is fine for v1).
+**Wave D — complete ✅ (2026-07-09).**
+
+- Cron triggers on per-site Workers: **shipped** (this was listed as "needs CF cron API wiring" long after it landed). `dply.yaml` parses `crons:`, `EdgeEffectiveCrons` merges repo + dashboard rows, and both bundle uploaders push them via `EdgeCloudflareClient::setDispatchScriptSchedules()`. UI on the Crons tab.
+- Interactive create/attach/detach UI for bindings: **shipped**. `edge-bindings` tab, backed by `EdgeEffectiveBindings` + `EdgeDashboardBindingProvisioner`. wrangler.toml stays authoritative; dashboard rows are additive and lose name collisions.
+
+**Still deferred:** proper service-bindings for middleware → SSR (today they coexist; dispatch overhead is fine for v1). **Phase 3b Custom Hostnames (SSL for SaaS)** shipped on managed `dply_edge` — see `EdgeCustomDomainProvisioner` + `config/edge.php` `custom_hostnames`.
+
+> Bindings and crons only reach a **per-deployment Worker**, which exists for SSR
+> sites and for static/hybrid sites shipping a `middleware.ts`. A purely static
+> site serves assets straight from R2 with no Worker, so neither applies there —
+> the Bindings tab warns about this explicitly.
 
 ## Phase 5 — Programmatic surface (CLI + Public API) ✅ (2026-05-24)
 
@@ -224,23 +245,39 @@ Shipped: Echo live tail on Logs tab, log ingest broadcast, HTTP polling API + CL
 - CLI `dply edge logs --tail` subscribes via WebSocket
 - 7-day retention in `edge_access_logs`; "download last hour" CSV export
 
-### 9b — Deploy notifications (Wave E)
+### 9b — Deploy notifications (Wave E) ✅ shipped
 
-Per-site notification rules.
+Shipped **without** the proposed `edge_notification_rules` table — it would have
+duplicated the platform's existing notification stack. Instead the Edge events are
+registered as ordinary notification event keys, so subscriptions, channels
+(email / Slack / Discord / webhook), routing and the site Settings UI all work for
+Edge sites with no Edge-specific machinery.
 
-- New table `edge_notification_rules` (channel, target, event_mask)
-- Channels: email, Slack webhook, Discord webhook, generic webhook
-- Events: deploy.success, deploy.failed, deploy.duration_regressed (>1.5× rolling p50), domain.verified, domain.failing, usage.over_budget
-- Wired via `App\Events\Edge\*` → `App\Listeners\DispatchEdgeNotification`
-- UI: settings tab with "Test" button per rule
+- Event keys in `config/notification_events.php` under the `edge` category:
+  `edge.deploy.succeeded`, `edge.deploy.failed`, `edge.domain.verified`,
+  `edge.domain.failing`, `edge.usage.over_budget`, `edge.rum.breach`
+- Published via `NotificationPublisher` (subject = the `Site`)
+- `edge.deploy.succeeded` + publish-phase `edge.deploy.failed` fire from
+  `PublishEdgeDeploymentJob`; build-phase `edge.deploy.failed` fires from
+  `BuildEdgeSiteJob::markFailed()` with `metadata.phase = build`
+- Every publish is best-effort — a dead channel must never fail a good deploy,
+  nor mask the build error on the failure path
 
-### 9c — Audit log (Wave E)
+`edge.deploy.duration_regressed` fires from `EdgeDeployDurationRegression` —
+median (not mean) of the last N successful deploys, `min_samples` before it can
+alert, all knobs under `config('edge.duration_regression')`.
 
-- New table `edge_audit_log` (actor_id, site_id, action, target, before, after, ip, ua)
-- Capture: env changes, domain add/remove, deploys, rollbacks, promotes, access rule changes, member changes
-- UI tab + CSV export; 90-day retention default
+The proposed per-rule "Test" button needs no work: it presumed the
+`edge_notification_rules` table that was never built, and the existing
+per-channel test (`ManagesNotificationChannels::sendTest`) already covers
+Slack / Discord / email.
 
-**Touchpoints:** new models + migrations, `app/Listeners/Edge/*`, `resources/views/livewire/sites/edge-logs.blade.php`
+### 9c — Audit log (Wave E) ✅ shipped
+
+Shipped on the shared `AuditLog` model (kernel) rather than a new `edge_audit_log`
+table — Edge rows are scoped by `subject_type = Site::class`.
+
+- CSV export at `sites.edge.audit.export` (`EdgeAuditLogExportController`)
 
 ---
 

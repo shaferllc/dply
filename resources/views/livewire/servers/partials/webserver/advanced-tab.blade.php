@@ -1,6 +1,6 @@
         {{-- PHP-FPM --}}
         @if (! empty($phpFpm['versions']))
-            <div class="{{ $card }} p-6 sm:p-8">
+            <div class="{{ $card }} px-5 py-5 sm:px-6">
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('PHP-FPM') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">
                     {{ __('Detected installations under /etc/php/. Default is set in server meta and used by deploys and the per-row PHP-FPM actions.') }}
@@ -71,7 +71,7 @@
 
         {{-- TLS / certbot --}}
         @if (! empty($certbot['present']))
-            <div class="{{ $card }} p-6 sm:p-8">
+            <div class="{{ $card }} px-5 py-5 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="max-w-2xl">
                         <h3 class="text-base font-semibold text-brand-ink">{{ __('TLS / certbot') }}</h3>
@@ -135,7 +135,7 @@
 
         {{-- Switch history --}}
         @if ($recentSwitches->isNotEmpty())
-            <div class="{{ $card }} p-6 sm:p-8">
+            <div class="{{ $card }} px-5 py-5 sm:px-6">
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('Switch history') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Recent webserver switches on this server.') }}</p>
 

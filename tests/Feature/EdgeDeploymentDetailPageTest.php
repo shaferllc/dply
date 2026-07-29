@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\SiteType;
+use App\Livewire\Sites\Edge\Workspace\Previews;
 use App\Livewire\Sites\EdgeDeploymentDetail;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
@@ -13,6 +14,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -122,6 +124,8 @@ test('deploys table links deployment id to edge deployment detail', function () 
 });
 
 test('promote confirmation modal includes structured preview diff', function () {
+    Feature::define('global.deploy_contract', false);
+
     [$user, $server, $site] = makeEdgeDeploymentDetailFixtures();
     $preview = Site::factory()->create([
         'server_id' => $server->id,
@@ -153,7 +157,7 @@ test('promote confirmation modal includes structured preview diff', function () 
     ]);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-previews'])
+        ->test(Previews::class, ['server' => $server, 'site' => $site])
         ->call('confirmPromoteEdgePreview', (string) $preview->id)
         ->assertSet('showConfirmActionModal', true)
         ->assertSet('confirmActionModalMethod', 'promoteEdgePreview')

@@ -10,6 +10,7 @@
     $summary = $report['summary'] ?? [];
 @endphp
 
+{{-- Standalone Logs page — merged chrome (no floating hero). --}}
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
         'server' => $server,
@@ -19,17 +20,10 @@
         'contextualDocSlug' => 'vm-site-logs',
     ])
 
-    <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-hero-card
-                :eyebrow="__('Site')"
-                :title="__('Logs')"
-                :description="__('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.')"
-                icon="document-text"
-            />
-
+        <div class="min-w-0 lg:col-span-9">
             <div
                 id="dply-server-log-broadcast-context"
                 class="hidden"
@@ -38,64 +32,86 @@
                 data-subscribe="{{ $logBroadcastEchoSubscribable ? '1' : '0' }}"
             ></div>
 
-            {{-- dply Logs app-log stream — only when a logging binding routes to it. --}}
-            @if ($hasDplyRealtime)
-                <livewire:sites.site-app-logs :site="$site" wire:key="site-app-logs-{{ $site->id }}" />
-            @endif
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Logs') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-            <x-server-workspace-tablist :aria-label="__('Logs workspace sections')" scroll class="sm:min-w-0 sm:flex-1">
-                <x-server-workspace-tab
-                    id="logs-tab-viewer"
-                    icon="heroicon-o-command-line"
-                    :active="$logsTab === 'viewer'"
-                    wire:click="setLogsWorkspaceTab('viewer')"
-                >
-                    {{ __('Viewer') }}
-                </x-server-workspace-tab>
-                <x-server-workspace-tab
-                    id="logs-tab-overview"
-                    icon="heroicon-o-chart-bar-square"
-                    :active="$logsTab === 'overview'"
-                    wire:click="setLogsWorkspaceTab('overview')"
-                >
-                    {{ __('Overview') }}
-                </x-server-workspace-tab>
-                <x-server-workspace-tab
-                    id="logs-tab-sources"
-                    icon="heroicon-o-queue-list"
-                    :active="$logsTab === 'sources'"
-                    wire:click="setLogsWorkspaceTab('sources')"
-                >
-                    {{ __('Sources') }}
-                    @if (($summary['source_count'] ?? 0) > 0)
-                        <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
+                {{-- dply Logs app-log stream — only when a logging binding routes to it. --}}
+                @if ($hasDplyRealtime)
+                    <livewire:sites.site-app-logs :site="$site" :embedded="true" wire:key="site-app-logs-{{ $site->id }}" />
+                @endif
+
+                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <x-server-workspace-tablist
+                        :aria-label="__('Logs workspace sections')"
+                        scroll
+                        class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+                    >
+                        <x-server-workspace-tab
+                            id="logs-tab-viewer"
+                            icon="heroicon-o-command-line"
+                            :active="$logsTab === 'viewer'"
+                            wire:click="setLogsWorkspaceTab('viewer')"
+                        >
+                            {{ __('Viewer') }}
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            id="logs-tab-overview"
+                            icon="heroicon-o-chart-bar-square"
+                            :active="$logsTab === 'overview'"
+                            wire:click="setLogsWorkspaceTab('overview')"
+                        >
+                            {{ __('Overview') }}
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            id="logs-tab-sources"
+                            icon="heroicon-o-queue-list"
+                            :active="$logsTab === 'sources'"
+                            wire:click="setLogsWorkspaceTab('sources')"
+                        >
+                            {{ __('Sources') }}
+                            @if (($summary['source_count'] ?? 0) > 0)
+                                <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
+                            @endif
+                        </x-server-workspace-tab>
+                    </x-server-workspace-tablist>
+                </div>
+
+                <div class="relative min-w-0" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setLogsWorkspaceTab">
+                    @if ($logsTab === 'viewer')
+                        @include('livewire.servers.partials.log-viewer-panel', ['logSources' => $logSources])
                     @endif
-                </x-server-workspace-tab>
-            </x-server-workspace-tablist>
 
-            @if ($logsTab === 'viewer')
-                @include('livewire.servers.partials.log-viewer-panel', ['logSources' => $logSources])
-            @endif
+                    @if ($logsTab === 'overview')
+                        @include('livewire.servers.partials.logs._tab-overview', [
+                            'report' => $report,
+                            'tonePalette' => $tonePalette,
+                            'server' => $server,
+                        ])
+                    @endif
 
-            @if ($logsTab === 'overview')
-                @include('livewire.servers.partials.logs._tab-overview', [
-                    'report' => $report,
-                    'tonePalette' => $tonePalette,
-                    'server' => $server,
-                ])
-            @endif
+                    @if ($logsTab === 'sources')
+                        @include('livewire.servers.partials.logs._tab-sources', [
+                            'report' => $report,
+                            'tonePalette' => $tonePalette,
+                            'server' => $server,
+                        ])
+                    @endif
+                </div>
 
-            @if ($logsTab === 'sources')
-                @include('livewire.servers.partials.logs._tab-sources', [
-                    'report' => $report,
-                    'tonePalette' => $tonePalette,
-                    'server' => $server,
-                ])
-            @endif
-
-            {{-- Machine-wide logs live on the server logs workspace. --}}
-            <div class="dply-card overflow-hidden">
-                <div class="flex flex-col gap-3 bg-brand-sand/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                {{-- Machine-wide logs live on the server logs workspace. --}}
+                <div class="flex flex-col gap-3 border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <div class="flex min-w-0 items-center gap-3">
                         <x-heroicon-o-server-stack class="h-5 w-5 shrink-0 text-brand-moss" aria-hidden="true" />
                         <p class="text-sm text-brand-moss">{{ __('Need syslog, PHP-FPM, or fleet activity for the whole server?') }}</p>
@@ -109,12 +125,14 @@
                         {{ __('Open server logs') }}
                     </a>
                 </div>
-            </div>
 
-            <x-cli-snippet :commands="[
-                ['label' => __('Tail logs'), 'command' => 'dply sites:logs '.$site->slug.' --tail'],
-                ['label' => __('Show log files'), 'command' => 'dply sites:logs:list '.$site->slug],
-            ]" />
-        </main>
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('Tail logs'), 'command' => 'dply sites:logs '.$site->slug.' --tail'],
+                        ['label' => __('Show log files'), 'command' => 'dply sites:logs:list '.$site->slug],
+                    ]" />
+                </div>
+            </section>
+        </div>
     </div>
 </div>

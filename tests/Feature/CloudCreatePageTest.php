@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudCreatePageTest;
 
-use App\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\GitCloner;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\Concerns\WithFeatures;
@@ -74,6 +75,7 @@ test('changing backend resets region to first available', function () {
 });
 test('deploy dispatches provision job and redirects', function () {
     Queue::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,
@@ -136,6 +138,34 @@ test('source mode validates repo and branch', function () {
         ->call('deploy')
         ->assertHasErrors(['repo']);
 });
+test('aws backend shows app runner compute estimate in sidebar', function () {
+    config([
+        'server_providers.enabled.aws_app_runner' => true,
+        'subscription.standard.cloud_cents' => 500,
+        'subscription.standard.app_runner_hours_per_month' => 730,
+        'subscription.standard.app_runner_vcpu_usd_per_hour' => 0.064,
+        'subscription.standard.app_runner_memory_gb_usd_per_hour' => 0.007,
+    ]);
+    $user = ownerWithOrg();
+    ProviderCredential::query()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+        'provider' => 'aws_app_runner',
+        'name' => 'AWS',
+        'credentials' => ['access_key_id' => 'k', 'secret_access_key' => 's', 'region' => 'us-east-1'],
+    ]);
+
+    // Platform $5 + small App Runner always-on floor $14.24 = $19.24
+    Livewire::actingAs($user)
+        ->test(CloudCreate::class)
+        ->set('backend', 'aws_app_runner')
+        ->set('size_tier', 'small')
+        ->set('instances', 1)
+        ->assertSee('AWS compute')
+        ->assertSee('$19.24')
+        ->call('recomputeCostPreview')
+        ->assertSet('costPreview.value', 14.24);
+});
 test('source mode warns when aws lacks github connection', function () {
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
@@ -150,7 +180,8 @@ test('source mode warns when aws lacks github connection', function () {
         ->test(CloudCreate::class)
         ->set('mode', 'source')
         ->set('backend', 'aws_app_runner')
-        ->assertSee('Repository builds need GitHub authorized on your cloud account');
+        ->assertSee('Repository builds need GitHub authorized on your cloud account')
+        ->assertSee('Add the connection ARN');
 });
 test('source mode skips warning when aws has github connection', function () {
     $user = ownerWithOrg();
@@ -253,6 +284,7 @@ test('picker selection populates repo and branch', function () {
 });
 test('source mode dispatches provision with source meta', function () {
     Queue::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,
@@ -320,6 +352,7 @@ test('source mode detection does not overwrite typed port', function () {
 });
 test('source mode detection failure does not block deploy', function () {
     Queue::fake();
+    Http::fake(['*' => Http::response(['app_cost' => 12.34], 200)]);
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,

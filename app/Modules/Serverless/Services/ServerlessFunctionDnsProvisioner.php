@@ -3,7 +3,7 @@
 namespace App\Modules\Serverless\Services;
 
 use App\Models\Site;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -104,7 +104,7 @@ final class ServerlessFunctionDnsProvisioner
                 ]);
                 $do = new DigitalOceanService($token);
                 foreach ($blocking as $r) {
-                    $recordId = (int) ($r['id']);
+                    $recordId = (int) ($r['id'] ?? 0);
                     if ($recordId > 0) {
                         $do->deleteDomainRecord($zone, $recordId);
                     }
@@ -351,7 +351,7 @@ final class ServerlessFunctionDnsProvisioner
      */
     private function store(Site $site, array $payload): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
         $serverless['dns'] = $payload;
         $meta['serverless'] = $serverless;

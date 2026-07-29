@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Forms;
 
-use App\Livewire\Edge\Create;
-use App\Support\Edge\EdgeRepoRoot;
+use App\Modules\Edge\Livewire\Create;
+use App\Modules\Edge\Support\EdgeRepoRoot;
 use Livewire\Form;
 
 class EdgeCreateForm extends Form

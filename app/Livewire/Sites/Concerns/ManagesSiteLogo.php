@@ -12,8 +12,9 @@ use Livewire\Features\SupportFileUploads\WithFileUploads;
 
 /**
  * Custom site logo management for the settings workspace: upload an image,
- * pull the live site's favicon, or remove it. Logos live on the `public` disk
- * under site-logos/; the model exposes them via {@see Site::logoUrl()}.
+ * pull the live site's favicon, or remove it. Logos live on the durable
+ * `site_assets` disk under site-logos/ (release-independent, so they survive a
+ * redeploy); the model exposes them via {@see Site::logoUrl()}.
  *
  * Raster formats only (png/jpg/webp/gif/ico) — SVG is rejected to avoid serving
  * script-bearing SVGs from our own origin.
@@ -42,11 +43,11 @@ trait ManagesSiteLogo
         $ext = $this->extensionFor($this->site_logo_upload->getMimeType());
         $path = 'site-logos/'.$this->site->id.'-'.Str::lower(Str::random(8)).'.'.$ext;
 
-        Storage::disk('public')->put($path, file_get_contents($this->site_logo_upload->getRealPath()));
+        Storage::disk('site_assets')->put($path, file_get_contents($this->site_logo_upload->getRealPath()));
         $this->site->forceFill(['logo_path' => $path])->save();
 
         if (is_string($old) && $old !== '' && $old !== $path) {
-            Storage::disk('public')->delete($old);
+            Storage::disk('site_assets')->delete($old);
         }
 
         $this->reset('site_logo_upload');
@@ -76,7 +77,7 @@ trait ManagesSiteLogo
 
         $old = $this->site->logo_path;
         if (is_string($old) && $old !== '') {
-            Storage::disk('public')->delete($old);
+            Storage::disk('site_assets')->delete($old);
             $this->site->forceFill(['logo_path' => null])->save();
             $this->recordLogoChange($old, null, 'remove');
         }

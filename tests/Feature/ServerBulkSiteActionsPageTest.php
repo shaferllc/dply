@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ServerBulkSiteActionsPageTest;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Models\Organization;
 use App\Models\Server;

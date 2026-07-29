@@ -73,7 +73,7 @@ class ServerlessSequenceDeployer implements ServerlessSequenceBackend
      */
     private function componentNames(FunctionAction $sequence): array
     {
-        $components = ($sequence->components );
+        $components = is_array($sequence->components) ? $sequence->components : [];
 
         return array_values(array_filter(array_map(
             static function (mixed $component): ?string {

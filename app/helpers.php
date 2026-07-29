@@ -5,7 +5,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Ai\LlmSynthesizer;
+use App\Modules\Ai\Services\LlmSynthesizer;
 use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;
@@ -895,5 +895,37 @@ if (! function_exists('audit_log')) {
         ?array $newValues = null
     ): AuditLog {
         return AuditLog::log($organization, $user, $action, $subject, $oldValues, $newValues);
+    }
+}
+
+if (! function_exists('production_data_mirror_available')) {
+    /**
+     * Local-only Production data mirror (`/live/*`) is allowed on this host.
+     */
+    function production_data_mirror_available(): bool
+    {
+        return \App\Services\ProductionData\ProductionDataMirror::available();
+    }
+}
+
+if (! function_exists('production_data_mirror_connected')) {
+    function production_data_mirror_connected(?User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        return app(\App\Services\ProductionData\ProductionDataMirror::class)
+            ->connectionFor($user) !== null;
+    }
+}
+
+if (! function_exists('production_data_mirror_entry_url')) {
+    /**
+     * Browse entry for Production data: Connect when unbound, Sites when connected.
+     */
+    function production_data_mirror_entry_url(): string
+    {
+        return production_data_mirror_connected()
+            ? route('live.sites.index')
+            : route('live.connect');
     }
 }

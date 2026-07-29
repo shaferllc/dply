@@ -228,6 +228,30 @@ return [
     | given provider, e.g. DPLY_TESTING_DOMAINS_HETZNER="dply.forum".
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Lookout (uselookout.app) error-tracking resource
+    |--------------------------------------------------------------------------
+    |
+    | The one-click Lookout error-tracking binding. `url` is the Lookout
+    | instance dply provisions projects against (the hosted SaaS by default).
+    | `provision_token` is reserved for the future dply-managed account model
+    | (a service token against POST /api/provision); the shipped per-customer
+    | model uses the customer's own Lookout API token and needs no value here.
+    | See docs/LOOKOUT_RESOURCE.md.
+    |
+    */
+    'lookout' => [
+        'url' => env('LOOKOUT_URL', 'https://uselookout.app'),
+        // 'byo' (default): each customer pastes their own Lookout API token and
+        // the project lands in their account. 'managed': dply mints projects
+        // under its own org via the service token + POST /api/provision.
+        'account_model' => env('LOOKOUT_ACCOUNT_MODEL', 'byo'),
+        // Service token + default org for the 'managed' model only.
+        'provision_token' => env('LOOKOUT_PROVISION_TOKEN'),
+        'managed_organization_id' => env('LOOKOUT_MANAGED_ORG_ID'),
+    ],
+
     'dply' => [
         'testing_domains' => [
             'digitalocean' => array_values(array_unique(array_filter(array_merge(

@@ -62,15 +62,19 @@ class StatusCacheServiceJob implements ShouldQueue
         $emit = new ConsoleEmitter($this->consoleActionId);
 
         try {
+            // The unit name is resolved on the host (`$UNIT`) rather than assumed:
+            // distro packages register different names (`valkey.service` vs
+            // `valkey-server.service`), and querying the wrong one shows a useless
+            // "Unit not found" for an engine that's running fine under its sibling.
             $unit = CacheServiceInstallScripts::instanceServiceUnit($row->engine, $row->name);
-            $unitArg = escapeshellarg($unit);
+            $resolveUnit = CacheServiceInstallScripts::resolveUnitSnippet($row->engine);
 
             // Same shape used previously by the modal. Wrapping in `(...); exit 0`
             // so a non-zero systemctl/journalctl exit code (e.g. unit not loaded
             // yet) still surfaces useful output instead of throwing.
-            $script = $this->view === 'logs'
-                ? '(journalctl --no-pager --output=short-iso -u '.$unitArg.' -n 200 2>&1); exit 0'
-                : '(systemctl status '.$unitArg.' --no-pager -l 2>&1); exit 0';
+            $script = $resolveUnit."\n".($this->view === 'logs'
+                ? '(journalctl --no-pager --output=short-iso -u "$UNIT" -n 200 2>&1); exit 0'
+                : '(systemctl status "$UNIT" --no-pager -l 2>&1); exit 0');
 
             $emit->step('cache', $this->view === 'logs'
                 ? sprintf('journalctl -u %s -n 200', $unit)

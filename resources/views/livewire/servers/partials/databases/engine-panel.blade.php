@@ -17,7 +17,7 @@
 
 @include('livewire.servers.partials.databases._header-tabs', compact('engine'))
 
-<div class="space-y-6">
+<div>
     @if ($engineComingSoon && $engine_subtab === 'info')
         @include('livewire.servers.partials.databases._subtab-info', compact('engine', 'engineRow', 'dbEngineInfoForTab', 'card', 'isDeployer'))
     @elseif ($engineComingSoon)
@@ -35,7 +35,7 @@
     @elseif (! $capabilitiesLoaded && $engine !== 'sqlite')
         {{-- Engine reachability is probed off the render path (wire:init=loadCapabilities).
              Show a neutral checking state instead of flashing "Databases unavailable". --}}
-        <div class="{{ $card }} px-6 py-10 sm:px-7">
+        <div class="{{ $card }} px-5 py-10 sm:px-6">
             <div class="flex items-center justify-center gap-3 text-sm text-brand-moss">
                 <x-spinner variant="forest" size="sm" />
                 {{ __('Checking :engine on this server…', ['engine' => $engineLabels[$engine] ?? ucfirst($engine)]) }}

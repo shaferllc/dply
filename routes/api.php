@@ -2,18 +2,18 @@
 
 use App\Http\Controllers\Api\AccountApiController;
 use App\Http\Controllers\Api\Auth\DeviceAuthorizationController;
-use App\Http\Controllers\Api\BillingApiController;
-use App\Http\Controllers\Api\Edge\EdgeAccessApiController;
-use App\Http\Controllers\Api\Edge\EdgeAliasApiController;
-use App\Http\Controllers\Api\Edge\EdgeCacheApiController;
-use App\Http\Controllers\Api\Edge\EdgeDeploymentApiController;
-use App\Http\Controllers\Api\Edge\EdgeDomainApiController;
-use App\Http\Controllers\Api\Edge\EdgeLintApiController;
-use App\Http\Controllers\Api\Edge\EdgeLogApiController;
-use App\Http\Controllers\Api\Edge\EdgePreviewApiController;
-use App\Http\Controllers\Api\Edge\EdgeSiteApiController;
-use App\Http\Controllers\Api\Edge\EdgeUsageApiController;
-use App\Http\Controllers\Api\EdgeEnvController;
+use App\Modules\Billing\Http\Controllers\Api\BillingApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeAccessApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeAliasApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeCacheApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeDeploymentApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeDomainApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeLintApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeLogApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgePreviewApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeSiteApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeUsageApiController;
+use App\Modules\Edge\Http\Controllers\Api\EdgeEnvController;
 use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\ServerLogShippingController;
 use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\SiteEnvApiController;
 use App\Http\Controllers\Api\SiteResourceApiController;
 use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,13 @@ Route::prefix('v1')->group(function (): void {
         ->middleware(['throttle:30,1']);
     Route::post('/auth/device/poll', [DeviceAuthorizationController::class, 'poll'])
         ->middleware(['throttle:60,1']);
+
+    // Bundled-products entitlement pull (reconcile backstop) — service-token auth,
+    // called by tracely/Lookout. Dark until BUNDLE_ENTITLEMENTS_API_TOKEN is set.
+    Route::middleware('bundle.service')->group(function (): void {
+        Route::get('/orgs/{organization}/entitlements', [\App\Http\Controllers\Api\BundleEntitlementsController::class, 'show'])
+            ->middleware('throttle:120,1');
+    });
 
     Route::middleware('fleet.operator')->group(function (): void {
         Route::get('/operator/summary', [OperatorSummaryController::class, 'show']);
@@ -177,6 +185,17 @@ Route::prefix('v1')->group(function (): void {
         // Extended site resource endpoints (slug-routed via Site::getRouteKeyName)
         Route::get('/sites/{site}', [SiteResourceApiController::class, 'show'])->middleware('ability:'.$apiAbilities['sites.show']);
         Route::patch('/sites/{site}', [SiteResourceApiController::class, 'update'])->middleware('ability:'.$apiAbilities['sites.update']);
+
+        // VM/BYO site env vars (values encrypted at rest, never returned by GET).
+        Route::get('/sites/{site}/env', [SiteEnvApiController::class, 'index'])->middleware('ability:'.$apiAbilities['sites.env.index']);
+        Route::get('/sites/{site}/env/content', [SiteEnvApiController::class, 'showContent'])
+            ->middleware('ability:'.$apiAbilities['sites.env.content']);
+        Route::put('/sites/{site}/env/content', [SiteEnvApiController::class, 'updateContent'])
+            ->middleware('ability:'.$apiAbilities['sites.env.content_put']);
+        Route::patch('/sites/{site}/env/{key}', [SiteEnvApiController::class, 'upsert'])
+            ->middleware('ability:'.$apiAbilities['sites.env.set'])->where('key', '[A-Za-z_][A-Za-z0-9_]{0,127}');
+        Route::delete('/sites/{site}/env/{key}', [SiteEnvApiController::class, 'destroy'])
+            ->middleware('ability:'.$apiAbilities['sites.env.delete'])->where('key', '[A-Za-z_][A-Za-z0-9_]{0,127}');
         Route::get('/sites/{site}/workers', [SiteResourceApiController::class, 'workers'])->middleware('ability:'.$apiAbilities['sites.workers']);
         Route::get('/sites/{site}/schedules', [SiteResourceApiController::class, 'schedules'])->middleware('ability:'.$apiAbilities['sites.schedules']);
         Route::get('/sites/{site}/errors', [SiteResourceApiController::class, 'errors'])->middleware('ability:'.$apiAbilities['sites.errors']);

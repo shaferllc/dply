@@ -47,6 +47,50 @@ return [
             'report' => false,
         ],
 
+        /*
+         | Durable store for control-plane UI assets that must SURVIVE a redeploy:
+         | site/server logos + org icons (dirs site-logos/, server-logos/,
+         | org-logos/). These were previously on the `public` disk, which roots at
+         | the per-release storage/app/public and is replaced (then pruned) on
+         | every atomic deploy — so a captured favicon 404'd the next time dply
+         | self-deployed.
+         |
+         | This disk roots at a release-INDEPENDENT path with ZERO config: on an
+         | atomic-release host `current/.env` is always a symlink into the
+         | persistent shared/ dir (the deploy guarantees it — shared/.env is
+         | "sacred"; see deploy/ATOMIC_RELEASES.md), so we resolve that symlink and
+         | drop assets in shared/site-assets, which outlives `current` flipping. In
+         | dev (.env is a real file) it falls back to the local storage path.
+         | SITE_ASSETS_PATH is an optional override for non-standard layouts.
+         |
+         | `serve => true` registers a framework route (storage.site_assets at
+         | /site-assets) that streams the files through PHP — no nginx symlink and
+         | no deploy coupling, the whole reason the previous approach was fragile.
+         | Unique url path so it doesn't collide with the local/public disks at
+         | /storage.
+         */
+        'site_assets' => [
+            'driver' => 'local',
+            'root' => env('SITE_ASSETS_PATH') ?: (static function (): string {
+                // current/.env -> <ROOT>/shared/.env on atomic-release hosts;
+                // realpath resolves the symlink so site-assets lands in shared/,
+                // outside the releases/ tree. Resolved at config:cache time (after
+                // the deploy symlinks .env in), so the absolute shared path bakes
+                // into the cached config. Regular-file .env (dev) => local path.
+                $env = base_path('.env');
+                if (is_link($env) && ($real = realpath($env)) !== false) {
+                    return dirname($real).'/site-assets';
+                }
+
+                return storage_path('app/site-assets');
+            })(),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/site-assets',
+            'serve' => true,
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

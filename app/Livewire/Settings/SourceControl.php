@@ -5,9 +5,11 @@ namespace App\Livewire\Settings;
 use App\Actions\Auth\UnlinkSocialAccount;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesGitProviderTokens;
 use App\Models\GitProviderToken;
 use App\Models\SocialAccount;
+use App\Modules\SourceControl\Services\GitProviderTokenHealth;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -16,6 +18,7 @@ use Livewire\Component;
 class SourceControl extends Component
 {
     use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
     use ManagesGitProviderTokens;
 
     public ?string $editingId = null;
@@ -26,6 +29,10 @@ class SourceControl extends Component
 
     public string $editPatLabel = '';
 
+    /** New token value to swap in for the one being edited (optional). */
+    public string $editPatToken = '';
+
+    /** @return list<array<string, mixed>> */
     public function getProvidersProperty(): array
     {
         $enabled = OAuthController::getEnabledProviders();
@@ -137,6 +144,8 @@ class SourceControl extends Component
             ->findOrFail($patId);
         $this->editingPatId = $pat->getKey();
         $this->editPatLabel = (string) ($pat->label ?? '');
+        $this->editPatToken = '';
+        $this->resetErrorBag('editPatToken');
         $this->cancelEdit();
         $this->cancelAddPat();
     }
@@ -145,6 +154,7 @@ class SourceControl extends Component
     {
         $this->validate([
             'editPatLabel' => ['nullable', 'string', 'max:255'],
+            'editPatToken' => ['nullable', 'string', 'min:8', 'max:1024'],
         ]);
 
         if ($this->editingPatId === null) {
@@ -155,9 +165,41 @@ class SourceControl extends Component
             ->where('user_id', auth()->id())
             ->findOrFail($this->editingPatId);
 
-        $pat->update([
+        $data = [
             'label' => $this->editPatLabel === '' ? null : $this->editPatLabel,
-        ]);
+        ];
+
+        // Replace-in-place: swapping the token value on the existing row keeps
+        // every site pointing at this token working (sites reference it by id
+        // via git_source_control_account_id) — unlike remove + re-add, which
+        // breaks that linkage. Validate against the provider first so a typo'd
+        // token never silently replaces a working one.
+        $newToken = trim($this->editPatToken);
+        if ($newToken !== '') {
+            $base = $this->resolveGitProviderBaseUrl($pat->provider, (string) ($pat->api_base_url ?? ''));
+            $result = $this->fetchGitProviderProfile($pat->provider, $base, $newToken);
+            if ($result['profile'] === null) {
+                $this->addError('editPatToken', $this->describePatRejection($pat->provider, $result));
+
+                return;
+            }
+
+            $data['access_token'] = $newToken;
+            $data['provider_id'] = $result['profile']['id'] !== '' ? $result['profile']['id'] : $pat->provider_id;
+            $data['nickname'] = $result['profile']['nickname'] !== '' ? $result['profile']['nickname'] : $pat->nickname;
+            $data['last_validated_at'] = now();
+            // The old token's expiry/health no longer applies to the new value.
+            $data['expires_at'] = null;
+            $data['validation_error'] = null;
+        }
+
+        $pat->update($data);
+
+        if ($newToken !== '') {
+            // Capture the replacement's real expiry immediately (GitHub sends
+            // it in a response header) so the expiring-soon warning stays live.
+            app(\App\Modules\SourceControl\Services\GitProviderTokenHealth::class)->refresh($pat);
+        }
 
         $this->cancelEditPat();
     }
@@ -166,6 +208,30 @@ class SourceControl extends Component
     {
         $this->editingPatId = null;
         $this->editPatLabel = '';
+        $this->editPatToken = '';
+    }
+
+    /**
+     * On-demand re-check of a stored PAT against its provider — the same probe
+     * the daily token health check runs, so it stamps last_validated_at,
+     * expires_at, and validation_error on the row and the list re-renders
+     * with the fresh state.
+     */
+    public function validatePat(string $patId, GitProviderTokenHealth $health): void
+    {
+        $pat = GitProviderToken::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($patId);
+
+        $result = $health->refresh($pat);
+
+        if ($result === true) {
+            $this->toastSuccess(__('Token is valid — the provider accepted it.'));
+        } elseif ($result === false) {
+            $this->toastError(__('The provider rejected this token — replace it.'));
+        } else {
+            $this->toastError(__('Could not reach the provider to validate right now — try again shortly.'));
+        }
     }
 
     public function unlinkPat(string $patId): void

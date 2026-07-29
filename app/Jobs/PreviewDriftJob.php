@@ -51,8 +51,18 @@ class PreviewDriftJob implements ShouldQueue
         $statusKey = config('server_ssh_keys.meta_drift_status_key');
         $finishedKey = config('server_ssh_keys.meta_drift_finished_at_key');
         $errorKey = config('server_ssh_keys.meta_drift_error_key');
+        $hasChangesKey = config('server_ssh_keys.meta_drift_has_changes_key');
+        $addedCountKey = config('server_ssh_keys.meta_drift_added_count_key');
+        $removedCountKey = config('server_ssh_keys.meta_drift_removed_count_key');
 
-        $this->updateMeta($server, [$statusKey => 'running']);
+        // Clear any prior outcome so a stale "No drift" summary can't show next
+        // to a fresh run that hasn't computed its result yet.
+        $this->updateMeta($server, [
+            $statusKey => 'running',
+            $hasChangesKey => null,
+            $addedCountKey => null,
+            $removedCountKey => null,
+        ]);
 
         $bufferLines = [];
         $cacheKey = $this->cacheKey();
@@ -99,10 +109,26 @@ class PreviewDriftJob implements ShouldQueue
             $bufferLines[] = '> Done. Diff computed.';
             $flush($result, true);
 
+            // Summarize the outcome (root is auto-managed and hidden from the
+            // workspace diff, so it never counts as user-facing drift — mirror
+            // the same exclusion the Drift tab renders with).
+            $added = 0;
+            $removed = 0;
+            foreach ($result as $user => $block) {
+                if ($user === 'root') {
+                    continue;
+                }
+                $added += count($block['added'] ?? []);
+                $removed += count($block['removed'] ?? []);
+            }
+
             $this->updateMeta($server, [
                 $statusKey => 'completed',
                 $finishedKey => now()->toIso8601String(),
                 $errorKey => null,
+                $hasChangesKey => ($added + $removed) > 0,
+                $addedCountKey => $added,
+                $removedCountKey => $removed,
             ]);
         } catch (\Throwable $e) {
             $message = Str::limit(trim($e->getMessage()), 800) ?: 'Drift preview failed.';

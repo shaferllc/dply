@@ -6,7 +6,7 @@ use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\VultrService;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\Queue\ShouldQueue;

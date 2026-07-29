@@ -29,7 +29,7 @@ Per-server fees are **capped at $40** — you're never charged more than the XL 
 | Product | Unit | Default fee |
 |---------|------|-------------|
 | dply Cloud | per live app | $5/mo |
-| dply Edge | per live site | $2/mo platform fee |
+| dply Edge | per live site | $2/mo static/hybrid · $7/mo Worker SSR |
 | dply Edge delivery (managed mode) | metered usage | pass-through + margin (see below) |
 
 **Delivery usage billing applies to managed (`dply_edge`) sites only.** BYO Cloudflare (`org_cloudflare`) sites publish into the customer's account — they pay Cloudflare directly for Workers, R2, and bandwidth; dply does not meter that usage today.

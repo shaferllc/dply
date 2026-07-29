@@ -5,7 +5,7 @@
     'samples',
     'loaded',
     'error' => null,
-    'card' => 'dply-card overflow-hidden',
+    'card' => 'border-b border-brand-ink/10',
 ])
 
 @php

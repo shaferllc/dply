@@ -2,15 +2,17 @@
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Models\ConfigRevision;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
 use App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -18,6 +20,7 @@ use Livewire\Component;
 class WebserverConfig extends Component
 {
     use DispatchesToastNotifications;
+    use WatchesConsoleActionOutcomes;
 
     public Server $server;
 
@@ -33,13 +36,21 @@ class WebserverConfig extends Component
 
     public string $full_override_body = '';
 
-    public ?string $local_validation_message = null;
+    /** Output from the last validation run (server `nginx -t`, or local fallback). */
+    public ?string $validation_message = null;
 
-    public ?string $remote_validation_message = null;
+    /** Where the last validation ran: 'server' (authoritative) or 'local' (fallback). */
+    public ?string $validation_source = null;
 
     public ?string $health_hint = null;
 
-    public bool $show_history_modal = false;
+    /**
+     * Gate on "Apply to server": true only once the current editor content has
+     * passed a validation (local or server). Any edit clears it, so you can never
+     * push a config you haven't validated since the last change.
+     */
+    public bool $config_validated = false;
+
 
     public ?string $remote_live_config = null;
 
@@ -60,7 +71,9 @@ class WebserverConfig extends Component
         Gate::authorize('view', $site);
 
         $this->server = $server;
-        $this->site = $site;
+        // The route already bound both models — pin the relation so nothing
+        // downstream (loadMissing/fresh) re-queries the server row.
+        $this->site = $site->setRelation('server', $server);
 
         // Headless sites (webserver=none) have no vhost/server block to edit.
         // The editor service throws on this case; redirect with a flash so
@@ -80,8 +93,11 @@ class WebserverConfig extends Component
         if (Gate::allows('update', $site)) {
             $hydrate = $editor->hydrateEditorFromServer($site, $profile);
             if ($hydrate['ok']) {
-                $this->site = $site->fresh(['server', 'webserverConfigProfile']);
-                $this->hydrateFromProfile($this->site->webserverConfigProfile ?? $profile->fresh());
+                // hydrateEditorFromServer mutates $profile/$site through the same
+                // instances (Eloquent update() syncs them in memory), so no fresh()
+                // round trip is needed — just pin the relation.
+                $this->site->setRelation('webserverConfigProfile', $profile);
+                $this->hydrateFromProfile($profile);
                 if ($hydrate['remote_config'] !== null) {
                     $this->remote_live_config = $hydrate['remote_config'];
                 }
@@ -195,83 +211,165 @@ class WebserverConfig extends Component
         $this->toastSuccess(__('Draft saved.'));
     }
 
-    public function validateLocalAction(SiteWebserverConfigEditorService $editor): void
+    /**
+     * Single "Validate": run the authoritative `nginx -t` on the actual server.
+     * If the box can't be reached, fall back to the local sandbox syntax check
+     * (only nginx has a real one — for other engines local is a stub, so an
+     * unreachable server is surfaced as a failure rather than a fake pass). A
+     * pass here is what unlocks "Apply to server".
+     */
+    public function validateConfig(SiteWebserverConfigEditorService $editor): void
     {
         Gate::authorize('view', $this->site);
         $this->resetValidation();
-        $pending = $editor->effectivePreview($this->site, $this->draftProfile());
-        $r = $editor->validateLocal($this->site, $pending);
-        $this->local_validation_message = $r['message'];
-        if (! $r['ok']) {
-            $this->addError('local', $r['message']);
-        }
-    }
+        $this->validation_message = null;
+        $this->validation_source = null;
 
-    public function validateRemoteAction(SiteWebserverConfigEditorService $editor): void
-    {
-        Gate::authorize('view', $this->site);
-        $this->resetValidation();
         $profile = $this->draftProfile();
         $pending = $editor->effectivePreview($this->site, $profile);
-        $r = $editor->validateRemote($this->site, $pending, $profile);
-        $this->remote_validation_message = $r['message'];
-        if (! $r['ok']) {
-            $this->addError('remote', $r['message']);
+
+        try {
+            $remote = $editor->validateRemote($this->site, $pending, $profile);
+        } catch (\Throwable $e) {
+            $remote = ['ok' => false, 'reachable' => false, 'message' => $e->getMessage()];
         }
-    }
 
-    public function apply(SiteWebserverConfigEditorService $editor): void
-    {
-        Gate::authorize('update', $this->site);
-        $this->resetValidation();
-        $this->health_hint = null;
+        // Engines that don't report reachability (caddy/apache/…) are treated as
+        // authoritative — only nginx flags reachable=false to trigger a fallback.
+        $reachable = $remote['reachable'] ?? true;
 
-        $lock = $editor->lock($this->site);
-        if (! $lock->get()) {
-            $this->addError('apply', __('Another config apply is in progress. Try again in a moment.'));
+        if ($reachable) {
+            $this->validation_source = 'server';
+            $this->validation_message = (string) $remote['message'];
+            $this->config_validated = (bool) $remote['ok'];
+            if (! $remote['ok']) {
+                $this->addError('validate', (string) $remote['message']);
+            }
 
             return;
         }
 
-        try {
-            $profile = $editor->getOrCreateProfile($this->site);
-            $profile->update([
-                'mode' => $this->mode,
-                'before_body' => $this->before_body,
-                'main_snippet_body' => $this->main_snippet_body,
-                'after_body' => $this->after_body,
-                'full_override_body' => $this->full_override_body,
-            ]);
+        // Server unreachable. nginx has a real local sandbox; other engines don't,
+        // so for them keep Apply locked and report that we couldn't validate.
+        if ($this->site->webserver() !== 'nginx') {
+            $this->config_validated = false;
+            $this->validation_source = 'server';
+            $this->validation_message = (string) $remote['message'];
+            $this->addError('validate', __('Couldn’t reach the server to validate: :msg', ['msg' => (string) $remote['message']]));
 
-            $remote = $editor->validateRemote($this->site, $editor->effectivePreview($this->site->fresh(), $profile->fresh()), $profile->fresh());
-            if (! $remote['ok']) {
-                $this->addError('apply', $remote['message']);
-
-                return;
-            }
-
-            $out = $editor->applyAndRecord($this->site->fresh(['server']), $profile->fresh());
-
-            $org = $this->site->organization;
-            if ($org) {
-                audit_log($org, auth()->user(), 'site.webserver_config.applied', $this->site->fresh(), null, [
-                    'webserver' => $this->site->webserver(),
-                    'output_excerpt' => Str::limit($out, 500),
-                ]);
-            }
-
-            $this->toastSuccess(__('Web server configuration applied.'));
-            $hint = $editor->optionalHttpHealthHint($this->site->fresh());
-            if ($hint !== null) {
-                $this->health_hint = ($hint['ok'] ?? false)
-                    ? __('HTTP check: :url responded with :status.', ['url' => $hint['url'] ?? '', 'status' => (string) ($hint['status'] ?? '')])
-                    : __('HTTP check failed for :url.', ['url' => $hint['url'] ?? '']).' '.(string) ($hint['error'] ?? '');
-            }
-        } catch (\Throwable $e) {
-            $this->addError('apply', $e->getMessage());
-        } finally {
-            $lock->release();
+            return;
         }
+
+        $local = $editor->validateLocal($this->site, $pending);
+        $this->validation_source = 'local';
+        $this->validation_message = (string) $local['message'];
+        $this->config_validated = (bool) $local['ok'];
+        if (! $local['ok']) {
+            $this->addError('validate', (string) $local['message']);
+        }
+    }
+
+    /**
+     * Any edit to the config invalidates the prior validation — clear the gate
+     * (and the now-stale validation output) so the user must re-validate before
+     * "Apply to server" re-enables.
+     */
+    public function updated(string $name): void
+    {
+        if (in_array($name, ['before_body', 'main_snippet_body', 'after_body', 'full_override_body', 'mode'], true)) {
+            $this->config_validated = false;
+            $this->validation_message = null;
+            $this->validation_source = null;
+            $this->resetValidation();
+        }
+    }
+
+    /**
+     * Apply the config to the server. The SSH work runs in a queued job that
+     * streams its progress into a console-action banner (the worker console), so
+     * the operator watches the write/nginx -t/reload happen live instead of a
+     * blocking spinner. The persistence happens here (fast, no SSH) so the job
+     * builds exactly what was validated; the job stamps checksums + records the
+     * "Applied to server" revision on success.
+     */
+    public function apply(SiteWebserverConfigEditorService $editor): void
+    {
+        Gate::authorize('update', $this->site);
+
+        // Never push to the server until the current content has passed a
+        // validation. The button is disabled in this state too, but guard here so
+        // a stale client can't bypass it.
+        if (! $this->config_validated) {
+            $this->addError('apply', __('Validate the configuration first — it must pass before you can apply it to the server.'));
+
+            return;
+        }
+
+        $this->resetValidation();
+        $this->health_hint = null;
+
+        // Persist the validated content so the queued apply builds exactly this.
+        $editor->persistEditorState($this->site, [
+            'mode' => $this->mode,
+            'before_body' => $this->before_body,
+            'main_snippet_body' => $this->main_snippet_body,
+            'after_body' => $this->after_body,
+            'full_override_body' => $this->full_override_body,
+        ]);
+
+        $run = $this->seedQueuedConsoleAction('webserver_config', __('Applying webserver config to the server'));
+
+        ApplySiteWebserverConfigJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            seededConsoleRunId: (string) $run->id,
+            recordApplied: true,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Web server configuration applied.'),
+            __('The apply did not finish — see the console output below.'),
+        );
+
+        // Re-lock Apply while this run streams: another apply should re-validate
+        // first, and it keeps the button from looking actionable mid-apply.
+        $this->config_validated = false;
+    }
+
+    /**
+     * Pre-seed a `queued` console_actions row so the worker-console banner shows
+     * the moment the apply job is dispatched. Supersedes any stale/finished rows
+     * for this site so the banner shows just this run.
+     */
+    protected function seedQueuedConsoleAction(string $kind, ?string $label = null): ConsoleAction
+    {
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
+            ->update(['dismissed_at' => now()]);
+
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
+            ->get()
+            ->filter(fn (ConsoleAction $row): bool => $row->isStale())
+            ->each(fn (ConsoleAction $row) => $row->forceFill(['dismissed_at' => now()])->save());
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => $kind,
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => auth()->id(),
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
     }
 
     public function saveRevision(SiteWebserverConfigEditorService $editor): void
@@ -321,6 +419,7 @@ class WebserverConfig extends Component
 
         $editor->restoreRevision($profile, $rev);
         $this->hydrateFromProfile($profile->fresh());
+        $this->config_validated = false;
 
         $org = $this->site->organization;
         if ($org) {
@@ -329,8 +428,40 @@ class WebserverConfig extends Component
             ]);
         }
 
-        $this->show_history_modal = false;
+        $this->dispatch('close-modal', 'webserver-history-modal');
         $this->toastSuccess(__('Revision restored into the editor.'));
+    }
+
+    /**
+     * Throw away unsaved edits in the editor and reload the last saved snapshot
+     * (the most recent revision — an applied config or a manual checkpoint). This
+     * is the "draft" escape hatch: the working copy on the profile is overwritten
+     * with the last known-good state.
+     */
+    public function discardDraft(SiteWebserverConfigEditorService $editor): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $rev = ConfigRevision::query()
+            ->forStream($editor->profileStreamKey($this->site))
+            ->first();
+
+        if (! $rev instanceof ConfigRevision) {
+            $this->toastError(__('There’s no saved configuration to revert to yet — save a revision or apply first.'));
+
+            return;
+        }
+
+        $profile = $editor->getOrCreateProfile($this->site);
+        $editor->restoreRevision($profile, $rev);
+        $this->hydrateFromProfile($profile->fresh());
+
+        $this->config_validated = false;
+        $this->resetValidation();
+        $this->validation_message = null;
+        $this->validation_source = null;
+
+        $this->toastSuccess(__('Reverted to the last saved configuration.'));
     }
 
     public function fetchRemoteConfig(SiteWebserverConfigEditorService $editor): void
@@ -371,6 +502,13 @@ class WebserverConfig extends Component
         $profile = $this->site->webserverConfigProfile;
         $coreChangedWarning = $profile && $profile->last_applied_core_hash !== null
             && $editor->coreChangedSinceApply($this->site, $profile);
+
+        // Does the current editor content differ from what's live on the server?
+        // Compare the effective build's checksum to the one we stored at last
+        // apply. Never-applied profiles always read as "not yet applied".
+        $lastAppliedChecksum = $profile?->last_applied_effective_checksum;
+        $hasUnappliedChanges = $lastAppliedChecksum !== null
+            && hash('sha256', $effectiveConfigPreview) !== $lastAppliedChecksum;
 
         $revisions = ConfigRevision::query()
             ->forStream($editor->profileStreamKey($this->site))
@@ -425,6 +563,17 @@ class WebserverConfig extends Component
             'config_paths' => $this->configDisplayPaths(),
             'webserverSnippets' => $snippets,
             'configPlaceholders' => $placeholders,
+            'draft_saved_at' => $profile?->draft_saved_at,
+            'last_applied_at' => $profile?->last_applied_at,
+            'has_unapplied_changes' => $hasUnappliedChanges,
+            'has_revisions' => $revisions->isNotEmpty(),
+            'webserverConsoleRun' => ConsoleAction::query()
+                ->where('subject_type', $this->site->getMorphClass())
+                ->where('subject_id', $this->site->id)
+                ->where('kind', 'webserver_config')
+                ->whereNull('dismissed_at')
+                ->orderByDesc('created_at')
+                ->first(),
         ]);
     }
 

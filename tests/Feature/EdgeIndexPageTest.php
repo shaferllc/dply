@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeIndexPageTest;
 
 use App\Enums\SiteType;
-use App\Livewire\Edge\Index as EdgeIndex;
+use App\Modules\Edge\Livewire\Index as EdgeIndex;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -24,8 +24,13 @@ test('empty state when no edge sites', function () {
         ->get(route('edge.index'))
         ->assertOk()
         ->assertSee('Edge sites')
-        ->assertSee('No edge sites found')
-        ->assertSee(route('edge.create'), false);
+        ->assertSee('Launch your first Edge site')
+        ->assertSee('What Edge gives you')
+        ->assertSee('Deploy an edge app')
+        ->assertSee('Browse templates')
+        ->assertSee(route('edge.create'), false)
+        ->assertSee(route('edge.templates'), false)
+        ->assertDontSee('No edge sites found');
 });
 
 test('lists only edge sites for current org', function () {

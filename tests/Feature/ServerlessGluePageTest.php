@@ -19,14 +19,17 @@ uses(RefreshDatabase::class);
 
 usesFeatures('surface.serverless');
 
-function glueUserWithOrg(): User
+/**
+ * @return array{0: User, 1: Organization}
+ */
+function glueUserWithOrg(): array
 {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
-    return $user;
+    return [$user, $org];
 }
 
 function glueFunctionsSite(Organization $org, User $user): Site
@@ -54,19 +57,22 @@ function glueFunctionsSite(Organization $org, User $user): Site
 
 test('serverless glue page is hidden without feature flag', function (): void {
     Feature::define('surface.serverless', fn (): bool => false);
+    Feature::purge(['surface.serverless']);
     Feature::flushCache();
 
-    $user = glueUserWithOrg();
+    [$user, $org] = glueUserWithOrg();
 
     $this->actingAs($user)
+        ->withSession(['current_organization_id' => $org->id])
         ->get(route('serverless.glue'))
         ->assertStatus(400);
 });
 
 test('serverless glue page renders recipe catalog', function (): void {
-    $user = glueUserWithOrg();
+    [$user, $org] = glueUserWithOrg();
 
     $this->actingAs($user)
+        ->withSession(['current_organization_id' => $org->id])
         ->get(route('serverless.glue'))
         ->assertOk()
         ->assertSee(__('Serverless glue'))
@@ -76,8 +82,7 @@ test('serverless glue page renders recipe catalog', function (): void {
 test('livewire can save and deploy a sequence', function (): void {
     Http::fake(['*' => Http::response(['ok' => true], 200)]);
 
-    $user = glueUserWithOrg();
-    $org = Organization::query()->first();
+    [$user, $org] = glueUserWithOrg();
     $site = glueFunctionsSite($org, $user);
 
     $first = FunctionAction::query()->create([
@@ -94,9 +99,15 @@ test('livewire can save and deploy a sequence', function (): void {
         'runtime' => 'nodejs:18',
     ]);
 
-    Livewire::actingAs($user)
-        ->test(Glue::class)
-        ->set('tab', 'sequences')
+    session(['current_organization_id' => $org->id]);
+
+    $component = Livewire::actingAs($user)->test(Glue::class);
+
+    // Abort/error layouts embed nested Livewire (bell); ensure Glue mounted.
+    expect($component->instance())->toBeInstanceOf(Glue::class);
+
+    $component
+        ->call('setTab', 'sequences')
         ->set('sequenceServerId', (string) $site->server_id)
         ->set('sequenceSiteId', (string) $site->id)
         ->set('sequenceName', 'pipeline')
@@ -108,6 +119,8 @@ test('livewire can save and deploy a sequence', function (): void {
 
     expect($sequence)->not->toBeNull();
     expect($sequence->isSequence())->toBeTrue();
+
+    session(['current_organization_id' => $org->id]);
 
     Livewire::actingAs($user)
         ->test(Glue::class)

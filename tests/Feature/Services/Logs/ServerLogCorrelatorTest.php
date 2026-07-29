@@ -6,8 +6,8 @@ namespace Tests\Feature\Services\Logs\ServerLogCorrelatorTest;
 
 use App\Models\ErrorEvent;
 use App\Models\Server;
-use App\Services\Logs\ClickHouseClient;
-use App\Services\Logs\ServerLogCorrelator;
+use App\Modules\Logs\Services\ClickHouseClient;
+use App\Modules\Logs\Services\ServerLogCorrelator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Mockery;

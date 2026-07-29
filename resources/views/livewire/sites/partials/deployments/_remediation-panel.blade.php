@@ -58,26 +58,50 @@
 
                     <div class="mt-4 flex flex-wrap gap-2">
                         @foreach ($remediation['actions'] as $action)
-                            <button
-                                type="button"
-                                wire:click="applyDeploymentRemediation('{{ $deployment->id }}', '{{ $action['key'] }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="applyDeploymentRemediation('{{ $deployment->id }}', '{{ $action['key'] }}')"
-                                @class([
-                                    'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-60',
-                                    'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),
-                                    'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']),
-                                ])
-                            >
-                                <x-heroicon-o-wrench class="h-4 w-4" aria-hidden="true" />
-                                {{ $action['label'] }}
-                                @if (! empty($action['recommended']))
-                                    <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
-                                @endif
-                            </button>
+                            @if (! empty($action['route']))
+                                {{-- Link action: the fix lives on another page (e.g. an
+                                     expired Git token replaced in account settings), not
+                                     in an SSH script run on the box. --}}
+                                <a href="{{ route($action['route']) }}" wire:navigate
+                                    @class([
+                                        'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition',
+                                        'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),
+                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']),
+                                    ])
+                                >
+                                    <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
+                                    {{ $action['label'] }}
+                                    @if (! empty($action['recommended']))
+                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                    @endif
+                                </a>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="applyDeploymentRemediation('{{ $deployment->id }}', '{{ $action['key'] }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyDeploymentRemediation('{{ $deployment->id }}', '{{ $action['key'] }}')"
+                                    @class([
+                                        'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-60',
+                                        'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),
+                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']),
+                                    ])
+                                >
+                                    <x-heroicon-o-wrench class="h-4 w-4" aria-hidden="true" />
+                                    {{ $action['label'] }}
+                                    @if (! empty($action['recommended']))
+                                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                    @endif
+                                </button>
+                            @endif
                         @endforeach
                     </div>
-                    <p class="mt-2 text-[11px] text-brand-mist">{{ __('Runs over SSH on :server. After it succeeds, re-deploy to continue.', ['server' => $server->name]) }}</p>
+                    @php $hasScriptAction = collect($remediation['actions'])->contains(fn ($a) => empty($a['route'])); @endphp
+                    @if ($hasScriptAction)
+                        <p class="mt-2 text-[11px] text-brand-mist">{{ __('Runs over SSH on :server. After it succeeds, re-deploy to continue.', ['server' => $server->name]) }}</p>
+                    @else
+                        <p class="mt-2 text-[11px] text-brand-mist">{{ __('After updating, re-deploy to continue.') }}</p>
+                    @endif
                 @endif
             </div>
         </div>

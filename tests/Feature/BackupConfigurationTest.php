@@ -35,7 +35,7 @@ test('authenticated user can view backup destinations page', function () {
     $this->actingAs($user)
         ->get(route('profile.backup-configurations'))
         ->assertOk()
-        ->assertSee('Organization backup destinations', false);
+        ->assertSee('Backup destinations', false);
 });
 
 test('user can create custom s3 backup destination under their org', function () {

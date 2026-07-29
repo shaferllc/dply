@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\Route53Service;
+use App\Modules\Cloud\Services\Route53Service;
 
 class Route53DnsProvider implements DnsProvider
 {
@@ -22,5 +22,14 @@ class Route53DnsProvider implements DnsProvider
         unset($zone);
 
         $this->service->deleteRecord($recordId);
+    }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->hostedZoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

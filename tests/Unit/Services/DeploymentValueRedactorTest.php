@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\DeploymentValueRedactorTest;
 
-use App\Services\Deploy\DeploymentValueRedactor;
+use App\Modules\Deploy\Services\DeploymentValueRedactor;
 
 test('it redacts sensitive context values', function () {
     $redactor = app(DeploymentValueRedactor::class);

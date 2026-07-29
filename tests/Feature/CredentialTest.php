@@ -16,6 +16,17 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+// DNS/CDN providers default off (config server_providers.enabled.*); enable the
+// ones these tests connect so ServerProviderGate::enabled() doesn't refuse them.
+beforeEach(function (): void {
+    config([
+        'server_providers.enabled.gandi' => true,
+        'server_providers.enabled.namecheap' => true,
+        'server_providers.enabled.vercel_dns' => true,
+        'server_providers.enabled.cloudflare' => true,
+    ]);
+});
+
 function userWithOrganization(): User
 {
     $user = User::factory()->create();

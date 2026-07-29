@@ -55,14 +55,73 @@
     </p>
 </div>
 
+{{-- TOP failure callout. A failed deploy's reason used to live ONLY in the
+     bottom banner, below every phase — so a deploy that died in a post-Release
+     phase (Activate/Restart/Health) read as "Failed" with all-green visible
+     phases and no error above the fold. Surface the cause HERE, gated on the
+     deployment's own status (not exit_code, which a between-phase failure can
+     leave at 0/null), naming the phase that failed and showing its output. --}}
+@if ($deployment->status === 'failed')
+    @php
+        $failedPhase = null;
+        $failedStepOutput = '';
+        foreach ($timelinePhases as $tp) {
+            if (($tp['status'] ?? null) === 'failed') {
+                $failedPhase = $tp;
+                foreach ($tp['steps'] as $s) {
+                    if (! ($s['ok'] ?? false) && ! ($s['skipped'] ?? false) && ! ($s['pending'] ?? false)) {
+                        $failedStepOutput = trim((string) ($s['output'] ?? ''));
+                        if ($failedStepOutput !== '') {
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        $calloutBody = $failedStepOutput;
+        if ($calloutBody === '') {
+            $calloutBody = trim((string) $deployment->log_output);
+        }
+        if ($calloutBody !== '' && mb_strlen($calloutBody) > 1600) {
+            $calloutBody = '…'.mb_substr($calloutBody, -1600);
+        }
+    @endphp
+    <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+        <div class="flex items-start gap-2">
+            <x-heroicon-m-x-circle class="mt-0.5 h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
+            <div class="min-w-0">
+                <p class="text-xs font-semibold text-rose-800">
+                    @if ($failedPhase)
+                        {{ __('Failed during the :phase phase', ['phase' => $failedPhase['label']]) }}
+                    @elseif ($phaseDone === 0)
+                        {{ __('Deploy failed before the first phase started — usually the initial clone or the connection to the server.') }}
+                    @else
+                        {{ __('Deploy failed after the recorded phases — the worker may have been restarted mid-deploy.') }}
+                    @endif
+                </p>
+                @if ($calloutBody !== '')
+                    <pre class="mt-2 max-h-44 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $calloutBody }}</pre>
+                @else
+                    <p class="mt-1 text-[11px] text-rose-700/90">{{ __('No output was captured. Trigger the deploy again, or open the full deploy log.') }}</p>
+                @endif
+            </div>
+        </div>
+    </div>
+@endif
+
 <ol class="relative">
     @foreach ($timelinePhases as $phase)
         @php
             $st = $phase['status'];
             $stepCount = count($phase['steps']);
             $durTxt = $phase['duration_ms'] > 0 ? number_format($phase['duration_ms'] / 1000, 1).'s' : null;
+            $hasSteps = $phase['steps'] !== [];
+            // Collapse finished/upcoming phases; keep the running or failed one
+            // open so a long success run reads as a short rail of phase headers.
+            $phaseAutoOpen = in_array($st, ['running', 'failed'], true);
         @endphp
-        <li class="relative pl-12">
+        <li class="relative pl-12" @if ($hasSteps) x-data="{ open: @js($phaseAutoOpen) }" @endif>
             {{-- Rail segment beneath this node, tinted by this phase's outcome so
                  the line reads as "done" (green) up to the active node, then fades
                  to gray for what's still ahead. Hidden on the last phase. --}}
@@ -104,8 +163,11 @@
                     @endswitch
                 </span>
 
-                {{-- Phase header --}}
-                <div class="flex flex-wrap items-baseline gap-x-2">
+                {{-- Phase header — clickable to expand/collapse its steps. --}}
+                <div @if ($hasSteps) x-on:click="open = ! open" role="button" tabindex="0" x-on:keydown.enter.prevent="open = ! open" x-on:keydown.space.prevent="open = ! open" @endif @class([
+                    'flex flex-wrap items-baseline gap-x-2',
+                    'w-full cursor-pointer select-none' => $hasSteps,
+                ])>
                     <span @class([
                         'text-sm font-semibold',
                         'text-brand-ink' => $st !== 'pending' && $st !== 'skipped',
@@ -129,11 +191,12 @@
                                 {{ __('Not started') }}
                         @endswitch
                     </span>
+                    @if ($hasSteps)<span class="ml-auto self-center font-mono text-[10px] text-brand-mist" x-text="open ? '▾' : '▸'"></span>@endif
                 </div>
 
-                {{-- Steps --}}
-                @if ($phase['steps'] !== [])
-                    <ul class="mt-2 space-y-1.5">
+                {{-- Steps (collapsible) --}}
+                @if ($hasSteps)
+                    <ul x-show="open" x-cloak class="mt-2 space-y-1.5">
                         @foreach ($phase['steps'] as $step)
                             @include('livewire.sites.partials.deployments._phase-timeline-step', [
                                 'step' => $step,

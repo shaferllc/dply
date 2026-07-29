@@ -117,6 +117,7 @@ test('shared host workspace renders attribution panel with feature on and two si
         ->assertSee(__('Site load attribution'))
         ->assertSee(__('Fairness Advisor'))
         ->assertSee(__('Shared stack map'))
+        ->call('setSharedHostTab', 'contention')
         ->assertSee(__('Contention timeline'));
 });
 

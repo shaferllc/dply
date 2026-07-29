@@ -7,8 +7,8 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
-use App\Services\Deploy\DeployResumePlan;
-use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
+use App\Modules\Deploy\Services\DeployResumePlan;
+use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
@@ -59,7 +59,7 @@ class AtomicSiteDeployer
         }
 
         $gitSsh = $privateKey
-            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o StrictHostKeyChecking=accept-new').' && '
+            ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new').' && '
             : '';
 
         // For HTTPS repos with no deploy key, inject the stored OAuth/PAT token.
@@ -218,7 +218,7 @@ class AtomicSiteDeployer
 
             $cloneLog .= $this->anchorRunner->runClone($ssh, $site, $newRelease, $gitSsh, $repo, $branch, true, false);
             $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
-            $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
+            $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease, $cloneLog);
 
             // Post-clone snapshot: confirm exactly what landed in the release dir.
             $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));
@@ -301,7 +301,7 @@ class AtomicSiteDeployer
         // deployer, needed for dply's own self-deploy). Customer sites keep
         // per-release storage unless
         // they explicitly opt in. Default target = <project root>/shared/storage.
-        $deployMeta = ($site->meta );
+        $deployMeta = is_array($site->meta) ? $site->meta : [];
         if (! empty($deployMeta['shared_storage'])) {
             $sharedStorage = trim((string) ($deployMeta['shared_storage_path'] ?? ''));
             if ($sharedStorage === '') {
@@ -526,7 +526,7 @@ class AtomicSiteDeployer
                 'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
             ]]);
 
-            $meta = ($site->meta );
+            $meta = is_array($site->meta) ? $site->meta : [];
             $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? config('deploy.health_check_auto_rollback', true));
             if ($autoRollback && $previousActiveRelease !== null) {
                 try {
@@ -569,9 +569,13 @@ class AtomicSiteDeployer
             // prior atomic history so the tree stays the two pinned trees. The
             // live slot was just flipped to, so nothing here can drop it.
             $log .= "\n--- blue-green: keep blue + green, sweep strays ---\n";
+            // sudo -n first so root-owned files inside a release (managed error
+            // pages, certbot artefacts) don't leave the dir half-deleted; fall
+            // back to a plain rm on hosts where the deploy user lacks NOPASSWD
+            // sudo but owns the bytes.
             $log .= $ssh->exec(
                 sprintf(
-                    'find %s/releases -mindepth 1 -maxdepth 1 -type d ! -name blue ! -name green -exec rm -rf {} + 2>/dev/null; echo done',
+                    'find %s/releases -mindepth 1 -maxdepth 1 -type d ! -name blue ! -name green 2>/dev/null | while read -r d; do sudo -n rm -rf "$d" 2>/dev/null || rm -rf "$d"; done; echo done',
                     $baseEsc
                 ),
                 120
@@ -579,9 +583,14 @@ class AtomicSiteDeployer
         } else {
             $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));
             $log .= "\n--- prune old releases ---\n";
+            // sudo -n first so root-owned files inside an old release (managed
+            // error pages like .dply/errors/500.html, .dply/suspended/index.html,
+            // certbot artefacts) can't block the delete and leave a stale dir
+            // behind; fall back to a plain rm on hosts where the deploy user
+            // lacks NOPASSWD sudo but owns the bytes.
             $log .= $ssh->exec(
                 sprintf(
-                    'cd %s/releases 2>/dev/null && ls -1t 2>/dev/null | tail -n +%d | while read -r d; do rm -rf "$d"; done; echo done',
+                    'cd %s/releases 2>/dev/null && ls -1t 2>/dev/null | tail -n +%d | while read -r d; do sudo -n rm -rf "$d" 2>/dev/null || rm -rf "$d"; done; echo done',
                     $baseEsc,
                     $keep + 1
                 ),

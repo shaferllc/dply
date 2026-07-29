@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;
@@ -18,7 +18,7 @@ use App\Models\EdgeDeployReplay;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\DeployContract\DeployContractState;
-use App\Support\Edge\EdgePreviewPolicy;
+use App\Modules\Edge\Support\EdgePreviewPolicy;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;

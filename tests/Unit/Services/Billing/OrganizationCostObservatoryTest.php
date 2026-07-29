@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Organization;
 use App\Models\Server;
-use App\Services\Billing\DesiredBillingState;
-use App\Services\Billing\OrganizationCostObservatory;
-use App\Services\Billing\ServerMonthlyCostNoteParser;
+use App\Modules\Billing\Services\DesiredBillingState;
+use App\Modules\Billing\Services\OrganizationCostObservatory;
+use App\Modules\Billing\Services\ServerMonthlyCostNoteParser;
 use App\Services\Servers\ServerProviderCostEstimator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

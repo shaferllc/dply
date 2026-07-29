@@ -113,4 +113,71 @@ final class ObjectStorageBucketProvisioner
             }
         }
     }
+
+    /**
+     * Empty and delete a provisioned bucket. Idempotent when the bucket is
+     * already gone. Used when an operator detaches a storage binding and opts
+     * to delete the underlying bucket.
+     */
+    public function delete(string $provider, string $region, string $accessKey, string $secret, string $bucket): void
+    {
+        $providers = (array) config('object_storage.providers', []);
+        $meta = $providers[$provider] ?? null;
+        if (! is_array($meta) || ! (bool) ($meta['provision'] ?? false)) {
+            throw new InvalidArgumentException(__('This provider does not support deleting a provisioned bucket.'));
+        }
+
+        $region = trim($region);
+        if ($region === '') {
+            throw new InvalidArgumentException(__('Choose a region for the bucket.'));
+        }
+
+        $template = (string) ($meta['endpoint_template'] ?? '');
+        $endpoint = $template !== '' ? str_replace('{region}', $region, $template) : '';
+        if ($endpoint === '') {
+            throw new InvalidArgumentException(__('Could not resolve the storage endpoint for this provider and region.'));
+        }
+
+        $providerLabel = (string) ($meta['label'] ?? $provider);
+
+        $client = new S3Client([
+            'version' => 'latest',
+            'region' => $region,
+            'endpoint' => $endpoint,
+            'use_path_style_endpoint' => true,
+            'credentials' => ['key' => $accessKey, 'secret' => $secret],
+            'http' => ['connect_timeout' => 5, 'timeout' => 60],
+        ]);
+
+        try {
+            $paginator = $client->getPaginator('ListObjectsV2', ['Bucket' => $bucket]);
+            foreach ($paginator as $page) {
+                $objects = $page['Contents'] ?? [];
+                if ($objects === []) {
+                    continue;
+                }
+
+                $client->deleteObjects([
+                    'Bucket' => $bucket,
+                    'Delete' => [
+                        'Objects' => array_map(
+                            fn (array $object): array => ['Key' => (string) $object['Key']],
+                            $objects,
+                        ),
+                    ],
+                ]);
+            }
+
+            $client->deleteBucket(['Bucket' => $bucket]);
+        } catch (S3Exception $e) {
+            $code = (string) $e->getAwsErrorCode();
+            if (in_array($code, ['NoSuchBucket', 'NotFound'], true)) {
+                return;
+            }
+
+            throw new RuntimeException(__('Could not delete the bucket: :err', ['err' => $e->getAwsErrorMessage() ?: $e->getMessage()]));
+        } catch (AwsException $e) {
+            throw new RuntimeException(__('Could not reach :provider to delete the bucket: :err', ['provider' => $providerLabel, 'err' => $e->getMessage()]));
+        }
+    }
 }

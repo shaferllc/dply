@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ProvisionTenantTestingHostnameJob;
+use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Services\Sites\SiteReachabilityChecker;
+use App\Services\Sites\TenantDnsProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
 
@@ -70,7 +75,7 @@ trait ManagesSiteTenantDomains
             'new_tenant_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        SiteTenantDomain::query()->create([
+        $tenant = SiteTenantDomain::query()->create([
             'site_id' => $this->site->id,
             'hostname' => strtolower(trim($validated['new_tenant_hostname'])),
             'tenant_key' => trim((string) ($validated['new_tenant_key'] ?? '')) ?: null,
@@ -85,6 +90,11 @@ trait ManagesSiteTenantDomains
         $this->new_tenant_comment = '';
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain added.');
+
+        // If a connected DNS credential controls this hostname's zone, point it at
+        // the server automatically — so the tenant "just works" without the
+        // operator hand-creating the A record. Silent when no credential covers it.
+        $this->provisionTenantCustomDns($tenant, quietWhenNoCredential: true);
     }
 
     public function confirmRemoveTenantDomain(string $tenantDomainId): void
@@ -110,14 +120,13 @@ trait ManagesSiteTenantDomains
         // and delete the row from a queued job (DNS API + webserver re-apply both
         // belong off the web request); otherwise delete inline as before.
         if ($tenant->testingHostname() !== null) {
-            ProvisionTenantTestingHostnameJob::dispatch(
-                (string) $this->site->id,
-                (string) $tenant->id,
+            $this->streamTenantTestingHostnameJob(
+                $tenant,
                 remove: true,
-                userId: (string) (auth()->id() ?? ''),
                 deleteTenantRow: true,
+                label: __('Removing tenant :host', ['host' => $tenant->hostname]),
+                successToast: __('Tenant :host removed.', ['host' => $tenant->hostname]),
             );
-            $this->toastSuccess(__('Removing tenant domain and its testing hostname…'));
 
             return;
         }
@@ -138,14 +147,13 @@ trait ManagesSiteTenantDomains
 
         $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
 
-        ProvisionTenantTestingHostnameJob::dispatch(
-            (string) $this->site->id,
-            (string) $tenant->id,
+        $this->streamTenantTestingHostnameJob(
+            $tenant,
             remove: false,
-            userId: (string) (auth()->id() ?? ''),
+            deleteTenantRow: false,
+            label: __('Creating testing URL for :host', ['host' => $tenant->hostname]),
+            successToast: __('Testing URL ready for :host.', ['host' => $tenant->hostname]),
         );
-
-        $this->toastSuccess(__('Creating a testing URL for this tenant… DNS and the webserver update in the background.'));
     }
 
     public function removeTenantTestingHostname(string $tenantDomainId): void
@@ -154,14 +162,40 @@ trait ManagesSiteTenantDomains
 
         $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
 
+        $this->streamTenantTestingHostnameJob(
+            $tenant,
+            remove: true,
+            deleteTenantRow: false,
+            label: __('Removing testing URL for :host', ['host' => $tenant->hostname]),
+            successToast: __('Testing URL removed for :host.', ['host' => $tenant->hostname]),
+        );
+    }
+
+    /**
+     * Seed a console-action run, dispatch the tenant testing-hostname job bound to
+     * it, focus the console drawer, and watch for completion — so testing-URL
+     * create/remove and tenant removal all stream live instead of a silent toast.
+     */
+    private function streamTenantTestingHostnameJob(
+        SiteTenantDomain $tenant,
+        bool $remove,
+        bool $deleteTenantRow,
+        string $label,
+        string $successToast,
+    ): void {
+        $run = $this->seedQueuedConsoleAction('tenant_dns', $label);
+
         ProvisionTenantTestingHostnameJob::dispatch(
             (string) $this->site->id,
             (string) $tenant->id,
-            remove: true,
+            remove: $remove,
             userId: (string) (auth()->id() ?? ''),
+            deleteTenantRow: $deleteTenantRow,
+            seededConsoleRunId: (string) $run->id,
         );
 
-        $this->toastSuccess(__('Removing this tenant’s testing URL…'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, $successToast, __('Tenant routing update did not finish — see the output below.'));
     }
 
     public function editTenantDomain(string $tenantDomainId): void
@@ -220,6 +254,10 @@ trait ManagesSiteTenantDomains
         $this->cancelEditTenantDomain();
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain updated.');
+
+        // Point the (possibly changed) hostname at the server when a connected
+        // credential owns its zone — so editing a tenant "just works" like adding.
+        $this->provisionTenantCustomDns($tenant->fresh(), quietWhenNoCredential: true);
     }
 
     /**
@@ -283,5 +321,105 @@ trait ManagesSiteTenantDomains
         $this->bulk_tenant_input = '';
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
+    }
+
+    /**
+     * Issue a per-tenant HTTP-01 certificate for a tenant's CUSTOM domain. Each
+     * tenant onboards over time at its own arbitrary hostname, so they get their
+     * own cert (rather than one ever-growing SAN cert where a single tenant's bad
+     * DNS would break everyone). Gated on reachability so we don't queue a cert
+     * that's guaranteed to fail at the CA; a Cloudflare-proxied tenant still
+     * passes (the HTTP-01 challenge routes through the proxy to this origin).
+     */
+    public function issueTenantCertificate(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->find($tenantDomainId);
+        if ($tenant === null) {
+            return;
+        }
+
+        $hostname = strtolower(trim((string) $tenant->hostname));
+        if ($hostname === '') {
+            return;
+        }
+
+        $alreadyCovered = $this->site->certificates()
+            ->whereIn('status', [
+                SiteCertificate::STATUS_PENDING,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+                SiteCertificate::STATUS_ACTIVE,
+            ])
+            ->get()
+            ->contains(fn (SiteCertificate $certificate): bool => in_array($hostname, $certificate->domainHostnames(), true));
+        if ($alreadyCovered) {
+            $this->toastError(__('SSL is already configured or in progress for :host.', ['host' => $hostname]));
+
+            return;
+        }
+
+        $reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
+        if (! ($reachability['ok'] ?? false) && empty($reachability['behind_cloudflare'])) {
+            $this->toastError($reachability['error']
+                ?? __('“:host” isn’t pointed at this server yet — point its DNS here, then request SSL.', ['host' => $hostname]));
+
+            return;
+        }
+
+        $certificate = app(CertificateRequestService::class)->create([
+            'site_id' => $this->site->id,
+            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+            'domains_json' => [$hostname],
+            'status' => SiteCertificate::STATUS_PENDING,
+            'requested_settings' => [
+                'source' => 'tenant_ssl',
+                'tenant_domain_id' => (string) $tenant->id,
+            ],
+        ]);
+
+        ExecuteSiteCertificateJob::dispatch((string) $certificate->id);
+        $this->toastSuccess(__('SSL requested for :host.', ['host' => $hostname]));
+        $this->site->load('certificates');
+    }
+
+    /**
+     * Operator-triggered "Point DNS here" for a tenant's custom domain — creates
+     * the A record at whichever connected provider hosts its zone.
+     */
+    public function provisionTenantDns(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->find($tenantDomainId);
+        if ($tenant === null) {
+            return;
+        }
+
+        $this->provisionTenantCustomDns($tenant, quietWhenNoCredential: false);
+    }
+
+    /**
+     * Auto-point a tenant's custom domain at this server: resolve the connected
+     * DNS credential that owns the hostname's zone and upsert an A record → the
+     * server IP. No-ops (optionally quietly) when no connected credential covers
+     * the zone — then the operator points DNS themselves.
+     */
+    private function provisionTenantCustomDns(SiteTenantDomain $tenant, bool $quietWhenNoCredential = false): void
+    {
+        $result = app(TenantDnsProvisioner::class)->ensure($this->site, $tenant);
+        $host = (string) $tenant->hostname;
+
+        if ($result['status'] === 'created') {
+            $this->toastSuccess(__('Pointed “:host” at this server in :zone — DNS may take a few minutes to propagate, then add SSL.', ['host' => $host, 'zone' => $result['zone']]));
+        } elseif ($result['status'] === 'no_credential' && ! $quietWhenNoCredential) {
+            $this->toastWarning(__('No connected DNS credential controls “:host”’s zone — connect the provider that hosts it (e.g. Cloudflare), or point its DNS at this server manually.', ['host' => $host]));
+        } elseif ($result['status'] === 'error') {
+            $this->toastError(__('Could not create the DNS record for “:host”: :err', ['host' => $host, 'err' => $result['message']]));
+        }
+        // 'no_server_ip' / 'invalid' → silent (nothing actionable for the operator here).
     }
 }

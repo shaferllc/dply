@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 
 return [
 
@@ -86,7 +86,11 @@ return [
     */
     'log_ingest' => [
         'key' => env('DPLY_EDGE_LOG_INGEST_KEY'),
-        'base_url' => env('DPLY_EDGE_LOG_INGEST_BASE_URL', env('APP_URL')),
+        // Workers run on the public internet — prefer the tunnel/public URL
+        // over APP_URL (often a local *.test host that Edge cannot reach).
+        'base_url' => env('DPLY_EDGE_LOG_INGEST_BASE_URL')
+            ?: env('DPLY_PUBLIC_APP_URL')
+            ?: env('APP_URL'),
     ],
 
     /*
@@ -125,14 +129,74 @@ return [
         // with DPLY_EDGE_BUILD_IMAGE if you need to pin older Node for a
         // specific deploy.
         'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
+        // Images pre-pulled on worker boot / schedule (skip per-deploy pull when present).
+        'warm_images' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('DPLY_EDGE_BUILD_WARM_IMAGES', 'node:20-bookworm,node:22-bookworm')),
+        ))),
+        'warm_images_on_schedule' => filter_var(env('DPLY_EDGE_BUILD_WARM_IMAGES_SCHEDULE', true), FILTER_VALIDATE_BOOLEAN),
+        // Skip `docker pull` when `docker image inspect` succeeds locally.
+        'skip_pull_if_present' => filter_var(env('DPLY_EDGE_BUILD_SKIP_PULL_IF_PRESENT', true), FILTER_VALIDATE_BOOLEAN),
+        // Long-running clone/build/publish — Horizon supervisor-heavy.
+        'queue' => env('DPLY_EDGE_BUILD_QUEUE', 'dply-provision'),
         'timeout_seconds' => 900,
         'artifact_max_bytes' => 524_288_000,
+        // Docker should always be present on a build worker, but if a box came
+        // up without it we self-heal by installing Docker inline on the next
+        // deploy (idempotent; needs passwordless sudo when the worker isn't
+        // root). Set false to fail fast with an install hint instead.
+        'docker_autoinstall' => filter_var(env('DPLY_EDGE_BUILD_DOCKER_AUTOINSTALL', true), FILTER_VALIDATE_BOOLEAN),
+        'docker_install_timeout_seconds' => (int) env('DPLY_EDGE_BUILD_DOCKER_INSTALL_TIMEOUT', 600),
+        /*
+         * Where the per-deploy checkout lives before it is bind-mounted
+         * into the build container. This MUST be a path the Docker daemon
+         * is allowed to share: on macOS (Docker Desktop / OrbStack) a
+         * mount of an unshared path such as /var/tmp silently resolves to
+         * an EMPTY directory inside the container, and the build fails
+         * with a misleading "npm ci needs a package-lock.json". Defaults
+         * under storage/ (same convention as git_cache_dir) so it is
+         * always inside the project tree.
+         */
+        'work_root' => env('DPLY_EDGE_BUILD_WORK_ROOT', storage_path('app/edge-builds')),
         // Persistent --mirror clone per repo so repeated builds skip
         // re-downloading the full history. Set git_cache_enabled=false
         // to bypass the mirror and clone directly (slower, but useful
         // when debugging a stale cache).
         'git_cache_enabled' => filter_var(env('DPLY_EDGE_BUILD_GIT_CACHE', true), FILTER_VALIDATE_BOOLEAN),
         'git_cache_dir' => env('DPLY_EDGE_BUILD_GIT_CACHE_DIR', storage_path('app/edge-git-cache')),
+        // Host-side npm/pnpm/yarn caches bind-mounted into every build
+        // container so installs reuse downloaded tarballs across deploys.
+        'package_store_enabled' => filter_var(env('DPLY_EDGE_BUILD_PACKAGE_STORE', true), FILTER_VALIDATE_BOOLEAN),
+        'package_store_dir' => env('DPLY_EDGE_BUILD_PACKAGE_STORE_DIR', storage_path('app/edge-pkg-store')),
+        // Upload node_modules cache to R2 after publish (off the deploy
+        // critical path). When false, snapshot runs inline after build.
+        'async_cache_snapshot' => filter_var(env('DPLY_EDGE_BUILD_ASYNC_CACHE_SNAPSHOT', true), FILTER_VALIDATE_BOOLEAN),
+        // Sparse-checkout when a monorepo repo_root is set (shallow + cone).
+        'sparse_checkout' => filter_var(env('DPLY_EDGE_BUILD_SPARSE_CHECKOUT', true), FILTER_VALIDATE_BOOLEAN),
+        // Prefer filtered workspace installs (`pnpm --filter`, `npm -w`) when
+        // building a single package inside a monorepo.
+        'monorepo_filter_install' => filter_var(env('DPLY_EDGE_BUILD_MONOREPO_FILTER', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Deploy duration regression (edge.deploy.duration_regressed)
+    |--------------------------------------------------------------------------
+    | After a deploy goes live we compare its wall-clock duration against the
+    | median (p50) of the site's recent successful deploys. Slower than
+    | `multiplier` x p50 raises `edge.deploy.duration_regressed`.
+    |
+    | The median — not the mean — is deliberate: a single pathological build
+    | (cold Docker cache, npm registry stall) would drag a mean upward and mask
+    | every later regression. `min_samples` suppresses the alert until there is
+    | enough history for a p50 to mean anything; without it the very first
+    | couple of deploys on a new site alert against a baseline of one.
+    */
+    'duration_regression' => [
+        'enabled' => filter_var(env('DPLY_EDGE_DURATION_REGRESSION', true), FILTER_VALIDATE_BOOLEAN),
+        'window' => (int) env('DPLY_EDGE_DURATION_REGRESSION_WINDOW', 10),
+        'min_samples' => (int) env('DPLY_EDGE_DURATION_REGRESSION_MIN_SAMPLES', 5),
+        'multiplier' => (float) env('DPLY_EDGE_DURATION_REGRESSION_MULTIPLIER', 1.5),
     ],
 
     /*
@@ -184,6 +248,26 @@ return [
     | When unset, subdomains CNAME onto the zone apex.
     */
     'testing_dns_target' => env('DPLY_EDGE_TESTING_DNS_TARGET'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Hostnames (SSL for SaaS) — Phase 3b
+    |--------------------------------------------------------------------------
+    | When enabled, managed `dply_edge` sites register attached custom domains
+    | via Cloudflare Custom Hostnames on the worker zone so TLS is issued for
+    | customer hostnames that CNAME to the Edge delivery hostname. BYO
+    | `org_cloudflare` sites keep customer-zone TLS (orange cloud) and skip
+    | this path. Requires Custom Hostnames entitlement + API token permission
+    | "SSL and Certificates → Custom Hostnames → Edit" on the worker zone.
+    */
+    'custom_hostnames' => [
+        'enabled' => filter_var(env('DPLY_EDGE_CUSTOM_HOSTNAMES', true), FILTER_VALIDATE_BOOLEAN),
+        // DV method: http (default), txt, or email.
+        'ssl_method' => env('DPLY_EDGE_CUSTOM_HOSTNAME_SSL_METHOD', 'http'),
+        // Optional override for CF custom_origin_server / CNAME target shown
+        // in the UI. When empty, sites keep CNAME → {slug}.{on-dply apex}.
+        'fallback_origin' => env('DPLY_EDGE_CUSTOM_HOSTNAME_FALLBACK_ORIGIN'),
+    ],
 
     'default_backend' => 'dply_edge',
 

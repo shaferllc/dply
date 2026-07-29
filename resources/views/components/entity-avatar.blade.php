@@ -20,12 +20,22 @@
     $avatarStyle = "background-image: linear-gradient(135deg, hsl({$avatarHueA}deg 65% 56%) 0%, hsl({$avatarHueB}deg 65% 42%) 100%);";
 @endphp
 @if (filled($image))
-    {{-- Uploaded/custom logo. Size + rounding come from the caller's classes. --}}
+    {{-- Uploaded/custom logo. Size + rounding come from the caller's classes.
+         Never show the browser's broken-image glyph: if the URL fails to load
+         (deleted asset, wiped serve-disk, dead favicon), hide the img and
+         reveal the initials fallback rendered right after it. Plain onerror
+         (not Alpine) so it works even before any framework boots. --}}
     <img
         src="{{ $image }}"
         alt="{{ $avatarSeed }}"
+        onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='inline-flex';"
         {{ $attributes->merge(['class' => "shrink-0 bg-white object-cover $rounded shadow-sm ring-1 ring-brand-ink/10"]) }}
     />
+    <span
+        {{ $attributes->merge(['class' => "inline-flex shrink-0 items-center justify-center $rounded font-semibold text-white shadow-sm ring-1 ring-brand-ink/10"]) }}
+        style="display: none; {{ $avatarStyle }}"
+        aria-hidden="true"
+    >{{ $avatarInitials }}</span>
 @else
     <span
         {{ $attributes->merge(['class' => "inline-flex shrink-0 items-center justify-center $rounded font-semibold text-white shadow-sm ring-1 ring-brand-ink/10"]) }}

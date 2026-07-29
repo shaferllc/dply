@@ -8,6 +8,7 @@ use App\Modules\Backups\Console\DbBackupCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Backups\Console\RunBackupScheduleCommand;
+use App\Modules\Backups\Console\DbRestoreCommand;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -33,6 +34,7 @@ class BackupsServiceProvider extends ServiceProvider
                 PruneBackupDownloadStagingsCommand::class,
                 PruneBackupsCommand::class,
                 RunBackupScheduleCommand::class,
+                DbRestoreCommand::class,
             ]);
         }
     }

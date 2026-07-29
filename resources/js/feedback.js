@@ -279,9 +279,14 @@ export function registerFeedbackSidebar(Alpine) {
 
         toggle() {
             this.open = !this.open;
+            window.dispatchEvent(new CustomEvent(this.open ? 'dply-feedback-opened' : 'dply-feedback-closed'));
         },
         close() {
+            if (! this.open) {
+                return;
+            }
             this.open = false;
+            window.dispatchEvent(new CustomEvent('dply-feedback-closed'));
         },
 
         async submitWithCapture() {
@@ -327,6 +332,17 @@ export function registerFeedbackSidebar(Alpine) {
             // Livewire tells us when a report was filed OK so we can close + reset.
             this.$wire.on('feedback-submitted', () => {
                 this.open = false;
+            });
+
+            // Floating dock (and other chrome) opens the panel via this event.
+            window.addEventListener('dply-open-feedback', () => {
+                if (! this.open) {
+                    this.open = true;
+                    window.dispatchEvent(new CustomEvent('dply-feedback-opened'));
+                }
+            });
+            window.addEventListener('dply-toggle-feedback', () => {
+                this.toggle();
             });
         },
     }));

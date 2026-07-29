@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SshConnectionFactory;
 use App\Support\Servers\HetznerCloudFirewallRules;

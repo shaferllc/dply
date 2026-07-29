@@ -11,9 +11,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBackend;
 use App\Models\SupervisorProgram;
-use App\Services\Deploy\DeploymentSecretInventory;
-use App\Services\Deploy\LaravelComposerPackageDetector;
-use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
+use App\Modules\Deploy\Services\DeploymentSecretInventory;
+use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\SupervisorDeployRestarter;
 use Illuminate\Database\Eloquent\Model;
@@ -67,7 +67,7 @@ trait ResolvesSiteRuntime
             return $this->runtime;
         }
 
-        return $this->type->value;
+        return $this->type?->value;
     }
 
     /**
@@ -738,7 +738,34 @@ trait ResolvesSiteRuntime
      */
     public function shouldShowOctaneRuntimeUi(): bool
     {
+        return $this->hasOctanePackageInstalled();
+    }
+
+    /**
+     * Composer / runtime detection found `laravel/octane` — the package may be
+     * present but Octane is not the live runtime until {@see isOctaneEnabled()}.
+     */
+    public function hasOctanePackageInstalled(): bool
+    {
         return $this->resolvedLaravelPackageFlag('octane');
+    }
+
+    /**
+     * Operator saved an Octane port under Runtime / Laravel settings.
+     */
+    public function isOctaneEnabled(): bool
+    {
+        return (bool) $this->octane_port;
+    }
+
+    /**
+     * Whether Octane is installed AND enabled for this site — both composer
+     * package detection and a saved Octane port are required. Package alone
+     * still serves through PHP-FPM until a port is configured.
+     */
+    public function usesOctaneRuntime(): bool
+    {
+        return $this->isOctaneEnabled() && $this->hasOctanePackageInstalled();
     }
 
     /**

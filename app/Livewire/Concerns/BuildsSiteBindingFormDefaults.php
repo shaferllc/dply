@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Models\ObjectStorageCredential;
-use App\Models\RealtimeApp;
-use App\Services\Deploy\DeploymentSecretInventory;
+use App\Modules\Realtime\Models\RealtimeApp;
+use App\Modules\Deploy\Services\DeploymentSecretInventory;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -23,7 +23,7 @@ trait BuildsSiteBindingFormDefaults
     private function defaultBindingForm(string $type, string $mode): array
     {
         return match (true) {
-            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => '', 'host' => '127.0.0.1'],
+            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => '', 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'vm_size' => '', 'vendor_api_key' => '', 'vendor_account' => '', 'vendor_region' => ''],
             $type === 'database' => $this->defaultDatabaseAttachBindingForm(),
             // use_for_drivers: also wire cache/sessions/queue at this Redis in one
             // step (default on — it's why you attach Redis). Existing driver
@@ -198,6 +198,10 @@ trait BuildsSiteBindingFormDefaults
             'region' => '',
             // Resend
             'key' => '',
+            // Cloudflare (account_id + sending key); cf_domain drives the
+            // guided "email on your domain" panel, defaulting to the primary.
+            'account_id' => '',
+            'cf_domain' => (string) ($this->site->primaryDomain()?->hostname ?? ''),
             // Saved-credential reuse + save-for-reuse.
             'credential_id' => '',
             'save_credential' => false,
@@ -374,6 +378,15 @@ trait BuildsSiteBindingFormDefaults
             'api_key' => '',
             // Flare
             'key' => '',
+            // Lookout: a sub-mode toggle inside the (single-mode) error-tracking
+            // form. 'provision' mints a project from a token + org; 'attach'
+            // pastes an existing DSN. project_name defaults to the site name.
+            'lookout_mode' => 'provision',
+            'lookout_token' => '',
+            'lookout_org' => '',
+            // Billing tier for the managed account model (config('lookout.tiers')).
+            'lookout_tier' => (string) config('lookout.default_tier', 'starter'),
+            'project_name' => (string) ($this->site->name ?: $this->site->slug ?: ''),
             // Saved-credential reuse + save-for-reuse.
             'credential_id' => '',
             'save_credential' => false,

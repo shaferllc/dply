@@ -16,19 +16,9 @@ class RedirectGuestsToComingSoon
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // COMING_SOON env (via config): true forces the gate on (even locally,
-        // for preview), false turns it fully off, null = legacy behavior
-        // (gated in any non-local environment).
-        $flag = config('dply.coming_soon');
-
-        // Fully disabled, or an authenticated user — always pass.
-        if ($flag === false || auth()->check()) {
-            return $next($request);
-        }
-
-        // Gate active in non-local (or forced on with COMING_SOON=true).
-        $gateOn = $flag === true || ! $this->isLocalDevelopmentRequest($request);
-        if (! $gateOn) {
+        // COMING_SOON=true forces the gate on (even locally, for preview).
+        // Default is off — the public site is live.
+        if (! filter_var(config('dply.coming_soon'), FILTER_VALIDATE_BOOLEAN) || auth()->check()) {
             return $next($request);
         }
 
@@ -48,11 +38,7 @@ class RedirectGuestsToComingSoon
         // results to /webhook/task/* (update-output, mark-as-failed, …) and
         // deploy/git callbacks land on /hooks/*; the uptime probe hits /up.
         // These have their own auth (signed URLs / webhook secrets / throttle)
-        // and carry no session, so a 302 here silently swallows the POST —
-        // which is exactly what wedged server provisioning during the beta:
-        // every mark-as-failed callback bounced to /coming-soon, so tasks
-        // stayed "running" forever and the provision journey spun with no
-        // error. Let them through regardless of the gate.
+        // and carry no session, so a 302 here silently swallows the POST.
         if ($this->isMachineCallback($request)) {
             return $next($request);
         }
@@ -61,8 +47,7 @@ class RedirectGuestsToComingSoon
         // the beta gate is up: social-login (OAuth) and passkey-login round
         // trips (the visitor has no session yet at the callback), the
         // `curl … | sh` CLI installer, public status pages, and one-time
-        // credential-share links. These are NOT machine callbacks (they
-        // legitimately 503 during maintenance), so they live in their own list.
+        // credential-share links.
         if ($this->isPublicDuringComingSoon($request)) {
             return $next($request);
         }
@@ -97,19 +82,6 @@ class RedirectGuestsToComingSoon
             'status/*',          // public status pages
             'share/*',           // one-time credential-share links
         );
-    }
-
-    private function isLocalDevelopmentRequest(Request $request): bool
-    {
-        if (app()->environment('local')) {
-            return true;
-        }
-
-        return in_array($request->getHost(), [
-            'localhost',
-            '127.0.0.1',
-            '::1',
-        ], true);
     }
 
     /**

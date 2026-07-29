@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
-use App\Services\AwsEksService;
+use App\Modules\Cloud\Services\AwsEksService;
 use Aws\CommandInterface;
 use Aws\Exception\AwsException;
 use Aws\MockHandler;

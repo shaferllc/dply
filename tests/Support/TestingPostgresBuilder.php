@@ -32,9 +32,12 @@ class TestingPostgresBuilder extends PostgresBuilder
         }
 
         foreach (array_chunk($tables, self::DROP_CHUNK_SIZE) as $chunk) {
-            $this->connection->statement(
-                $this->grammar->compileDropAllTables($chunk)
-            );
+            // IF EXISTS: a concurrent/interrupted migrate:fresh can leave the
+            // catalog half-dropped; Laravel's default DROP TABLE list then fails
+            // on the first missing name and aborts the rest of the wipe.
+            $sql = $this->grammar->compileDropAllTables($chunk);
+            $sql = preg_replace('/^drop table /i', 'drop table if exists ', $sql) ?? $sql;
+            $this->connection->statement($sql);
         }
     }
 
@@ -47,9 +50,9 @@ class TestingPostgresBuilder extends PostgresBuilder
         }
 
         foreach (array_chunk($views, self::DROP_CHUNK_SIZE) as $chunk) {
-            $this->connection->statement(
-                $this->grammar->compileDropAllViews($chunk)
-            );
+            $sql = $this->grammar->compileDropAllViews($chunk);
+            $sql = preg_replace('/^drop view /i', 'drop view if exists ', $sql) ?? $sql;
+            $this->connection->statement($sql);
         }
     }
 

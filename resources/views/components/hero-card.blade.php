@@ -31,7 +31,11 @@
      page-specific. Use the `leading` slot to supply a fully custom badge
      instead of the `icon` heroicon slug. --}}
 @php
-    $hasActions = trim((string) $slot) !== '';
+    // Livewire 3 wraps every @if block in <!--[if BLOCK]><![endif]--> comment
+    // markers, so a slot whose conditionals ALL rendered nothing still
+    // stringifies non-empty — leaving an empty mt-4 pill row that pads out the
+    // header. Strip the markers (and any stray HTML comments) before deciding.
+    $hasActions = trim(preg_replace('/<!--.*?-->/s', '', (string) $slot) ?? '') !== '';
 @endphp
 
 <section {{ $attributes->class(['dply-card overflow-hidden']) }}>

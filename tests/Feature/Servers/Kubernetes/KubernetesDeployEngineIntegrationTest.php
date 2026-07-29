@@ -10,9 +10,9 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Deploy\DeployContext;
-use App\Services\Deploy\KubernetesDeployEngine;
-use App\Services\Deploy\KubernetesKubectlExecutor;
+use App\Modules\Deploy\Services\DeployContext;
+use App\Modules\Deploy\Services\KubernetesDeployEngine;
+use App\Modules\Deploy\Services\KubernetesKubectlExecutor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

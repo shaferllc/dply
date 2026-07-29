@@ -3,16 +3,16 @@
     $activeWebserverInfo = $webserverCatalog[$activeWebserver] ?? null;
 @endphp
 
-<div class="space-y-6">
-    <div class="{{ $card }} p-6 sm:p-8">
+<div class="min-w-0">
+    <div class="{{ $card }} px-5 py-5 sm:px-6">
         <div class="max-w-2xl">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge proxy on this server') }}</h3>
+            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Edge proxy on this server') }}</h3>
             <p class="mt-1 text-sm text-brand-moss">
                 {{ __('An edge proxy is optional. When active, it binds :80 and routes hostnames to Caddy backends on ephemeral high ports. Removing an edge proxy restores :webserver on :port.', ['port' => 80, 'webserver' => $edgeProxyPreviousLabel ?? __('your previous webserver')]) }}
             </p>
         </div>
 
-        <div class="mt-5 flex flex-wrap items-center gap-3">
+        <div class="mt-4 flex flex-wrap items-center gap-3">
             @if ($activeEdgeProxy !== null)
                 @php $activeInfo = $edgeProxyCatalog[$activeEdgeProxy] ?? null; @endphp
                 <span class="inline-flex items-center gap-2 rounded-full bg-brand-sage/15 px-3 py-1.5 text-sm font-semibold text-brand-forest ring-1 ring-brand-sage/25">
@@ -43,13 +43,13 @@
         @endif
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2">
+    <div class="grid gap-2 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-2 sm:px-6">
         <button
             type="button"
             wire:click="setWorkspaceTab('change')"
-            class="group {{ $card }} flex items-start gap-3 p-5 text-left transition hover:border-brand-forest/25 hover:shadow-md sm:p-6"
+            class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
         >
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                 <x-heroicon-o-arrow-up-tray class="h-5 w-5" aria-hidden="true" />
             </span>
             <span class="min-w-0">
@@ -61,9 +61,9 @@
             <button
                 type="button"
                 wire:click="setWorkspaceTab('{{ $activeEdgeProxy }}')"
-                class="group {{ $card }} flex items-start gap-3 p-5 text-left transition hover:border-brand-forest/25 hover:shadow-md sm:p-6"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
             >
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-dynamic-component :component="$edgeProxyCatalog[$activeEdgeProxy]['icon'] ?? 'heroicon-o-bolt'" class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">

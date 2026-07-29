@@ -5,7 +5,7 @@ namespace App\Services\Servers;
 use App\Jobs\ApplyFirewallJob;
 use App\Models\Server;
 use App\Models\ServerFirewallRule;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use App\Support\Servers\HetznerCloudFirewallRules;
 use Illuminate\Support\Facades\Log;
 

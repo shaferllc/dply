@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\Billing\ServerTierClassifierTest;
 
 use App\Enums\ServerTier;
-use App\Services\Billing\ServerTierClassifier;
+use App\Modules\Billing\Services\ServerTierClassifier;
 
 beforeEach(function () {
     $this->classifier = new ServerTierClassifier;

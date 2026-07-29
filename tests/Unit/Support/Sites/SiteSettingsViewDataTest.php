@@ -58,7 +58,7 @@ test('edge deploys section skips delivery worker context', function () {
     $payload = SiteSettingsViewData::for(
         $server,
         $site,
-        'edge-domains',
+        'edge-routing',
         null,
         [],
         null,
@@ -121,6 +121,48 @@ test('edge overview observability helper loads billing and traffic snapshots', f
 
     expect($payload['edgeSiteBilling'])->not->toBeNull()
         ->and($payload['edgeSiteTraffic'])->not->toBeNull();
+});
+
+test('edge traffic shell defers usage analytics to the nested child', function () {
+    [$server, $site] = makeEdgeSiteForViewData();
+
+    EdgeUsageSnapshot::query()->create([
+        'organization_id' => $site->organization_id,
+        'site_id' => $site->id,
+        'period_start' => now()->subDay()->toDateString(),
+        'period_end' => now()->subDay()->toDateString(),
+        'requests' => 500,
+        'bytes_egress' => 1024,
+        'r2_storage_bytes' => 0,
+        'r2_class_a_ops' => 0,
+        'r2_class_b_ops' => 0,
+        'source' => 'manual',
+    ]);
+
+    DB::enableQueryLog();
+
+    $shell = SiteSettingsViewData::for($server, $site, 'edge-traffic', null, [], null);
+
+    $shellQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains($query['query'], 'edge_usage_snapshots'))
+        ->count();
+
+    expect($shell['edgeSiteTraffic'])->toBeNull()
+        ->and($shell['edgeSiteAccess'])->toBeNull()
+        ->and($shellQueries)->toBe(0);
+
+    $child = SiteSettingsViewData::edgeSectionAnalytics($site, 'edge-traffic');
+    $again = SiteSettingsViewData::edgeSectionAnalytics($site, 'edge-traffic');
+
+    $usageQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains($query['query'], 'edge_usage_snapshots'))
+        ->count();
+
+    DB::disableQueryLog();
+
+    expect($child['edgeSiteTraffic'])->not->toBeNull()
+        ->and($again['edgeSiteTraffic'])->toBe($child['edgeSiteTraffic'])
+        ->and($usageQueries)->toBe(2); // MTD aggregate + daily rows, once each
 });
 
 /**

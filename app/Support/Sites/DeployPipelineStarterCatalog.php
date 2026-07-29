@@ -6,7 +6,7 @@ namespace App\Support\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
+use App\Modules\Deploy\Services\RuntimeAwareDeployStepDefaults;
 use InvalidArgumentException;
 
 /**

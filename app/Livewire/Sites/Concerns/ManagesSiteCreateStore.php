@@ -10,7 +10,7 @@ use App\Jobs\ProvisionSiteJob;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteProcess;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;

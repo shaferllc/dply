@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Deploy;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Mcp\Tools\AbstractDplyTool;
 use App\Models\Organization;
 use App\Models\SiteDeployment;

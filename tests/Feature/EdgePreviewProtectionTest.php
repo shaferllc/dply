@@ -11,7 +11,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\EdgeAccessTokenIssuer;
+use App\Modules\Edge\Services\EdgeAccessTokenIssuer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 

@@ -11,10 +11,10 @@ use App\Models\SiteCertificate;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Services\Billing\EdgeSiteAccessAnalytics;
-use App\Services\Billing\EdgeSiteBillingAnalytics;
-use App\Services\Billing\EdgeSiteTrafficAnalytics;
-use App\Services\Billing\ManagedProductCostEstimator;
+use App\Modules\Billing\Services\EdgeSiteAccessAnalytics;
+use App\Modules\Billing\Services\EdgeSiteBillingAnalytics;
+use App\Modules\Billing\Services\EdgeSiteTrafficAnalytics;
+use App\Modules\Billing\Services\ManagedProductCostEstimator;
 use App\Support\Deployment\DeploymentContract;
 use App\Modules\Docs\Support\ContextualDocResolver;
 use App\Support\SiteSettingsHeader;
@@ -89,6 +89,9 @@ final class SiteSettingsViewData
         ];
         $routingTabLabels = [
             'dns' => __('DNS'),
+            // "Preview" reads like per-branch deploy previews; this is a single
+            // shareable staging hostname for the live site, so label it plainly.
+            'preview' => __('Preview URL'),
         ];
         $runtimeTabs = SiteSettingsSidebar::runtimeTabsFor($site);
         $runtimeTabIcons = [
@@ -455,8 +458,30 @@ final class SiteSettingsViewData
     }
 
     /**
+     * Analytics payloads for nested Edge Livewire children (Traffic / Billing).
+     * Request-memoized so a double-render cannot re-run the same snapshot queries.
+     *
+     * @return array{
+     *     edgeUsageBillingEnabled: bool,
+     *     edgeManagedFee: float|null,
+     *     edgeUsageRates: array<string, mixed>,
+     *     edgeSiteBilling: array<string, mixed>|null,
+     *     edgeSiteTraffic: array<string, mixed>|null,
+     *     edgeSiteAccess: array<string, mixed>|null,
+     * }
+     */
+    public static function edgeSectionAnalytics(Site $site, string $section): array
+    {
+        return self::resolveEdgeAnalytics($site, $section);
+    }
+
+    /**
      * Edge billing/traffic/access snapshots are section-scoped — avoid running
      * usage queries on every workspace tab (Deploys, Build, Domains, etc.).
+     *
+     * Traffic / Billing are owned by nested Livewire children — the parent
+     * EdgeSettings shell must not pre-load them or every page hits the same
+     * snapshot queries twice in one request.
      *
      * @return array{
      *     edgeUsageBillingEnabled: bool,
@@ -469,35 +494,46 @@ final class SiteSettingsViewData
      */
     private static function edgeAnalyticsForSection(Site $site, string $section): array
     {
-        $empty = [
-            'edgeUsageBillingEnabled' => false,
-            'edgeManagedFee' => null,
-            'edgeUsageRates' => [],
-            'edgeSiteBilling' => null,
-            'edgeSiteTraffic' => null,
-            'edgeSiteAccess' => null,
-        ];
-
         if (! $site->usesEdgeRuntime()) {
-            return $empty;
+            return self::emptyEdgeAnalytics();
         }
 
-        $edgeUsageBillingEnabled = (bool) config('dply.edge.usage_billing.enabled', false);
-        $edgeManagedFee = ((int) config('subscription.standard.edge_cents', 0)) / 100;
+        // Nested children load these via {@see edgeSectionAnalytics()}.
+        if (in_array($section, ['edge-traffic', 'edge-billing'], true)) {
+            return self::edgeAnalyticsFlagsOnly();
+        }
+
+        return self::resolveEdgeAnalytics($site, $section);
+    }
+
+    /**
+     * @return array{
+     *     edgeUsageBillingEnabled: bool,
+     *     edgeManagedFee: float|null,
+     *     edgeUsageRates: array<string, mixed>,
+     *     edgeSiteBilling: array<string, mixed>|null,
+     *     edgeSiteTraffic: array<string, mixed>|null,
+     *     edgeSiteAccess: array<string, mixed>|null,
+     * }
+     */
+    private static function resolveEdgeAnalytics(Site $site, string $section): array
+    {
+        $memoKey = 'site_settings.edge_analytics.'.$site->id.'.'.$section;
+        if (app()->bound('request')) {
+            $cached = request()->attributes->get($memoKey);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        }
+
+        $flags = self::edgeAnalyticsFlagsOnly();
 
         $needsBillingSnapshot = $section === 'edge-billing';
-        $needsTrafficSnapshot = in_array($section, ['edge-traffic'], true);
+        $needsTrafficSnapshot = $section === 'edge-traffic';
         $needsAccessSnapshot = $section === 'edge-traffic';
 
         if (! $needsBillingSnapshot && ! $needsTrafficSnapshot && ! $needsAccessSnapshot) {
-            return [
-                'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
-                'edgeManagedFee' => $edgeManagedFee,
-                'edgeUsageRates' => [],
-                'edgeSiteBilling' => null,
-                'edgeSiteTraffic' => null,
-                'edgeSiteAccess' => null,
-            ];
+            return $flags;
         }
 
         $edgeUsageRates = ($needsBillingSnapshot || $needsTrafficSnapshot)
@@ -516,13 +552,63 @@ final class SiteSettingsViewData
             ? app(EdgeSiteAccessAnalytics::class)->forSite($site)
             : null;
 
-        return [
-            'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
-            'edgeManagedFee' => $edgeManagedFee,
+        $payload = [
+            'edgeUsageBillingEnabled' => $flags['edgeUsageBillingEnabled'],
+            'edgeManagedFee' => $flags['edgeManagedFee'],
             'edgeUsageRates' => $edgeUsageRates,
             'edgeSiteBilling' => $edgeSiteBilling,
             'edgeSiteTraffic' => $edgeSiteTraffic,
             'edgeSiteAccess' => $edgeSiteAccess,
+        ];
+
+        if (app()->bound('request')) {
+            request()->attributes->set($memoKey, $payload);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array{
+     *     edgeUsageBillingEnabled: bool,
+     *     edgeManagedFee: float|null,
+     *     edgeUsageRates: array<string, mixed>,
+     *     edgeSiteBilling: null,
+     *     edgeSiteTraffic: null,
+     *     edgeSiteAccess: null,
+     * }
+     */
+    private static function edgeAnalyticsFlagsOnly(): array
+    {
+        return [
+            'edgeUsageBillingEnabled' => (bool) config('dply.edge.usage_billing.enabled', false),
+            'edgeManagedFee' => ((int) config('subscription.standard.edge_cents', 0)) / 100,
+            'edgeUsageRates' => [],
+            'edgeSiteBilling' => null,
+            'edgeSiteTraffic' => null,
+            'edgeSiteAccess' => null,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     edgeUsageBillingEnabled: false,
+     *     edgeManagedFee: null,
+     *     edgeUsageRates: array{},
+     *     edgeSiteBilling: null,
+     *     edgeSiteTraffic: null,
+     *     edgeSiteAccess: null,
+     * }
+     */
+    private static function emptyEdgeAnalytics(): array
+    {
+        return [
+            'edgeUsageBillingEnabled' => false,
+            'edgeManagedFee' => null,
+            'edgeUsageRates' => [],
+            'edgeSiteBilling' => null,
+            'edgeSiteTraffic' => null,
+            'edgeSiteAccess' => null,
         ];
     }
 
@@ -532,10 +618,44 @@ final class SiteSettingsViewData
      */
     private static function breadcrumbs(Server $server, Site $site, string $section, array $sectionHeader): array
     {
+        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
+            && function_exists('production_data_mirror_connected')
+            && production_data_mirror_connected();
+
+        if ($isProductionMirror) {
+            $items = [
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
+                ['label' => __('Sites'), 'href' => route('live.sites.index'), 'icon' => 'globe-alt'],
+                [
+                    'label' => $server->name,
+                    'href' => route('live.servers.index'),
+                    'icon' => 'server-stack',
+                    'avatar' => $server->name ?: (string) $server->id,
+                    'avatar_image' => $server->logoUrl(),
+                ],
+                [
+                    'label' => $site->name,
+                    'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
+                    'icon' => 'globe-alt',
+                    'avatar' => $site->name ?: (string) $site->id,
+                    'avatar_image' => $site->logoUrl(),
+                ],
+            ];
+
+            if ($section !== 'general') {
+                $items[] = [
+                    'label' => $sectionHeader['title'],
+                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
+                ];
+            }
+
+            return $items;
+        }
+
         if ($site->usesEdgeRuntime()) {
             $items = [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
                 ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
             ];
 
@@ -628,7 +748,7 @@ final class SiteSettingsViewData
         }
 
         return $site->deployments
-            ->filter(fn (SiteDeployment $deployment): bool => $deployment->phase_results !== [])
+            ->filter(fn (SiteDeployment $deployment): bool => filled($deployment->phase_results))
             ->take(10)
             ->values();
     }

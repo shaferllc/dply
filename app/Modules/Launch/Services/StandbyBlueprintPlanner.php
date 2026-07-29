@@ -163,7 +163,7 @@ final class StandbyBlueprintPlanner
                 'domain' => (string) $domain->hostname,
                 'site_name' => $site !== null ? (string) $site->name : __('Unknown site'),
                 'is_primary' => (bool) $domain->is_primary,
-                'href' => $site !== null ? $this->siteHref($site, $site->usesEdgeRuntime() ? 'edge-domains' : 'routing') : null,
+                'href' => $site !== null ? $this->siteHref($site, $site->usesEdgeRuntime() ? 'edge-routing' : 'routing') : null,
             ];
         }
 
@@ -173,7 +173,7 @@ final class StandbyBlueprintPlanner
                 'id' => (string) $server->id,
                 'name' => (string) $server->name,
                 'status' => (string) $server->status,
-                'ip_address' => ($server->ip_address ),
+                'ip_address' => is_string($server->ip_address) ? $server->ip_address : null,
                 'href' => route('servers.overview', $server),
             ];
         }

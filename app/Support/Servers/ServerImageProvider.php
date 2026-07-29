@@ -9,10 +9,10 @@ use App\Jobs\CloneServerOnDigitalOceanJob;
 use App\Jobs\CreateServerImageJob;
 use App\Jobs\RefreshServerPrivateIpJob;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
-use App\Services\LinodeService;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Cloud\Services\VultrService;
 use Carbon\Carbon;
 
 /**
@@ -117,7 +117,7 @@ class ServerImageProvider
     {
         $result = $h->createImageFromServer($serverId, $name);
         $actionId = (int) ($result['action']['id'] ?? 0);
-        $imageId = (int) ($result['image_id']);
+        $imageId = (int) ($result['image_id'] ?? 0);
 
         $h->waitForAction($actionId, onTick: function (array $a) use ($onTick): void {
             if ($onTick !== null) {

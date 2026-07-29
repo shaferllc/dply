@@ -3,7 +3,7 @@
 namespace Tests\Feature\MarketplaceTest;
 
 use App\Modules\Marketplace\Livewire\Index;
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerRecipe;

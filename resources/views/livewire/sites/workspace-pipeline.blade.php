@@ -50,7 +50,8 @@
 
             <main class="min-w-0 space-y-6 mt-8">
 @else
-<div class="space-y-6">
+{{-- Nested inside Deployments merged card — no outer spacing / second card. --}}
+<div class="min-w-0">
 @endif
                 @if ($watchedConsoleRunId)
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>

@@ -252,7 +252,7 @@ final class DeployPipelineJsonImporter
             $strategy = 'simple';
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         if (array_key_exists('deploy_health_enabled', $rollout)) {
             $meta['deploy_health_enabled'] = (bool) $rollout['deploy_health_enabled'];
         }

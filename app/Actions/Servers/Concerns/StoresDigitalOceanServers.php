@@ -12,7 +12,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -191,7 +191,7 @@ trait StoresDigitalOceanServers
                     ha: (bool) $form->do_kubernetes_new_ha,
                     version: $form->do_kubernetes_new_version !== '' ? $form->do_kubernetes_new_version : null,
                 );
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 throw ValidationException::withMessages([
                     'form.do_kubernetes_new_name' => __('DigitalOcean refused to create the cluster: :detail', ['detail' => $e->getMessage()]),
                 ]);
@@ -219,7 +219,7 @@ trait StoresDigitalOceanServers
                         break;
                     }
                 }
-            } catch (Throwable) {
+            } catch (\Throwable) {
                 //
             }
         }

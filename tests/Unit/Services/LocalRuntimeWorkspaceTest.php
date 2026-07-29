@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\LocalRuntimeWorkspaceTest;
 
 use App\Models\Site;
-use App\Services\Deploy\LocalRuntimeWorkspace;
+use App\Modules\Deploy\Services\LocalRuntimeWorkspace;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 

@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\AzureDnsService;
+use App\Modules\Cloud\Services\AzureDnsService;
 
 class AzureDnsProvider implements DnsProvider
 {
@@ -31,5 +31,14 @@ class AzureDnsProvider implements DnsProvider
         }
 
         $this->service->deleteRecordById($recordId);
+    }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->zoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

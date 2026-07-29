@@ -6,7 +6,7 @@ namespace App\Modules\Serverless\Services\Aws;
 
 use App\Models\FunctionAction;
 use App\Models\Server;
-use App\Services\Deploy\ServerlessProviders\Aws\AwsLambdaClientOptions;
+use App\Modules\Deploy\Services\ServerlessProviders\Aws\AwsLambdaClientOptions;
 use App\Modules\Serverless\Services\Backends\ServerlessSequenceBackend;
 use Aws\Exception\AwsException;
 use Aws\Sfn\SfnClient;
@@ -95,7 +95,7 @@ class AwsStepFunctionsSequenceBackend implements ServerlessSequenceBackend
      */
     private function componentNames(FunctionAction $sequence): array
     {
-        $components = ($sequence->components );
+        $components = is_array($sequence->components) ? $sequence->components : [];
 
         return array_values(array_filter(array_map(
             static fn (mixed $component): string => is_array($component) ? trim((string) ($component['name'] ?? '')) : '',

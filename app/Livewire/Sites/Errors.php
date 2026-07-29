@@ -6,6 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\LookupSiteErrorReferenceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CorrelatesErrorLogs;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\SurfacesErrorStream;
@@ -35,6 +36,7 @@ use Livewire\WithPagination;
 class Errors extends Component
 {
     use ConfirmsActionWithModal;
+    use CorrelatesErrorLogs;
     use CreatesNotificationChannelInline;
     use DispatchesToastNotifications;
     use ManagesErrorsNotifications;
@@ -71,6 +73,13 @@ class Errors extends Component
 
         $this->server = $server;
         $this->site = $site;
+        $this->showLogCorrelation = (bool) $server->logAgent()->exists();
+    }
+
+    /** Resolve a correlatable error within this site's scope. */
+    protected function findCorrelatableError(string $errorId): ?ErrorEvent
+    {
+        return ErrorEvent::query()->forSite((string) $this->site->id)->find($errorId);
     }
 
     public function setErrorsWorkspaceTab(string $tab): void

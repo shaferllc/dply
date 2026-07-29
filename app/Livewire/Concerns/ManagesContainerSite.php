@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Actions\Cloud\ConfigureCloudAutoscaling;
-use App\Actions\Cloud\ConfigureCloudHealthCheck;
-use App\Actions\Cloud\CreateCloudWorker;
-use App\Jobs\AttachCloudDatabaseJob;
-use App\Jobs\AttachCloudDomainJob;
-use App\Jobs\DetachCloudDomainJob;
-use App\Jobs\RedeployCloudSiteJob;
-use App\Jobs\SyncCloudWorkersJob;
-use App\Jobs\TeardownCloudSiteJob;
+use App\Modules\Cloud\Actions\ConfigureCloudAutoscaling;
+use App\Modules\Cloud\Actions\ConfigureCloudHealthCheck;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
+use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
+use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
+use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Jobs\TeardownCloudSiteJob;
 use App\Models\CloudDatabase;
 use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\Site;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\CloudScalingConfig;
-use App\Services\Cloud\ResolvesMetricWindows;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\CloudScalingConfig;
+use App\Modules\Cloud\Backends\ResolvesMetricWindows;
 use Livewire\Component;
 
 /**

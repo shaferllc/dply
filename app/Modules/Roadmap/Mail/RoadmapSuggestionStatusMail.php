@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Roadmap\Mail;
 
-use App\Models\RoadmapItem;
+use App\Modules\Roadmap\Models\RoadmapItem;
 use App\Models\RoadmapSuggestion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\WorkspaceCachesTest;
 
 use App\Jobs\InstallCacheServiceJob;
+use App\Jobs\StatusCacheServiceJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Models\Organization;
@@ -18,7 +19,10 @@ use App\Support\Servers\CacheServiceAuth;
 use App\Support\Servers\CacheServiceConfigWriter;
 use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServicePort;
+use App\Jobs\RefreshCacheClientsJob;
+use App\Jobs\RefreshCacheMemorySettingsJob;
 use App\Support\Servers\CacheServiceStats;
+use Illuminate\Support\Facades\Cache;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -82,13 +86,14 @@ test('workspace renders with no cache service', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->assertSet('workspace_tab', 'overview')
+        ->call('loadCacheCapabilities') // engine panels/empty-state load via wire:init
         ->assertSee('Overview')
         ->assertSee('Redis')
         ->assertSee('Valkey')
         ->assertSee('Memcached')
         ->assertSee('KeyDB')
         ->assertSee('Dragonfly')
-        ->assertSee('No cache services installed');
+        ->assertSee('No cache engines installed');
 });
 test('install dispatches job and creates row', function () {
     Queue::fake();
@@ -196,9 +201,11 @@ test('install refuses second redis family engine on same server', function () {
     ]);
 });
 test('install refuses a coming soon engine before queueing', function () {
-    // Default state: Valkey is gated behind cache.valkey (coming soon). The
-    // install action must refuse without creating a row or queueing a job.
+    // Valkey is now GA by default; force it coming-soon so the install action
+    // refuses without creating a row or queueing a job.
     Queue::fake();
+    config(['features.cache.valkey' => false]);
+    Feature::flushCache();
     [$user, $server] = actingOwnerWithServer();
 
     $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
@@ -641,10 +648,13 @@ test('load cache clients populates property from stats', function () {
         ['id' => '13', 'addr' => '127.0.0.1:55301', 'name' => 'workers', 'age' => '60', 'idle' => '0', 'db' => '0'],
     ];
 
-    $this->mock(CacheServiceStats::class, function ($mock) use ($sample): void {
-        $mock->shouldReceive('snapshot')->byDefault()->andReturn([]);
-        $mock->shouldReceive('clients')->once()->andReturn($sample);
-    });
+    // CLIENT LIST is now refreshed via RefreshCacheClientsJob into a cache key
+    // that the poll reads; seed it so the poll hydrates the property.
+    Cache::put(
+        RefreshCacheClientsJob::resultCacheKey($server->id, 'redis'),
+        ['ok' => true, 'clients' => $sample, 'at' => now()->toIso8601String()],
+        now()->addHour(),
+    );
 
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
@@ -814,11 +824,13 @@ test('load cache memory settings populates form', function () {
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
-    $this->mock(CacheServiceMemoryConfig::class, function ($mock): void {
-        $mock->shouldReceive('read')
-            ->once()
-            ->andReturn(['maxmemory' => '512mb', 'maxmemory_policy' => 'allkeys-lru']);
-    });
+    // Memory settings are refreshed via RefreshCacheMemorySettingsJob into a
+    // cache key the poll reads; seed it so the form hydrates.
+    Cache::put(
+        RefreshCacheMemorySettingsJob::resultCacheKey($server->id, 'redis'),
+        ['ok' => true, 'maxmemory' => '512mb', 'maxmemory_policy' => 'allkeys-lru', 'at' => now()->toIso8601String()],
+        now()->addHour(),
+    );
 
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
@@ -1049,10 +1061,11 @@ test('change cache port rejects no op', function () {
         'event' => ServerCacheServiceAuditEvent::EVENT_PORT_CHANGED,
     ]);
 });
-test('show cache instance status runs systemctl for default instance', function () {
+test('show cache instance status dispatches a status console job', function () {
+    Queue::fake();
     [$user, $server] = actingOwnerWithServer();
 
-    ServerCacheService::query()->create([
+    $row = ServerCacheService::query()->create([
         'server_id' => $server->id,
         'engine' => 'redis',
         'status' => ServerCacheService::STATUS_RUNNING,
@@ -1065,37 +1078,23 @@ test('show cache instance status runs systemctl for default instance', function 
         $mock->shouldReceive('probeInstance')->andReturn(true);
     });
 
-    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
-        $mock->shouldReceive('runInlineBash')
-            ->once()
-            ->withArgs(function ($server, $name, $cmd): bool {
-                return $name === 'cache-service:status:redis:default'
-                    && str_contains($cmd, 'systemctl status')
-                    && str_contains($cmd, "'redis-server'");
-            })
-            ->andReturn(new ProcessOutput("● redis-server.service — active (running)\n", 0, false));
-    });
-
+    // Status now runs through the async console-action pattern: it seeds a
+    // ConsoleAction and dispatches StatusCacheServiceJob (output streams into
+    // the banner), rather than running systemctl synchronously into a modal.
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->set('workspace_tab', 'redis')
         ->call('showCacheInstanceStatus', 'redis')
-        ->assertHasNoErrors()
-        ->assertSet('showCacheStatusModal', true)
-        ->assertSet('cacheStatusModalEngine', 'redis')
-        ->assertSet('cacheStatusModalInstance', 'default')
-        ->assertSet('cacheStatusModalUnit', 'redis-server')
-        ->assertSet('cacheStatusModalView', 'status')
-        ->assertSet('cacheStatusModalLoading', false)
-        ->assertSee('active (running)');
+        ->assertHasNoErrors();
+
+    Queue::assertPushed(StatusCacheServiceJob::class, fn (StatusCacheServiceJob $job): bool => $job->view === 'status' && $job->cacheServiceId === (string) $row->id);
+    $this->assertDatabaseHas('console_actions', ['kind' => 'cache_status', 'subject_id' => $row->id]);
 });
-test('show cache instance logs runs journalctl for default instance', function () {
-    // Post-collapse there's only one instance per engine per server (`name='default'`)
-    // and the systemd unit is the non-templated form (e.g. `redis-server`, not
-    // `redis-server@queue`). This test verifies the logs modal targets that unit.
+test('show cache instance logs dispatches a logs console job', function () {
+    Queue::fake();
     [$user, $server] = actingOwnerWithServer();
 
-    ServerCacheService::query()->create([
+    $row = ServerCacheService::query()->create([
         'server_id' => $server->id,
         'engine' => 'redis',
         'status' => ServerCacheService::STATUS_RUNNING,
@@ -1109,27 +1108,15 @@ test('show cache instance logs runs journalctl for default instance', function (
         $mock->shouldReceive('probeInstance')->andReturn(true);
     });
 
-    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
-        $mock->shouldReceive('runInlineBash')
-            ->once()
-            ->withArgs(function ($server, $name, $cmd): bool {
-                return str_starts_with($name, 'cache-service:logs:redis:')
-                    && str_contains($cmd, 'journalctl --no-pager --output=short-iso')
-                    && str_contains($cmd, "'redis-server'")
-                    && str_contains($cmd, '-n 200');
-            })
-            ->andReturn(new ProcessOutput("2026-05-11T10:00:00+0000 redis-server: Ready to accept connections\n", 0, false));
-    });
-
+    // Logs run through the same async console-action pattern (view = 'logs').
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->set('workspace_tab', 'redis')
         ->call('showCacheInstanceLogs', 'redis')
-        ->assertHasNoErrors()
-        ->assertSet('showCacheStatusModal', true)
-        ->assertSet('cacheStatusModalUnit', 'redis-server')
-        ->assertSet('cacheStatusModalView', 'logs')
-        ->assertSee('Ready to accept connections');
+        ->assertHasNoErrors();
+
+    Queue::assertPushed(StatusCacheServiceJob::class, fn (StatusCacheServiceJob $job): bool => $job->view === 'logs' && $job->cacheServiceId === (string) $row->id);
+    $this->assertDatabaseHas('console_actions', ['kind' => 'cache_logs', 'subject_id' => $row->id]);
 });
 test('set cache status modal view reprobes with logs script', function () {
     [$user, $server] = actingOwnerWithServer();
@@ -1147,16 +1134,11 @@ test('set cache status modal view reprobes with logs script', function () {
         $mock->shouldReceive('probeInstance')->andReturn(true);
     });
 
-    // First call (Status open) returns systemctl output; second call
-    // (after the view switches to Logs) returns journalctl output.
+    // Switching the open modal's view re-runs the synchronous probe with the
+    // journalctl (logs) script. (Opening the modal is now driven by the async
+    // status job/banner, so seed the open-modal state directly.)
     $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
         $mock->shouldReceive('runInlineBash')
-            ->once()
-            ->withArgs(fn ($server, $name, $cmd): bool => str_contains($cmd, 'systemctl status'))
-            ->andReturn(new ProcessOutput('initial status output', 0, false));
-
-        $mock->shouldReceive('runInlineBash')
-            ->once()
             ->withArgs(fn ($server, $name, $cmd): bool => str_contains($cmd, 'journalctl --no-pager --output=short-iso'))
             ->andReturn(new ProcessOutput('switched logs output', 0, false));
     });
@@ -1164,9 +1146,11 @@ test('set cache status modal view reprobes with logs script', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->set('workspace_tab', 'redis')
-        ->call('showCacheInstanceStatus', 'redis')
-        ->assertSet('cacheStatusModalView', 'status')
-        ->assertSee('initial status output')
+        ->set('showCacheStatusModal', true)
+        ->set('cacheStatusModalEngine', 'redis')
+        ->set('cacheStatusModalInstance', 'default')
+        ->set('cacheStatusModalUnit', 'redis-server')
+        ->set('cacheStatusModalView', 'status')
         ->call('setCacheStatusModalView', 'logs')
         ->assertSet('cacheStatusModalView', 'logs')
         ->assertSee('switched logs output');

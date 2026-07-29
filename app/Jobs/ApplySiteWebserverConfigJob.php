@@ -31,6 +31,7 @@ class ApplySiteWebserverConfigJob implements ShouldBeUniqueUntilProcessing, Shou
         public string $siteId,
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
+        public bool $recordApplied = false,
     ) {}
 
     /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
@@ -100,6 +101,27 @@ class ApplySiteWebserverConfigJob implements ShouldBeUniqueUntilProcessing, Shou
                 ->whereNotNull('pending_removal_at')
                 ->where('pending_removal_at', '<=', $applyStartedAt)
                 ->delete();
+
+            // Editor-driven apply: stamp last-applied checksums + record an
+            // "Applied to server" revision so the async path keeps the same
+            // bookkeeping the old synchronous apply had. Other callers (tenant
+            // routing, basic-auth, suspend) leave this off — they're re-applying
+            // managed config, not a user edit.
+            if ($this->recordApplied) {
+                $emit->step('webserver', 'recording revision');
+                $user = $this->userId !== null && $this->userId !== ''
+                    ? \App\Models\User::find($this->userId)
+                    : null;
+                app(\App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService::class)
+                    ->recordApplied($site->fresh(['server']), $user);
+
+                $org = $site->organization;
+                if ($org) {
+                    audit_log($org, $user, 'site.webserver_config.applied', $site->fresh(), null, [
+                        'webserver' => $site->webserver(),
+                    ]);
+                }
+            }
 
             $this->completeConsoleAction();
         } catch (\Throwable $e) {

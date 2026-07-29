@@ -105,6 +105,21 @@ class WorkspaceFiles extends Component
         }
     }
 
+    /**
+     * Merged Files card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-files-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(): View
     {
         if ($this->comingSoonPreview) {
@@ -124,15 +139,35 @@ class WorkspaceFiles extends Component
         ]);
     }
 
-    /** Navigate into a directory by name (relative entry click). */
-    public function openEntry(string $name): void
+    /**
+     * Navigate into a directory by name. When $linkTarget is set (directory
+     * symlink), jump to the resolved absolute path instead of the link path.
+     */
+    public function openEntry(string $name, ?string $linkTarget = null): void
     {
         try {
-            $this->path = FileBrowserPathPolicy::join($this->path, $name);
-            $this->filter = '';
+            $joined = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
             $this->toastError($e->getMessage());
+
+            return;
         }
+
+        if (is_string($linkTarget) && $linkTarget !== '') {
+            try {
+                $this->path = FileBrowserPathPolicy::resolveLinkTarget($joined, $linkTarget);
+                $this->filter = '';
+
+                return;
+            } catch (\InvalidArgumentException $e) {
+                $this->toastError($e->getMessage());
+
+                return;
+            }
+        }
+
+        $this->path = $joined;
+        $this->filter = '';
     }
 
     /** Jump to an absolute path (breadcrumb / quick-jump click). */

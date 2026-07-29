@@ -7,6 +7,7 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesDeployPolicyNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -14,6 +15,8 @@ use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -34,11 +37,14 @@ use Livewire\WithPagination;
  * (no feature flag). Viewing requires `view` on the server; editing the policy
  * requires `update` — the editor renders read-only otherwise.
  */
+#[Layout('layouts.app')]
+#[Lazy]
 class Deploys extends Component
 {
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesDeployPolicyNotifications;
+    use RendersWorkspacePlaceholder;
     use WithPagination;
 
     /** @var list<string> */
@@ -213,7 +219,22 @@ class Deploys extends Component
             ];
         }
 
-        return view('livewire.servers.deploys', $data)->layout('layouts.app');
+        return view('livewire.servers.deploys', $data);
+    }
+
+    /**
+     * Merged Deploys card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-deploys-placeholder', [
+            'server' => $this->server,
+        ]);
     }
 
     /**

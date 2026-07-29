@@ -6,7 +6,7 @@ namespace Tests\Unit\Services\Billing;
 
 use App\Models\BillingSubscriptionSyncEvent;
 use App\Models\Organization;
-use App\Services\Billing\BillingSubscriptionSyncEventRecorder;
+use App\Modules\Billing\Services\BillingSubscriptionSyncEventRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

@@ -61,11 +61,10 @@ test('handle marks meta completed and writes buffer on success', function () {
     });
 
     $job = new ApplyFirewallJob(serverId: $server->id, runId: $runId, userId: $user->id);
-    $job->handle(
-        app(ServerFirewallProvisioner::class),
-        app(ServerFirewallAuditLogger::class),
-        app(ServerFirewallApplyRecorder::class),
-    );
+    // Resolve handle()'s dependencies through the container rather than listing
+    // them: the job has gained an injected collaborator twice now, and each time
+    // it broke this test with an ArgumentCountError rather than a real failure.
+    app()->call([$job, 'handle']);
 
     $meta = $server->fresh()->meta ?? [];
     expect(data_get($meta, config('server_firewall.meta_apply_status_key')))->toBe('completed');
@@ -93,11 +92,10 @@ test('handle marks meta failed and records error on throw', function () {
     });
 
     $job = new ApplyFirewallJob(serverId: $server->id, runId: $runId, userId: $user->id);
-    $job->handle(
-        app(ServerFirewallProvisioner::class),
-        app(ServerFirewallAuditLogger::class),
-        app(ServerFirewallApplyRecorder::class),
-    );
+    // Resolve handle()'s dependencies through the container rather than listing
+    // them: the job has gained an injected collaborator twice now, and each time
+    // it broke this test with an ArgumentCountError rather than a real failure.
+    app()->call([$job, 'handle']);
 
     $meta = $server->fresh()->meta ?? [];
     expect(data_get($meta, config('server_firewall.meta_apply_status_key')))->toBe('failed');

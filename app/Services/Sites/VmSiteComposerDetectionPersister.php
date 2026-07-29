@@ -6,7 +6,7 @@ namespace App\Services\Sites;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
-use App\Services\Deploy\LaravelComposerPackageDetector;
+use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
 
 /**
  * Persists composer-based Laravel stack hints for VM (atomic SSH) deploys so
@@ -61,7 +61,7 @@ final class VmSiteComposerDetectionPersister
             }
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $meta['vm_runtime'] = [
             'detected' => $detected,
             'detected_at' => now()->toIso8601String(),

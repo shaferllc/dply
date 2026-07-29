@@ -1,4 +1,4 @@
-<section class="dply-card overflow-hidden">
+<div class="border-b border-brand-ink/10">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
         <h2 class="text-base font-semibold text-brand-ink">{{ __('Compose projects') }}</h2>
         <button type="button" wire:click="loadComposeProjects" wire:loading.attr="disabled" wire:target="loadComposeProjects" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
@@ -66,7 +66,7 @@
             </table>
         </div>
     @endif
-</section>
+</div>
 
 <p class="mt-3 text-xs text-brand-moss">
     {{ __('dply site deploys on Docker hosts write docker-compose.dply.yml under each site checkout. Up rebuilds and starts services; Down stops containers for the project.') }}

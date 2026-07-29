@@ -18,6 +18,17 @@
     $declaredR2 = is_array($repoBindings['r2'] ?? null) ? $repoBindings['r2'] : [];
     $declaredD1 = is_array($repoBindings['d1'] ?? null) ? $repoBindings['d1'] : [];
 
+    // dply-backed bindings — native refs to sibling dply resources. Resolve for
+    // STATUS only; the connection value is a secret and is deliberately dropped
+    // here so it never reaches the view layer.
+    $declaredDply = is_array($repoBindings['dply'] ?? null) ? $repoBindings['dply'] : [];
+    $dplyResolved = $declaredDply === []
+        ? []
+        : array_map(
+            fn (array $r): array => ['env_name' => $r['env_name'], 'ref' => $r['ref'], 'status' => $r['status'], 'warning' => $r['warning']],
+            app(\App\Modules\Edge\Services\EdgeDplyResourceResolver::class)->resolve($site, $declaredDply),
+        );
+
     $accountId = config('edge.cf.account_id') ?: ($site->edgeProviderCredential?->getMeta('account_id'));
     $kvCfUrl = ($accountId && $defaultKvId)
         ? "https://dash.cloudflare.com/{$accountId}/workers/kv/namespaces/{$defaultKvId}"
@@ -56,6 +67,7 @@
     tab: 'read',
     r2Open: {{ $declaredR2 === [] ? 'false' : 'true' }},
     d1Open: {{ $declaredD1 === [] ? 'false' : 'true' }},
+    dplyOpen: {{ $declaredDply === [] ? 'false' : 'true' }},
     templatesOpen: false,
     r2Fmt: 'wrangler',
     d1Fmt: 'wrangler',
@@ -251,6 +263,69 @@ database_name = "my-site-db"</code></pre>
   .prepare('SELECT id, email FROM users WHERE org_id = ?')
   .bind(orgId)
   .all();</code></pre>
+            @endif
+        </div>
+    </div>
+
+    {{-- dply resources — the full-stack differentiator: bind this edge site to
+         sibling dply-managed Postgres / Redis / queue / storage. --}}
+    <div class="border-t border-brand-ink/10">
+        <button type="button" @click="dplyOpen = ! dplyOpen" class="flex w-full items-center justify-between gap-3 px-6 py-3 text-left hover:bg-brand-sand/20 sm:px-8">
+            <div>
+                <p class="text-sm font-semibold text-brand-ink">{{ __('dply resources') }}</p>
+                <p class="mt-0.5 text-xs text-brand-moss">
+                    {{ __('Bind to your dply database, cache, or queue') }}
+                    @if ($declaredDply !== [])
+                        — <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">{{ count($declaredDply) }} {{ __('declared') }}</span>
+                    @else
+                        — <span class="text-brand-mist">{{ __('Not wired — declare in dply.yaml') }}</span>
+                    @endif
+                </p>
+            </div>
+            <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition-transform" x-bind:class="dplyOpen ? 'rotate-180' : ''" />
+        </button>
+        <div x-show="dplyOpen" x-cloak class="space-y-4 px-6 pb-4 sm:px-8">
+            @if ($declaredDply === [])
+                <div>
+                    <p class="text-xs text-brand-moss">{{ __('Reference a resource from another site in this workspace by name. Publicly-reachable resources (managed clusters) inject a connection string as a worker secret; VM resources route through hybrid origin instead.') }}</p>
+                    <div x-show="true" class="mt-2 flex items-start gap-2">
+                        <pre class="flex-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand" x-ref="dplyYaml"><code>bindings:
+  dply:
+    DATABASE_URL: database.main
+    REDIS_URL: redis.cache
+    API_BASE: site.api</code></pre>
+                        <button type="button" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40" @click="copy($refs.dplyYaml.innerText, $event.currentTarget)">{{ __('Copy') }}</button>
+                    </div>
+                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Format: ENV_NAME: <kind>.<name> — kinds: database, redis, queue, storage, site.') }}</p>
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Once wired, your code can use:') }}</p>
+                    <pre class="mt-1 overflow-x-auto rounded-lg bg-brand-ink/95 px-4 py-3 font-mono text-[11px] leading-relaxed text-brand-sand opacity-70"><code>const db = postgres(env.DATABASE_URL);
+const rows = await db`select id, email from users`;</code></pre>
+                </div>
+            @else
+                <div class="space-y-2">
+                    @foreach ($dplyResolved as $binding)
+                        @php
+                            [$pillClass, $pillLabel] = match ($binding['status']) {
+                                'public' => ['bg-emerald-100 text-emerald-900', __('Live secret')],
+                                'private' => ['bg-amber-100 text-amber-900', __('Via origin')],
+                                default => ['bg-red-100 text-red-900', __('Unresolved')],
+                            };
+                        @endphp
+                        <div class="rounded-lg border border-brand-ink/10 p-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="font-mono text-sm text-brand-ink">env.{{ $binding['env_name'] }}</p>
+                                <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $pillClass }}">{{ $pillLabel }}</span>
+                            </div>
+                            <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $binding['ref'] }}</p>
+                            @if ($binding['warning'] !== null)
+                                <p class="mt-1 text-[11px] text-brand-moss">{{ $binding['warning'] }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-[11px] text-brand-mist">{{ __('Connection secrets are resolved fresh on each deploy and never stored in your repo or shown here.') }}</p>
             @endif
         </div>
     </div>

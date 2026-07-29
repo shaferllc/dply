@@ -83,17 +83,23 @@ class Automation extends Component
         // The route-bound model is already fresh — hydrate directly off it
         // rather than re-querying via refreshOrganization()'s fresh().
         $this->organization = $organization;
-        $this->hydrateOrganization();
+        $this->loadOrganizationRelations();
     }
 
     protected function refreshOrganization(): void
     {
         // Post-mutation reload: re-fetch from the DB to pick up the change.
         $this->organization = $this->organization->fresh();
-        $this->hydrateOrganization();
+        $this->loadOrganizationRelations();
     }
 
-    protected function hydrateOrganization(): void
+    /**
+     * NB: do not rename this back to hydrateOrganization(). Livewire treats
+     * `hydrate{Property}` as a lifecycle hook for the public $organization
+     * property and invokes it from outside the class — which lands in __call
+     * for a protected method and throws BadMethodCallException.
+     */
+    protected function loadOrganizationRelations(): void
     {
         $this->organization->load([
             'apiTokens',

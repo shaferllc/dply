@@ -352,7 +352,7 @@ class DeployDatabaseFix extends Component
                 'deployment_id' => null,
             ], 600);
 
-            \App\Jobs\RunSiteDeploymentJob::dispatch(
+            \App\Modules\Deploy\Jobs\RunSiteDeploymentJob::dispatch(
                 $this->site,
                 SiteDeployment::TRIGGER_RESUME,
                 null,
@@ -362,7 +362,7 @@ class DeployDatabaseFix extends Component
 
             $this->toastSuccess(__('Resuming the deploy from the :phase phase.', ['phase' => $deployment->resumeStartPhase()]));
         } else {
-            \App\Jobs\RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+            \App\Modules\Deploy\Jobs\RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
             $this->toastSuccess(__('Re-deploying from scratch.'));
         }
 

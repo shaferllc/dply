@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Contracts\AwsLambdaGateway;
 use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
@@ -22,17 +23,18 @@ use App\Models\Incident;
 use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Script;
+use App\Models\LookoutProject;
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
-use App\Models\Subscription;
-use App\Models\SubscriptionItem;
+use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Models\SubscriptionItem;
 use App\Models\SupervisorProgram;
 use App\Models\Team;
 use App\Models\User;
@@ -44,8 +46,9 @@ use App\Modules\Backups\Observers\BackupAutoResumeObserver;
 use App\Modules\Backups\Observers\BackupFailureNotifyObserver;
 use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
 use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
+use App\Observers\LookoutProjectBillingObserver;
 use App\Observers\ServerObserver;
-use App\Observers\SiteBillingObserver;
+use App\Modules\Billing\Observers\SiteBillingObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Modules\Backups\Policies\BackupConfigurationPolicy;
@@ -69,30 +72,30 @@ use App\Modules\Certificates\Services\ImportedCertificateInstaller;
 use App\Modules\Certificates\Services\LetsEncryptDnsCertificateEngine;
 use App\Modules\Certificates\Services\LetsEncryptHttpCertificateEngine;
 use App\Modules\Certificates\Services\ZeroSslHttpCertificateEngine;
-use App\Services\Deploy\AwsLambdaDeployEngine;
-use App\Services\Deploy\ByoServerDeployEngine;
-use App\Services\Deploy\DeployEngineResolver;
-use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
-use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
-use App\Services\Deploy\DockerDeployEngine;
-use App\Services\Deploy\EphemeralDeployCredentialContext;
-use App\Services\Deploy\KubernetesDeployEngine;
-use App\Services\Deploy\RuntimeDetection\GitCloner;
-use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
-use App\Services\Deploy\RuntimeDetection\PythonRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
-use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
-use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
-use App\Services\Deploy\ServerlessProvisionerFactory;
-use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Modules\Deploy\Services\AwsLambdaDeployEngine;
+use App\Modules\Deploy\Services\ByoServerDeployEngine;
+use App\Modules\Deploy\Services\DeployEngineResolver;
+use App\Modules\Deploy\Services\DigitalOceanFunctionsActionDeployer;
+use App\Modules\Deploy\Services\DigitalOceanFunctionsDeployEngine;
+use App\Modules\Deploy\Services\DockerDeployEngine;
+use App\Modules\Deploy\Services\EphemeralDeployCredentialContext;
+use App\Modules\Deploy\Services\KubernetesDeployEngine;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\GoRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\NodeRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\PhpRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\ProcessGitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\PythonRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\RubyRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\RuntimeDetectionEngine;
+use App\Modules\Deploy\Services\RuntimeDetection\StaticRuntimeDetector;
+use App\Modules\Deploy\Services\ServerlessProvisionerFactory;
+use App\Modules\Deploy\Services\SiteResourceBindingResolver;
 use App\Modules\Docs\Services\DocsManifest;
-use App\Services\Edge\CloudflareEdgeDelivery;
-use App\Services\Edge\EdgeArtifactPublisher;
-use App\Services\Edge\EdgeDeliveryContextResolver;
-use App\Services\Edge\EdgeHostMapPublisher;
+use App\Modules\Edge\Services\CloudflareEdgeDelivery;
+use App\Modules\Edge\Services\EdgeArtifactPublisher;
+use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Services\EdgeHostMapPublisher;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
 use App\Modules\Imports\Services\StepRegistry;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
@@ -108,6 +111,7 @@ use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteApacheProvisioner;
 use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\Sites\SiteDeployCoordinator;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
@@ -130,10 +134,12 @@ use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
 use App\Support\Debug\SshCallRecorder;
 use App\Support\Debug\SshCallsCollector;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
-use App\Support\Edge\EdgeFilesystemRegistrar;
-use App\Support\Edge\EdgePlatformCredentials;
+use App\Modules\Edge\Support\EdgeFilesystemRegistrar;
+use App\Modules\Edge\Support\EdgePlatformCredentials;
 use App\Support\Servers\EnvoyAdminScript;
 use App\Support\Servers\ServerConsoleActionLookup;
+use App\Support\Sites\SiteSyncPeersResolver;
+use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -184,6 +190,30 @@ class AppServiceProvider extends ServiceProvider
         // shared, request-memoized loader collapses those into one query set.
         $this->app->scoped(ServerWebserverSitesProvider::class);
         $this->app->scoped(ServerConsoleActionLookup::class);
+
+        // Scoped: a Deploy-tab render resolves the same site's sync-peer set up to
+        // three times (the sidebar's syncPeers computed + the sidebar's and the
+        // Deploy page's status() snapshots), each firing the sites + servers
+        // SELECT pair. The resolver memoizes the peer set per site on the instance.
+        $this->app->scoped(SiteSyncPeersResolver::class);
+
+        // Scoped: the deploy sidebar and the Deploy page both render in one request
+        // and each reads status(), which fans out to latest-deployment, in-flight
+        // fixer (console_actions), and sync-peer SELECTs. The coordinator memoizes
+        // the snapshot per site so those run once; write paths forget() it.
+        $this->app->scoped(SiteDeployCoordinator::class);
+
+        // Scoped: SitePolicy::update() authorizes the same site as several
+        // distinct model instances in one render (page, deploy sidebar, sync
+        // peers, command palette), each lazy-loading $site->workspace and then
+        // $workspace->organization. Resolving through one shared Workspace
+        // instance per id collapses both PK lookups to a single query.
+        $this->app->scoped(WorkspaceRegistry::class);
+
+        // Scoped: the Deploy sidebar and the Deploy-tab panel both read
+        // pendingFor() on one render, each firing the scheduled_deploys SELECT.
+        // The action memoizes the lookup per site; write paths forget() it.
+        $this->app->scoped(ScheduleSiteDeploy::class);
 
         // Scoped: the contextual docs sidebar renders on EVERY authenticated page
         // and resolves a title/url per published doc (indexEntries), each of which
@@ -330,6 +360,20 @@ class AppServiceProvider extends ServiceProvider
 
         $this->mergeEnvoyServiceActionScripts();
 
+        // Models extracted into app/Modules/<Domain>/Models keep their factories
+        // in database/factories/ (namespace Database\Factories). Laravel's default
+        // resolver would look for Database\Factories\Modules\<Domain>\Models\<X>Factory;
+        // map module models back to the flat Database\Factories\<X>Factory.
+        \Illuminate\Database\Eloquent\Factories\Factory::guessFactoryNamesUsing(function (string $modelName): string {
+            $relative = \Illuminate\Support\Str::startsWith($modelName, 'App\\Models\\')
+                ? \Illuminate\Support\Str::after($modelName, 'App\\Models\\')
+                : (str_starts_with($modelName, 'App\\Modules\\')
+                    ? class_basename($modelName)
+                    : \Illuminate\Support\Str::after($modelName, 'App\\'));
+
+            return 'Database\\Factories\\'.$relative.'Factory';
+        });
+
         Cashier::useCustomerModel(Organization::class);
         Cashier::useSubscriptionModel(Subscription::class);
         Cashier::useSubscriptionItemModel(SubscriptionItem::class);
@@ -438,6 +482,7 @@ class AppServiceProvider extends ServiceProvider
         Site::observe(ImportSiteWakeupObserver::class);
         Site::observe(SiteBillingObserver::class);
         RealtimeApp::observe(RealtimeAppBillingObserver::class);
+        LookoutProject::observe(LookoutProjectBillingObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
         ServerDatabaseBackup::observe(BackupAutoResumeObserver::class);

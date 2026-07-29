@@ -1,30 +1,33 @@
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
-                @switch($report['overall'])
-                    @case('critical') {{ __('Action needed') }} @break
-                    @case('warning') {{ __('Review updates') }} @break
-                    @default {{ __('Up to date') }}
-                @endswitch
-            </h2>
-            <p class="mt-1 text-sm text-brand-moss">
-                @if ($report['inventory']['checked_at'])
-                    {{ __('Last scan :time', ['time' => $report['inventory']['checked_at']->diffForHumans()]) }}
-                    @if ($report['inventory']['stale'])
-                        · <span class="font-medium text-amber-800">{{ __('stale') }}</span>
+{{-- Nested inside the merged Patches card — no second outer card/header. --}}
+<div>
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                    @switch($report['overall'] ?? 'ok')
+                        @case('critical') {{ __('Action needed') }} @break
+                        @case('warning') {{ __('Review updates') }} @break
+                        @default {{ __('Up to date') }}
+                    @endswitch
+                </h3>
+                <p class="mt-1 text-sm text-brand-moss">
+                    @if ($report['inventory']['checked_at'] ?? null)
+                        {{ __('Last scan :time', ['time' => $report['inventory']['checked_at']->diffForHumans()]) }}
+                        @if ($report['inventory']['stale'] ?? false)
+                            · <span class="font-medium text-amber-800">{{ __('stale') }}</span>
+                        @endif
+                    @else
+                        {{ __('No inventory scan on record yet.') }}
                     @endif
-                @else
-                    {{ __('No inventory scan on record yet.') }}
-                @endif
-                @if ($report['os']['pretty'])
-                    · {{ $report['os']['pretty'] }}
-                @endif
-            </p>
+                    @if ($report['os']['pretty'] ?? null)
+                        · {{ $report['os']['pretty'] }}
+                    @endif
+                </p>
+            </div>
         </div>
         @if ($opsReady && ! $isDeployer)
             <button
@@ -46,8 +49,8 @@
         @endif
     </div>
 
-    @if ($report['alert_count'] > 0)
-        <ul class="divide-y divide-brand-ink/10">
+    @if (($report['alert_count'] ?? 0) > 0)
+        <ul class="divide-y divide-brand-ink/10 border-b border-brand-ink/10">
             @foreach ($report['alerts'] as $alert)
                 @php
                     $alertTone = match ($alert['severity']) {
@@ -56,7 +59,7 @@
                         default => $tonePalette['sage'],
                     };
                 @endphp
-                <li class="flex flex-wrap items-start justify-between gap-3 px-6 py-4 sm:px-7">
+                <li class="flex flex-wrap items-start justify-between gap-3 px-5 py-4 sm:px-6">
                     <div class="flex min-w-0 items-start gap-3">
                         <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $alertTone }}">
                             @if ($alert['severity'] === 'critical')
@@ -80,25 +83,23 @@
             @endforeach
         </ul>
     @else
-        <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">
+        <p class="border-b border-brand-ink/10 px-5 py-5 text-sm text-brand-moss sm:px-6">
             {{ __('No patch or reboot alerts from the latest inventory scan.') }}
-        </div>
+        </p>
     @endif
-</section>
 
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
             <x-heroicon-o-chart-bar-square class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
+        </span>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Patch snapshot') }}</h2>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Summary') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Patch snapshot') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Key counts from the latest inventory probe.') }}</p>
         </div>
     </div>
 
-    <div class="grid gap-3 px-6 py-5 sm:grid-cols-2 sm:px-7 xl:grid-cols-4">
+    <div class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Upgradable') }}</p>
             <p class="mt-2 flex items-baseline gap-2">
@@ -127,14 +128,14 @@
 
         <div @class([
             'rounded-2xl border p-4 shadow-sm',
-            'border-amber-200/80 bg-amber-50/40' => $report['reboot']['required'] === true,
-            'border-brand-ink/10 bg-white' => $report['reboot']['required'] !== true,
+            'border-amber-200/80 bg-amber-50/40' => ($report['reboot']['required'] ?? null) === true,
+            'border-brand-ink/10 bg-white' => ($report['reboot']['required'] ?? null) !== true,
         ])>
             <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Reboot pending') }}</p>
             <p class="mt-2 text-lg font-semibold text-brand-ink">
-                @if ($report['reboot']['required'] === true)
+                @if (($report['reboot']['required'] ?? null) === true)
                     <span class="text-amber-900">{{ __('Yes') }}</span>
-                @elseif ($report['reboot']['required'] === false)
+                @elseif (($report['reboot']['required'] ?? null) === false)
                     <span class="text-emerald-700">{{ __('No') }}</span>
                 @else
                     <span class="text-brand-moss">—</span>
@@ -145,13 +146,13 @@
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Last apt update') }}</p>
             <p class="mt-2 text-sm font-semibold leading-snug text-brand-ink">
-                @if ($report['inventory']['last_apt_update'])
+                @if ($report['inventory']['last_apt_update'] ?? null)
                     {{ $report['inventory']['last_apt_update']->diffForHumans() }}
                 @else
                     <span class="text-brand-moss">{{ __('Unknown') }}</span>
                 @endif
             </p>
-            @if ($report['inventory']['last_apt_update'])
+            @if ($report['inventory']['last_apt_update'] ?? null)
                 <p class="mt-1 text-[11px] text-brand-moss">
                     {{ $report['inventory']['last_apt_update']->timezone(config('app.timezone'))->format('Y-m-d H:i T') }}
                 </p>
@@ -159,8 +160,8 @@
         </div>
     </div>
 
-    @if (($report['packages']['total'] ?? 0) > 0 || count($report['packages']['rows']) > 0)
-        <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-7">
+    @if (($report['packages']['total'] ?? 0) > 0 || count($report['packages']['rows'] ?? []) > 0)
+        <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
             <button
                 type="button"
                 wire:click="setPatchesWorkspaceTab('packages')"
@@ -171,4 +172,4 @@
             </button>
         </div>
     @endif
-</section>
+</div>

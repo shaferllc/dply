@@ -110,6 +110,15 @@ an env change as requiring the same cache rebuild, not just a `.env` write.
 - Rollback: `current` → previous `releases/<ts>` + cache rebuild; needs a
   one-command path in the self-deploy action.
 
+## Supervisor / Horizon (dogfood)
+
+Root [`dply.yaml`](../dply.yaml) declares both:
+
+- `supervisor.roles` — Phase 1 merge-sync into `dply-platform.conf` via `dply:self:sync-supervisor` (hooked from `dply:self-horizon-restart`)
+- `processes:` — Phase 2 BYO-style path (`SiteProcess` → `WorkerDaemonBackend` → `dply-sv-*`), same schema customers use
+
+See [dply-production-runtime.md](dply-production-runtime.md) for role mapping and migration off hand-copied confs.
+
 ## Related
 - `deploy/ENV_SYNC.md`, `deploy/check-env-drift.sh`, `deploy/ATOMIC_RELEASES.md`
 - Memories: prod APP_KEY trifurcation, deploy nginx-never-cutover, worker env drift.

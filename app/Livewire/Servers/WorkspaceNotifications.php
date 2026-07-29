@@ -168,15 +168,22 @@ class WorkspaceNotifications extends Component
             return;
         }
 
+        $channels = $this->assignableChannels();
+
         $result = NotificationSubscriptionMatrix::save(
             Server::class,
             (string) $this->server->id,
             $this->managedEventKeys(),
-            $this->assignableChannels(),
+            $channels,
             $this->channelEventSelections,
         );
 
-        $this->loadServerNotificationPreferences();
+        $this->channelEventSelections = NotificationSubscriptionMatrix::load(
+            Server::class,
+            (string) $this->server->id,
+            $this->managedEventKeys(),
+            $channels,
+        );
 
         if ($result['changed'] > 0 && $this->server->organization) {
             audit_log($this->server->organization, Auth::user(), 'server.notifications.subscriptions_updated', $this->server, null, [

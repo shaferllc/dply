@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\RubyRuntimeDetectorTest;
 
 use App\Models\SiteProcess;
-use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
+use App\Modules\Deploy\Services\RuntimeDetection\RubyRuntimeDetector;
 
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-ruby-detector-'.uniqid();

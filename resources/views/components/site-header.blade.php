@@ -32,12 +32,13 @@
     $browseActive = $req->routeIs(
         'infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*',
         'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*', 'backups.*',
+        'live.*',
     );
     $moreMenuActive = $featuresActive
         || $changelogActive
         || $pricingActive
         || $roadmapActive
-        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*')
+        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*', 'blog.*')
         || ($authed
             && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
             && ($req->routeIs('admin.*') || $req->is('horizon*', 'pulse*')));
@@ -224,14 +225,14 @@
                                                 </x-coming-soon-dropdown-link>
                                             @endfeature
                                             @feature('surface.serverless')
-                                                <x-dropdown-link :href="route('serverless.index')" :description="__('Functions, no servers')">
+                                                <x-dropdown-link :href="route('serverless.index')" :description="__('Laravel apps, no servers')">
                                                     <x-slot name="icon">
                                                         <x-heroicon-o-bolt class="{{ $hi }}" />
                                                     </x-slot>
                                                     {{ __('Serverless') }}
                                                 </x-dropdown-link>
                                             @else
-                                                <x-coming-soon-dropdown-link :description="__('Functions, no servers')">
+                                                <x-coming-soon-dropdown-link :description="__('Laravel apps, no servers')">
                                                     <x-slot name="icon">
                                                         <x-heroicon-o-bolt class="{{ $hi }}" />
                                                     </x-slot>
@@ -278,6 +279,19 @@
                                                 </x-slot>
                                                 {{ __('Backups') }}
                                             </x-coming-soon-dropdown-link>
+                                            @if (production_data_mirror_available())
+                                                <x-dropdown-link
+                                                    :href="production_data_mirror_entry_url()"
+                                                    :description="production_data_mirror_connected()
+                                                        ? __('Browse live org data from this local app')
+                                                        : __('Device-flow login to a production control plane')"
+                                                >
+                                                    <x-slot name="icon">
+                                                        <x-heroicon-o-exclamation-triangle class="{{ $hi }} text-amber-600" />
+                                                    </x-slot>
+                                                    {{ production_data_mirror_connected() ? __('Production') : __('Production data') }}
+                                                </x-dropdown-link>
+                                            @endif
 
                                             <p class="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Org') }}</p>
                                             <x-dropdown-link :href="route('organizations.index')" :description="__('Workspaces, members & billing')">
@@ -349,6 +363,12 @@
                                                 <x-heroicon-o-book-open class="{{ $hi }}" />
                                             </x-slot>
                                             {{ __('Docs') }}
+                                        </x-dropdown-link>
+                                        <x-dropdown-link :href="route('blog.index')" :description="__('Build-in-public devlog')">
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-newspaper class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Blog') }}
                                         </x-dropdown-link>
                                         <x-dropdown-link :href="route('pricing')" :description="__('Plans & pricing')">
                                             <x-slot name="icon">
@@ -583,6 +603,14 @@
                     </x-slot>
                     {{ __('Backups') }}
                 </x-coming-soon-responsive-nav-link>
+                @if (production_data_mirror_available())
+                    <x-responsive-nav-link :href="production_data_mirror_entry_url()" :active="request()->routeIs('live.*')">
+                        <x-slot name="icon">
+                            <x-heroicon-o-exclamation-triangle class="{{ $hi }} text-amber-600" />
+                        </x-slot>
+                        {{ production_data_mirror_connected() ? __('Production') : __('Production data') }}
+                    </x-responsive-nav-link>
+                @endif
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Org') }}</p>
                 <x-responsive-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
                     <x-slot name="icon">
@@ -666,6 +694,12 @@
                         <x-heroicon-o-book-open class="{{ $hi }}" />
                     </x-slot>
                     {{ __('Docs') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('blog.index')" :active="request()->routeIs('blog.*')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-newspaper class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Blog') }}
                 </x-responsive-nav-link>
                 <div class="pt-4 mt-2 border-t border-brand-ink/10">
                     <p class="px-4 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ Auth::user()->name }}</p>

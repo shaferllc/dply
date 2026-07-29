@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 /**
  * @param  list<array<string, mixed>>  $history
@@ -24,6 +25,7 @@ function functionSite(array $history): array
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
         'user_id' => $user->id,

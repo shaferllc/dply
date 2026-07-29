@@ -1,3 +1,14 @@
+import {
+  applyHtmlAddons,
+  runEarlyAddons,
+  waitingRoomAdmitCookie,
+  type FormsConfig,
+  type RateLimitConfig,
+  type SnippetsConfig,
+  type TagsConfig,
+  type TurnstileConfig,
+  type WaitingRoomConfig,
+} from './addons';
 import { handleAccessGate } from './auth';
 import type { AccessGateConfig } from './auth';
 import { injectRumScript, shouldInjectRum, VITALS_BEACON_PATH } from './rum';
@@ -176,6 +187,13 @@ export interface HostMapEntry {
    * functional during/after a deploy that re-hashed chunk URLs.
    */
   recent_storage_prefixes?: string[];
+  /** Managed-delivery product add-ons (bot / rate limit / forms / …). */
+  turnstile?: TurnstileConfig;
+  rate_limit?: RateLimitConfig;
+  forms?: FormsConfig;
+  waiting_room?: WaitingRoomConfig;
+  snippets?: SnippetsConfig;
+  tags?: TagsConfig;
 }
 
 function looksLikeAssetPath(requestPath: string): boolean {
@@ -458,6 +476,18 @@ async function handleRequestInner(
     if (decision) return decision;
   }
 
+  // Product add-ons (waiting room, forms POST, rate limits) — managed
+  // dply_edge only. Skip vitals/image paths so beacons stay healthy.
+  if (
+    url.pathname !== VITALS_BEACON_PATH &&
+    url.pathname !== EDGE_IMAGE_PATH
+  ) {
+    const addonEarly = await runEarlyAddons(request, url.pathname, hostEntry);
+    if (addonEarly) {
+      return addonEarly;
+    }
+  }
+
   // Split-traffic (P10d) — pick a variant before everything else so
   // middleware + redirects + R2 lookup all see the variant's
   // storage_prefix. Returns the (possibly mutated) hostEntry +
@@ -671,13 +701,22 @@ async function handleRequestInner(
     && hostEntry.is_preview === true
     && hostEntry.comment_widget_enabled === true;
 
-  if (isHtml && (shouldInjectRum(requestPath, hasIngest) || shouldInjectComments)) {
+  const hasHtmlAddons = Boolean(
+    hostEntry.snippets?.enabled ||
+      hostEntry.tags?.enabled ||
+      hostEntry.turnstile?.enabled,
+  );
+
+  if (isHtml && (shouldInjectRum(requestPath, hasIngest) || shouldInjectComments || hasHtmlAddons)) {
     let html = await object.text();
     if (shouldInjectRum(requestPath, hasIngest)) {
       html = injectRumScript(html);
     }
     if (shouldInjectComments) {
       html = injectCommentWidget(html, hostEntry);
+    }
+    if (hasHtmlAddons) {
+      html = applyHtmlAddons(html, '/' + requestPath.replace(/^\/+/, ''), hostEntry);
     }
     headers.delete('Content-Length');
     response = new Response(html, { status: 200, headers });
@@ -687,6 +726,12 @@ async function handleRequestInner(
 
   response = applyRepoHeaderRules(response, requestPath, hostEntry);
   response = stampVariantCookie(response);
+  const wrCookie = waitingRoomAdmitCookie(request, hostEntry.waiting_room);
+  if (wrCookie) {
+    const stamped = new Response(response.body, response);
+    stamped.headers.append('Set-Cookie', wrCookie);
+    response = stamped;
+  }
 
   recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'hit');
 

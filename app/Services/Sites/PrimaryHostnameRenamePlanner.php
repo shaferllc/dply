@@ -6,7 +6,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 
 /**
  * Pure read-only previewer for the cascade triggered when an operator
@@ -162,7 +162,7 @@ final class PrimaryHostnameRenamePlanner
 
     private function isLaravelScaffold(Site $site): bool
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $framework = $meta['scaffold']['framework'] ?? null;
 
         return is_string($framework) && strtolower($framework) === 'laravel';

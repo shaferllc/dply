@@ -1,8 +1,8 @@
 <section
-    class="dply-card overflow-hidden"
+    class="border-b border-brand-ink/10"
     @if ($laravelPailLive) wire:poll.2s="loadLaravelPail" @endif
 >
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
         <x-icon-badge>
             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-5 py-5 sm:px-6">
     <x-input-error :messages="$errors->get('laravel_pail')" class="mt-3" />
 
     @if (! $laravelPailLoaded)

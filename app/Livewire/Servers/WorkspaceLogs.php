@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesServerLogAlerts;
 use App\Livewire\Servers\Concerns\ManagesServerLogExplorer;
 use App\Livewire\Servers\Concerns\ManagesServerLogShipping;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
@@ -26,16 +27,33 @@ class WorkspaceLogs extends Component
     use DispatchesToastNotifications;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesServerLogAlerts;
     use ManagesServerLogExplorer;
     use ManagesServerLogShipping;
     use ManagesServerSystemLogs;
     use RendersWorkspacePlaceholder;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'activity', 'related'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity', 'related'];
 
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';
+
+    /** @var list<string> */
+    public const SHIPPING_SUBTABS = ['logs', 'settings', 'activity'];
+
+    /**
+     * Sub-tab within the dply Logs tab. Defaults to 'logs' so the stream is the
+     * first thing shown — agent setup lives under 'settings', install output under
+     * 'activity' — no scrolling past the add-on card to reach the logs.
+     */
+    #[Url(as: 'sub', except: 'logs')]
+    public string $shippingSubTab = 'logs';
+
+    public function setShippingSubTab(string $tab): void
+    {
+        $this->shippingSubTab = in_array($tab, self::SHIPPING_SUBTABS, true) ? $tab : 'logs';
+    }
 
     public bool $logOptionsMenuOpen = false;
 
@@ -112,7 +130,7 @@ class WorkspaceLogs extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
-        $this->server->loadMissing(['organization', 'sites', 'logAgent']);
+        $this->server->loadMissing(['organization', 'sites', 'logAgent', 'logAggregator']);
         $this->bootServerLogs();
         $this->bootLogShipping();
         $this->logsTab = in_array($this->logsTab, self::LOGS_TABS, true) ? $this->logsTab : 'viewer';
@@ -126,11 +144,26 @@ class WorkspaceLogs extends Component
         $this->mergeRemoteLogFromBroadcast($data);
     }
 
+    /**
+     * Merged Logs card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-logs-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(ServerSystemLogsReport $logsReport): View
     {
         $logSources = $this->availableLogSources();
         $this->server->loadMissing('organization');
-        $this->server->load('logAgent');
+        $this->server->load(['logAgent', 'logAggregator']);
 
         return view('livewire.servers.workspace-logs', [
             'logSources' => $logSources,
@@ -151,8 +184,12 @@ class WorkspaceLogs extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            // Only query ClickHouse when the Shipping tab is actually open.
-            'logExplorer' => $this->logsTab === 'shipping' ? $this->loadLogExplorer() : null,
+            // Only query ClickHouse when the Shipping tab's Logs sub-tab is open.
+            'logExplorer' => $this->logsTab === 'shipping' && $this->shippingSubTab === 'logs' ? $this->loadLogExplorer() : null,
+            'logHistogram' => $this->logsTab === 'shipping' && $this->shippingSubTab === 'logs' && $this->logCorrelationEnabled ? $this->loadLogHistogram() : null,
+            // Alert rules + entitlement, only while the Alerts tab is open.
+            'logAlertRules' => $this->logsTab === 'alerts' ? $this->loadLogAlertRules() : collect(),
+            'logAlertingAvailable' => $this->logAlertingAvailable,
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\SyncServerProviderSpecsJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
@@ -77,6 +78,19 @@ class WorkspaceSettings extends Component
         return ! (bool) auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user());
     }
 
+    /**
+     * Post-resize verification: re-read size/specs from the cloud provider and
+     * reconcile the stored copy, then re-probe the box. Queued — the provider
+     * card polls briefly and shows the refreshed snapshot when it lands.
+     */
+    public function syncProviderSpecs(): void
+    {
+        $this->authorize('update', $this->server);
+
+        SyncServerProviderSpecsJob::dispatch($this->server);
+        $this->toastSuccess(__('Verifying with the provider — stored size and specs will update shortly.'));
+    }
+
     public function checkHealth(ServerHealthProbe $probe): void
     {
         $this->authorize('view', $this->server);
@@ -110,21 +124,19 @@ class WorkspaceSettings extends Component
     }
 
     /**
-     * Override the trait placeholder so the Settings sub-tab strip stays
-     * visible (with the destination section highlighted) while the body
-     * lazy-loads — only the content area below the sub-tabs skeletons.
+     * Merged Settings card skeleton (hide-hero) so lazy load matches the page
+     * — destination section stays highlighted while the body skeletons.
      */
     public function placeholder(): View
     {
-        return view('livewire.servers.partials.workspace-subtab-placeholder', [
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-settings-placeholder', [
             'server' => $this->server,
-            'active' => 'settings',
-            'title' => __('Settings'),
             'tabs' => $this->settingsWorkspaceTabs(),
             'section' => $this->section,
-            'routeName' => 'servers.settings',
-            'idPrefix' => 'settings-tab-',
-            'ariaLabel' => __('Settings categories'),
         ]);
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\FunctionStatsRangeQueryTest;
 
-use App\Models\FunctionInvocation;
+use App\Modules\Serverless\Models\FunctionInvocation;
 use App\Models\Site;
 use App\Modules\Serverless\Services\FunctionStatsRangeQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;

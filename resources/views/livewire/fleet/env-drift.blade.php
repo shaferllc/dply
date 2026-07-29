@@ -3,43 +3,43 @@
         :title="__('Cross-product env drift')"
         :description="__('Sites that share a Git repo across BYO, Cloud, and Edge — and whether their environment variables agree. The first column is the baseline; later columns are compared against it.')"
         :section="__('Env drift')"
+        icon="heroicon-o-arrows-right-left"
     >
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-        <div class="min-w-[18rem] flex-1">
-            <label for="drift_search" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Filter by repo') }}</label>
-            <input id="drift_search" type="search" wire:model.live.debounce.300ms="search" placeholder="github.com/owner/repo" class="dply-input font-mono" />
-        </div>
-        <label class="inline-flex items-center gap-2 self-end text-sm text-brand-moss">
-            <input type="checkbox" wire:model.live="hideClean" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest" />
-            {{ __('Hide repos with no drift') }}
-        </label>
-        <button type="button" wire:click="toggleReveal" class="self-end rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-            {{ $reveal ? __('Hide values') : __('Reveal values') }}
-        </button>
-        @if ($search !== '' || $hideClean)
-            <button type="button" wire:click="clearFilters" class="self-end text-xs font-semibold text-brand-moss hover:text-brand-ink">
-                {{ __('Clear filters') }}
+        <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            <div class="min-w-[18rem] flex-1">
+                <label for="drift_search" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Filter by repo') }}</label>
+                <input id="drift_search" type="search" wire:model.live.debounce.300ms="search" placeholder="github.com/owner/repo" class="dply-input font-mono" />
+            </div>
+            <label class="inline-flex items-center gap-2 self-end text-sm text-brand-moss">
+                <input type="checkbox" wire:model.live="hideClean" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest" />
+                {{ __('Hide repos with no drift') }}
+            </label>
+            <button type="button" wire:click="toggleReveal" class="self-end rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
+                {{ $reveal ? __('Hide values') : __('Reveal values') }}
             </button>
-        @endif
-    </div>
+            @if ($search !== '' || $hideClean)
+                <button type="button" wire:click="clearFilters" class="self-end text-xs font-semibold text-brand-moss hover:text-brand-ink">
+                    {{ __('Clear filters') }}
+                </button>
+            @endif
+        </div>
 
-    @if ($totalGroups === 0)
-        <x-fleet-empty :title="__('No cross-product repos yet.')">
-            <p class="mt-1">{{ __('Drift comparison kicks in when at least two sites in the org point at the same Git repo — for example, a Cloud API and an Edge front-end of the same product.') }}</p>
-        </x-fleet-empty>
-    @elseif ($groups === [])
-        <x-fleet-empty>{{ __('No repos match the current filters.') }}</x-fleet-empty>
-    @else
-        <p class="mb-4 text-xs text-brand-moss">
-            {{ trans_choice('{1} 1 cross-product repo|[2,*] :count cross-product repos', $totalGroups, ['count' => $totalGroups]) }} · {{ $cleanGroups }} {{ __('clean') }} · {{ $totalGroups - $cleanGroups }} {{ __('drifted') }}
-        </p>
-        <div class="space-y-6">
+        @if ($totalGroups === 0)
+            <x-fleet-empty :title="__('No cross-product repos yet.')">
+                <p class="mt-1">{{ __('Drift comparison kicks in when at least two sites in the org point at the same Git repo — for example, a Cloud API and an Edge front-end of the same product.') }}</p>
+            </x-fleet-empty>
+        @elseif ($groups === [])
+            <x-fleet-empty>{{ __('No repos match the current filters.') }}</x-fleet-empty>
+        @else
+            <p class="border-b border-brand-ink/10 px-5 py-3 text-xs text-brand-moss sm:px-6">
+                {{ trans_choice('{1} 1 cross-product repo|[2,*] :count cross-product repos', $totalGroups, ['count' => $totalGroups]) }} · {{ $cleanGroups }} {{ __('clean') }} · {{ $totalGroups - $cleanGroups }} {{ __('drifted') }}
+            </p>
             @foreach ($groups as $group)
                 @php($matrix = $group['matrix'])
-                <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
+                <section @class(['border-b border-brand-ink/10' => ! $loop->last])>
+                    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
                         <div class="min-w-0">
-                            <p class="font-mono text-sm text-brand-ink truncate">{{ $group['repo'] }}</p>
+                            <p class="truncate font-mono text-sm text-brand-ink">{{ $group['repo'] }}</p>
                             <p class="mt-0.5 text-xs text-brand-moss">
                                 {{ trans_choice('{1} 1 environment|[2,*] :count environments', count($group['envs']), ['count' => count($group['envs'])]) }} ·
                                 {{ trans_choice('{1} 1 key|[2,*] :count keys', count($matrix['keys']), ['count' => count($matrix['keys'])]) }}
@@ -62,10 +62,10 @@
                         <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                             <thead class="bg-brand-cream/60 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">
                                 <tr>
-                                    <th class="sticky left-0 z-10 bg-brand-cream/95 px-4 py-3 backdrop-blur">{{ __('Key') }}</th>
+                                    <th class="sticky left-0 z-10 bg-brand-cream/95 px-5 py-3 backdrop-blur sm:px-6">{{ __('Key') }}</th>
                                     @foreach ($group['envs'] as $env)
                                         <th class="px-4 py-3 align-top">
-                                            <div class="font-semibold text-brand-ink normal-case tracking-normal">{{ $env['site']->name }}</div>
+                                            <div class="font-semibold normal-case tracking-normal text-brand-ink">{{ $env['site']->name }}</div>
                                             <div class="mt-0.5 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-brand-moss">
                                                 <span class="rounded bg-brand-ink/[0.06] px-1.5 py-0.5">{{ $env['surface'] }}</span>
                                                 <span>{{ $env['scope'] }}</span>
@@ -78,7 +78,7 @@
                                 @foreach ($matrix['keys'] as $key)
                                     @php($cells = $matrix['rows'][$key])
                                     <tr class="hover:bg-brand-sand/10">
-                                        <td class="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-2 font-mono text-xs text-brand-ink">{{ $key }}</td>
+                                        <td class="sticky left-0 z-10 whitespace-nowrap bg-white px-5 py-2 font-mono text-xs text-brand-ink sm:px-6">{{ $key }}</td>
                                         @foreach ($cells as $cell)
                                             @if ($cell['status'] === 'missing')
                                                 <td class="px-4 py-2 align-top">
@@ -105,7 +105,6 @@
                     </div>
                 </section>
             @endforeach
-        </div>
-    @endif
+        @endif
     </x-fleet-shell>
 </div>

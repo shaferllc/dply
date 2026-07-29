@@ -20,6 +20,7 @@ use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -296,6 +297,49 @@ trait ManagesDatabaseEngineLifecycle
                 ? __('Activating :engine — progress shows in the banner above.', ['engine' => $engineLabel])
                 : __('Deactivating :engine — progress shows in the banner above.', ['engine' => $engineLabel])
         );
+    }
+
+    /**
+     * Make this engine the server's primary/default. Exactly one engine row per
+     * server carries {@see ServerDatabaseEngine::$is_default}; new sites default
+     * their `database_engine` to it ({@see \App\Models\Server::defaultDatabaseEngine()}).
+     * Pure metadata — no SSH — so it applies immediately.
+     */
+    public function setPrimaryEngine(string $engine, ServerDatabaseAuditLogger $auditLogger): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__('No :engine engine on this server.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if ($row->is_default) {
+            return;
+        }
+
+        DB::transaction(function () use ($row): void {
+            ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->where('is_default', true)
+                ->update(['is_default' => false]);
+
+            $row->update(['is_default' => true]);
+        });
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+
+        $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DEFAULT_ENGINE_CHANGED, [
+            'engine' => $engine,
+        ], auth()->user());
+
+        $this->toastSuccess(__(':engine is now the primary database engine for this server.', ['engine' => $engineLabel]));
     }
 
     /**

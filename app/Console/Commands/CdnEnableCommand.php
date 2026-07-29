@@ -9,7 +9,7 @@ use App\Jobs\ApplySiteCdnJob;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Services\Cloudflare\CloudflareCdnService;
+use App\Modules\Cloud\Cloudflare\CloudflareCdnService;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use Illuminate\Console\Command;

@@ -63,7 +63,8 @@ return [
             'group' => 'edge',
             'when' => 'edge_site',
             'params' => [
-                'section' => 'edge-domains',
+                'section' => 'edge-routing',
+                'tab' => 'domains',
             ],
         ],
         [

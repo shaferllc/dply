@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudTeardownCommandTest;
 
-use App\Actions\Cloud\CreateCloudPreviewSite;
+use App\Modules\Cloud\Actions\CreateCloudPreviewSite;
 use App\Enums\SiteType;
-use App\Jobs\TeardownCloudSiteJob;
+use App\Modules\Cloud\Jobs\TeardownCloudSiteJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

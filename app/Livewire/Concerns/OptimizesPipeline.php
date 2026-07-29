@@ -9,7 +9,7 @@ use App\Jobs\VerifySiteOctaneJob;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\OctaneRuntimeVerifier;
 use App\Support\Sites\SitePipelineAdvisor;
 use Livewire\Component;
@@ -39,20 +39,14 @@ trait OptimizesPipeline
      * and serving this site before the "Reload Octane workers" suggestion is
      * allowed to show. The advisor can't SSH from the render path, so it gates
      * on a cached verdict; this queues the probe that writes it — but only when
-     * Octane is plausibly relevant (Laravel + laravel/octane in composer, VM
-     * host) and the last verdict is missing or stale, so we don't SSH on every
-     * page load.
+     * Octane is installed and enabled in site settings and the last verdict is
+     * missing or stale, so we don't SSH on every page load.
      */
     public function ensureOctaneVerificationProbe(): void
     {
         $site = $this->site;
         $server = $site->server;
-        if ($server === null || ! $server->isVmHost() || ! $site->isLaravelFrameworkDetected()) {
-            return;
-        }
-
-        $detection = $site->resolvedRuntimeAppDetection() ?? [];
-        if (empty($detection['laravel_octane'])) {
+        if ($server === null || ! $server->isVmHost() || ! $site->usesOctaneRuntime()) {
             return;
         }
 

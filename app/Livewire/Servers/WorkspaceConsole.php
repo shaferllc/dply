@@ -147,6 +147,10 @@ class WorkspaceConsole extends Component
         }
         $this->probesLoaded = true;
 
+        // Two bundled SSH execs (10s + 15s budgets) — past PHP's default ceiling
+        // on a cold box, so lift it for this request.
+        set_time_limit(60);
+
         $script = <<<'SH'
 bash -lc 'compgen -c 2>/dev/null | LC_ALL=C sort -u | grep -v "^_" | head -n 2000'
 echo "===DPLY-PROBE-SEPARATOR==="
@@ -243,6 +247,9 @@ SH;
         $this->cliInstalling = true;
         $this->cliInstallError = null;
 
+        // apt-get install jq alone carries a 120s budget inside the installer.
+        set_time_limit(240);
+
         try {
             $version = $installer->install($this->server);
             $this->cliVersion = $version;
@@ -260,6 +267,21 @@ SH;
         } finally {
             $this->cliInstalling = false;
         }
+    }
+
+    /**
+     * Merged console card skeleton (hide-hero) — not the generic workspace
+     * hero + three pulsing cards, which undoes the page merge during load.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-console-placeholder', [
+            'server' => $this->server,
+        ]);
     }
 
     public function render(): View

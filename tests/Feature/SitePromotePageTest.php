@@ -22,14 +22,23 @@ usesFeatures('workspace.site_promote');
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
-function promoteUserWithOrg(): User
+beforeEach(function (): void {
+    // Fresh factory servers must count toward plan tier so promote isn't
+    // blocked by the Free plan's 1-site ceiling (clone policy requires create).
+    config(['subscription.standard.min_billable_age_days' => 0]);
+});
+
+/**
+ * @return array{0: User, 1: Organization}
+ */
+function promoteUserWithOrg(): array
 {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
-    return $user;
+    return [$user, $org];
 }
 
 function promoteReadyServer(User $user, Organization $org): Server
@@ -43,10 +52,10 @@ function promoteReadyServer(User $user, Organization $org): Server
 
 test('promote page is hidden without feature flag', function (): void {
     Feature::define('workspace.site_promote', fn (): bool => false);
+    Feature::purge(['workspace.site_promote']);
     Feature::flushCache();
 
-    $user = promoteUserWithOrg();
-    $org = Organization::query()->first();
+    [$user, $org] = promoteUserWithOrg();
     $server = promoteReadyServer($user, $org);
     $site = Site::factory()->create([
         'server_id' => $server->id,
@@ -55,14 +64,16 @@ test('promote page is hidden without feature flag', function (): void {
     ]);
 
     $this->actingAs($user)
+        ->withSession(['current_organization_id' => $org->id])
         ->get(route('sites.promote', [$server, $site]))
         ->assertStatus(400);
 });
 
 test('promote page renders for vm site', function (): void {
-    $user = promoteUserWithOrg();
-    $org = Organization::query()->first();
+    [$user, $org] = promoteUserWithOrg();
     $server = promoteReadyServer($user, $org);
+    // Second billable server → Starter plan headroom for the promote clone.
+    promoteReadyServer($user, $org);
     $site = Site::factory()->create([
         'server_id' => $server->id,
         'user_id' => $user->id,
@@ -70,6 +81,7 @@ test('promote page renders for vm site', function (): void {
     ]);
 
     $this->actingAs($user)
+        ->withSession(['current_organization_id' => $org->id])
         ->get(route('sites.promote', [$server, $site]))
         ->assertOk()
         ->assertSee(__('Promote to server'));
@@ -78,8 +90,7 @@ test('promote page renders for vm site', function (): void {
 test('start promote dispatches clone job with preview flags', function (): void {
     Queue::fake();
 
-    $user = promoteUserWithOrg();
-    $org = Organization::query()->first();
+    [$user, $org] = promoteUserWithOrg();
     $server = promoteReadyServer($user, $org);
     $dest = promoteReadyServer($user, $org);
     $site = Site::factory()->create([
@@ -93,8 +104,16 @@ test('start promote dispatches clone job with preview flags', function (): void 
         'is_primary' => true,
     ]);
 
-    Livewire::actingAs($user)
-        ->test(SitePromote::class, ['server' => $server, 'site' => $site])
+    session(['current_organization_id' => $org->id]);
+
+    $component = Livewire::actingAs($user)
+        ->test(SitePromote::class, ['server' => $server, 'site' => $site]);
+
+    // Abort/error layouts embed nested Livewire (bell, command palette); ensure
+    // we actually mounted SitePromote before driving properties.
+    expect($component->instance())->toBeInstanceOf(SitePromote::class);
+
+    $component
         ->set('destination_server_id', (string) $dest->id)
         ->set('promote_site_name', 'Prod standby')
         ->set('hostname_mode', 'preview')

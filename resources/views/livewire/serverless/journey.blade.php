@@ -61,7 +61,7 @@
                 $banner = match (true) {
                     $live => [
                         'icon' => 'heroicon-o-check-circle',
-                        'title' => __('Your function is live'),
+                        'title' => __('Your app is live'),
                         'detail' => __('It\'s deployed and answering requests.'),
                         'ring' => 'border-brand-forest/25', 'wash' => 'bg-brand-forest/5',
                         'badge' => 'bg-brand-forest/15 text-brand-forest',
@@ -216,7 +216,7 @@
                     @if ($live && $actionUrl)
                         <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
                            class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
-                            {{ __('Open function') }}
+                            {{ __('Open app') }}
                         </a>
                     @endif
 
@@ -230,7 +230,7 @@
             @endif
         </div>
 
-        {{-- Function facts --}}
+        {{-- App facts --}}
         <div class="dply-card overflow-hidden mt-6">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
@@ -238,7 +238,7 @@
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Details') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function details') }}</h2>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('App details') }}</h2>
                 </div>
                 @if ($deployDuration !== '')
                     <span class="ml-auto shrink-0 text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>

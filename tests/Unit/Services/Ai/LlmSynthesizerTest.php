@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Ai;
 
-use App\Services\Ai\LlmSynthesizer;
+use App\Modules\Ai\Services\LlmSynthesizer;
 use Illuminate\Support\Facades\Http;
 
 test('llm synthesizer parses json suggestions', function () {

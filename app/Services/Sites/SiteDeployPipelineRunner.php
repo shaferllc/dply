@@ -6,7 +6,7 @@ use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\DeployPhaseRunner;
+use App\Modules\Deploy\Services\DeployPhaseRunner;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
@@ -105,16 +105,31 @@ class SiteDeployPipelineRunner
 
         $parts = [];
         $labels = [];
+        $flushOpcache = false;
 
-        if ((bool) $site->octane_port || $site->resolvedLaravelPackageFlag('octane')) {
+        if ($site->usesOctaneRuntime()) {
             // Octane serves the app itself — reload its workers onto the new release.
             $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "octane:reload" '
                 .'&& { echo "[dply] octane:reload"; php artisan octane:reload 2>&1 || echo "[dply] octane:reload skipped/failed (continuing)"; }; } || true';
             $labels[] = 'Octane';
         } elseif ($site->runtimeKey() === 'php') {
-            // Non-Octane PHP: reload FPM so it serves the freshly swapped `current`.
-            $parts[] = 'for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do sudo systemctl reload "$svc" 2>/dev/null && { echo "[dply] reloaded $svc"; break; }; done || true';
-            $labels[] = 'PHP-FPM';
+            if ($site->phpFpmDeployStrategy() === 'restart') {
+                // Operator opted into a full restart: OPcache starts empty on
+                // the new release (no agent flush needed), at the cost of a
+                // brief blip for every pool on that PHP version.
+                $services = array_values(array_unique([
+                    sprintf('php%s-fpm', $site->resolvedPhpFpmVersion()),
+                    'php8.5-fpm', 'php8.4-fpm', 'php8.3-fpm', 'php-fpm',
+                ]));
+                $parts[] = 'for svc in '.implode(' ', $services).'; do sudo systemctl restart "$svc" 2>/dev/null && { echo "[dply] restarted $svc — OPcache starts empty"; break; }; done || true';
+                $labels[] = 'PHP-FPM (restart)';
+            } else {
+                // Non-Octane PHP: reload FPM so it serves the freshly swapped `current`.
+                $parts[] = 'for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do sudo systemctl reload "$svc" 2>/dev/null && { echo "[dply] reloaded $svc"; break; }; done || true';
+                $labels[] = 'PHP-FPM';
+                // A reload re-reads pool config but does NOT flush OPcache — see flushOpcache().
+                $flushOpcache = true;
+            }
         }
 
         if ($site->resolvedLaravelPackageFlag('horizon')) {
@@ -161,6 +176,10 @@ class SiteDeployPipelineRunner
         }
 
         $out = $ssh->exec(sprintf('cd %s 2>/dev/null; %s', escapeshellarg($workingDirectory), implode('; ', $parts)), 120);
+
+        if ($flushOpcache) {
+            $out .= app(SiteOpcacheManager::class)->flushForDeploy($site);
+        }
 
         return [
             'log' => sprintf("\n--- managed restart (%s) ---\n%s\n", implode(', ', $labels), $out),
@@ -326,7 +345,93 @@ class SiteDeployPipelineRunner
             }
         }
 
+        // Vite manifest safety net (build phase only). A Laravel/@vite app that
+        // reaches cutover with no public/build/manifest.json 500s on every
+        // request. That happens when the pipeline has NO asset-build step (e.g. a
+        // site whose steps predate Vite detection): the build phase reports ok
+        // with nothing built, and on atomic each release is a pristine clone with
+        // no manifest (flat masked it by reusing a dir that still held an old
+        // one). Rather than ship a broken release, auto-resolve by building the
+        // assets here; if a manifest still can't be produced, fail the phase so
+        // the deploy aborts BEFORE cutover instead of going live broken.
+        if ($ok && $phase === SiteDeployStep::PHASE_BUILD) {
+            $guard = $this->ensureViteManifest($ssh, $workingDirectory, $cwd);
+            $log .= $guard['log'];
+            if ($guard['step'] !== null) {
+                $steps[] = $guard['step'];
+            }
+            if (! $guard['ok']) {
+                $ok = false;
+            }
+        }
+
         return ['log' => $log, 'steps' => $steps, 'ok' => $ok];
+    }
+
+    /**
+     * Self-heal a missing Vite manifest. Returns ok=false only when the app
+     * genuinely needs a build (vite.config present, not opted out) and one still
+     * can't be produced — so the caller fails the deploy before cutover.
+     *
+     * @return array{log: string, ok: bool, step: ?array<string, mixed>}
+     */
+    private function ensureViteManifest(RemoteShell $ssh, string $workingDirectory, string $cwd): array
+    {
+        $probe = $ssh->exec(sprintf(
+            'cd %s 2>/dev/null && { vite=no; for f in vite.config.js vite.config.ts vite.config.mjs vite.config.cjs; do [ -f "$f" ] && vite=yes; done; '
+            .'man=no; { [ -f public/build/manifest.json ] || [ -f public/build/.vite/manifest.json ]; } && man=yes; '
+            .'optout=no; { [ -f package.json ] && tr -d " \t\n\r" < package.json 2>/dev/null | grep -q %s; } && optout=yes; '
+            .'echo "DPLY_VITE vite=$vite man=$man optout=$optout"; }',
+            $cwd,
+            escapeshellarg('"dply":{[^{}]*"build":false')
+        ), 30);
+
+        if (preg_match('/DPLY_VITE vite=(\w+) man=(\w+) optout=(\w+)/', $probe, $m) !== 1) {
+            return ['log' => '', 'ok' => true, 'step' => null]; // probe inconclusive — never block on uncertainty
+        }
+        [, $vite, $man, $optout] = $m;
+
+        if ($vite !== 'yes' || $man === 'yes' || $optout === 'yes') {
+            return ['log' => '', 'ok' => true, 'step' => null];
+        }
+
+        $log = "\n[dply] VITE GUARD → @vite app is missing public/build/manifest.json; auto-building assets so the release doesn't ship a 500…\n";
+
+        // Reuse the node self-heal (mise/NodeSource/snap + loud-fail) via the
+        // tooling prefix by synthesizing an npm step.
+        $synthetic = new SiteDeployStep;
+        $synthetic->step_type = SiteDeployStep::TYPE_NPM_RUN;
+        $buildCmd = 'npm ci --include=dev && npm run build --if-present';
+        $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd).$buildCmd;
+
+        $start = microtime(true);
+        $out = $ssh->exec(sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $runCmd), 900);
+        $durationMs = (int) round((microtime(true) - $start) * 1000);
+        $log .= $out;
+
+        $recheck = $ssh->exec(sprintf(
+            'cd %s 2>/dev/null && { [ -f public/build/manifest.json ] || [ -f public/build/.vite/manifest.json ]; } && echo DPLY_MAN_OK || echo DPLY_MAN_MISSING',
+            $cwd
+        ), 30);
+        $built = str_contains($recheck, 'DPLY_MAN_OK');
+
+        $log .= $built
+            ? "[dply] VITE GUARD → manifest built; release is safe to cut over.\n"
+            : "[dply] VITE GUARD → still no manifest after auto-build — failing the deploy so a broken release can't go live. Fix Node/the build, or set {\"dply\":{\"build\":false}} in package.json to opt out.\n";
+
+        return [
+            'log' => $log,
+            'ok' => $built,
+            'step' => [
+                'step_id' => 'vite_manifest_guard',
+                'step_type' => 'vite_manifest_guard',
+                'command' => $buildCmd,
+                'ok' => $built,
+                'output' => $out,
+                'duration_ms' => $durationMs,
+                'skipped' => false,
+            ],
+        ];
     }
 
     /**
@@ -428,15 +533,29 @@ class SiteDeployPipelineRunner
                 .'curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1 && apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
                 .'elif command -v sudo >/dev/null 2>&1; then '
                 .'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - >/dev/null 2>&1 && sudo apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
+                .'fi; }; '
+                // 3) Still missing, but snap is available (stock Ubuntu) — install a
+                //    current Node via snap. This is the path that actually works on
+                //    BYO boxes with no mise where the NodeSource apt path failed, and
+                //    it gives Node 20+/22 — Vite 7 / Tailwind 4 (oxide) reject the
+                //    distro `nodejs` 18, so an old apt Node still can't build.
+                .'command -v npm >/dev/null 2>&1 || { '
+                .'if command -v snap >/dev/null 2>&1; then '
+                .'echo "[dply] installing Node via snap…"; '
+                .'if [ "$(id -u)" = 0 ]; then snap install node --classic --channel=lts/stable >/dev/null 2>&1 || snap install node --classic >/dev/null 2>&1 || true; '
+                .'elif command -v sudo >/dev/null 2>&1; then sudo snap install node --classic --channel=lts/stable >/dev/null 2>&1 || sudo snap install node --classic >/dev/null 2>&1 || true; fi; '
+                .'export PATH="/snap/bin:$PATH"; '
                 .'fi; }; ';
-            // 3) Still no npm. For a Node-only step (npm_ci / npm_run) warn and
-            //    SKIP the build rather than failing the whole deploy — the app
-            //    ships without rebuilt assets and the operator can install Node
-            //    and redeploy. For a combined composer+node custom step we must
-            //    NOT exit here (that would skip composer too); let the command
-            //    run and surface the npm failure on its own.
+            // 4) Still no npm. The app has a package.json and did NOT opt out
+            //    (checked above), so it genuinely needs an asset build — without
+            //    one it 500s on a missing public/build/manifest.json. FAIL the
+            //    deploy loudly rather than shipping a green deploy over a broken
+            //    site (the old behaviour silently exit 0'd and we shipped sites
+            //    with no manifest). Operator fixes Node or sets the opt-out.
+            //    Combined composer+node steps don't exit here — that would skip
+            //    composer too; let the command run and surface npm's own failure.
             if (! $usesComposer) {
-                $prefix .= 'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable and auto-install failed — skipping frontend build (install Node on the server and redeploy to build assets)."; exit 0; }; ';
+                $prefix .= 'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable and auto-install (mise/NodeSource/snap) all failed — failing the deploy so a missing public/build/manifest.json can not ship silently. Install Node on the server, or set {\"dply\":{\"build\":false}} in package.json to opt out, then redeploy."; exit 1; }; ';
             }
             $prefix .= 'fi; ';
         }

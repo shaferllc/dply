@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceDatabaseTest;
 
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
 
 test('create database cluster posts and normalizes the response', function () {

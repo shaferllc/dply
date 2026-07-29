@@ -2,18 +2,19 @@
     /** @var \Illuminate\Support\Collection $notifSubscriptions */
     /** @var \Illuminate\Support\Collection $notifChannels */
     /** @var array<string, string> $notifEventLabels */
-    $card = 'dply-card overflow-hidden';
+    $card = $card ?? 'border-b border-brand-ink/10';
     $subscriptionsByChannel = $notifSubscriptions->groupBy('notification_channel_id');
 @endphp
 
 <div class="{{ $card }}">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-bell class="h-5 w-5" />
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Webserver alerts') }}</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Alerts') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver alerts') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s webserver events — engine switches, rollbacks, and config saves. Each row binds one channel to one event.') }}
                 </p>
@@ -25,13 +26,12 @@
         </x-secondary-button>
     </div>
 
-    <div class="mx-6 mt-5 flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-relaxed text-brand-moss sm:mx-8">
-        <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+    <div class="border-b border-brand-ink/10 px-5 py-3.5 text-sm leading-relaxed text-brand-moss sm:px-6">
         <p>{{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry whenever the webserver engine is switched (or the switch fails or is reverted) or a config file is saved — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}</p>
     </div>
 
     {{-- Current subscriptions --}}
-    <div class="px-6 py-5 sm:px-8">
+    <div class="px-5 py-5 sm:px-6">
         @if ($subscriptionsByChannel->isEmpty())
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />

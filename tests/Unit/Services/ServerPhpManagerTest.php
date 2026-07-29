@@ -752,7 +752,7 @@ it('reassigns the cli default before uninstalling that version', function () {
         'php_new_site_default_version' => '8.4',
     ]);
 
-    $lock = Mockery::mock();
+    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -811,7 +811,7 @@ it('reassigns the remote detected cli default before uninstall even when persist
         'php_new_site_default_version' => '8.4',
     ]);
 
-    $lock = Mockery::mock();
+    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -866,7 +866,7 @@ it('reassigns the new site default before uninstalling that version', function (
         'php_new_site_default_version' => '8.3',
     ]);
 
-    $lock = Mockery::mock();
+    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -916,7 +916,7 @@ it('blocks uninstall when the version is still a default and no other php versio
         'php_new_site_default_version' => '8.3',
     ]);
 
-    $lock = Mockery::mock();
+    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 
@@ -966,7 +966,7 @@ it('uses a lock ttl that covers the full remote package action timeout', functio
         'server_role' => 'application',
     ]);
 
-    $lock = Mockery::mock();
+    $lock = Mockery::mock(\Illuminate\Contracts\Cache\Lock::class);
     $lock->shouldReceive('get')->once()->andReturn(true);
     $lock->shouldReceive('release')->once();
 

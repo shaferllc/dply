@@ -2,7 +2,7 @@
 
 namespace App\Contracts;
 
-use App\Services\Deploy\DeployContext;
+use App\Modules\Deploy\Services\DeployContext;
 
 interface DeployEngine
 {

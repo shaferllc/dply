@@ -8,8 +8,8 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Edge\EdgeDeliveryContextResolver;
-use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

@@ -33,7 +33,7 @@ class TraefikWebserverConfigEngine implements WebserverConfigEngineInterface
 
     private function backendPort(Site $site): int
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $existing = $meta['traefik_backend_port'] ?? null;
         if (is_numeric($existing) && (int) $existing >= 20000) {
             return (int) $existing;

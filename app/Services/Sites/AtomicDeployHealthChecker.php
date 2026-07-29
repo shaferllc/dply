@@ -17,7 +17,7 @@ final class AtomicDeployHealthChecker
      */
     public function verify(Site $site, SshConnection $ssh): string
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         // Validate-by-default: every atomic deploy is HTTP-smoke-tested after
         // cutover unless explicitly opted out (meta.deploy_health_enabled=false
@@ -103,7 +103,129 @@ final class AtomicDeployHealthChecker
             }
         }
 
+        // Asset-integrity gate. The homepage rendered non-5xx above, but a
+        // freshly-hashed Vite asset can still 404 when workers serve a STALE
+        // release — OPcache pinned the old `current` realpath and a plain FPM
+        // reload didn't clear it. That surfaces as a 200 HTML page whose
+        // <link>/<script> point at build/assets/* that resolve to the branded
+        // 404 (Content-Type text/html): a green health check over an unstyled
+        // site. Pull the asset URLs the app actually rendered and assert each
+        // returns 200 + a non-HTML MIME. Default-on; opt out per-site via
+        // meta.deploy_asset_integrity_enabled=false or globally in config.
+        if (($meta['deploy_asset_integrity_enabled'] ?? config('deploy.asset_integrity_default', true)) !== false) {
+            $log .= $this->verifyAssets($site, $ssh, $scheme, $targetHost, $hosts);
+        }
+
         return $log;
+    }
+
+    /**
+     * Fetch the rendered homepage and assert every Vite build asset it
+     * references serves as a real asset (200 + a stylesheet/script MIME). This
+     * catches the "stale release" failure a 5xx probe can't: a 200 page whose
+     * hashed CSS/JS 404s to the branded fallback (text/html), leaving the site
+     * unstyled. Best-effort self-heal — on the first miss it flushes OPcache and
+     * re-probes once (the fix is deterministic) before throwing to trigger the
+     * deployer's auto-rollback.
+     *
+     * @param  list<string>  $hosts
+     * @throws \RuntimeException when assets stay broken after the heal attempt
+     */
+    private function verifyAssets(Site $site, SshConnection $ssh, string $scheme, string $targetHost, array $hosts): string
+    {
+        $host = $hosts[0];
+        $assets = $this->extractBuildAssets($ssh, $host, $scheme, $targetHost);
+
+        $log = "\n--- asset integrity ---\n";
+        if ($assets === []) {
+            return $log.'no build/assets referenced by '.$host."/ — nothing to verify.\n";
+        }
+
+        $broken = $this->probeAssets($ssh, $host, $scheme, $targetHost, $assets);
+        $log .= 'Checked '.count($assets).' asset(s) referenced by '.$host."/\n";
+
+        if ($broken === []) {
+            return $log."All assets return 200 + a stylesheet/script MIME.\n";
+        }
+
+        // The deterministic cause is a stale OPcache pin — heal once, re-probe.
+        $log .= count($broken)." asset(s) broken (stale release?) — flushing OPcache and re-checking:\n";
+        foreach ($broken as $b) {
+            $log .= '  '.$b['path'].' → '.$b['reason']."\n";
+        }
+        $log .= '  '.trim(app(SiteOpcacheManager::class)->flushForDeploy($site))."\n";
+        usleep(750 * 1000);
+
+        $stillBroken = $this->probeAssets($ssh, $host, $scheme, $targetHost, array_column($broken, 'path'));
+        if ($stillBroken === []) {
+            return $log."Re-check passed — assets now serve correctly.\n";
+        }
+
+        $detail = implode("\n", array_map(fn (array $b): string => '  '.$b['path'].' → '.$b['reason'], $stillBroken));
+
+        throw new \RuntimeException(
+            __('Deploy asset-integrity check failed: :n asset(s) the homepage references do not serve (stale release / OPcache not cleared).', ['n' => count($stillBroken)])
+            ."\n\n".$detail
+        );
+    }
+
+    /**
+     * GET the homepage over loopback and pull the distinct build/assets/* CSS
+     * and JS paths the app rendered into its <link>/<script> tags. Returns the
+     * PATH portion only (host-relative); capped so a chunk-heavy page can't
+     * balloon the probe. Empty for non-Vite sites — a clean skip, not a failure.
+     *
+     * @return list<string>
+     */
+    private function extractBuildAssets(SshConnection $ssh, string $host, string $scheme, string $targetHost): array
+    {
+        $url = $scheme.'://'.$host.'/';
+        $curl = 'curl -sS -L -k --max-time 25'
+            .' --resolve '.escapeshellarg($host.':80:'.$targetHost)
+            .' --resolve '.escapeshellarg($host.':443:'.$targetHost)
+            .' '.escapeshellarg($url).' 2>/dev/null';
+        $html = $ssh->exec($curl, 45);
+
+        if (! preg_match_all('#/build/assets/[A-Za-z0-9_./-]+\.(?:css|js)#', $html, $m)) {
+            return [];
+        }
+
+        return array_slice(array_values(array_unique($m[0])), 0, 20);
+    }
+
+    /**
+     * HEAD each asset over loopback; return the ones that are NOT a clean 200 +
+     * stylesheet/script MIME. A 404 or a `text/html` response means the box is
+     * serving the branded fallback in place of the asset — the stale-release
+     * signature. Uses the LAST status/Content-Type in the response so a
+     * redirect chain reflects the final hop.
+     *
+     * @param  list<string>  $assets  asset paths
+     * @return list<array{path: string, reason: string}>
+     */
+    private function probeAssets(SshConnection $ssh, string $host, string $scheme, string $targetHost, array $assets): array
+    {
+        $broken = [];
+
+        foreach ($assets as $path) {
+            $url = $scheme.'://'.$host.$path;
+            $curl = 'curl -sS -I -L -k --max-time 20'
+                .' --resolve '.escapeshellarg($host.':80:'.$targetHost)
+                .' --resolve '.escapeshellarg($host.':443:'.$targetHost)
+                .' '.escapeshellarg($url).' 2>&1';
+            $head = $ssh->exec($curl, 30);
+
+            $code = preg_match_all('#HTTP/[\d.]+\s+(\d{3})#', $head, $codes) ? (int) end($codes[1]) : 0;
+            $ctype = preg_match_all('/Content-Type:\s*([^\r\n;]+)/i', $head, $ct) ? strtolower(trim((string) end($ct[1]))) : '';
+
+            if ($code !== 200) {
+                $broken[] = ['path' => $path, 'reason' => 'HTTP '.($code !== 0 ? $code : '(no response)')];
+            } elseif (str_contains($ctype, 'text/html')) {
+                $broken[] = ['path' => $path, 'reason' => '200 but MIME '.($ctype !== '' ? $ctype : 'unknown').' (served the fallback page, not the asset)'];
+            }
+        }
+
+        return $broken;
     }
 
     /**
@@ -249,9 +371,18 @@ ls -la {$this->sh($repo)}/current/public/index.php 2>/dev/null || echo "  no cur
 echo "── nginx error log (recent) ──"
 (sudo -n tail -n 40 /var/log/nginx/error.log 2>/dev/null || tail -n 40 /var/log/nginx/error.log 2>/dev/null || echo "(no access to /var/log/nginx/error.log)") | grep -E {$this->sh($logFilter)} | tail -n 10
 
-echo "── site laravel.log (tail) ──"
+echo "── site laravel.log (last error, full trace) ──"
 for p in {$logCandidates}; do
-  if [ -f "\$p" ]; then echo "\$p:"; tail -n 25 "\$p"; break; fi
+  if [ -f "\$p" ]; then
+    echo "\$p:"
+    # Print the LAST complete log entry in full — from its [timestamp] header
+    # through every stack frame — so the exception class/message at the top is
+    # never lost to a fixed tail. Reset the buffer on each new entry header
+    # ([20xx-..]); emit whatever's buffered at EOF. Capped so a runaway trace
+    # can't flood the diagnostic.
+    awk '/^\[20[0-9][0-9]-/{buf=""} {buf=buf \$0 ORS} END{printf "%s", buf}' "\$p" | head -n 500
+    break
+  fi
 done
 BASH;
 

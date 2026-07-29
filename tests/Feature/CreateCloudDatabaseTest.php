@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudDatabaseTest;
 
-use App\Actions\Cloud\CreateCloudDatabase;
-use App\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

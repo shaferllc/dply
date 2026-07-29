@@ -7,7 +7,7 @@ namespace App\Jobs;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

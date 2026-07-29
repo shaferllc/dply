@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceDnsTest;
 
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
 
 test('it fetches domain when present in account', function () {

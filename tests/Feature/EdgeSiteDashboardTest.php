@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeSiteDashboardTest;
 
 use App\Enums\SiteType;
-use App\Jobs\BuildEdgeSiteJob;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
+use App\Livewire\Sites\Edge\Workspace\Previews;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
@@ -39,7 +40,7 @@ test('dashboard shows fake edge banner when fake mode enabled', function () {
     Livewire::actingAs($user)
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertSee('Fake edge — local mode')
-        ->assertSee('Dply Edge (local fake backend)');
+        ->assertSee('Managed Edge (local)');
 });
 
 test('dashboard shows cloudflare delivery label when platform configured', function () {
@@ -56,8 +57,8 @@ test('dashboard shows cloudflare delivery label when platform configured', funct
 
     Livewire::actingAs($user)
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-        ->assertSee('Dply Edge (managed)')
-        ->assertSee('Live on dply Edge');
+        ->assertSee('Managed Edge')
+        ->assertDontSee('Fake edge — local mode');
 });
 
 test('redeploy button dispatches build job', function () {
@@ -114,7 +115,7 @@ test('preview teardown dispatches job', function () {
     ]);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $parent, 'section' => 'general'])
+        ->test(Previews::class, ['server' => $server, 'site' => $parent])
         ->call('tearDownEdgePreview', $preview->id);
 
     Queue::assertPushed(TeardownEdgeSiteJob::class, fn (TeardownEdgeSiteJob $job): bool => $job->siteId === $preview->id);
@@ -161,5 +162,14 @@ function makeEdgeSite(): array
         'published_at' => now(),
     ]);
 
-    return [$user, $server, $site];
+    $deployment = EdgeDeployment::query()->where('site_id', $site->id)->latest('id')->first();
+    $site->update([
+        'meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
+            'edge' => array_merge($site->edgeMeta(), [
+                'active_deployment_id' => $deployment?->id,
+            ]),
+        ]),
+    ]);
+
+    return [$user, $server, $site->fresh()];
 }

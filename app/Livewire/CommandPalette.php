@@ -78,6 +78,12 @@ class CommandPalette extends Component
      * this stays in step with navigation). Route-model binding means the `site`
      * / `server` route parameters are already-resolved models. The seed is a
      * starting point only — every action re-resolves org-scoped and re-authorizes.
+     *
+     * NB: this reads the live route, so the component must NOT be #[Lazy] — a
+     * lazy-load request carries the Livewire endpoint route, not the page route,
+     * which would drop the ⌘K page context. (It's also a global overlay that
+     * registers its own keydown/open listeners in Alpine init, so it must be
+     * present on initial render, not deferred.)
      */
     public function mount(): void
     {

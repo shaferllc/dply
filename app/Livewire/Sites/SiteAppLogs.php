@@ -20,6 +20,9 @@ class SiteAppLogs extends Component
 {
     public Site $site;
 
+    /** When true, render as a strip inside parent merged chrome (no nested hero/card). */
+    public bool $embedded = false;
+
     public string $levelFilter = '';
 
     public string $search = '';

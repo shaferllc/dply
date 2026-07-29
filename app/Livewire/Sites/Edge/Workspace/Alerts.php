@@ -6,8 +6,10 @@ namespace App\Livewire\Sites\Edge\Workspace;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
+use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Edge\Support\EdgeEffectiveAlerts;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Validate;
@@ -15,9 +17,9 @@ use Livewire\Component;
 
 /**
  * RUM-style alerting (P58). Per-site thresholds for LCP p75, 5xx rate,
- * and 5xx count. CheckEdgeRumAlertsCommand runs hourly and publishes
- * `edge.rum.breach` notification events when any enabled threshold is
- * crossed over the last hour. Cooldown is 6h per (site, kind).
+ * and 5xx count. Values come from dply.yaml `alerts:` merged with
+ * dashboard overrides ({@see EdgeEffectiveAlerts}). CheckEdgeRumAlertsCommand
+ * runs hourly and publishes `edge.rum.breach` when a threshold is crossed.
  */
 class Alerts extends Component
 {
@@ -43,17 +45,13 @@ class Alerts extends Component
     {
         $this->mountEdgeWorkspaceSection($server, $site);
 
-        $alerts = is_array($site->edgeMeta()['alerts'] ?? null) ? $site->edgeMeta()['alerts'] : [];
-        $lcp = is_array($alerts['lcp_p75_ms'] ?? null) ? $alerts['lcp_p75_ms'] : [];
-        $err = is_array($alerts['error_rate'] ?? null) ? $alerts['error_rate'] : [];
-        $cnt = is_array($alerts['five_xx_count'] ?? null) ? $alerts['five_xx_count'] : [];
-
-        $this->lcp_enabled = (bool) ($lcp['enabled'] ?? false);
-        $this->lcp_threshold = (int) ($lcp['threshold'] ?? 2500);
-        $this->err_rate_enabled = (bool) ($err['enabled'] ?? false);
-        $this->err_rate_threshold = (float) ($err['threshold'] ?? 5.0);
-        $this->err_count_enabled = (bool) ($cnt['enabled'] ?? false);
-        $this->err_count_threshold = (int) ($cnt['threshold'] ?? 50);
+        $effective = EdgeEffectiveAlerts::for($site);
+        $this->lcp_enabled = $effective['lcp_p75_ms']['enabled'];
+        $this->lcp_threshold = (int) $effective['lcp_p75_ms']['threshold'];
+        $this->err_rate_enabled = $effective['error_rate']['enabled'];
+        $this->err_rate_threshold = (float) $effective['error_rate']['threshold'];
+        $this->err_count_enabled = $effective['five_xx_count']['enabled'];
+        $this->err_count_threshold = (int) $effective['five_xx_count']['threshold'];
     }
 
     public function save(): void
@@ -86,9 +84,34 @@ class Alerts extends Component
 
     public function render(): View
     {
+        $latestLive = EdgeDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', EdgeDeployment::STATUS_LIVE)
+            ->latest('id')
+            ->first()
+            ?: EdgeDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->whereNotNull('repo_config')
+                ->latest('id')
+                ->first();
+
+        $repoAlerts = [];
+        $sourcePath = 'dply.yaml';
+        if ($latestLive !== null && is_array($latestLive->repo_config)) {
+            $repoAlerts = is_array($latestLive->repo_config['alerts'] ?? null) ? $latestLive->repo_config['alerts'] : [];
+            $sourcePath = is_string($latestLive->repo_config['source_path'] ?? null)
+                ? (string) $latestLive->repo_config['source_path']
+                : 'dply.yaml';
+        }
+
         return view('livewire.sites.edge.workspace.alerts', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-alerts'),
-            ['server' => $this->server, 'site' => $this->site],
+            [
+                'server' => $this->server,
+                'site' => $this->site,
+                'repoAlerts' => $repoAlerts,
+                'sourcePath' => $sourcePath,
+            ],
         ));
     }
 }

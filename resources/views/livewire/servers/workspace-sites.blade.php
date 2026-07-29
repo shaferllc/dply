@@ -1,29 +1,13 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-        'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
-        'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    ];
-
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
-
-    $newCardEyebrow = $isContainerHost ? __('Container apps') : __('Sites');
-    $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
-    $newCardDescription = $isContainerHost
-        ? __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.')
-        : __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.');
     $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
     $listHeading = $isContainerHost ? __('Container apps') : __('Site directory');
-    $listEyebrow = __('Library');
     $emptyHeadline = $isContainerHost ? __('No container apps yet') : __('No sites yet');
     $emptyLead = $isContainerHost
         ? __('Add one to deploy a Git repo onto this host.')
         : __('Add a site to manage web server config, SSL, Git deploys, and environment files.');
     $siteCount = $server->sites->count();
+    $siteType = $server->siteType();
 @endphp
 
 <x-server-workspace-layout
@@ -31,51 +15,104 @@
     active="sites"
     :title="__('Sites')"
     :description="__('Manage sites, databases, automation, and deploy tools for this server.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div class="space-y-6">
-
-        {{-- Hero: new site/container CTA. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            @if ($isContainerHost)
-                                <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
-                            @else
-                                <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
-                            @endif
-                        </x-icon-badge>
+    <div class="space-y-4">
+        {{-- Merged: page identity + directory in one card (same pattern as Run/Console). --}}
+        <section class="dply-card min-w-0 overflow-hidden p-0">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            @switch($siteType)
+                                @case('container')
+                                    <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
+                                    @break
+                                @case('php')
+                                    <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
+                                    @break
+                                @case('static')
+                                    <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
+                                    @break
+                                @case('node')
+                                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                                    @break
+                                @default
+                                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                            @endswitch
+                        </span>
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $newCardEyebrow }}</p>
-                            <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ $newCardHeading }}</h2>
-                            <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                {{ $newCardDescription }}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">
+                                    {{ $isContainerHost ? __('Container apps') : __('Sites') }}
+                                </h2>
+                                <span class="rounded-md bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                    {{ ucfirst($siteType) }}
+                                </span>
+                            </div>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                @switch($siteType)
+                                    @case('container')
+                                        {{ __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.') }}
+                                        @break
+                                    @case('php')
+                                        {{ __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.') }}
+                                        @break
+                                    @case('static')
+                                        {{ __('Host static sites from Git with zero-config builds.') }}
+                                        @break
+                                    @case('node')
+                                        {{ __('Deploy Node.js apps from Git, with build and NPM support.') }}
+                                        @break
+                                    @default
+                                        {{ __('Manage sites on this server — deploys, env, and settings per workspace.') }}
+                                @endswitch
+                            </p>
+                            <p class="mt-2 text-xs text-brand-mist">
+                                <span class="font-mono font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</span>
+                                {{ $isContainerHost ? __('on this host') : __('on this server') }}
+                                ·
+                                @switch($siteType)
+                                    @case('container')
+                                        {{ __('Container') }}
+                                        @break
+                                    @case('php')
+                                        {{ __('VM · PHP') }}
+                                        @break
+                                    @case('static')
+                                        {{ __('VM · Static') }}
+                                        @break
+                                    @case('node')
+                                        {{ __('VM · Node') }}
+                                        @break
+                                    @default
+                                        {{ ucfirst((string) $server->hostKind()) }}
+                                @endswitch
                             </p>
                             @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
-                                <div class="mt-3 inline-flex items-start gap-2 whitespace-nowrap rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                <div class="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-900">
                                     <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    <span class="whitespace-normal">{{ $this->addSiteBlockedReason }}</span>
+                                    <span>{{ $this->addSiteBlockedReason }}</span>
                                 </div>
                             @endif
                         </div>
                     </div>
-                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
                         @if ($this->canAddSite)
                             <button
                                 type="button"
                                 wire:click="openAddSiteModal"
-                                class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
                             >
                                 <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ $addCtaLabel }}
                             </button>
                         @else
                             <span
-                                class="inline-flex cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-xl bg-brand-mist/30 px-4 py-2 text-sm font-semibold text-brand-moss"
+                                class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-brand-mist/30 px-3 py-1.5 text-xs font-semibold text-brand-moss"
                                 title="{{ $this->addSiteBlockedReason }}"
                             >
                                 <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -84,55 +121,30 @@
                         @endif
                     </div>
                 </div>
-                <dl class="grid grid-cols-2 gap-2 lg:col-span-5">
-                    <div @class([
-                        'rounded-2xl border px-4 py-3 shadow-sm',
-                        'border-brand-sage/30 bg-brand-sage/8' => $siteCount > 0,
-                        'border-brand-ink/10 bg-white' => $siteCount === 0,
-                    ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $isContainerHost ? __('Apps') : __('Sites') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('on this host|on this host', $siteCount) }}</span>
-                        </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Per server') }}</p>
-                    </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</dt>
-                        <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
-                            {{ $isContainerHost ? __('Container') : __('VM') }}
-                        </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ ucfirst((string) $server->hostKind()) }}</p>
-                    </div>
-                </dl>
             </div>
-        </section>
 
-        {{-- Sites list. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $listEyebrow }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $listHeading }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        @if ($bulkActionsEnabled && ! $isContainerHost)
-                            {{ __('Select sites to run bulk actions, or click a row to open that workspace.') }}
-                        @else
-                            {{ __('Click a row to open that workspace and manage deploys, env, and settings.') }}
-                        @endif
-                    </p>
+            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listHeading }}</p>
+                    </div>
+                    @if ($siteCount > 0)
+                        <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
+                    @endif
                 </div>
-                @if ($siteCount > 0)
-                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
-                @endif
+                <p class="mt-1 text-xs text-brand-moss">
+                    @if ($bulkActionsEnabled && ! $isContainerHost)
+                        {{ __('Select sites to run bulk actions, or click a row to open that workspace.') }}
+                    @else
+                        {{ __('Click a row to open that workspace.') }}
+                    @endif
+                </p>
             </div>
 
             @php $bulkSelectedCount = count(array_filter($selectedSiteIds ?? [])); @endphp
             @if ($bulkActionsEnabled && ! $isContainerHost && $bulkSelectedCount > 0)
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
                     <span class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ trans_choice(':count site selected|:count sites selected', $bulkSelectedCount, ['count' => $bulkSelectedCount]) }}</span>
                     <button
                         type="button"
@@ -184,7 +196,7 @@
             @endif
 
             @if ($server->sites->isEmpty())
-                <div class="px-6 py-12 text-center sm:px-7">
+                <div class="px-5 py-12 text-center sm:px-6">
                     <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                         @if ($isContainerHost)
                             <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
@@ -217,6 +229,15 @@
                             $gitRef = $s->git_repository_url;
                             $gitShort = $gitRef ? (preg_match('#([^/:]+/[^/]+?)(?:\.git)?$#', $gitRef, $m) ? $m[1] : \Illuminate\Support\Str::limit($gitRef, 40)) : null;
                             $debugOn = filter_var($s->meta['debug'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                            // Whether the fleet-style Deploy / Sync buttons apply
+                            // to this row: a VM site (not a functions/edge runtime)
+                            // the viewer may update. The action handlers re-check
+                            // this, so a stale click is a safe no-op either way.
+                            $siteDeployable = $server->isVmHost()
+                                && ! $s->usesFunctionsRuntime()
+                                && ! $s->usesEdgeRuntime()
+                                && auth()->user()?->can('update', $s);
 
                             $containerLaunchStatus = (string) data_get($server->meta, 'container_launch.status', '');
                             $isWaitingOnHost = $s->status === \App\Models\Site::STATUS_PENDING
@@ -324,12 +345,57 @@
                                     <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                                 </div>
                             </a>
+                            @if ($siteDeployable)
+                                {{-- Per-site Deploy sits outside the row link so it fires
+                                     the deploy console instead of navigating. When the site's
+                                     repo is deployed on OTHER servers too, a "Sync N" button
+                                     ships this site and its cross-server peers together
+                                     (deploySyncedSites → SiteSyncPeers), so two linked sites on
+                                     two servers can be deployed in one click without opening
+                                     each workspace. --}}
+                                @php $syncCount = (int) ($this->syncPeerCounts[(string) $s->id] ?? 1); @endphp
+                                <div class="flex shrink-0 items-center gap-1 border-l border-brand-ink/10 px-3 sm:px-4">
+                                    <button
+                                        type="button"
+                                        wire:click="deploySite('{{ $s->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="deploySite('{{ $s->id }}')"
+                                        class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                                        title="{{ __('Deploy this site') }}"
+                                    >
+                                        <x-heroicon-m-rocket-launch wire:loading.remove wire:target="deploySite('{{ $s->id }}')" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <span wire:loading wire:target="deploySite('{{ $s->id }}')" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                            <x-spinner variant="cream" size="sm" />
+                                        </span>
+                                        {{ __('Deploy') }}
+                                    </button>
+                                    @if ($syncCount > 1)
+                                        <button
+                                            type="button"
+                                            wire:click="deploySyncedSites('{{ $s->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="deploySyncedSites('{{ $s->id }}')"
+                                            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                            title="{{ __('Deploy this site and its :n linked sites across servers together.', ['n' => $syncCount - 1]) }}"
+                                        >
+                                            <x-heroicon-m-arrows-right-left wire:loading.remove wire:target="deploySyncedSites('{{ $s->id }}')" class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                                            <span wire:loading wire:target="deploySyncedSites('{{ $s->id }}')" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-spinner size="sm" />
+                                            </span>
+                                            {{ __('Sync :n', ['n' => $syncCount]) }}
+                                        </button>
+                                    @endif
+                                </div>
+                            @endif
                         </li>
                     @endforeach
                 </ul>
             @endif
         </section>
     </div>
+
+    {{-- Deploy console lives in the app shell (deploy-console-sidebar + dock). --}}
+    @include('livewire.servers.partials.deploy-sites-modal')
 
     <x-slot name="modals">
         @include('livewire.servers.partials.remove-server-modal', [
@@ -355,10 +421,13 @@
                         </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                            {{-- $sites is not passed to this view; the rest of the file reads $server->sites (eager-loaded in render()). --}}
+                            @if($server->sites->count() > 0)
                             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
-                            <p class="mt-1 text-sm leading-6 text-brand-moss">
-                                {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
-                            </p>
+                                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                    {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
+                                </p>
+                            @endif
                         </div>
                     </div>
 

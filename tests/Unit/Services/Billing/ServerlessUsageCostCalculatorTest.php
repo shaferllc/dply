@@ -2,8 +2,8 @@
 
 namespace Tests\Unit\Services\Billing\ServerlessUsageCostCalculatorTest;
 
-use App\Services\Billing\ServerlessUsageCostCalculator;
-use App\Services\Billing\ServerlessUsageTotals;
+use App\Modules\Billing\Services\ServerlessUsageCostCalculator;
+use App\Modules\Billing\Services\ServerlessUsageTotals;
 use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {

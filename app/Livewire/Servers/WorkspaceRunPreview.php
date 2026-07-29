@@ -25,8 +25,6 @@ class WorkspaceRunPreview extends Component
     use InteractsWithServerWorkspace;
     use RendersWorkspacePlaceholder;
 
-    public Server $server;
-
     public function mount(Server $server): void
     {
         abort_if(Feature::active('workspace.run'), 404);

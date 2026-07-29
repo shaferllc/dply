@@ -1,15 +1,17 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <x-breadcrumb-trail
+        :items="$settingsBreadcrumbs"
+        :site="$site"
+        doc-contextual
+        :contextual-doc-slug="$contextualDocSlug ?? null"
+        class="mb-6"
+    />
+
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
-            <x-breadcrumb-trail
-                :items="$settingsBreadcrumbs"
-                doc-contextual
-                :contextual-doc-slug="$contextualDocSlug ?? null"
-            />
-
-            <main class="min-w-0 space-y-6 mt-6">
+            <main class="min-w-0 space-y-6">
             <x-hero-card
                 :eyebrow="__('Deployments')"
                 :title="__('Deployment detail')"
@@ -41,15 +43,23 @@
                             </p>
                         </div>
                     </div>
-                    <button type="button" wire:click="toggleOutput" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                        @if ($showOutput)
-                            <x-heroicon-m-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Hide step output') }}
-                        @else
-                            <x-heroicon-m-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Show step output') }}
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($this->showWindowLogCorrelation)
+                            <button type="button" wire:click="openLogsForDeploy" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                                <x-heroicon-m-bars-3-bottom-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Logs around this deploy') }}
+                            </button>
                         @endif
-                    </button>
+                        <button type="button" wire:click="toggleOutput" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                            @if ($showOutput)
+                                <x-heroicon-m-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Hide step output') }}
+                            @else
+                                <x-heroicon-m-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Show step output') }}
+                            @endif
+                        </button>
+                    </div>
                 </div>
 
                 @php
@@ -156,4 +166,7 @@
             </main>
         </div>
     </div>
+
+    {{-- dply Logs correlation: host logs across this deployment's window --}}
+    @include('livewire.partials.window-logs-drawer')
 </div>

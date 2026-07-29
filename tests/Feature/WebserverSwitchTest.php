@@ -16,6 +16,7 @@ use App\Models\SiteCertificate;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
+use App\Modules\Notifications\Services\ServerWebserverNotificationDispatcher;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Services\Servers\WebserverSwitchPreflight;
@@ -491,7 +492,7 @@ test('job records audit event on success', function () {
 
         protected function executeStageDisableOld(Server $server, string $from): void {}
     };
-    $job->handle();
+    $job->handle(app(ServerWebserverNotificationDispatcher::class));
 
     $audit = ServerWebserverAuditEvent::query()
         ->where('server_id', $server->id)
@@ -543,7 +544,7 @@ test('job requeues preview ssl after switch away from caddy', function () {
 
         protected function executeStageDisableOld(Server $server, string $from): void {}
     };
-    $job->handle();
+    $job->handle(app(ServerWebserverNotificationDispatcher::class));
 
     expect($site->fresh()->status)->toBe(Site::STATUS_APACHE_ACTIVE);
     expect($certificate->fresh()->status)->toBe(SiteCertificate::STATUS_PENDING);
@@ -677,7 +678,7 @@ test('cleanup failed switch errors when row is still in flight', function () {
 });
 
 test('switch job validates caddy as caddy user and restarts on cutover', function () {
-    $source = file_get_contents(app_path('Jobs/SwitchServerWebserverJob.php'));
+    $source = file_get_contents(app_path('Jobs/Concerns/RunsWebserverSwitchStages.php'));
 
     expect($source)
         ->toContain('CaddyRuntimeOwnership::validateCommand()')

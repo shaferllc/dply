@@ -16,7 +16,7 @@ use App\Models\LoadBalancer;
 use App\Models\LoadBalancerService;
 use App\Models\LoadBalancerTarget;
 use App\Models\Server;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
@@ -34,8 +34,6 @@ class WorkspaceLoadBalancers extends Component
     use InteractsWithServerWorkspace;
     use ManagesLoadBalancerNotifications;
     use RendersWorkspacePlaceholder;
-
-    public Server $server;
 
     // ── Create form ───────────────────────────────────────────────────────────
     public string $lb_name = '';
@@ -402,6 +400,21 @@ class WorkspaceLoadBalancers extends Component
         $lb->delete();
         $this->dispatchLoadBalancerNotification('deleted', [$deletedLbName], ['provider' => 'hetzner']);
         $this->toastSuccess(__('Load balancer deleted.'));
+    }
+
+    /**
+     * Merged Load balancers card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-load-balancers-placeholder', [
+            'server' => $this->server,
+        ]);
     }
 
     public function render(): View

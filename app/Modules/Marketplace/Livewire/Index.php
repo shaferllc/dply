@@ -4,7 +4,7 @@ namespace App\Modules\Marketplace\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use App\Models\Server;
 use App\Models\User;
 use App\Models\Workspace;
@@ -47,6 +47,12 @@ class Index extends Component
         if ($value !== 'all' && ! array_key_exists($value, MarketplaceItem::categories())) {
             $this->category = 'all';
         }
+    }
+
+    public function resetFilters(): void
+    {
+        $this->category = 'all';
+        $this->search = '';
     }
 
     public function openDeployImport(string $itemId): void
@@ -318,12 +324,14 @@ class Index extends Component
         }
 
         $items = $query->get();
+        $catalogTotal = MarketplaceItem::query()->active()->count();
         $servers = $this->serversForCurrentOrg();
         $workspaces = $this->workspacesForCurrentOrg();
         $canImportWebserver = $org && $org->hasAdminAccess($user);
 
         return view('livewire.marketplace.index', [
             'items' => $items,
+            'catalogTotal' => $catalogTotal,
             'categories' => MarketplaceItem::categories(),
             'servers' => $servers,
             'workspaces' => $workspaces,

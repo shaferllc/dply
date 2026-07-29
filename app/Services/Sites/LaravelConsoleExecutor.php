@@ -5,8 +5,8 @@ namespace App\Services\Sites;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Services\Deploy\LocalDockerKubernetesRuntimeManager;
-use App\Services\Deploy\LocalDockerRuntimeManager;
+use App\Modules\Deploy\Services\LocalDockerKubernetesRuntimeManager;
+use App\Modules\Deploy\Services\LocalDockerRuntimeManager;
 use App\Modules\RemoteCli\Services\Artisan as ArtisanService;
 use App\Modules\RemoteCli\Services\Kind;
 use App\Modules\RemoteCli\Services\RiskLevel;
@@ -76,7 +76,7 @@ final class LaravelConsoleExecutor
      */
     public function customCommands(Site $site): array
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $raw = data_get($meta, 'laravel_console.custom_commands');
 
         if (! is_array($raw)) {

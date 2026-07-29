@@ -28,25 +28,23 @@
     $hasDetail = filled($report['health']['detail'] ?? '');
 @endphp
 
-<div class="space-y-6">
+<div class="min-w-0">
     @if ($isDeployer)
-        <section class="dply-card overflow-hidden border-amber-200">
-            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge tone="amber">
-                        <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can view worker health but cannot refresh supervisor status over SSH.') }}</p>
-                    </div>
+        <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-4 sm:px-6">
+            <div class="flex items-start gap-3">
+                <x-icon-badge tone="amber">
+                    <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
+                    <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can view worker health but cannot refresh supervisor status over SSH.') }}</p>
                 </div>
             </div>
-        </section>
+        </div>
     @endif
 
-    <section class="dply-card overflow-hidden">
+    <section class="border-b border-brand-ink/10">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="flex items-start gap-3">
@@ -142,7 +140,7 @@
     </section>
 
     <div class="grid gap-6 lg:grid-cols-2">
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Program inventory') }}</h2>
                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('Active supervisor programs from the last health snapshot.') }}</p>
@@ -183,7 +181,7 @@
             </div>
         </section>
 
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Supervisor snapshot') }}</h2>
                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('From the last health check or scheduled probe.') }}</p>
@@ -225,7 +223,7 @@
     </div>
 
     @if ($report['programs']['active'] > 0)
-        <section class="dply-card overflow-hidden">
+        <section class="border-b border-brand-ink/10">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>

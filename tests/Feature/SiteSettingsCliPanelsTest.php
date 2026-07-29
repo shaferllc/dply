@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('workspace.site_cli');
 
 test('every settings section renders a cli panel', function () {
     $user = User::factory()->create();

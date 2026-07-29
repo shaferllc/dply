@@ -73,7 +73,9 @@ test('reader failure marks run failed', function () {
     {
         public function __construct() {}
 
-        public function read(Site $site): string
+        // Must match SiteEnvReader::read() — an incompatible declaration is a
+        // PHP fatal that takes down the whole Pest process, not just this test.
+        public function read(Site $site, ?string $pathOverride = null): string
         {
             throw new \RuntimeException('connection refused');
         }
@@ -104,7 +106,9 @@ function bindFakeReader(string $payload): void
             // Bypass parent constructor — no SSH wrapper needed for the fake.
         }
 
-        public function read(Site $site): string
+        // Must match SiteEnvReader::read() — an incompatible declaration is a
+        // PHP fatal that takes down the whole Pest process, not just this test.
+        public function read(Site $site, ?string $pathOverride = null): string
         {
             return $this->payload;
         }

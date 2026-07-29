@@ -1,11 +1,11 @@
 <?php
 
 declare(strict_types=1);
-use App\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
 use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\ProvisionSiteJob;
-use App\Jobs\RemoveEdgeProxyJob;
+use App\Modules\Edge\Jobs\RemoveEdgeProxyJob;
 use App\Jobs\SwitchServerWebserverJob;
 use App\Jobs\SyncAuthorizedKeysJob;
 

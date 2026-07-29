@@ -270,7 +270,7 @@ HTML;
      */
     private function customHtml(Site $site): ?string
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $html = trim((string) ($meta['worker_page_html'] ?? ''));
         if ($html === '') {
             return null;

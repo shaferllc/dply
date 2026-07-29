@@ -6,7 +6,7 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineSafetyPresets;
 use App\Support\Sites\DeployPipelineStarterApplier;
 use App\Support\Sites\DeployPipelineStarterCatalog;

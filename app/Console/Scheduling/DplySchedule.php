@@ -5,69 +5,76 @@ declare(strict_types=1);
 namespace App\Console\Scheduling;
 
 use App\Console\Commands\CdnSyncMetricsCommand;
-use App\Console\Commands\CheckEdgeRumAlertsCommand;
+use App\Console\Commands\CheckGitProviderTokensCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
-use App\Console\Commands\CloudPollStatusCommand;
-use App\Console\Commands\CollectEdgeUsageCommand;
-use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
-use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
 use App\Console\Commands\DispatchReleaseHygieneScansCommand;
 use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchServerHealthChecksCommand;
-use App\Modules\Insights\Console\DispatchServerInsightsCommand;
-use App\Modules\Insights\Console\DispatchSiteInsightsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
 use App\Console\Commands\DispatchSystemdInventorySyncCommand;
-use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
 use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
-use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
-use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
-use App\Console\Commands\MeterServerLogUsageCommand;
-use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
-use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
-use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
-use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
-use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneNotificationInboxItemsCommand;
 use App\Console\Commands\PruneOrphanedSiteDataCommand;
 use App\Console\Commands\PruneQuickDownloadsCommand;
-use App\Console\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
-use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
+use App\Console\Commands\ReapStuckConsoleActionsCommand;
+use App\Console\Commands\ReconcileTenantDnsCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
-use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
-use App\Console\Commands\RunDueDeploymentSchedulesCommand;
-use App\Console\Commands\RunDueScheduledDeploysCommand;
-use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
-use App\Modules\Secrets\Console\SecretsEscrowCommand;
-use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
-use App\Modules\Serverless\Console\ServerlessTickCommand;
-use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
 use App\Console\Commands\SweepSiteHttpErrorsCommand;
-use App\Console\Commands\SweepStalledTasksCommand;
-use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
-use App\Console\Commands\SyncLogAggregatorPolicyCommand;
 use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
-use App\Jobs\VerifyEdgeCustomDomainsJob;
+use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
+use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
+use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
+use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
+use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
+use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
+use App\Modules\Cloud\Console\CloudPollStatusCommand;
+use App\Modules\Deploy\Console\FlushDeployDigestCommand;
+use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
+use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
+use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
+use App\Modules\Edge\Console\CollectEdgeUsageCommand;
+use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
+use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
+use App\Modules\Edge\Console\WarmEdgeBuildImagesCommand;
+use App\Modules\Edge\Jobs\VerifyEdgeCustomDomainsJob;
+use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
+use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
+use App\Modules\Insights\Console\DispatchServerInsightsCommand;
+use App\Modules\Insights\Console\DispatchSiteInsightsCommand;
+use App\Modules\Insights\Console\ProcessInsightDigestQueueCommand;
+use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
+use App\Modules\Logs\Console\MeterServerLogUsageCommand;
+use App\Modules\Logs\Console\PruneAppLogsCommand;
+use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
+use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
+use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
+use App\Modules\Secrets\Console\SecretsEscrowCommand;
+use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
+use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
+use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
+use App\Modules\Serverless\Console\ServerlessTickCommand;
+use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
+use App\Modules\TaskRunner\Commands\SweepStalledTasksCommand;
 use App\Support\DplyRuntime;
 use Illuminate\Console\Scheduling\Schedule;
 
@@ -108,6 +115,13 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('dispatch-release-hygiene-scans');
 
+        // Validate stored Git tokens + capture real expiry, and warn owners
+        // BEFORE an expired token starts failing deploys at clone time.
+        $schedule->command(CheckGitProviderTokensCommand::class)
+            ->dailyAt('03:35')
+            ->withoutOverlapping()
+            ->name('check-git-provider-tokens');
+
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
@@ -118,6 +132,22 @@ final class DplySchedule
 
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
         $schedule->command(ProcessScheduledSiteDeletionsCommand::class)->everyMinute();
+
+        // Fail console actions a restarted worker stranded mid-flight, so their
+        // page-top banners stop spinning forever (conservative thresholds — never
+        // touches a legitimately long-running job).
+        $schedule->command(ReapStuckConsoleActionsCommand::class)
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->name('reap-stuck-console-actions');
+
+        // Self-heal tenant custom-domain DNS: ensure each tenant hostname has an A
+        // record pointing at its server wherever dply holds the zone credential —
+        // so pre-existing tenants don't need a manual re-save.
+        $schedule->command(ReconcileTenantDnsCommand::class)
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('reconcile-tenant-dns');
 
         $schedule->command(CloudPollStatusCommand::class)->everyMinute();
 
@@ -160,6 +190,15 @@ final class DplySchedule
             ->hourly()
             ->name('edge-usage-today');
 
+        // Keep Node build images warm on workers so Edge deploys skip cold pulls.
+        if ((bool) config('edge.build.warm_images_on_schedule', true)) {
+            $schedule->command(WarmEdgeBuildImagesCommand::class)
+                ->everySixHours()
+                ->name('edge-warm-build-images')
+                ->withoutOverlapping()
+                ->onOneServer();
+        }
+
         $schedule->command(CollectServerlessUsageCommand::class)
             ->hourly()
             ->name('serverless-usage-today');
@@ -182,6 +221,14 @@ final class DplySchedule
             ->name('server-log-usage-finalize')
             ->withoutOverlapping();
 
+        // dply Logs alerting (paid tier): evaluate enabled alert rules against the
+        // log store and notify on threshold breaches. Inert until a plan with
+        // alerting + a rule exists (the command three-way gates internally).
+        $schedule->command(EvaluateLogAlertsCommand::class)
+            ->everyFiveMinutes()
+            ->name('server-log-alerts-evaluate')
+            ->withoutOverlapping();
+
         // Refresh per-org retention + hard-cap policy on the aggregator(s), after
         // the hourly meter so caps reflect the latest usage. No-ops on the box when
         // the policy is unchanged. Inert today (all plans default → empty policy).
@@ -197,6 +244,18 @@ final class DplySchedule
             ->withoutOverlapping();
 
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
+
+        // Bundled products (free tracely + Lookout): nightly pull-reconcile heals
+        // any missed bundle.* webhook; the daily purge tears down workspaces
+        // suspended past retention. Both no-op while BUNDLE_PRODUCTS_ENABLED is off.
+        $schedule->command(ReconcileBundleEntitlementsCommand::class)
+            ->dailyAt('02:50')
+            ->name('bundle-entitlements-reconcile')
+            ->withoutOverlapping();
+        $schedule->command(PurgeSuspendedBundleEntitlementsCommand::class)
+            ->dailyAt('03:05')
+            ->name('bundle-entitlements-purge')
+            ->withoutOverlapping();
 
         $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();
 

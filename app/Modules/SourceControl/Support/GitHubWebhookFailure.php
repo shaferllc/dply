@@ -68,8 +68,11 @@ final class GitHubWebhookFailure
                 ]);
             }
 
-            // No X-OAuth-Scopes header → a fine-grained token.
-            return __('GitHub rejected the webhook (:status). A fine-grained token needs Read and write access to this repository\'s Webhooks permission.:detail', [
+            // No X-OAuth-Scopes header → a fine-grained token. There is no Dply
+            // scope to flip here — the Webhooks permission lives entirely on the
+            // token — so point the user at the exact GitHub setting and at the
+            // OAuth path, which carries webhook access automatically.
+            return __('GitHub rejected the webhook (:status). Give this fine-grained token the Webhooks repository permission set to Read and write, then reconnect it — or connect GitHub via OAuth instead, which grants webhook access automatically.:detail', [
                 'status' => $status,
                 'detail' => $detail,
             ]);

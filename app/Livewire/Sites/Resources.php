@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Actions\Cloud\CreateCloudDatabase;
-use App\Actions\Cloud\CreateCloudWorker;
-use App\Jobs\AttachCloudDatabaseJob;
-use App\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Actions\CreateCloudDatabase;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
+use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
@@ -41,6 +41,9 @@ class Resources extends Component
     public Server $server;
 
     public Site $site;
+
+    /** When true, suppress page chrome (breadcrumb / hero) — already wrapped by Settings. */
+    public bool $embedded = false;
 
     /**
      * Container (Cloud) sites get the full attach/detach CRUD against

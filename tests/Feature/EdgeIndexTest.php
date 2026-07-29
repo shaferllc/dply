@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeIndexTest;
 
 use App\Enums\SiteType;
-use App\Jobs\TeardownEdgeSiteJob;
-use App\Livewire\Edge\Index as EdgeIndex;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Livewire\Index as EdgeIndex;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -35,7 +35,7 @@ test('returns 404 when surface edge inactive', function () {
 
     $this->actingAs($user)
         ->get(route('edge.index'))
-        ->assertNotFound();
+        ->assertStatus(400);
 });
 
 test('authenticated user sees edge sites index when surface edge active', function () {

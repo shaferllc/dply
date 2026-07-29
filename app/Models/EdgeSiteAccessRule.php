@@ -68,7 +68,7 @@ class EdgeSiteAccessRule extends Model
     {
         return array_values(array_unique(array_filter(array_map(
             static fn (string $email): string => strtolower(trim($email)),
-            $this->allowed_emails,
+            $this->allowed_emails ?? [],
         ))));
     }
 }

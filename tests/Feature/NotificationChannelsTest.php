@@ -184,7 +184,7 @@ test('user can create email channel and send test', function () {
     Livewire::actingAs($user)
         ->test(ProfileNotificationChannels::class)
         ->call('sendTest', $channel->id)
-        ->assertDispatched('notify', message: __('Test email sent.'), type: 'success');
+        ->assertDispatched('notify', message: __('Test email queued — it will arrive shortly.'), type: 'success');
 });
 
 test('bulk assign notifications creates subscription', function () {

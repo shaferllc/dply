@@ -314,25 +314,98 @@ BASH;
     }
 
     /**
+     * Every unit name the engine's package may register, preferred first. Distro packages
+     * disagree on this — e.g. some valkey/keydb builds ship `valkey.service` instead of
+     * `valkey-server.service` — which is exactly why the install scripts `||`-chain their
+     * `systemctl enable --now` calls. Runtime actions (restart/stop/status/journal) must
+     * tolerate the same variance or they fail with "Unit not found" on a box the installer
+     * just reported healthy.
+     *
+     * @return non-empty-list<string>
+     */
+    public static function unitCandidatesFor(string $engine): array
+    {
+        return match ($engine) {
+            'redis' => ['redis-server', 'redis'],
+            'valkey' => ['valkey-server', 'valkey'],
+            'memcached' => ['memcached'],
+            'keydb' => ['keydb-server', 'keydb'],
+            'dragonfly' => ['dragonfly'],
+            default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
+        };
+    }
+
+    /**
+     * Bash snippet that resolves the engine's actual systemd unit into `$UNIT` on the host.
+     * Walks {@see unitCandidatesFor()} and picks the first unit systemd knows about
+     * (`systemctl cat` exits non-zero for unknown units); falls back to the preferred name
+     * so a follow-up `systemctl <verb> "$UNIT"` still produces the canonical
+     * "Unit x.service not found" error when nothing is installed.
+     */
+    public static function resolveUnitSnippet(string $engine): string
+    {
+        $candidates = self::unitCandidatesFor($engine);
+        $quoted = implode(' ', array_map('escapeshellarg', $candidates));
+        $fallback = escapeshellarg($candidates[0]);
+
+        return <<<BASH
+UNIT={$fallback}
+for dply_unit in {$quoted}; do
+    if systemctl cat "\$dply_unit" >/dev/null 2>&1; then UNIT="\$dply_unit"; break; fi
+done
+BASH;
+    }
+
+    /**
+     * Marker line the install jobs echo immediately before {@see versionProbeScript()}.
+     * {@see parseVersionFromProbeOutput()} only parses buffer content AFTER the last
+     * occurrence, so a numeric token in chatty apt output (byte counts, package sizes)
+     * can never masquerade as the engine version.
+     */
+    public const VERSION_PROBE_MARKER = 'DPLY_CACHE_VERSION_PROBE';
+
+    /**
      * Emit the engine's raw `--version` line(s). Parsing happens PHP-side via
-     * {@see CacheServiceInstallScripts::parseVersionFromBuffer()}.
+     * {@see CacheServiceInstallScripts::parseVersionFromProbeOutput()}.
      *
      * The probe deliberately avoids awk-based field extraction because the previous
      * `awk "{print \$2}"` shape was fragile (set -euo pipefail + PATH-restricted
-     * non-login root shell could silently produce empty output). Each `||` chain
-     * picks the first CLI that actually exists; trailing `|| true` keeps the script
-     * exit code 0 even when the engine isn't on PATH so set -e doesn't abort.
+     * non-login root shell could silently produce empty output). Trailing `|| true`
+     * keeps the script exit code 0 even when the engine isn't on PATH so set -e
+     * doesn't abort.
+     *
+     * No redis-cli fallback for valkey/keydb: their packages always ship their own
+     * cli, and falling back used to report a *co-resident Redis* version as the
+     * valkey/keydb version whenever the engine's cli was missing.
      */
     public static function versionProbeScript(string $engine): string
     {
         return match ($engine) {
             'redis' => '(command -v redis-cli >/dev/null 2>&1 && redis-cli --version) || true',
-            'valkey' => '(command -v valkey-cli >/dev/null 2>&1 && valkey-cli --version) || (command -v redis-cli >/dev/null 2>&1 && redis-cli --version) || true',
+            'valkey' => '(command -v valkey-cli >/dev/null 2>&1 && valkey-cli --version) || true',
             'memcached' => '(command -v memcached >/dev/null 2>&1 && memcached --version) || true',
-            'keydb' => '(command -v keydb-cli >/dev/null 2>&1 && keydb-cli --version) || (command -v redis-cli >/dev/null 2>&1 && redis-cli --version) || true',
+            'keydb' => '(command -v keydb-cli >/dev/null 2>&1 && keydb-cli --version) || true',
             'dragonfly' => '(command -v dragonfly >/dev/null 2>&1 && dragonfly --version | head -n1) || true',
             default => 'true',
         };
+    }
+
+    /**
+     * Parse the engine version out of an install buffer that had a
+     * {@see VERSION_PROBE_MARKER} echoed before the version probe. Only the content after
+     * the last marker is considered — the apt/systemctl output before it is full of
+     * version-shaped numbers (fetch byte counts, package sizes) that used to leak into
+     * the version field whenever the probe itself printed nothing. Buffers without the
+     * marker (older callers) fall back to whole-buffer parsing.
+     */
+    public static function parseVersionFromProbeOutput(string $buffer): ?string
+    {
+        $pos = strrpos($buffer, self::VERSION_PROBE_MARKER);
+        if ($pos !== false) {
+            $buffer = substr($buffer, $pos + strlen(self::VERSION_PROBE_MARKER));
+        }
+
+        return self::parseVersionFromBuffer($buffer);
     }
 
     /**
@@ -407,7 +480,7 @@ redis-cli ping
 BASH,
             'valkey' => <<<'BASH'
 systemctl enable --now valkey-server || systemctl enable --now valkey
-(valkey-cli ping || redis-cli ping) 2>/dev/null
+valkey-cli ping
 BASH,
             'memcached' => <<<'BASH'
 systemctl enable --now memcached
@@ -415,7 +488,7 @@ systemctl is-active memcached
 BASH,
             'keydb' => <<<'BASH'
 systemctl enable --now keydb-server || systemctl enable --now keydb
-keydb-cli ping || redis-cli ping
+keydb-cli ping
 BASH,
             'dragonfly' => <<<'BASH'
 systemctl enable --now dragonfly

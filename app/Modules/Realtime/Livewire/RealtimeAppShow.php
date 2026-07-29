@@ -8,7 +8,7 @@ use App\Modules\Realtime\Actions\DeleteRealtimeApp;
 use App\Modules\Realtime\Actions\UpdateRealtimeApp;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
-use App\Models\RealtimeApp;
+use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\SiteBinding;
 use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Contracts\View\View;

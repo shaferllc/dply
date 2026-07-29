@@ -80,6 +80,21 @@ class WorkspaceCron extends Component
         $this->cron_workspace_tab = in_array($tab, $this->cronWorkspaceTabs, true) ? $tab : 'jobs';
     }
 
+    /**
+     * Merged Cron card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-cron-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);

@@ -9,7 +9,7 @@ use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\ProvisionHetznerServerJob;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\SshConnection;
 use App\Support\ServerProviderGate;
 use Illuminate\Http\RedirectResponse;

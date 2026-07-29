@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessActionDiscoveryTest;
 
-use App\Services\Deploy\ServerlessActionDiscovery;
-use App\Services\Deploy\ServerlessRuntimeDetector;
+use App\Modules\Deploy\Services\ServerlessActionDiscovery;
+use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
 use Illuminate\Support\Facades\File;
 
 function capabilities(): array

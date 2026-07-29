@@ -8,8 +8,8 @@
             {{-- Slim trigger card. The "Add a key" button opens a modal containing the actual
                  Profile/Paste/Generate form — keeps the page from being dominated by a 165-line
                  form when the operator is just here to sync or review drift. --}}
-            <div class="{{ $card }} overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="{{ $card }}">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                         <div class="flex min-w-0 items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
@@ -236,10 +236,12 @@
             </x-modal>
 
             @if ($orgKeys->isNotEmpty() || $teamKeys->isNotEmpty())
-                <div class="{{ $card }} mt-6 p-6 sm:p-8">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Organization & team keys') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('Use saved organization or team keys when you want a shared key on this server without pasting it again.') }}</p>
-                    <div class="mt-4 grid gap-6 lg:grid-cols-2">
+                <div class="{{ $card }}">
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Organization & team keys') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Use saved organization or team keys when you want a shared key on this server without pasting it again.') }}</p>
+                    </div>
+                    <div class="grid gap-6 px-6 py-5 sm:px-8 lg:grid-cols-2">
                         @if ($orgKeys->isNotEmpty())
                             <form wire:submit="deployOrganizationKey" class="space-y-3 rounded-xl border border-brand-ink/10 p-4">
                                 <x-input-label for="deploy_org_key_id" :value="__('Organization key')" />
@@ -298,8 +300,8 @@
                 </div>
             @endif
 
-            <div class="{{ $card }} mt-6 overflow-hidden">
-                <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+            <div class="{{ $card }}">
+                <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
                     <div>
                         <h2 class="text-base font-semibold text-brand-ink">{{ __('Keys on this server') }}</h2>
                         <p class="mt-1 text-sm text-brand-moss">{{ __('Fingerprints, rotation dates, removal — applied on the next sync.') }}</p>

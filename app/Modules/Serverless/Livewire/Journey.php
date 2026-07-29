@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Serverless\Livewire;
 
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\ServerlessDeployProgress;
+use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;

@@ -132,14 +132,44 @@ class Files extends Component
         return FileBrowserPathPolicy::normalize($this->site->effectiveRepositoryPath());
     }
 
-    public function openEntry(string $name): void
+    /**
+     * Navigate into a directory entry. When $linkTarget is provided (directory
+     * symlink), resolve to the real path if it stays inside the site root —
+     * so atomic `current` → `releases/<id>` lands on the release folder.
+     */
+    public function openEntry(string $name, ?string $linkTarget = null): void
     {
         try {
-            $this->path = FileBrowserPathPolicy::join($this->path, $name);
-            $this->filter = '';
+            $joined = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
             $this->toastError($e->getMessage());
+
+            return;
         }
+
+        if (is_string($linkTarget) && $linkTarget !== '') {
+            try {
+                $resolved = FileBrowserPathPolicy::resolveLinkTarget($joined, $linkTarget);
+            } catch (\InvalidArgumentException $e) {
+                $this->toastError($e->getMessage());
+
+                return;
+            }
+
+            if (! FileBrowserPathPolicy::isInside($resolved, $this->siteRoot())) {
+                $this->toastError(__('That symlink points outside this site\'s directory.'));
+
+                return;
+            }
+
+            $this->path = $resolved;
+            $this->filter = '';
+
+            return;
+        }
+
+        $this->path = $joined;
+        $this->filter = '';
     }
 
     public function jumpTo(string $absolute): void

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Models\Site;
-use App\Services\Edge\EdgeDeliveryContextResolver;
-use App\Support\Edge\EdgeLocalDevDiagnostics;
-use App\Support\Edge\EdgePlatformCredentials;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Support\EdgeLocalDevDiagnostics;
+use App\Modules\Edge\Support\EdgePlatformCredentials;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 
 /**
  * Shared Edge site dashboard variables for settings + show views.
@@ -180,7 +180,8 @@ final class EdgeSiteViewData
 
     private static function sectionNeedsDeliveryWorker(string $section): bool
     {
-        return in_array($section, ['general', 'edge-delivery'], true);
+        // Delivery no longer surfaces worker/zone internals — Overview only.
+        return $section === 'general';
     }
 
     private static function sectionNeedsDeliveryBanner(string $section): bool
@@ -194,13 +195,13 @@ final class EdgeSiteViewData
         bool $fakeMode,
     ): string {
         if ($usesByoCloudflare) {
-            return __('Your Cloudflare account');
+            return __('Your connected account');
         }
 
         if ($usesManagedBackend) {
             return $fakeMode
-                ? __('Dply Edge (local fake backend)')
-                : __('Dply Edge (managed)');
+                ? __('Managed Edge (local)')
+                : __('Managed Edge');
         }
 
         return __('Unknown delivery backend');

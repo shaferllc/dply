@@ -4,11 +4,11 @@ namespace App\Services\WorkerPools;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
-use App\Services\LinodeService;
-use App\Services\UpCloudService;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Cloud\Services\UpCloudService;
+use App\Modules\Cloud\Services\VultrService;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Throwable;
 

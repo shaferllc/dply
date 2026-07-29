@@ -3,85 +3,111 @@
     active="firewall"
     :title="__('Firewall')"
     :description="__('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.')"
+    hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @if ($opsReady)
-        <div class="space-y-6">
-            @include('livewire.servers.partials.firewall._banner')
-
-            <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')">
-                <x-server-workspace-tab id="firewall-tab-rules" :active="$firewall_workspace_tab === 'rules'" wire:click="setFirewallWorkspaceTab('rules')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Rules') }}
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                     </span>
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="setFirewallWorkspaceTab('templates')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Templates') }}
-                    </span>
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-activity" :active="$firewall_workspace_tab === 'activity'" wire:click="setFirewallWorkspaceTab('activity')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Activity') }}
-                    </span>
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="firewall-tab-notifications" :active="$firewall_workspace_tab === 'notifications'" wire:click="setFirewallWorkspaceTab('notifications')">
-                    <span class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Notifications') }}
-                    </span>
-                </x-server-workspace-tab>
-            </x-server-workspace-tablist>
-
-            <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setFirewallWorkspaceTab">
-
-            @if ($firewall_workspace_tab === 'rules')
-                <x-server-workspace-tab-panel
-                    id="firewall-panel-rules"
-                    labelled-by="firewall-tab-rules"
-                    panel-class="space-y-6"
-                >
-                    @include('livewire.servers.partials.firewall.rules-tab')
-                </x-server-workspace-tab-panel>
-            @endif
-
-            @if ($firewall_workspace_tab === 'templates')
-                <x-server-workspace-tab-panel
-                    id="firewall-panel-templates"
-                    labelled-by="firewall-tab-templates"
-                >
-                    @include('livewire.servers.partials.firewall.templates-tab')
-                </x-server-workspace-tab-panel>
-            @endif
-
-            @if ($firewall_workspace_tab === 'activity')
-                <x-server-workspace-tab-panel
-                    id="firewall-panel-activity"
-                    labelled-by="firewall-tab-activity"
-                >
-                    @include('livewire.servers.partials.firewall.activity-tab')
-                </x-server-workspace-tab-panel>
-            @endif
-
-            @if ($firewall_workspace_tab === 'notifications')
-                <x-server-workspace-tab-panel
-                    id="firewall-panel-notifications"
-                    labelled-by="firewall-tab-notifications"
-                >
-                    @include('livewire.servers.partials.firewall.notifications-tab')
-                </x-server-workspace-tab-panel>
-            @endif
-
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Firewall') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.') }}
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
-    @else
-        @include('livewire.servers.partials.workspace-ops-not-ready')
-    @endif
+
+        @if ($opsReady)
+            <div @class([
+                'border-b border-brand-ink/10 px-5 py-3 sm:px-6' => $applyShowBanner || ! empty($panel_event_lines),
+            ])>
+                @include('livewire.servers.partials.firewall._banner')
+            </div>
+
+            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                    <x-server-workspace-tab id="firewall-tab-rules" :active="$firewall_workspace_tab === 'rules'" wire:click="setFirewallWorkspaceTab('rules')">
+                        <span class="inline-flex items-center gap-1.5">
+                            <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Rules') }}
+                        </span>
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="setFirewallWorkspaceTab('templates')">
+                        <span class="inline-flex items-center gap-1.5">
+                            <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Templates') }}
+                        </span>
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab id="firewall-tab-activity" :active="$firewall_workspace_tab === 'activity'" wire:click="setFirewallWorkspaceTab('activity')">
+                        <span class="inline-flex items-center gap-1.5">
+                            <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Activity') }}
+                        </span>
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab id="firewall-tab-notifications" :active="$firewall_workspace_tab === 'notifications'" wire:click="setFirewallWorkspaceTab('notifications')">
+                        <span class="inline-flex items-center gap-1.5">
+                            <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Notifications') }}
+                        </span>
+                    </x-server-workspace-tab>
+                </x-server-workspace-tablist>
+            </div>
+
+            <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setFirewallWorkspaceTab">
+                @if ($firewall_workspace_tab === 'rules')
+                    <x-server-workspace-tab-panel
+                        id="firewall-panel-rules"
+                        labelled-by="firewall-tab-rules"
+                        panel-class="min-w-0"
+                    >
+                        @include('livewire.servers.partials.firewall.rules-tab')
+                    </x-server-workspace-tab-panel>
+                @endif
+
+                @if ($firewall_workspace_tab === 'templates')
+                    <x-server-workspace-tab-panel
+                        id="firewall-panel-templates"
+                        labelled-by="firewall-tab-templates"
+                        panel-class="min-w-0"
+                    >
+                        @include('livewire.servers.partials.firewall.templates-tab')
+                    </x-server-workspace-tab-panel>
+                @endif
+
+                @if ($firewall_workspace_tab === 'activity')
+                    <x-server-workspace-tab-panel
+                        id="firewall-panel-activity"
+                        labelled-by="firewall-tab-activity"
+                        panel-class="min-w-0"
+                    >
+                        @include('livewire.servers.partials.firewall.activity-tab')
+                    </x-server-workspace-tab-panel>
+                @endif
+
+                @if ($firewall_workspace_tab === 'notifications')
+                    <x-server-workspace-tab-panel
+                        id="firewall-panel-notifications"
+                        labelled-by="firewall-tab-notifications"
+                        panel-class="min-w-0"
+                    >
+                        @include('livewire.servers.partials.firewall.notifications-tab')
+                    </x-server-workspace-tab-panel>
+                @endif
+            </div>
+        @else
+            <div class="px-5 py-6 sm:px-6">
+                @include('livewire.servers.partials.workspace-ops-not-ready')
+            </div>
+        @endif
+    </section>
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')

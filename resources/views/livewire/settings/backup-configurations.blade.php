@@ -1,18 +1,10 @@
 @php
-    $tonePalette = [
-        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
-        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
-        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
-        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
-        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
-    ];
-
     $totalConfigs = $configurations->count();
     $providersInUse = $configurations->pluck('provider')->unique()->count();
     $allProviders = count(\App\Models\BackupConfiguration::providers());
     $hasBackupSearch = trim($search ?? '') !== '';
 
-    $heroDescription = $organization
+    $shellDescription = $organization
         ? __('External storage shared by everyone in :org and reusable across every server. Add the bucket or remote here, then pick it when creating a schedule on a server.', ['org' => $organization->name])
         : __('External storage shared by your organization and reusable across every server. Add the bucket or remote here, then pick it when creating a schedule on a server.');
 
@@ -29,6 +21,9 @@
             default => 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss',
         };
     };
+
+    // Header Add only when the list already has items — empty state owns the CTA.
+    $showShellAdd = $totalConfigs > 0;
 @endphp
 
 <div>
@@ -42,30 +37,31 @@
         ]" />
     @endpush
 
-    {{-- Hero: positioning + at-a-glance counts. --}}
-    <x-hero-card
-        :eyebrow="__('Storage')"
+    <x-profile-shell
         :title="__('Backup destinations')"
-        :description="$heroDescription"
-        icon="archive-box-arrow-down"
-        iconSize="md"
+        :description="$shellDescription"
+        icon="heroicon-o-cloud-arrow-up"
     >
-        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Back to profile') }}
-        </x-outline-link>
-        <button
-            type="button"
-            wire:click="openCreateModal"
-            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-        >
-            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-            {{ __('Add destination') }}
-        </button>
+        <x-slot:actions>
+            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Back to profile') }}
+            </x-outline-link>
+            @if ($showShellAdd)
+                <button
+                    type="button"
+                    wire:click="openCreateModal"
+                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add destination') }}
+                </button>
+            @endif
+        </x-slot:actions>
 
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destinations') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalConfigs }}</span>
@@ -74,9 +70,9 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Reusable across servers') }}</p>
                 </div>
                 <div @class([
-                    'rounded-2xl border px-4 py-3 shadow-sm',
+                    'rounded-xl border px-4 py-3',
                     'border-brand-sage/30 bg-brand-sage/8' => $providersInUse > 0,
-                    'border-brand-ink/10 bg-white' => $providersInUse === 0,
+                    'border-brand-ink/10 bg-white/80' => $providersInUse === 0,
                 ])>
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -85,20 +81,18 @@
                     </dd>
                     <p class="mt-1 text-[11px] text-brand-mist">{{ $allProviders }} {{ __('supported') }}</p>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
                     <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $organization?->name ?? __('Personal') }}">{{ $organization?->name ?? __('Personal') }}</dd>
                     <p class="mt-1 text-[11px] text-brand-mist">{{ $organization ? __('Shared in this org') : __('Just you') }}</p>
                 </div>
             </dl>
         </x-slot:stats>
-    </x-hero-card>
 
-    <div class="mt-6 space-y-6">
-        {{-- Edit panel (inline section card, mirrors create) --}}
+        {{-- Edit panel --}}
         @if ($editing_id)
-            <section wire:key="edit-{{ $editing_id }}" class="dply-card overflow-hidden border-brand-sage/30">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div wire:key="edit-{{ $editing_id }}" class="border-b border-brand-ink/10 bg-brand-sage/5">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -108,7 +102,7 @@
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Update the label or credentials, then save.') }}</p>
                     </div>
                 </div>
-                <div class="space-y-5 p-6 sm:p-7">
+                <div class="space-y-5 px-5 py-5 sm:px-6">
                     <div class="grid gap-5 sm:grid-cols-2">
                         <div>
                             <x-input-label for="bc_edit_name" :value="__('Name')" />
@@ -143,125 +137,97 @@
                         </x-primary-button>
                     </div>
                 </div>
-            </section>
+            </div>
         @endif
 
-        {{-- Saved destinations --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Saved destinations') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick any of these when creating a backup schedule on a server.') }}</p>
-                </div>
-                <div class="flex shrink-0 items-center gap-2">
-                        @if ($totalConfigs > 0)
-                            <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $totalConfigs }}</span>
-                        @endif
-                        <button
-                            type="button"
-                            wire:click="openCreateModal"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                        >
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Add destination') }}
-                        </button>
+        @if ($totalConfigs > 0 || $hasBackupSearch)
+            <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+                <div class="w-full sm:max-w-sm">
+                    <label for="bc_search" class="sr-only">{{ __('Search') }}</label>
+                    <div class="relative">
+                        <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist">
+                            <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <input
+                            id="bc_search"
+                            type="search"
+                            wire:model.live.debounce.300ms="search"
+                            placeholder="{{ __('Search destinations by name…') }}"
+                            autocomplete="off"
+                            class="w-full rounded-lg border-brand-ink/15 bg-white py-2 ps-9 pe-3 text-sm text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                        />
                     </div>
+                </div>
             </div>
+        @endif
 
-            @if ($totalConfigs > 0 || $hasBackupSearch)
-                {{-- Toolbar: search. --}}
-                <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-6 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-7">
-                    <div class="w-full sm:max-w-sm">
-                        <label for="bc_search" class="sr-only">{{ __('Search') }}</label>
-                        <div class="relative">
-                            <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist">
-                                <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
-                            </span>
-                            <input
-                                id="bc_search"
-                                type="search"
-                                wire:model.live.debounce.300ms="search"
-                                placeholder="{{ __('Search destinations by name…') }}"
-                                autocomplete="off"
-                                class="w-full rounded-lg border-brand-ink/15 bg-white py-2 ps-9 pe-3 text-sm text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                            />
+        @if (! $hasBackupSearch && $configurations->isEmpty())
+            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+                <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-archive-box class="h-6 w-6" aria-hidden="true" />
+                </span>
+                <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No backup destinations yet') }}</p>
+                <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
+                    {{ __('Add a storage provider to start scheduling backups on your servers.') }}
+                </p>
+                <button
+                    type="button"
+                    wire:click="openCreateModal"
+                    class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Add destination') }}
+                </button>
+            </div>
+        @elseif ($hasBackupSearch && $configurations->isEmpty())
+            <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6">
+                <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                    <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No destinations match this search.') }}</p>
+                <button type="button" wire:click="$set('search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
+            </div>
+        @else
+            <ul class="divide-y divide-brand-ink/10">
+                @foreach ($configurations as $row)
+                    @php
+                        $providerSlug = $row->provider;
+                        $providerLabel = \App\Models\BackupConfiguration::labelForProvider($providerSlug);
+                        $badgeClasses = $providerBadge($providerSlug);
+                        $isEditing = $editing_id === (string) $row->id;
+                    @endphp
+                    <li wire:key="bc-{{ $row->id }}" @class([
+                        'flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-6',
+                        'bg-brand-sage/5' => $isEditing,
+                    ])>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                <span class="truncate text-sm font-semibold text-brand-ink">{{ $row->name }}</span>
+                                <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $badgeClasses }}">{{ $providerLabel }}</span>
+                                @if ($isEditing)
+                                    <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">
+                                        <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                                        {{ __('Editing') }}
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Added :time', ['time' => $row->created_at?->diffForHumans() ?? '—']) }}</p>
                         </div>
-                    </div>
-                </div>
-            @endif
-
-            @if (! $hasBackupSearch && $configurations->isEmpty())
-                <div class="px-6 py-12 text-center sm:px-7">
-                    <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-archive-box class="h-6 w-6" aria-hidden="true" />
-                    </span>
-                    <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No backup destinations yet') }}</p>
-                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                        {{ __('Add a storage provider to start scheduling backups on your servers.') }}
-                    </p>
-                    <button
-                        type="button"
-                        wire:click="openCreateModal"
-                        class="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add destination') }}
-                    </button>
-                </div>
-            @elseif ($hasBackupSearch && $configurations->isEmpty())
-                <div class="px-6 py-12 text-center sm:px-7">
-                    <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No destinations match this search.') }}</p>
-                    <button type="button" wire:click="$set('search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
-                </div>
-            @else
-                <ul class="divide-y divide-brand-ink/10">
-                    @foreach ($configurations as $row)
-                        @php
-                            $providerSlug = $row->provider;
-                            $providerLabel = \App\Models\BackupConfiguration::labelForProvider($providerSlug);
-                            $badgeClasses = $providerBadge($providerSlug);
-                            $isEditing = $editing_id === (string) $row->id;
-                        @endphp
-                        <li wire:key="bc-{{ $row->id }}" @class([
-                            'flex items-center justify-between gap-4 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-7',
-                            'bg-brand-sage/5' => $isEditing,
-                        ])>
-                            <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <span class="truncate text-sm font-semibold text-brand-ink">{{ $row->name }}</span>
-                                    <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $badgeClasses }}">{{ $providerLabel }}</span>
-                                    @if ($isEditing)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">
-                                            <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            {{ __('Editing') }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Added :time', ['time' => $row->created_at?->diffForHumans() ?? '—']) }}</p>
-                            </div>
-                            <div class="flex flex-wrap items-center justify-end gap-3">
-                                <button type="button" wire:click="startEdit('{{ $row->id }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
-                                    <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Edit') }}
-                                </button>
-                                <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
-                                    <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Delete') }}
-                                </button>
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
-            @endif
-        </section>
-    </div>
+                        <div class="flex flex-wrap items-center justify-end gap-3">
+                            <button type="button" wire:click="startEdit('{{ $row->id }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
+                                <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Edit') }}
+                            </button>
+                            <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Delete') }}
+                            </button>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </x-profile-shell>
 
     <x-modal
         name="backup-destination-modal"

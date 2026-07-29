@@ -85,20 +85,18 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="overview" :breadcrumb="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'icon' => 'building-office-2'],
-        ]">
-
-            {{-- Hero card. Stat strip on the right summarizes the four
-                 numbers an admin scans for first — plan, fleet, people,
-                 automation. Each tile keeps the family stat-tile look. --}}
-            <x-hero-card
-                :eyebrow="__('Organization')"
-                :title="$organization->name"
-                :description="__('Plan, people, and the surface for everything dply automates on your behalf — pick a section below.')"
-                icon="building-office-2"
-            >
+        <x-organization-shell
+            :organization="$organization"
+            section="overview"
+            :title="$organization->name"
+            :description="__('Plan, people, and the surface for everything dply automates on your behalf — pick a section below.')"
+            icon="heroicon-o-building-office-2"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'icon' => 'building-office-2'],
+            ]"
+        >
+            <x-slot:actions>
                 <x-docs-link slug="org-overview" size="md">
                     <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('Organization guide') }}
@@ -113,69 +111,62 @@
                         {{ __('Billing & plan') }}
                     </a>
                 @endif
+            </x-slot:actions>
 
-                <x-slot:stats>
-                    <dl class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</dt>
-                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fleet') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $organization->servers_count }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('server|servers', $organization->servers_count) }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->sites_count }} {{ trans_choice('site|sites', $organization->sites_count) }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('People') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">
-                                {{ $organization->teams->count() }} {{ trans_choice('team|teams', $organization->teams->count()) }}
-                                @if ($organization->invitations->count() > 0)
-                                    · {{ $organization->invitations->count() }} {{ trans_choice('pending|pending', $organization->invitations->count()) }}
-                                @endif
-                            </p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Automation') }}</dt>
-                            <dd class="mt-1 flex items-baseline gap-1.5">
-                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $organization->apiTokens->count() }}</span>
-                                <span class="text-[11px] text-brand-moss">{{ trans_choice('API token|API tokens', $organization->apiTokens->count()) }}</span>
-                            </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->notificationWebhookDestinations->count() }} {{ trans_choice('webhook|webhooks', $organization->notificationWebhookDestinations->count()) }}</p>
-                        </div>
-                    </dl>
-                </x-slot:stats>
-            </x-hero-card>
+            <x-slot:stats>
+                <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="{{ __('Organization at a glance') }}">
+                    <x-fleet-stat :label="__('Plan')">
+                        <p class="mt-2 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Org-wide subscription') }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Fleet')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->servers_count }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('server|servers', $organization->servers_count) }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->sites_count }} {{ trans_choice('site|sites', $organization->sites_count) }}</p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('People')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->users->count() }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('member|members', $organization->users->count()) }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">
+                            {{ $organization->teams->count() }} {{ trans_choice('team|teams', $organization->teams->count()) }}
+                            @if ($organization->invitations->count() > 0)
+                                · {{ $organization->invitations->count() }} {{ trans_choice('pending|pending', $organization->invitations->count()) }}
+                            @endif
+                        </p>
+                    </x-fleet-stat>
+                    <x-fleet-stat :label="__('Automation')">
+                        <p class="mt-2 flex items-baseline gap-1.5">
+                            <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $organization->apiTokens->count() }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('API token|API tokens', $organization->apiTokens->count()) }}</span>
+                        </p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->notificationWebhookDestinations->count() }} {{ trans_choice('webhook|webhooks', $organization->notificationWebhookDestinations->count()) }}</p>
+                    </x-fleet-stat>
+                </dl>
+            </x-slot:stats>
 
-            {{-- Section navigator. Mirrors the credentials provider grid:
-                 icon tile + label + one-line description on each card, all
-                 clickable. Cleaner than the previous list of plain "→"
-                 link rows. --}}
-            <section class="dply-card mt-6 overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            {{-- Section navigator as a hairline strip (not a nested card). --}}
+            <section class="border-b border-brand-ink/10 last:border-b-0">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Navigate') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization sections') }}</h3>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization sections') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Jump straight to the surface you need — billing, people, channels, credentials, and automation.') }}</p>
                     </div>
                 </div>
-                <ul class="grid gap-3 p-6 sm:p-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <ul class="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3 xl:grid-cols-4">
                     @foreach ($quickLinks as $link)
                         <li>
                             <a
                                 href="{{ $link['href'] }}"
                                 wire:navigate
-                                class="group relative flex h-full w-full flex-col items-start gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40"
+                                class="group relative flex h-full w-full flex-col items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 text-left transition hover:border-brand-sage/35 hover:bg-brand-sand/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40"
                             >
                                 <div class="flex w-full items-start justify-between gap-2">
                                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette[$link['tone']] }}">

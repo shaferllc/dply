@@ -1,19 +1,25 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="secrets">
-            <x-livewire-validation-errors />
+        <x-organization-shell
+            :organization="$organization"
+            section="secrets"
+            :title="__('Organization secrets')"
+            :description="__('Choose who holds the key that encrypts secrets you move off the plaintext .env, and register external stores your sites can reference. Move individual variables on each site\'s Environment tab.')"
+            icon="heroicon-o-lock-closed"
+            :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Secrets'), 'icon' => 'lock-closed'],
+            ]"
+        >
+            @if ($errors->isNotEmpty())
+                <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+                    <x-livewire-validation-errors />
+                </div>
+            @endif
 
-            {{-- Intro --}}
-            <x-hero-card
-                :eyebrow="__('Secret residency')"
-                :title="__('Organization secrets')"
-                :description="__('Choose who holds the key that encrypts secrets you move off the plaintext .env, and register external stores your sites can reference. Move individual variables on each site\'s Environment tab.')"
-                icon="lock-closed"
-            />
-
-            {{-- One-time identity reveal --}}
             @if ($revealed_identity)
-                <section class="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-6">
+                <section class="border-b border-brand-ink/10 bg-amber-50 px-5 py-5 sm:px-6">
                     <div class="flex items-start gap-3">
                         <x-heroicon-o-exclamation-triangle class="h-6 w-6 shrink-0 text-amber-600" />
                         <div class="min-w-0 flex-1">
@@ -28,12 +34,18 @@
                 </section>
             @endif
 
-            {{-- Organization key --}}
-            <section class="mt-6 dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/8 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Encryption key') }}</h2>
+            <section class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                    <x-icon-badge>
+                        <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Residency') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Encryption key') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Who holds the key that encrypts secrets moved out of plaintext .env.') }}</p>
+                    </div>
                 </div>
-                <div class="p-6 sm:p-8 space-y-5">
+                <div class="space-y-5 px-5 py-5 sm:px-6">
                     @if ($orgKey)
                         <dl class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div>
@@ -84,17 +96,22 @@
                 </div>
             </section>
 
-            {{-- External stores --}}
-            <section class="mt-6 dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/8 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('External secret stores') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Reference secrets that live in your own store; the value never enters dply.') }}</p>
+            <section class="border-b border-brand-ink/10 last:border-b-0">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
+                    <x-icon-badge>
+                        <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('External') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('External secret stores') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Reference secrets that live in your own store; the value never enters dply.') }}</p>
+                    </div>
                 </div>
 
                 @if ($stores->isNotEmpty())
-                    <ul class="divide-y divide-brand-ink/8">
+                    <ul class="divide-y divide-brand-ink/10">
                         @foreach ($stores as $store)
-                            <li class="flex items-center justify-between gap-3 px-6 py-3 sm:px-8" wire:key="store-{{ $store->id }}">
+                            <li class="flex items-center justify-between gap-3 px-5 py-3 sm:px-6" wire:key="store-{{ $store->id }}">
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $store->name }}</p>
                                     <p class="text-[11px] text-brand-moss">
@@ -103,7 +120,10 @@
                                     </p>
                                 </div>
                                 @can('update', $organization)
-                                    <x-secondary-button type="button" wire:click="deleteStore('{{ $store->id }}')" wire:confirm="{{ __('Remove this store? Sites referencing it will fail to resolve.') }}">
+                                    <x-secondary-button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('deleteStore', ['{{ $store->id }}'], @js(__('Remove secret store')), @js(__('Remove this store? Sites referencing it will fail to resolve.')), @js(__('Remove')), true)"
+                                    >
                                         {{ __('Remove') }}
                                     </x-secondary-button>
                                 @endcan
@@ -111,11 +131,11 @@
                         @endforeach
                     </ul>
                 @else
-                    <p class="px-6 py-5 text-sm text-brand-moss sm:px-8">{{ __('No external stores yet.') }}</p>
+                    <p class="px-5 py-5 text-sm text-brand-moss sm:px-6">{{ __('No external stores yet.') }}</p>
                 @endif
 
                 @can('update', $organization)
-                    <div class="border-t border-brand-ink/8 bg-brand-sand/20 p-6 sm:p-8">
+                    <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Add a store') }}</h3>
                         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
@@ -191,4 +211,8 @@
             </section>
         </x-organization-shell>
     </div>
+
+    <x-slot name="modals">
+        @include('livewire.partials.confirm-action-modal')
+    </x-slot>
 </div>

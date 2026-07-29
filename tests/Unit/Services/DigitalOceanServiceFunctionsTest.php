@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceFunctionsTest;
 
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
 
 test('create functions namespace recombines uuid and key into an access key', function () {

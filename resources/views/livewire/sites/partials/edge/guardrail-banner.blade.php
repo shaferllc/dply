@@ -12,7 +12,7 @@
             ? ['border' => 'border-red-300', 'bg' => 'bg-red-50', 'icon' => 'text-red-700', 'title' => 'text-red-900', 'body' => 'text-red-800', 'badge' => 'bg-red-100 text-red-800']
             : ['border' => 'border-amber-300', 'bg' => 'bg-amber-50', 'icon' => 'text-amber-700', 'title' => 'text-amber-900', 'body' => 'text-amber-800', 'badge' => 'bg-amber-100 text-amber-800'];
     @endphp
-    <div class="mb-4 rounded-2xl border {{ $tone['border'] }} {{ $tone['bg'] }} px-4 py-3 sm:px-5">
+    <div class="border-b {{ $tone['border'] }} {{ $tone['bg'] }} px-5 py-3 sm:px-6">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex min-w-0 items-start gap-3">
                 @if ($isOver)

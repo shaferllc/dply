@@ -8,6 +8,8 @@ use App\Livewire\Servers\WorkspaceServices;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
+use App\Models\ServerSystemdServiceAuditEvent;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -18,7 +20,7 @@ use Illuminate\Support\Collection;
 final class ServicesWorkspaceViewData
 {
     /**
-     * @param  list<array<string, mixed>>  $systemdServiceActivity
+     * @param  LengthAwarePaginator<int, array<string, mixed>>|null  $activityEvents
      * @return array<string, mixed>
      */
     public static function for(
@@ -27,10 +29,11 @@ final class ServicesWorkspaceViewData
         bool $includeBannerContext = false,
         bool $includeInventoryContext = false,
         bool $includeActivityContext = false,
-        array $systemdServiceActivity = [],
+        ?LengthAwarePaginator $activityEvents = null,
         ?string $systemdInventoryFetchedAt = null,
     ): array {
-        $card = 'dply-card';
+        // Nested sections inside the merged Services card — not second page cards.
+        $card = 'border-b border-brand-ink/10';
 
         $customMeta = $server->meta['custom_systemd_services'] ?? [];
         $customMetaList = is_array($customMeta)
@@ -172,19 +175,29 @@ final class ServicesWorkspaceViewData
         }
 
         if ($includeActivityContext) {
-            $activityCount = count($systemdServiceActivity);
+            $activityCount = $activityEvents?->total() ?? 0;
+
             $latestActivityRel = null;
             if ($activityCount > 0) {
-                try {
-                    $latestActivityRel = Carbon::parse($systemdServiceActivity[0]['at'] ?? null)
-                        ->timezone(config('app.timezone'))
-                        ->diffForHumans();
-                } catch (\Throwable) {
-                    $latestActivityRel = null;
+                $latestAt = ServerSystemdServiceAuditEvent::query()
+                    ->where('server_id', $server->id)
+                    ->orderByDesc('occurred_at')
+                    ->orderByDesc('id')
+                    ->value('occurred_at');
+
+                if ($latestAt !== null) {
+                    try {
+                        $latestActivityRel = Carbon::parse($latestAt)
+                            ->timezone(config('app.timezone'))
+                            ->diffForHumans();
+                    } catch (\Throwable) {
+                        $latestActivityRel = null;
+                    }
                 }
             }
 
             $data = array_merge($data, compact(
+                'activityEvents',
                 'activityCount',
                 'latestActivityRel',
             ));
@@ -278,9 +291,9 @@ final class ServicesWorkspaceViewData
             ],
             [
                 'key' => 'php',
-                'label' => (string) __('PHP'),
+                'label' => (string) __('Runtime'),
                 'icon' => 'heroicon-o-command-line',
-                'href' => route('servers.php', $server),
+                'href' => route('servers.runtime', $server),
                 'detail' => (string) $phpDetail,
                 'shown' => $phpInstalled,
             ],

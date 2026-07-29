@@ -20,6 +20,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 test('vm host shows custom entry point on create page', function () {
+    config(['dply.scaffold_v1_enabled' => false]);
+
     $user = userWithOrganization();
     $server = vmServer($user);
 
@@ -28,6 +30,8 @@ test('vm host shows custom entry point on create page', function () {
         ->assertSee('Create a Custom site');
 });
 test('docker host hides custom entry point', function () {
+    config(['dply.scaffold_v1_enabled' => false]);
+
     $user = userWithOrganization();
     $server = dockerServer($user);
 

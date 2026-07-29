@@ -11,7 +11,7 @@
          the whole block is gated to avoid undefined $bindingModal* vars. --}}
     @if (method_exists($this, 'openBindingModal'))
     @php
-        $siteBindings = app(\App\Services\Deploy\SiteResourceBindingResolver::class)->forSite($site);
+        $siteBindings = app(\App\Modules\Deploy\Services\SiteResourceBindingResolver::class)->forSite($site);
         $bindingStatusBadge = [
             'configured' => 'bg-emerald-100 text-emerald-800',
             'pending' => 'bg-amber-100 text-amber-900',
@@ -103,7 +103,7 @@
                             {{ $binding->status }}
                         </span>
                         @if ($binding->bindingId)
-                            <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $binding->bindingId]), @js(__('Detach binding?')), @js(__('Detach this :type binding? Its connection variables stop being injected at deploy.', ['type' => $binding->type])), @js(__('Detach')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $binding->bindingId), @js($binding->type))" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 <x-heroicon-o-x-mark class="h-4 w-4" />
                                 {{ __('Detach') }}
                             </button>
@@ -135,6 +135,87 @@
     </section>
     @endif
 
+    {{-- Read-only connection-details modal. Opened by the "Info" button on the
+         binding rows / resource cards; shows what the binding injects at deploy
+         (secrets masked) plus its reachability. Lives here so it's in the DOM on
+         both the Environment tab and the Resources hub (which includes this
+         partial for exactly this kind of shared modal). --}}
+    @if (method_exists($this, 'openBindingInfoModal'))
+    <x-modal name="binding-info-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
+        @php $bi = $bindingInfo ?? null; @endphp
+        <div class="relative border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Connection details') }}</p>
+            <h2 class="mt-2 flex flex-wrap items-center gap-2 text-xl font-semibold text-brand-ink">
+                {{ $bi ? ($bindingTypeLabels[$bi['type']] ?? str($bi['type'])->replace('_', ' ')->title()) : __('Binding') }}
+                @if ($bi && $bi['name'])
+                    <span class="font-mono text-sm font-normal text-brand-moss">· {{ $bi['name'] }}</span>
+                @endif
+            </h2>
+            <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
+        </div>
+
+        @if ($bi)
+            <div class="space-y-5 px-6 py-6">
+                {{-- Status / reachability summary --}}
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $bi['status'] }}</span>
+                    @if ($bi['provider'])
+                        <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-200/70">{{ $bi['provider'] }}</span>
+                    @endif
+                    @if ($bi['reachable'] === true)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70"><x-heroicon-m-check class="h-3 w-3" />{{ __('Reachable') }}</span>
+                    @elseif ($bi['reachable'] === false)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800 ring-1 ring-inset ring-rose-200/70" title="{{ $bi['reachable_detail'] }}"><x-heroicon-m-exclamation-triangle class="h-3 w-3" />{{ __('Unreachable') }}</span>
+                    @endif
+                    @if ($bi['private_network'])
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2.5 py-0.5 text-[11px] font-semibold text-brand-moss"><x-heroicon-o-globe-alt class="h-3 w-3" />{{ __('Private network') }}</span>
+                    @endif
+                </div>
+
+                @if ($bi['needs_remote_access'])
+                    <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ __('Remote access is off on the source — enable it (and allow this server\'s private IP) or the deploy will fail to connect.') }}</p>
+                @endif
+                @if ($bi['last_error'])
+                    <p class="rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700 ring-1 ring-inset ring-rose-200/70">{{ $bi['last_error'] }}</p>
+                @endif
+
+                {{-- Injected variables --}}
+                <div>
+                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Injected at deploy') }} · {{ trans_choice('{1} :count variable|[2,*] :count variables', count($bi['vars']), ['count' => count($bi['vars'])]) }}</p>
+                    @if ($bi['vars'] === [])
+                        <p class="text-xs text-brand-moss">{{ __('This binding injects no environment variables.') }}</p>
+                    @else
+                        <div class="overflow-hidden rounded-xl border border-brand-ink/10">
+                            <table class="w-full table-fixed text-left text-xs">
+                                <tbody class="divide-y divide-brand-ink/8">
+                                    @foreach ($bi['vars'] as $v)
+                                        <tr class="align-top">
+                                            <td class="w-2/5 break-all bg-brand-sand/15 px-3 py-2 font-mono font-semibold text-brand-ink">{{ $v['key'] }}</td>
+                                            <td class="break-all px-3 py-2 font-mono text-brand-moss">
+                                                {{ $v['value'] }}
+                                                @if ($v['sensitive'])
+                                                    <x-heroicon-m-lock-closed class="ml-1 inline h-3 w-3 text-brand-mist" title="{{ __('Secret — masked') }}" />
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Secrets are masked. These values are injected at deploy and can be overridden per-key in the variables list.') }}</p>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        <div class="flex justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+        </div>
+    </x-modal>
+    @endif
+
     {{-- Shared attach / provision modal. Body switches on the chosen type +
          mode; form values live in the loose $bindingForm array on the
          component (see ManagesSiteBindings). Rendered whenever the host
@@ -151,10 +232,11 @@
         </div>
 
         <div class="space-y-4 px-6 py-6">
-            @if ($bindingModalType === 'storage')
-                {{-- One entry, two modes: attach an existing bucket or have dply
-                     provision a new one. Switching re-seeds the form server-side
-                     (see setBindingMode). --}}
+            @if (in_array($bindingModalType, ['storage', 'database'], true))
+                {{-- One entry, two modes: attach an existing resource or have dply
+                     provision a fresh one. Switching re-seeds the form server-side
+                     (see setBindingMode). Shown for both storage and database since
+                     each supports an attach-existing and a provision-new path. --}}
                 <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
                     <button type="button" wire:click="setBindingMode('attach')" class="rounded-md px-3 py-1.5 transition-colors {{ $bindingModalMode !== 'provision' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
                         {{ __('Attach existing') }}
@@ -162,6 +244,64 @@
                     <button type="button" wire:click="setBindingMode('provision')" class="rounded-md px-3 py-1.5 transition-colors {{ $bindingModalMode === 'provision' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
                         {{ __('Provision new') }}
                     </button>
+                </div>
+            @endif
+
+            {{-- Shared connection/instance name for the connection-style multi
+                 types (database, redis). Blank = the PRIMARY instance (bare
+                 keys); a name attaches a SECOND alongside it with namespaced
+                 keys + a generated config snippet. Storage uses its own disk
+                 field; provider-keyed types (ai/oauth/sms/captcha) instead key
+                 on the provider picked in their form, so they skip this. --}}
+            @if (
+                ($bindingModalType === 'database')
+                || (in_array($bindingModalType, ['redis', 'mail'], true) && $bindingModalMode !== 'provision')
+            )
+                @php
+                    $miType = $bindingModalType;
+                    $miRoot = ['database' => 'DB', 'redis' => 'REDIS', 'mail' => 'MAIL', 'broadcasting' => 'BROADCAST'][$miType] ?? strtoupper($miType);
+                    $miRaw = trim((string) ($bindingForm['connection'] ?? ''));
+                    $miSlug = trim(strtolower((string) preg_replace('/[^a-z0-9_]+/', '_', $miRaw)), '_');
+                    $miPrimary = $miSlug === '' || $miSlug === 'default' || $miSlug === 'primary';
+                    $miPrefix = $miRoot.'_'.strtoupper($miSlug).'_';
+                    $miExistingPrimary = $this->site->bindings
+                        ->first(fn ($b) => $b->type === $miType
+                            && ((($b->config['connection'] ?? '')) === '')
+                            && (string) $b->id !== (string) ($this->bindingModalBindingId ?? ''));
+                    $miPrimaryLabel = $miExistingPrimary
+                        ? ($miExistingPrimary->config['database_name'] ?? $miExistingPrimary->config['service'] ?? $miExistingPrimary->name)
+                        : null;
+                    // A DIFFERENT instance already using this exact name — attaching
+                    // would be rejected server-side; warn before the operator submits.
+                    $miNameTaken = ! $miPrimary && $this->site->bindings
+                        ->contains(fn ($b) => $b->type === $miType
+                            && (string) $b->name === $miSlug
+                            && (string) $b->id !== (string) ($this->bindingModalBindingId ?? ''));
+                @endphp
+                <div>
+                    <x-input-label for="binding_connection_name" :value="__('Connection name (optional)')" />
+                    {{-- Debounced so typing a connection name doesn't fire a
+                         round-trip (and full re-render) per keystroke; the live
+                         slug/warning preview still updates ~after you pause. --}}
+                    <x-text-input id="binding_connection_name" wire:model.live.debounce.400ms="bindingForm.connection" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('primary (default :root_* keys)', ['root' => $miRoot]) }}" />
+                    @if ($miPrimary && $miExistingPrimary)
+                        <p class="mt-1.5 flex items-start gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
+                            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{{ __('This site already has a primary (:name) — it will NOT be replaced. Give this one a connection name (e.g. clickhouse, analytics) to add it alongside, or detach/edit the existing primary first.', ['name' => $miPrimaryLabel]) }}</span>
+                        </p>
+                    @elseif ($miPrimary)
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('Leave blank for the primary — it owns the bare :root_* keys. One primary per site; attaching another replaces it.', ['root' => $miRoot]) }}</p>
+                    @elseif ($miNameTaken)
+                        <p class="mt-1.5 flex items-start gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
+                            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{{ __('A connection named ":name" is already attached. Pick a different name, or edit the existing one — it won\'t be overwritten.', ['name' => $miSlug]) }}</span>
+                        </p>
+                    @else
+                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('A second, named connection. Injects :prefix* so it won\'t collide with the primary; after attaching, paste the generated config snippet and reference it by name (":name").', ['prefix' => $miPrefix, 'name' => $miSlug]) }}</p>
+                        @if ($miType === 'mail')
+                            <p class="mt-1 text-xs text-amber-700">{{ __('A named secondary mailer must use SMTP or Log — API providers (Mailgun, SES, …) read global credentials, so keep those as your primary.') }}</p>
+                        @endif
+                    @endif
                 </div>
             @endif
             @if ($bindingModalType === 'database' && $bindingModalMode === 'attach')
@@ -372,21 +512,129 @@
 
                 </div>
             @elseif ($bindingModalType === 'database' && $bindingModalMode === 'provision')
-                <div class="grid gap-4 sm:grid-cols-2">
+                @php
+                    $dbPlacements = $this->databasePlacements();
+                @endphp
+                <div
+                    x-data="{
+                        engine: $wire.entangle('bindingForm.engine'),
+                        placement: $wire.entangle('bindingForm.placement'),
+                        placements: @js(collect($dbPlacements)->mapWithKeys(fn ($p) => [$p['key'] => ['engines' => $p['engines'], 'available' => $p['available']]])),
+                        validFor(eng) {
+                            return Object.keys(this.placements).filter((k) => this.placements[k].engines.includes(eng) && this.placements[k].available);
+                        },
+                    }"
+                    x-effect="
+                        const valid = validFor(engine);
+                        if (valid.length && !valid.includes(placement)) { placement = valid[0]; }
+                    "
+                    class="space-y-4"
+                >
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-input-label for="binding_db_engine" :value="__('Engine')" />
+                            <select id="binding_db_engine" x-model="engine" class="dply-input">
+                                <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
+                                <option value="postgres">{{ __('PostgreSQL') }}</option>
+                                {{-- ClickHouse provisions on the server (engine must be installed
+                                     from the Databases tab). It has no standard DB_* block, so give
+                                     it a connection name to wire it as a named secondary. --}}
+                                <option value="clickhouse">{{ __('ClickHouse') }}</option>
+                                {{-- Redis here means a managed cluster or a serverless vendor
+                                     (Upstash) — on-box Redis is attached via the Redis resource.
+                                     The placement cards filter to redis-capable backends. --}}
+                                <option value="redis">{{ __('Redis') }}</option>
+                                <option value="sqlite">{{ __('SQLite') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <x-input-label for="binding_db_name" :value="__('Database name')" />
+                            <x-text-input id="binding_db_name" wire:model="bindingForm.name" class="mt-1 block w-full font-mono text-sm" placeholder="app_production" />
+                        </div>
+                    </div>
+
+                    {{-- Placement: where the database lives. Cards filter to the backends
+                         that support the chosen engine; an unavailable managed card (no
+                         connected provider credential) is shown disabled with a hint. --}}
                     <div>
-                        <x-input-label for="binding_db_engine" :value="__('Engine')" />
-                        <select id="binding_db_engine" wire:model="bindingForm.engine" class="dply-input">
-                            <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
-                            <option value="postgres">{{ __('PostgreSQL') }}</option>
-                            <option value="sqlite">{{ __('SQLite') }}</option>
+                        <x-input-label :value="__('Where should it live?')" />
+                        <div class="mt-2 space-y-2">
+                            @foreach ($dbPlacements as $p)
+                                <label
+                                    x-show="@js($p['engines']).includes($wire.bindingForm.engine)"
+                                    @class([
+                                        'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
+                                        'border-brand-ink/15 hover:border-brand-ink/30' => $p['available'],
+                                        'cursor-not-allowed border-brand-ink/10 opacity-60' => ! $p['available'],
+                                    ])
+                                    :class="$wire.bindingForm.placement === '{{ $p['key'] }}' ? 'border-brand-ink ring-1 ring-brand-ink bg-brand-sand/30' : ''"
+                                >
+                                    <input type="radio" x-model="placement" value="{{ $p['key'] }}" @disabled(! $p['available']) class="mt-1">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-brand-ink">{{ $p['label'] }}</span>
+                                        <span class="block text-xs text-brand-moss">{{ $p['sublabel'] }}</span>
+                                        @if ($p['note'])
+                                            <span class="mt-0.5 block text-xs font-medium text-amber-700">{{ $p['note'] }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Managed clusters are sized; on-box databases just share the host. --}}
+                    <div x-show="$wire.bindingForm.placement === 'managed'" x-cloak>
+                        <x-input-label for="binding_db_size" :value="__('Cluster size')" />
+                        <select id="binding_db_size" wire:model="bindingForm.size" class="dply-input">
+                            <option value="small">{{ __('Small — 1 vCPU / 1 GB · ~$15/mo') }}</option>
+                            <option value="medium">{{ __('Medium — 1 vCPU / 2 GB · ~$30/mo') }}</option>
+                            <option value="large">{{ __('Large — 2 vCPU / 4 GB · ~$60/mo') }}</option>
                         </select>
                     </div>
-                    <div>
-                        <x-input-label for="binding_db_name" :value="__('Database name')" />
-                        <x-text-input id="binding_db_name" wire:model="bindingForm.name" class="mt-1 block w-full font-mono text-sm" placeholder="app_production" />
+
+                    {{-- Dedicated VM: a real server sized from the provider's catalog. --}}
+                    <div x-show="['dedicated_vm', 'docker_vm'].includes($wire.bindingForm.placement)" x-cloak>
+                        <x-input-label for="binding_db_vm_size" :value="__('Server size')" />
+                        <select id="binding_db_vm_size" wire:model="bindingForm.vm_size" class="dply-input">
+                            @forelse ($dedicatedVmSizes as $s)
+                                <option value="{{ $s['value'] }}">{{ $s['label'] }}</option>
+                            @empty
+                                <option value="">{{ __('No sizes available for this provider/region') }}</option>
+                            @endforelse
+                        </select>
                     </div>
+
+                    {{-- BYO serverless vendors: pick a vendor region + connect an API key. --}}
+                    @foreach (collect($dbPlacements)->where('serverless', true) as $sv)
+                        <div x-show="$wire.bindingForm.placement === '{{ $sv['key'] }}'" x-cloak class="space-y-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                            <div>
+                                <x-input-label for="binding_db_vendor_region_{{ $sv['key'] }}" :value="__(':vendor region', ['vendor' => $sv['label']])" />
+                                <select id="binding_db_vendor_region_{{ $sv['key'] }}" wire:model="bindingForm.vendor_region" class="dply-input">
+                                    @foreach ($sv['regions'] as $r)
+                                        <option value="{{ $r['value'] }}">{{ $r['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @if (! empty($sv['account_label']))
+                                <div>
+                                    <x-input-label for="binding_db_vendor_account_{{ $sv['key'] }}" :value="$sv['account_label']" />
+                                    <x-text-input id="binding_db_vendor_account_{{ $sv['key'] }}" wire:model="bindingForm.vendor_account" class="mt-1 block w-full font-mono text-sm" placeholder="{{ $sv['account_label'] }}" />
+                                </div>
+                            @endif
+                            <div>
+                                <x-input-label for="binding_db_vendor_key_{{ $sv['key'] }}" :value="__(':vendor API key', ['vendor' => $sv['label']])" />
+                                <x-text-input type="password" id="binding_db_vendor_key_{{ $sv['key'] }}" wire:model="bindingForm.vendor_api_key" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('paste your :vendor API key', ['vendor' => $sv['label']]) }}" autocomplete="new-password" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Stored encrypted. Leave blank to reuse a key you\'ve already connected.') }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'on_box'">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'docker'" x-cloak>{{ __('Starts an isolated Docker container on this server, maps it to loopback, and injects the connection variables once the container is ready.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'docker_vm'" x-cloak>{{ __('Provisions a new Docker host on your connected provider (same region + private network), starts the database in a container, and attaches it once ready (several minutes). Redeploy to apply.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'managed'" x-cloak>{{ __('Provisions an isolated managed cluster co-located with this server, locks it to your server\'s network, and injects the connection variables once it\'s online (a few minutes). Redeploy to apply.') }}</p>
+                    <p class="text-xs text-brand-moss" x-show="$wire.bindingForm.placement === 'dedicated_vm'" x-cloak>{{ __('Provisions a new server on your connected provider (same region + private network), installs the engine, and attaches the database once it\'s ready (several minutes). Redeploy to apply.') }}</p>
                 </div>
-                <p class="text-xs text-brand-moss">{{ __('Creates the database on this site\'s server with generated credentials and injects the connection variables.') }}</p>
             @elseif ($bindingModalType === 'queue')
                 <div>
                     <x-input-label for="binding_queue_driver" :value="__('Queue driver')" />
@@ -665,11 +913,108 @@
                             <option value="sentry">{{ __('Sentry') }}</option>
                             <option value="bugsnag">{{ __('Bugsnag') }}</option>
                             <option value="flare">{{ __('Flare') }}</option>
+                            <option value="lookout">{{ __('Lookout') }}</option>
                         </select>
                     </div>
-                    @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
-                    @php $etPackage = \App\Services\Deploy\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
-                    @if ($etPackage)
+
+                    @if ($etProvider === 'lookout')
+                        @php
+                            $lkMode = (string) ($bindingForm['lookout_mode'] ?? 'provision');
+                            $lkManaged = config('services.lookout.account_model') === 'managed';
+                        @endphp
+                        <div class="flex gap-2">
+                            <button type="button" wire:click="$set('bindingForm.lookout_mode', 'provision')"
+                                class="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition {{ $lkMode === 'provision' ? 'border-brand-sage bg-brand-sage/10 text-brand-pine' : 'border-brand-mist text-brand-moss hover:border-brand-sage/60' }}">
+                                {{ __('Create a project') }}
+                            </button>
+                            <button type="button" wire:click="$set('bindingForm.lookout_mode', 'attach')"
+                                class="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition {{ $lkMode === 'attach' ? 'border-brand-sage bg-brand-sage/10 text-brand-pine' : 'border-brand-mist text-brand-moss hover:border-brand-sage/60' }}">
+                                {{ __('Use an existing DSN') }}
+                            </button>
+                        </div>
+
+                        @if ($lkMode === 'provision')
+                            @if ($lkManaged)
+                                <div class="rounded-lg border border-brand-sage/40 bg-brand-sage/5 px-4 py-3 text-xs text-brand-pine">
+                                    {{ __('dply manages the Lookout account — pick a plan and name the project, and we create it for you.') }}
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_lk_name" :value="__('Project name')" />
+                                    <x-text-input id="binding_lk_name" wire:model="bindingForm.project_name" class="w-full" />
+                                </div>
+                                <div>
+                                    <x-input-label :value="__('Plan')" />
+                                    @php
+                                        $lkTiers = (array) config('lookout.tiers', []);
+                                        $lkChosen = (string) ($bindingForm['lookout_tier'] ?? config('lookout.default_tier', 'starter'));
+                                        $lkBillingOn = (bool) config('lookout.billing_enabled', false);
+                                    @endphp
+                                    <div class="mt-1 grid gap-2 sm:grid-cols-3">
+                                        @foreach ($lkTiers as $slug => $tier)
+                                            <button type="button" wire:click="$set('bindingForm.lookout_tier', '{{ $slug }}')"
+                                                class="rounded-lg border px-3 py-2 text-left transition {{ $lkChosen === $slug ? 'border-brand-sage bg-brand-sage/10' : 'border-brand-mist hover:border-brand-sage/60' }}">
+                                                <span class="block text-sm font-semibold text-brand-pine">{{ $tier['label'] ?? ucfirst($slug) }}</span>
+                                                <span class="block text-xs text-brand-moss">{{ (int) ($tier['retention_days'] ?? 0) }}{{ __('d retention · ') }}{{ number_format((int) ($tier['monthly_events'] ?? 0)) }} {{ __('events/mo') }}</span>
+                                                <span class="mt-1 block text-xs font-semibold text-brand-pine">${{ number_format((int) ($tier['price_cents'] ?? 0) / 100, ((int) ($tier['price_cents'] ?? 0)) % 100 === 0 ? 0 : 2) }}/{{ __('mo') }}</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                    <p class="mt-2 text-xs text-brand-moss">
+                                        {{ __('Your first managed Lookout project is free; additional projects bill at the plan price on your dply invoice.') }}
+                                        @unless ($lkBillingOn)
+                                            <span class="text-brand-sage">{{ __('(Billing is not enabled yet — projects are free for now.)') }}</span>
+                                        @endunless
+                                    </p>
+                                </div>
+                            @else
+                                <div>
+                                    <x-input-label for="binding_lk_token" :value="__('Lookout API token')" />
+                                    <x-text-input id="binding_lk_token" type="password" wire:model="bindingForm.lookout_token" class="w-full" placeholder="lk_…" autocomplete="off" />
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('From uselookout.app → Settings → API tokens. Stored encrypted and reused across sites in this organization.') }}</p>
+                                </div>
+                                <div>
+                                    <div class="flex items-end justify-between gap-2">
+                                        <x-input-label for="binding_lk_org" :value="__('Lookout organization')" />
+                                        <button type="button" wire:click="loadLookoutOrganizations" wire:target="loadLookoutOrganizations" wire:loading.attr="disabled"
+                                            class="text-xs font-semibold text-brand-sage hover:text-brand-pine disabled:opacity-50">
+                                            <span wire:loading.remove wire:target="loadLookoutOrganizations">{{ __('Load my organizations') }}</span>
+                                            <span wire:loading wire:target="loadLookoutOrganizations">{{ __('Loading…') }}</span>
+                                        </button>
+                                    </div>
+                                    @if (count($lookoutOrganizations) > 0)
+                                        <select id="binding_lk_org" wire:model="bindingForm.lookout_org" class="dply-input">
+                                            <option value="">{{ __('Select an organization…') }}</option>
+                                            @foreach ($lookoutOrganizations as $lkOrg)
+                                                <option value="{{ $lkOrg['id'] }}">{{ $lkOrg['name'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <x-text-input id="binding_lk_org" wire:model="bindingForm.lookout_org" class="w-full" placeholder="01J…" autocomplete="off" />
+                                        <p class="mt-1 text-xs text-brand-moss">{{ __('Enter the organization ID, or load them from your token above.') }}</p>
+                                    @endif
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_lk_name" :value="__('Project name')" />
+                                    <x-text-input id="binding_lk_name" wire:model="bindingForm.project_name" class="w-full" />
+                                </div>
+                            @endif
+                        @else
+                            <div>
+                                <x-input-label for="binding_lk_dsn" :value="__('Lookout DSN')" />
+                                <x-text-input id="binding_lk_dsn" wire:model="bindingForm.dsn" class="w-full" placeholder="https://&lt;key&gt;&#64;uselookout.app" autocomplete="off" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Paste the ingest DSN from an existing Lookout project.') }}</p>
+                            </div>
+                        @endif
+                    @else
+                        @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
+                    @endif
+
+                    @php $etPackage = \App\Modules\Deploy\Services\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
+                    @if ($etProvider === 'lookout')
+                        <div class="rounded-lg border border-brand-sage/40 bg-brand-sage/5 px-4 py-3 text-xs text-brand-pine">
+                            {{ __('dply runs') }} <code class="font-mono font-semibold">composer require lookout/tracing</code> {{ __('on the server for you, then injects LOOKOUT_DSN at deploy.') }}
+                        </div>
+                    @elseif ($etPackage)
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                             {{ __('Requires the') }} <code class="font-mono font-semibold">{{ $etPackage }}</code> {{ __('package. Add it to your') }} <code class="font-mono font-semibold">composer.json</code> {{ __('before deploying.') }}
                         </div>
@@ -681,6 +1026,8 @@
                             {{ __('Injects BUGSNAG_API_KEY at deploy.') }}
                         @elseif ($etProvider === 'flare')
                             {{ __('Injects FLARE_KEY at deploy. Flare ships with Laravel via spatie/laravel-ignition.') }}
+                        @elseif ($etProvider === 'lookout')
+                            {{ __('Injects LOOKOUT_DSN + LOOKOUT_LARAVEL=true so the app reports errors, traces and logs to Lookout.') }}
                         @endif
                     </p>
                 </div>
@@ -699,7 +1046,7 @@
                     </div>
                     @include('livewire.sites.settings.partials.environment.ai-credential-fields', ['aiProvider' => $aiProvider])
                     <p class="text-xs text-brand-moss">
-                        {{ __('Injects') }} <code class="font-mono">{{ \App\Services\Deploy\SiteBindingManager::AI_KEY_ENV[$aiProvider] ?? 'OPENAI_API_KEY' }}</code>
+                        {{ __('Injects') }} <code class="font-mono">{{ \App\Modules\Deploy\Services\SiteBindingManager::AI_KEY_ENV[$aiProvider] ?? 'OPENAI_API_KEY' }}</code>
                         @if ($aiProvider === 'openai') {{ __('(and OPENAI_ORGANIZATION when set)') }} @endif
                         {{ __('at deploy.') }}
                     </p>
@@ -752,7 +1099,7 @@
                         </select>
                     </div>
                     @include('livewire.sites.settings.partials.environment.search-credential-fields', ['searchProvider' => $searchProvider])
-                    @php $searchPackage = \App\Services\Deploy\SiteBindingManager::SEARCH_PACKAGES[$searchProvider] ?? null; @endphp
+                    @php $searchPackage = \App\Modules\Deploy\Services\SiteBindingManager::SEARCH_PACKAGES[$searchProvider] ?? null; @endphp
                     <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
                         {{ __('Requires') }} <code class="font-mono font-semibold">laravel/scout</code>@if ($searchPackage) {{ __(' and ') }}<code class="font-mono font-semibold">{{ $searchPackage }}</code>@endif. {{ __('Add to composer.json before deploying.') }}
                     </div>

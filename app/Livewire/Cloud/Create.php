@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cloud;
 
-use App\Actions\Cloud\CreateCloudSite;
-use App\Actions\Cloud\CreateCloudSiteFromSource;
+use App\Modules\Cloud\Actions\CreateCloudSite;
+use App\Modules\Cloud\Actions\CreateCloudSiteFromSource;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Cloud\Concerns\ManagesCloudCostBackend;
 use App\Livewire\Cloud\Concerns\ManagesCloudRepository;
@@ -18,11 +18,11 @@ use App\Models\CloudDatabase;
 use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
-use App\Services\Billing\ManagedProductCostEstimator;
-use App\Services\Cloud\AwsAppRunnerBackend;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
-use App\Services\DigitalOceanAppPlatformService;
+use App\Modules\Billing\Services\ManagedProductCostEstimator;
+use App\Modules\Cloud\Backends\AwsAppRunnerBackend;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
+use App\Modules\Cloud\Services\DigitalOceanAppPlatformService;
 use App\Modules\SourceControl\Services\DefaultBranchResolver;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
@@ -160,7 +160,7 @@ class Create extends Component
      *
      * @var list<array{
      *     _id: string,
-     *     mode: 'attach'|'create',
+     *     mode: 'attach'|'create'|'external',
      *     cloud_database_id?: string,
      *     name: string,
      *     engine: 'postgres'|'mysql'|'redis',
@@ -408,6 +408,7 @@ class Create extends Component
             'attachableDatabases' => $databases,
             'backendSupportsWorkers' => $this->backend !== 'aws_app_runner',
             'backendSupportsDeployTasks' => $this->backend !== 'aws_app_runner',
+            'backendSupportsManagedDatabases' => $this->backend !== 'aws_app_runner',
         ])->layout('layouts.app');
     }
 }

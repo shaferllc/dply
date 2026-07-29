@@ -120,17 +120,73 @@ class SiteWebserverConfigEditorService
 
         $out = $this->applier->apply($site->fresh(['server']));
 
+        $this->markApplied($site->fresh(['server']));
+
+        return $out;
+    }
+
+    /**
+     * Persist the editor's pending content onto the profile (and keep
+     * nginx_extra_raw in sync) WITHOUT touching the server. Used so the queued
+     * apply job builds exactly what the user validated, and so "Save draft"
+     * shares one code path.
+     *
+     * @param  array{mode: string, before_body: ?string, main_snippet_body: ?string, after_body: ?string, full_override_body: ?string}  $payload
+     */
+    public function persistEditorState(Site $site, array $payload): SiteWebserverConfigProfile
+    {
+        $profile = $this->getOrCreateProfile($site);
+        $profile->update([
+            'mode' => $payload['mode'],
+            'before_body' => $payload['before_body'] ?? null,
+            'main_snippet_body' => $payload['main_snippet_body'] ?? null,
+            'after_body' => $payload['after_body'] ?? null,
+            'full_override_body' => $payload['full_override_body'] ?? null,
+            'draft_saved_at' => now(),
+        ]);
+
+        if ($site->webserver() === 'nginx') {
+            $site->update(['nginx_extra_raw' => $payload['main_snippet_body'] ?? null]);
+        }
+
+        return $profile->fresh();
+    }
+
+    /**
+     * Post-apply bookkeeping after a SUCCESSFUL apply: stamp the profile's
+     * last-applied checksums and capture an "Applied to server" revision into
+     * history. Idempotent-ish — the recorder dedupes identical snapshots. Called
+     * by the queued apply job so the async path keeps the same record-keeping the
+     * old synchronous apply had.
+     */
+    public function recordApplied(Site $site, ?User $user = null): void
+    {
+        $this->markApplied($site->fresh(['server']));
+
+        $profile = $this->getOrCreateProfile($site->fresh(['server']));
+        if ($user instanceof User) {
+            $this->captureProfileSnapshot($site->fresh(['server']), [
+                'mode' => $profile->mode,
+                'before_body' => $profile->before_body,
+                'main_snippet_body' => $profile->main_snippet_body,
+                'after_body' => $profile->after_body,
+                'full_override_body' => $profile->full_override_body,
+            ], $user, __('Applied to server'));
+        }
+    }
+
+    /** Stamp the profile's last-applied checksums from the current effective build. */
+    public function markApplied(Site $site): void
+    {
         $site = $site->fresh(['server']);
-        $profile = $profile->fresh();
-        $effective = $this->effectivePreview($site, $profile);
+        $profile = $this->getOrCreateProfile($site);
+        $effective = $this->effectivePreview($site, $profile->fresh());
 
         $profile->update([
             'last_applied_effective_checksum' => hash('sha256', $effective),
             'last_applied_core_hash' => $this->managedCoreHash($site),
             'last_applied_at' => now(),
         ]);
-
-        return $out;
     }
 
     /**

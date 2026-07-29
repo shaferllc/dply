@@ -553,18 +553,21 @@ append_to_database() {
     fi
 }
 
-# Execute the original script and capture its output
+# Execute the original script and capture its output. PIPESTATUS[0] preserves
+# the SCRIPT's exit status — the pipeline itself reports the while-loop's (0).
 bash "{$originalScript}" 2>&1 | while IFS= read -r line; do
     echo "\$line"
     append_to_database "\$line"
 done
+SCRIPT_EXIT=\${PIPESTATUS[0]}
 
 # Add completion marker
 echo "{$eofMarker}"
 append_to_database "{$eofMarker}"
 
-# Mark task as completed
-php artisan task:complete {$taskId} --exit-code=0 > /dev/null 2>&1
+# Mark task as completed with the real exit code — hardcoding 0 here recorded
+# failed local background tasks as successful.
+php artisan task:complete {$taskId} --exit-code=\$SCRIPT_EXIT > /dev/null 2>&1
 SCRIPT;
     }
 

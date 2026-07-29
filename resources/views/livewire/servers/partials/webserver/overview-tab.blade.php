@@ -8,10 +8,10 @@
         @endphp
 
         @if ($activeInfo !== null)
-            <div class="{{ $card }} overflow-hidden">
+            <div class="{{ $card }}">
                 {{-- Engine header — icon + label + version + status pill, all
                      more prominent than the old inline arrangement. --}}
-                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                     <div class="flex items-center gap-3">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10">
                             <x-dynamic-component :component="$activeInfo['icon']" class="h-5 w-5 text-brand-forest" />
@@ -114,13 +114,13 @@
             </div>
         @endif
 
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-2 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-2 sm:px-6">
             <button
                 type="button"
                 wire:click="setWorkspaceTab('change')"
-                class="group {{ $card }} flex items-start gap-3 p-5 text-left transition hover:border-brand-forest/25 hover:shadow-md sm:p-6"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
             >
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">
@@ -131,9 +131,9 @@
             <a
                 href="{{ route('servers.edge-proxy', $server) }}"
                 wire:navigate
-                class="group {{ $card }} flex items-start gap-3 p-5 transition hover:border-brand-forest/25 hover:shadow-md sm:p-6"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
             >
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">
@@ -150,9 +150,9 @@
             <button
                 type="button"
                 wire:click="setWorkspaceTab('health')"
-                class="group {{ $card }} flex items-start gap-3 p-5 text-left transition hover:border-brand-forest/25 hover:shadow-md sm:p-6"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30 sm:col-span-2"
             >
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">
@@ -163,7 +163,7 @@
         </div>
 
         @if ($activeInfo !== null)
-            <div class="{{ $card }} p-5 sm:p-6">
+            <div class="{{ $card }} px-5 py-4 sm:px-6">
                 <p class="text-sm text-brand-moss">
                     {{ __('Deep config, logs, and live-state inspectors for :engine live on the :engine tab.', ['engine' => $activeInfo['label']]) }}
                     <button type="button" wire:click="setWorkspaceTab('{{ $activeWebserver }}')" class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">

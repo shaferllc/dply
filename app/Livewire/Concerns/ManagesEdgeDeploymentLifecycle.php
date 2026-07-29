@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Actions\Edge\PromoteEdgePreview;
-use App\Actions\Edge\QueueEdgeDeployReplay;
-use App\Actions\Edge\RollbackEdgeDeployment;
-use App\Actions\Edge\UpdateEdgeSplitTraffic;
+use App\Modules\Edge\Actions\PromoteEdgePreview;
+use App\Modules\Edge\Actions\QueueEdgeDeployReplay;
+use App\Modules\Edge\Actions\RollbackEdgeDeployment;
+use App\Modules\Edge\Actions\UpdateEdgeSplitTraffic;
 use App\Livewire\Sites\EdgeDeploymentDetail;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Services\DeployContract\DeployContractState;
-use App\Services\Edge\EdgePreviewReviewState;
-use App\Support\Edge\EdgeDeploymentConfirmSummary;
+use App\Modules\Edge\Services\EdgePreviewReviewState;
+use App\Modules\Edge\Support\EdgeDeploymentConfirmSummary;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
 

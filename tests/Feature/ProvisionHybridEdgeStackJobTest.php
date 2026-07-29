@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ProvisionHybridEdgeStackJobTest;
 
-use App\Actions\Edge\CreateHybridEdgeStack;
+use App\Modules\Edge\Actions\CreateHybridEdgeStack;
 use App\Enums\SiteType;
-use App\Jobs\BuildEdgeSiteJob;
-use App\Jobs\ProvisionCloudSiteJob;
-use App\Jobs\ProvisionHybridEdgeStackJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
+use App\Modules\Cloud\Jobs\ProvisionCloudSiteJob;
+use App\Modules\Edge\Jobs\ProvisionHybridEdgeStackJob;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Models\User;
@@ -21,6 +21,7 @@ usesFeatures('surface.cloud');
 
 beforeEach(function (): void {
     Feature::define('surface.cloud', fn (): bool => true);
+    Feature::purge(['surface.cloud']);
     Feature::flushCache();
 });
 

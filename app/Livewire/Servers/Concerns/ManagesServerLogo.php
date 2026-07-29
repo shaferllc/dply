@@ -10,8 +10,9 @@ use Livewire\Features\SupportFileUploads\WithFileUploads;
 
 /**
  * Custom server logo management for the manage workspace: upload an image or
- * remove it. Logos live on the `public` disk under server-logos/; the model
- * exposes them via {@see \App\Models\Server::logoUrl()}. Mirrors
+ * remove it. Logos live on the durable `site_assets` disk under server-logos/
+ * (release-independent, so they survive a redeploy); the model exposes them via
+ * {@see \App\Models\Server::logoUrl()}. Mirrors
  * {@see \App\Livewire\Sites\Concerns\ManagesSiteLogo} — servers have no public
  * URL, so there's no favicon-pull variant.
  *
@@ -42,11 +43,11 @@ trait ManagesServerLogo
         $ext = $this->extensionFor($this->server_logo_upload->getMimeType());
         $path = 'server-logos/'.$this->server->id.'-'.Str::lower(Str::random(8)).'.'.$ext;
 
-        Storage::disk('public')->put($path, file_get_contents($this->server_logo_upload->getRealPath()));
+        Storage::disk('site_assets')->put($path, file_get_contents($this->server_logo_upload->getRealPath()));
         $this->server->forceFill(['logo_path' => $path])->save();
 
         if (is_string($old) && $old !== '' && $old !== $path) {
-            Storage::disk('public')->delete($old);
+            Storage::disk('site_assets')->delete($old);
         }
 
         $this->reset('server_logo_upload');
@@ -60,7 +61,7 @@ trait ManagesServerLogo
 
         $old = $this->server->logo_path;
         if (is_string($old) && $old !== '') {
-            Storage::disk('public')->delete($old);
+            Storage::disk('site_assets')->delete($old);
             $this->server->forceFill(['logo_path' => null])->save();
             $this->recordServerLogoChange($old, null, 'remove');
         }

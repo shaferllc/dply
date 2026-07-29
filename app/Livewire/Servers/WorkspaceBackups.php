@@ -29,7 +29,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -182,6 +182,27 @@ class WorkspaceBackups extends Component
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
+    }
+
+    /**
+     * Merged Backups card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate title card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        // Site-scoped backups render inside the site settings shell — keep the
+        // generic empty placeholder rather than the server workspace chrome.
+        if ($this->siteDedicatedContext) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-backups-placeholder', [
+            'server' => $this->server,
+        ]);
     }
 
     public function mount(Server $server, ?Site $site = null): void

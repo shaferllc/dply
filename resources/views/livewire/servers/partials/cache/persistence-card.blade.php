@@ -13,7 +13,7 @@
     $schedule = $state['save_schedule'] ?? [];
 @endphp
 
-<div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8" wire:init="loadPersistenceState">
+<div class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6" wire:init="loadPersistenceState">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
             <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — persistence', ['engine' => $engineLabel]) }}</h3>

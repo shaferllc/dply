@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
@@ -11,9 +12,9 @@ use App\Livewire\Forms\EdgeBuildSettingsForm;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Edge\EdgeImageUrlSigner;
-use App\Support\Edge\EdgeEffectiveImages;
-use App\Support\Edge\EdgeEffectiveOrigin;
+use App\Modules\Edge\Services\EdgeImageUrlSigner;
+use App\Modules\Edge\Support\EdgeEffectiveImages;
+use App\Modules\Edge\Support\EdgeEffectiveOrigin;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Http;
@@ -21,6 +22,7 @@ use Livewire\Component;
 
 class Delivery extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesEdgeBuildSettings;
     use MountsEdgeWorkspaceSection;
@@ -37,6 +39,26 @@ class Delivery extends Component
     {
         $this->mountEdgeWorkspaceSection($server, $site);
         $this->mountEdgeBuildSettings($site);
+    }
+
+    public function requestConvertToHybrid(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->validate([
+            'buildForm.edge_convert_origin_url' => ['required', 'string', 'max:500', 'url:http,https'],
+        ], [
+            'buildForm.edge_convert_origin_url.url' => __('Origin URL must be a valid http(s) URL.'),
+        ]);
+
+        $this->openConfirmActionModal(
+            'convertEdgeStaticToHybrid',
+            [],
+            __('Convert to hybrid'),
+            __('Convert to hybrid mode? The next deploy will healthcheck the origin before going live.'),
+            __('Convert'),
+            false,
+        );
     }
 
     public function testOrigin(): void

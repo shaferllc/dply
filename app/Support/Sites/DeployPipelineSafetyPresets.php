@@ -8,7 +8,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployPipeline;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 
 /**
  * One-click Laravel safety bundles for the deploy pipeline workspace.
@@ -134,7 +134,7 @@ final class DeployPipelineSafetyPresets
         return <<<'BASH'
 set -euo pipefail
 [ -f .env ] || { echo "No .env present — skipping pre-migrate backup."; exit 0; }
-envval() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'"; }
+envval() { { grep -E "^$1=" .env || true; } | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'"; }
 DB_CONNECTION=$(envval DB_CONNECTION)
 DB_DATABASE=$(envval DB_DATABASE)
 DB_USERNAME=$(envval DB_USERNAME)

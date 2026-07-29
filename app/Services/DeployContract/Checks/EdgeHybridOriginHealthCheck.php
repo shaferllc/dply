@@ -7,7 +7,7 @@ namespace App\Services\DeployContract\Checks;
 use App\Services\DeployContract\Contracts\DeployContractCheck;
 use App\Services\DeployContract\DeployContractCheckResult;
 use App\Services\DeployContract\DeployContractContext;
-use App\Services\Edge\OriginHealthcheckRunner;
+use App\Modules\Edge\Services\OriginHealthcheckRunner;
 
 final class EdgeHybridOriginHealthCheck implements DeployContractCheck
 {

@@ -23,7 +23,7 @@ test('authenticated dashboard includes cloud apps link when surface cloud active
         ->assertSee(route('cloud.index'), escape: false);
 });
 
-test('cloud apps link hidden when surface cloud inactive', function () {
+test('cloud apps link is coming soon when surface cloud inactive', function () {
     Feature::define('surface.cloud', fn () => false);
     Feature::flushCache();
 
@@ -31,8 +31,10 @@ test('cloud apps link hidden when surface cloud inactive', function () {
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
+    // Gated surfaces stay visible with a Coming soon teaser (not hidden).
     $response->assertOk()
-        ->assertDontSee('Cloud apps')
+        ->assertSee('Cloud apps')
+        ->assertSee(__('Coming soon'))
         ->assertDontSee(route('cloud.index'), false);
 });
 
@@ -51,7 +53,7 @@ test('browse dropdown includes compute apps and org sections', function () {
         ->assertSee('Sites')
         ->assertSee('Organizations')
         ->assertSee(route('servers.index'), false)
-        ->assertSee(route('serverless.index'), false)
+        // surface.serverless defaults off — Coming soon teaser has no href.
         ->assertSee(route('edge.index'), false)
         ->assertSee(route('sites.index'), false)
         ->assertSee(route('organizations.index'), false);

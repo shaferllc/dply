@@ -438,15 +438,6 @@ final class ServerProvisionCommandBuilder
             return [];
         }
 
-        // Skip-fast only on the REQUIRED set. Optional extensions may legitimately
-        // have no package on the distro (e.g. php8.3-sodium on noble — built into
-        // core), so dpkg -s would always fail for them and the "already installed"
-        // short-circuit could never fire on a resume/baked-snapshot re-run.
-        $checks = array_map(
-            fn (string $p): string => 'dpkg -s '.escapeshellarg($p).' >/dev/null 2>&1',
-            $required,
-        );
-
         $requiredList = implode(' ', $required);
         $optionalList = implode(' ', $optional);
 
@@ -473,6 +464,20 @@ final class ServerProvisionCommandBuilder
 
         // Drop the empty placeholder lines we may have inserted for the no-optional case.
         $install = implode("\n", array_values(array_filter(explode("\n", $install), fn (string $l): bool => $l !== '')));
+
+        // Mirror ensurePackagesInstalled: force-reinstall skips the dpkg short-circuit.
+        if ($this->forceReinstall()) {
+            return [$install];
+        }
+
+        // Skip-fast only on the REQUIRED set. Optional extensions may legitimately
+        // have no package on the distro (e.g. php8.3-sodium on noble — built into
+        // core), so dpkg -s would always fail for them and the "already installed"
+        // short-circuit could never fire on a resume/baked-snapshot re-run.
+        $checks = array_map(
+            fn (string $p): string => 'dpkg -s '.escapeshellarg($p).' >/dev/null 2>&1',
+            $required,
+        );
 
         return [
             'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else'."\n".$install."\n".'fi',

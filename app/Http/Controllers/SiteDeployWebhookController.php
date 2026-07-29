@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WebhookDeliveryLog;

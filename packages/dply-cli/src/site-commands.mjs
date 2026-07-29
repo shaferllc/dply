@@ -6,6 +6,7 @@ import {
   followSiteDeployment,
   waitForLatestDeployment,
 } from './deploy-follow.mjs';
+import { readFile } from 'node:fs/promises';
 import { c, info, ok, printJson, printKeyValues, printTable, warn } from './print.mjs';
 
 /**
@@ -36,6 +37,8 @@ export async function siteCommand(args, flags) {
       return siteDeployments(args.slice(1), flags);
     case 'deployment':
       return siteDeploymentShow(args.slice(1), flags);
+    case 'env':
+      return siteEnv(args.slice(1), flags);
     default:
       throw cliError(`Unknown site command: ${sub}. Run \`dply site help\`.`, 2);
   }
@@ -347,6 +350,98 @@ async function siteDeploymentShow(args, flags) {
   return 0;
 }
 
+/**
+ * Env vars for a BYO/VM site. Values are write-only via the API (GET returns
+ * keys only) — the VM counterpart to `dply edge env`. Changes reach the box on
+ * the next deploy/push.
+ *
+ * @param {string[]} args  [site?, sub, ...rest]
+ * @param {Record<string, unknown>} flags
+ */
+async function siteEnv(args, flags) {
+  const { client, siteId } = await requireByoSiteContext(flags, args[0]);
+  const base = `/sites/${encodeURIComponent(siteId)}/env`;
+  const sub = args[1] ?? 'list';
+
+  if (sub === 'list' || sub === 'pull') {
+    const rows = (await client.get(base))?.data ?? [];
+    if (sub === 'pull') {
+      info(c.dim(`# dply env keys for site ${siteId} (values are write-only)`));
+      for (const row of rows) info(`${row.key}=`);
+
+      return;
+    }
+    if (flags.json) return printJson(rows);
+    printTable(['key'], rows.map((r) => ({ key: r.key })));
+
+    return;
+  }
+
+  if (sub === 'set') {
+    const pairs = args.slice(2);
+    if (pairs.length === 0) throw cliError('Usage: dply site env <site> set KEY=value [KEY=value …]', 2);
+    for (const pair of pairs) {
+      const eq = pair.indexOf('=');
+      if (eq <= 0) throw cliError(`Invalid pair "${pair}" — expected KEY=value.`, 2);
+      const key = pair.slice(0, eq);
+      await client.patch(`${base}/${encodeURIComponent(key)}`, { value: pair.slice(eq + 1) });
+      ok(`Set ${c.cyan(key)}`);
+    }
+
+    return;
+  }
+
+  if (sub === 'rm' || sub === 'remove' || sub === 'unset') {
+    const keys = args.slice(2);
+    if (keys.length === 0) throw cliError('Usage: dply site env <site> rm KEY [KEY …]', 2);
+    for (const key of keys) {
+      await client.delete(`${base}/${encodeURIComponent(key)}`);
+      ok(`Removed ${c.cyan(key)}`);
+    }
+
+    return;
+  }
+
+  if (sub === 'push') {
+    const file = flags.file || flags.f;
+    if (!file) throw cliError('Usage: dply site env <site> push --file PATH', 2);
+    const parsed = parseSiteDotenv(await readFile(String(file), 'utf8'));
+    const keys = Object.keys(parsed);
+    if (keys.length === 0) {
+      warn(`${file} produced no KEY=value pairs — nothing pushed.`);
+
+      return;
+    }
+    for (const key of keys) {
+      await client.patch(`${base}/${encodeURIComponent(key)}`, { value: parsed[key] });
+    }
+    ok(`Pushed ${keys.length} key(s) from ${c.dim(String(file))}.`);
+
+    return;
+  }
+
+  throw cliError(`Unknown env subcommand "${sub}". Use list, set, rm, push, pull.`, 2);
+}
+
+/** Minimal KEY=value dotenv parser (strips matching surrounding quotes; #-comments ignored). */
+function parseSiteDotenv(raw) {
+  const out = {};
+  for (const line of String(raw).split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (value.length >= 2 && (value[0] === '"' || value[0] === "'") && value[value.length - 1] === value[0]) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+
+  return out;
+}
+
 function printSiteHelp() {
   info(`${c.bold('dply site')} — BYO VM site deploys`);
   info('');
@@ -357,6 +452,7 @@ function printSiteHelp() {
   info(`  ${'logs'.padEnd(16)} ${c.dim('[site] — latest deploy log · --follow to tail')}`);
   info(`  ${'deployments'.padEnd(16)} ${c.dim('[site] — recent deploy runs')}`);
   info(`  ${'deployment'.padEnd(16)} ${c.dim('<id> [--site …] — one deploy + logs')}`);
+  info(`  ${'env'.padEnd(16)} ${c.dim('[site] list | set KEY=val | rm KEY | push --file .env')}`);
   info('');
   info(c.dim('Flags: --sync · --follow/--wait · --interval ms · --idempotency-key · --site · --json'));
   info(c.dim('CI: `dply deploy --sync --wait` · dev: `dply deploy --follow` after `dply link --byo <id>`'));

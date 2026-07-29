@@ -29,15 +29,15 @@
 
 @if ($resolvedTone === 'footer' && $command !== null && trim((string) $command) !== '')
     <footer
-        {{ $attributes->class(['text-xs text-slate-500']) }}
+        {{ $attributes->class(['text-xs text-brand-moss']) }}
         data-cli-snippet="footer"
         x-data="{ copied: false }"
     >
-        {{ $footerLabel }}
-        <code class="ml-1 select-all rounded bg-slate-100 px-1 py-0.5 font-mono">{{ $command }}</code>
+        <span class="font-medium text-brand-ink/70">{{ $footerLabel }}</span>
+        <code class="ml-1 select-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 font-mono text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $command }}</code>
         <button
             type="button"
-            class="ml-1 inline-flex items-center justify-center rounded p-0.5 text-slate-400 align-middle hover:bg-slate-200 hover:text-slate-700"
+            class="ml-1 inline-flex items-center justify-center rounded p-0.5 text-brand-mist align-middle hover:bg-brand-sand hover:text-brand-ink"
             title="{{ __('Copy command') }}"
             aria-label="{{ __('Copy command') }}"
             @click="navigator.clipboard.writeText(@js($command)); copied = true; setTimeout(() => copied = false, 1500)"
@@ -47,25 +47,26 @@
         <span x-show="copied" x-cloak class="ml-1 text-[10px] font-medium text-emerald-700">{{ __('Copied') }}</span>
     </footer>
 @elseif ($resolvedTone === 'details' && $rows !== [])
+    {{-- Flush disclosure — no nested rounded card (merged chrome footers). --}}
     <details
-        {{ $attributes->class(['rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600']) }}
+        {{ $attributes->class(['text-xs text-brand-moss']) }}
         data-cli-snippet="details"
     >
-        <summary class="cursor-pointer font-semibold text-slate-700">{{ $detailsSummary }}</summary>
+        <summary class="cursor-pointer select-none font-semibold text-brand-ink">{{ $detailsSummary }}</summary>
         @if ($intro)
-            <p class="mt-2">{{ $intro }}</p>
+            <p class="mt-2 text-brand-moss">{{ $intro }}</p>
         @endif
-        <ul class="mt-2 space-y-1 font-mono {{ $rowSizeClass }}">
+        <ul class="mt-2 space-y-1.5 font-mono {{ $rowSizeClass }}">
             @foreach ($rows as $row)
                 <li x-data="{ copied: false }" class="flex flex-wrap items-center gap-x-1.5">
                     @if (! empty($row['label']))
-                        <span class="font-sans text-slate-600">{{ $row['label'] }}</span>
-                        <span class="font-sans text-slate-400" aria-hidden="true">—</span>
+                        <span class="font-sans text-brand-moss">{{ $row['label'] }}</span>
+                        <span class="font-sans text-brand-mist" aria-hidden="true">—</span>
                     @endif
-                    <code class="select-all rounded bg-white px-1 py-0.5">{{ $row['command'] }}</code>
+                    <code class="select-all rounded-md bg-brand-sand/80 px-1.5 py-0.5 text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $row['command'] }}</code>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center rounded p-0.5 text-slate-400 hover:bg-white hover:text-slate-700"
+                        class="inline-flex items-center justify-center rounded p-0.5 text-brand-mist hover:bg-brand-sand hover:text-brand-ink"
                         title="{{ __('Copy command') }}"
                         aria-label="{{ __('Copy command') }}"
                         @click="navigator.clipboard.writeText(@js($row['command'])); copied = true; setTimeout(() => copied = false, 1500)"
@@ -79,10 +80,10 @@
     </details>
 @else
     <details
-        {{ $attributes->class(['rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600']) }}
+        {{ $attributes->class(['text-xs text-brand-moss']) }}
         data-cli-snippet="stub"
     >
-        <summary class="cursor-pointer font-semibold text-slate-700">{{ $detailsSummary }}</summary>
-        <p class="mt-2 text-slate-500">{{ $summary === null ? $stubMessage : ($intro ?? $stubMessage) }}</p>
+        <summary class="cursor-pointer select-none font-semibold text-brand-ink">{{ $detailsSummary }}</summary>
+        <p class="mt-2 text-brand-moss">{{ $summary === null ? $stubMessage : ($intro ?? $stubMessage) }}</p>
     </details>
 @endif

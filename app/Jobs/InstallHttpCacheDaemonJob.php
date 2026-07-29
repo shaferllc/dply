@@ -57,6 +57,7 @@ class InstallHttpCacheDaemonJob implements ShouldQueue
 
         try {
             $script = HttpCacheDaemonInstallScripts::installScriptForRow($row, $this->backendPort)
+                ."\necho ".CacheServiceInstallScripts::VERSION_PROBE_MARKER
                 ."\n".HttpCacheDaemonInstallScripts::versionProbeScript($row->engine);
 
             $bufferAcc = '';
@@ -89,7 +90,7 @@ class InstallHttpCacheDaemonJob implements ShouldQueue
                 );
             }
 
-            $version = CacheServiceInstallScripts::parseVersionFromBuffer($output->buffer);
+            $version = CacheServiceInstallScripts::parseVersionFromProbeOutput($output->buffer);
 
             $row->update([
                 'status' => ServerCacheService::STATUS_RUNNING,

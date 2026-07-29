@@ -6,7 +6,7 @@ namespace App\Jobs;
 
 use App\Models\ProviderCredential;
 use App\Models\Site;
-use App\Services\Cloudflare\CloudflareCdnService;
+use App\Modules\Cloud\Cloudflare\CloudflareCdnService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

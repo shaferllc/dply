@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Console\Commands\BackfillWebserverStatsEndpointsCommand;
-use App\Jobs\AddEdgeProxyJob;
+use App\Modules\Edge\Jobs\AddEdgeProxyJob;
 use App\Jobs\SwitchServerWebserverJob;
 
 /**

@@ -13,8 +13,9 @@
     the DOM. The edge SVG uses preserveAspectRatio="none" (x scales to width, y stays
     px-exact) with non-scaling-stroke so lines stay crisp.
 --}}
-<section class="dply-card overflow-hidden">
-    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+{{-- Nested strip inside the Access graph workspace card (not a second page card). --}}
+<section class="border-b border-brand-ink/10">
+    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
         <div class="flex min-w-0 items-start gap-3">
             <x-icon-badge>
                 <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />

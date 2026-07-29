@@ -40,7 +40,7 @@ test('simple universal starter moves migrate to build phase', function () {
         ->and($migrate['phase'])->toBe('build');
 });
 
-test('zero downtime rollout enables health check with laravel up path', function () {
+test('zero downtime rollout enables health check with homepage path', function () {
     $site = Site::factory()->create([
         'meta' => [
             'vm_runtime' => [
@@ -51,9 +51,11 @@ test('zero downtime rollout enables health check with laravel up path', function
 
     $rollout = app(DeployPipelineStarterCatalog::class)->rolloutChangesFor($site, 'laravel-zero-downtime');
 
+    // Probe `/` (not `/up`) so Vite/layout failures surface — a bare health
+    // route can 200 while real pages 500.
     expect($rollout['deploy_strategy'])->toBe('atomic')
         ->and($rollout['deploy_health_enabled'])->toBeTrue()
-        ->and($rollout['deploy_health_path'])->toBe('/up');
+        ->and($rollout['deploy_health_path'])->toBe('/');
 });
 
 test('universal zero downtime starter includes laravel release steps for php site without detection meta', function () {
@@ -83,7 +85,7 @@ test('laravel starters visible for php runtime without vm_runtime detection', fu
     expect($keys)->toContain('laravel-zero-downtime', 'zero-downtime');
 });
 
-test('simple rollout disables deploy health check', function () {
+test('simple rollout enables deploy health check without auto rollback', function () {
     $site = Site::factory()->create([
         'deploy_strategy' => 'atomic',
         'meta' => ['deploy_health_enabled' => true, 'deploy_health_auto_rollback' => true],
@@ -91,7 +93,10 @@ test('simple rollout disables deploy health check', function () {
 
     $rollout = app(DeployPipelineStarterCatalog::class)->rolloutChangesFor($site, 'simple-in-place');
 
+    // Flat deploys still HTTP-smoke-test; they can't auto-rollback (no previous
+    // release symlink), so the gate fails the deploy instead.
     expect($rollout['deploy_strategy'])->toBe('simple')
-        ->and($rollout['deploy_health_enabled'])->toBeFalse()
-        ->and($rollout['deploy_health_auto_rollback'])->toBeFalse();
+        ->and($rollout['deploy_health_enabled'])->toBeTrue()
+        ->and($rollout['deploy_health_auto_rollback'])->toBeFalse()
+        ->and($rollout['deploy_health_path'])->toBe('/');
 });

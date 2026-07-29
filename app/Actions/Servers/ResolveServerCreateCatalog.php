@@ -7,14 +7,14 @@ namespace App\Actions\Servers;
 use App\Actions\Concerns\AsObject;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Services\AwsEc2Service;
-use App\Services\AzureComputeService;
-use App\Services\DigitalOceanService;
-use App\Services\HetznerService;
-use App\Services\LinodeService;
-use App\Services\OracleComputeService;
-use App\Services\UpCloudService;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\AwsEc2Service;
+use App\Modules\Cloud\Services\AzureComputeService;
+use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Cloud\Services\OracleComputeService;
+use App\Modules\Cloud\Services\UpCloudService;
+use App\Modules\Cloud\Services\VultrService;
 use Illuminate\Support\Collection;
 
 /**

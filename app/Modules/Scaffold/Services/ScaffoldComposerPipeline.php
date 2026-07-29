@@ -391,7 +391,7 @@ class ScaffoldComposerPipeline
     private function setMeta(Site $site, string $dottedPath, mixed $value): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         data_set($meta, $dottedPath, $value);
         $site->meta = $meta;
         $site->save();
@@ -400,7 +400,7 @@ class ScaffoldComposerPipeline
     private function markStep(Site $site, string $key, string $state, ?string $error = null): void
     {
         $site = $site->fresh() ?? $site;
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $steps = $meta['scaffold']['steps'] ?? [];
         foreach ($steps as &$step) {
             if (($step['key'] ?? null) === $key) {

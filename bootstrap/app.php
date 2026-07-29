@@ -6,14 +6,16 @@ use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
+use App\Http\Middleware\EnsureProductionDataMirror;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Http\Middleware\ResolveEdgeCustomDomain;
+use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
 use App\Support\DplyRuntime;
+use App\Support\Http\ScannerProbePaths;
 use App\Support\MachineCallbackPaths;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -47,15 +49,21 @@ return Application::configure(basePath: dirname(__DIR__))
             $middleware->trustProxies(at: $at);
         }
 
+        // Stamp X-Dply-Ref (the Lookout occurrence id) on 5xx responses so a
+        // reference can be quoted by users and resolved by admins.
+        $middleware->append(\App\Http\Middleware\StampDebugReference::class);
+
         $middleware->alias([
             'org' => SetCurrentOrganization::class,
             'auth.api' => AuthenticateApiToken::class,
             'ability' => EnsureApiTokenAbility::class,
             'fleet.operator' => ValidateFleetOperatorToken::class,
+            'bundle.service' => \App\Http\Middleware\ValidateBundleServiceToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,
             'vm.platform' => EnsureVmPlatformEnabled::class,
+            'production.mirror' => EnsureProductionDataMirror::class,
         ]);
         // Machine/external callback paths come from the single canonical list
         // (App\Support\MachineCallbackPaths) the guest gates also use, so a new
@@ -134,6 +142,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // stale snapshot pointing at a route/resource that has since moved.
         // (API callers still fall through to Laravel's JSON 404.)
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            // Known scanner/bot probes (wp-*, *.env, /actuator, leaked-secret
+            // fishing, …) flood Lookout's RequestHandled 404 reporter with noise.
+            // That reporter fires ONLY on status === 404, so we answer probes with
+            // a 410 Gone — the bot can't tell the difference, but Lookout skips it.
+            // Genuine 404s on real routes still return 404 and are still reported.
+            if (ScannerProbePaths::matches($request)) {
+                return response('', 410);
+            }
+
             // X-Livewire = component update (POST); X-Livewire-Navigate = the
             // wire:navigate SPA fetch (GET) — the latter is what morphed the
             // duplicated header in. Catch both.

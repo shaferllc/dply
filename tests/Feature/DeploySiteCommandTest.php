@@ -7,7 +7,7 @@ namespace Tests\Feature\DeploySiteCommandTest;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\Deploy\DeploymentRunner;
+use App\Modules\Deploy\Services\DeploymentRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Mockery;

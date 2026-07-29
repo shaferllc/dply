@@ -53,9 +53,16 @@ for releases_dir in /home/dply/*/releases /var/www/*/releases; do
   while IFS= read -r folder; do
     [ -n "$folder" ] || continue
     [ -d "$folder" ] || continue
-    rm -rf "$folder"
-    pruned=$((pruned + 1))
-    echo "Removed $releases_dir/$folder"
+    # sudo -n first so root-owned files inside a release (managed error pages,
+    # certbot artefacts) can't block the delete; fall back to a plain rm on
+    # hosts without NOPASSWD sudo. Guarded by `if` so a genuinely-stuck folder
+    # warns and the loop continues instead of aborting under `set -e`.
+    if sudo -n rm -rf "$folder" 2>/dev/null || rm -rf "$folder" 2>/dev/null; then
+      pruned=$((pruned + 1))
+      echo "Removed $releases_dir/$folder"
+    else
+      echo "WARN: could not remove $releases_dir/$folder (permission?)" >&2
+    fi
   done < <(ls -1t 2>/dev/null | tail -n +"$((KEEP + 1))")
 done
 

@@ -37,6 +37,21 @@ class WorkspaceEdgeProxy extends WorkspaceWebserver
         $this->resetLogViewerState();
     }
 
+    /**
+     * Merged Edge proxy card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing the Webserver placeholder.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-edge-proxy-placeholder', [
+            'server' => $this->server,
+        ]);
+    }
+
     public function render(ServerManageToolsReport $toolsReport): View
     {
         // Edge proxy ships behind a coming-soon teaser until the L7 routing UI is

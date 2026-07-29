@@ -6,6 +6,8 @@ use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\EnforcesSiteQuota;
+use App\Livewire\Concerns\GuardsBilledDeploys;
+use App\Livewire\Concerns\WatchesSiteDeploys;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -13,7 +15,7 @@ use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Servers\ServerBulkSiteActions;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -21,6 +23,7 @@ use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteCreateAccess;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -35,9 +38,11 @@ class WorkspaceSites extends Component
 {
     use DispatchesToastNotifications;
     use EnforcesSiteQuota;
+    use GuardsBilledDeploys;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RendersWorkspacePlaceholder;
+    use WatchesSiteDeploys;
 
     public SiteCreateForm $form;
 
@@ -139,6 +144,38 @@ class WorkspaceSites extends Component
     {
         $this->dispatch('close-modal', 'add-site-modal');
         $this->showAddSiteModal = false;
+    }
+
+    /**
+     * Sync-peer count per site on this server, keyed by site id — drives the
+     * per-row "Sync N / deploy both" button. Counts are derived from ONE
+     * org-wide pass grouped by canonical repo identity (the same identity
+     * {@see SiteSyncPeers} matches on), so a single-site server still shows a
+     * peer count when its repo is deployed on other servers too, and we never
+     * N+1 a per-row peer query. A site with no repo (server-mate sync only)
+     * reports 1 — its peers are all on this server, already covered by deploying
+     * the rows here, so no cross-server "deploy both" affordance is offered.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function syncPeerCounts(): array
+    {
+        $repoCounts = Site::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->whereNotNull('git_repository_url')
+            ->where('git_repository_url', '!=', '')
+            ->pluck('git_repository_url')
+            ->groupBy(fn (string $repo): string => SiteSyncPeers::canonicalRepo($repo))
+            ->map->count();
+
+        $counts = [];
+        foreach ($this->server->sites as $site) {
+            $repo = SiteSyncPeers::canonicalRepo((string) $site->git_repository_url);
+            $counts[(string) $site->id] = $repo !== '' ? (int) ($repoCounts[$repo] ?? 1) : 1;
+        }
+
+        return $counts;
     }
 
     public function selectAllSites(): void
@@ -383,6 +420,21 @@ class WorkspaceSites extends Component
         ProvisionSiteJob::dispatch($site->id);
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
+    }
+
+    /**
+     * Merged Sites card skeleton (hide-hero) so lazy load matches the page
+     * instead of flashing a separate CTA card + generic pulses.
+     */
+    public function placeholder(): View
+    {
+        if ($this->server === null) {
+            return view('livewire.servers.partials.workspace-placeholder-empty');
+        }
+
+        return view('livewire.servers.partials.workspace-sites-placeholder', [
+            'server' => $this->server,
+        ]);
     }
 
     public function render(): View

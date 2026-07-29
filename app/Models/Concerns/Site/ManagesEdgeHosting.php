@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Models\Site;
-use App\Support\Edge\EdgeRepoRoot;
-use App\Support\Edge\EdgeTestingDomains;
+use App\Modules\Edge\Support\EdgeRepoRoot;
+use App\Modules\Edge\Support\EdgeTestingDomains;
 use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
@@ -32,8 +32,8 @@ trait ManagesEdgeHosting
     public function edgeBackendLabel(): string
     {
         return match ($this->edge_backend) {
-            'org_cloudflare' => __('Your Cloudflare account'),
-            'dply_edge' => __('Dply Edge (managed)'),
+            'org_cloudflare' => __('Your connected account'),
+            'dply_edge' => __('Managed Edge'),
             default => (string) ($this->edge_backend ?: __('Unknown')),
         };
     }
@@ -223,6 +223,19 @@ trait ManagesEdgeHosting
     public function isDplyCloudSite(): bool
     {
         return $this->container_backend === 'dply_cloud';
+    }
+
+    /**
+     * True when this site is a managed Cloud container app
+     * (DO App Platform / App Runner / dply_cloud), not a BYO VM site.
+     *
+     * Null and empty string both mean "not cloud" — factories and
+     * PHP/VM sites leave container_backend unset (null), so callers
+     * must not rely on `=== ''` alone.
+     */
+    public function isCloudContainerSite(): bool
+    {
+        return is_string($this->container_backend) && $this->container_backend !== '';
     }
 
     public function isCloudPreview(): bool

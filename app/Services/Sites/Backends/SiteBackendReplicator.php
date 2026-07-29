@@ -10,7 +10,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\WorkerPools\WorkerWorkloadReplayer;
 use Illuminate\Support\Str;
 
@@ -142,7 +142,7 @@ class SiteBackendReplicator
      */
     private function childSiteMeta(Site $source, string $pinnedSha): array
     {
-        $meta = ($source->meta );
+        $meta = is_array($source->meta) ? $source->meta : [];
 
         // Drop per-site provisioning/runtime state so the child starts clean,
         // but keep operator intent (repository config, git ref kind, …).

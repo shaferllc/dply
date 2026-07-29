@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\ResourcesPageTest;
 
 use App\Enums\SiteType;
-use App\Jobs\AttachCloudDatabaseJob;
-use App\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Sites\Resources;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
@@ -15,7 +15,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -233,7 +233,32 @@ test('detach worker deletes the row and dispatches sync', function () {
     Bus::assertDispatched(SyncCloudWorkersJob::class);
 });
 
-test('non-container site 404s', function () {
+test('serverless site resources page 404s', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        'type' => SiteType::Php,
+        'runtime' => 'php',
+        'meta' => ['functions' => ['provider' => 'digitalocean']],
+    ]);
+
+    $this->withoutExceptionHandling();
+    Livewire::actingAs($user)
+        ->test(Resources::class, ['server' => $server, 'site' => $site]);
+})->throws(NotFoundHttpException::class);
+
+test('vm site resources page renders worker roll-up', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -250,7 +275,7 @@ test('non-container site 404s', function () {
         'type' => SiteType::Php,
     ]);
 
-    $this->withoutExceptionHandling();
     Livewire::actingAs($user)
-        ->test(Resources::class, ['server' => $server, 'site' => $site]);
-})->throws(NotFoundHttpException::class);
+        ->test(Resources::class, ['server' => $server, 'site' => $site])
+        ->assertOk();
+});

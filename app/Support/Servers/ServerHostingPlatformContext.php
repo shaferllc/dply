@@ -6,14 +6,14 @@ namespace App\Support\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Organization;
-use App\Services\HetznerService;
-use App\Services\VultrService;
+use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Cloud\Services\VultrService;
 use RuntimeException;
 
 /**
  * Platform cloud credentials for dply-managed servers — the VM counterpart to
  * {@see App\Modules\Serverless\Support\ServerlessPlatformContext} and
- * {@see App\Support\Edge\EdgeDeliveryContext} `platform()`.
+ * {@see App\Modules\Edge\Support\EdgeDeliveryContext} `platform()`.
  *
  * In managed mode dply provisions and pays for the VM on its own platform cloud
  * account (rather than the customer's connected credential), and bills it all-in

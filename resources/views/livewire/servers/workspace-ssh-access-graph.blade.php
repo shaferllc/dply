@@ -5,14 +5,36 @@
     $timelineRangeLabels = ['7d' => __('7 days'), '30d' => __('30 days'), '90d' => __('90 days')];
 @endphp
 
-<x-server-workspace-layout :server="$server" active="ssh-access" :title="__('Access graph')" :description="__('Who had SSH access on this server over time — your keys, temporary sessions, and when Dply accessed the server to run jobs.')">
+<x-server-workspace-layout
+    :server="$server"
+    active="ssh-access"
+    :title="__('Access graph')"
+    :description="__('Who had SSH access on this server over time — your keys, temporary sessions, and when Dply accessed the server to run jobs.')"
+    hide-hero
+>
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div class="space-y-6">
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Access graph') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Who had SSH access on this server over time — your keys, temporary sessions, and when Dply accessed the server to run jobs.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <x-access-map :map="$accessMap" :server="$server" />
 
-        <section class="dply-card overflow-hidden">
-            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10">
+            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -43,7 +65,7 @@
                 </div>
             </div>
 
-            <div class="space-y-5 px-6 py-5 sm:px-7">
+            <div class="space-y-5 px-5 py-5 sm:px-6">
                 <div class="flex flex-wrap items-center gap-4 text-[11px] text-brand-moss">
                     <span class="inline-flex items-center gap-1.5">
                         <span class="inline-block h-0.5 w-5 rounded bg-brand-forest"></span>
@@ -166,9 +188,10 @@
                     </div>
                 @endif
             </div>
-        </section>
-        <section class="dply-card overflow-hidden">
-            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        </div>
+
+        <div class="border-b border-brand-ink/10">
+            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                 <x-icon-badge><x-heroicon-o-key class="h-5 w-5" /></x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
@@ -191,39 +214,39 @@
             @if ($report['alert_count'] > 0)
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['alerts'] as $alert)
-                        <li class="flex flex-wrap justify-between gap-3 px-6 py-4 sm:px-7">
+                        <li class="flex flex-wrap justify-between gap-3 px-5 py-4 sm:px-6">
                             <div><p class="text-sm font-semibold text-brand-ink">{{ $alert['title'] }}</p><p class="text-sm text-brand-moss">{{ $alert['message'] }}</p></div>
                             @if ($alert['href'])<a href="{{ $alert['href'] }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>@endif
                         </li>
                     @endforeach
                 </ul>
             @endif
-        </section>
+        </div>
 
         @if (count($report['rows']) > 0)
-            <section class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10">
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-left text-xs">
-                        <thead class="bg-brand-sand/30 text-brand-moss"><tr><th class="px-3 py-2">{{ __('Name') }}</th><th class="px-3 py-2">{{ __('Source') }}</th><th class="px-3 py-2">{{ __('User') }}</th><th class="px-3 py-2">{{ __('Synced') }}</th><th class="px-3 py-2">{{ __('Review') }}</th></tr></thead>
+                        <thead class="bg-brand-sand/30 text-brand-moss"><tr><th class="px-3 py-2 sm:px-5">{{ __('Name') }}</th><th class="px-3 py-2">{{ __('Source') }}</th><th class="px-3 py-2">{{ __('User') }}</th><th class="px-3 py-2">{{ __('Synced') }}</th><th class="px-3 py-2 sm:px-5">{{ __('Review') }}</th></tr></thead>
                         <tbody class="divide-y divide-brand-ink/5 bg-white">
                             @foreach ($report['rows'] as $row)
                                 <tr @class(['bg-amber-50/40' => $row['review_overdue']])>
-                                    <td class="px-3 py-2 font-medium text-brand-ink">{{ $row['name'] }}</td>
+                                    <td class="px-3 py-2 font-medium text-brand-ink sm:px-5">{{ $row['name'] }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ $sourceLabels[$row['source']] ?? $row['source'] }}</td>
                                     <td class="px-3 py-2 font-mono text-brand-moss">{{ $row['target_linux_user'] }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ $row['synced_at']?->diffForHumans() ?? '—' }}</td>
-                                    <td class="px-3 py-2 text-brand-moss">@if ($row['review_after']){{ $row['review_after']->format('Y-m-d') }}@else—@endif</td>
+                                    <td class="px-3 py-2 text-brand-moss sm:px-5">@if ($row['review_after']){{ $row['review_after']->format('Y-m-d') }}@else—@endif</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </div>
         @endif
 
         @if ($sessionsEnabled && count($report['sessions']) > 0)
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -235,7 +258,7 @@
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['sessions'] as $session)
-                        <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
+                        <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6">
                             <div>
                                 <p class="text-sm font-semibold text-brand-ink">{{ $session['name'] }}</p>
                                 <p class="text-xs text-brand-moss">{{ __('Expires :time · :user', ['time' => $session['expires_at']->diffForHumans(), 'user' => $session['created_by'] ?: __('Unknown')]) }}</p>
@@ -244,9 +267,9 @@
                         </li>
                     @endforeach
                 </ul>
-            </section>
+            </div>
         @endif
-    </div>
+    </section>
 
     @if ($sessionsEnabled)
         <x-modal name="grant-ssh-session" maxWidth="2xl" overlayClass="bg-brand-ink/40">

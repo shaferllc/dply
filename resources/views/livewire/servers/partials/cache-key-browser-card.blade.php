@@ -11,7 +11,7 @@
     'valueError' => null,
     'error' => null,
     'replUnlocked' => false,
-    'card' => 'dply-card overflow-hidden',
+    'card' => 'border-b border-brand-ink/10',
     /** Current page of the in-memory SCAN buffer. Drives slice + prev/next. */
     'keysTablePage' => 1,
     /** True when the keys list was hydrated from session on mount, not freshly SCANned. */
@@ -31,7 +31,7 @@
      visible portion looks like it's "hiding behind" the next workspace card.
      The header still uses bg-brand-sand/20 + border-b which naturally
      respects rounded corners, so visually nothing else changes. --}}
-<div class="{{ str_replace('overflow-hidden', 'overflow-visible', $card) }}" wire:key="cache-key-browser-{{ $engine }}">
+<div class="{{ $card }} overflow-visible" wire:key="cache-key-browser-{{ $engine }}">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>
             <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />

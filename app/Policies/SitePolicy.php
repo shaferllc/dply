@@ -2,9 +2,12 @@
 
 namespace App\Policies;
 
+use App\Models\EdgeSiteMember;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Workspaces\WorkspaceRegistry;
 
 class SitePolicy
 {
@@ -17,7 +20,12 @@ class SitePolicy
     {
         $server = $this->resolveServer($site);
 
-        return $server !== null && $user->can('view', $server);
+        if ($server !== null && $user->can('view', $server)) {
+            return true;
+        }
+
+        // Edge per-site members elevate — never restrict — org access.
+        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_VIEWER);
     }
 
     public function create(User $user): bool
@@ -37,17 +45,26 @@ class SitePolicy
 
     public function update(User $user, Site $site): bool
     {
-        if ($site->workspace_id && $site->workspace) {
-            if (! $site->workspace->userCanView($user)) {
+        $workspace = app(WorkspaceRegistry::class)->for($site);
+        if ($workspace !== null) {
+            if (! $workspace->userCanView($user)) {
                 return false;
             }
 
-            return $site->workspace->userCanUpdate($user);
+            if ($workspace->userCanUpdate($user)) {
+                return true;
+            }
+
+            return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
         }
 
         $server = $this->resolveServer($site);
 
-        return $server !== null && $user->can('update', $server);
+        if ($server !== null && $user->can('update', $server)) {
+            return true;
+        }
+
+        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
     }
 
     public function clone(User $user, Site $site): bool
@@ -63,26 +80,61 @@ class SitePolicy
         }
 
         if ($site->organization_id !== null) {
-            return $site->organization->hasAdminAccess($user);
+            return $this->resolveOrganization($user, $site)?->hasAdminAccess($user) ?? false;
         }
 
         return $site->user_id === $user->id;
     }
 
     /**
-     * Manage per-site team members on an Edge site. Org admin only.
-     * The per-site members feature (edge_site_members) was deprecated
-     * along with the Members workspace tab — kept as a method for
-     * backwards-compat with any lingering Gate checks.
+     * Manage per-site Edge members (Wave E P12). Org admins always can;
+     * Edge site admins elevate to the same gate.
      */
     public function manageMembers(User $user, Site $site): bool
     {
-        $server = $this->resolveServer($site);
+        if ($site->organization_id === null) {
+            return false;
+        }
 
-        return $server !== null
-            && $user->can('view', $server)
-            && $site->organization_id !== null
-            && $site->organization->hasAdminAccess($user);
+        if ($this->resolveOrganization($user, $site)?->hasAdminAccess($user) ?? false) {
+            return true;
+        }
+
+        return $this->edgeMemberRank($user, $site) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_ADMIN);
+    }
+
+    private function edgeMemberRank(User $user, Site $site): int
+    {
+        if (! $site->usesEdgeRuntime()) {
+            return 0;
+        }
+
+        $role = $site->edgeSiteMembers()
+            ->where('user_id', $user->id)
+            ->value('role');
+
+        return is_string($role) ? EdgeSiteMember::rankFor($role) : 0;
+    }
+
+    /**
+     * Resolve a site's organization for an admin check, preferring the user's
+     * already-memoized {@see User::currentOrganization()} when it's the same org
+     * (the common case) so authorizing several site instances in one render
+     * doesn't reload the same `organizations` row each time. Falls back to the
+     * relation for the rare cross-org check.
+     */
+    private function resolveOrganization(User $user, Site $site): ?Organization
+    {
+        if ($site->organization_id === null) {
+            return null;
+        }
+
+        $current = $user->currentOrganization();
+        if ($current !== null && (string) $current->id === (string) $site->organization_id) {
+            return $current;
+        }
+
+        return $site->organization;
     }
 
     private function resolveServer(Site $site): ?Server

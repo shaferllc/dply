@@ -8,7 +8,7 @@ use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\EdgeSiteBillingAnalytics;
+use App\Modules\Billing\Services\EdgeSiteBillingAnalytics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

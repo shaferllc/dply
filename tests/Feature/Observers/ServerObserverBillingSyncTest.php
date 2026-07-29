@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Observers\ServerObserverBillingSyncTest;
 
-use App\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;

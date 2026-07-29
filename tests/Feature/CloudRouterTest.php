@@ -9,9 +9,9 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\AwsAppRunnerBackend;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
+use App\Modules\Cloud\Backends\AwsAppRunnerBackend;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

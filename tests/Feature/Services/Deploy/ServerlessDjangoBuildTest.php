@@ -6,7 +6,7 @@ namespace Tests\Feature\Services\Deploy\ServerlessDjangoBuildTest;
 
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\DigitalOceanFunctionsArtifactBuilder;
+use App\Modules\Deploy\Services\DigitalOceanFunctionsArtifactBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;

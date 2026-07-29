@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Credentials;
 use App\Http\Controllers\Controller;
 use App\Models\ProviderCredential;
 use App\Models\Organization;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

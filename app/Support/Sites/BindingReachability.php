@@ -43,7 +43,7 @@ final class BindingReachability
         }
 
         $env = $binding->connectionEnv();
-        $cfg = ($binding->config );
+        $cfg = is_array($binding->config) ? $binding->config : [];
         $provider = strtolower(trim((string) ($cfg['provider'] ?? '')));
 
         return match ($binding->type) {

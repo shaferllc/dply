@@ -38,7 +38,41 @@
             $attachedTypes += $t['attached'] ? 1 : 0;
         }
     }
-    $groupCount = count($hubGroups);
+    // A type renders as a card when it's attached (or is publication, which is
+    // pure runtime-managed state). Everything else is "available" and lives only
+    // in the single global "Add resource" dropdown until attached. Shared by the
+    // header dropdown and each group column so they stay in lockstep.
+    $isShownAsCard = function ($t) {
+        if ($t['type'] === 'storage') {
+            return ($t['bindings'] ?? collect())->isNotEmpty();
+        }
+        if ($t['type'] === 'publication') {
+            return true;
+        }
+        return $t['attached'];
+    };
+
+    // Only draw a group pathway (hub + column + its trunk edge) once it actually
+    // has a card to show. Empty pathways stay hidden until you add a resource to
+    // them from the global "Add resource" dropdown, which then makes them appear.
+    $visibleGroups = array_filter(
+        $hubGroups,
+        fn ($g) => collect($g['types'])->contains(fn ($t) => $isShownAsCard($t))
+    );
+    $groupCount = count($visibleGroups);
+
+    // Available types grouped by their (human) category label, so the global
+    // dropdown shows which column each pick will land in. Spans every group —
+    // even hidden ones — so a hidden pathway is still reachable from here.
+    $availableByGroup = [];
+    foreach ($hubGroups as $g) {
+        foreach ($g['types'] as $t) {
+            if (! $isShownAsCard($t)) {
+                $availableByGroup[$g['label']][] = $t;
+            }
+        }
+    }
+    $availableCount = array_sum(array_map('count', $availableByGroup));
 
     // Attached worker SERVER pool(s) get their own graph column on the right, so the
     // scalable background fleet shows as an attached resource. Scoped to pools that
@@ -58,14 +92,67 @@
     $routingActive = $routingDomainCount > 0;
 @endphp
 
-<div class="space-y-5">
-    {{-- Header: title, count chip, legend --}}
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-ink">{{ __('Resource map') }}</h2>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
-        </div>
+{{-- Nested inside Settings Resources merged card — toolbar + strips, no second page card. --}}
+<div class="min-w-0">
+    {{-- Toolbar: actions + status (page title lives in the outer sand identity). --}}
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
+        <p class="text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
         <div class="flex flex-wrap items-center gap-3">
+            {{-- One global "Add resource" dropdown. Every unattached type lives
+                 here, grouped by category so you can see which column it lands in;
+                 picking one runs the same attach path and it pops out as a card in
+                 its proper group below. --}}
+            @if ($availableCount > 0)
+                <div class="relative" x-data="{ open: false }">
+                    <button type="button" @click="open = ! open" :aria-expanded="open"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                        <x-heroicon-o-plus class="h-4 w-4" />
+                        {{ __('Add resource') }}
+                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-[10px] font-semibold">{{ $availableCount }}</span>
+                        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <div x-show="open" x-cloak x-transition x-on:click.outside="open = false"
+                        class="absolute right-0 z-30 mt-1 max-h-[28rem] w-80 overflow-y-auto rounded-xl border border-brand-ink/10 bg-white py-1.5 text-left shadow-xl">
+                        @foreach ($availableByGroup as $groupLabel => $items)
+                            <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
+                            @foreach ($items as $at)
+                                @php
+                                    $atType = $at['type'];
+                                    $atRuntimeUrl = match ($atType) {
+                                        'logging' => $sectionUrl('logs'),
+                                        'scheduler' => route('sites.schedule', ['server' => $server, 'site' => $site]),
+                                        'workers' => route('sites.daemons', ['server' => $server, 'site' => $site]),
+                                        default => null,
+                                    };
+                                @endphp
+                                @if ($atRuntimeUrl)
+                                    <a href="{{ $atRuntimeUrl }}" wire:navigate
+                                        class="flex items-start gap-2.5 px-3 py-2 transition hover:bg-brand-sand/40">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                                            <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
+                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                        </span>
+                                    </a>
+                                @else
+                                    <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')" @click="open = false"
+                                        class="flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-brand-sand/40">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                                            <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
+                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                        </span>
+                                    </button>
+                                @endif
+                            @endforeach
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             @if ($networkedAttached > 0)
                 <button type="button" wire:click="validateReachability" wire:loading.attr="disabled" wire:target="validateReachability"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
@@ -84,9 +171,86 @@
         </div>
     </div>
 
+    {{-- Release health. Only meaningful for dedicated-pool atomic sites (a shared
+         pool or flat checkout has no per-release symlink to pin). Gated
+         synchronously here; the live "which release are workers serving?" probe
+         runs off the render path via wire:init. --}}
+    @php $showReleaseHealth = $site->usesDedicatedPhpFpmPool() && $site->isAtomicDeploys(); @endphp
+    @if ($showReleaseHealth)
+        <div wire:init="loadReleaseHealth" wire:key="release-health">
+            @if (! $releaseHealthLoaded)
+                <div class="flex items-center gap-2.5 border-b border-brand-ink/10 px-5 py-3 text-xs text-brand-moss sm:px-6">
+                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin text-brand-mist" />
+                    {{ __('Checking which release the live workers are serving…') }}
+                </div>
+            @elseif ($releaseHealth !== null)
+                @php
+                    $state = $releaseHealth['state'];
+                    $expected = $releaseHealth['expected'];
+                    $serving = $releaseHealth['serving'];
+                    $oc = $releaseHealth['opcache'] ?? null;
+                    $card = match ($state) {
+                        'drifted' => ['ring' => 'border-amber-200/80 bg-amber-50/40', 'dot' => 'bg-amber-500', 'icon' => 'heroicon-o-exclamation-triangle', 'iconColor' => 'text-amber-600'],
+                        'in_sync' => ['ring' => 'border-brand-ink/10 bg-brand-forest/5', 'dot' => 'bg-brand-forest', 'icon' => 'heroicon-o-check-circle', 'iconColor' => 'text-brand-forest'],
+                        default => ['ring' => 'border-brand-ink/10 bg-white', 'dot' => 'bg-brand-mist', 'icon' => 'heroicon-o-cube', 'iconColor' => 'text-brand-moss'],
+                    };
+                @endphp
+                <div class="border-b {{ $card['ring'] }} px-5 py-3.5 sm:px-6">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <x-dynamic-component :component="$card['icon']" class="mt-0.5 h-5 w-5 shrink-0 {{ $card['iconColor'] }}" />
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Release health') }}</h3>
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $state === 'drifted' ? 'bg-amber-100 text-amber-800' : ($state === 'in_sync' ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-ink/5 text-brand-moss') }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $card['dot'] }}"></span>
+                                        {{ $state === 'drifted' ? __('Workers pinned') : ($state === 'in_sync' ? __('In sync') : __('Unconfirmed')) }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                                    @if ($state === 'drifted')
+                                        {{ __('php-fpm is serving an OLDER release than the one this deploy activated — OPcache pinned the previous `current`. The site may show stale assets (Vite hash 404s). Flush to re-sync.') }}
+                                    @elseif ($state === 'in_sync')
+                                        {{ __('The live workers are serving the current release. Nothing to do.') }}
+                                    @else
+                                        {{ __('Couldn’t confirm the live release (the workers’ cache is empty or just flushed). Refresh after some traffic.') }}
+                                    @endif
+                                </p>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-mist">
+                                    <span>{{ __('Activated') }}: <span class="font-mono text-brand-ink">{{ $expected ?? '—' }}</span></span>
+                                    <span>{{ __('Serving') }}: <span class="font-mono {{ $state === 'drifted' ? 'text-amber-700' : 'text-brand-ink' }}">{{ $serving ?? '—' }}</span></span>
+                                    @if (is_array($oc) && ($oc['enabled'] ?? false))
+                                        <span>{{ __('OPcache hit rate') }}: <span class="font-mono text-brand-ink">{{ $oc['hit_rate'] !== null ? $oc['hit_rate'].'%' : '—' }}</span></span>
+                                        @if (($oc['memory_wasted'] ?? 0) > 0)
+                                            <span>{{ __('wasted') }}: <span class="font-mono text-brand-ink">{{ round(($oc['memory_wasted'] ?? 0) / 1048576, 1) }} MB</span></span>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button" wire:click="refreshReleaseHealth" wire:loading.attr="disabled" wire:target="refreshReleaseHealth"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshReleaseHealth" />
+                                {{ __('Refresh') }}
+                            </button>
+                            @if ($state === 'drifted')
+                                <button type="button" wire:click="flushOpcacheResync" wire:loading.attr="disabled" wire:target="flushOpcacheResync"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60">
+                                    <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                                    {{ __('Flush OPcache & re-sync') }}
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- The graph. Horizontally scrollable on narrow screens so the topology
-         keeps its shape instead of collapsing. --}}
-    <div class="dply-card overflow-x-auto bg-linear-to-br from-white to-brand-cream/30 p-6 sm:p-8" style="zoom: .95;">
+         keeps its shape instead of collapsing. Strip inside the merged card. --}}
+    <div class="overflow-x-auto border-b border-brand-ink/10 bg-linear-to-br from-white to-brand-cream/30 px-5 py-6 sm:px-6 sm:py-8" style="zoom: .95;">
         <div
             x-data="{
                 w: 0, h: 0, _ro: null, _zoom: 1,
@@ -265,33 +429,46 @@
                 </div>
             </div>
 
-            {{-- One row per group: hub pill (col 2) + resource nodes (col 3) --}}
-            @foreach ($hubGroups as $groupKey => $group)
+            {{-- One row per visible group: hub pill (col 2) + resource nodes (col 3).
+                 Groups with nothing attached are hidden until a resource lands. --}}
+            @foreach ($visibleGroups as $groupKey => $group)
                 @php
                     $col = $loop->iteration;
                     $gAttached = collect($group['types'])->where('attached', true)->count();
-                    $gTotal = count($group['types']);
+
+                    // Only render the resources that are actually present as cards
+                    // (anything attached, plus publication which is purely
+                    // runtime-managed state). Unattached types are added from the
+                    // single global "Add resource" dropdown in the header and pop
+                    // out here once attached — no wall of empty ghost cards.
+                    $cardTypes = collect($group['types'])->filter($isShownAsCard)->values();
                 @endphp
 
                 {{-- Group hub --}}
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
-                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ $gAttached }}/{{ $gTotal }} {{ __('attached') }}</p>
+                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gAttached, ['count' => $gAttached]) }}</p>
                     </div>
                 </div>
 
                 {{-- Resource nodes for this group (left gutter leaves room for the branch curves) --}}
                 <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $col }}; grid-row: 4;">
-                    @foreach ($group['types'] as $t)
+                    @foreach ($cardTypes as $t)
                         @if ($t['type'] === 'storage')
                             @include('livewire.sites.settings.partials._resource-storage-card', ['t' => $t])
                             @continue
                         @endif
                         @php
                             $type = $t['type'];
-                            $binding = $t['binding'];
-                            $attached = $t['attached'];
+                            // Multi-instance types (database, …) render one node per
+                            // attached instance; single types render their one node.
+                            $isMulti = \App\Models\SiteBinding::isMultiInstance($type);
+                            $instances = $isMulti ? collect($t['bindings'] ?? []) : collect([$t['binding']]);
+                        @endphp
+                        @foreach ($instances as $binding)
+                        @php
+                            $attached = $binding instanceof \App\Models\SiteBinding;
                             $envKeys = $attached && is_array($binding->injected_env) ? array_keys($binding->injected_env) : [];
                             $canProvision = in_array($type, $provisionTypes, true);
                             $canConfig = in_array($type, $configTypes, true);
@@ -306,6 +483,17 @@
                             // Human-readable explanation of THIS tile's current state, surfaced as an
                             // HTML tooltip on the status dot + badge so a hover tells you what's wrong.
                             $cfg = $attached && is_array($binding->config) ? $binding->config : [];
+
+                            // Managed DBs inject their connection vars at provision-complete time,
+                            // but those only reach the running app at the next deploy. A managed
+                            // binding "needs redeploy" until last_deploy_at catches up to when the
+                            // connection became ready.
+                            $managedReadyAt = ($cfg['managed'] ?? false) && filled($cfg['connection_ready_at'] ?? null)
+                                ? \Illuminate\Support\Carbon::parse($cfg['connection_ready_at'])
+                                : null;
+                            $needsRedeploy = $managedReadyAt !== null
+                                && $attached && $binding->status === 'configured'
+                                && ($site->last_deploy_at === null || $site->last_deploy_at->lt($managedReadyAt));
                             $reasonMap = [
                                 'drivers_reference_redis_without_connection' => __('Cache, queue, or session is set to redis, but no Redis connection is configured yet — attach Redis.'),
                                 's3_disk_without_bucket' => __('The filesystem disk is S3-compatible, but AWS_BUCKET is not set.'),
@@ -318,15 +506,31 @@
                                 $isUnreachable => __('The server could not open a connection to this resource.'),
                                 filled($cfg['reason'] ?? null) && isset($reasonMap[$cfg['reason']]) => $reasonMap[$cfg['reason']],
                                 filled($cfg['reason'] ?? null) => \Illuminate\Support\Str::headline((string) $cfg['reason']),
+                                // Managed databases provision asynchronously: the cluster takes a few
+                                // minutes, then its connection vars land on the binding. They apply at
+                                // the next deploy, so a configured managed DB prompts a redeploy.
+                                $attached && ($cfg['managed'] ?? false) && $binding->status === 'provisioning' => __('Provisioning the managed cluster — this takes a few minutes.'),
+                                $attached && in_array($cfg['placement'] ?? '', ['docker', 'docker_vm'], true) && $binding->status === 'provisioning' => match ($cfg['placement'] ?? '') {
+                                    'docker_vm' => __('Provisioning the Docker database server and starting the container — this can take several minutes.'),
+                                    default => __('Starting the Docker database container — this usually takes under a minute.'),
+                                },
+                                $needsRedeploy => __('Connection ready — redeploy to apply the connection variables.'),
                                 $attached && $binding->status === 'configured' => __('Configured and ready.'),
                                 $attached && $binding->status === 'pending' => __('Attached, but not fully configured yet.'),
                                 $attached => \Illuminate\Support\Str::headline((string) $binding->status),
                                 default => __('Not attached yet.'),
                             };
+
+                            // A dedicated-VM database binding owns its own server. Let the status
+                            // badge deep-link to that server — servers.show redirects to the live
+                            // provisioning journey while it's still coming up, then to the server
+                            // workspace once it's ready.
+                            $dbVmServerId = in_array($cfg['placement'] ?? null, ['dedicated_vm', 'docker_vm'], true) ? ($cfg['db_vm_server_id'] ?? null) : null;
+                            $dbVmServerUrl = $attached && filled($dbVmServerId) ? route('servers.show', $dbVmServerId) : null;
                         @endphp
                         <div
-                            wire:key="res-{{ $type }}"
-                            data-resource-node="{{ $type }}"
+                            wire:key="res-{{ $type }}-{{ $attached ? $binding->id : 'new' }}"
+                            data-resource-node="{{ $type }}{{ $attached ? '-'.$binding->id : '' }}"
                             data-group="{{ $groupKey }}"
                             data-attached="{{ $attached ? '1' : '0' }}"
                             x-data="{ open: false }"
@@ -336,7 +540,7 @@
                                 'border-brand-ink/10 border-dashed hover:border-brand-forest/40 hover:shadow-md' => ! $attached,
                             ])
                         >
-                            {{-- corner controls: expand details + detach --}}
+                            {{-- corner controls: expand details + (multi-instance) edit + detach --}}
                             <div class="absolute right-1.5 top-1.5 flex items-center gap-0.5">
                                 @if ($attached && $envKeys !== [])
                                     <button type="button" @click="open = ! open" :aria-expanded="open" title="{{ __('Details') }}"
@@ -344,9 +548,16 @@
                                         <svg class="h-4 w-4 transition-transform duration-200" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
                                     </button>
                                 @endif
+                                @if ($attached && $isMulti)
+                                    <button type="button" title="{{ __('Edit') }}"
+                                        wire:click="openBindingModal('{{ $type }}', 'attach', @js((string) $binding->id))"
+                                        class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                    </button>
+                                @endif
                                 @if ($attached && ! $isLogging)
                                     <button type="button" title="{{ __('Detach') }}"
-                                        wire:click="openConfirmActionModal('detachBinding', @js([(string) $binding->id]), @js(__('Detach :label?', ['label' => $t['label']])), @js(__('Remove this resource binding? Its injected variables will no longer be applied at deploy.')), @js(__('Detach')), true)"
+                                        wire:click="openDetachBindingConfirmModal(@js((string) $binding->id), @js($t['label']))"
                                         class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
                                         <x-heroicon-o-x-mark class="h-4 w-4" />
                                     </button>
@@ -372,7 +583,20 @@
                                     @if ($attached)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
                                             <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
-                                            <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                            @if ($dbVmServerUrl)
+                                                <a href="{{ $dbVmServerUrl }}" wire:navigate
+                                                    title="{{ $binding->status === 'provisioning' ? __('View provisioning status') : __('View database server') }}"
+                                                    class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
+                                            @else
+                                                <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                            @endif
+                                            @if ($needsRedeploy)
+                                                <a href="{{ $sectionUrl('deploy') }}" wire:navigate
+                                                    title="{{ __('The connection variables apply at the next deploy.') }}"
+                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200">
+                                                    <x-heroicon-o-arrow-path class="h-2.5 w-2.5" /> {{ __('Redeploy to apply') }}
+                                                </a>
+                                            @endif
                                         </div>
                                         @if ($conn !== null)
                                             @php
@@ -432,6 +656,17 @@
                                                 </div>
                                             @endforeach
                                         </div>
+                                        @if ($isMulti && filled($cfg['connection_snippet'] ?? null))
+                                            {{-- A named (secondary) connection needs a matching block in
+                                                 the app's config/database.php — hand over the exact array. --}}
+                                            <div class="mt-2" x-data="{ copied: false, async copy() { try { await navigator.clipboard.writeText(@js((string) ($cfg['connection_snippet'] ?? ''))); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }">
+                                                <div class="flex items-center justify-between">
+                                                    <p class="text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/database.php → connections') }}</p>
+                                                    <button type="button" @click="copy()" class="text-[10px] font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                                </div>
+                                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-[10px] leading-relaxed text-brand-cream">{{ $cfg['connection_snippet'] }}</pre>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             @endif
@@ -466,11 +701,23 @@
                                      from the server (cache/queue/session resolve to their engine). --}}
                                 @if ($attached && method_exists($this, 'seedQueuedConsoleAction'))
                                     @if ($type === 'mail' && method_exists($this, 'sendBindingTestEmail'))
-                                        <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail"
-                                            title="{{ __('Send a test email through this transport to your account.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
-                                            <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
-                                        </button>
+                                        {{-- Like the variables-list "Send test": pop a recipient field so
+                                             the operator can pick who gets it (blank → their own email). --}}
+                                        <div class="relative" x-data="{ open: false }" wire:key="cardmailtest-{{ md5((string) $binding->id) }}">
+                                            <button type="button" x-on:click="open = !open"
+                                                title="{{ __('Send a test email through this transport.') }}"
+                                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                                <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
+                                            </button>
+                                            <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 text-left shadow-lg">
+                                                <x-input-label for="cardmailtest_to_{{ md5((string) $binding->id) }}" :value="__('Send test email to')" />
+                                                <input id="cardmailtest_to_{{ md5((string) $binding->id) }}" type="email" wire:model="mailTestRecipient" placeholder="{{ auth()->user()?->email }}" class="dply-input mt-1 text-sm" />
+                                                <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
+                                                    <x-heroicon-o-paper-airplane class="h-4 w-4" /> {{ __('Send test email') }}
+                                                </button>
+                                                <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
+                                            </div>
+                                        </div>
                                     @elseif (in_array($type, ['database', 'redis', 'cache', 'queue', 'session'], true) && method_exists($this, 'verifyBinding'))
                                         <button type="button" wire:click="verifyBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="verifyBinding"
                                             title="{{ __('Probe this connection from the server now.') }}"
@@ -487,6 +734,13 @@
                                         </button>
                                     @endif
                                 @endif
+                                @if ($attached && method_exists($this, 'openBindingInfoModal'))
+                                    <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
+                                        title="{{ __('View this connection\'s details (injected variables + reachability).') }}"
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ __('Info') }}
+                                    </button>
+                                @endif
                                 {{-- Jump from a managed broadcasting binding to the relay app's own page
                                      (credentials, live stats, connected sites, tier). --}}
                                 @if ($type === 'broadcasting' && $attached && $binding->target_type === 'realtime_app' && (auth()->user()?->can('view', $site->organization) ?? false))
@@ -501,7 +755,10 @@
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                     </a>
                                 @elseif ($canProvision)
-                                    @if ($attached)
+                                    @if ($attached && $isMulti)
+                                        {{-- Multi-instance (database): per-instance Edit lives in the
+                                             corner and "Add another" sits below the list, so no Replace. --}}
+                                    @elseif ($attached)
                                         {{-- Already wired up: one binding per type, so attach/provision
                                              both *replace* it. Offer a single "Replace…" that opens the
                                              modal (where you can re-link an existing one or spin up a new). --}}
@@ -517,9 +774,15 @@
                                         </button>
                                     @endif
                                 @elseif ($canConfig)
-                                    <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
-                                    </button>
+                                    @if ($attached && $isMulti)
+                                        {{-- Multi-instance: per-instance Edit lives in the corner and
+                                             "Add another" sits below; the id-less Configure button here
+                                             would open a fresh form, so it's suppressed. --}}
+                                    @else
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
+                                        </button>
+                                    @endif
                                 @else
                                     @php
                                         $runtimeUrl = match ($type) {
@@ -557,6 +820,17 @@
                                 @endif
                             </div>
                         </div>
+                        @endforeach
+                        @if ($isMulti)
+                            {{-- Add another instance of this multi-instance type (e.g.
+                                 a second database / connection). It lands in this same
+                                 column once attached. --}}
+                            <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
+                                class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 bg-white/60 px-3 py-2 text-[11px] font-semibold text-brand-moss shadow-sm transition hover:border-brand-forest/40 hover:text-brand-ink hover:shadow-md">
+                                <x-heroicon-o-plus class="h-3.5 w-3.5 text-brand-forest" />
+                                {{ __('Add another :label', ['label' => \Illuminate\Support\Str::lower($t['label'])]) }}
+                            </button>
+                        @endif
                     @endforeach
                 </div>
             @endforeach
@@ -610,6 +884,12 @@
 
     {{-- Fix-unreachable modal (auto-fix in place / re-point for database & redis). --}}
     @include('livewire.sites.settings.partials.environment.fix-binding-modal')
+
+    {{-- Detach / destructive confirm. Property-driven ($showConfirmActionModal),
+         so it must render inside THIS component — the corner "Detach" button sets
+         the flag on ResourceMap, not on the parent Settings host. Without it the X
+         opened nothing. --}}
+    @include('livewire.partials.confirm-action-modal')
 
     @verbatim
         <style>

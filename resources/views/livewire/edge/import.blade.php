@@ -207,7 +207,9 @@
                         </li>
                         <li>
                             <span class="font-semibold text-brand-ink">{{ __('2. Attach each domain in the Edge → Domains tab.') }}</span>
-                            {{ __('dply will show you a per-domain target hostname like') }} <code class="font-mono text-brand-ink">your-site.dply.app</code>. {{ __('Note it down.') }}
+                            {{ __('dply shows a CNAME target per domain (your site’s') }}
+                            <code class="font-mono text-brand-ink">{slug}.on-dply.site</code>
+                            {{ __('hostname, or a fallback origin when configured). Copy it from the Domains row.') }}
                         </li>
                         <li>
                             <span class="font-semibold text-brand-ink">{{ __('3. Lower TTL at your DNS provider.') }}</span>
@@ -215,14 +217,19 @@
                         </li>
                         <li>
                             <span class="font-semibold text-brand-ink">{{ __('4. Update the CNAME.') }}</span>
-                            {{ __('Change the record currently pointing at :from to point at :to.', ['from' => $currentTargetHint, 'to' => '(target shown in dply Domains tab)']) }}
+                            {{ __('Change the record currently pointing at :from to the CNAME target from step 2.', ['from' => $currentTargetHint]) }}
                         </li>
                         <li>
                             <span class="font-semibold text-brand-ink">{{ __('5. Verify and decommission.') }}</span>
-                            {{ __('Hit each domain through dply (Domains tab shows when the certificate is live), then remove the old custom-domain entry on :provider so it stops billing or holding the hostname.', ['provider' => $providerLabel]) }}
+                            {{ __('In Domains, click Verify DNS and wait for Ready + TLS active, then remove the old custom-domain entry on :provider so it stops billing or holding the hostname.', ['provider' => $providerLabel]) }}
                         </li>
                     </ol>
-                    <p class="mt-2 text-[10px] text-brand-mist">{{ __('Apex (root) domains: most providers require ALIAS/ANAME or a flattening CNAME — dply provides the same target host you point a CNAME at.') }}</p>
+                    <p class="mt-2 text-[10px] text-brand-mist">
+                        {{ __('Apex (root) domains: most providers require ALIAS/ANAME or a flattening CNAME — use the same target host as a normal CNAME.') }}
+                    </p>
+                    <div class="mt-2">
+                        <x-docs-link slug="edge-domains" :label="__('Edge domains docs')" />
+                    </div>
                 </div>
             @endif
 

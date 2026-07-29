@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Services\Cloudflare\CloudflareDnsService;
+use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
 
 class CloudflareDnsProvider implements DnsProvider
 {
@@ -31,5 +31,14 @@ class CloudflareDnsProvider implements DnsProvider
     public function deleteRecord(string $zone, string $recordId): void
     {
         $this->service->deleteDnsRecord($zone, $recordId);
+    }
+
+    public function controlsZone(string $zone): bool
+    {
+        try {
+            return $this->service->zoneExists($zone);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

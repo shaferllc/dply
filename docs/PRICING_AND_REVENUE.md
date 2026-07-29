@@ -113,7 +113,7 @@ Managed products run on **dply-owned infra**, so they bill per live unit on top 
 | Product | Billable unit | Default fee | Notes |
 |---|---|---|---|
 | **dply Cloud** | Per live production app | **$5/mo** | Container apps on `dply_cloud`; branch previews excluded |
-| **dply Edge** | Per live production site | **$2/mo** | Static/SSG on managed `dply_edge`; branch previews excluded |
+| **dply Edge** | Per live production site | **$2/mo** static/hybrid · **$7/mo** Worker SSR | Managed `dply_edge`; branch previews excluded; hybrid Cloud origin bills separately |
 | **Serverless** | Per code function | **$2/mo** | Active function sites / code actions |
 
 ---
@@ -122,7 +122,7 @@ Managed products run on **dply-owned infra**, so they bill per live unit on top 
 
 ### Platform fee
 
-**$2/mo per live production Edge site** (requires a paid plan).
+**$2/mo** per live static or hybrid Edge site; **$7/mo** per Worker-native SSR site (requires a paid plan). Hybrid origins bill Cloud separately.
 
 ### Delivery usage (optional)
 
@@ -191,7 +191,8 @@ Optional: `DPLY_API_TOKENS_REQUIRE_PAID_PLAN=true` gates **creating new** API to
 | `subscription.standard.plans.business` | $39 / unlimited | Business plan |
 | `subscription.standard.serverless_cents` | 200 | $2/function |
 | `subscription.standard.cloud_cents` | 500 | $5/app |
-| `subscription.standard.edge_cents` | 200 | $2/site |
+| `subscription.standard.edge_cents` | 200 | $2/site (static/hybrid) |
+| `subscription.standard.edge_ssr_cents` | 700 | $7/site (Worker-native SSR) |
 | `subscription.standard.annual_discount_pct` | 20 | Annual discount |
 | `subscription.standard.min_billable_age_days` | 1 | New-server grace |
 | `subscription.standard.trial_days` | 14 | Trial length |
@@ -256,7 +257,7 @@ Each Edge site (+$2), Cloud app (+$5), or function (+$2) stacks on the plan and 
 
 ### Edge usage billing
 
-High-traffic Edge sites add variable revenue on top of the flat $2/site platform fee.
+High-traffic Edge sites add variable revenue on top of the flat platform fee ($2 static/hybrid, $7 Worker SSR).
 
 ### Enterprise
 
@@ -290,7 +291,7 @@ MRR ≈ Σ (paying orgs × plan fee by server count)
 |---|---|---|
 | **BYO VMs** | Customer → provider | Flat plan by server count (Free → Business) |
 | **dply Cloud** | Dply / container backend | $5/app (paid plan required) |
-| **dply Edge** | Dply / CF (managed) or customer (BYO CF) | $2/site (+ usage if enabled; paid plan required) |
+| **dply Edge** | Dply / CF (managed) or customer (BYO CF) | $2/site static/hybrid · $7/site SSR (+ usage if enabled; paid plan required) |
 | **Serverless** | Customer → FaaS provider | $2/function (paid plan required) |
 
 ---

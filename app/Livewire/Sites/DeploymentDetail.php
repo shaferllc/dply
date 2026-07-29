@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\CorrelatesWindowLogs;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
@@ -25,6 +26,7 @@ use Livewire\Component;
  */
 class DeploymentDetail extends Component
 {
+    use CorrelatesWindowLogs;
     use DispatchesToastNotifications;
     use SurfacesDeploymentRemediation;
 
@@ -51,11 +53,31 @@ class DeploymentDetail extends Component
         $this->server = $server;
         $this->site = $site;
         $this->deployment = $deployment;
+
+        // Needed by CorrelatesWindowLogs to gate the "logs around this deploy" jump.
+        $this->server->loadMissing('logAgent');
     }
 
     public function toggleOutput(): void
     {
         $this->showOutput = ! $this->showOutput;
+    }
+
+    /**
+     * Open the dply Logs correlation drawer on the host log slice that spans this
+     * deployment — started_at..finished_at (falling back to created_at / now for
+     * an in-flight or never-finished run), padded by the correlator.
+     */
+    public function openLogsForDeploy(): void
+    {
+        $from = $this->deployment->started_at ?? $this->deployment->created_at;
+        $to = $this->deployment->finished_at ?? now();
+
+        $this->presentWindowLogs(
+            $from,
+            $to,
+            __('Logs around deploy :id', ['id' => $this->deployment->id]),
+        );
     }
 
     public function render(): View

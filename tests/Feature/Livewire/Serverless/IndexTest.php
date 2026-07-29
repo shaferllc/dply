@@ -11,11 +11,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->org = Organization::factory()->create();
     $this->org->users()->attach($this->user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $this->org->id]);
 });
 
 function makeFunction(User $user, Organization $org, string $name): Site
@@ -35,22 +37,26 @@ function makeFunction(User $user, Organization $org, string $name): Site
     ]);
 }
 
-test('it shows the empty state with no functions', function () {
+test('it shows the empty state with no apps', function () {
     Livewire::actingAs($this->user)
         ->test(ServerlessIndex::class)
-        ->assertSee('No functions yet');
+        ->assertSee('No apps yet')
+        ->assertSee('Laravel first')
+        ->assertSee('How it works')
+        ->assertSee('Create an app')
+        ->assertSee('Start from Laravel');
 });
 
-test('it lists the organizations functions', function () {
+test('it lists the organizations apps', function () {
     makeFunction($this->user, $this->org, 'Orders API');
 
     Livewire::actingAs($this->user)
         ->test(ServerlessIndex::class)
         ->assertSee('Orders API')
-        ->assertDontSee('No functions yet');
+        ->assertDontSee('No apps yet');
 });
 
-test('it does not list another organizations functions', function () {
+test('it does not list another organizations apps', function () {
     makeFunction($this->user, Organization::factory()->create(), 'Someone Elses Function');
 
     Livewire::actingAs($this->user)

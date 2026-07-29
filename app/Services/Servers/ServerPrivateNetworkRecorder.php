@@ -6,7 +6,7 @@ namespace App\Services\Servers;
 
 use App\Models\PrivateNetwork;
 use App\Models\Server;
-use App\Services\Deploy\Concerns\ResolvesReachableResources;
+use App\Modules\Deploy\Services\Concerns\ResolvesReachableResources;
 
 /**
  * Records the provider VPC / private network a server sits in as a

@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Billing\VatInsightServiceTest;
 
-use App\Services\Billing\VatInsightService;
+use App\Modules\Billing\Services\VatInsightService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;

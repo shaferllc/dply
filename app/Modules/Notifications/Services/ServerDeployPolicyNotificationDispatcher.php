@@ -2,7 +2,7 @@
 
 namespace App\Modules\Notifications\Services;
 
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Servers\Deploys;
 use App\Models\Server;
 use App\Models\User;

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Jobs\ApplySiteDnsRecordsJob;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Jobs\AttachCloudDomainJob;
-use App\Jobs\DetachCloudDomainJob;
+use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
+use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
+use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
@@ -16,6 +19,8 @@ use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
+use App\Services\Sites\SiteReachabilityChecker;
+use App\Services\Sites\TestingHostnameProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
 
@@ -463,5 +468,203 @@ trait ManagesSiteDomainsRouting
         }
 
         $this->finalizeRoutingMutation('Domain removed.');
+    }
+
+    /**
+     * The per-(server, zone) wildcard cert securing this site's testing
+     * hostname (e.g. *.on-dply.cc), in any status — used by the domains tab to
+     * surface why TLS is or isn't working on the generated testing host. Null
+     * when the site has no testing hostname or no wildcard row exists yet.
+     */
+    public function testingWildcardCertificate(): ?ServerWildcardCertificate
+    {
+        $zone = $this->site->testingZone();
+        if ($zone === null || $this->site->server_id === null) {
+            return null;
+        }
+
+        return ServerWildcardCertificate::query()
+            ->where('server_id', $this->site->server_id)
+            ->where('zone', $zone)
+            ->first();
+    }
+
+    /**
+     * (Re)issue the server wildcard certificate that secures this site's testing
+     * hostname. Mirrors the backfill command: ensure the row exists with its DNS
+     * provider + credential resolved, flip it to PENDING so the job's
+     * needsIssuance() gate fires, then dispatch the DNS-01 issuer job. The
+     * failure reason (if any) lands back in last_output, shown on this tab.
+     */
+    public function reissueTestingWildcard(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $zone = $this->site->testingZone();
+        $serverId = $this->site->server_id;
+        if ($zone === null || $serverId === null) {
+            $this->toastError(__('This site has no dply-managed testing hostname to secure.'));
+
+            return;
+        }
+
+        if (! ($this->site->server?->isReady() ?? false)) {
+            $this->toastError(__('The server is not ready — wait for it to come online, then retry.'));
+
+            return;
+        }
+
+        $route = app(TestingHostnameProvisioner::class)->testingDnsRoutingForSite($this->site);
+
+        ServerWildcardCertificate::query()->updateOrCreate(
+            ['server_id' => $serverId, 'zone' => $zone],
+            [
+                'provider' => $route['provider'],
+                'provider_credential_id' => $route['credential']?->id,
+                'status' => ServerWildcardCertificate::STATUS_PENDING,
+                'live_directory' => $zone,
+            ],
+        );
+
+        // Stream certbot progress into the page-top banner instead of making the
+        // operator refresh to read last_output. Guarded so any host component
+        // reusing this trait without the console-action machinery still works.
+        $useConsole = method_exists($this, 'seedQueuedConsoleAction') && method_exists($this, 'watchConsoleAction');
+        $run = $useConsole
+            ? $this->seedQueuedConsoleAction('ssl', __('Issuing *.:zone wildcard certificate', ['zone' => $zone]))
+            : null;
+
+        IssueServerWildcardCertificateJob::dispatch(
+            $serverId,
+            $zone,
+            $run !== null ? (string) $run->id : null,
+            $run !== null ? (string) $this->site->id : null,
+        );
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.wildcard.reissue_requested', $this->site, null, [
+                'zone' => $zone,
+                'server_id' => $serverId,
+            ]);
+        }
+
+        if ($run !== null) {
+            $this->dispatch('dply-console-action-focus');
+            $this->watchConsoleAction(
+                $run,
+                __('Wildcard *.:zone issued.', ['zone' => $zone]),
+                __('Wildcard *.:zone issuance did not finish — check the output below.', ['zone' => $zone]),
+            );
+        } else {
+            $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
+        }
+    }
+
+    /**
+     * Per-hostname DNS record status for the routing → DNS tab. Populated lazily
+     * (wire:init) because each row runs a live resolver probe; kept on the
+     * component so a re-check just refreshes it in place.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $dnsRecordStatuses = [];
+
+    public bool $dnsRecordsLoaded = false;
+
+    /** wire:init entry point — defers the resolver probes off the first paint. */
+    public function loadDnsRecordStatuses(): void
+    {
+        $this->dnsRecordStatuses = $this->computeDnsRecordRows();
+        $this->dnsRecordsLoaded = true;
+    }
+
+    /** Operator-triggered refresh (Re-check button). */
+    public function recheckDnsRecords(): void
+    {
+        $this->authorize('view', $this->site);
+        $this->loadDnsRecordStatuses();
+    }
+
+    /**
+     * Whether dply can apply records itself: a DNS credential resolves AND a zone
+     * is known, so {@see ApplySiteDnsRecordsJob} has something to write into.
+     */
+    public function dnsRecordsManaged(): bool
+    {
+        $zone = trim((string) ($this->site->dns_zone ?: ($this->site->guessDnsZoneFromPrimaryHostname() ?? '')));
+
+        return $zone !== '' && $this->site->dnsAutomationCredential() !== null;
+    }
+
+    /**
+     * Queue the provider-side A-record upserts (apex + every customer hostname in
+     * the zone → this server). Streams into the page-top banner; the operator
+     * re-checks once DNS propagates.
+     */
+    public function applySiteDnsRecords(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->dnsRecordsManaged()) {
+            $this->toastError(__('No DNS credential controls this zone — add the records shown above manually instead.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('dns_apply', __('Applying DNS records'));
+        ApplySiteDnsRecordsJob::dispatch((string) $this->site->id, (string) $run->id, (string) auth()->id());
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('DNS records applied — give them a few minutes to propagate, then re-check.'),
+            __('Applying DNS records did not finish — see the output below.'),
+        );
+    }
+
+    /**
+     * Build the per-hostname record + live status rows. Each customer hostname
+     * gets the A record it needs (→ the server IP) plus where it actually points,
+     * reusing the reachability probe (which knows Cloudflare-proxied domains).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function computeDnsRecordRows(): array
+    {
+        $serverIp = trim((string) ($this->site->server->ip_address ?? ''));
+        $zone = strtolower(trim((string) ($this->site->dns_zone ?: ($this->site->guessDnsZoneFromPrimaryHostname() ?? ''))));
+        $checker = app(SiteReachabilityChecker::class);
+
+        $rows = [];
+        foreach ($this->site->customerDomainHostnames() as $host) {
+            $host = strtolower(trim((string) $host));
+            if ($host === '') {
+                continue;
+            }
+
+            $reach = $checker->checkHostname($this->site, $host);
+            $inZone = $zone !== '' && ($host === $zone || str_ends_with($host, '.'.$zone));
+            $recordName = ! $inZone
+                ? $host
+                : ($host === $zone ? '@' : rtrim(substr($host, 0, -(strlen($zone) + 1)), '.'));
+
+            $status = ! empty($reach['behind_cloudflare']) ? 'cloudflare'
+                : (($reach['points_here'] ?? false) ? 'pointing'
+                : (($reach['resolves'] ?? false) ? 'wrong' : 'missing'));
+
+            $rows[] = [
+                'hostname' => $host,
+                'type' => 'A',
+                'name' => $recordName === '' ? '@' : $recordName,
+                'value' => $serverIp,
+                'zone' => $zone,
+                'in_zone' => $inZone,
+                'status' => $status,
+                'resolved_ips' => array_values($reach['resolved_ips'] ?? []),
+            ];
+        }
+
+        return $rows;
     }
 }

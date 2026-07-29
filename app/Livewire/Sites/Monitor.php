@@ -4,12 +4,14 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CorrelatesWindowLogs;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\ManagesUptimeNotifications;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteUptimeIncident;
 use App\Models\SiteUptimeMonitor;
 use App\Modules\Serverless\Services\FunctionStatsRangeQuery;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
@@ -30,6 +32,7 @@ use Livewire\Component;
 class Monitor extends Component
 {
     use ConfirmsActionWithModal;
+    use CorrelatesWindowLogs;
     use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
@@ -93,6 +96,9 @@ class Monitor extends Component
 
         $this->server = $server;
         $this->site = $site->load('uptimeMonitors');
+
+        // Needed by CorrelatesWindowLogs to gate the "logs around this incident" jump.
+        $this->server->loadMissing('logAgent');
 
         // Default the probe worker to the one nearest the host; the region
         // label follows the worker (falling back to nearest region when no
@@ -319,6 +325,28 @@ class Monitor extends Component
     public function toggleHistory(string $monitorId): void
     {
         $this->expandedMonitorId = $this->expandedMonitorId === $monitorId ? null : $monitorId;
+    }
+
+    /**
+     * Open the dply Logs correlation drawer on the host log slice that spans a
+     * downtime incident — started_at..resolved_at (now() while still ongoing),
+     * padded by the correlator. The integrated "why was it down?" jump: a
+     * standalone uptime checker can't show you the host logs at the dip.
+     */
+    public function openLogsForIncident(string $incidentId): void
+    {
+        $incident = SiteUptimeIncident::query()
+            ->where('site_id', $this->site->id)
+            ->findOrFail($incidentId);
+
+        $from = $incident->started_at ?? $incident->created_at;
+        $to = $incident->resolved_at ?? now();
+
+        $this->presentWindowLogs(
+            $from,
+            $to,
+            __('Logs around :severity incident', ['severity' => $incident->severity]),
+        );
     }
 
     public function runCheckNow(string $monitorId): void

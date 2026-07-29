@@ -72,7 +72,7 @@ final class ServerRemoteAccessLogger
             return;
         }
 
-        $meta = ($event->meta );
+        $meta = is_array($event->meta) ? $event->meta : [];
         $meta['last_command'] = $preview;
 
         $event->forceFill([

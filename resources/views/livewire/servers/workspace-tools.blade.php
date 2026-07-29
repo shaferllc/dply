@@ -1,10 +1,8 @@
 @php
-    $card = 'dply-card overflow-hidden';
     $opsReady = $server->isReady() && $server->ip_address && $server->ssh_private_key;
     $isDeployer = auth()->user()->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
 
     $manageShare = [
-        'card' => $card,
         'server' => $server,
         'opsReady' => $opsReady,
         'isDeployer' => $isDeployer,
@@ -17,6 +15,8 @@
         'pendingToolActionKey' => $pendingToolActionKey ?? null,
         'miseReprobePending' => $miseReprobePending ?? false,
         'toolsPanel' => $toolsPanel ?? 'tools',
+        // Nested sections inside the merged Tools card — not second page cards.
+        'card' => 'border-b border-brand-ink/10',
     ];
 
     // Same workspace-scoped console-actions banner WorkspaceManage surfaced: the
@@ -29,6 +29,7 @@
         ->whereNull('dismissed_at')
         ->orderByDesc('created_at')
         ->first();
+
 @endphp
 
 <x-server-workspace-layout
@@ -36,6 +37,7 @@
     active="tools"
     :title="__('Tools')"
     :description="__('Installed CLIs, version managers, and language runtimes for this host.')"
+    hide-hero
 >
     @if ($manageRemoteTaskId || ($activeMiseRuntimeOps ?? []) !== [] || ($activeToolActionOps ?? []) !== [] || ($miseReprobePending ?? false) || ($pendingToolActionKey ?? null))
         <div wire:poll.2s="pollManageWorkspace" class="hidden" aria-hidden="true"></div>
@@ -44,87 +46,81 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div class="space-y-6">
-        @include('livewire.partials.console-action-banner-static', [
-            'run' => $manageConsoleRun,
-            'kindLabels' => (array) config('console_actions.kinds', []),
-        ])
+    @include('livewire.partials.console-action-banner-static', [
+        'run' => $manageConsoleRun,
+        'kindLabels' => (array) config('console_actions.kinds', []),
+    ])
 
-        @if ($isDeployer)
-            <section class="dply-card overflow-hidden border-amber-200">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                    <x-icon-badge tone="amber">
-                        <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+                    </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can view this page but cannot run SSH actions or install tools.') }}</p>
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Tools') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Installed CLIs and version managers from the inventory probe — install, upgrade, or repair from here.') }}
+                        </p>
                     </div>
                 </div>
-            </section>
+            </div>
+        </div>
+
+        @if ($isDeployer)
+            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+                <span class="font-semibold">{{ __('Deployer role.') }}</span>
+                {{ __('Deployers can view this page but cannot run SSH actions or install tools.') }}
+            </div>
         @endif
 
         @if (! $opsReady)
-            <section class="dply-card overflow-hidden border-amber-200">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                    <x-icon-badge tone="amber">
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before tool inventory and installs work.') }}</p>
-                    </div>
-                </div>
-            </section>
+            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+                {{ __('Provisioning and SSH must be ready before tool inventory and installs work.') }}
+            </div>
         @endif
 
-        <div class="relative space-y-6">
-            @include('livewire.servers.partials.manage.group-tools', $manageShare)
+        @include('livewire.servers.partials.manage.group-tools', $manageShare)
 
-            {{-- Host power: reboot + stuck-task cleanup. These ride on Tools (rather
-                 than a standalone Manage > Danger tab) because they reuse the same
-                 inherited action stack; reboot also remains on the Patches page. --}}
-            @if ($opsReady && ! $isDeployer && (count($dangerousActions) > 0 || $manageRemoteTaskId))
-                <section class="dply-card overflow-hidden border-red-200/50">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-red-50/40 px-6 py-5 sm:px-7">
-                        <x-icon-badge tone="rose">
-                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-800">{{ __('Power') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host power') }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Reboot the host or clear a stuck queued task. A reboot drops your SSH session and any in-flight work.') }}</p>
+        @if ($opsReady && ! $isDeployer && (count($dangerousActions) > 0 || $manageRemoteTaskId))
+            <div class="border-t border-red-200/60 bg-red-50/30 px-5 py-5 sm:px-6">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-800 ring-1 ring-rose-200">
+                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-800">{{ __('Power') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host power') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Reboot the host or clear a stuck queued task. A reboot drops your SSH session and any in-flight work.') }}</p>
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            @foreach ($dangerousActions as $actionKey => $action)
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label'] ?? $actionKey), @js($action['confirm'] ?? __('Are you sure?')), @js($action['label'] ?? __('Run action')), true)"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-900 transition-colors hover:bg-red-100"
+                                >
+                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ $action['label'] ?? $actionKey }}
+                                </button>
+                            @endforeach
+
+                            @if ($manageRemoteTaskId)
+                                <button
+                                    type="button"
+                                    wire:click="cancelQueuedManageTasks"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Cancel queued task') }}
+                                </button>
+                            @endif
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 px-6 py-5 sm:px-7">
-                        @foreach ($dangerousActions as $actionKey => $action)
-                            <button
-                                type="button"
-                                wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label'] ?? $actionKey), @js($action['confirm'] ?? __('Are you sure?')), @js($action['label'] ?? __('Run action')), true)"
-                                class="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-900 hover:bg-red-100 transition-colors"
-                            >
-                                <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $action['label'] ?? $actionKey }}
-                            </button>
-                        @endforeach
-
-                        @if ($manageRemoteTaskId)
-                            <button
-                                type="button"
-                                wire:click="cancelQueuedManageTasks"
-                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Cancel queued task') }}
-                            </button>
-                        @endif
-                    </div>
-                </section>
-            @endif
-        </div>
-    </div>
+                </div>
+            </div>
+        @endif
+    </section>
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')

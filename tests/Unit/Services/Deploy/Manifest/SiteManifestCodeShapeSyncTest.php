@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\Manifest;
 
+use App\Jobs\ControlWorkerDaemonJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
 use App\Models\User;
-use App\Services\Deploy\Manifest\DplyManifest;
-use App\Services\Deploy\Manifest\DplyManifestParser;
-use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
+use App\Modules\Deploy\Services\Manifest\DplyManifest;
+use App\Modules\Deploy\Services\Manifest\DplyManifestParser;
+use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Queue::fake();
+});
 
 function manifestSite(): Site
 {
@@ -67,6 +73,8 @@ test('reconcile creates managed build/release steps and processes', function () 
     $worker = SiteProcess::where('site_id', $site->id)->where('managed_by_manifest', true)->first();
     expect($worker->type)->toBe('worker');
     expect($worker->command)->toBe('php artisan queue:work');
+
+    Queue::assertPushed(ControlWorkerDaemonJob::class, fn (ControlWorkerDaemonJob $job) => $job->siteId === (string) $site->id && $job->action === 'ensure');
 });
 
 test('a category dropped from the manifest clears its managed rows but keeps user rows', function () {

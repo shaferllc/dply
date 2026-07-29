@@ -20,8 +20,10 @@ use Illuminate\Support\Carbon;
  * @property string $access_token
  * @property string $api_base_url
  * @property string $label
+ * @property ?Carbon $expires_at
  * @property ?Carbon $last_validated_at
  * @property string $nickname
+ * @property ?string $validation_error
  * @property string $provider
  * @property ?string $provider_id
  * @property ?string $user_id
@@ -43,6 +45,8 @@ class GitProviderToken extends Model implements GitIdentity
         'access_token',
         'api_base_url',
         'last_validated_at',
+        'expires_at',
+        'validation_error',
     ];
 
     protected $hidden = [
@@ -55,6 +59,7 @@ class GitProviderToken extends Model implements GitIdentity
         return [
             'access_token' => 'encrypted',
             'last_validated_at' => 'datetime',
+            'expires_at' => 'datetime',
         ];
     }
 

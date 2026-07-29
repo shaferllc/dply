@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessShimRuntimeTest;
 
-use App\Services\Deploy\ServerlessLoggingShimInjector;
+use App\Modules\Deploy\Services\ServerlessLoggingShimInjector;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Assert;
 use Symfony\Component\Process\ExecutableFinder;

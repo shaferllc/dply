@@ -28,8 +28,15 @@ test('empty state with warning when no credentials', function () {
 
     $response->assertOk()
         ->assertSee('Cloud apps')
+        ->assertSee('Ship your first app in minutes')
         ->assertSee('Connect a cloud account to deploy')
-        ->assertSee('Ship your first app in minutes');
+        ->assertSee('Connect DigitalOcean')
+        ->assertSee('Use AWS')
+        ->assertSee('Deploy an app')
+        ->assertSee('What Cloud gives you')
+        ->assertSee('Auto-scale')
+        ->assertSee(route('cloud.create'), escape: false)
+        ->assertSee(route('credentials.index', ['provider' => 'digitalocean']), escape: false);
 });
 test('lists only container sites for current org', function () {
     $user = ownerWithOrg();
@@ -96,7 +103,11 @@ test('warning hides when a backend credential is connected', function () {
 
     $response = $this->actingAs($user)->get(route('cloud.index'));
 
-    $response->assertDontSee('Connect a cloud account to deploy');
+    $response->assertOk()
+        ->assertSee('Ship your first app in minutes')
+        ->assertSee('Deploy an app')
+        ->assertDontSee('Connect a cloud account to deploy')
+        ->assertDontSee('Connect DigitalOcean');
 });
 test('lists source mode site with repo branch', function () {
     $user = ownerWithOrg();

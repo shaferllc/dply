@@ -13,7 +13,7 @@
     ];
 @endphp
 
-<x-server-workspace-tablist ariaLabel="{{ __('Deployments sections') }}" scroll>
+<x-server-workspace-tablist ariaLabel="{{ __('Deployments sections') }}" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
     @foreach ($tabs as $entry)
         @if (($tabsVisible[$entry['id']] ?? true))
             <x-server-workspace-tab

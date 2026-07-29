@@ -13,7 +13,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
-use App\Services\AwsEksService;
+use App\Modules\Cloud\Services\AwsEksService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;

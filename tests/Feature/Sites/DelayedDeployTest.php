@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\DelayedDeployTest;
 
 use App\Actions\Sites\ScheduleSiteDeploy;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\ScheduledDeploy;
 use App\Models\Server;

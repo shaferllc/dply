@@ -37,6 +37,13 @@ test('provision writes apache vhost and placeholder page', function () {
     $site->setRelation('domains', new Collection([
         new SiteDomain(['hostname' => 'docs.example.com', 'is_primary' => true]),
     ]));
+    $site->setRelation('domainAliases', new Collection);
+    $site->setRelation('tenantDomains', new Collection);
+    $site->setRelation('previewDomains', new Collection);
+    $site->setRelation('redirects', new Collection);
+    $site->setRelation('basicAuthUsers', new Collection);
+    $site->setRelation('accessGate', null);
+    $site->setRelation('accessGatePasswords', new Collection);
 
     $writtenFiles = [];
 
@@ -44,8 +51,9 @@ test('provision writes apache vhost and placeholder page', function () {
     // the container so the provisioner never opens a real socket.
     $ssh = Mockery::mock(SshConnection::class);
     $ssh->shouldReceive('effectiveUsername')->andReturn('root');
+    // Placeholder index + managed 500.html + Apache vhost.
     $ssh->shouldReceive('putFile')
-        ->twice()
+        ->times(3)
         ->andReturnUsing(function (string $remotePath, string $contents) use (&$writtenFiles): void {
             $writtenFiles[$remotePath] = $contents;
         });

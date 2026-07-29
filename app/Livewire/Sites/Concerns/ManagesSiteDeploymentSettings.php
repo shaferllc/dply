@@ -6,6 +6,7 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Enums\DeploymentMethod;
 use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\SyncEnvFromServerJob;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Validation\Rule;
@@ -175,6 +176,14 @@ trait ManagesSiteDeploymentSettings
         $previousLayout = $layoutOf($previousMethod);
         $newLayout = $layoutOf($method);
 
+        // Capture the env path under the CURRENT (pre-switch) layout. A flat↔atomic
+        // switch moves effectiveEnvFilePath() (e.g. <root>/.env ↔ <root>/current/.env),
+        // and the new path doesn't exist until the first deploy in the new layout —
+        // so the canonical env_file_content (and the env gate) would lose sight of
+        // the live .env and the deploy dead-locks on "needs N environment variables".
+        // We grab this before update() flips deploy_strategy.
+        $preSwitchEnvPath = $this->site->effectiveEnvFilePath();
+
         $this->site->update([
             'deploy_method' => $method->value,
             'deploy_strategy' => $newStrategy,
@@ -203,6 +212,20 @@ trait ManagesSiteDeploymentSettings
                 'armed_at' => now()->toIso8601String(),
             ];
             $this->site->forceFill(['meta' => $meta])->save();
+
+            // Carry the live on-disk env into the canonical store so the new
+            // layout's first deploy can push it (and the env gate sees it).
+            // onlyIfEmpty so we never overwrite an operator-managed env_file_content;
+            // when it's already populated the gate's env_file_content fallback
+            // (RequiredEnvEvaluator) already covers the switch.
+            if ($this->site->server?->hostCapabilities()->supportsEnvPushToHost()) {
+                SyncEnvFromServerJob::dispatch(
+                    siteId: $this->site->id,
+                    userId: auth()->id(),
+                    envPathOverride: $preSwitchEnvPath,
+                    onlyIfEmpty: true,
+                );
+            }
         }
 
         if ($this->shouldAutoReapplyManagedWebserverConfig()) {

@@ -37,16 +37,14 @@ test('restart fresh delegates cleanup and requeues provisioning', function (): v
 
     [$user, $server, $site] = provisioningSite();
 
-    $restarter = Mockery::mock(SiteProvisioningRestarter::class);
-    $restarter->shouldReceive('restart')
-        ->once()
-        ->withArgs(fn (Site $passed): bool => (string) $passed->id === (string) $site->id);
-    app()->instance(SiteProvisioningRestarter::class, $restarter);
-
     Livewire::actingAs($user)
         ->test(Show::class, ['server' => $server, 'site' => $site])
         ->call('restartProvisioningFresh')
         ->assertHasNoErrors();
+
+    Queue::assertPushed(\App\Jobs\RestartSiteProvisioningJob::class, function (\App\Jobs\RestartSiteProvisioningJob $job) use ($site): bool {
+        return $job->siteId === (string) $site->id;
+    });
 });
 
 test('site provisioning restarter resets local state and queues provision job', function (): void {

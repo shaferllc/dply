@@ -43,6 +43,47 @@
                             @endforeach
                         </p>
                     @endif
+
+                    {{-- Manage the resource behind these warnings without leaving the
+                         page. A warning whose key belongs to a managed binding type
+                         (DB_* → database, REDIS_*/CACHE_*/QUEUE_* → Redis, …) gets a
+                         button that opens that resource's attach/provision modal —
+                         attaching auto-discovers what already exists on the server, so
+                         e.g. an empty DB_PASSWORD is fixed by linking a managed database
+                         instead of hand-typing credentials. --}}
+                    @php
+                        $resourceActionMap = [
+                            'database' => ['label' => __('database'), 'icon' => 'heroicon-m-circle-stack', 'prefixes' => ['DB_', 'DATABASE_URL']],
+                            'redis' => ['label' => __('Redis'), 'icon' => 'heroicon-m-bolt', 'prefixes' => ['REDIS_', 'CACHE_', 'QUEUE_', 'SESSION_']],
+                            'storage' => ['label' => __('object storage'), 'icon' => 'heroicon-m-archive-box', 'prefixes' => ['AWS_', 'FILESYSTEM_', 'S3_']],
+                            'mail' => ['label' => __('mail'), 'icon' => 'heroicon-m-envelope', 'prefixes' => ['MAIL_']],
+                            'broadcasting' => ['label' => __('broadcasting'), 'icon' => 'heroicon-m-signal', 'prefixes' => ['PUSHER_', 'REVERB_', 'ABLY_', 'BROADCAST_']],
+                        ];
+                        $warningKeys = collect($envWarnings)->pluck('key')->filter()->all();
+                        $resourceActions = [];
+                        foreach ($resourceActionMap as $type => $meta) {
+                            foreach ($warningKeys as $wk) {
+                                foreach ($meta['prefixes'] as $pfx) {
+                                    if (str_ends_with($pfx, '_') ? str_starts_with((string) $wk, $pfx) : (string) $wk === $pfx) {
+                                        $resourceActions[$type] = $meta;
+                                        continue 3;
+                                    }
+                                }
+                            }
+                        }
+                    @endphp
+                    @if ($resourceActions !== [])
+                        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-black/5 pt-3">
+                            <span class="text-[11px] font-medium text-brand-moss">{{ __('Manage the resource instead:') }}</span>
+                            @foreach ($resourceActions as $type => $meta)
+                                <button type="button" wire:click="openBindingModal(@js($type))"
+                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-brand-ink underline-offset-2 transition hover:bg-white hover:underline">
+                                    <x-dynamic-component :component="$meta['icon']" class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                    {{ __('Manage :resource', ['resource' => $meta['label']]) }}
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             </div>
     @endif

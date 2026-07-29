@@ -80,7 +80,7 @@ final class ServerlessGlueInventory
             }
 
             if ($action->isSequence()) {
-                $components = ($action->components );
+                $components = is_array($action->components) ? $action->components : [];
                 $sequences[] = [
                     ...$row,
                     'component_count' => count($components),

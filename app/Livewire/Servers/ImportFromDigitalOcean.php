@@ -5,7 +5,7 @@ namespace App\Livewire\Servers;
 use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;

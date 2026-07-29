@@ -114,15 +114,18 @@ test('edge product line page shows delivery emergency and surface flags', functi
         ->assertSee('surface.edge');
 });
 
-test('orgs inherit enabled config defaults for gated surfaces', function () {
+test('orgs inherit config defaults for gated surfaces', function () {
     $org = Organization::factory()->create();
 
-    expect(Feature::for($org)->active('surface.serverless'))->toBeTrue();
-    expect(Feature::for($org)->active('surface.cloud'))->toBeTrue();
-    expect(Feature::for($org)->active('provider.aws'))->toBeTrue();
+    // Non-BYO surfaces + hyperscale providers default off in config/features.php
+    // (FEATURE_* env / per-org override to enable).
+    expect(Feature::for($org)->active('surface.serverless'))->toBeFalse();
+    expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
+    expect(Feature::for($org)->active('provider.aws'))->toBeFalse();
+    expect(Feature::for($org)->active('surface.fleet'))->toBeTrue();
 });
 
-test('cloud nav link hidden when surface disabled in config', function () {
+test('cloud nav link is coming soon when surface disabled in config', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -136,7 +139,9 @@ test('cloud nav link hidden when surface disabled in config', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertDontSee('Cloud apps');
+        ->assertSee('Cloud apps')
+        ->assertSee(__('Coming soon'))
+        ->assertDontSee(route('cloud.index'), false);
 });
 
 test('per-org override beats the config default for a surface', function () {

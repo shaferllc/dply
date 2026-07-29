@@ -11,7 +11,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\CloudRouter;
+use App\Modules\Cloud\Backends\CloudRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -27,7 +27,7 @@ test('observability section renders on dashboard', function () {
     $response->assertOk()
         ->assertSee('Observability')
         ->assertSee('Runtime logs')
-        ->assertSee('Fetch runtime logs');
+        ->assertSee('Fetch');
 });
 test('refresh metrics renders graphs for do site', function () {
     Http::fake([

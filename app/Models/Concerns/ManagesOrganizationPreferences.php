@@ -25,8 +25,8 @@ trait ManagesOrganizationPreferences
 {
     /**
      * Public URL of the org's uploaded icon/logo, or null when none is set —
-     * callers fall back to the generated initials avatar. Stored on the
-     * `public` disk (mirrors {@see Site::logoUrl()}).
+     * callers fall back to the generated initials avatar. Stored on the durable
+     * `site_assets` disk so it survives a redeploy (mirrors {@see Site::logoUrl()}).
      */
     public function iconUrl(): ?string
     {
@@ -35,7 +35,7 @@ trait ManagesOrganizationPreferences
             return null;
         }
 
-        return Storage::disk('public')->url($path);
+        return Storage::disk('site_assets')->url($path);
     }
 
     public function hasIcon(): bool

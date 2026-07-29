@@ -178,7 +178,7 @@ class SiteProvisioningRestarter
 
     private function resetLocalState(Site $site): void
     {
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
 
         foreach ([
             'caddy_last_output',

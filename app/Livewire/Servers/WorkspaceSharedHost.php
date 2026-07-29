@@ -14,7 +14,7 @@ use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsSharedHostAttributionScan;
 use App\Models\AiAdvisorRun;
 use App\Models\Server;
-use App\Services\Ai\AiAdvisorRunRecorder;
+use App\Modules\Ai\Services\AiAdvisorRunRecorder;
 use App\Support\Servers\SharedHostBudgetSettings;
 use App\Support\Servers\SharedHostFairnessAdvisor;
 use App\Support\Servers\SharedHostLlmAdvisor;

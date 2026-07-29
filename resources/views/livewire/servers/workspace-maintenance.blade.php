@@ -28,15 +28,18 @@
     $untilAt = ! empty($state['until'])
         ? \Illuminate\Support\Carbon::parse($state['until'])->timezone(config('app.timezone'))
         : null;
+
+    $maintenanceDescription = __('Visitor maintenance window, site impact, and related downtime controls for this server.');
 @endphp
 
 <x-server-workspace-layout
     :server="$server"
     active="maintenance"
     :title="__('Maintenance')"
-    :description="__('Visitor maintenance window, site impact, and related downtime controls for this server.')"
-    :pageHeaderToolbar="true"
+    :description="$maintenanceDescription"
+    hide-hero
 >
+    @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     {{-- The one shared console-action banner for everything that runs on this
@@ -55,63 +58,80 @@
         'kindLabels' => $consoleKindLabels,
     ])
 
-    <x-server-workspace-tablist :aria-label="__('Maintenance sections')">
-        <x-server-workspace-tab icon="heroicon-o-pause-circle" :active="$maintenance_tab === 'window'" wire:click="setMaintenanceTab('window')">
-            {{ __('Visitor window') }}
-            @if ($active)
-                <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
-            @endif
-        </x-server-workspace-tab>
-        <x-server-workspace-tab icon="heroicon-o-wrench-screwdriver" :active="$maintenance_tab === 'operations'" wire:click="setMaintenanceTab('operations')">
-            {{ __('Operations') }}
-        </x-server-workspace-tab>
-        <x-server-workspace-tab icon="heroicon-o-calendar-days" :active="$maintenance_tab === 'schedule'" wire:click="setMaintenanceTab('schedule')">
-            {{ __('Schedule') }}
-        </x-server-workspace-tab>
-        <x-server-workspace-tab icon="heroicon-o-bell" :active="$maintenance_tab === 'notifications'" wire:click="setMaintenanceTab('notifications')">
-            {{ __('Notifications') }}
-        </x-server-workspace-tab>
-    </x-server-workspace-tablist>
-
-    {{-- Webserver apply failures — a maintenance toggle can leave a box's vhost
-         broken if the async apply failed. Surface it loudly with one-click re-apply. --}}
-    @if (! empty($applyFailures))
-        <div class="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
-            <div class="flex items-start gap-3">
-                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-rose-800">{{ __('Webserver config apply failed') }}</p>
-                    <p class="mt-0.5 text-sm text-rose-700">{{ __('The live webserver on these sites may not match their saved state. Re-apply to reconcile.') }}</p>
-                    <ul class="mt-3 space-y-2">
-                        @foreach ($applyFailures as $fail)
-                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-white/70 px-3 py-2">
-                                <span class="font-medium text-brand-ink">{{ $fail['name'] }}</span>
-                                @if ($fail['at'])
-                                    <span class="text-xs text-rose-700/80">{{ $fail['at']->timezone(config('app.timezone'))->diffForHumans() }}</span>
-                                @endif
-                                <span class="w-full truncate font-mono text-xs text-rose-700/80" title="{{ $fail['error'] }}">{{ \Illuminate\Support\Str::limit($fail['error'], 160) }}</span>
-                                <button
-                                    type="button"
-                                    wire:click="reapplyWebserverConfig('{{ $fail['site_id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
-                                >
-                                    <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
-                                    {{ __('Re-apply') }}
-                                </button>
-                            </li>
-                        @endforeach
-                    </ul>
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-wrench class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Maintenance') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ $maintenanceDescription }}
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
-    @endif
 
-    <div class="space-y-6">
+        @if (! empty($applyFailures))
+            <div class="border-b border-rose-200/80 bg-rose-50/70 px-5 py-4 sm:px-6">
+                <div class="flex items-start gap-3">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" aria-hidden="true" />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-rose-800">{{ __('Webserver config apply failed') }}</p>
+                        <p class="mt-0.5 text-sm text-rose-700">{{ __('The live webserver on these sites may not match their saved state. Re-apply to reconcile.') }}</p>
+                        <ul class="mt-3 space-y-2">
+                            @foreach ($applyFailures as $fail)
+                                <li class="flex flex-wrap items-center gap-x-3 gap-y-1 border border-rose-200/60 bg-white/70 px-3 py-2">
+                                    <span class="font-medium text-brand-ink">{{ $fail['name'] }}</span>
+                                    @if ($fail['at'])
+                                        <span class="text-xs text-rose-700/80">{{ $fail['at']->timezone(config('app.timezone'))->diffForHumans() }}</span>
+                                    @endif
+                                    <span class="w-full truncate font-mono text-xs text-rose-700/80" title="{{ $fail['error'] }}">{{ \Illuminate\Support\Str::limit($fail['error'], 160) }}</span>
+                                    <button
+                                        type="button"
+                                        wire:click="reapplyWebserverConfig('{{ $fail['site_id'] }}')"
+                                        wire:loading.attr="disabled"
+                                        class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
+                                    >
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Re-apply') }}
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Maintenance sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tab icon="heroicon-o-pause-circle" :active="$maintenance_tab === 'window'" wire:click="setMaintenanceTab('window')">
+                    {{ __('Visitor window') }}
+                    @if ($active)
+                        <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
+                    @endif
+                </x-server-workspace-tab>
+                <x-server-workspace-tab icon="heroicon-o-wrench-screwdriver" :active="$maintenance_tab === 'operations'" wire:click="setMaintenanceTab('operations')">
+                    {{ __('Operations') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab icon="heroicon-o-calendar-days" :active="$maintenance_tab === 'schedule'" wire:click="setMaintenanceTab('schedule')">
+                    {{ __('Schedule') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab icon="heroicon-o-bell" :active="$maintenance_tab === 'notifications'" wire:click="setMaintenanceTab('notifications')">
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
+
+        <div class="relative min-w-0" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setMaintenanceTab">
         {{-- Overall (window tab) --}}
-        <div @class(['hidden' => $maintenance_tab !== 'window'])>
-        <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        @if ($maintenance_tab === 'window')
+        <div class="border-b border-brand-ink/10">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 {{ $overallTone }}">
@@ -119,13 +139,13 @@
                         </span>
                         <div>
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Visitor maintenance') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @if ($active)
                                     {{ __('Maintenance active — visitors see suspended pages') }}
                                 @else
                                     {{ __('No active visitor maintenance window') }}
                                 @endif
-                            </h2>
+                            </h3>
                             <p class="mt-1 text-sm text-brand-moss">
                                 @if ($active && $startedAt)
                                     {{ __('Started :time', ['time' => $startedAt->diffForHumans()]) }}
@@ -159,7 +179,7 @@
                 </div>
             </div>
 
-            <div class="grid gap-px bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div class="grid gap-px border-b border-brand-ink/10 bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 @foreach ([
                     ['label' => __('Total sites'), 'value' => $summary['total_sites'] ?? 0],
                     ['label' => __('Eligible'), 'value' => $summary['eligible'] ?? 0],
@@ -176,7 +196,7 @@
             </div>
 
             @if ($active && (! empty($state['note']) || ! empty($state['message'])))
-                <div class="border-t border-brand-ink/10 px-6 py-4 text-sm text-brand-moss sm:px-7">
+                <div class="border-b border-brand-ink/10 px-5 py-4 text-sm text-brand-moss sm:px-6">
                     @if (! empty($state['note']))
                         <p><span class="font-medium text-brand-ink">{{ __('Operator note') }}:</span> {{ $state['note'] }}</p>
                     @endif
@@ -187,15 +207,13 @@
                     @endif
                 </div>
             @endif
-        </section>
-
         </div>
+        @endif
 
         {{-- Related maintenance controls (schedule tab) --}}
-        <div @class(['hidden' => $maintenance_tab !== 'schedule'])>
-        <div>
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        @if ($maintenance_tab === 'schedule')
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
@@ -205,7 +223,7 @@
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Advisory only — the days and hours you\'d prefer Dply to run disruptive work (upgrades, reboots, firewall apply, supervisor restarts). Dply warns before risky actions outside it; it doesn\'t pause cron or suspend sites. Times use your Dply timezone.') }}</p>
                     </div>
                 </div>
-                <div class="px-6 py-5 sm:px-7">
+                <div class="px-5 py-5 sm:px-6">
                     @if ($recurringWindow->enabled())
                         <p @class([
                             'mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
@@ -266,56 +284,55 @@
                         @endif
                     </form>
                 </div>
-            </section>
-        </div>
+            </div>
 
-        {{-- Maintenance history --}}
-        <section class="dply-card mt-6 overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Maintenance history') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Recent visitor-maintenance windows on this server — when they started, ended, and how many sites were affected.') }}</p>
+            {{-- Maintenance history --}}
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                    <x-icon-badge>
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Maintenance history') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Recent visitor-maintenance windows on this server — when they started, ended, and how many sites were affected.') }}</p>
+                    </div>
+                </div>
+                <div class="px-5 py-5 sm:px-6">
+                    @if (empty($maintenanceHistory))
+                        <p class="text-sm text-brand-moss">{{ __('No maintenance windows recorded yet.') }}</p>
+                    @else
+                        <ol class="relative space-y-4 border-l border-brand-ink/10 pl-5">
+                            @foreach ($maintenanceHistory as $event)
+                                <li class="relative">
+                                    <span @class([
+                                        'absolute -left-[1.42rem] mt-1 inline-flex h-3 w-3 rounded-full ring-4 ring-white',
+                                        $event['ok'] ? 'bg-emerald-500' : 'bg-amber-500',
+                                    ])></span>
+                                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                        <span class="text-sm font-semibold text-brand-ink">{{ $event['label'] }}</span>
+                                        <span class="text-xs text-brand-moss" title="{{ $event['at']->timezone(config('app.timezone'))->format('Y-m-d H:i T') }}">
+                                            {{ $event['at']->timezone(config('app.timezone'))->diffForHumans() }}
+                                        </span>
+                                        @if ($event['by'])
+                                            <span class="text-xs text-brand-mist">· {{ $event['by'] }}</span>
+                                        @endif
+                                    </div>
+                                    @if ($event['detail'])
+                                        <p class="mt-0.5 text-xs text-brand-moss">{{ $event['detail'] }}</p>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ol>
+                    @endif
                 </div>
             </div>
-            <div class="px-6 py-5 sm:px-7">
-                @if (empty($maintenanceHistory))
-                    <p class="text-sm text-brand-moss">{{ __('No maintenance windows recorded yet.') }}</p>
-                @else
-                    <ol class="relative space-y-4 border-l border-brand-ink/10 pl-5">
-                        @foreach ($maintenanceHistory as $event)
-                            <li class="relative">
-                                <span @class([
-                                    'absolute -left-[1.42rem] mt-1 inline-flex h-3 w-3 rounded-full ring-4 ring-white',
-                                    $event['ok'] ? 'bg-emerald-500' : 'bg-amber-500',
-                                ])></span>
-                                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <span class="text-sm font-semibold text-brand-ink">{{ $event['label'] }}</span>
-                                    <span class="text-xs text-brand-moss" title="{{ $event['at']->timezone(config('app.timezone'))->format('Y-m-d H:i T') }}">
-                                        {{ $event['at']->timezone(config('app.timezone'))->diffForHumans() }}
-                                    </span>
-                                    @if ($event['by'])
-                                        <span class="text-xs text-brand-mist">· {{ $event['by'] }}</span>
-                                    @endif
-                                </div>
-                                @if ($event['detail'])
-                                    <p class="mt-0.5 text-xs text-brand-moss">{{ $event['detail'] }}</p>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ol>
-                @endif
-            </div>
-        </section>
-        </div>
+        @endif
 
         {{-- Site impact (window tab) --}}
-        <div @class(['hidden' => $maintenance_tab !== 'window'])>
-        <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+        @if ($maintenance_tab === 'window')
+        <div class="border-b border-brand-ink/10">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-5 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
@@ -339,7 +356,7 @@
             </div>
 
             @if ($siteRows === [])
-                <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-7">
+                <div class="px-5 py-10 text-center text-sm text-brand-moss sm:px-6">
                     {{ __('No sites on this server yet.') }}
                 </div>
             @else
@@ -377,14 +394,13 @@
                     </table>
                 </div>
             @endif
-        </section>
-
         </div>
+        @endif
 
         {{-- Server maintenance operations (operations tab) --}}
-        <div @class(['hidden' => $maintenance_tab !== 'operations'])>
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        @if ($maintenance_tab === 'operations')
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
                 <x-icon-badge>
                     <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -395,7 +411,7 @@
                 </div>
             </div>
 
-            <div class="space-y-6 px-6 py-6 sm:px-7">
+            <div class="space-y-6 px-5 py-6 sm:px-6">
                 {{-- Host-upkeep ops render in the shared console-action banner at
                      the top of the page (same as every other workspace op).
                      While one is in flight we disable the Run buttons; this poll
@@ -494,33 +510,30 @@
                     @livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server], key('recent-actions-log-'.$server->id))
                 </div>
             </div>
-        </section>
-
         </div>
+        @endif
 
         {{-- Enable / settings form (window tab) --}}
-        <div @class(['hidden' => $maintenance_tab !== 'window'])>
-
-
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+        @if ($maintenance_tab === 'window')
+        <div class="border-b border-brand-ink/10">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-5 py-5 sm:px-6">
                 <x-icon-badge tone="amber">
                     <x-heroicon-o-pause-circle class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Maintenance') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $active ? __('Window details') : __('Start visitor maintenance') }}</h2>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $active ? __('Window details') : __('Start visitor maintenance') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            @if ($active)
-                                {{ __('End maintenance above to resume sites suspended by this window. Fields below reflect the active window (read-only).') }}
-                            @else
-                                {{ __('Review timing and messages, then confirm to suspend eligible sites and queue webserver config updates.') }}
-                            @endif
-                        </p>
-                    </div>
+                        @if ($active)
+                            {{ __('End maintenance above to resume sites suspended by this window. Fields below reflect the active window (read-only).') }}
+                        @else
+                            {{ __('Review timing and messages, then confirm to suspend eligible sites and queue webserver config updates.') }}
+                        @endif
+                    </p>
+                </div>
             </div>
 
-            <form class="space-y-5 p-6 sm:p-7">
+            <form class="space-y-5 px-5 py-6 sm:px-6">
                 <div
                     x-data="{ tz: '' }"
                     x-init="
@@ -587,14 +600,15 @@
                     </x-primary-button>
                 @endif
             </form>
-        </section>
         </div>
+        @endif
 
         {{-- Notifications tab --}}
-        <div @class(['hidden' => $maintenance_tab !== 'notifications'])>
+        @if ($maintenance_tab === 'notifications')
             @include('livewire.servers.partials.maintenance.notifications-tab')
+        @endif
         </div>
-    </div>
+    </section>
 
     @include('livewire.partials.create-notification-channel-modal')
 

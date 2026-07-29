@@ -4,24 +4,26 @@ namespace Tests\Feature\Livewire\Serverless\JourneyTest;
 
 use App\Modules\Serverless\Exceptions\ServerlessDeployCancelledException;
 use App\Modules\Serverless\Jobs\ProvisionServerlessHostJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Services\Deploy\ServerlessDeployProgress;
+use App\Modules\Deploy\Services\ServerlessDeployProgress;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+usesFeatures('surface.serverless');
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->org = Organization::factory()->create();
     $this->org->users()->attach($this->user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $this->org->id]);
 });
 
 /**

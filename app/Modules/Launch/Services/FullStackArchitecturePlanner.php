@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Launch\Services;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\GitCloner;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
-use App\Services\Edge\EdgeMonorepoDetector;
-use App\Services\Edge\Frameworks\EdgeFrameworkPresetRegistry;
-use App\Support\Edge\EdgeSsrDetection;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloner;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Edge\Services\EdgeMonorepoDetector;
+use App\Modules\Edge\Services\Frameworks\EdgeFrameworkPresetRegistry;
+use App\Modules\Edge\Support\EdgeSsrDetection;
 use App\Modules\Launch\Support\FullStackLaunchPlan;
 use App\Modules\Launch\Support\FullStackLayer;
 use Illuminate\Support\Str;
@@ -152,7 +152,7 @@ final class FullStackArchitecturePlanner
         return new FullStackLaunchPlan(
             repo: $repo,
             branch: $branch,
-            isMonorepo: (bool) ($monorepo['is_monorepo']),
+            isMonorepo: (bool) ($monorepo['is_monorepo'] ?? false),
             layers: $layers,
             wiringHints: $this->wiringHints($layers),
             reasons: $reasons,
@@ -187,7 +187,7 @@ final class FullStackArchitecturePlanner
             $targets[] = [
                 'path' => $absolute,
                 'repo_root' => $relative,
-                'label' => (string) ($package['label']),
+                'label' => (string) ($package['label'] ?? $relative),
             ];
         }
 

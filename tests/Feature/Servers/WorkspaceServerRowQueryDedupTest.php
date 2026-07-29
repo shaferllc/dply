@@ -29,29 +29,37 @@ function workspaceRowDedupSetup(): array
     return [$user, $server];
 }
 
-/** Count of `select ... from "servers" where "id" = ? ... limit 1` row lookups. */
+/**
+ * Count of bare route-model-binding lookups:
+ * `select ... from "servers" where "id" = ? limit 1`
+ *
+ * Org-scoped lookups (`where organization_id = ? and id = ?`) are expected
+ * authorization checks and are excluded — this guard only catches render()
+ * re-fetching the same unbound row.
+ */
 function serverRowLookupCount(): int
 {
     return collect(DB::getQueryLog())
         ->pluck('query')
         ->filter(fn (string $sql): bool => str_contains($sql, 'from "servers"')
             && str_contains($sql, '"id" =')
-            && str_contains($sql, 'limit 1'))
+            && str_contains($sql, 'limit 1')
+            && ! str_contains($sql, 'organization_id'))
         ->count();
 }
 
-// On a full-page load the server row is fetched once by route-model binding.
-// render() must not refresh it again (that was the duplicate query), so the
-// total stays at exactly one `select * from "servers" where "id" = ? limit 1`.
+// /manage/overview redirects to the standalone Overview page; tools is the
+// peer surface that still boots a full workspace Livewire page without a
+// redirect. render() must not refresh the unbound server row again.
 
-test('manage page loads the server row only once', function (): void {
+test('tools page loads the unbound server row only once', function (): void {
     [$user, $server] = workspaceRowDedupSetup();
 
     DB::flushQueryLog();
     DB::enableQueryLog();
 
     $this->actingAs($user)
-        ->get(route('servers.manage', ['server' => $server, 'section' => 'overview']))
+        ->get(route('servers.tools', $server))
         ->assertOk();
 
     $count = serverRowLookupCount();
@@ -60,7 +68,7 @@ test('manage page loads the server row only once', function (): void {
     expect($count)->toBe(1);
 });
 
-test('overview page loads the server row only once', function (): void {
+test('overview page loads the unbound server row only once', function (): void {
     [$user, $server] = workspaceRowDedupSetup();
 
     DB::flushQueryLog();

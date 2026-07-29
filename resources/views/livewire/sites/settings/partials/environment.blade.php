@@ -2,7 +2,10 @@
     use App\Models\ConsoleAction;
     use App\Services\Sites\DotEnvFileParser;
 
-    $card = 'dply-card overflow-hidden';
+    // Nested inside Deployments / standalone Environment chrome → hairline strips.
+    // Standalone cards only when this partial is the page's only surface (setup).
+    $envMergedChrome = (bool) ($envMergedChrome ?? false);
+    $card = $envMergedChrome ? 'border-b border-brand-ink/10' : 'dply-card overflow-hidden';
 
     // Capability gates: only VM-style hosts have a server-side .env file we can
     // sync from / push to. Container/serverless runtimes still use the same
@@ -237,7 +240,7 @@
 @endphp
 
 <section
-    class="space-y-6"
+    @class(['min-w-0' => $envMergedChrome, 'space-y-6' => ! $envMergedChrome])
     @if ($supportsEnvPush && empty($envMap) && $cacheOrigin === '' && ! $envSyncInFlight)
         wire:init="autoSyncIfFirstVisit"
     @endif
@@ -265,7 +268,7 @@
     @endphp
 
     @if ($showAttention)
-        <section class="dply-card overflow-hidden">
+        <section @class([$card, 'overflow-hidden'])>
             <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
                 <x-heroicon-o-bell-alert class="h-4 w-4 text-brand-sage" aria-hidden="true" />
                 <h2 class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Needs attention') }}</h2>
@@ -340,13 +343,17 @@
          variables list still function; the visible binding card is suppressed. --}}
     @include('livewire.sites.settings.partials.environment.resources', ['bindingModalOnly' => true])
 
-    <x-cli-snippet
-        :intro="__('Manage env via CLI when you have many keys at once:')"
-        :commands="[
-            ['label' => __('Set one'), 'command' => 'dply sites:env:set '.$site->slug.' KEY=value'],
-            ['label' => __('Bulk import from .env'), 'command' => 'dply sites:env:import '.$site->slug.' --file=.env'],
-            ['label' => __('Export current as .env'), 'command' => 'dply sites:env:export '.$site->slug.' --to=.env'],
-            ['label' => __('Diff cache vs server'), 'command' => 'dply sites:env:diff '.$site->slug],
-        ]"
-    />
+    <div @class([
+        'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => $envMergedChrome,
+    ])>
+        <x-cli-snippet
+            :intro="__('Manage env via CLI when you have many keys at once:')"
+            :commands="[
+                ['label' => __('Set one'), 'command' => 'dply sites:env:set '.$site->slug.' KEY=value'],
+                ['label' => __('Bulk import from .env'), 'command' => 'dply sites:env:import '.$site->slug.' --file=.env'],
+                ['label' => __('Export current as .env'), 'command' => 'dply sites:env:export '.$site->slug.' --to=.env'],
+                ['label' => __('Diff cache vs server'), 'command' => 'dply sites:env:diff '.$site->slug],
+            ]"
+        />
+    </div>
 </section>

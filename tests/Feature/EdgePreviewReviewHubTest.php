@@ -15,6 +15,12 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    // Deploy contract promote-gate is out of scope for these review-hub assertions.
+    \Laravel\Pennant\Feature::define('global.deploy_contract', fn () => false);
+    \Laravel\Pennant\Feature::flushCache();
+});
+
 test('preview review hub renders for edge preview site', function () {
     [$user, $server, $parent, $preview] = previewReviewFixtures();
 

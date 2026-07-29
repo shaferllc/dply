@@ -50,13 +50,25 @@
                                     {{ $runtimeDrifted ? __('Drift') : __('In sync') }}
                                 </span>
                             </li>
-                            <li class="flex items-start justify-between gap-3 py-3">
+                            @php $cloudflareTls = $site->cloudflareTerminatesTls(); @endphp
+                            <li class="flex items-start justify-between gap-3 py-3"
+                                @if ($ssl_recheck_running) wire:poll.3s="pollSslRecheck" @endif>
                                 <div class="min-w-0">
                                     <p class="text-sm font-medium text-brand-ink">{{ __('SSL') }}</p>
-                                    <p class="text-xs capitalize text-brand-moss">{{ $site->ssl_status ?: __('Not configured') }}</p>
+                                    @if ($cloudflareTls)
+                                        <p class="text-xs text-brand-moss">{{ __('Active — secured via Cloudflare') }}</p>
+                                    @else
+                                        <p class="text-xs capitalize text-brand-moss">{{ $site->ssl_status ?: __('Not configured') }}</p>
+                                    @endif
+                                    <button type="button" wire:click="recheckSsl" wire:loading.attr="disabled" wire:target="recheckSsl"
+                                        @if ($ssl_recheck_running) disabled @endif
+                                        class="mt-1 text-[11px] font-semibold text-brand-forest hover:underline disabled:opacity-50">
+                                        {{ $ssl_recheck_running ? __('Rechecking…') : __('Recheck SSL') }}
+                                    </button>
                                 </div>
-                                <span class="shrink-0 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                                    {{ $site->currentSslSummary() ?: '—' }}
+                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
+                                    {{ $cloudflareTls ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-sand/40 text-brand-moss' }}">
+                                    {{ $cloudflareTls ? __('Cloudflare') : ($site->currentSslSummary() ?: '—') }}
                                 </span>
                             </li>
                             @if ($site->isSuspended())

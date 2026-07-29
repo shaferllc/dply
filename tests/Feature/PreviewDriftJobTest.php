@@ -67,6 +67,52 @@ test('handle marks meta completed and writes buffer and diff result', function (
     expect($payload['diff_result'])->toHaveKey('root');
 });
 
+test('handle records no-drift outcome when nothing changes', function () {
+    [, $server] = ownerWithServer();
+    $runId = '01TESTRUNNODRIFT00000';
+
+    $this->mock(ServerAuthorizedKeysDiffPreview::class, function ($mock): void {
+        $mock->shouldReceive('withOutputCallback')->andReturnSelf();
+        $mock->shouldReceive('diffPerUser')
+            ->once()
+            ->andReturn([
+                'deploy' => ['remote' => [], 'desired' => [], 'added' => [], 'removed' => [], 'kept' => ['ssh-ed25519 AAAA kept']],
+            ]);
+    });
+
+    $job = new PreviewDriftJob(serverId: $server->id, runId: $runId);
+    $job->handle(app(ServerAuthorizedKeysDiffPreview::class));
+
+    $meta = $server->fresh()->meta ?? [];
+    expect(data_get($meta, config('server_ssh_keys.meta_drift_has_changes_key')))->toBeFalse();
+    expect(data_get($meta, config('server_ssh_keys.meta_drift_added_count_key')))->toBe(0);
+    expect(data_get($meta, config('server_ssh_keys.meta_drift_removed_count_key')))->toBe(0);
+});
+
+test('handle records drift counts and excludes root', function () {
+    [, $server] = ownerWithServer();
+    $runId = '01TESTRUNWITHDRIFT000';
+
+    $this->mock(ServerAuthorizedKeysDiffPreview::class, function ($mock): void {
+        $mock->shouldReceive('withOutputCallback')->andReturnSelf();
+        $mock->shouldReceive('diffPerUser')
+            ->once()
+            ->andReturn([
+                // root is auto-managed and hidden from the UI — must not count.
+                'root' => ['remote' => [], 'desired' => [], 'added' => ['ssh-ed25519 AAAA root-recovery'], 'removed' => []],
+                'deploy' => ['remote' => [], 'desired' => [], 'added' => ['ssh-ed25519 BBBB a', 'ssh-ed25519 CCCC b'], 'removed' => ['ssh-ed25519 DDDD old']],
+            ]);
+    });
+
+    $job = new PreviewDriftJob(serverId: $server->id, runId: $runId);
+    $job->handle(app(ServerAuthorizedKeysDiffPreview::class));
+
+    $meta = $server->fresh()->meta ?? [];
+    expect(data_get($meta, config('server_ssh_keys.meta_drift_has_changes_key')))->toBeTrue();
+    expect(data_get($meta, config('server_ssh_keys.meta_drift_added_count_key')))->toBe(2);
+    expect(data_get($meta, config('server_ssh_keys.meta_drift_removed_count_key')))->toBe(1);
+});
+
 test('handle marks meta failed and records error on throw', function () {
     [, $server] = ownerWithServer();
     $runId = '01TESTRUNFAILEDXXXXXXX';

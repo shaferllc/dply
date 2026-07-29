@@ -30,8 +30,8 @@ class NotificationChannels extends Component
     protected function notificationChannelsViewData(): array
     {
         return [
-            'pageTitle' => __('Organization notification channels'),
-            'intro' => __('Webhooks and chat destinations for this organization. Only organization admins can add or edit channels.'),
+            'pageTitle' => __('Notification channels'),
+            'intro' => __('Webhooks and chat destinations for this organization. Admins can add or edit channels.'),
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
                 ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],

@@ -10,7 +10,7 @@ use App\Jobs\UninstallLogAgentJob;
 use App\Models\Server;
 use App\Models\ServerLogAgent;
 use App\Models\ServerLogUsageDaily;
-use App\Services\Logs\ServerLogEntitlements;
+use App\Modules\Logs\Services\ServerLogEntitlements;
 
 /**
  * The single code path for the dply Logs add-on lifecycle — enable, re-sync,

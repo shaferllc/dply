@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns;
 
-use App\Models\Server;
-use App\Services\Billing\OrganizationBillingStateComputer;
-use App\Services\Billing\SubscriptionPlanResolver;
+use App\Modules\Billing\Services\OrganizationBillingStateComputer;
+use App\Modules\Billing\Services\SubscriptionPlanResolver;
 use Laravel\Cashier\Billable;
 
 /**
@@ -30,21 +29,15 @@ trait ManagesOrganizationSubscription
     }
 
     /**
-     * Billable BYO server count used to pick the plan. Mirrors the filter in
-     * {@see OrganizationBillingStateComputer}: ready, past the new-server age
-     * grace, and excluding dply-managed logical hosts.
+     * Billable BYO server count used to pick the plan. Delegates to
+     * {@see OrganizationBillingStateComputer::billableByoServerCount()} so the
+     * ready-server SELECT (and metric eager-load) is shared with bill compute
+     * / analytics in the same request.
      */
     private function billablePlanServerCount(): int
     {
-        $minAgeDays = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
-        $ageCutoff = now()->subDays($minAgeDays);
-
-        return $this->servers()
-            ->where('status', Server::STATUS_READY)
-            ->where('created_at', '<=', $ageCutoff)
-            ->get()
-            ->reject(fn (Server $server) => $server->isManagedProductHost())
-            ->count();
+        return app(OrganizationBillingStateComputer::class)
+            ->billableByoServerCount($this);
     }
 
     public function planTierLabel(): string
@@ -118,6 +111,42 @@ trait ManagesOrganizationSubscription
         return $this->subscriptionMatchesAnyPrice([
             config('subscription.enterprise.stripe_price_id'),
         ]);
+    }
+
+    /**
+     * The single source of truth for the bundled-products perk (free tracely +
+     * Lookout): the org is on the most expensive plan, committed for a year.
+     *
+     * "Most expensive, for a year" resolves to a valid subscription carrying the
+     * BUSINESS yearly plan price OR the (sales-led, annual) Enterprise price.
+     * Business-*monthly* deliberately does not qualify — the annual commitment is
+     * what funds giving two products away. Because {@see subscriptionMatchesAnyPrice}
+     * gates on `subscription('default')->valid()`, this is only ever true for an
+     * active/paid subscription — a trialing/past-due/cancelled org returns false.
+     *
+     * Every consumer (the OIDC entitlement claim, the provisioning emitter, the
+     * nightly reconcile) reads THIS method so the perk can never drift between
+     * surfaces. See docs/adr/bundled-products-sso.md.
+     */
+    public function qualifiesForBundledProducts(): bool
+    {
+        return $this->subscriptionMatchesAnyPrice($this->bundleQualifyingStripePriceIds());
+    }
+
+    /**
+     * The Stripe prices that grant the bundle: business-yearly and Enterprise.
+     *
+     * @return list<?string>
+     */
+    private function bundleQualifyingStripePriceIds(): array
+    {
+        $stripe = (array) config('subscription.standard.stripe', []);
+        $businessYearly = ((array) ($stripe['plans_yearly'] ?? []))['business'] ?? null;
+
+        return [
+            is_string($businessYearly) ? $businessYearly : null,
+            config('subscription.enterprise.stripe_price_id'),
+        ];
     }
 
     /**

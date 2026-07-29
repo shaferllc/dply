@@ -4,17 +4,24 @@
      * component exposes: $this->events, $this->facets, $this->openCount and the
      * actions dismiss/restore/retry/dismissAll/setCategory + $showDismissed.
      *
+     * Pass `$errorStreamNested = true` when rendering inside a merged workspace
+     * card (server Errors) so this partial does not wrap itself in another card.
+     *
      * @var \Illuminate\Contracts\Pagination\LengthAwarePaginator $events
      * @var array<string,int> $facets
      */
     $events = $this->events;
     $facets = $this->facets;
+    $nested = (bool) ($errorStreamNested ?? false);
 @endphp
 
 {{-- Live tail while open; cheap, scoped to this view only. --}}
-<div wire:poll.6s class="space-y-4">
+<div wire:poll.6s @class(['space-y-4' => ! $nested])>
     {{-- Controls --}}
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div @class([
+        'flex flex-wrap items-center justify-between gap-3',
+        'border-b border-brand-ink/10 px-5 py-4 sm:px-6' => $nested,
+    ])>
         <div class="flex flex-wrap items-center gap-1.5">
             <button type="button" wire:click="setCategory('')"
                 class="rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset {{ $category === '' ? 'bg-brand-ink text-brand-cream ring-brand-ink' : 'bg-white text-brand-moss ring-brand-ink/10 hover:bg-brand-sand/40' }}">
@@ -46,7 +53,10 @@
 
     {{-- Stream --}}
     @if ($events->isEmpty())
-        <div class="dply-card px-6 py-10">
+        <div @class([
+            'dply-card px-6 py-10' => ! $nested,
+            'px-5 py-10 sm:px-6' => $nested,
+        ])>
             <x-empty-state
                 borderless
                 icon="heroicon-o-check-circle"
@@ -58,7 +68,10 @@
             />
         </div>
     @else
-        <div class="dply-card divide-y divide-brand-ink/5 overflow-hidden">
+        <div @class([
+            'dply-card divide-y divide-brand-ink/5 overflow-hidden' => ! $nested,
+            'divide-y divide-brand-ink/5' => $nested,
+        ])>
             @foreach ($events as $event)
                 <div class="flex items-start gap-3 px-5 py-4 {{ $event->dismissed_at ? 'opacity-55' : '' }}" wire:key="err-{{ $event->id }}" x-data="{ open: false }">
                     <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $event->dismissed_at ? 'bg-brand-ink/5 text-brand-mist' : 'bg-rose-50 text-rose-600 ring-1 ring-rose-600/15' }}">
@@ -87,7 +100,15 @@
                             $rem = $event->dismissed_at ? null : $event->remediation();
                             $recAction = $rem ? (collect($rem['actions'])->firstWhere('recommended', true) ?? ($rem['actions'][0] ?? null)) : null;
                         @endphp
-                        @if ($rem && $recAction)
+                        @if ($rem && $recAction && ! empty($recAction['route']))
+                            {{-- Link action: the fix lives on another page (e.g. an expired
+                                 Git token), not in an SSH script — navigate, don't dispatch. --}}
+                            <a href="{{ route($recAction['route']) }}" wire:navigate
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
+                                title="{{ $rem['title'] }}">
+                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" /> {{ $recAction['label'] }}
+                            </a>
+                        @elseif ($rem && $recAction)
                             <button type="button"
                                 wire:click="openConfirmActionModal('applyRemediation', ['{{ $event->id }}'], @js($rem['title']), @js($rem['explanation']), @js($recAction['label']), false, @js([
                                     ['label' => __('Action'), 'value' => $recAction['label'], 'multiline' => true],
@@ -132,6 +153,8 @@
                 </div>
             @endforeach
         </div>
-        <div>{{ $events->links() }}</div>
+        <div @class(['border-t border-brand-ink/10 px-5 py-4 sm:px-6' => $nested])>
+            {{ $events->links() }}
+        </div>
     @endif
 </div>

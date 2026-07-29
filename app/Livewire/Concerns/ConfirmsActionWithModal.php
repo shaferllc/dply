@@ -31,6 +31,18 @@ trait ConfirmsActionWithModal
     public ?array $confirmActionModalDetails = null;
 
     /**
+     * Optional extra opt-in on the confirm dialog (e.g. "also delete the
+     * underlying resource"). When a label is set the modal renders a checkbox;
+     * its boolean value is appended to the confirmed method's arguments, so the
+     * target method receives it as a trailing parameter.
+     */
+    public ?string $confirmActionModalToggleLabel = null;
+
+    public string $confirmActionModalToggleHint = '';
+
+    public bool $confirmActionModalToggle = false;
+
+    /**
      * @param  list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}>|null  $details
      */
     public function openConfirmActionModal(
@@ -41,6 +53,9 @@ trait ConfirmsActionWithModal
         string $confirmLabel = 'Confirm',
         bool $destructive = false,
         ?array $details = null,
+        ?string $toggleLabel = null,
+        string $toggleHint = '',
+        bool $toggleDefault = false,
     ): void {
         if (in_array($method, [
             'openConfirmActionModal',
@@ -63,6 +78,9 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalConfirmLabel = $confirmLabel;
         $this->confirmActionModalDestructive = $destructive;
         $this->confirmActionModalDetails = $details;
+        $this->confirmActionModalToggleLabel = $toggleLabel;
+        $this->confirmActionModalToggleHint = $toggleHint;
+        $this->confirmActionModalToggle = $toggleDefault;
         $this->showConfirmActionModal = true;
     }
 
@@ -76,12 +94,21 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalArguments = [];
         $this->confirmActionModalDestructive = false;
         $this->confirmActionModalDetails = null;
+        $this->confirmActionModalToggleLabel = null;
+        $this->confirmActionModalToggleHint = '';
+        $this->confirmActionModalToggle = false;
     }
 
     public function confirmActionModal(): mixed
     {
         $method = $this->confirmActionModalMethod;
         $arguments = $this->confirmActionModalArguments;
+
+        // A rendered toggle appends its boolean as the trailing argument, so the
+        // confirmed method opts into the extra behaviour (e.g. delete-resource).
+        if ($this->confirmActionModalToggleLabel !== null) {
+            $arguments[] = $this->confirmActionModalToggle;
+        }
 
         $this->closeConfirmActionModal();
 

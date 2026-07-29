@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\Edge;
 
-use App\Actions\Edge\CreateEdgePreviewSite;
+use App\Modules\Edge\Actions\CreateEdgePreviewSite;
 use App\Enums\SiteType;
 use App\Models\Organization;
 use App\Models\Server;

@@ -214,13 +214,18 @@ class RemoteProcessRunner
 
     /**
      * Formats the script and output paths, and runs the script.
+     *
+     * `exit ${PIPESTATUS[0]}` re-raises the SCRIPT's exit status: without it the
+     * pipeline reports tee's status (0) no matter how the script died, so every
+     * caller checking ProcessOutput::getExitCode() saw success unconditionally —
+     * failed installs were recorded as running, failed deploy steps as done.
      */
     public function runUploadedScript(string $script, string $output, int $timeout = 0): ProcessOutput
     {
         $scriptPath = $this->path($script);
         $outputPath = $this->path($output);
 
-        return $this->run("bash {$scriptPath} 2>&1 | tee {$outputPath}", $timeout);
+        return $this->run("bash {$scriptPath} 2>&1 | tee {$outputPath}; exit \${PIPESTATUS[0]}", $timeout);
     }
 
     /**

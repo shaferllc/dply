@@ -1,25 +1,27 @@
-<x-server-workspace-tablist id="daemons-sync-tablist" :aria-label="__('Sync sections')">
-    <x-server-workspace-tab
-        id="daemons-sync-sub-preview"
-        icon="heroicon-o-eye"
-        :active="$daemons_sync_subtab === 'preview'"
-        wire:click="$set('daemons_sync_subtab', 'preview')"
-    >{{ __('Preview') }}</x-server-workspace-tab>
+<div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+    <x-server-workspace-tablist id="daemons-sync-tablist" :aria-label="__('Sync sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+        <x-server-workspace-tab
+            id="daemons-sync-sub-preview"
+            icon="heroicon-o-eye"
+            :active="$daemons_sync_subtab === 'preview'"
+            wire:click="$set('daemons_sync_subtab', 'preview')"
+        >{{ __('Preview') }}</x-server-workspace-tab>
 
-    <x-server-workspace-tab
-        id="daemons-sync-sub-drift"
-        icon="heroicon-o-arrows-right-left"
-        :active="$daemons_sync_subtab === 'drift'"
-        wire:click="$set('daemons_sync_subtab', 'drift')"
-    >{{ __('Drift') }}</x-server-workspace-tab>
+        <x-server-workspace-tab
+            id="daemons-sync-sub-drift"
+            icon="heroicon-o-arrows-right-left"
+            :active="$daemons_sync_subtab === 'drift'"
+            wire:click="$set('daemons_sync_subtab', 'drift')"
+        >{{ __('Drift') }}</x-server-workspace-tab>
 
-    <x-server-workspace-tab
-        id="daemons-sync-sub-output"
-        icon="heroicon-o-document-text"
-        :active="$daemons_sync_subtab === 'output'"
-        wire:click="$set('daemons_sync_subtab', 'output')"
-    >{{ __('Last output') }}</x-server-workspace-tab>
-</x-server-workspace-tablist>
+        <x-server-workspace-tab
+            id="daemons-sync-sub-output"
+            icon="heroicon-o-document-text"
+            :active="$daemons_sync_subtab === 'output'"
+            wire:click="$set('daemons_sync_subtab', 'output')"
+        >{{ __('Last output') }}</x-server-workspace-tab>
+    </x-server-workspace-tablist>
+</div>
 
 @if ($daemons_sync_subtab === 'preview')
     <div

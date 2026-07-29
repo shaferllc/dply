@@ -29,7 +29,7 @@ final class MonitorWorkspaceViewData
         ?string $monitorLastGuestSampleAt,
         int $pollRemoteTaskSeconds,
     ): array {
-        $card = 'dply-card overflow-hidden';
+        $card = '';
 
         $m = $server->meta ?? [];
         $sshKnown = array_key_exists('monitoring_ssh_reachable', $m);

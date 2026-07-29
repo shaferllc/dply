@@ -82,13 +82,12 @@ test('firewall workspace shows basics and hides advanced sections', function () 
     $response->assertSee('Firewall rules');
     $response->assertSee('Templates');
     $response->assertSee('Activity');
-    $response->assertDontSee('↑');
-    $response->assertDontSee('↓');
 
     // The view now shows an "Advanced" details panel collapsed by
     // default; the test's intent is that advanced fields aren't
     // user-visible above the fold. assertDontSee on the heading is
     // too strict — advanced items below this line are still asserted.
+    // (Do not assertDontSee ↑/↓ — the global command palette chrome uses them.)
     $response->assertDontSee('Drift detection');
     $response->assertDontSee('Import / export');
     $response->assertDontSee('Scheduled apply');

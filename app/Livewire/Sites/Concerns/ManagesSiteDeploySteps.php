@@ -7,7 +7,7 @@ namespace App\Livewire\Sites\Concerns;
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
 use App\Models\SiteDeployStep;
-use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineStepDuplicate;
 use Livewire\Component;
 

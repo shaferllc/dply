@@ -97,7 +97,9 @@ trait ManagesAdminFlagToggles
             $entries[] = [
                 'key' => $key,
                 'label' => $label,
-                'active' => AdminFeatureFlags::configDefault($key),
+                // `active` reflects the effective platform default (a /admin/flags/all
+                // override wins); `configDefault` stays the raw config value for the caption.
+                'active' => AdminFeatureFlags::platformState($key),
                 'default' => AdminFeatureFlags::configDefault($key),
                 'configDefault' => AdminFeatureFlags::configDefault($key),
             ];
@@ -120,7 +122,7 @@ trait ManagesAdminFlagToggles
                 $previewEntry = [
                     'key' => $previewKey,
                     'label' => $allFlagsInGroup[$previewKey],
-                    'active' => AdminFeatureFlags::configDefault($previewKey),
+                    'active' => AdminFeatureFlags::platformState($previewKey),
                     'default' => AdminFeatureFlags::configDefault($previewKey),
                     'configDefault' => AdminFeatureFlags::configDefault($previewKey),
                 ];
@@ -129,7 +131,7 @@ trait ManagesAdminFlagToggles
             $entries[] = [
                 'key' => $key,
                 'label' => $label,
-                'active' => AdminFeatureFlags::configDefault($key),
+                'active' => AdminFeatureFlags::platformState($key),
                 'default' => AdminFeatureFlags::configDefault($key),
                 'configDefault' => AdminFeatureFlags::configDefault($key),
                 'preview' => $previewEntry,
@@ -149,7 +151,7 @@ trait ManagesAdminFlagToggles
             $entries[] = [
                 'key' => $key,
                 'label' => $label,
-                'active' => AdminFeatureFlags::configDefault($key),
+                'active' => AdminFeatureFlags::platformState($key),
                 'default' => AdminFeatureFlags::configDefault($key),
             ];
         }

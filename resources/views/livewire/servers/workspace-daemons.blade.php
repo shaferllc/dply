@@ -7,11 +7,6 @@
         'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
         'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
     ];
-
-    // Site-context daemons (the per-site Daemons page) renders inside the site
-    // workspace wrapper — left sidebar + breadcrumb — to match the other site
-    // sub-pages. The server-level Daemons workspace keeps the server shell.
-    $daemonsContextSite = $contextSiteModel ?? null;
 @endphp
 
 {{-- Single stable root: a Livewire component must morph against ONE consistent
@@ -21,9 +16,9 @@
      orphaned, snapshot-less root ("Snapshot missing on Livewire component").
      `display:contents` keeps the wrapper layout-neutral. --}}
 <div class="contents">
-@if ($daemonsContextSite)
+@if ($siteDedicatedContext ?? false)
     @php
-        $site = $daemonsContextSite;
+        $site = $contextSiteModel;
         $runtimeMode = $site->runtimeTargetMode();
         $runtimeTarget = $site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
@@ -47,16 +42,7 @@
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
             @include('livewire.sites.settings.partials.sidebar')
 
-            <main class="min-w-0 space-y-6 lg:col-span-9">
-                <x-page-header
-                    :eyebrow="__('Background')"
-                    :title="__('Workers')"
-                    :description="__('Supervisor-managed worker processes for this site (queue workers, websocket servers, long-running binaries).')"
-                    :show-documentation="false"
-                    flush
-                    compact
-                />
-
+            <main class="min-w-0 lg:col-span-9">
                 @include('livewire.servers.partials.daemons._workspace-content')
             </main>
         </div>
@@ -70,6 +56,7 @@
         :title="__('Workers')"
         :description="__('Supervisor-managed queue workers and background daemons — health snapshot, program CRUD, sync, and logs.')"
         :context-site="null"
+        hide-hero
     >
         @include('livewire.servers.partials.daemons._workspace-content')
 

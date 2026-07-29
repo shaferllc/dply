@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\GithubEdgeWebhookTest;
 
 use App\Enums\SiteType;
-use App\Jobs\BuildEdgeSiteJob;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;

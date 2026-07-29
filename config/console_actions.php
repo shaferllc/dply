@@ -24,6 +24,18 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'dns_apply' => [
+            'running' => 'Applying DNS records …',
+            'completed' => 'DNS records applied.',
+            'failed' => 'Applying DNS records failed.',
+            'stale' => 'Applying DNS records did not finish.',
+        ],
+        'tenant_dns' => [
+            'running' => 'Updating tenant routing …',
+            'completed' => 'Tenant routing updated.',
+            'failed' => 'Tenant routing update failed.',
+            'stale' => 'Tenant routing update did not finish.',
+        ],
         'server_maintenance_op' => [
             'running' => 'Running host maintenance on :host …',
             'completed' => 'Host maintenance finished.',
@@ -125,6 +137,9 @@ return [
             'completed' => 'Fix completed.',
             'failed' => 'The fix did not complete — see the output.',
             'stale' => 'Fix did not finish.',
+            // Fixers run up to 900s (npm clean-reinstall); the redis-ext job is
+            // 660s. Keep above both so a legit fix isn't flagged stale mid-run.
+            'stale_seconds' => 1200,
         ],
         'pipeline_optimize' => [
             'running' => 'Reading package.json / composer.json on :host …',
@@ -203,6 +218,8 @@ return [
             'completed' => 'Clone ready.',
             'failed' => 'Clone failed.',
             'stale' => 'Clone did not finish.',
+            // CloneServerOnDigitalOceanJob runs up to 2400s.
+            'stale_seconds' => 3000,
         ],
         'php_load_config' => [
             'running' => 'Loading PHP config from :host …',
@@ -263,6 +280,8 @@ return [
             'completed' => 'Database engine installed.',
             'failed' => 'Database engine install failed.',
             'stale' => 'Database engine install did not finish.',
+            // InstallDatabaseEngineJob runs up to 1800s.
+            'stale_seconds' => 2400,
         ],
         'db_engine_uninstall' => [
             'running' => 'Uninstalling database engine on :host …',
@@ -313,6 +332,8 @@ return [
             'completed' => 'Database backup complete.',
             'failed' => 'Database backup failed.',
             'stale' => 'Database backup did not finish.',
+            // ExportServerDatabaseBackupJob runs up to 3600s.
+            'stale_seconds' => 4200,
         ],
         // On-demand site-files export (Overview "Run files backup now" + a
         // schedule's "Run now"). Streams archive/ship phases.
@@ -321,6 +342,8 @@ return [
             'completed' => 'Site files backup complete.',
             'failed' => 'Site files backup failed.',
             'stale' => 'Site files backup did not finish.',
+            // ExportSiteFileBackupJob runs up to 7200s (large site archives).
+            'stale_seconds' => 7800,
         ],
     ],
 
@@ -356,7 +379,7 @@ return [
         // "tracking in the console" toast isn't a dead end.
         'general' => ['disk_usage_measure'],
         'settings' => ['webserver_config'],
-        'routing' => ['webserver_config'],
+        'routing' => ['webserver_config', 'ssl', 'dns_apply', 'tenant_dns'],
         'certificates' => ['ssl', 'webserver_config'],
         'runtime' => ['webserver_config'],
         'system-user' => ['system_user', 'webserver_config', 'permissions'],

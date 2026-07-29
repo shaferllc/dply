@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Backups\Console;
 
 use App\Models\ServerDatabaseBackup;
-use App\Models\SiteFileBackup;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;

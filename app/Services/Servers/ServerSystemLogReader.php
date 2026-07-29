@@ -104,7 +104,14 @@ class ServerSystemLogReader
 
         $sitePath = $this->resolveSitePerHostLogPath($server, $key);
         if ($sitePath !== null) {
-            if (! $this->pathMatchesAllowlist($sitePath)) {
+            // May be a single path or an ordered candidate list (no-downtime
+            // Laravel/Horizon logs). Keep only allowlisted, traversal-free paths.
+            $candidates = array_values(array_filter(
+                is_array($sitePath) ? $sitePath : [$sitePath],
+                fn (string $p): bool => $p !== '' && ! str_contains($p, '..') && $this->pathMatchesAllowlist($p),
+            ));
+
+            if ($candidates === []) {
                 return ['output' => '', 'error' => __('This log path is not allowlisted.')];
             }
 
@@ -114,7 +121,7 @@ class ServerSystemLogReader
 
             return $this->tailFileOverSsh(
                 $server,
-                $sitePath,
+                $candidates,
                 $tailLimit,
                 $onStreamStart,
                 $onOutputChunk,
@@ -315,23 +322,38 @@ class ServerSystemLogReader
      * @param  callable(string):void|null  $onOutputChunk
      * @return array{output: string, error: ?string}
      */
+    /**
+     * @param  string|list<string>  $path  A single path, or an ordered list of
+     *   candidates — the first that exists (and is a regular file) is tailed.
+     *   Used for layout-sensitive logs (a no-downtime site's Laravel log lives
+     *   under current/, but falls back to shared/ and the flat root when current/
+     *   isn't present yet).
+     */
     private function tailFileOverSsh(
         Server $server,
-        string $path,
+        string|array $path,
         int $lines,
         ?callable $onStreamStart,
         ?callable $onOutputChunk,
         ?int $sinceMinutes = null,
     ): array {
-        $qPath = escapeshellarg($path);
+        $paths = array_values(array_filter(is_array($path) ? $path : [$path], static fn ($p): bool => (string) $p !== ''));
+        $joined = implode(' ', array_map('escapeshellarg', $paths));
         // Read directly when the SSH user can; otherwise fall back to passwordless
         // sudo (the dply model: deploy user + sudo, root login disabled). Many
         // system logs (e.g. /var/log/nginx/error.log) are root/adm-owned and only
-        // reachable via sudo.
-        $script = "if [ -r {$qPath} ]; then tail -n {$lines} {$qPath} 2>&1; ".
-            "elif sudo -n test -r {$qPath} 2>/dev/null; then sudo -n tail -n {$lines} {$qPath} 2>&1; ".
-            "elif [ -f {$qPath} ]; then echo '[dply] File exists but is not readable as this SSH user, and passwordless sudo is unavailable.'; ".
-            "else echo '[dply] File not found or path is not a regular file.'; fi";
+        // reachable via sudo. With several candidates, tail the FIRST that's a
+        // regular file readable directly or via sudo; only if none are readable do
+        // we emit the exists-but-unreadable / not-found markers (which drive the
+        // root-login retry and the UI message respectively).
+        $script = 'for p in '.$joined.'; do '.
+            'if [ -f "$p" ] && [ -r "$p" ]; then tail -n '.$lines.' "$p" 2>&1; exit 0; fi; '.
+            'if sudo -n test -r "$p" 2>/dev/null && sudo -n test -f "$p" 2>/dev/null; then sudo -n tail -n '.$lines.' "$p" 2>&1; exit 0; fi; '.
+            'done; '.
+            'for p in '.$joined.'; do '.
+            'if [ -f "$p" ] || { sudo -n test -f "$p" 2>/dev/null; }; then echo \'[dply] File exists but is not readable as this SSH user, and passwordless sudo is unavailable.\'; exit 0; fi; '.
+            'done; '.
+            'echo \'[dply] File not found or path is not a regular file.\'';
         $cmd = '/bin/sh -c '.escapeshellarg($script);
         $budget = (int) config('server_system_logs.request_time_budget_seconds', 90);
         $sshTimeout = $budget > 0 ? max(15, min(60, $budget - 5)) : 60;
@@ -505,7 +527,12 @@ class ServerSystemLogReader
             ->first();
     }
 
-    private function resolveSitePerHostLogPath(Server $server, string $key): ?string
+    /**
+     * @return string|list<string>|null A single path, or an ordered candidate
+     *   list (first existing wins) for layout-sensitive logs like the Laravel
+     *   log on a no-downtime site.
+     */
+    private function resolveSitePerHostLogPath(Server $server, string $key): string|array|null
     {
         if (! preg_match('/^site_([0-9A-HJKMNP-TV-Z]{26})_(access|error|laravel|laravel_horizon)$/i', $key, $m)) {
             return null;
@@ -528,7 +555,9 @@ class ServerSystemLogReader
                 return null;
             }
 
-            return $site->effectiveEnvDirectory().'/storage/logs/laravel.log';
+            // Candidates (current → shared → flat) so a no-downtime site whose
+            // current/ symlink isn't present yet still finds the live log.
+            return $site->storageLogCandidates('laravel.log');
         }
 
         if ($which === 'laravel_horizon') {
@@ -536,7 +565,7 @@ class ServerSystemLogReader
                 return null;
             }
 
-            return $site->effectiveEnvDirectory().'/storage/logs/horizon.log';
+            return $site->storageLogCandidates('horizon.log');
         }
 
         $basename = $site->webserverConfigBasename();

@@ -1,6 +1,4 @@
 <div>
-    <x-livewire-validation-errors />
-
     @push('breadcrumbs')
         <x-breadcrumb-trail doc-contextual :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
@@ -15,17 +13,14 @@
         $lastUsed = $cliTokens->pluck('last_used_at')->filter()->sort()->last();
     @endphp
 
-    {{-- Hero card: positioning + at-a-glance counts (mirrors the
-         notification-channels header). --}}
-    <x-hero-card
-        :eyebrow="__('Command line')"
+    <x-profile-shell
         :title="__('CLI')"
         :description="__('Install the dply CLI, sign in once with device-flow login, and manage every CLI session tied to your organizations from here.')"
-        icon="command-line"
+        icon="heroicon-o-command-line"
     >
         <x-slot:stats>
             <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sessions') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $sessionCount }}</span>
@@ -33,7 +28,7 @@
                     </dd>
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Active devices') }}</p>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organizations') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
@@ -41,7 +36,7 @@
                     </dd>
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('You administer') }}</p>
                 </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last used') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
                         <span class="text-sm font-semibold text-brand-ink">{{ $lastUsed ? $lastUsed->diffForHumans() : '—' }}</span>
@@ -50,28 +45,25 @@
                 </div>
             </dl>
         </x-slot:stats>
-    </x-hero-card>
 
-    @if ($organizations->isEmpty())
-        <section class="dply-card mt-6 overflow-hidden p-6 sm:p-8">
-            <p class="text-sm text-brand-moss">{{ __('Org admin access is required to manage CLI authentications.') }}</p>
-        </section>
-    @else
-        <div class="mt-6 space-y-6">
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        @if ($organizations->isEmpty())
+            <div class="px-5 py-6 sm:px-6">
+                <p class="text-sm text-brand-moss">{{ __('Org admin access is required to manage CLI authentications.') }}</p>
+            </div>
+        @else
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Install') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Get the dply CLI') }}</h2>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Get the dply CLI') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Requires Node 18+. Run `dply login` — your browser opens here, you approve once, and the terminal drops into `dply shell`. Press Enter for numbered menus, or type commands directly.') }}
                         </p>
                     </div>
                 </div>
-                <div class="space-y-4 px-6 py-5 sm:px-7">
+                <div class="space-y-4 px-5 py-5 sm:px-6">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1. Install') }}</p>
                         @php $installUrl = route('cli.install'); @endphp
@@ -137,22 +129,21 @@ jobs:
                         </p>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10">
+                <div class="flex items-start gap-3 bg-brand-sand/15 px-5 py-4 sm:px-6">
                     <x-icon-badge>
                         <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Configure') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repo config: dply.yaml or dply.json') }}</h2>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Repo config: dply.yaml or dply.json') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Drop a `dply.yaml`, `dply.yml`, or `dply.json` at your repo root. dply reads it on every deploy — build overrides, redirects, rewrites, header rules, and env declarations. YAML and JSON are interchangeable; pick whichever your team prefers.') }}
                         </p>
                     </div>
                 </div>
-                <div class="space-y-4 px-6 py-5 sm:px-7">
+                <div class="space-y-4 px-5 py-5 sm:px-6">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('YAML — dply.yaml') }}</p>
                         <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>@verbatim build:
@@ -243,17 +234,16 @@ env:
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <section class="dply-card overflow-hidden">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+            <div class="last:border-b-0">
+                <div class="flex flex-col gap-4 bg-brand-sand/15 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
                     <div class="flex min-w-0 items-start gap-3">
                         <x-icon-badge>
                             <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sessions') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('CLI authentications') }}</h2>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('CLI authentications') }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Tokens from device-flow login (“:name”). Revoke to sign a machine out immediately.', ['name' => $cliTokenName]) }}
                             </p>
@@ -272,7 +262,7 @@ env:
                 </div>
 
                 @if ($cliTokens->isEmpty())
-                    <div class="px-6 py-10 text-center sm:px-7">
+                    <div class="px-5 py-10 text-center sm:px-6">
                         <p class="text-sm font-medium text-brand-ink">{{ __('No CLI sessions yet') }}</p>
                         <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                             {{ __('Run `dply login` from a terminal and approve the device to create the first session.') }}
@@ -281,7 +271,7 @@ env:
                 @else
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($cliTokens as $token)
-                            <li wire:key="cli-token-{{ $token->id }}" class="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                            <li wire:key="cli-token-{{ $token->id }}" class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                                 <div class="min-w-0">
                                     <p class="font-mono text-sm text-brand-ink">{{ $token->token_prefix }}…</p>
                                     <p class="mt-1 text-xs text-brand-moss">
@@ -304,9 +294,9 @@ env:
                         @endforeach
                     </ul>
                 @endif
-            </section>
-        </div>
-    @endif
+            </div>
+        @endif
+    </x-profile-shell>
 
     @include('livewire.partials.confirm-action-modal')
 </div>

@@ -14,9 +14,9 @@
     };
 @endphp
 
-<div class="space-y-6">
-    <div class="dply-card overflow-hidden scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+<div>
+    <div class="scroll-mt-24 border-b border-brand-ink/10">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
             <x-icon-badge>
                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
@@ -27,7 +27,7 @@
             </div>
         </div>
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-6 sm:px-6">
             <form wire:submit="saveServerWebhooks" class="space-y-5">
             <div>
                 <x-input-label for="settings-webhook-url" value="{{ __('Webhook URL') }}" />
@@ -79,8 +79,8 @@
         </div>
     </div>
 
-    <div class="dply-card overflow-hidden scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+    <div class="scroll-mt-24 border-b border-brand-ink/10">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
             <x-icon-badge>
                 <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
@@ -95,7 +95,7 @@
         </div>
 
         @if ($webhookDeliveries->isEmpty())
-            <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">
+            <div class="px-5 py-10 text-center text-sm text-brand-moss sm:px-6">
                 {{ __('No webhook deliveries yet. Click “Send test” above to fire one.') }}
             </div>
         @else
@@ -105,7 +105,7 @@
                         [$badgeLabel, $badgeClasses] = $statusBadge($delivery->status);
                         $payloadJson = json_encode($delivery->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" :class="openId === @js($delivery->id) ? 'bg-brand-sand/20' : ''">
+                    <li class="px-5 py-3 sm:px-6" :class="openId === @js($delivery->id) ? 'bg-brand-sand/20' : ''">
                         <button
                             type="button"
                             class="flex w-full items-center gap-3 text-left"

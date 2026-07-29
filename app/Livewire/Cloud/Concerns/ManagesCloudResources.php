@@ -105,21 +105,35 @@ trait ManagesCloudResources
      */
     public function addDatabase(string $engine = CloudDatabase::ENGINE_POSTGRES): void
     {
-        if (! in_array($engine, [CloudDatabase::ENGINE_POSTGRES, CloudDatabase::ENGINE_MYSQL, CloudDatabase::ENGINE_REDIS], true)) {
+        $aws = ($this->backend ?? '') === 'aws_app_runner';
+        $allowed = $aws
+            ? [CloudDatabase::ENGINE_POSTGRES, CloudDatabase::ENGINE_MYSQL]
+            : [CloudDatabase::ENGINE_POSTGRES, CloudDatabase::ENGINE_MYSQL, CloudDatabase::ENGINE_REDIS];
+        if (! in_array($engine, $allowed, true)) {
             $engine = CloudDatabase::ENGINE_POSTGRES;
         }
 
         $id = 'db-'.bin2hex(random_bytes(4));
 
-        $this->databases[] = [
+        $row = [
             '_id' => $id,
-            'mode' => 'create',
+            'mode' => $aws ? 'external' : 'create',
             'name' => $this->nextDatabaseName($engine),
             'engine' => $engine,
             'version' => $this->defaultEngineVersion($engine),
             'size' => 'small',
             'env_prefix' => $this->nextEnvPrefix($engine),
         ];
+        if ($aws) {
+            $row['host'] = '';
+            $row['port'] = $engine === CloudDatabase::ENGINE_MYSQL ? 3306 : 5432;
+            $row['database'] = '';
+            $row['username'] = '';
+            $row['password'] = '';
+            $row['ssl'] = true;
+        }
+
+        $this->databases[] = $row;
 
         // The canvas's Alpine state seeds its `cards` map from PHP on
         // mount; new rows added after mount need a runtime hint so the

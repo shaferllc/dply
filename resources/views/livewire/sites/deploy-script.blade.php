@@ -41,7 +41,8 @@
         <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white/80 p-4 shadow-sm sm:p-5"
              x-data="{ zd: @js($atomic_release) }">
             <label class="flex cursor-pointer items-start gap-3">
-                <input type="checkbox" id="deploy-atomic-toggle" wire:model="atomic_release" x-on:change="zd = $event.target.checked"
+                <input type="checkbox" id="deploy-atomic-toggle" wire:model="atomic_release"
+                    x-on:change="zd = $event.target.checked; $dispatch('dply-zd-changed', { on: $event.target.checked })"
                     class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
                 <span class="min-w-0">
                     <span class="text-sm font-semibold text-brand-ink">{{ __('Zero-downtime (atomic) release') }}</span>
@@ -77,15 +78,43 @@
                         <div class="mt-3 space-y-1.5">
                             @foreach ($locked as $step)
                                 @php $pinnedCustom = $step->step_type === $customType; @endphp
-                                <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1.5">
-                                    <x-heroicon-m-lock-closed class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
-                                    <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
-                                    <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-brand-mist">{{ $step->commandFor() }}</span>
-                                    <span @class([
-                                        'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
-                                        'bg-brand-gold/20 text-brand-ink' => $pinnedCustom,
-                                        'bg-brand-ink/5 text-brand-moss' => ! $pinnedCustom,
-                                    ])>{{ $pinnedCustom ? __('Pinned') : __('Builder') }}</span>
+                                <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1.5" wire:key="locked-{{ $step->id }}">
+                                    @if ($editing_step_id === (string) $step->id)
+                                        {{-- Inline edit: a typed builder step becomes a custom command in place. --}}
+                                        <div class="flex items-center gap-2">
+                                            <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
+                                            <input type="text" wire:model="editing_step_command" spellcheck="false"
+                                                wire:keydown.enter.prevent="saveStep" wire:keydown.escape="cancelStepEdit"
+                                                class="min-w-0 flex-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-[11px] text-brand-ink focus:border-brand-forest focus:ring-brand-forest" autofocus>
+                                            <button type="button" wire:click="saveStep"
+                                                class="shrink-0 rounded-md bg-brand-forest px-2 py-1 text-[10px] font-semibold text-white hover:bg-brand-forest/90">{{ __('Save') }}</button>
+                                            <button type="button" wire:click="cancelStepEdit"
+                                                class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[10px] font-semibold text-brand-moss hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
+                                        </div>
+                                        @error('editing_step_command')
+                                            <p class="mt-1 text-[10px] font-medium text-rose-600">{{ $message }}</p>
+                                        @enderror
+                                    @else
+                                        <div class="flex items-center gap-2">
+                                            <x-heroicon-m-lock-closed class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
+                                            <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
+                                            <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-brand-mist">{{ $step->commandFor() }}</span>
+                                            <span @class([
+                                                'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                                                'bg-brand-gold/20 text-brand-ink' => $pinnedCustom,
+                                                'bg-brand-ink/5 text-brand-moss' => ! $pinnedCustom,
+                                            ])>{{ $pinnedCustom ? __('Pinned') : __('Builder') }}</span>
+                                            <button type="button" wire:click="editStep('{{ $step->id }}')" title="{{ __('Edit command') }}"
+                                                class="shrink-0 rounded-md p-1 text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink">
+                                                <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
+                                            </button>
+                                            <button type="button" title="{{ __('Remove step') }}"
+                                                x-on:click="$dispatch('confirm-remove-step', { id: '{{ $step->id }}', label: @js($step->pillLabel()) }); $dispatch('open-modal', 'deploy-step-remove-confirm')"
+                                                class="shrink-0 rounded-md p-1 text-brand-moss hover:bg-rose-50 hover:text-rose-600">
+                                                <x-heroicon-m-trash class="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                             <p class="text-[10px] text-brand-mist">{{ __('Your commands below run after these.') }}</p>
@@ -95,7 +124,7 @@
                     {{-- Restart phase: be transparent about dply's managed restart and let the user opt out. --}}
                     @if ($phase === 'restart')
                         @if ($managedRestart['has'])
-                            <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3" x-data="{ managed: @js($managed_restart_enabled) }">
+                            <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3" x-data="{ managed: @js($managed_restart_enabled), fpmStrategy: @js($php_fpm_strategy) }">
                                 <label class="flex cursor-pointer items-start gap-2.5">
                                     <input type="checkbox" id="deploy-managed-restart-toggle" wire:model="managed_restart_enabled" x-on:change="managed = $event.target.checked"
                                         class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
@@ -116,6 +145,30 @@
                                         </span>
                                     </span>
                                 </label>
+
+                                {{-- PHP-FPM & OPcache strategy — how the managed restart hands FPM the new release. --}}
+                                @if ($managedRestart['fpm_strategy_selectable'] ?? false)
+                                    <div class="mt-3 border-t border-brand-ink/10 pt-3 pl-[26px]" x-show="managed" x-cloak>
+                                        <label for="deploy-php-fpm-strategy" class="text-[11px] font-semibold text-brand-ink">{{ __('PHP-FPM & OPcache') }}</label>
+                                        <select id="deploy-php-fpm-strategy" wire:model="php_fpm_strategy" x-on:change="fpmStrategy = $event.target.value"
+                                            class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white py-1.5 text-[11px] text-brand-ink focus:border-brand-forest focus:ring-brand-forest">
+                                            @foreach ($phpFpmStrategyOptions as $value => $label)
+                                                <option value="{{ $value }}">{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        <p x-show="fpmStrategy === 'flush'" x-cloak class="mt-1.5 text-[11px] text-brand-moss">
+                                            {{ __('Zero-downtime: FPM is reloaded and OPcache is flushed inside a live worker. If the flush can’t reach the pool, dply restarts PHP-FPM so the new release always goes live.') }}
+                                        </p>
+                                        <p x-show="fpmStrategy === 'flush_only'" x-cloak class="mt-1.5 flex items-start gap-1 text-[11px] font-medium text-amber-700">
+                                            <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                            <span>{{ __('dply never restarts FPM for this site. If the OPcache flush fails, the site may keep serving the previous release until PHP-FPM is restarted by hand.') }}</span>
+                                        </p>
+                                        <p x-show="fpmStrategy === 'restart'" x-cloak class="mt-1.5 flex items-start gap-1 text-[11px] font-medium text-amber-700">
+                                            <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                            <span>{{ __('Restarting PHP-FPM briefly interrupts every site on this PHP version on the server — in-flight requests can be dropped.') }}</span>
+                                        </p>
+                                    </div>
+                                @endif
                             </div>
                         @else
                             <p class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-[11px] text-brand-moss">{{ $managedRestart['label'] }}</p>
@@ -130,7 +183,8 @@
         </div>
 
         {{-- Deploy hooks — shell scripts at positional anchors around the deploy. --}}
-        <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white/80 p-4 shadow-sm sm:p-5">
+        <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-white/80 p-4 shadow-sm sm:p-5"
+             x-data="{ zd: @js($atomic_release) }" x-on:dply-zd-changed.window="zd = $event.detail.on">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
@@ -149,13 +203,28 @@
             @else
                 <ul class="mt-3 divide-y divide-brand-ink/10">
                     @foreach ($hooks as $hook)
-                        @php $editable = $hook->hook_kind === $shellKind && in_array($hook->anchor, $hookAnchorOptions, true); @endphp
-                        <li class="flex items-center gap-3 py-2.5" wire:key="hook-{{ $hook->id }}">
+                        @php
+                            $editable = $hook->hook_kind === $shellKind && in_array($hook->anchor, $hookAnchorOptions, true);
+                            $hookScriptLc = strtolower((string) $hook->script);
+                            // Maintenance down/up are redundant under zero-downtime — the atomic
+                            // symlink swap means the app is never served from a half-updated state,
+                            // so `artisan down`/`up` only adds an unnecessary outage window.
+                            $isMaintenanceHook = str_contains($hookScriptLc, 'artisan down') || str_contains($hookScriptLc, 'artisan up');
+                        @endphp
+                        <li class="flex items-center gap-3 py-2.5" wire:key="hook-{{ $hook->id }}"
+                            @if ($isMaintenanceHook) :class="zd ? 'opacity-50' : ''" @endif>
                             <span class="shrink-0 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-forest">
                                 {{ $hookAnchorLabels[$hook->anchor] ?? $hook->anchor }}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="truncate text-xs font-semibold text-brand-ink">{{ $hook->pillLabel() }}</p>
+                                <p class="truncate text-xs font-semibold text-brand-ink">
+                                    {{ $hook->pillLabel() }}
+                                    @if ($isMaintenanceHook)
+                                        <span x-cloak x-show="zd"
+                                            class="ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-amber-800"
+                                            title="{{ __('Maintenance mode adds an outage window that zero-downtime makes unnecessary. It is skipped at deploy time while zero-downtime is on.') }}">{{ __('Redundant with zero-downtime') }}</span>
+                                    @endif
+                                </p>
                                 @if ($hook->hook_kind === $shellKind && trim((string) $hook->script) !== '')
                                     <p class="truncate font-mono text-[10px] text-brand-mist">{{ \Illuminate\Support\Str::limit(trim((string) $hook->script), 80) }}</p>
                                 @endif
@@ -165,8 +234,8 @@
                             @else
                                 <span class="shrink-0 rounded-full bg-brand-ink/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-moss" title="{{ __('Edit in the visual builder') }}">{{ __('Builder') }}</span>
                             @endif
-                            <button type="button" wire:click="deleteHook('{{ $hook->id }}')"
-                                wire:confirm="{{ __('Remove this hook?') }}"
+                            <button type="button"
+                                x-on:click="$dispatch('confirm-remove-hook', { id: '{{ $hook->id }}', label: @js($hook->pillLabel()) }); $dispatch('open-modal', 'deploy-hook-remove-confirm')"
                                 class="shrink-0 text-xs font-semibold text-red-700 hover:underline">{{ __('Remove') }}</button>
                         </li>
                     @endforeach
@@ -214,6 +283,64 @@
             </div>
         </div>
     </div>
+
+    {{-- Remove-step confirmation — deletes a locked builder/pinned step from the pipeline. --}}
+    <x-modal name="deploy-step-remove-confirm" maxWidth="md" overlayClass="bg-brand-ink/40" focusable>
+        <div x-data="{ stepId: null, stepLabel: '' }"
+            x-on:confirm-remove-step.window="stepId = $event.detail.id; stepLabel = $event.detail.label">
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Remove step') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                            {{ __('Remove') }} <span x-text="stepLabel"></span>{{ __('?') }}
+                        </h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This deletes the step from the deploy pipeline immediately. You can re-add it later from “Insert command”.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <button type="button" x-on:click="$dispatch('close-modal', 'deploy-step-remove-confirm')"
+                    class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
+                <button type="button" x-on:click="$wire.removeStep(stepId); $dispatch('close-modal', 'deploy-step-remove-confirm')"
+                    class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">
+                    <x-heroicon-o-trash class="h-4 w-4" /> {{ __('Remove step') }}
+                </button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- Remove-hook confirmation — deletes a deploy hook immediately. --}}
+    <x-modal name="deploy-hook-remove-confirm" maxWidth="md" overlayClass="bg-brand-ink/40" focusable>
+        <div x-data="{ hookId: null, hookLabel: '' }"
+            x-on:confirm-remove-hook.window="hookId = $event.detail.id; hookLabel = $event.detail.label">
+            <div class="border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Remove hook') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                            {{ __('Remove') }} <span x-text="hookLabel"></span>{{ __('?') }}
+                        </h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This deletes the deploy hook immediately. You can add it again later with “Add hook”.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <button type="button" x-on:click="$dispatch('close-modal', 'deploy-hook-remove-confirm')"
+                    class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
+                <button type="button" x-on:click="$wire.deleteHook(hookId); $dispatch('close-modal', 'deploy-hook-remove-confirm')"
+                    class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">
+                    <x-heroicon-o-trash class="h-4 w-4" /> {{ __('Remove hook') }}
+                </button>
+            </div>
+        </div>
+    </x-modal>
 
     {{-- Preset confirmation — replaces the loaded scripts in the editor (not persisted until Save). --}}
     <x-modal name="deploy-preset-confirm" maxWidth="md" overlayClass="bg-brand-ink/40" focusable>

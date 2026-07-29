@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Resources\DplyYamlExamplesTest;
 
-use App\Services\Deploy\Manifest\DplyManifestParser;
+use App\Modules\Deploy\Services\Manifest\DplyManifestParser;
 
 /**
  * @return array<string, array{0: string, 1: string}>

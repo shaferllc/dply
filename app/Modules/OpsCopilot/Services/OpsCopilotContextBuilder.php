@@ -101,7 +101,7 @@ final class OpsCopilotContextBuilder
                 ->all();
         }
 
-        $meta = ($site->meta );
+        $meta = is_array($site->meta) ? $site->meta : [];
         $repoConfig = $failure['repo_config'] ?? null;
         if ($repoConfig === null && is_array($meta['repo_config'] ?? null)) {
             $repoConfig = $meta['repo_config'];
@@ -181,7 +181,7 @@ final class OpsCopilotContextBuilder
                 'log_excerpt' => $excerpt,
                 'exit_code' => null,
                 'failed_at' => $edgeAt?->toIso8601String(),
-                'repo_config' => ($edge->repo_config ),
+                'repo_config' => is_array($edge->repo_config) ? $edge->repo_config : null,
             ];
         }
 

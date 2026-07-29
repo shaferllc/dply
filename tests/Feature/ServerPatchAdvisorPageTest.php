@@ -23,9 +23,11 @@ function patchAdvisorUserWithServer(): array
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
-    $server = Server::factory()->create([
+    $server = Server::factory()->ready()->create([
         'organization_id' => $org->id,
         'user_id' => $user->id,
+        'ip_address' => '203.0.113.10',
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
         'meta' => [
             'host_kind' => 'vm',
             'inventory_checked_at' => now()->subHour()->toIso8601String(),
@@ -52,13 +54,13 @@ test('server patch advisor page is hidden without feature flag', function (): vo
 test('server patch advisor page renders rollup', function (): void {
     [$user, $server] = patchAdvisorUserWithServer();
 
-    $this->actingAs($user)
-        ->get(route('servers.patches', $server))
-        ->assertOk()
+    Livewire::actingAs($user)
+        ->test(WorkspacePatchAdvisor::class, ['server' => $server])
         ->assertSee(__('Patches'))
-        ->assertSee(__('Apt actions'))
         ->assertSee(__('Refresh scan'))
-        ->assertSee('Ubuntu 24.04.2 LTS');
+        ->assertSee('Ubuntu 24.04.2 LTS')
+        ->call('setPatchesWorkspaceTab', 'actions')
+        ->assertSee(__('Apt actions'));
 });
 
 test('manage updates section redirects to patches when patch advisor is enabled', function (): void {

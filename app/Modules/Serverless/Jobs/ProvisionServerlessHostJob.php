@@ -5,7 +5,10 @@ namespace App\Modules\Serverless\Jobs;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Services\DigitalOceanService;
+// Unqualified, this resolves to App\Modules\Serverless\Jobs\RunSiteDeploymentJob
+// which does not exist — a fatal on dispatch. No test covers this path.
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Modules\Serverless\Support\ServerlessPlatformContext;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;

@@ -129,7 +129,7 @@ trait BuildsPhpWorkspaceData
             'selected_version_installed' => $selectedVersionInstalled,
             'has_installed_versions' => $installedVersions !== [],
             'mismatch_version' => $currentVersion !== null && ! $selectedVersionInstalled ? $currentVersion : null,
-            'server_php_workspace_url' => route('servers.php', $server, false),
+            'server_php_workspace_url' => route('servers.runtime', $server, false),
             'runtime' => [
                 'memory_limit' => is_string($runtime['memory_limit'] ?? null) ? $runtime['memory_limit'] : null,
                 'upload_max_filesize' => is_string($runtime['upload_max_filesize'] ?? null) ? $runtime['upload_max_filesize'] : null,

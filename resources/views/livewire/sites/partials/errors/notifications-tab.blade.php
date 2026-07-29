@@ -2,18 +2,19 @@
     /** @var \Illuminate\Support\Collection $notifSubscriptions */
     /** @var \Illuminate\Support\Collection $notifChannels */
     /** @var array<string, string> $notifEventLabels */
-    $card = 'dply-card overflow-hidden';
     $subscriptionsByChannel = $notifSubscriptions->groupBy('notification_channel_id');
 @endphp
 
-<div class="{{ $card }}">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+{{-- Nested inside Errors merged card — strip, no second page card. --}}
+<div class="min-w-0">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-bell class="h-5 w-5" />
-            </span>
+            <x-icon-badge>
+                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Error alerts') }}</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Error alerts') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this site\'s error stream — get pinged the moment a deploy or operation fails for this site. Each row binds one channel to one event.') }}
                 </p>
@@ -25,17 +26,19 @@
         </x-secondary-button>
     </div>
 
-    <div class="mx-6 mt-5 flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-relaxed text-brand-moss sm:mx-8">
-        <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-        <p>
-            {{ __('Alerts fire once per captured failure as it lands in the stream — never repeated for the same error, and never doubled with a server-level subscription on the same channel. "Deployment failed" covers this site\'s deploys; "Site operation failed" covers everything else (SSL, env sync, connectivity fixes…). Add a channel below to send email / chat / webhook alerts.') }}
-            {{ __('These are the same subscriptions shown on the site\'s') }}
-            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'notifications']) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ __('Notifications page') }}</a>{{ __(', alongside deploy and uptime alerts.') }}
-        </p>
+    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-relaxed text-brand-moss">
+            <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+            <p>
+                {{ __('Alerts fire once per captured failure as it lands in the stream — never repeated for the same error, and never doubled with a server-level subscription on the same channel. "Deployment failed" covers this site\'s deploys; "Site operation failed" covers everything else (SSL, env sync, connectivity fixes…). Add a channel below to send email / chat / webhook alerts.') }}
+                {{ __('These are the same subscriptions shown on the site\'s') }}
+                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'notifications']) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ __('Notifications page') }}</a>{{ __(', alongside deploy and uptime alerts.') }}
+            </p>
+        </div>
     </div>
 
     {{-- Current subscriptions --}}
-    <div class="px-6 py-5 sm:px-8">
+    <div class="px-5 py-5 sm:px-6">
         @if ($subscriptionsByChannel->isEmpty())
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
@@ -76,7 +79,7 @@
     </div>
 
     {{-- Add subscription --}}
-    <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
+    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
         <p class="text-sm font-medium text-brand-ink">{{ __('Add a channel') }}</p>
         <form wire:submit="addErrorsNotificationSubscription" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">

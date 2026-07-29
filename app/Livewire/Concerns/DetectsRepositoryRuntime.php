@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
-use App\Services\Deploy\ServerlessRepositoryCheckout;
-use App\Services\Deploy\ServerlessRuntimeDetector;
-use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Modules\Deploy\Services\RuntimeDetection\GitCloneException;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
+use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
+use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
+use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
 use Throwable;
 
 /**
@@ -124,10 +124,18 @@ trait DetectsRepositoryRuntime
      * @param  array<string, mixed>  $capabilities  target capability map from
      *                                              {@see ServerlessTargetCapabilityResolver}
      */
-    public function runServerlessDetection(string $url, string $branch, string $subdirectory, array $capabilities): void
-    {
+    public function runServerlessDetection(
+        string $url,
+        string $branch,
+        string $subdirectory,
+        array $capabilities,
+        ?string $sourceControlAccountId = null,
+        ?string $refKind = null,
+    ): void {
         $url = trim($url);
         $branch = trim($branch) !== '' ? trim($branch) : 'main';
+        $sourceControlAccountId = is_string($sourceControlAccountId) ? trim($sourceControlAccountId) : '';
+        $sourceControlAccountId = $sourceControlAccountId !== '' ? $sourceControlAccountId : null;
 
         if ($url === '') {
             $this->detectedPlan = [];
@@ -140,12 +148,13 @@ trait DetectsRepositoryRuntime
 
         try {
             $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
-                'preview-create-serverless-'.(string) auth()->id().'-'.md5($url.'|'.$branch.'|'.$subdirectory),
+                'preview-create-serverless-'.(string) auth()->id().'-'.md5($url.'|'.$branch.'|'.$subdirectory.'|'.($sourceControlAccountId ?? '')),
                 $url,
                 $branch,
                 $subdirectory,
                 auth()->id(),
-                null,
+                $sourceControlAccountId,
+                $refKind,
             );
 
             $detection = app(ServerlessRuntimeDetector::class)->detect(

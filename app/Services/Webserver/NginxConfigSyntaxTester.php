@@ -61,12 +61,16 @@ class NginxConfigSyntaxTester
         // The 4 wrapper lines below sit ahead of the user's config. We subtract
         // them from nginx's reported line numbers so they map to what the user
         // submitted (neutralization is line-preserving, so the rest lines up).
+        // `access_log off;` rides on the `http {` line (so it doesn't shift the
+        // offset): without it nginx falls back to its compiled-in default
+        // /var/log/nginx/access.log and `nginx -t` fails (13: Permission denied)
+        // as the app user — even though the config's syntax is valid.
         $wrapperOffset = 4;
         $wrapped = <<<NGINX
         pid {$pidFile};
         error_log {$errLog};
         events {}
-        http {
+        http { access_log off;
         {$serverBlock}
         }
         NGINX;

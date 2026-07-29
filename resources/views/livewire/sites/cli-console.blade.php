@@ -1,77 +1,91 @@
+@php
+    $apiHostLabel = parse_url($apiHost, PHP_URL_HOST) ?: $apiHost;
+@endphp
 <div
     wire:key="cli-console-{{ $site->id }}"
+    class="space-y-4"
     x-data="{ scrollToBottom() { const el = $refs.scroll; if (el) el.scrollTop = el.scrollHeight; } }"
     x-on:cli-console-ran.window="$nextTick(() => scrollToBottom())"
     x-init="scrollToBottom()"
 >
-    <x-hero-card
-        :eyebrow="__('Site')"
-        :title="__('CLI Console')"
-        :description="__('Run dply commands against this site straight from the browser, with output streamed back inline.')"
-        icon="command-line"
-    />
-
-    <div class="mt-6"></div>
-
-    <x-console-terminal-shell prompt-user="you" :prompt-host="'dply'">
+    <x-console-terminal-shell tone="dark" prompt-user="you" prompt-host="dply" class="min-h-[22rem]">
         <x-slot:toolbar>
-            <div class="flex items-center gap-1.5">
-                <span class="inline-flex h-2 w-2 rounded-full bg-red-400/80" aria-hidden="true"></span>
-                <span class="inline-flex h-2 w-2 rounded-full bg-amber-300/80" aria-hidden="true"></span>
-                <span class="inline-flex h-2 w-2 rounded-full bg-brand-sage/80" aria-hidden="true"></span>
-            </div>
-            <span class="font-mono text-[11px] font-medium text-brand-forest">dply — {{ $site->slug }}</span>
-            @if (! $cliBinary)
-                <span class="inline-flex items-center gap-1 rounded-full border border-red-300/70 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-800">
-                    {{ __('CLI not found') }}
-                </span>
-            @else
-                <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/30 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-semibold text-brand-forest">
-                    <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
-                    {{ __('Ready') }}
-                </span>
-            @endif
-            <div class="ml-auto flex items-center gap-2 text-[11px]">
-                @if (! empty($history))
-                    <span class="text-brand-moss">{{ trans_choice('{1} :count entry|[2,*] :count entries', count($history), ['count' => count($history)]) }}</span>
-                    <button type="button" wire:click="clearHistory" class="font-semibold text-brand-moss hover:text-brand-ink">{{ __('Clear') }}</button>
-                @endif
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+                <div class="flex items-center gap-1.5" aria-hidden="true">
+                    <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#ff5f57]"></span>
+                    <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
+                    <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
+                </div>
+
+                <div class="flex min-w-0 items-center gap-2">
+                    <span class="truncate font-mono text-[11px] font-medium text-slate-300">dply · {{ $site->slug }}</span>
+                    @if ($isProductionMirror)
+                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200 ring-1 ring-inset ring-amber-300/25">
+                            {{ __('Prod') }}
+                        </span>
+                    @endif
+                </div>
+
+                <div class="ms-auto flex items-center gap-2 text-[11px]">
+                    @if ($cliReady)
+                        <span class="inline-flex items-center gap-1.5 text-emerald-300/90">
+                            <span class="relative flex h-1.5 w-1.5">
+                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/50 opacity-75"></span>
+                                <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                            </span>
+                            {{ __('Ready') }}
+                        </span>
+                    @else
+                        <span class="font-medium text-rose-300">{{ __('CLI missing') }}</span>
+                    @endif
+                    <span class="hidden text-slate-500 sm:inline" aria-hidden="true">·</span>
+                    <span class="hidden font-mono text-slate-400 sm:inline" title="{{ $apiHost }}">{{ $apiHostLabel }}</span>
+                    @if (! empty($history))
+                        <span class="hidden text-slate-500 sm:inline" aria-hidden="true">·</span>
+                        <button type="button" wire:click="clearHistory" class="font-medium text-slate-400 transition hover:text-slate-200">
+                            {{ __('Clear') }}
+                        </button>
+                    @endif
+                </div>
             </div>
         </x-slot:toolbar>
 
         <x-slot:body>
-            <div x-ref="scroll" class="space-y-3">
+            <div x-ref="scroll" class="min-h-[14rem] space-y-4">
                 @if (empty($history))
-                    <p class="italic text-slate-400">{{ __('Type a dply command and press Enter — e.g.') }} <code class="rounded bg-slate-700 px-1 text-slate-200">sites:show {{ $site->slug }}</code></p>
+                    <div class="space-y-2 text-slate-400">
+                        <p>{{ __('Run a command against this site. Try one of the shortcuts below, or type:') }}</p>
+                        <p class="font-mono text-slate-300">
+                            <span class="text-emerald-400/90">$</span>
+                            <span class="text-slate-500">dply</span>
+                            site show --site {{ $site->id }}
+                        </p>
+                    </div>
                 @endif
 
                 @foreach ($history as $entry)
-                    <div>
+                    <div class="space-y-1.5">
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span class="text-brand-sage">~</span>
-                            <span class="text-slate-500">$</span>
-                            <span class="text-slate-300 font-semibold">dply</span>
+                            <span class="select-none text-emerald-400/90">$</span>
+                            <span class="select-none text-slate-500">dply</span>
                             <span class="break-all text-slate-100">{{ $entry['cmd'] }}</span>
                         </div>
                         @if ($entry['error'])
-                            <pre class="mt-1 whitespace-pre-wrap break-words text-rose-300">{{ $entry['error'] }}</pre>
+                            <pre class="whitespace-pre-wrap break-words text-rose-300/95">{{ $entry['error'] }}</pre>
                         @endif
                         @if ($entry['out'] !== '')
-                            <pre class="mt-1 whitespace-pre-wrap break-words text-slate-200">{{ $entry['out'] }}</pre>
+                            <pre class="whitespace-pre-wrap break-words text-slate-300">{{ $entry['out'] }}</pre>
                         @endif
                         @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                            <p class="mt-1 text-[11px] text-amber-300">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                            <p class="text-[11px] text-amber-300/90">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
                         @endif
                     </div>
                 @endforeach
 
-                <div wire:loading wire:target="run" class="text-slate-400">
-                    <span class="text-brand-sage">~</span>
-                    <span class="text-slate-500">$</span>
-                    <span class="ml-1 inline-flex animate-pulse items-center gap-1.5">
-                        <x-spinner variant="slate" size="sm" />
-                        {{ __('running…') }}
-                    </span>
+                <div wire:loading wire:target="run" class="flex items-center gap-2 text-slate-400">
+                    <span class="select-none text-emerald-400/90">$</span>
+                    <x-spinner variant="slate" size="sm" />
+                    <span class="animate-pulse">{{ __('running…') }}</span>
                 </div>
             </div>
         </x-slot:body>
@@ -79,61 +93,54 @@
         <x-slot:footer>
             <form
                 wire:submit="run"
-                class="flex items-center gap-2 border-t border-slate-700/60 bg-slate-900/80 px-3 py-2"
+                class="flex items-center gap-2.5"
             >
-                <div class="flex shrink-0 items-center gap-1 font-mono text-[11px]">
-                    <span class="text-brand-sage">~</span>
-                    <span class="text-slate-500">$</span>
-                    <span class="font-semibold text-slate-300">dply</span>
+                <div class="flex min-w-0 flex-1 items-center gap-2 font-mono text-[12px]">
+                    <span class="shrink-0 select-none text-emerald-400/90">$</span>
+                    <span class="shrink-0 select-none text-slate-500">dply</span>
+                    <input
+                        type="text"
+                        wire:model="input"
+                        @disabled(! $cliReady)
+                        placeholder="site show --site {{ $site->id }}"
+                        autocomplete="off"
+                        spellcheck="false"
+                        class="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[12px] text-slate-100 caret-emerald-300 placeholder:text-slate-600 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-40"
+                        x-on:cli-console-ran.window="$nextTick(() => $el.focus())"
+                    />
                 </div>
-                <input
-                    type="text"
-                    wire:model="input"
-                    @disabled(! $cliBinary)
-                    placeholder="sites:show {{ $site->slug }}"
-                    autocomplete="off"
-                    spellcheck="false"
-                    class="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-slate-100 placeholder:text-slate-600 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-                    x-on:cli-console-ran.window="$nextTick(() => $el.focus())"
-                />
                 <button
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="run"
-                    @disabled(! $cliBinary)
-                    class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-sage/20 px-2 py-1 text-[11px] font-semibold text-brand-forest hover:bg-brand-sage/30 disabled:cursor-not-allowed disabled:opacity-40"
+                    @disabled(! $cliReady)
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     <span wire:loading.remove wire:target="run">{{ __('Run') }}</span>
-                    <span wire:loading wire:target="run">{{ __('…') }}</span>
+                    <span wire:loading wire:target="run" class="inline-flex items-center gap-1">
+                        <x-spinner variant="ink" size="sm" />
+                        {{ __('…') }}
+                    </span>
                 </button>
             </form>
-            @if (! $cliBinary)
-                <p class="border-t border-slate-700/40 bg-slate-900/60 px-3 py-2 font-mono text-[10px] text-amber-400">
-                    {{ __('Set DPLY_CLI_BINARY in .env to point to the dply binary, or place dply-cli/ as a sibling of this repo.') }}
+            @if (! $cliReady)
+                <p class="mt-2 font-mono text-[10px] leading-relaxed text-amber-300/90">
+                    {{ __('Expected packages/dply-cli/bin/dply.mjs with Node 18+, or set DPLY_CLI_BINARY in .env.') }}
                 </p>
             @endif
         </x-slot:footer>
     </x-console-terminal-shell>
 
-    {{-- Quick-run buttons for common site commands --}}
-    <div class="mt-4 flex flex-wrap gap-2">
-        @foreach ([
-            'sites:show '.$site->slug,
-            'sites:deployments '.$site->slug,
-            'sites:errors '.$site->slug,
-            'sites:uptime '.$site->slug,
-            'sites:workers '.$site->slug,
-            'sites:schedules '.$site->slug,
-            'sites:domains:list '.$site->slug,
-            'sites:ssl:status '.$site->slug,
-            'sites:commits '.$site->slug,
-        ] as $preset)
+    <div class="flex flex-wrap items-center gap-2">
+        <span class="me-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Shortcuts') }}</span>
+        @foreach ($presetCommands as $preset)
             <button
                 type="button"
-                wire:click="prefill('{{ $preset }}')"
-                class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[11px] text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                wire:click="prefill(@js($preset['command']))"
+                title="dply {{ $preset['command'] }}"
+                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/40 px-2.5 py-1 text-[11px] font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand"
             >
-                {{ $preset }}
+                {{ $preset['label'] }}
             </button>
         @endforeach
     </div>

@@ -183,14 +183,16 @@ test('run now refuses when paused', function () {
 test('schedule workspace tabs switch via query param and setter', function () {
     [$user, $server] = array_slice(setupWithScheduler(), 0, 2);
 
+    // Enable is a modal now (not a workspace tab). Valid tabs: schedulers,
+    // overview, logs, activity — unknown values fall back to schedulers.
     Livewire::actingAs($user)
         ->withQueryParams(['tab' => 'schedulers'])
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->assertSet('schedule_workspace_tab', 'schedulers')
-        ->call('setScheduleWorkspaceTab', 'enable')
-        ->assertSet('schedule_workspace_tab', 'enable')
+        ->call('setScheduleWorkspaceTab', 'overview')
+        ->assertSet('schedule_workspace_tab', 'overview')
         ->call('setScheduleWorkspaceTab', 'bogus')
-        ->assertSet('schedule_workspace_tab', 'overview');
+        ->assertSet('schedule_workspace_tab', 'schedulers');
 });
 
 afterEach(function () {

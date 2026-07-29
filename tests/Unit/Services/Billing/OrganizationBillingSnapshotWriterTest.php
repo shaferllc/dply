@@ -7,7 +7,7 @@ namespace Tests\Unit\Services\Billing;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Billing\OrganizationBillingSnapshotWriter;
+use App\Modules\Billing\Services\OrganizationBillingSnapshotWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

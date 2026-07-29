@@ -30,8 +30,8 @@ use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\DeploymentContractBuilder;
-use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Modules\Deploy\Services\DeploymentContractBuilder;
+use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Services\Servers\ServerPhpManager;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\Sites\SiteShowViewData;
@@ -228,19 +228,21 @@ class Show extends Component
             ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
             ->update(['dismissed_at' => now()]);
 
-        // Also dismiss orphaned queued/running rows past the staleness threshold
-        // — they represent jobs whose workers never picked them up (queue down,
+        // Also dismiss orphaned queued/running rows past their staleness
+        // threshold — jobs whose workers never picked them up (queue down,
         // redis flushed) or that died mid-run. Without this, the new dispatch
         // would race against a zombie banner and the operator would be unsure
-        // which run is theirs.
-        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        // which run is theirs. isStale() honours per-kind overrides so a
+        // legitimately long run (a multi-hour backup) is never mistaken for a
+        // zombie just because it outlived the 10-minute global default.
         ConsoleAction::query()
             ->where('subject_type', $this->site->getMorphClass())
             ->where('subject_id', $this->site->id)
             ->whereNull('dismissed_at', 'and', false)
             ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
-            ->where('created_at', '<', now()->subSeconds($staleSeconds))
-            ->update(['dismissed_at' => now()]);
+            ->get()
+            ->filter(fn (ConsoleAction $row): bool => $row->isStale())
+            ->each(fn (ConsoleAction $row) => $row->forceFill(['dismissed_at' => now()])->save());
 
         return ConsoleAction::query()->create([
             'subject_type' => $this->site->getMorphClass(),
@@ -260,6 +262,124 @@ class Show extends Component
         }
 
         return $this->site->shouldShowPhpOctaneRolloutSettings();
+    }
+
+    /** Overview SSL card: probe in flight (see {@see \App\Jobs\DetectSiteCloudflareTlsJob}). */
+    public bool $ssl_recheck_running = false;
+
+    /** `checked_at` seen at dispatch, so the poll can tell when a fresh result lands. */
+    public ?string $ssl_recheck_requested_at = null;
+
+    /**
+     * Re-evaluate the site's SSL from the overview card. dply's own origin cert
+     * may read `failed` while the domain is actually secured at Cloudflare's edge
+     * (orange-clouded) — this fires the header-based Cloudflare TLS probe so the
+     * card can reflect that instead of a misleading "failed". Outbound HTTP only,
+     * no SSH (the job runs off the request).
+     */
+    public function recheckSsl(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->ssl_recheck_requested_at = $this->site->cloudflareTlsCheckedAt();
+        $this->ssl_recheck_running = true;
+        \App\Jobs\DetectSiteCloudflareTlsJob::dispatch($this->site->id);
+    }
+
+    /** Driven by wire:poll while a recheck is in flight; resolves once meta updates. */
+    public function pollSslRecheck(): void
+    {
+        if (! $this->ssl_recheck_running) {
+            return;
+        }
+
+        $this->site->refresh();
+        $checkedAt = $this->site->cloudflareTlsCheckedAt();
+
+        // A fresh result has landed once checked_at advances past dispatch time.
+        if ($checkedAt !== null && $checkedAt !== $this->ssl_recheck_requested_at) {
+            $this->ssl_recheck_running = false;
+            $this->toastSuccess(
+                $this->site->cloudflareTerminatesTls()
+                    ? __('SSL is active — TLS is terminated at Cloudflare’s edge for this domain.')
+                    : __('Recheck complete — Cloudflare edge TLS was not detected for this domain.'),
+            );
+        }
+    }
+
+    /**
+     * Load the server's workspace (header/breadcrumb) but reuse the row the site
+     * just loaded when both share it — the common case — so the render doesn't
+     * fire a second identical `workspaces` PK lookup. Call only after the site's
+     * own `workspace` relation has been loaded.
+     */
+    protected function hydrateServerWorkspace(): void
+    {
+        // Server and site almost always share one workspace. Resolve it through
+        // the request-scoped WorkspaceRegistry (the SitePolicy already populated
+        // it during authorization) and hand that ONE instance to both the site
+        // and server — so we don't fire a second `workspaces where id in (...)`
+        // here on top of the policy's.
+        if (
+            $this->server->workspace_id !== null
+            && (string) $this->server->workspace_id === (string) $this->site->workspace_id
+        ) {
+            $workspace = app(\App\Support\Workspaces\WorkspaceRegistry::class)->for($this->site);
+
+            if ($workspace !== null) {
+                if (! $this->site->relationLoaded('workspace')) {
+                    $this->site->setRelation('workspace', $workspace);
+                }
+                $this->server->setRelation('workspace', $workspace);
+            }
+        } else {
+            $this->server->loadMissing('workspace');
+        }
+
+        $this->shareOrganizationInstance();
+    }
+
+    /**
+     * Site, server and the workspace are all in the same organization — and it's
+     * the user's CURRENT org, which is already memoized (with the member role
+     * primed). Reuse that one instance everywhere instead of lazy-loading
+     * site->organization / server->organization / workspace->organization, each
+     * of which fires its own `organizations where id = ?`.
+     */
+    private function shareOrganizationInstance(): void
+    {
+        $current = auth()->user()?->currentOrganization();
+        if (
+            $current !== null
+            && (string) $current->id === (string) $this->site->organization_id
+            && ! $this->site->relationLoaded('organization')
+        ) {
+            $this->site->setRelation('organization', $current);
+        } else {
+            $this->site->loadMissing('organization');
+        }
+
+        $org = $this->site->organization;
+        if ($org === null) {
+            return;
+        }
+
+        if (
+            $this->server->organization_id !== null
+            && (string) $this->server->organization_id === (string) $org->id
+            && ! $this->server->relationLoaded('organization')
+        ) {
+            $this->server->setRelation('organization', $org);
+        }
+
+        $workspace = $this->site->workspace;
+        if (
+            $workspace !== null
+            && (string) $workspace->organization_id === (string) $org->id
+            && ! $workspace->relationLoaded('organization')
+        ) {
+            $workspace->setRelation('organization', $org);
+        }
     }
 
     public function render(): View
@@ -293,7 +413,7 @@ class Show extends Component
         }
 
         $this->site->load($relations);
-        $this->server->loadMissing('workspace');
+        $this->hydrateServerWorkspace();
 
         $openSiteInsightsCount = InsightFinding::query()
             ->where('site_id', $this->site->id)

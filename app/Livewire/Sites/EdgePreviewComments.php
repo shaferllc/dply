@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Actions\Edge\PromoteEdgePreview;
+use App\Modules\Edge\Actions\PromoteEdgePreview;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesDeployContract;
@@ -14,8 +14,8 @@ use App\Models\EdgePreviewReviewApproval;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\DeployContract\DeployContractState;
-use App\Services\Edge\EdgePreviewReviewState;
-use App\Support\Edge\EdgeDeploymentConfirmSummary;
+use App\Modules\Edge\Services\EdgePreviewReviewState;
+use App\Modules\Edge\Support\EdgeDeploymentConfirmSummary;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;

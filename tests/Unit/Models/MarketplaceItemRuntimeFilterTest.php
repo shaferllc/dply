@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Models\MarketplaceItemRuntimeFilterTest;
 
-use App\Models\MarketplaceItem;
+use App\Modules\Marketplace\Models\MarketplaceItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

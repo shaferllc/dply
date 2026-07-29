@@ -4,7 +4,7 @@ namespace Tests\Feature\Components\TrialPauseBannerTest;
 
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\Subscription;
+use App\Modules\Billing\Models\Subscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Config;

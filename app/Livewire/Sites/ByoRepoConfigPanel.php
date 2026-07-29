@@ -8,7 +8,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
-use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
+use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Sites\SiteManifestExporter;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;

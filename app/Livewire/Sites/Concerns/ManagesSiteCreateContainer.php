@@ -8,7 +8,7 @@ use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\LocalRepositoryInspector;
+use App\Modules\Deploy\Services\LocalRepositoryInspector;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 

@@ -2,10 +2,13 @@
     'catalog' => [],
     'orgHasPro' => false,
     'twoColumns' => true,
+    'nested' => false,
 ])
 
 @php
-    $card = 'dply-card overflow-hidden';
+    $card = $nested
+        ? 'rounded-xl border border-brand-ink/10 bg-white'
+        : 'dply-card overflow-hidden';
     $keys = array_keys($catalog);
     $half = (int) ceil(count($keys) / 2);
     $columns = $twoColumns ? array_chunk($keys, $half, true) : [$keys];

@@ -29,6 +29,14 @@ class ServerDatabaseAuditEvent extends Model
     public const EVENT_DATABASE_DROPPED_REMOTE = 'database_dropped_remote';
 
     /**
+     * Operator changed which engine is the server's primary/default
+     * (the {@see ServerDatabaseEngine::$is_default} flag). The {@see meta}
+     * payload carries the chosen `engine`. New sites default their
+     * `database_engine` to this engine.
+     */
+    public const EVENT_DEFAULT_ENGINE_CHANGED = 'default_engine_changed';
+
+    /**
      * Operator changed metadata or SQLite file path on a tracked
      * database via the unified Edit modal. The {@see meta} payload
      * carries the diff (e.g. `description`, `mysql_charset`, `host`).

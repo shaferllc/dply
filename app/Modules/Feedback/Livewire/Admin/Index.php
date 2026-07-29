@@ -10,6 +10,7 @@ use App\Models\FeedbackReport;
 use App\Modules\Feedback\Notifications\FeedbackReportStatusChanged;
 use App\Support\Admin\PlatformAdmins;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -45,6 +46,9 @@ class Index extends Component
     public string $triageNotes = '';
 
     public bool $notifyReporter = false;
+
+    /** Report id pending permanent delete confirmation. */
+    public string $confirmingDeleteId = '';
 
     public function mount(): void
     {
@@ -148,6 +152,61 @@ class Index extends Component
         $this->closeReport();
     }
 
+    public function openDeleteModal(string $id): void
+    {
+        $this->authorizePlatformAdmin();
+
+        $report = FeedbackReport::query()->find($id);
+        if ($report === null) {
+            $this->toastError(__('That report no longer exists.'));
+
+            return;
+        }
+
+        $this->confirmingDeleteId = $report->id;
+        $this->dispatch('open-modal', 'admin-feedback-delete-confirmation');
+    }
+
+    public function closeDeleteModal(): void
+    {
+        $this->confirmingDeleteId = '';
+        $this->dispatch('close-modal', 'admin-feedback-delete-confirmation');
+    }
+
+    public function deleteReport(): void
+    {
+        $this->authorizePlatformAdmin();
+
+        if ($this->confirmingDeleteId === '') {
+            return;
+        }
+
+        $report = FeedbackReport::query()->find($this->confirmingDeleteId);
+        if ($report === null) {
+            $this->closeDeleteModal();
+            $this->toastError(__('That report no longer exists.'));
+
+            return;
+        }
+
+        $reference = $report->reference;
+        $reportId = $report->id;
+
+        // Hard-delete: FeedbackReport does not use SoftDeletes. Clear stored
+        // screenshot/attachments first so we don't leave orphan files on disk.
+        $disk = Storage::disk((string) config('feedback.disk'));
+        $disk->deleteDirectory("reports/{$reportId}");
+
+        $report->delete();
+
+        if ($this->selectedId === $reportId) {
+            $this->closeReport();
+        }
+
+        $this->closeDeleteModal();
+        $this->toastSuccess(__('Report :ref deleted.', ['ref' => $reference]));
+    }
+
     public function render(): View
     {
         $reports = FeedbackReport::query()
@@ -163,9 +222,14 @@ class Index extends Component
             ? FeedbackReport::query()->with(['user', 'organization', 'assignee'])->find($this->selectedId)
             : null;
 
+        $deleteCandidate = $this->confirmingDeleteId !== ''
+            ? FeedbackReport::query()->find($this->confirmingDeleteId)
+            : null;
+
         return view('livewire.admin.feedback.index', [
             'reports' => $reports,
             'selected' => $selected,
+            'deleteCandidate' => $deleteCandidate,
             'admins' => PlatformAdmins::users(),
             'newCount' => FeedbackReport::query()->where('status', FeedbackReport::STATUS_NEW)->count(),
             'types' => config('feedback.types', []),

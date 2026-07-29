@@ -14,22 +14,22 @@
     ];
 @endphp
 
-<div class="mt-6 space-y-6">
-    {{-- Stat strip (absorbs the old Overview tab). --}}
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
+<div>
+    {{-- Stat strip — nested in the merged Deploys card. --}}
+    <section>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
+            </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy window policy') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy window policy') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                     @switch($overall)
                         @case('blocked') {{ __('Deploys blocked now') }} @break
                         @case('allowed') {{ __('Deploys allowed now') }} @break
                         @default {{ __('Policy disabled') }}
                     @endswitch
-                </h2>
+                </h3>
                 <p class="mt-1 text-sm text-brand-moss">
                     @if ($overall === 'disabled')
                         {{ __('Enable the policy below to enforce deny windows for every site on this server.') }}
@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        <div class="grid gap-px bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="grid gap-px border-b border-brand-ink/10 bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-5">
             @foreach ([
                 ['label' => __('Policy'), 'value' => ($summary['enabled'] ?? false) ? __('On') : __('Off')],
                 ['label' => __('Deny rules'), 'value' => number_format((int) ($summary['rule_count'] ?? 0))],
@@ -64,19 +64,19 @@
 
     @if ($canUpdate)
         {{-- Editor (absorbs the old Schedule tab). --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
+        <section>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
+                </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Editor') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edit policy') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Editor') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edit policy') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Toggle enforcement, set timezone + skip message, and manage deny rules. Save to apply server-wide.') }}</p>
                 </div>
             </div>
 
-            <form wire:submit="savePolicy" class="space-y-5 p-6 sm:p-7">
+            <form wire:submit="savePolicy" class="space-y-5 px-5 py-5 sm:px-6">
                 <label class="inline-flex items-center gap-2 text-sm font-medium text-brand-ink">
                     <input type="checkbox" wire:model.live="policy_enabled" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40">
                     {{ __('Enable deploy window policy') }}
@@ -140,20 +140,20 @@
         </section>
     @else
         {{-- Read-only view for operators without `update` on this server. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
+        <section>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
+                </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deny windows') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deny windows') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Configured deny windows') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('You have read-only access to this policy. Each rule blocks deploys on selected weekdays between start and end (server policy timezone).') }}</p>
                 </div>
             </div>
 
             @if ($ruleRows === [])
-                <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-7">{{ __('No deny rules configured.') }}</div>
+                <div class="px-5 py-10 text-center text-sm text-brand-moss sm:px-6">{{ __('No deny rules configured.') }}</div>
             @else
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-sm">

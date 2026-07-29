@@ -292,7 +292,7 @@
                             </div>
                             <div>
                                 <x-input-label for="item_shipped_release" :value="__('Shipped release train (optional)')" />
-                                <select id="item_shipped_release" wire:model="itemShippedReleaseId" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm" @disabled($itemStatus !== \App\Models\RoadmapItem::STATUS_SHIPPED)>
+                                <select id="item_shipped_release" wire:model="itemShippedReleaseId" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm" @disabled($itemStatus !== \App\Modules\Roadmap\Models\RoadmapItem::STATUS_SHIPPED)>
                                     <option value="">{{ __('None') }}</option>
                                     @foreach ($releaseOptions as $releaseOption)
                                         <option value="{{ $releaseOption->id }}">{{ $releaseOption->trainLabel() }} · {{ $releaseOption->displayTitle() }}</option>

@@ -103,11 +103,11 @@ class Settings extends Component
         $ext = $this->extensionFor($this->org_icon_upload->getMimeType());
         $path = 'org-logos/'.$this->organization->id.'-'.Str::lower(Str::random(8)).'.'.$ext;
 
-        Storage::disk('public')->put($path, file_get_contents($this->org_icon_upload->getRealPath()));
+        Storage::disk('site_assets')->put($path, file_get_contents($this->org_icon_upload->getRealPath()));
         $this->organization->forceFill(['icon_path' => $path])->save();
 
         if (is_string($old) && $old !== '' && $old !== $path) {
-            Storage::disk('public')->delete($old);
+            Storage::disk('site_assets')->delete($old);
         }
 
         $this->reset('org_icon_upload');
@@ -121,7 +121,7 @@ class Settings extends Component
 
         $old = $this->organization->icon_path;
         if (is_string($old) && $old !== '') {
-            Storage::disk('public')->delete($old);
+            Storage::disk('site_assets')->delete($old);
             $this->organization->forceFill(['icon_path' => null])->save();
             $this->recordIconChange($old, null);
         }

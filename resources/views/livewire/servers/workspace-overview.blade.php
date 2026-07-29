@@ -113,6 +113,9 @@
         @endif
 
         @include('livewire.servers.partials.overview._danger-zone')
+
+        {{-- Deploy console lives in the app shell; modal stays for multi-site pick. --}}
+        @include('livewire.servers.partials.deploy-sites-modal')
     </div>
 
     <x-slot name="modals">

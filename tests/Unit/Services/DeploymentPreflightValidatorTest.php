@@ -4,7 +4,7 @@ namespace Tests\Unit\Services\DeploymentPreflightValidatorTest;
 
 use App\Enums\SiteType;
 use App\Models\Site;
-use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 
 test('it flags missing repository for container targets', function () {
     $site = new Site([

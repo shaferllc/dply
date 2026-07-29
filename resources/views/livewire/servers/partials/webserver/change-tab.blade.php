@@ -1,4 +1,4 @@
-        <div class="{{ $card }} p-6 sm:p-8">
+        <div class="{{ $card }} px-5 py-5 sm:px-6">
             <div class="max-w-2xl">
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('Switch webserver') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">

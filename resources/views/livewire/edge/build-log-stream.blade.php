@@ -35,8 +35,8 @@
                     },
                 }"
                 x-on:scroll.throttle.100ms="onScroll"
-                class="max-h-[28rem] overflow-auto px-4 py-3 font-mono text-xs leading-relaxed text-brand-cream"
-            >{{ $buffer }}</pre>
+                class="max-h-[28rem] overflow-auto px-4 py-3 font-mono text-xs leading-relaxed text-brand-cream whitespace-pre-wrap break-words"
+            >{!! \App\Modules\Edge\Support\AnsiHtml::toHtml($buffer) !!}</pre>
         </div>
     @endif
 </div>

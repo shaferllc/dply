@@ -59,12 +59,16 @@ class SiteEnvPusher
             throw new \RuntimeException('.env has parse errors — fix and retry: '.implode('; ', $parsed['errors']));
         }
 
-        // Compose attached-resource bindings under the cache (cache/override
-        // wins). The merged map is both what gets written AND what we validate —
-        // a binding-supplied DB_HOST/REDIS_HOST shouldn't read as "missing".
+        // Compose attached-resource bindings OVER the cache — an attached
+        // resource is a deliberate, specific declaration, so its connection vars
+        // are authoritative for the keys it owns and win over stale base-.env
+        // defaults (e.g. a scaffold's DB_USERNAME=root left behind after a real
+        // managed database was attached). The merged map is both what gets
+        // written AND what we validate — a binding-supplied DB_HOST/REDIS_HOST
+        // shouldn't read as "missing".
         $bindingEnv = $this->bindingEnv($site);
         $mergedVars = $bindingEnv !== []
-            ? array_merge($bindingEnv, $parsed['variables'])
+            ? array_merge($parsed['variables'], $bindingEnv)
             : $parsed['variables'];
 
         // Resolve any non-resident secrets (escrowed / external references) to

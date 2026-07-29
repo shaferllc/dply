@@ -92,7 +92,8 @@ final class EdgeProxyWorkspaceViewData
      */
     public static function for(Server $server, WorkspaceEdgeProxy $component): array
     {
-        $card = 'dply-card overflow-hidden';
+        // Nested sections inside the merged Edge proxy card — not second page cards.
+        $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->ip_address && $server->ssh_private_key;
         $isDeployer = auth()->user()->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
 

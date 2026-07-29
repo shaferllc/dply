@@ -239,7 +239,7 @@ final class ServerMaintenanceWindow
                 continue;
             }
 
-            $siteMeta = ($site->meta );
+            $siteMeta = is_array($site->meta) ? $site->meta : [];
             if ($publicMessage !== '') {
                 $siteMeta['suspended_message'] = $publicMessage;
             } else {
@@ -338,7 +338,7 @@ final class ServerMaintenanceWindow
                     continue;
                 }
 
-                $siteMeta = ($site->meta );
+                $siteMeta = is_array($site->meta) ? $site->meta : [];
                 unset($siteMeta['suspended_message']);
 
                 $site->update([

@@ -67,7 +67,8 @@ test('organization show is displayed for member', function () {
 
     $response->assertOk();
     $response->assertSee($org->name);
-    $response->assertSee('Quick links');
+    $response->assertSee('Organization sections');
+    $response->assertSee('Members');
 });
 
 test('organization automation page shows webhook and deploy controls for admins', function () {

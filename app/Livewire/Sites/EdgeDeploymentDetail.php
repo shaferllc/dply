@@ -10,7 +10,7 @@ use App\Livewire\Concerns\ManagesEdgeDeploymentLifecycle;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Edge\EdgeDeploymentAliasGenerator;
+use App\Modules\Edge\Services\EdgeDeploymentAliasGenerator;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;

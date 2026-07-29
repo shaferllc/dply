@@ -820,7 +820,10 @@
                                 <div>
                                     <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Mode') }}</label>
                                     <select wire:model.live="databases.{{ $i }}.mode" class="dply-input mt-1 block w-full text-xs">
-                                        <option value="create">{{ __('Create new') }}</option>
+                                        @if ($backendSupportsManagedDatabases ?? true)
+                                            <option value="create">{{ __('Create new') }}</option>
+                                        @endif
+                                        <option value="external">{{ __('Connect external') }}</option>
                                         <option value="attach" @disabled($attachableDatabases->isEmpty())>{{ __('Attach existing') }}</option>
                                     </select>
                                 </div>
@@ -841,6 +844,37 @@
                                         @endforeach
                                     </select>
                                     <x-input-error :messages="$errors->get('databases.'.$i.'.cloud_database_id')" class="mt-1" />
+                                </div>
+                            @elseif ($rowMode === 'external')
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</label>
+                                        <select wire:model.live="databases.{{ $i }}.engine" class="dply-input mt-1 block w-full text-xs">
+                                            <option value="postgres">Postgres</option>
+                                            <option value="mysql">MySQL</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</label>
+                                        <input type="text" wire:model.blur="databases.{{ $i }}.host" class="dply-input mt-1 block w-full font-mono text-xs" placeholder="db.example.com" autocomplete="off">
+                                        <x-input-error :messages="$errors->get('databases.'.$i.'.host')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</label>
+                                        <input type="number" wire:model.blur="databases.{{ $i }}.port" class="dply-input mt-1 block w-full font-mono text-xs" min="1" max="65535">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</label>
+                                        <input type="text" wire:model.blur="databases.{{ $i }}.database" class="dply-input mt-1 block w-full font-mono text-xs" autocomplete="off">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</label>
+                                        <input type="text" wire:model.blur="databases.{{ $i }}.username" class="dply-input mt-1 block w-full font-mono text-xs" autocomplete="off">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</label>
+                                        <input type="password" wire:model.blur="databases.{{ $i }}.password" class="dply-input mt-1 block w-full font-mono text-xs" autocomplete="new-password">
+                                    </div>
                                 </div>
                             @else
                                 <div class="grid grid-cols-3 gap-2">
@@ -969,11 +1003,19 @@
                          supported as long as env_prefix differs. The
                          server-dispatched 'database-added' event tells the
                          canvas where to place + scroll the new card. --}}
-                    @foreach ([
-                        ['engine' => 'postgres', 'label' => __('Add Postgres'),  'desc' => __('Managed Postgres cluster')],
-                        ['engine' => 'mysql',    'label' => __('Add MySQL'),    'desc' => __('Managed MySQL cluster')],
-                        ['engine' => 'redis',    'label' => __('Add Redis'),    'desc' => __('Managed Redis cluster')],
-                    ] as $tile)
+                    @php
+                        $dbTiles = ($backendSupportsManagedDatabases ?? true)
+                            ? [
+                                ['engine' => 'postgres', 'label' => __('Add Postgres'), 'desc' => __('Managed Postgres cluster')],
+                                ['engine' => 'mysql', 'label' => __('Add MySQL'), 'desc' => __('Managed MySQL cluster')],
+                                ['engine' => 'redis', 'label' => __('Add Redis'), 'desc' => __('Managed Redis cluster')],
+                            ]
+                            : [
+                                ['engine' => 'postgres', 'label' => __('Connect Postgres'), 'desc' => __('External Postgres / RDS / Neon')],
+                                ['engine' => 'mysql', 'label' => __('Connect MySQL'), 'desc' => __('External MySQL / RDS / Aurora')],
+                            ];
+                    @endphp
+                    @foreach ($dbTiles as $tile)
                         <button
                             type="button"
                             wire:click="addDatabase('{{ $tile['engine'] }}')"

@@ -1,4 +1,4 @@
-<div class="dply-card overflow-hidden">
+<div class="min-w-0">
     @php
         $actionPrimary = 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50';
         $actionSecondary = 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/8 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50';

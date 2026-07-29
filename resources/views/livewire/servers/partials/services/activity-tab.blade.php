@@ -1,10 +1,11 @@
-<div class="{{ $card }} p-6 sm:p-8">
+<div class="{{ $card }} px-5 py-5 sm:px-6">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-clock class="h-5 w-5" />
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Service activity') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activity') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Service activity') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Started, stopped, restarted, and state-change events Dply observed between inventory snapshots.') }}</p>
                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                             <span class="inline-flex items-center gap-1">
@@ -19,9 +20,9 @@
                     </div>
                 </div>
 
-                @if ($activityCount > 0)
-                    <ul class="mt-6 space-y-2">
-                        @foreach ($systemdServiceActivity as $ev)
+                @if ($activityCount > 0 && $activityEvents)
+                    <ul class="mt-5 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
+                        @foreach ($activityEvents as $ev)
                             @php
                                 $kind = (string) ($ev['kind'] ?? '');
                                 $kindLabel = match ($kind) {
@@ -53,7 +54,7 @@
                                     default => 'heroicon-o-bolt',
                                 };
                             @endphp
-                            <li class="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 text-sm">
+                            <li class="flex flex-wrap items-start gap-x-3 gap-y-1 bg-white px-3 py-2.5 text-sm">
                                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 {{ $iconCls }}">
                                     <x-dynamic-component :component="$iconComponent" class="h-4 w-4" aria-hidden="true" />
                                 </span>
@@ -72,15 +73,15 @@
                             </li>
                         @endforeach
                     </ul>
+
+                    @if ($activityEvents->hasPages())
+                        <div class="mt-4">
+                            {{ $activityEvents->links() }}
+                        </div>
+                    @endif
                 @else
-                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
-                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-clock class="h-5 w-5" />
-                        </span>
-                        <p class="text-sm font-medium text-brand-ink">{{ __('No service activity yet.') }}</p>
-                        <p class="text-xs text-brand-moss">{{ __('Start, stop, or restart a unit and the events will show up here as Dply detects them.') }}</p>
-                    </div>
+                    <p class="mt-5 text-center text-sm text-brand-moss">{{ __('No service activity yet. Start, stop, or restart a unit and events will show up here.') }}</p>
                 @endif
             </div>
 
-@livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server], key('recent-actions-log-'.$server->id))
+@livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server, 'nested' => true], key('recent-actions-log-'.$server->id))

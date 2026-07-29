@@ -9,6 +9,7 @@ use App\Models\ConsoleAction;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -59,6 +60,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
         public bool $pushEnv = false,
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
+        public ?string $siteBindingId = null,
     ) {
         $this->onQueue('dply-control');
     }
@@ -118,12 +120,18 @@ class CreateSiteDatabaseJob implements ShouldQueue
 
             $this->maybeEnsurePhpDriver($emit, $site, $db);
 
+            // A binding-provision dispatch waits on this job to confirm the
+            // database actually exists on the host — flip it from provisioning
+            // to configured now that CREATE DATABASE succeeded.
+            $this->markBinding(SiteBinding::STATUS_CONFIGURED, null);
+
             $emit->success(__('Database :name ready.', ['name' => $db->name]), 'db');
             $this->completeConsoleAction();
         } catch (\Throwable $e) {
             $message = Str::limit($e->getMessage(), 800);
             $emit->error($message, 'db');
             $this->failConsoleAction($message);
+            $this->markBinding(SiteBinding::STATUS_ERROR, $message);
 
             Log::warning('CreateSiteDatabaseJob failed', [
                 'server_database_id' => $this->serverDatabaseId,
@@ -133,6 +141,22 @@ class CreateSiteDatabaseJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Update the originating site binding's status when this job was dispatched
+     * from the binding-provision flow (so the Resources map reflects success or
+     * the failure reason). No-op for the plain Database-tab path.
+     */
+    private function markBinding(string $status, ?string $error): void
+    {
+        if ($this->siteBindingId === null) {
+            return;
+        }
+
+        SiteBinding::query()
+            ->whereKey($this->siteBindingId)
+            ->update(['status' => $status, 'last_error' => $error]);
     }
 
     /**

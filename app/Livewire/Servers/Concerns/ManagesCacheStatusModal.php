@@ -197,7 +197,11 @@ trait ManagesCacheStatusModal
             return;
         }
 
-        $unit = CacheServiceInstallScripts::instanceServiceUnit($engine, $row->name);
+        // Unit name resolved on-host ($UNIT) so the diagnostics query whichever
+        // unit the distro package actually registered (`valkey.service` vs
+        // `valkey-server.service`) instead of showing "Unit not found" for a
+        // daemon that's running under the sibling name.
+        $resolveUnit = CacheServiceInstallScripts::resolveUnitSnippet($engine);
         $port = (int) $row->port;
         // CLI tool: each engine's own cli first; redis-cli as the RESP fallback.
         $cli = match ($engine) {
@@ -207,19 +211,18 @@ trait ManagesCacheStatusModal
             default => '',
         };
 
-        $script = sprintf(
+        $script = $resolveUnit."\n".sprintf(
             <<<'BASH'
-echo "═══ systemctl status %1$s ═══"
-systemctl status --no-pager --lines=20 %1$s 2>&1 || true
+echo "═══ systemctl status $UNIT ═══"
+systemctl status --no-pager --lines=20 "$UNIT" 2>&1 || true
 echo
-echo "═══ Listening on :%2$d? ═══"
-(ss -tlnp 2>/dev/null | grep ":%2$d " || netstat -tlnp 2>/dev/null | grep ":%2$d " || echo "Nothing listening on :%2$d (or ss/netstat unavailable).") || true
+echo "═══ Listening on :%1$d? ═══"
+(ss -tlnp 2>/dev/null | grep ":%1$d " || netstat -tlnp 2>/dev/null | grep ":%1$d " || echo "Nothing listening on :%1$d (or ss/netstat unavailable).") || true
 echo
-%3$s
+%2$s
 echo "═══ Recent journal (last 30 lines) ═══"
-journalctl -u %1$s --no-pager -n 30 2>&1 || true
+journalctl -u "$UNIT" --no-pager -n 30 2>&1 || true
 BASH,
-            escapeshellarg($unit),
             $port,
             $cli !== ''
                 ? sprintf("echo \"═══ %1\$s -p %2\$d ping ═══\"\n(command -v %1\$s >/dev/null && %1\$s -p %2\$d ping 2>&1 || (command -v redis-cli >/dev/null && redis-cli -p %2\$d ping 2>&1) || echo \"%1\$s and redis-cli not on PATH\") || true\necho",

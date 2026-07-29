@@ -4,6 +4,7 @@ namespace App\Modules\Certificates\Services;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Models\SitePreviewDomain;
 use App\Services\SshConnection;
 
 class CertificateRequestService
@@ -47,9 +48,12 @@ class CertificateRequestService
         ]));
     }
 
-    public function queuePrimaryPreviewAutoSsl(Site $site): ?SiteCertificate
+    public function queuePrimaryPreviewAutoSsl(Site $site, ?SitePreviewDomain $previewDomain = null): ?SiteCertificate
     {
-        $previewDomain = $site->primaryPreviewDomain();
+        // Defaults to the primary preview domain, but a specific one can be passed
+        // (e.g. an operator-added extra managed preview URL) so it gets its own
+        // preview-scoped certificate too.
+        $previewDomain ??= $site->primaryPreviewDomain();
         if (! $previewDomain || ! $previewDomain->auto_ssl || $previewDomain->hostname === '') {
             return null;
         }

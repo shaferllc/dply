@@ -18,7 +18,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\HetznerService;
+use App\Modules\Cloud\Services\HetznerService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -390,7 +390,7 @@ trait StoresOtherProviderServers
         try {
             $svc = new HetznerService($credential);
             $serverTypes = $svc->getServerTypes();
-        } catch (Throwable) {
+        } catch (\Throwable) {
             // Catalog probe failed — fall through and let the provision job
             // surface the API error. We don't want to block submission on a
             // transient Hetzner outage.

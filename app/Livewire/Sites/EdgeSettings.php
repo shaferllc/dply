@@ -58,6 +58,19 @@ class EdgeSettings extends Component
             $section = 'general';
         }
 
+        // BYO uses `/routing`; Edge's section is `edge-routing`. Domains merged
+        // into Routing as ?tab=domains — alias old URLs.
+        if ($section === 'routing' || $section === 'edge-domains') {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'edge-routing',
+                'tab' => $section === 'edge-domains' ? 'domains' : request()->query('tab', 'domains'),
+            ]), navigate: true);
+
+            return;
+        }
+
         $querySection = request()->query('section');
         if (is_string($querySection) && $querySection !== '') {
             $rest = collect(request()->query())->except('section')->all();

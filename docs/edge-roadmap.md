@@ -32,7 +32,7 @@ First-party Netlify-style platform: git-connected builds, branch previews, CDN d
 - CNAME target + copy, Verify DNS button, status badges in Domains UI
 - `VerifyEdgeCustomDomainsJob` scheduled every 15 minutes
 - Pending custom domains gated in fake-edge middleware (503 pending page)
-- TLS copy qualified (Cloudflare proxy / managed zone); Custom Hostnames API stub in `EdgeCloudflareClient` for Phase 3b
+- TLS via Custom Hostnames (SSL for SaaS) on managed delivery — Phase 3b ✅ (`EdgeCloudflareClient` CRUD + provisioner + SSL poll in `VerifyEdgeCustomDomainsJob`)
 
 ### Phase 4 — SSR (split)
 

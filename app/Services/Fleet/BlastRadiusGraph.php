@@ -221,7 +221,7 @@ final class BlastRadiusGraph
             if (! $site->usesContainerRuntime()) {
                 continue;
             }
-            $meta = ($site->meta );
+            $meta = is_array($site->meta) ? $site->meta : [];
             $stack = is_array($meta['container']['hybrid_edge_stack'] ?? null)
                 ? $meta['container']['hybrid_edge_stack']
                 : [];

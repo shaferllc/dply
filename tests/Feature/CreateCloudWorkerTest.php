@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudWorkerTest;
 
-use App\Actions\Cloud\CreateCloudWorker;
+use App\Modules\Cloud\Actions\CreateCloudWorker;
 use App\Enums\SiteType;
-use App\Jobs\SyncCloudWorkersJob;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\AwsAppRunnerBackend;
-use App\Services\Cloud\CloudRouter;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
-use App\Services\Cloud\FakeCloudBackend;
+use App\Modules\Cloud\Backends\AwsAppRunnerBackend;
+use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Backends\DigitalOceanAppPlatformBackend;
+use App\Modules\Cloud\Backends\FakeCloudBackend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 

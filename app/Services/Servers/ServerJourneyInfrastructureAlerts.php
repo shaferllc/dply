@@ -6,7 +6,7 @@ namespace App\Services\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\TcpPortProbe;
 use Illuminate\Support\Facades\Cache;

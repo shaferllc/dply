@@ -4,7 +4,7 @@
  * dply — DigitalOcean Functions ↔ Laravel adapter.
  *
  * Injected into a checked-out Laravel app at deploy time by
- * App\Services\Deploy\DigitalOceanFunctionsLaravelAdapter. It is the
+ * App\Modules\Deploy\Services\DigitalOceanFunctionsLaravelAdapter. It is the
  * OpenWhisk-side counterpart to bref/laravel-bridge: DigitalOcean Functions
  * invokes main($args); this file translates that raw web-action event into
  * an Illuminate HTTP request, runs it through Laravel's HTTP kernel, and

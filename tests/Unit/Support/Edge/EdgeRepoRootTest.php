@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Support\Edge;
 
-use App\Support\Edge\EdgeRepoRoot;
+use App\Modules\Edge\Support\EdgeRepoRoot;
 
 test('normalize trims slashes and rejects traversal', function () {
     expect(EdgeRepoRoot::normalize(' apps/web/ '))->toBe('apps/web');
