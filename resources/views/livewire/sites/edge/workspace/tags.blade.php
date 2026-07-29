@@ -11,7 +11,7 @@
             'setupLinks' => [
                 [
                     'label' => __('Use Snippets for inline HTML'),
-                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-snippets']),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-snippets']),
                 ],
             ],
             'tips' => [

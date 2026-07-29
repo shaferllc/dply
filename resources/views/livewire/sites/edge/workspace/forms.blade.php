@@ -12,7 +12,7 @@
             'setupLinks' => [
                 [
                     'label' => __('Bot protection setup'),
-                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-bot-protection']),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-bot-protection']),
                 ],
             ],
             'tips' => [

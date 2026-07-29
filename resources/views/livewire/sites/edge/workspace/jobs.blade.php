@@ -11,7 +11,7 @@
             'setupLinks' => [
                 [
                     'label' => __('Open Bindings'),
-                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-bindings']),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-bindings']),
                 ],
             ],
             'tips' => [
