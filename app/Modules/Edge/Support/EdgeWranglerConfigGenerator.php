@@ -69,11 +69,12 @@ class EdgeWranglerConfigGenerator
             ]);
         }
 
-        // Workers for Platforms dispatch binding — emitted only when
-        // the scope has a namespace configured. Without it the
-        // platform Worker still serves static + hybrid sites; SSR
-        // sites simply can't be created until the namespace lands.
-        if ($context->supportsSsr()) {
+        // Workers for Platforms dispatch binding — require a concrete
+        // namespace *id*, not just a configured name. Name-only scopes
+        // still advertise SSR via ensure-on-create; wrangler must not
+        // bind DISPATCHER on accounts without WfP (deploy fails with
+        // Cloudflare error 10121). Static + hybrid keep working either way.
+        if ($context->dispatchNamespaceId !== '' && $context->dispatchNamespaceName !== '') {
             $lines = array_merge($lines, [
                 '',
                 '[[dispatch_namespaces]]',
