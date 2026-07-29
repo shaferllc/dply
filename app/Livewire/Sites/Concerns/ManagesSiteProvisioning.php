@@ -10,6 +10,7 @@ use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RestartSiteProvisioningJob;
+use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Modules\Certificates\Services\CertificateRepairService;
@@ -223,6 +224,20 @@ trait ManagesSiteProvisioning
 
         try {
             if ($this->site->usesEdgeRuntime()) {
+                // Prefer EdgeSettings + ManagesEdgeSiteProvisioning; this path
+                // is a fallback. Mark cancelled + async teardown so the build
+                // job cannot resurrect BUILDING while Cloudflare cleanup runs.
+                $deployment = EdgeDeployment::query()
+                    ->where('site_id', $this->site->id)
+                    ->whereIn('status', [
+                        EdgeDeployment::STATUS_BUILDING,
+                        EdgeDeployment::STATUS_PUBLISHING,
+                    ])
+                    ->orderByDesc('created_at')
+                    ->first();
+                $deployment?->markCancelledByOperator(__('Cancelled by user.'));
+                $this->site->update(['status' => Site::STATUS_EDGE_FAILED]);
+
                 // Hard redirect — SPA navigate flashes 404 on the deleted site URL.
                 $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
                 $this->skipRender();

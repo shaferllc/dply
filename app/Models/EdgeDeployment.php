@@ -113,6 +113,61 @@ class EdgeDeployment extends Model
     }
 
     /**
+     * Operator cancelled this deploy from the Build Journey UI. Jobs must
+     * exit without flipping status back to building/publishing.
+     */
+    public function wasCancelledByOperator(): bool
+    {
+        if (($this->meta['cancelled'] ?? false) === true) {
+            return true;
+        }
+
+        return $this->status === self::STATUS_FAILED
+            && is_string($this->failure_reason)
+            && str_contains(strtolower($this->failure_reason), 'cancelled');
+    }
+
+    /**
+     * Mark this in-flight deployment cancelled. Idempotent if already terminal.
+     */
+    public function markCancelledByOperator(string $reason = 'Cancelled by user.'): void
+    {
+        if (in_array($this->status, [self::STATUS_LIVE, self::STATUS_SUPERSEDED], true)) {
+            return;
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta['cancelled'] = true;
+        $meta['cancelled_at'] = now()->toIso8601String();
+
+        $this->update([
+            'status' => self::STATUS_FAILED,
+            'failed_at' => now(),
+            'failure_reason' => $reason,
+            'meta' => $meta,
+        ]);
+    }
+
+    /**
+     * Atomically set status only when the operator has not cancelled.
+     * Prevents Build/Publish jobs from resurrecting a cancelled deploy.
+     */
+    public function trySetStatusUnlessCancelled(string $status): bool
+    {
+        $affected = static::query()
+            ->whereKey($this->getKey())
+            ->where(function ($query): void {
+                $query->whereNull('meta->cancelled')
+                    ->orWhere('meta->cancelled', false);
+            })
+            ->update(['status' => $status]);
+
+        $this->refresh();
+
+        return $affected > 0 && ! $this->wasCancelledByOperator();
+    }
+
+    /**
      * Live-tail helper for the in-flight build log. While the build is
      * still running the log is on the queue worker's local filesystem
      * (path stashed in meta.local_build_log_path); after publish, the

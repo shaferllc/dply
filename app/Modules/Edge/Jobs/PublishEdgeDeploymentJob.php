@@ -74,6 +74,15 @@ class PublishEdgeDeploymentJob implements ShouldQueue
 
         $site = Site::find($deployment->site_id);
         if ($site === null) {
+            $this->cleanupLocalArtifact();
+
+            return;
+        }
+
+        $deployment->refresh();
+        if ($deployment->wasCancelledByOperator()) {
+            $this->cleanupLocalArtifact();
+
             return;
         }
 
@@ -91,7 +100,11 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             return;
         }
 
-        $deployment->update(['status' => EdgeDeployment::STATUS_PUBLISHING]);
+        if (! $deployment->trySetStatusUnlessCancelled(EdgeDeployment::STATUS_PUBLISHING)) {
+            $this->cleanupLocalArtifact();
+
+            return;
+        }
 
         // Atomic gate for hybrid sites: confirm the origin answers before
         // we flip KV to point at this deployment. Without this, an unhealthy
@@ -108,6 +121,13 @@ class PublishEdgeDeploymentJob implements ShouldQueue
         }
 
         try {
+            $deployment->refresh();
+            if ($deployment->wasCancelledByOperator()) {
+                $this->cleanupLocalArtifact();
+
+                return;
+            }
+
             // SSR: ship the bundled worker.js into the dispatch
             // namespace BEFORE we publish KV — that way the host map
             // is never pointing at a script that hasn't landed yet.
@@ -121,13 +141,38 @@ class PublishEdgeDeploymentJob implements ShouldQueue
                 ->uploadFromSidecar($deployment, $site, $this->middlewareBundlePath);
             $deployment->refresh();
 
+            if ($deployment->wasCancelledByOperator()) {
+                $this->cleanupLocalArtifact();
+
+                return;
+            }
+
             if (($site->edgeMeta()['runtime_mode'] ?? 'static') === 'ssr') {
                 app(EdgeSsrBundleUploader::class)
                     ->uploadFromSidecar($deployment, $site, $this->ssrBundlePath);
                 $deployment->refresh();
             }
 
+            if ($deployment->wasCancelledByOperator()) {
+                $this->cleanupLocalArtifact();
+
+                return;
+            }
+
             $result = $backend->publishDeployment($deployment, $site, $this->localArtifactDir);
+
+            $deployment->refresh();
+            if ($deployment->wasCancelledByOperator()) {
+                // Best-effort: unpublish what we just wrote; site teardown
+                // will also unpublish when the cancel path deletes the site.
+                try {
+                    $backend->unpublish($site);
+                } catch (Throwable) {
+                }
+                $this->cleanupLocalArtifact();
+
+                return;
+            }
 
             EdgeDeployment::query()
                 ->where('site_id', $site->id)

@@ -290,7 +290,7 @@ class Index extends Component
             'site_id' => (string) $site->id,
             'site_name' => $siteName,
         ];
-        $canceller->cancel($site);
+        $canceller->cancel($site, sync: true);
         if ($org) {
             audit_log($org, auth()->user(), 'site.edge.deleted', null, $snapshot, null);
         }

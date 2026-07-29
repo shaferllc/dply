@@ -60,6 +60,13 @@ class BuildEdgeSiteJob implements ShouldQueue
             return;
         }
 
+        // Operator may have cancelled while this job was still queued —
+        // never overwrite FAILED/cancelled back to building.
+        $deployment->refresh();
+        if ($deployment->wasCancelledByOperator()) {
+            return;
+        }
+
         $edge = $site->edgeMeta();
         $source = is_array($edge['source'] ?? null) ? $edge['source'] : [];
         $build = is_array($edge['build'] ?? null) ? $edge['build'] : [];
@@ -70,8 +77,15 @@ class BuildEdgeSiteJob implements ShouldQueue
         $outputDir = (string) ($build['output_dir'] ?? 'dist');
         $runtimeMode = (string) ($edge['runtime_mode'] ?? EdgeBuildRunner::MODE_STATIC);
 
+        if (! $deployment->trySetStatusUnlessCancelled(EdgeDeployment::STATUS_BUILDING)) {
+            return;
+        }
+
+        $site->refresh();
+        if (! Site::query()->whereKey($site->id)->exists()) {
+            return;
+        }
         $site->update(['status' => Site::STATUS_EDGE_PROVISIONING]);
-        $deployment->update(['status' => EdgeDeployment::STATUS_BUILDING]);
 
         $buildResult = null;
         $workRoot = null;
@@ -106,6 +120,16 @@ class BuildEdgeSiteJob implements ShouldQueue
             $artifactDir = $buildResult['artifact_dir'];
             $workRoot = dirname($artifactDir);
 
+            // Cancel mid-Docker: leave artifacts for cleanup, do not publish.
+            $deployment->refresh();
+            if ($deployment->wasCancelledByOperator() || ! Site::query()->whereKey($site->id)->exists()) {
+                if (is_dir($artifactDir) && str_starts_with($artifactDir, EdgeBuildRunner::buildRoot())) {
+                    File::deleteDirectory($workRoot);
+                }
+
+                return;
+            }
+
             $buildLogPath = $this->persistBuildLog($site, $deployment, $buildResult['build_log']);
             $updates = ['build_log_path' => $buildLogPath];
             if (is_string($buildResult['git_commit'] ?? null) && $buildResult['git_commit'] !== '') {
@@ -120,7 +144,16 @@ class BuildEdgeSiteJob implements ShouldQueue
             ], fn ($value) => is_string($value) && $value !== '');
             if ($commitMeta !== []) {
                 $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
+                // Preserve cancelled flag if a race set it during persist.
                 $updates['meta'] = array_merge($existingMeta, ['commit' => $commitMeta]);
+            }
+            $deployment->refresh();
+            if ($deployment->wasCancelledByOperator()) {
+                if (is_dir($artifactDir) && str_starts_with($artifactDir, EdgeBuildRunner::buildRoot())) {
+                    File::deleteDirectory($workRoot);
+                }
+
+                return;
             }
             $deployment->update($updates);
 
@@ -165,6 +198,15 @@ class BuildEdgeSiteJob implements ShouldQueue
                 ? $buildResult['cache_async']
                 : null;
 
+            $deployment->refresh();
+            if ($deployment->wasCancelledByOperator() || ! Site::query()->whereKey($site->id)->exists()) {
+                if (is_dir($artifactDir) && str_starts_with($artifactDir, EdgeBuildRunner::buildRoot())) {
+                    File::deleteDirectory($workRoot);
+                }
+
+                return;
+            }
+
             PublishEdgeDeploymentJob::dispatch(
                 $deployment->id,
                 $artifactDir,
@@ -177,6 +219,11 @@ class BuildEdgeSiteJob implements ShouldQueue
             // common failure path (clone/lint/docker/install). Still persist
             // whatever the runner wrote to the local log so the Build log tab
             // isn't empty after a failed deploy.
+            $deployment = EdgeDeployment::query()->find($this->deploymentId);
+            if ($deployment === null || $deployment->wasCancelledByOperator()) {
+                return;
+            }
+
             $localLog = $this->resolveLocalBuildLogPath($deployment, $buildResult);
             if ($localLog !== null) {
                 try {

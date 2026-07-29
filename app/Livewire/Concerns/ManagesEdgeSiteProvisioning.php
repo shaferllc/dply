@@ -78,6 +78,11 @@ trait ManagesEdgeSiteProvisioning
 
         $this->site->refresh();
 
+        // Flip the deployment row first so the journey UI stops showing
+        // BUILDING even if teardown / the queue worker is slow. Build +
+        // publish jobs honor meta.cancelled and will not resurrect status.
+        $this->markInFlightDeploymentCancelled();
+
         // If the site has ever had a successful publish, cancelling the
         // current in-flight build should NOT delete the app — just abort
         // this deployment and leave the live one serving. Full teardown
@@ -86,16 +91,20 @@ trait ManagesEdgeSiteProvisioning
         // on first success, and it persists across redeploys.
         $activeDeploymentId = $this->site->edgeMeta()['active_deployment_id'] ?? null;
         if (is_string($activeDeploymentId) && $activeDeploymentId !== '') {
-            $this->abortInFlightDeployment();
+            $this->site->update(['status' => Site::STATUS_EDGE_ACTIVE]);
+            $this->toastSuccess(__('Build cancelled. The previous deployment is still serving.'));
 
             return;
         }
 
+        // Mark failed so the journey stops showing BUILDING if redirect
+        // is slow; teardown runs async so Cloudflare/R2 cleanup cannot
+        // leave the confirm modal stuck on "Working…".
+        $this->site->update(['status' => Site::STATUS_EDGE_FAILED]);
+
         try {
-            // Tear down first, then hard-redirect. wire:navigate would briefly
-            // re-hit this site URL after the row is gone → flash of 404 before
-            // edge.index. skipRender avoids dehydrating the deleted Site model.
             $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
+            $this->toastSuccess(__('Build cancelled. Removing this Edge site…'));
             $this->skipRender();
             $this->redirect(route('edge.index'), navigate: false);
         } catch (\Throwable $e) {
@@ -104,21 +113,11 @@ trait ManagesEdgeSiteProvisioning
     }
 
     /**
-     * Mark the in-flight deployment as failed without tearing down the
-     * site. Used by cancel when a previous deploy is already serving on
-     * the edge — we want to abandon this specific build, not the app.
-     *
-     * The running BuildEdgeSiteJob in the queue worker isn't killed
-     * (Horizon job-kill is out of scope for v1); it'll run to completion
-     * and either silently no-op (publish path sees the deployment
-     * already-failed and bails) or get its publish discarded by the
-     * active_deployment_id guard. Either way the UI flips back to the
-     * existing live deploy immediately.
+     * Mark the newest in-flight deployment cancelled so workers bail out
+     * and the Build Journey flips off BUILDING immediately.
      */
-    protected function abortInFlightDeployment(): void
+    protected function markInFlightDeploymentCancelled(): void
     {
-        $this->site->refresh();
-
         $deployment = EdgeDeployment::query()
             ->where('site_id', $this->site->id)
             ->whereIn('status', [
@@ -128,20 +127,19 @@ trait ManagesEdgeSiteProvisioning
             ->orderByDesc('created_at')
             ->first();
 
-        if ($deployment !== null) {
-            $deployment->update([
-                'status' => EdgeDeployment::STATUS_FAILED,
-                'failed_at' => now(),
-                'failure_reason' => __('Cancelled by user.'),
-            ]);
+        // Also catch a row that was just cancelled but a racing job reset
+        // status — prefer the latest non-live deployment.
+        if ($deployment === null) {
+            $deployment = EdgeDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->whereNotIn('status', [
+                    EdgeDeployment::STATUS_LIVE,
+                    EdgeDeployment::STATUS_SUPERSEDED,
+                ])
+                ->orderByDesc('created_at')
+                ->first();
         }
 
-        // Site stays "active" — the previous successful deployment is
-        // still serving on the edge.
-        $this->site->update([
-            'status' => Site::STATUS_EDGE_ACTIVE,
-        ]);
-
-        $this->toastSuccess(__('Build cancelled. The previous deployment is still serving.'));
+        $deployment?->markCancelledByOperator(__('Cancelled by user.'));
     }
 }

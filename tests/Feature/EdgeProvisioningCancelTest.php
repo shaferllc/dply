@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeProvisioningCancelTest;
 
 use App\Enums\SiteType;
-use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Edge\Jobs\BuildEdgeSiteJob;
+use App\Modules\Edge\Jobs\TeardownEdgeSiteJob;
+use App\Modules\Edge\Services\EdgeBuildRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Mockery;
 
 uses(RefreshDatabase::class);
 
@@ -34,6 +37,61 @@ test('cancel build during edge provisioning tears down site and edge server', fu
     expect(Site::query()->find($siteId))->toBeNull();
     expect(Server::query()->find($serverId))->toBeNull();
     expect(EdgeDeployment::query()->find($deploymentId))->toBeNull();
+});
+
+test('cancel build marks deployment cancelled before teardown so workers cannot resurrect building', function () {
+    Queue::fake();
+
+    [$user, $server, $site] = makeProvisioningEdgeSite();
+    $deployment = EdgeDeployment::query()->where('site_id', $site->id)->firstOrFail();
+
+    Livewire::actingAs($user)
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('cancelProvisioning')
+        ->assertRedirect(route('edge.index'));
+
+    $deployment->refresh();
+    expect($deployment->wasCancelledByOperator())->toBeTrue()
+        ->and($deployment->status)->toBe(EdgeDeployment::STATUS_FAILED)
+        ->and($site->fresh()->status)->toBe(Site::STATUS_EDGE_FAILED);
+
+    Queue::assertPushed(TeardownEdgeSiteJob::class);
+
+    $runner = Mockery::mock(EdgeBuildRunner::class);
+    $runner->shouldNotReceive('build');
+
+    app()->call([new BuildEdgeSiteJob($deployment->id), 'handle'], [
+        'runner' => $runner,
+    ]);
+
+    expect($deployment->fresh()->status)->toBe(EdgeDeployment::STATUS_FAILED);
+});
+
+test('cancel in-flight redeploy aborts build without deleting the live site', function () {
+    Queue::fake();
+
+    [$user, $server, $site] = makeProvisioningEdgeSite();
+    $meta = is_array($site->meta) ? $site->meta : [];
+    $edge = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+    $edge['active_deployment_id'] = 'live-deploy-id';
+    $meta['edge'] = $edge;
+    $site->update([
+        'status' => Site::STATUS_EDGE_ACTIVE,
+        'meta' => $meta,
+    ]);
+
+    $deployment = EdgeDeployment::query()->where('site_id', $site->id)->firstOrFail();
+
+    Livewire::actingAs($user)
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('cancelProvisioning')
+        ->assertHasNoErrors();
+
+    expect(Site::query()->find($site->id))->not->toBeNull()
+        ->and($site->fresh()->status)->toBe(Site::STATUS_EDGE_ACTIVE)
+        ->and($deployment->fresh()->wasCancelledByOperator())->toBeTrue();
+
+    Queue::assertNotPushed(TeardownEdgeSiteJob::class);
 });
 
 test('open cancel modal uses edge copy for edge sites', function () {
