@@ -96,12 +96,15 @@ trait ManagesEdgeFormPrefills
         $mode = null;
 
         // Prefer live SSR signals (start/build commands) over the static
-        // preset table — Next export stays static; Next SSR → hybrid.
+        // preset table — Next export stays static; SSR-capable frameworks
+        // (incl. Keel) default to hybrid so orgs without Workers for
+        // Platforms aren't forced onto Worker SSR. Operators can still
+        // pick Worker SSR when it's available.
         if (EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)) {
             $mode = 'hybrid';
         } else {
             $preset = EdgeFrameworkPresetRegistry::byDetectionPlan($this->detectedPlan);
-            // Frameworks that are always hybrid (SvelteKit, Remix, Hono)
+            // Frameworks that are always hybrid (Keel, SvelteKit, Remix, Hono)
             // even when detection didn't surface a start command.
             if ($preset->runtimeMode === 'hybrid') {
                 $mode = 'hybrid';

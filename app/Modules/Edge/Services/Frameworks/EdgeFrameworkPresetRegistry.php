@@ -103,6 +103,22 @@ class EdgeFrameworkPresetRegistry
                 marquerFiles: ['vite.config.js', 'vite.config.ts'],
                 docsUrl: 'https://vitejs.dev',
             ),
+            // Keel before Hono — kits declare both `@shaferllc/keel` and `hono`.
+            // Default hybrid (Cloud/Node origin + Edge static). Worker SSR is
+            // optional when dispatch / Workers for Platforms is available.
+            new EdgeFrameworkPreset(
+                slug: 'keel',
+                label: 'Keel',
+                buildCommand: 'npm ci && (npm run css:build --if-present || true)',
+                outputDir: 'public',
+                runtimeMode: EdgeBuildRunner::MODE_HYBRID,
+                nodeVersion: '22',
+                cachePaths: ['node_modules/.cache', '.wrangler'],
+                packageDependencies: ['@shaferllc/keel'],
+                marquerFiles: ['worker.ts', 'wrangler.jsonc', 'bootstrap/app.ts'],
+                previewOriginRoutes: ['/*'],
+                docsUrl: 'https://keeljs.com/docs',
+            ),
             new EdgeFrameworkPreset(
                 slug: 'hono',
                 label: 'Hono',

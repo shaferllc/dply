@@ -17,6 +17,7 @@ test('allows node static and ssg frameworks', function (array $plan) {
 })->with([
     'vite' => [['runtime' => 'node', 'framework' => 'vite']],
     'astro' => [['runtime' => 'node', 'framework' => 'astro']],
+    'keel' => [['runtime' => 'node', 'framework' => 'keel']],
     'next static alias' => [['runtime' => 'node', 'framework' => 'nextjs']],
     'next' => [['runtime' => 'node', 'framework' => 'next']],
     'node generic' => [['runtime' => 'node', 'framework' => 'node_generic']],

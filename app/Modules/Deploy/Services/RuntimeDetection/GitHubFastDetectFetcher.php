@@ -38,10 +38,12 @@ final class GitHubFastDetectFetcher
         // dply manifest
         'dply.yaml',
         'dply.yml',
-        // Cloudflare Worker config
+        // Cloudflare Worker / Keel entry
         'wrangler.toml',
         'wrangler.jsonc',
         'wrangler.json',
+        'worker.ts',
+        'bootstrap/app.ts',
         // Static-site signals
         'index.html',
         '_config.yml',

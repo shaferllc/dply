@@ -28,3 +28,11 @@ test('non ssr frameworks are ignored', function () {
         'start_command' => 'vite preview',
     ]))->toBeFalse();
 });
+
+test('keel is always treated as ssr', function () {
+    expect(EdgeSsrDetection::planLooksLikeSsr([
+        'framework' => 'keel',
+        'start_command' => '',
+        'build_command' => 'npx wrangler deploy --dry-run --outdir=.dply-keel-bundle',
+    ]))->toBeTrue();
+});

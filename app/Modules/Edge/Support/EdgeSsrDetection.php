@@ -16,6 +16,13 @@ final class EdgeSsrDetection
     public static function planLooksLikeSsr(array $plan): bool
     {
         $framework = strtolower((string) ($plan['framework'] ?? ''));
+
+        // Keel is Workers-native — always treat as SSR even when detection
+        // doesn't surface a Node `start` script (kits use `serve` / wrangler).
+        if ($framework === 'keel') {
+            return true;
+        }
+
         if (! in_array($framework, ['next', 'nuxt', 'remix', 'sveltekit'], true)) {
             return false;
         }

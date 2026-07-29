@@ -122,6 +122,8 @@ final class NodeRuntimeDetector implements RuntimeDetector
     private function detectFramework(array $deps, array &$reasons): ?string
     {
         $frameworks = [
+            // Keel before hono-adjacent stacks — apps declare both.
+            '@shaferllc/keel' => 'keel',
             'next' => 'next',
             'nuxt' => 'nuxt',
             'astro' => 'astro',
@@ -289,6 +291,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
             'nuxt' => '.output/public',
             'astro' => 'dist',
             'sveltekit' => 'build',
+            'keel' => 'public',
             'vite', 'vue', 'react', 'svelte', 'remix', 'nest' => 'dist',
             default => null,
         };

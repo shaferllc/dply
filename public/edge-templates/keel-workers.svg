@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="keelTitle">
+  <title id="keelTitle">Keel on Workers template hero</title>
+  <defs>
+    <linearGradient id="keelBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#15222c"/>
+      <stop offset="55%" stop-color="#1c3340"/>
+      <stop offset="100%" stop-color="#d5462a"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#keelBg)"/>
+  <g transform="translate(430,210)" fill="none" stroke="#f2ede1" stroke-width="10" stroke-linecap="round">
+    <path d="M-70,-90 C-70,40 -20,95 0,95 C20,95 70,40 70,-90"/>
+    <path d="M-28,80 L-28,118 Q0,145 28,118 L28,80" fill="#d5462a" stroke="#d5462a" stroke-width="0"/>
+  </g>
+  <text x="48" y="270" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="56" font-weight="700" fill="#f2ede1" letter-spacing="-1.5">Keel</text>
+  <text x="48" y="306" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" font-weight="500" fill="#eae3d4" opacity="0.9">Workers-native house framework</text>
+  <g transform="translate(48,332)">
+    <rect width="88" height="22" rx="11" fill="#15222c" fill-opacity="0.85" stroke="#f2ede1" stroke-opacity="0.25"/>
+    <text x="44" y="15" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#f2ede1" letter-spacing="1.2">WORKER SSR</text>
+  </g>
+</svg>

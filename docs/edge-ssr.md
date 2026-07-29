@@ -71,13 +71,14 @@ must also be installed (or the build fails with a clear error).
 
 | Framework | Detected | Adapter | dply runs | Worker output | Assets dir |
 | --- | --- | --- | --- | --- | --- |
+| Keel | `@shaferllc/keel` | (Wrangler) | `wrangler deploy --dry-run --outdir=.dply-keel-bundle` (+ optional `css:build` / `docs`) | `.dply-keel-bundle/worker.js` | `public` |
 | Next.js | `next` | (built-in) | `npx --yes @opennextjs/cloudflare@latest build` | `.open-next/worker.js` | `.open-next/assets` |
 | SvelteKit | `@sveltejs/kit` | `@sveltejs/adapter-cloudflare` | your `build_command` | `.svelte-kit/cloudflare/_worker.js/` | `.svelte-kit/cloudflare` |
 | Astro | `astro` | `@astrojs/cloudflare` | your `build_command` | `dist/_worker.js/` | `dist` |
 | Remix | `@remix-run/cloudflare` | `@remix-run/cloudflare` | your `build_command` | `build/server/index.js` | `build/client` |
 
-Only Next.js has its build command overridden — OpenNext owns the full
-pipeline there. For the other three, dply runs whatever `build_command`
+Keel and Next.js override the build command — Wrangler dry-run (Keel) and
+OpenNext (Next) own those pipelines. For Astro / SvelteKit / Remix, dply runs whatever `build_command`
 you configured (defaulting to `npm run build`) after `npm install` and
 expects the worker output file/dir to land at the path above.
 

@@ -34,6 +34,19 @@ class EdgeTemplateRegistry
     {
         return [
             [
+                'slug' => 'keel-workers',
+                'name' => 'Keel on Edge',
+                'description' => 'House framework for Node.js — service container, routing, JSX views. Hybrid Edge + Cloud by default; Worker SSR optional.',
+                'repo' => 'shaferllc/keel-site',
+                'clone_repo' => 'shaferllc/keel-site',
+                'branch' => 'main',
+                'framework' => 'keel',
+                'runtime_mode' => 'hybrid',
+                'tags' => ['keel', 'hybrid', 'fullstack'],
+                'hero_emoji' => 'K',
+                'hero_url' => '/edge-templates/keel-workers.svg',
+            ],
+            [
                 'slug' => 'astro-blog',
                 'name' => 'Astro Blog',
                 'description' => 'Markdown blog with RSS feed, dark mode, and sitemap. Zero JS by default.',

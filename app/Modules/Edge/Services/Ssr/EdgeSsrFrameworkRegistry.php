@@ -25,6 +25,21 @@ class EdgeSsrFrameworkRegistry
     public static function all(): array
     {
         return self::$profiles ??= [
+            // Keel — Workers-native (@shaferllc/keel). Kits ship worker.ts +
+            // wrangler.jsonc; we dry-run Wrangler to emit a module bundle
+            // without uploading to the customer's Cloudflare account.
+            // Declared before anything that might match `hono` alone.
+            new EdgeSsrFrameworkProfile(
+                slug: 'keel',
+                label: 'Keel (via Wrangler bundle)',
+                detectDependencies: ['@shaferllc/keel'],
+                adapterDependency: null,
+                buildCommandOverride: 'mkdir -p public && (npm run css:build --if-present || true) && (npm run docs --if-present || true) && npx --yes wrangler deploy --dry-run --outdir=.dply-keel-bundle',
+                workerPath: '.dply-keel-bundle/worker.js',
+                assetsPath: 'public',
+                entryModule: 'worker.js',
+            ),
+
             // Next.js — OpenNext bundles `next build` output into a
             // single worker. dply runs OpenNext directly, ignoring
             // the user's build_command, because mis-set commands

@@ -78,7 +78,7 @@
     </div>
 
     <p class="px-1 text-xs leading-relaxed text-brand-moss">
-        {{ __('Static/SSG JS and hybrid SSR — not Laravel, Rails, WordPress, or Nest/Express.') }}
+        {{ __('Static/SSG JS, Keel, and hybrid SSR — not Laravel, Rails, WordPress, or Nest/Express. Worker SSR is optional.') }}
         @if (\Illuminate\Support\Facades\Route::has('cloud.create'))
             <a href="{{ route('cloud.create') }}" wire:navigate class="font-semibold text-brand-sage underline decoration-brand-sage/30 underline-offset-2 hover:text-brand-forest dark:hover:text-brand-gold">{{ __('Use Cloud') }}</a>
             {{ __('or BYO.') }}

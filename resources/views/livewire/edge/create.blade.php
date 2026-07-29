@@ -12,7 +12,7 @@
             <div class="min-w-0">
                 <x-profile-shell
                     :title="__('Deploy an edge app')"
-                    :description="__('Connect a static/SSG (or hybrid JS SSR) repo — we build and publish to the edge.')"
+                    :description="__('Connect a static/SSG, Keel, or hybrid JS SSR repo — we build and publish to the edge.')"
                     icon="heroicon-o-globe-alt"
                 >
                     <x-slot:actions>
@@ -556,9 +556,9 @@
                                             ['value' => 'hybrid', 'label' => __('Hybrid'), 'body' => __('Static on Edge + Cloud/HTTPS origin for SSR.')],
                                             [
                                                 'value' => 'ssr',
-                                                'label' => __('Worker SSR (Next.js)'),
+                                                'label' => __('Worker SSR'),
                                                 'body' => $ssrAvailable
-                                                    ? __('Next.js on the edge — no origin. $:fee/mo platform fee.', ['fee' => number_format($edgeSsrFee, 2)])
+                                                    ? __('Keel / Next.js on the edge — no origin. $:fee/mo platform fee.', ['fee' => number_format($edgeSsrFee, 2)])
                                                     : ($ssrUnavailableReason ?: __('Unavailable — use Hybrid.')),
                                                 'disabled' => ! $ssrAvailable,
                                             ],

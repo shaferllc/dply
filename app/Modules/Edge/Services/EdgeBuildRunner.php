@@ -413,7 +413,7 @@ class EdgeBuildRunner
                 $ssrProfile = EdgeSsrFrameworkRegistry::detectInProject($packageJson);
                 if ($ssrProfile === null) {
                     throw new RuntimeException(
-                        'SSR Edge sites need one of: Next.js, Astro, SvelteKit, or Remix. '
+                        'SSR Edge sites need one of: Keel, Next.js, Astro, SvelteKit, or Remix. '
                         .'Add the framework + its Cloudflare adapter to package.json or pick static / hybrid mode.'
                     );
                 }

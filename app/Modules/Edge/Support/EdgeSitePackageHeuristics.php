@@ -18,6 +18,7 @@ final class EdgeSitePackageHeuristics
      * @var list<string>
      */
     private const SITE_FRAMEWORK_DEPS = [
+        '@shaferllc/keel',
         'astro',
         'next',
         'nuxt',

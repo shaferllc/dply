@@ -437,7 +437,9 @@ trait ManagesEdgeRepoDetection
         );
 
         // Framework lookup: dep name → [framework, default build, default output]
+        // Keel before hono/vite — kits declare both `@shaferllc/keel` and `hono`.
         $frameworkMap = [
+            '@shaferllc/keel' => ['keel', 'npm run css:build --if-present', 'public'],
             'astro' => ['astro', 'npm run build', 'dist'],
             'next' => ['next', 'npm run build', 'out'],
             'nuxt' => ['nuxt', 'npm run generate', '.output/public'],
@@ -447,6 +449,7 @@ trait ManagesEdgeRepoDetection
             '@11ty/eleventy' => ['eleventy', 'npm run build', '_site'],
             'vitepress' => ['vitepress', 'npm run docs:build', 'docs/.vitepress/dist'],
             '@docusaurus/core' => ['docusaurus', 'npm run build', 'build'],
+            'hono' => ['hono', 'npm run build', 'dist'],
         ];
 
         $framework = null;
