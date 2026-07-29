@@ -80,6 +80,10 @@ class EdgeBuildRunner
         $workRoot = rtrim(self::buildRoot(), '/').'/dply-edge-build-'.$deployment->id;
         File::ensureDirectoryExists($workRoot);
         $checkout = $workRoot.'/src';
+        // Preserve the original checkout root — EdgeRepoRoot may re-point
+        // $checkout at a monorepo subdir, and finally must still wipe the
+        // whole tree so retries don't see a leftover src/.
+        $checkoutRoot = $checkout;
         $artifactDir = $workRoot.'/out';
         $buildLog = $workRoot.'/build.log';
         File::put($buildLog, '=== dply Edge build '.$deployment->id." ===\n");
@@ -612,8 +616,8 @@ class EdgeBuildRunner
 
             return $result;
         } finally {
-            if (is_dir($checkout)) {
-                File::deleteDirectory($checkout);
+            if (is_dir($checkoutRoot)) {
+                File::deleteDirectory($checkoutRoot);
             }
         }
     }

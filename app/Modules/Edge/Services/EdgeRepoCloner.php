@@ -48,14 +48,16 @@ final class EdgeRepoCloner
     {
         $log = [];
 
+        // Always start from an empty checkout. Retries (and mirror→direct
+        // fallback) otherwise hit "destination path already exists".
+        $this->ensureEmptyCheckout($checkout);
+
         if ($this->cacheEnabled()) {
             try {
                 return $this->cloneViaMirror($repoUrl, $branch, $checkout, $commitOverride, $log);
             } catch (\Throwable $e) {
                 $log[] = '[git-cache] mirror path failed, falling back to direct clone: '.$e->getMessage();
-                if (is_dir($checkout)) {
-                    File::deleteDirectory($checkout);
-                }
+                $this->ensureEmptyCheckout($checkout);
             }
         }
 
@@ -94,15 +96,12 @@ final class EdgeRepoCloner
             // git clones from a local path use hardlinks, so the working
             // tree is created near-instantly and `--depth` is a no-op
             // (git warns about it). Keep history; it costs almost nothing.
+            $this->ensureEmptyCheckout($checkout);
             $log[] = "Cloning from local mirror @ {$branch}";
             if ($commitOverride !== null) {
-                $clone = Process::timeout(60)->run(['git', 'clone', $mirror, $checkout]);
+                $this->runWithRetry(['git', 'clone', $mirror, $checkout], $log, $checkout);
             } else {
-                $clone = Process::timeout(60)->run(['git', 'clone', '--branch', $branch, $mirror, $checkout]);
-            }
-            $log[] = trim($clone->output().$clone->errorOutput());
-            if (! $clone->successful()) {
-                throw new RuntimeException('Local mirror clone failed: '.$clone->errorOutput());
+                $this->runWithRetry(['git', 'clone', '--branch', $branch, $mirror, $checkout], $log, $checkout);
             }
 
             if ($commitOverride !== null) {
@@ -125,9 +124,11 @@ final class EdgeRepoCloner
      */
     private function cloneDirect(string $repoUrl, string $branch, string $checkout, ?string $commitOverride, array $log): array
     {
+        $this->ensureEmptyCheckout($checkout);
+
         if ($commitOverride !== null) {
             $log[] = "Cloning {$repoUrl} (full history) for commit {$commitOverride}";
-            $this->runWithRetry(['git', 'clone', $repoUrl, $checkout], $log);
+            $this->runWithRetry(['git', 'clone', $repoUrl, $checkout], $log, $checkout);
             $result = Process::timeout(60)->path($checkout)->run(['git', 'checkout', $commitOverride]);
             $log[] = trim($result->output().$result->errorOutput());
             if (! $result->successful()) {
@@ -135,7 +136,7 @@ final class EdgeRepoCloner
             }
         } else {
             $log[] = "Cloning {$repoUrl} @ {$branch}";
-            $this->runWithRetry(['git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout], $log);
+            $this->runWithRetry(['git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout], $log, $checkout);
         }
 
         return array_values(array_filter($log, static fn ($line) => $line !== ''));
@@ -146,10 +147,14 @@ final class EdgeRepoCloner
      * operators can see WHY a retry kicked in (network blip vs. real auth
      * failure, etc.). Throws after the final attempt fails.
      *
-     * @param  array<string, mixed> $command
-     * @param  array<string, mixed> $log
+     * When `$cleanPathOnRetry` is set (clone destination), wipe it between
+     * attempts so a partial clone doesn't poison the next try with
+     * "destination path already exists".
+     *
+     * @param  list<string> $command
+     * @param  list<string> $log
      */
-    private function runWithRetry(array $command, array &$log): void
+    private function runWithRetry(array $command, array &$log, ?string $cleanPathOnRetry = null): void
     {
         $attempt = 0;
         $lastError = '';
@@ -164,12 +169,22 @@ final class EdgeRepoCloner
 
             $lastError = $result->errorOutput() !== '' ? $result->errorOutput() : $result->output();
             if ($attempt < self::NETWORK_RETRIES) {
+                if ($cleanPathOnRetry !== null) {
+                    $this->ensureEmptyCheckout($cleanPathOnRetry);
+                }
                 $log[] = sprintf('[git-cache] attempt %d/%d failed — retrying in %ds', $attempt, self::NETWORK_RETRIES, self::RETRY_BACKOFF_SECONDS);
                 sleep(self::RETRY_BACKOFF_SECONDS);
             }
         }
 
         throw new RuntimeException('Git clone failed after '.self::NETWORK_RETRIES.' attempts: '.$lastError);
+    }
+
+    private function ensureEmptyCheckout(string $checkout): void
+    {
+        if (is_dir($checkout)) {
+            File::deleteDirectory($checkout);
+        }
     }
 
     private function mirrorPath(string $repoUrl): string

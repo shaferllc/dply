@@ -126,13 +126,13 @@ final class EdgeProvisioningViewData
     private static function resolveError(Site $site, ?EdgeDeployment $deployment): ?string
     {
         $metaError = $site->edgeMeta()['last_error'] ?? null;
-        if (is_string($metaError) && $metaError !== '') {
-            return $metaError;
-        }
-
         $deploymentError = $deployment?->failure_reason;
-        if (is_string($deploymentError) && $deploymentError !== '') {
-            return $deploymentError;
+
+        // BuildJourney already shows failure_reason as "Reason". Only surface
+        // site-meta last_error when it differs (infra error that never hit
+        // the deployment row) — otherwise we print the same string twice.
+        if (is_string($metaError) && $metaError !== '' && $metaError !== $deploymentError) {
+            return $metaError;
         }
 
         return null;
