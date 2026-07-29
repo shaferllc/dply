@@ -558,7 +558,7 @@
                                                 'value' => 'ssr',
                                                 'label' => __('Worker SSR (Next.js)'),
                                                 'body' => $ssrAvailable
-                                                    ? __('Next.js on the edge — no origin.')
+                                                    ? __('Next.js on the edge — no origin. $:fee/mo platform fee.', ['fee' => number_format($edgeSsrFee, 2)])
                                                     : ($ssrUnavailableReason ?: __('Unavailable — use Hybrid.')),
                                                 'disabled' => ! $ssrAvailable,
                                             ],
@@ -705,7 +705,10 @@
                 </x-profile-shell>
             </div>
 
-            @include('livewire.edge.partials.create-sidebar', ['edgeFee' => $edgeFee])
+            @include('livewire.edge.partials.create-sidebar', [
+                'edgeFee' => $edgeFee,
+                'edgePlatformFee' => $edgePlatformFee,
+            ])
         </div>
     </form>
 

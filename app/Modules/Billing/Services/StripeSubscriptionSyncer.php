@@ -50,9 +50,10 @@ class StripeSubscriptionSyncer
         // Serverless functions — flat per-function line item.
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'serverless', $desired->serverlessCount);
 
-        // dply Cloud + Edge — flat per live site.
+        // dply Cloud + Edge — flat per live site (static/hybrid vs Worker-native SSR).
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'cloud', $desired->cloudCount);
-        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeCount);
+        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeBaseCount());
+        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge_ssr', $desired->edgeSsrCount);
         // Managed Realtime — one line per connection-tier in use, plus removal of
         // any legacy flat realtime line left over from the pre-tier model.
         $this->reconcileRealtimeTierLines($subscription, $desired, $changes);

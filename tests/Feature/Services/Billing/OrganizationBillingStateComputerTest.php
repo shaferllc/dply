@@ -309,9 +309,28 @@ test('active dply edge sites bill per site excluding previews', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->edgeCount)->toBe(1);
+    expect($state->edgeSsrCount)->toBe(0);
     expect($state->edgeSubtotalCents)->toBe(200);
     // Free plan ($0) + 1 edge site ($2) = $2
     expect($state->monthlyTotalCents)->toBe(200);
+});
+
+test('worker-native ssr edge sites bill at the higher platform fee', function () {
+    Config::set('subscription.standard.edge_cents', 200);
+    Config::set('subscription.standard.edge_ssr_cents', 700);
+    $org = Organization::factory()->create();
+    makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE, runtimeMode: 'static');
+    makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE, runtimeMode: 'ssr');
+    makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE, runtimeMode: 'hybrid');
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->edgeCount)->toBe(3);
+    expect($state->edgeSsrCount)->toBe(1);
+    expect($state->edgeBaseCount())->toBe(2);
+    // $2 + $7 + $2 = $11
+    expect($state->edgeSubtotalCents)->toBe(1100);
+    expect($state->monthlyTotalCents)->toBe(1100);
 });
 
 test('edge delivery usage adds pass through subtotal when enabled', function () {
@@ -572,7 +591,7 @@ function makeCloudSite(Organization $org, string $status, bool $preview = false)
     ]);
 }
 
-function makeEdgeSite(Organization $org, string $status, bool $preview = false): Site
+function makeEdgeSite(Organization $org, string $status, bool $preview = false, string $runtimeMode = 'static'): Site
 {
     $server = Server::factory()->create([
         'organization_id' => $org->id,
@@ -580,11 +599,16 @@ function makeEdgeSite(Organization $org, string $status, bool $preview = false):
         'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
     ]);
 
+    $edgeMeta = ['runtime_mode' => $runtimeMode];
+    if ($preview) {
+        $edgeMeta['preview_parent_site_id'] = 'parent-id';
+    }
+
     return Site::factory()->create([
         'organization_id' => $org->id,
         'server_id' => $server->id,
         'status' => $status,
         'edge_backend' => 'dply_edge',
-        'meta' => $preview ? ['edge' => ['preview_parent_site_id' => 'parent-id']] : [],
+        'meta' => ['edge' => $edgeMeta],
     ]);
 }

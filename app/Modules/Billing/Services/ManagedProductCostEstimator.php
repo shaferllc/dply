@@ -83,6 +83,22 @@ class ManagedProductCostEstimator
         return ((int) config('subscription.standard.edge_cents', 0)) / 100;
     }
 
+    /** Monthly platform fee (dollars) for Worker-native SSR Edge sites. */
+    public function edgeSsrFee(): float
+    {
+        return ((int) config('subscription.standard.edge_ssr_cents', 0)) / 100;
+    }
+
+    /**
+     * Platform fee for an Edge runtime mode (static/hybrid → edgeFee, ssr → edgeSsrFee).
+     */
+    public function edgeFeeForRuntimeMode(string $runtimeMode): float
+    {
+        return strtolower($runtimeMode) === 'ssr'
+            ? $this->edgeSsrFee()
+            : $this->edgeFee();
+    }
+
     /**
      * Monthly fee (dollars) for a managed Realtime app on the default tier.
      */

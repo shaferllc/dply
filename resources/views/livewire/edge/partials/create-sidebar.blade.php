@@ -51,11 +51,16 @@
             <div class="flex items-center justify-between gap-3 bg-brand-sand/20 px-5 py-3 dark:bg-brand-sand/10">
                 <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Est. cost') }}</dt>
                 <dd class="min-w-0 text-end">
+                    @php
+                        $platformFee = $edgePlatformFee ?? $edgeFee;
+                    @endphp
                     <p class="text-lg font-semibold tracking-tight text-brand-ink">
-                        ${{ number_format($edgeFee, 2) }}<span class="text-sm font-medium text-brand-moss">/mo</span>
+                        ${{ number_format($platformFee, 2) }}<span class="text-sm font-medium text-brand-moss">/mo</span>
                     </p>
                     <p class="mt-0.5 text-[11px] text-brand-moss">
-                        @if ($edgeUsageBillingEnabled)
+                        @if ($runtimeMode === 'ssr')
+                            {{ __('Worker SSR platform fee. Previews free.') }}
+                        @elseif ($edgeUsageBillingEnabled)
                             {{ __('Per live site + overage. Previews free.') }}
                         @else
                             {{ __('Per live site. Previews free.') }}

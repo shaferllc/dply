@@ -38,6 +38,8 @@ beforeEach(function () {
         'cloud_yearly' => 'price_cloud_y',
         'edge' => 'price_edge',
         'edge_yearly' => 'price_edge_y',
+        'edge_ssr' => 'price_edge_ssr',
+        'edge_ssr_yearly' => 'price_edge_ssr_y',
         'edge_usage' => 'price_edge_usage',
     ]);
 
@@ -165,6 +167,24 @@ test('cloud and edge sites add interval aware line items', function () {
     $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
     $this->assertContainsEquals(['price' => 'price_cloud_y', 'quantity' => 2], $yearly);
     $this->assertContainsEquals(['price' => 'price_edge_y', 'quantity' => 4], $yearly);
+});
+
+test('edge ssr sites use a separate stripe line from static edge', function () {
+    $desired = DesiredBillingState::fromPlanAndUsage(
+        plan: FREE,
+        edgeCount: 3,
+        edgeUnitCents: 200,
+        edgeSsrCount: 1,
+        edgeSsrUnitCents: 700,
+    );
+
+    $monthly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_MONTH);
+    $this->assertContainsEquals(['price' => 'price_edge', 'quantity' => 2], $monthly);
+    $this->assertContainsEquals(['price' => 'price_edge_ssr', 'quantity' => 1], $monthly);
+
+    $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
+    $this->assertContainsEquals(['price' => 'price_edge_y', 'quantity' => 2], $yearly);
+    $this->assertContainsEquals(['price' => 'price_edge_ssr_y', 'quantity' => 1], $yearly);
 });
 
 test('edge usage adds a metered line item on the monthly interval only', function () {

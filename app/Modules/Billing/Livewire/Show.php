@@ -575,13 +575,24 @@ class Show extends Component
             ];
         }
 
-        if ($state->edgeCount > 0) {
+        $edgeBaseCount = $state->edgeBaseCount();
+        if ($edgeBaseCount > 0) {
             $unit = (int) config('subscription.standard.edge_cents', 200);
             $items[] = [
                 'label' => __('dply Edge site'),
-                'quantity' => $state->edgeCount,
+                'quantity' => $edgeBaseCount,
                 'unit_cents' => $unit,
-                'line_cents' => $state->edgeSubtotalCents,
+                'line_cents' => $edgeBaseCount * $unit,
+            ];
+        }
+
+        if ($state->edgeSsrCount > 0) {
+            $ssrUnit = (int) config('subscription.standard.edge_ssr_cents', 700);
+            $items[] = [
+                'label' => __('dply Edge SSR site'),
+                'quantity' => $state->edgeSsrCount,
+                'unit_cents' => $ssrUnit,
+                'line_cents' => $state->edgeSsrCount * $ssrUnit,
             ];
         }
 

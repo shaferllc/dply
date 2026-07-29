@@ -5,24 +5,32 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Support;
 
 use App\Modules\Edge\Services\EdgeCloudflareClient;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
  * Whether Worker-native SSR can be offered / created.
  *
- * Availability is driven by platform Cloudflare credentials (account + API
- * token). The dispatch namespace id does not need to be pre-seeded in .env —
- * create/upload paths ensure the namespace via the API when the token can.
+ * Availability is driven by platform credentials. A failed dispatch-namespace
+ * ensure (plan/permission) is cached so the create UI stops offering SSR and
+ * steers operators to Hybrid instead of repeating a hard API error.
  */
 final class EdgeSsrAvailability
 {
+    private const DISPATCH_DENIED_CACHE_KEY = 'edge.ssr.dispatch_namespace_denied';
+
     public static function isAvailable(): bool
     {
         if (FakeEdgeProvision::enabled()) {
             return true;
         }
 
-        return self::hasPlatformCredentials() && self::dispatchNamespaceName() !== '';
+        if (! self::hasPlatformCredentials() || self::dispatchNamespaceName() === '') {
+            return false;
+        }
+
+        return ! Cache::has(self::DISPATCH_DENIED_CACHE_KEY);
     }
 
     public static function unavailableReason(): ?string
@@ -31,11 +39,15 @@ final class EdgeSsrAvailability
             return null;
         }
 
-        if (! self::hasPlatformCredentials()) {
-            return __('Set DPLY_EDGE_CF_ACCOUNT_ID and DPLY_EDGE_CF_API_TOKEN (Workers for Platforms permission), or use Hybrid with a Cloud origin.');
+        if (Cache::has(self::DISPATCH_DENIED_CACHE_KEY)) {
+            return __('Worker-native SSR isn’t available on this Edge account. Use Hybrid with a Cloud origin instead.');
         }
 
-        return __('SSR is unavailable — configure a dispatch namespace name or use Hybrid with a Cloud origin.');
+        if (! self::hasPlatformCredentials()) {
+            return __('Worker-native SSR isn’t configured yet. Use Hybrid with a Cloud origin, or finish Edge platform setup.');
+        }
+
+        return __('Worker-native SSR isn’t available. Use Hybrid with a Cloud origin instead.');
     }
 
     /**
@@ -50,32 +62,38 @@ final class EdgeSsrAvailability
 
         $configured = trim((string) config('edge.cloudflare.dispatch_namespace_id', ''));
         if ($configured !== '') {
+            Cache::forget(self::DISPATCH_DENIED_CACHE_KEY);
+
             return $configured;
         }
 
         if (! self::hasPlatformCredentials()) {
             throw new RuntimeException(
-                'SSR Edge sites need DPLY_EDGE_CF_ACCOUNT_ID and DPLY_EDGE_CF_API_TOKEN. '
-                .'Use Hybrid with a Cloud origin, or set those credentials and retry.',
+                (string) __('Worker-native SSR isn’t configured yet. Use Hybrid with a Cloud origin instead.'),
             );
         }
 
         $name = self::dispatchNamespaceName();
         if ($name === '') {
             throw new RuntimeException(
-                'SSR Edge sites need a Workers for Platforms dispatch namespace name '
-                .'(DPLY_EDGE_CF_DISPATCH_NAMESPACE).',
+                (string) __('Worker-native SSR isn’t available. Use Hybrid with a Cloud origin instead.'),
             );
         }
 
         try {
-            return EdgeCloudflareClient::fromConfig()->ensureDispatchNamespace($name);
+            $id = EdgeCloudflareClient::fromConfig()->ensureDispatchNamespace($name);
+            Cache::forget(self::DISPATCH_DENIED_CACHE_KEY);
+
+            return $id;
         } catch (\Throwable $e) {
+            Cache::put(self::DISPATCH_DENIED_CACHE_KEY, true, now()->addHours(6));
+            Log::warning('Edge SSR dispatch namespace ensure failed', [
+                'namespace' => $name,
+                'error' => $e->getMessage(),
+            ]);
+
             throw new RuntimeException(
-                'Could not ensure the SSR dispatch namespace via the Cloudflare API ('
-                .$e->getMessage()
-                .'). Check that the API token has Workers for Platforms / dispatch namespace permission '
-                .'and the account is on Workers Paid, or use Hybrid with a Cloud origin.',
+                (string) __('Worker-native SSR isn’t available on this Edge account. Switch runtime to Hybrid and deploy with a Cloud origin.'),
                 0,
                 $e,
             );
@@ -90,8 +108,14 @@ final class EdgeSsrAvailability
 
         throw new RuntimeException(
             self::unavailableReason()
-                ?? 'Worker-native SSR is not available in this environment.',
+                ?? (string) __('Worker-native SSR isn’t available. Use Hybrid with a Cloud origin instead.'),
         );
+    }
+
+    /** @internal testing */
+    public static function forgetDispatchDeniedCache(): void
+    {
+        Cache::forget(self::DISPATCH_DENIED_CACHE_KEY);
     }
 
     private static function hasPlatformCredentials(): bool

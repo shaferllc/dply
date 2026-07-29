@@ -61,6 +61,12 @@ class StripeBillingProvisioner
 
     public const ROLE_EDGE_YEARLY = 'standard_edge_yearly';
 
+    public const ROLE_EDGE_SSR_PRODUCT = 'standard_edge_ssr_product';
+
+    public const ROLE_EDGE_SSR_MONTHLY = 'standard_edge_ssr';
+
+    public const ROLE_EDGE_SSR_YEARLY = 'standard_edge_ssr_yearly';
+
     public const ROLE_EDGE_USAGE_PRODUCT = 'standard_edge_usage_product';
 
     public const ROLE_EDGE_USAGE_MONTHLY = 'standard_edge_usage';
@@ -253,7 +259,7 @@ class StripeBillingProvisioner
         if ($edgeCents > 0) {
             $edgeProduct = $this->upsertProduct(
                 name: 'dply Edge site',
-                description: 'Per-site fee for dply Edge — static and SSG sites on dply-owned CDN infrastructure. Covers builds, deploys, previews, and global delivery. Billed per live production site.',
+                description: 'Per-site fee for dply Edge — static, SSG, and hybrid sites on dply-owned CDN infrastructure. Covers builds, deploys, previews, and global delivery. Billed per live production site. Worker-native SSR uses a separate line.',
                 role: self::ROLE_EDGE_PRODUCT,
             );
             $result[self::ROLE_EDGE_PRODUCT] = $edgeProduct->id;
@@ -272,6 +278,32 @@ class StripeBillingProvisioner
                 interval: 'year',
                 nickname: 'Edge site — Yearly',
                 role: self::ROLE_EDGE_YEARLY,
+            )->id;
+        }
+
+        $edgeSsrCents = (int) ($standardConfig['edge_ssr_cents'] ?? 700);
+        if ($edgeSsrCents > 0) {
+            $edgeSsrProduct = $this->upsertProduct(
+                name: 'dply Edge SSR site',
+                description: 'Per-site fee for Worker-native SSR on dply Edge. Covers SSR dispatch, builds, deploys, and global delivery. Billed per live production SSR site.',
+                role: self::ROLE_EDGE_SSR_PRODUCT,
+            );
+            $result[self::ROLE_EDGE_SSR_PRODUCT] = $edgeSsrProduct->id;
+
+            $result[self::ROLE_EDGE_SSR_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $edgeSsrProduct->id,
+                amount: $edgeSsrCents,
+                interval: 'month',
+                nickname: 'Edge SSR site — Monthly',
+                role: self::ROLE_EDGE_SSR_MONTHLY,
+            )->id;
+
+            $result[self::ROLE_EDGE_SSR_YEARLY] = $this->upsertRecurringPrice(
+                productId: $edgeSsrProduct->id,
+                amount: $this->annualAmount($edgeSsrCents, $annualPct),
+                interval: 'year',
+                nickname: 'Edge SSR site — Yearly',
+                role: self::ROLE_EDGE_SSR_YEARLY,
             )->id;
         }
 
@@ -360,6 +392,8 @@ class StripeBillingProvisioner
             self::ROLE_CLOUD_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD_USAGE',
             self::ROLE_EDGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE',
             self::ROLE_EDGE_YEARLY => 'STRIPE_PRICE_STANDARD_EDGE_YEARLY',
+            self::ROLE_EDGE_SSR_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE_SSR',
+            self::ROLE_EDGE_SSR_YEARLY => 'STRIPE_PRICE_STANDARD_EDGE_SSR_YEARLY',
             self::ROLE_EDGE_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE_USAGE',
         ];
 

@@ -124,11 +124,20 @@ class ProvisionStripeBillingCommand extends Command
         }
         $edge = (int) ($standard['edge_cents'] ?? 0);
         if ($edge > 0) {
-            $this->line('  Product: dply Edge site');
+            $this->line('  Product: dply Edge site (static / hybrid)');
             $this->line(sprintf(
                 '    Per site $%s/mo   $%s/yr',
                 number_format($edge / 100, 2),
                 number_format($yearlyOf($edge) / 100, 2),
+            ));
+        }
+        $edgeSsr = (int) ($standard['edge_ssr_cents'] ?? 0);
+        if ($edgeSsr > 0) {
+            $this->line('  Product: dply Edge SSR site');
+            $this->line(sprintf(
+                '    Per site $%s/mo   $%s/yr',
+                number_format($edgeSsr / 100, 2),
+                number_format($yearlyOf($edgeSsr) / 100, 2),
             ));
         }
         $edgeUsageUnit = (int) ($standard['edge_usage_unit_cents'] ?? 1);

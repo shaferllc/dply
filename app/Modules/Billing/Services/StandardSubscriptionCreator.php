@@ -75,10 +75,18 @@ class StandardSubscriptionCreator
             }
         }
 
-        if ($desired->edgeCount > 0) {
+        $edgeBaseCount = $desired->edgeBaseCount();
+        if ($edgeBaseCount > 0) {
             $edgePriceId = $this->managedProductPriceIdForInterval('edge', $interval);
             if ($edgePriceId !== '') {
-                $items[] = ['price' => $edgePriceId, 'quantity' => $desired->edgeCount];
+                $items[] = ['price' => $edgePriceId, 'quantity' => $edgeBaseCount];
+            }
+        }
+
+        if ($desired->edgeSsrCount > 0) {
+            $edgeSsrPriceId = $this->managedProductPriceIdForInterval('edge_ssr', $interval);
+            if ($edgeSsrPriceId !== '') {
+                $items[] = ['price' => $edgeSsrPriceId, 'quantity' => $desired->edgeSsrCount];
             }
         }
 
@@ -148,6 +156,11 @@ class StandardSubscriptionCreator
     public function edgePriceIdForInterval(string $interval): string
     {
         return $this->managedProductPriceIdForInterval('edge', $interval);
+    }
+
+    public function edgeSsrPriceIdForInterval(string $interval): string
+    {
+        return $this->managedProductPriceIdForInterval('edge_ssr', $interval);
     }
 
     public function realtimePriceIdForInterval(string $interval): string

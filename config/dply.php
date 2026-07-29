@@ -263,14 +263,15 @@ return [
     | Edge: usage-based billing (pass-through + margin)
     |--------------------------------------------------------------------------
     |
-    | When enabled, live Edge sites keep the flat platform fee (edge_cents in
-    | config/subscription.php) plus metered delivery usage on top. Snapshots
-    | are collected by `dply:edge:collect-usage` (scheduled daily).
+    | When enabled, live Edge sites keep the flat platform fee (edge_cents /
+    | edge_ssr_cents in config/subscription.php) plus metered delivery usage
+    | on top. Snapshots are collected by `dply:edge:collect-usage` (scheduled
+    | daily).
     |
     | Unit rates are ~Cloudflare list (cost floor). `markup_percent` is applied
     | on the metered subtotal (same pattern as Cloud/Serverless — default 40%)
     | so overage is profitable. Per-site included allowances keep quiet sites
-    | on the flat $2 fee only.
+    | on the flat platform fee only ($2 static/hybrid, $7 Worker SSR).
     |
     | Approx CF list (2026): Workers requests ~$0.30/M, R2 storage ~$0.015/GB-mo,
     | Class A $4.50/M, Class B $0.36/M. Egress is charged as CDN delivery.

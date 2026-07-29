@@ -356,17 +356,23 @@ class Create extends Component
             : collect();
 
         $eligibility = EdgeEligibility::evaluate($this->detectedPlan);
+        $ssrAvailable = EdgeSsrAvailability::isAvailable();
+        if (! $ssrAvailable && $this->form->runtime_mode === 'ssr') {
+            $this->form->runtime_mode = 'hybrid';
+        }
 
         return view('livewire.edge.create', [
             'fakeEdgeActive' => FakeEdgeProvision::enabled(),
             'localSampleAppAvailable' => $this->localSampleAppAvailable(),
             'edgeFee' => app(ManagedProductCostEstimator::class)->edgeFee(),
+            'edgeSsrFee' => app(ManagedProductCostEstimator::class)->edgeSsrFee(),
+            'edgePlatformFee' => app(ManagedProductCostEstimator::class)->edgeFeeForRuntimeMode((string) $this->form->runtime_mode),
             'edgeUsageBillingEnabled' => app(ManagedProductCostEstimator::class)->edgeUsageBillingEnabled(),
             'edgeUsageRates' => app(ManagedProductCostEstimator::class)->edgeUsageRates(),
             'cloudflareCredentials' => $cloudflareCredentials,
             'orgCloudSites' => $this->orgCloudSitesForPicker(),
             'ssrDetected' => $this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan),
-            'ssrAvailable' => EdgeSsrAvailability::isAvailable(),
+            'ssrAvailable' => $ssrAvailable,
             'ssrUnavailableReason' => EdgeSsrAvailability::unavailableReason(),
             'edgeEligible' => $eligibility['eligible'],
             'edgeIneligibleMessage' => $eligibility['message'],

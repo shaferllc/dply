@@ -7,6 +7,7 @@ namespace Tests\Unit\Support\Edge;
 use App\Modules\Edge\Support\EdgeSsrAvailability;
 
 beforeEach(function () {
+    EdgeSsrAvailability::forgetDispatchDeniedCache();
     config([
         'edge.fake.enabled' => false,
         'edge.cloudflare.account_id' => '',
@@ -18,7 +19,9 @@ beforeEach(function () {
 
 test('ssr is unavailable without platform cloudflare credentials', function () {
     expect(EdgeSsrAvailability::isAvailable())->toBeFalse()
-        ->and(EdgeSsrAvailability::unavailableReason())->not->toBeNull();
+        ->and(EdgeSsrAvailability::unavailableReason())->not->toBeNull()
+        ->and(EdgeSsrAvailability::unavailableReason())->not->toContain('Cloudflare')
+        ->and(EdgeSsrAvailability::unavailableReason())->not->toContain('DPLY_EDGE');
 });
 
 test('ssr is available when account and api token are set even without namespace id', function () {
@@ -39,4 +42,16 @@ test('ssr is available in fake edge mode without credentials', function () {
     ]);
 
     expect(EdgeSsrAvailability::isAvailable())->toBeTrue();
+});
+
+test('cached dispatch denial marks ssr unavailable with hybrid guidance', function () {
+    config([
+        'edge.cloudflare.account_id' => 'acct_123',
+        'edge.cloudflare.api_token' => 'token_abc',
+    ]);
+
+    cache()->put('edge.ssr.dispatch_namespace_denied', true, now()->addHour());
+
+    expect(EdgeSsrAvailability::isAvailable())->toBeFalse()
+        ->and(EdgeSsrAvailability::unavailableReason())->toContain('Hybrid');
 });

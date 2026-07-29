@@ -46,6 +46,8 @@ class DesiredBillingState
         public readonly int $cloudSubtotalCents,
         public readonly int $cloudResourceSubtotalCents,
         public readonly int $edgeCount,
+        /** Worker-native SSR sites included in edgeCount (billed at edge_ssr_cents). */
+        public readonly int $edgeSsrCount,
         public readonly int $edgeSubtotalCents,
         public readonly int $edgeUsageSubtotalCents,
         public readonly array $edgeUsageEstimate,
@@ -93,6 +95,8 @@ class DesiredBillingState
         int $cloudResourceSubtotalCents = 0,
         int $edgeCount = 0,
         int $edgeUnitCents = 0,
+        int $edgeSsrCount = 0,
+        int $edgeSsrUnitCents = 0,
         int $edgeUsageSubtotalCents = 0,
         array $edgeUsageEstimate = [],
         // Legacy flat realtime inputs — kept for back-compat. Prefer
@@ -123,7 +127,10 @@ class DesiredBillingState
         $cloudResourceSubtotalCents = max(0, $cloudResourceSubtotalCents);
 
         $edgeCount = max(0, $edgeCount);
-        $edgeSubtotal = $edgeCount * max(0, $edgeUnitCents);
+        $edgeSsrCount = min($edgeCount, max(0, $edgeSsrCount));
+        $edgeBaseCount = $edgeCount - $edgeSsrCount;
+        $edgeSubtotal = ($edgeBaseCount * max(0, $edgeUnitCents))
+            + ($edgeSsrCount * max(0, $edgeSsrUnitCents));
 
         $edgeUsageSubtotalCents = max(0, $edgeUsageSubtotalCents);
 
@@ -195,6 +202,7 @@ class DesiredBillingState
             cloudSubtotalCents: $cloudSubtotal,
             cloudResourceSubtotalCents: $cloudResourceSubtotalCents,
             edgeCount: $edgeCount,
+            edgeSsrCount: $edgeSsrCount,
             edgeSubtotalCents: $edgeSubtotal,
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
@@ -224,6 +232,12 @@ class DesiredBillingState
     public function quantityFor(ServerTier $tier): int
     {
         return $this->tierQuantities[$tier->value] ?? 0;
+    }
+
+    /** Static / hybrid Edge sites (Stripe `edge` line quantity). */
+    public function edgeBaseCount(): int
+    {
+        return max(0, $this->edgeCount - $this->edgeSsrCount);
     }
 
     /**
@@ -272,6 +286,7 @@ class DesiredBillingState
             'cloud_subtotal_cents' => $this->cloudSubtotalCents,
             'cloud_resource_subtotal_cents' => $this->cloudResourceSubtotalCents,
             'edge_count' => $this->edgeCount,
+            'edge_ssr_count' => $this->edgeSsrCount,
             'edge_subtotal_cents' => $this->edgeSubtotalCents,
             'edge_usage_subtotal_cents' => $this->edgeUsageSubtotalCents,
             'edge_usage_estimate' => $this->edgeUsageEstimate,

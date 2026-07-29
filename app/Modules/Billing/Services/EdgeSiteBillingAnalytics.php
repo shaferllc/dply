@@ -37,13 +37,16 @@ final class EdgeSiteBillingAnalytics
         $mtdBySite = $this->aggregateSnapshots($organization->id, $siteIds, $periodStart, $periodEnd);
         $dailyBySite = $this->dailySnapshotsBySite($organization->id, $siteIds, $dailyDays);
 
-        $platformCents = (int) config('subscription.standard.edge_cents', 200);
         $result = [];
 
         foreach ($sites as $site) {
             $siteId = (string) $site->id;
             $mtd = $mtdBySite[$siteId] ?? EdgeUsageTotals::empty();
             $usageEstimate = $this->usageCostCalculator->estimate($mtd, 1);
+            $runtimeMode = strtolower((string) ($site->edgeMeta()['runtime_mode'] ?? 'static'));
+            $platformCents = $runtimeMode === 'ssr'
+                ? (int) config('subscription.standard.edge_ssr_cents', 700)
+                : (int) config('subscription.standard.edge_cents', 200);
 
             $result[] = $this->formatSiteRow(
                 site: $site,
@@ -89,9 +92,14 @@ final class EdgeSiteBillingAnalytics
         $mtd = $mtdBySite[$siteId] ?? EdgeUsageTotals::empty();
         $usageEstimate = $this->usageCostCalculator->estimate($mtd, 1);
 
+        $runtimeMode = strtolower((string) ($site->edgeMeta()['runtime_mode'] ?? 'static'));
+        $platformCents = $runtimeMode === 'ssr'
+            ? (int) config('subscription.standard.edge_ssr_cents', 700)
+            : (int) config('subscription.standard.edge_cents', 200);
+
         $payload = $this->formatSiteRow(
             site: $site,
-            platformCents: (int) config('subscription.standard.edge_cents', 200),
+            platformCents: $platformCents,
             mtd: $mtd,
             usageEstimate: $usageEstimate,
             daily: $dailyBySite[$siteId] ?? [],

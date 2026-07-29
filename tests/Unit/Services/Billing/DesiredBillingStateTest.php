@@ -180,8 +180,26 @@ test('edge sites add a flat per site subtotal', function () {
     );
 
     expect($state->edgeCount)->toBe(3);
+    expect($state->edgeSsrCount)->toBe(0);
     expect($state->edgeSubtotalCents)->toBe(600);
     expect($state->monthlyTotalCents)->toBe(600);
+});
+
+test('edge ssr sites mix with static at the higher unit price', function () {
+    // Free + 1 static ($2) + 1 SSR ($7) = $9
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: FREE,
+        edgeCount: 2,
+        edgeUnitCents: 200,
+        edgeSsrCount: 1,
+        edgeSsrUnitCents: 700,
+    );
+
+    expect($state->edgeCount)->toBe(2);
+    expect($state->edgeSsrCount)->toBe(1);
+    expect($state->edgeBaseCount())->toBe(1);
+    expect($state->edgeSubtotalCents)->toBe(900);
+    expect($state->monthlyTotalCents)->toBe(900);
 });
 
 test('edge delivery usage adds on top and is not plan eligible', function () {

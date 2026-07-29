@@ -253,13 +253,25 @@ final class BillingAnalytics
             ];
         }
 
-        if ($state->edgeCount > 0) {
+        $edgeBaseCount = $state->edgeBaseCount();
+        if ($edgeBaseCount > 0) {
             $unit = (int) config('subscription.standard.edge_cents', 200);
             $items[] = [
                 'label' => __('dply Edge site'),
-                'quantity' => $state->edgeCount,
+                'quantity' => $edgeBaseCount,
                 'unit_cents' => $unit,
-                'line_cents' => $state->edgeSubtotalCents,
+                'line_cents' => $edgeBaseCount * $unit,
+                'detail' => null,
+            ];
+        }
+
+        if ($state->edgeSsrCount > 0) {
+            $ssrUnit = (int) config('subscription.standard.edge_ssr_cents', 700);
+            $items[] = [
+                'label' => __('dply Edge SSR site'),
+                'quantity' => $state->edgeSsrCount,
+                'unit_cents' => $ssrUnit,
+                'line_cents' => $state->edgeSsrCount * $ssrUnit,
                 'detail' => null,
             ];
         }
@@ -496,11 +508,14 @@ final class BillingAnalytics
             }
 
             if ($site->status === Site::STATUS_EDGE_ACTIVE && $site->edge_backend === 'dply_edge' && ! $site->isEdgePreview()) {
+                $runtimeMode = strtolower((string) ($site->edgeMeta()['runtime_mode'] ?? 'static'));
                 $edge[] = [
                     'id' => $site->id,
                     'name' => $site->name,
                     'live_url' => $site->edgeLiveUrl(),
-                    'unit_cents' => (int) config('subscription.standard.edge_cents', 200),
+                    'unit_cents' => $runtimeMode === 'ssr'
+                        ? (int) config('subscription.standard.edge_ssr_cents', 700)
+                        : (int) config('subscription.standard.edge_cents', 200),
                 ];
             }
         }

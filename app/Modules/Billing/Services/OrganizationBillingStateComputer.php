@@ -197,6 +197,7 @@ class OrganizationBillingStateComputer
         $serverlessCount = 0;
         $cloudCount = 0;
         $edgeCount = 0;
+        $edgeSsrCount = 0;
 
         // Billable Cloud apps are collected so their backing DigitalOcean
         // resources (containers, workers, databases, buckets) can be metered.
@@ -217,7 +218,7 @@ class OrganizationBillingStateComputer
         }
 
         $siteQuery->get()
-            ->each(function (Site $site) use (&$serverlessCount, &$cloudCount, &$edgeCount, $billableCloudSites, $managedServerlessSites): void {
+            ->each(function (Site $site) use (&$serverlessCount, &$cloudCount, &$edgeCount, &$edgeSsrCount, $billableCloudSites, $managedServerlessSites): void {
                 if ($site->status === Site::STATUS_FUNCTIONS_ACTIVE) {
                     $serverlessCount += max(1, (int) $site->code_action_count);
 
@@ -241,6 +242,10 @@ class OrganizationBillingStateComputer
                     && ! $site->isEdgePreview()
                 ) {
                     $edgeCount++;
+                    $runtimeMode = strtolower((string) ($site->edgeMeta()['runtime_mode'] ?? 'static'));
+                    if ($runtimeMode === 'ssr') {
+                        $edgeSsrCount++;
+                    }
                 }
             });
 
@@ -355,6 +360,8 @@ class OrganizationBillingStateComputer
             cloudResourceSubtotalCents: $cloudResourceSubtotalCents,
             edgeCount: $edgeCount,
             edgeUnitCents: (int) config('subscription.standard.edge_cents', 200),
+            edgeSsrCount: $edgeSsrCount,
+            edgeSsrUnitCents: (int) config('subscription.standard.edge_ssr_cents', 700),
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
             realtimeTierQuantities: $realtimeTierQuantities,

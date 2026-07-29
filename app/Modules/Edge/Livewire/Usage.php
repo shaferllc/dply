@@ -69,7 +69,6 @@ class Usage extends Component
             ->values();
 
         $rows = [];
-        $platformCents = (int) config('subscription.standard.edge_cents', 200);
         foreach ($allEdgeSites as $site) {
             $perSite = app(EdgeSiteBillingAnalytics::class)->forSite($site);
 
