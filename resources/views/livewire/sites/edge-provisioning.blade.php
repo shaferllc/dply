@@ -11,17 +11,14 @@
     @endif
 
     <div class="dply-page-shell pt-6">
-        <x-breadcrumb-trail
-            :items="$siteHeaderBreadcrumbs"
-            doc-contextual
-        />
+        <x-breadcrumb-trail :items="$siteHeaderBreadcrumbs" />
     </div>
 
     <div class="dply-page-shell pt-4">
         <x-page-header
             :title="__('Edge deployment')"
             :description="__('Track the git build and Edge CDN publish until this site goes live.')"
-            :show-documentation="false"
+            doc-contextual
             toolbar
             compact
             flush
@@ -32,7 +29,7 @@
                 </span>
             </x-slot>
             <x-slot name="actions">
-                <x-outline-link :href="route('edge.index')" wire:navigate>
+                <x-outline-link size="sm" :href="route('edge.index')" wire:navigate>
                     <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                     {{ __('All Edge sites') }}
                 </x-outline-link>
