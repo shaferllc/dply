@@ -126,8 +126,8 @@ class EdgeDeployment extends Model
      */
     public function readLocalBuildLogSince(int $offset, int $maxBytes = 32_000): array
     {
-        $path = $this->meta['local_build_log_path'] ?? null;
-        if (! is_string($path) || $path === '' || ! is_file($path) || ! is_readable($path)) {
+        $path = $this->resolveLocalBuildLogPath();
+        if ($path === null || ! is_readable($path)) {
             return ['body' => '', 'offset' => $offset, 'exists' => false];
         }
 
@@ -160,24 +160,57 @@ class EdgeDeployment extends Model
 
     public function readBuildLog(?Site $site = null): ?string
     {
-        if (blank($this->build_log_path)) {
+        if (! blank($this->build_log_path)) {
+            $site ??= $this->site;
+            if ($site !== null) {
+                try {
+                    $context = app(EdgeDeliveryContextResolver::class)->forSite($site);
+                    $body = app(EdgeArtifactPublisher::class)->readFile($this->build_log_path, $context->diskName);
+                    if (is_string($body) && $body !== '') {
+                        return $body;
+                    }
+                } catch (\Throwable) {
+                    try {
+                        $body = app(EdgeArtifactPublisher::class)->readFile(
+                            $this->build_log_path,
+                            (string) config('edge.disk.name', 'edge_r2'),
+                        );
+                        if (is_string($body) && $body !== '') {
+                            return $body;
+                        }
+                    } catch (\Throwable) {
+                        // Fall through to local file.
+                    }
+                }
+            }
+        }
+
+        // Failed builds that never reached R2 (or lost the remote object) can
+        // still expose the in-flight log while it remains on the build host.
+        $local = $this->resolveLocalBuildLogPath();
+        if ($local === null || ! is_readable($local)) {
             return null;
         }
 
-        $site ??= $this->site;
-        if ($site === null) {
-            return null;
+        $body = @file_get_contents($local);
+
+        return is_string($body) && $body !== '' ? $body : null;
+    }
+
+    /**
+     * Absolute path to the in-flight build.log on the queue worker host.
+     * Prefers meta.local_build_log_path, then the conventional workdir layout.
+     */
+    public function resolveLocalBuildLogPath(): ?string
+    {
+        $path = $this->meta['local_build_log_path'] ?? null;
+        if (is_string($path) && $path !== '' && is_file($path)) {
+            return $path;
         }
 
-        try {
-            $context = app(EdgeDeliveryContextResolver::class)->forSite($site);
+        $candidate = rtrim((string) config('edge.build.work_root', storage_path('app/edge-builds')), '/')
+            .'/dply-edge-build-'.$this->id.'/build.log';
 
-            return app(EdgeArtifactPublisher::class)->readFile($this->build_log_path, $context->diskName);
-        } catch (\Throwable) {
-            return app(EdgeArtifactPublisher::class)->readFile(
-                $this->build_log_path,
-                (string) config('edge.disk.name', 'edge_r2'),
-            );
-        }
+        return is_file($candidate) ? $candidate : null;
     }
 }

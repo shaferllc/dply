@@ -227,6 +227,13 @@ class BuildJourney extends Component
             $sections = [$fallbackKey => trim($this->buffer)];
         }
 
+        // Status flips to BUILDING before clone finishes. Prefer the latest
+        // log step marker so "Installing…" doesn't show Waiting while clone
+        // output is still streaming under the Done row.
+        if (! $journey['hasFailed'] && ! $journey['isDone']) {
+            $journey = $this->alignJourneyToLogStep($journey, $sections);
+        }
+
         return view('livewire.edge.build-journey', [
             'missing' => false,
             'journey' => $journey,
@@ -234,6 +241,61 @@ class BuildJourney extends Component
             'deployment' => $deployment,
             'site' => $deployment->site,
             'server' => $deployment->site?->server,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $journey
+     * @param  array<string, string>  $sections
+     * @return array<string, mixed>
+     */
+    private function alignJourneyToLogStep(array $journey, array $sections): array
+    {
+        $logToState = [
+            'clone' => 'queued',
+            'build' => 'building',
+            'publish' => 'publishing',
+        ];
+
+        $latestLogStep = null;
+        foreach (['publish', 'build', 'clone'] as $key) {
+            if (isset($sections[$key])) {
+                $latestLogStep = $key;
+                break;
+            }
+        }
+
+        if ($latestLogStep === null) {
+            return $journey;
+        }
+
+        // Only walk the UI back (e.g. BUILDING status + clone-only log →
+        // show cloning as current). Never advance past the DB status.
+        $desiredState = $logToState[$latestLogStep] ?? null;
+        if ($desiredState === null) {
+            return $journey;
+        }
+
+        $stepKeys = $journey['stepKeys'];
+        $dbIndex = array_search($journey['state'], $stepKeys, true);
+        $logIndex = array_search($desiredState, $stepKeys, true);
+        if ($dbIndex === false || $logIndex === false || $logIndex >= $dbIndex) {
+            return $journey;
+        }
+
+        $statusSteps = $journey['statusSteps'];
+        $currentStepIndex = $logIndex;
+        $totalSteps = $journey['totalSteps'];
+        $completedSteps = max(1, min($totalSteps, $currentStepIndex + 1));
+
+        return array_merge($journey, [
+            'state' => $desiredState,
+            'currentStepIndex' => $currentStepIndex,
+            'completedSteps' => $completedSteps,
+            'progressPercent' => $totalSteps > 0
+                ? (int) round(($completedSteps / $totalSteps) * 100)
+                : 0,
+            'currentLabel' => $statusSteps[$desiredState] ?? $journey['currentLabel'],
         ]);
     }
 

@@ -13,8 +13,9 @@
             ];
         @endphp
 
-        <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-gradient-to-br from-brand-sand/40 to-white px-6 py-5 sm:px-8">
+        {{-- Nested under site/workspace chrome: hairline strips, not a second outer card. --}}
+        <section class="overflow-hidden">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-4 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
@@ -67,7 +68,7 @@
                         $stepLog = ($sectionKey !== null && isset($sections[$sectionKey])) ? $sections[$sectionKey] : '';
                         $hasLog = $stepLog !== '';
                     @endphp
-                    <li class="px-6 py-4 sm:px-8">
+                    <li class="px-5 py-4 sm:px-6">
                         <div class="flex items-start gap-3">
                             <div class="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold {{ $isCurrent ? ($journey['hasFailed'] ? 'bg-red-600 text-white' : 'bg-brand-forest text-white ring-4 ring-brand-sage/30') : ($isDone ? 'bg-emerald-600 text-white' : 'bg-white text-brand-mist ring-1 ring-brand-ink/10') }}">
                                 @if ($isDone)
@@ -155,7 +156,7 @@
                 @endforeach
             </ol>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-8">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
                 @if ($polling && ! $journey['hasFailed'] && ! $journey['isDone'])
                     <button
                         type="button"

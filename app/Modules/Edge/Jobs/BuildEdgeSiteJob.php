@@ -165,9 +165,14 @@ class BuildEdgeSiteJob implements ShouldQueue
                 $middlewareSidecarPath,
             );
         } catch (Throwable $e) {
-            if (is_array($buildResult) && is_file($buildResult['build_log'])) {
+            // build() throws before returning — $buildResult stays null for the
+            // common failure path (clone/lint/docker/install). Still persist
+            // whatever the runner wrote to the local log so the Build log tab
+            // isn't empty after a failed deploy.
+            $localLog = $this->resolveLocalBuildLogPath($deployment, $buildResult);
+            if ($localLog !== null) {
                 try {
-                    $buildLogPath = $this->persistBuildLog($site, $deployment, $buildResult['build_log']);
+                    $buildLogPath = $this->persistBuildLog($site, $deployment, $localLog);
                     $deployment->update(['build_log_path' => $buildLogPath]);
                 } catch (Throwable) {
                     // Best-effort — failure reason still captures the exception message.
@@ -178,6 +183,30 @@ class BuildEdgeSiteJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * @param  array{build_log?: string}|null  $buildResult
+     */
+    private function resolveLocalBuildLogPath(EdgeDeployment $deployment, ?array $buildResult): ?string
+    {
+        $fromResult = is_array($buildResult) ? ($buildResult['build_log'] ?? null) : null;
+        if (is_string($fromResult) && is_file($fromResult)) {
+            return $fromResult;
+        }
+
+        $deployment->refresh();
+        $fromMeta = $deployment->meta['local_build_log_path'] ?? null;
+        if (is_string($fromMeta) && is_file($fromMeta)) {
+            return $fromMeta;
+        }
+
+        $candidate = rtrim(EdgeBuildRunner::buildRoot(), '/').'/dply-edge-build-'.$deployment->id.'/build.log';
+        if (is_file($candidate)) {
+            return $candidate;
+        }
+
+        return null;
     }
 
     private function persistBuildLog(Site $site, EdgeDeployment $deployment, string $localLogPath): string
