@@ -68,6 +68,7 @@ return [
     'nav_groups' => [
         'general' => 'General',
         'networking' => 'Networking',
+        'site' => 'Site',
         'deploy' => 'Deploy',
         'runtime' => 'Runtime',
         'observability' => 'Observability',
