@@ -129,6 +129,8 @@ return [
         // with DPLY_EDGE_BUILD_IMAGE if you need to pin older Node for a
         // specific deploy.
         'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
+        // Long-running clone/build/publish — Horizon supervisor-heavy.
+        'queue' => env('DPLY_EDGE_BUILD_QUEUE', 'dply-provision'),
         'timeout_seconds' => 900,
         'artifact_max_bytes' => 524_288_000,
         // Docker should always be present on a build worker, but if a box came

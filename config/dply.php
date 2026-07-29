@@ -96,6 +96,11 @@ return [
 
     'deploy_notifications' => filter_var(env('DPLY_DEPLOY_NOTIFICATIONS', true), FILTER_VALIDATE_BOOL),
 
+    // Queued notifications (UniversalEventNotification, deploy mail, …) —
+    // Horizon supervisor-fast. Keep off dply / dply-provision so Edge builds
+    // never block the notification backlog.
+    'notification_queue' => env('DPLY_NOTIFICATION_QUEUE', 'default'),
+
     /*
     |--------------------------------------------------------------------------
     | Deploy hook default timeout (per-hook override on site_deploy_hooks)

@@ -33,7 +33,9 @@ class BuildEdgeSiteJob implements ShouldQueue
     public function __construct(
         public string $deploymentId,
         public ?string $commitOverride = null,
-    ) {}
+    ) {
+        $this->onQueue((string) config('edge.build.queue', 'dply-provision'));
+    }
 
     public function handle(EdgeBuildRunner $runner): void
     {

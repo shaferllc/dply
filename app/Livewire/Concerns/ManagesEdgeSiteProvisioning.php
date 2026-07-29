@@ -92,8 +92,12 @@ trait ManagesEdgeSiteProvisioning
         }
 
         try {
+            // Tear down first, then hard-redirect. wire:navigate would briefly
+            // re-hit this site URL after the row is gone → flash of 404 before
+            // edge.index. skipRender avoids dehydrating the deleted Site model.
             $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
-            $this->redirect(route('edge.index'), navigate: true);
+            $this->skipRender();
+            $this->redirect(route('edge.index'), navigate: false);
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }

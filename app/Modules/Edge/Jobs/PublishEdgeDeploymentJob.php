@@ -51,7 +51,9 @@ class PublishEdgeDeploymentJob implements ShouldQueue
          * runtime is SSR (the SSR Worker handles middleware itself).
          */
         public ?string $middlewareBundlePath = null,
-    ) {}
+    ) {
+        $this->onQueue((string) config('edge.build.queue', 'dply-provision'));
+    }
 
     public function handle(): void
     {

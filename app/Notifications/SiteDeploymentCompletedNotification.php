@@ -14,7 +14,9 @@ class SiteDeploymentCompletedNotification extends Notification implements Should
 
     public function __construct(
         public NotificationEvent $event
-    ) {}
+    ) {
+        $this->onQueue((string) config('dply.notification_queue', 'default'));
+    }
 
     /**
      * @return array<int, string>

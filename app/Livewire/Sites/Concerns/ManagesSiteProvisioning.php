@@ -223,8 +223,10 @@ trait ManagesSiteProvisioning
 
         try {
             if ($this->site->usesEdgeRuntime()) {
+                // Hard redirect — SPA navigate flashes 404 on the deleted site URL.
                 $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
-                $this->redirect(route('edge.index'), navigate: true);
+                $this->skipRender();
+                $this->redirect(route('edge.index'), navigate: false);
 
                 return;
             }
@@ -236,7 +238,8 @@ trait ManagesSiteProvisioning
             return;
         }
 
-        $this->redirect(route('sites.create', $this->server), navigate: true);
+        $this->skipRender();
+        $this->redirect(route('sites.create', $this->server), navigate: false);
     }
 
     public function runRuntimeAction(string $action, SiteRuntimeActionExecutor $executor): void

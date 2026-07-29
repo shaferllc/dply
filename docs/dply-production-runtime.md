@@ -26,14 +26,19 @@ DPLY_RUNTIME=web
 DPLY_RUNTIME=worker
 DPLY_WORKER_ROLE=primary
 HORIZON_NAME=dply-worker-1
-HORIZON_MAX_PROCESSES=6
 
 # Worker 2 (replica)
 DPLY_RUNTIME=worker
 DPLY_WORKER_ROLE=replica
 HORIZON_NAME=dply-worker-2
-HORIZON_MAX_PROCESSES=4
 ```
+
+Queues and process counts are defined in `config/horizon.php` (`$heavyQueues` / `$fastQueues`):
+
+| Supervisor | Queues | Purpose |
+|------------|--------|---------|
+| `supervisor-heavy` | `dply-provision`, `dply` | Edge builds, BYO deploys |
+| `supervisor-fast` | `default`, `dply-control`, `dply-manage`, probes… | Notifications, insights, short jobs |
 
 Required for split deploys:
 
@@ -41,6 +46,8 @@ Required for split deploys:
 - `CACHE_STORE=redis` on the primary worker (for `Schedule::onOneServer()`)
 
 Horizon UI stays on the **web** host at `/horizon` and lists both masters when `HORIZON_NAME` differs per worker.
+
+After deploy on each worker: `php artisan horizon:terminate`.
 
 ## Supervisor install
 

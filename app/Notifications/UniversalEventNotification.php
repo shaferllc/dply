@@ -14,7 +14,11 @@ class UniversalEventNotification extends Notification implements ShouldQueue
 
     public function __construct(
         public NotificationEvent $event
-    ) {}
+    ) {
+        // Stay off the heavy deploy/Edge queues so a build backlog never
+        // delays in-app notifications (Horizon supervisor-fast).
+        $this->onQueue((string) config('dply.notification_queue', 'default'));
+    }
 
     /**
      * @return list<string>
