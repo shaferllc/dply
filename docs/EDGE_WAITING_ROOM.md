@@ -24,9 +24,11 @@ Requires **Dply-hosted Edge delivery**.
 
 ## How to use it
 
-1. Before a launch, set a conservative max active and admit rate.
-2. List paths that should use the room (keep the wait page’s static assets outside if needed).
-3. Enable and **Save** before traffic spikes.
+No third-party account is required — configure everything in Dply (**Access → Waiting room**).
+
+1. Before a launch, set a conservative **max active** and **admits / minute**.
+2. List **paths** that should use the room (one per line). Prefer `/checkout` or `/launch` over site-wide `/*` when you can; keep static marketing pages outside the list so they stay snappy.
+3. Enable and **Save** before traffic spikes (delivery republishes in under a minute).
 4. Raise the cap once the room drains cleanly; turn off when the event ends.
 
 ## Tips

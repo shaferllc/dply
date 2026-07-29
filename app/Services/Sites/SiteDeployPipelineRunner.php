@@ -169,6 +169,12 @@ class SiteDeployPipelineRunner
             $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "queue:restart" '
                 .'&& { echo "[dply] queue:restart"; php artisan queue:restart 2>&1 || true; }; } || true';
             $labels[] = 'queue workers';
+
+            // Front-matter docs are cached forever in prod — flush so newly
+            // shipped docs/*.md appear in the slide-over without a manual docs:flush.
+            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "docs:flush" '
+                .'&& { echo "[dply] docs:flush"; php artisan docs:flush 2>&1 || true; }; } || true';
+            $labels[] = 'docs cache';
         }
 
         if ($parts === []) {

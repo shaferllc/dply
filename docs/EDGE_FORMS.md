@@ -40,7 +40,7 @@ Each endpoint has:
 ```
 
 3. Match the honeypot `name` to the dashboard field (default `company`).
-4. Optional: enable **Bot protection**, turn on **Require bot check**, and include the challenge token field your widget provides (often `cf-turnstile-response`).
+4. Optional: enable **Bot protection** (Cloudflare [Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) site + secret keys), turn on **Require bot check**, and include the challenge token field (often `cf-turnstile-response`).
 5. **Save**, then test a real POST from the live hostname.
 
 ## Tips

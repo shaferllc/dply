@@ -8,9 +8,16 @@
                 __('Optional: turn on Consent helper so your CMP can gate scripts via window.__dplyTags.consent / localStorage dply_tag_consent.'),
                 __('Enable and Save. Scripts inject on subsequent page loads.'),
             ],
+            'setupLinks' => [
+                [
+                    'label' => __('Use Snippets for inline HTML'),
+                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-snippets']),
+                ],
+            ],
             'tips' => [
                 __('Only https:// sources are allowed. Prefer async for non-critical pixels.'),
                 __('For one-off HTML (not a remote script URL), use Snippets instead.'),
+                __('Get script URLs from your vendor (GA4, Meta Pixel, Intercom, etc.) — paste the https://…js URL here.'),
             ],
         ])
 

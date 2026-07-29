@@ -77,6 +77,26 @@ test('reconcile creates managed build/release steps and processes', function () 
     Queue::assertPushed(ControlWorkerDaemonJob::class, fn (ControlWorkerDaemonJob $job) => $job->siteId === (string) $site->id && $job->action === 'ensure');
 });
 
+test('reconcile skips daemon ensure when site meta process_daemons is false', function () {
+    $site = manifestSite();
+    $site->forceFill([
+        'meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
+            'process_daemons' => false,
+        ]),
+    ])->save();
+
+    $result = sync()->reconcile($site, manifest(<<<'YAML'
+    processes:
+      horizon:
+        command: php artisan horizon
+        type: worker
+    YAML));
+
+    expect($result['processes'])->toBe(1);
+    expect(SiteProcess::query()->where('site_id', $site->id)->where('name', 'horizon')->value('is_active'))->toBeFalse();
+    Queue::assertNotPushed(ControlWorkerDaemonJob::class);
+});
+
 test('reconcile adopts an existing process with the same name instead of colliding', function () {
     $site = manifestSite();
 

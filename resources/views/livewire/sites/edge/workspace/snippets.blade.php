@@ -8,6 +8,12 @@
                 __('Paste the HTML (script tags, meta, markup). Keep it small and trusted.'),
                 __('Enable and Save. Delivery republishes; visitors see the inject on the next request.'),
             ],
+            'setupLinks' => [
+                [
+                    'label' => __('Prefer Tags for remote scripts'),
+                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-tags']),
+                ],
+            ],
             'tips' => [
                 __('Prefer Tags for third-party https:// script URLs; use Snippets for inline markup or one-off HTML.'),
                 __('Path /* matches everything. Narrow paths (e.g. /blog/*) keep marketing scripts off app routes.'),

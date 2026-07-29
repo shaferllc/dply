@@ -192,7 +192,7 @@ final class SiteSettingsHeader
             ],
             'edge-bot-protection' => [
                 'title' => __('Bot protection'),
-                'description' => __('Add a challenge widget on forms or every HTML page. Paste site + secret keys, then Save.'),
+                'description' => __('Cloudflare Turnstile on forms or every HTML page. Create a widget in Turnstile, paste site + secret keys, then Save.'),
                 'icon' => 'heroicon-o-finger-print',
             ],
             'edge-rate-limits' => [

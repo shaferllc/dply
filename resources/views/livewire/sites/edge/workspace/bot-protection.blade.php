@@ -2,16 +2,29 @@
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         @include('livewire.sites.edge.workspace.partials.feature-guide', [
             'docSlug' => 'edge-bot-protection',
-            'what' => __('Bot protection adds a privacy-friendly challenge widget on your Edge site so automated scripts can’t submit forms (or browse pages) as easily as real people.'),
+            'what' => __('Bot protection uses Cloudflare Turnstile: a privacy-friendly challenge widget so bots can’t submit forms (or browse pages) as easily as real people.'),
             'steps' => [
-                __('Create a challenge widget in your bot-protection provider and copy the site key + secret key.'),
+                __('In Cloudflare → Turnstile, create a widget and copy the Site Key and Secret Key.'),
                 __('Paste both keys below, pick Forms only (recommended) or All HTML pages, then enable and Save.'),
-                __('Dply republishes your Edge delivery config — the widget appears on matching traffic within a minute.'),
+                __('Dply republishes delivery — the widget appears on matching traffic within about a minute.'),
+            ],
+            'setupLinks' => [
+                [
+                    'label' => __('Open Cloudflare Turnstile'),
+                    'href' => 'https://dash.cloudflare.com/?to=/:account/turnstile',
+                    'external' => true,
+                ],
+                [
+                    'label' => __('Turnstile docs'),
+                    'href' => 'https://developers.cloudflare.com/turnstile/get-started/',
+                    'external' => true,
+                ],
             ],
             'tips' => [
-                __('Forms only protects POST endpoints and form pages; use All HTML pages only if you need a site-wide challenge.'),
-                __('Pair with Forms → “Require bot check” so Edge form endpoints reject submissions without a valid challenge token.'),
-                __('Requires Dply-hosted Edge delivery — BYO delivery keeps keys out of this control plane.'),
+                __('Site key = public (safe in HTML). Secret key = server-only — never commit it to your frontend repo.'),
+                __('Forms only protects POST / form surfaces; use All HTML pages only for site-wide challenges.'),
+                __('Pair with Forms → “Require bot check” so Edge form endpoints reject submissions without a valid token.'),
+                __('Requires Dply-hosted Edge delivery.'),
             ],
         ])
 
@@ -37,15 +50,18 @@
 
             <div>
                 <x-input-label for="site_key" :value="__('Site key (public)')" />
-                <x-text-input id="site_key" wire:model="site_key" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off" @disabled(! $managedDelivery) />
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Embedded in the page for the widget. Safe to expose in HTML.') }}</p>
+                <x-text-input id="site_key" wire:model="site_key" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="0x4AAAA…" autocomplete="off" @disabled(! $managedDelivery) />
+                <p class="mt-1 text-xs text-brand-moss">
+                    {{ __('From Cloudflare Turnstile → your widget → Site Key. Embedded in the page; safe to expose.') }}
+                    <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-sage underline-offset-2 hover:underline">{{ __('Get keys') }}</a>
+                </p>
                 <x-input-error :messages="$errors->get('site_key')" class="mt-2" />
             </div>
 
             <div>
                 <x-input-label for="secret_key" :value="__('Secret key')" />
                 <x-text-input id="secret_key" wire:model="secret_key" type="password" class="mt-1 block w-full font-mono text-sm" autocomplete="new-password" @disabled(! $managedDelivery) />
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Used only on Dply-hosted Edge to verify challenge tokens — never put this in your frontend repo.') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('From the same Turnstile widget → Secret Key. Used only on Dply-hosted Edge to verify tokens — never put this in your frontend repo.') }}</p>
                 <x-input-error :messages="$errors->get('secret_key')" class="mt-2" />
             </div>
 

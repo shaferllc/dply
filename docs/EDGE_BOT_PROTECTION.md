@@ -24,10 +24,13 @@ After you save site + secret keys and enable the feature, Edge republishes deliv
 
 ## How to set it up
 
-1. Create a challenge widget with your bot-protection provider and copy the **site key** (public) and **secret key**.
-2. Open the Edge site → **Bot protection**.
-3. Paste both keys, choose a mode, enable, and **Save**.
-4. Wait for delivery republish (usually under a minute), then verify a form page in a private window.
+1. Open [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) (account home → **Turnstile**, not a DNS zone).
+2. **Add widget** (or open an existing one). Domains can be your Edge hostname or left broad for testing.
+3. Copy the **Site Key** (public) and **Secret Key**.
+4. In Dply: Edge site → **Bot protection** → paste both keys, choose a mode, enable, and **Save**.
+5. Wait for delivery republish (usually under a minute), then verify a form page in a private window.
+
+Official guide: [Turnstile get started](https://developers.cloudflare.com/turnstile/get-started/).
 
 ## Tips
 

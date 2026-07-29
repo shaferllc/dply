@@ -8,9 +8,15 @@
                 __('Choose Block (HTTP 429) or Challenge (shows bot protection when that feature is enabled).'),
                 __('Enable and Save — rules apply on the Edge after delivery republishes.'),
             ],
+            'setupLinks' => [
+                [
+                    'label' => __('Configure bot protection'),
+                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-bot-protection']),
+                ],
+            ],
             'tips' => [
                 __('More specific paths win clarity: protect /api/login tightly; leave static assets open.'),
-                __('Challenge needs Bot protection configured; otherwise prefer Block.'),
+                __('Challenge needs Bot protection (Turnstile keys) configured; otherwise prefer Block.'),
             ],
         ])
 

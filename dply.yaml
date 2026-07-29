@@ -15,7 +15,9 @@ supervisor:
     worker.replica: deploy/supervisor/dply-worker.conf
     web: deploy/supervisor/dply-web.conf
 
-# Phase 2 — BYO-style processes (SiteProcess → WorkerDaemonBackend → dply-sv-*)
+# Phase 2 — BYO-style processes (SiteProcess → WorkerDaemonBackend → dply-sv-*).
+# While supervisor.use_templates is true, keep Site.meta.process_daemons=false on
+# the control-plane worker site so reconcile does not install duplicate systemd units.
 processes:
   horizon:
     command: php artisan horizon

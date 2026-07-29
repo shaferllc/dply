@@ -8,6 +8,12 @@
                 __('Set that name as the default queue binding below and enable Jobs.'),
                 __('From middleware/SSR code, send messages with await env.JOBS.send({ type: "…", … }) (binding name must match).'),
             ],
+            'setupLinks' => [
+                [
+                    'label' => __('Open Bindings'),
+                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-bindings']),
+                ],
+            ],
             'tips' => [
                 __('Consumers run in your bound worker scripts — this page only configures the default binding name.'),
                 __('If the list below is empty, add a queue binding first, then return here.'),

@@ -2,7 +2,7 @@
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         @include('livewire.sites.edge.workspace.partials.feature-guide', [
             'docSlug' => 'edge-waiting-room',
-            'what' => __('Waiting room queues excess visitors during launches or flash traffic so your site stays up instead of melting under a stampede.'),
+            'what' => __('Waiting room queues excess visitors during launches or flash traffic so your site stays up instead of melting under a stampede. Configure it entirely here — no third-party dashboard.'),
             'steps' => [
                 __('Set max active visitors (how many can browse at once) and how many new people to admit per minute.'),
                 __('Set session length — how long someone stays “active” before they may need to re-queue.'),
@@ -12,6 +12,7 @@
             'tips' => [
                 __('Start conservative (lower max active) and raise once you see the room drain cleanly.'),
                 __('Static marketing pages can stay outside the path list so the wait page itself stays snappy.'),
+                __('Requires Dply-hosted Edge delivery — Save republishes the host map.'),
             ],
         ])
 

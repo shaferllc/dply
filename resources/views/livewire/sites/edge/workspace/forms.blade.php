@@ -9,9 +9,16 @@
                 __('Include a hidden honeypot input (name must match below). Bots that fill it are discarded.'),
                 __('Optional: enable Bot protection and check “Require bot check”, then add the challenge token field to the form.'),
             ],
+            'setupLinks' => [
+                [
+                    'label' => __('Bot protection setup'),
+                    'href' => route('sites.show', ['site' => $site, 'section' => 'edge-bot-protection']),
+                ],
+            ],
             'tips' => [
                 __('Paths are matched on your Edge hostname after Save republishes delivery.'),
                 __('Use one endpoint per form. Remove unused endpoints so they stop accepting mail.'),
+                __('Requires Dply-hosted Edge delivery and a working outbound mail config for the org.'),
             ],
         ])
 

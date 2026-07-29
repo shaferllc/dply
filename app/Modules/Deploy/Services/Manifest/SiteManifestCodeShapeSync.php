@@ -128,8 +128,10 @@ final class SiteManifestCodeShapeSync
         $pipeline = $this->pipelines->ensureDefaultPipeline($site);
 
         $processes = $this->reconcileProcesses($site, $manifest->processes);
-        if ($processes > 0) {
-            // Close the loop: SiteProcess rows alone do not provision daemons.
+        // Site.meta.process_daemons=false: inventory-only (control-plane Phase 1
+        // supervisor templates already own Horizon/scheduler — installing
+        // systemd dply-site-* units would double-run them).
+        if ($processes > 0 && $this->shouldEnsureProcessDaemons($site)) {
             ControlWorkerDaemonJob::dispatch((string) $site->id, 'ensure');
         }
 
@@ -210,7 +212,8 @@ final class SiteManifestCodeShapeSync
                 'command' => $process->command,
                 'scale' => $process->scale,
                 'env_vars' => $process->env !== [] ? $process->env : null,
-                'is_active' => true,
+                // Keep inactive when daemons are owned elsewhere (supervisor templates).
+                'is_active' => $this->shouldEnsureProcessDaemons($site),
                 'managed_by_manifest' => true,
                 'meta' => $process->meta() !== [] ? $process->meta() : null,
             ]);
@@ -218,6 +221,23 @@ final class SiteManifestCodeShapeSync
         }
 
         return $count;
+    }
+
+    /**
+     * Whether manifest processes should be materialised as systemd/supervisor
+     * daemons via {@see ControlWorkerDaemonJob}. Opt out with
+     * Site.meta.process_daemons=false (dogfood Phase 1: dply.yaml
+     * supervisor.use_templates owns the box).
+     */
+    private function shouldEnsureProcessDaemons(Site $site): bool
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+
+        if (array_key_exists('process_daemons', $meta)) {
+            return (bool) $meta['process_daemons'];
+        }
+
+        return true;
     }
 
     /**
