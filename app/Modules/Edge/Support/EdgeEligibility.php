@@ -98,6 +98,19 @@ final class EdgeEligibility
             return $allow;
         }
 
+        // Framework / tooling monorepo roots (withastro/astro, next.js, …)
+        // often look like Node/Astro plans but never emit a site dist/.
+        if (! empty($plan['not_a_site'])) {
+            return [
+                'eligible' => false,
+                'message' => __(
+                    'This repository looks like a framework or monorepo package root, not a single Edge site. Pick an app package directory (for example examples/basics or apps/web), or point Edge at a project that produces a static build output.',
+                ),
+                'alternative_route' => null,
+                'alternative_label' => null,
+            ];
+        }
+
         $framework = self::normalizeFramework((string) ($plan['framework'] ?? ''));
         $runtime = strtolower(trim((string) ($plan['runtime'] ?? '')));
 

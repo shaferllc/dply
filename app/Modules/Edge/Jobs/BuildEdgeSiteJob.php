@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Modules\Edge\Services\EdgeArtifactPublisher;
 use App\Modules\Edge\Services\EdgeBuildRunner;
 use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use App\Modules\Edge\Support\EdgeRepoRoot;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\ProductLine\ProductLineKillSwitches;
@@ -223,6 +224,7 @@ class BuildEdgeSiteJob implements ShouldQueue
         }
 
         app(EdgeArtifactPublisher::class)->uploadFile($localLogPath, $storageKey, $diskName);
+        EdgeLiveBuildLog::clear((string) $deployment->id);
 
         return $storageKey;
     }

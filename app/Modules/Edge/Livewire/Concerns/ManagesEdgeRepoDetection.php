@@ -7,6 +7,7 @@ namespace App\Modules\Edge\Livewire\Concerns;
 use App\Jobs\DetectRepositoryRuntimeJob;
 use App\Livewire\Forms\EdgeCreateForm;
 use App\Modules\Edge\Services\EdgeMonorepoDetector;
+use App\Modules\Edge\Support\EdgeSitePackageHeuristics;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use Carbon\Carbon;
@@ -308,7 +309,8 @@ trait ManagesEdgeRepoDetection
         try {
             // Single Contents API call for package.json — that's all the
             // Node fast path needs. ~200ms round-trip end-to-end.
-            $packageJson = $this->fetchPackageJsonFromGitHub($owner, $repo, $branch);
+            $repoRoot = trim((string) ($this->form->repo_root ?? ''));
+            $packageJson = $this->fetchPackageJsonFromGitHub($owner, $repo, $branch, $repoRoot);
             if ($packageJson === null) {
                 return false;
             }
@@ -341,18 +343,22 @@ trait ManagesEdgeRepoDetection
     /**
      * @return array<string, mixed>|null
      */
-    private function fetchPackageJsonFromGitHub(string $owner, string $repo, string $branch): ?array
+    private function fetchPackageJsonFromGitHub(string $owner, string $repo, string $branch, string $subdir = ''): ?array
     {
+        $relative = trim(str_replace('\\', '/', $subdir), '/');
+        $filePath = $relative !== '' ? $relative.'/package.json' : 'package.json';
+
         // Path 1: raw.githubusercontent.com — direct file content, no
         // API metadata wrapping, no base64 decode, no per-IP rate limit
         // worth worrying about. Works for any PUBLIC repo. Typically
         // 80-150ms.
         try {
             $rawUrl = sprintf(
-                'https://raw.githubusercontent.com/%s/%s/%s/package.json',
+                'https://raw.githubusercontent.com/%s/%s/%s/%s',
                 $owner,
                 $repo,
                 $branch,
+                $filePath,
             );
             $rawResponse = Http::timeout(5)->get($rawUrl);
             if ($rawResponse->successful()) {
@@ -393,7 +399,7 @@ trait ManagesEdgeRepoDetection
             ->timeout(6)
             ->withHeaders(['X-GitHub-Api-Version' => '2022-11-28'])
             ->withToken($token)
-            ->get("/repos/{$owner}/{$repo}/contents/package.json", ['ref' => $branch]);
+            ->get("/repos/{$owner}/{$repo}/contents/{$filePath}", ['ref' => $branch]);
 
         if (! $apiResponse->successful()) {
             return null;
@@ -468,6 +474,7 @@ trait ManagesEdgeRepoDetection
 
         $engines = (string) ($pkg['engines']['node'] ?? '');
         $version = $engines !== '' ? $engines : null;
+        $notASite = EdgeSitePackageHeuristics::looksLikeNonDeployablePackageRoot($pkg);
 
         return [
             'url' => $url,
@@ -479,12 +486,17 @@ trait ManagesEdgeRepoDetection
             'start_command' => null,
             'app_port' => null,
             'output_dir' => $output,
-            'confidence' => 'high',
+            'confidence' => $notASite ? 'low' : 'high',
             'sources' => ['package.json'],
-            'reasons' => ['Fast-path GitHub API detection'],
-            'warnings' => [],
+            'reasons' => $notASite
+                ? ['Fast-path GitHub API detection', 'Root looks like a framework/monorepo package, not a single site']
+                : ['Fast-path GitHub API detection'],
+            'warnings' => $notASite
+                ? ['Pick an app package directory before deploying to Edge.']
+                : [],
             'has_manifest' => true,
             'processes' => [],
+            'not_a_site' => $notASite,
         ];
     }
 
@@ -563,6 +575,10 @@ trait ManagesEdgeRepoDetection
     public function updatedFormRepoRoot(): void
     {
         $this->repoRootTouched = true;
+        // Re-run fast detection against the chosen package so Astro
+        // examples (etc.) clear the framework-monorepo not_a_site gate.
+        $this->lastDetectionFingerprint = '';
+        $this->detectFromRepository();
     }
 
     private function detectMonorepoFromRepository(): void
@@ -609,7 +625,8 @@ trait ManagesEdgeRepoDetection
             return;
         }
 
-        $fingerprint = $this->normalizeToCloneUrl($repo).'|'.$branch;
+        $repoRoot = trim((string) ($this->form->repo_root ?? ''));
+        $fingerprint = $this->normalizeToCloneUrl($repo).'|'.$branch.'|'.$repoRoot;
         if ($fingerprint === $this->lastDetectionFingerprint) {
             return;
         }

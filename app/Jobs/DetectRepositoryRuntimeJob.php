@@ -6,12 +6,14 @@ namespace App\Jobs;
 
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePlan;
 use App\Modules\Deploy\Services\RuntimeDetection\RepositoryRuntimePreview;
+use App\Modules\Edge\Support\EdgeSitePackageHeuristics;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -67,7 +69,7 @@ class DetectRepositoryRuntimeJob implements ShouldQueue
 
             Cache::put($this->cacheKey, [
                 'state' => 'done',
-                'plan' => $this->planToArray($plan),
+                'plan' => $this->annotateNonSitePackageRoot($this->planToArray($plan)),
             ], now()->addMinutes(15));
         } catch (Throwable $e) {
             Cache::put($this->cacheKey, [
@@ -114,5 +116,60 @@ class DetectRepositoryRuntimeJob implements ShouldQueue
                 $plan->processes,
             ),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $plan
+     * @return array<string, mixed>
+     */
+    private function annotateNonSitePackageRoot(array $plan): array
+    {
+        $pkg = $this->fetchRootPackageJson();
+        if ($pkg === null || ! EdgeSitePackageHeuristics::looksLikeNonDeployablePackageRoot($pkg)) {
+            return $plan;
+        }
+
+        $plan['not_a_site'] = true;
+        $plan['confidence'] = 'low';
+        $reasons = is_array($plan['reasons'] ?? null) ? $plan['reasons'] : [];
+        $reasons[] = 'Root looks like a framework/monorepo package, not a single site';
+        $plan['reasons'] = $reasons;
+        $warnings = is_array($plan['warnings'] ?? null) ? $plan['warnings'] : [];
+        $warnings[] = 'Pick an app package directory before deploying to Edge.';
+        $plan['warnings'] = $warnings;
+
+        return $plan;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchRootPackageJson(): ?array
+    {
+        if (preg_match('~github\.com[/:]([^/]+)/([^/\s?#]+?)(?:\.git)?(?:[/?#]|$)~i', $this->url, $m) !== 1) {
+            return null;
+        }
+
+        $owner = $m[1];
+        $repo = rtrim($m[2], '/');
+        $branch = trim($this->branch) !== '' ? trim($this->branch) : 'main';
+
+        try {
+            $response = Http::timeout(5)->get(sprintf(
+                'https://raw.githubusercontent.com/%s/%s/%s/package.json',
+                $owner,
+                $repo,
+                $branch,
+            ));
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $parsed = json_decode($response->body(), true);
+
+            return is_array($parsed) ? $parsed : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

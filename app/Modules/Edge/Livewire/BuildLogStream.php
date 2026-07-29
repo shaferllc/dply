@@ -26,7 +26,7 @@ use Livewire\Component;
 class BuildLogStream extends Component
 {
     /** Soft cap on the buffer so a chatty install doesn't blow Livewire payload. */
-    private const BUFFER_MAX_CHARS = 64_000;
+    private const BUFFER_MAX_CHARS = 256_000;
 
     #[Locked]
     public string $deploymentId = '';
@@ -68,7 +68,7 @@ class BuildLogStream extends Component
             EdgeDeployment::STATUS_PUBLISHING,
         ], true);
 
-        $chunk = $deployment->readLocalBuildLogSince($this->offset, 16_000);
+        $chunk = $deployment->readLocalBuildLogSince($this->offset, 48_000);
         $this->logExists = $chunk['exists'];
 
         if ($chunk['body'] !== '') {

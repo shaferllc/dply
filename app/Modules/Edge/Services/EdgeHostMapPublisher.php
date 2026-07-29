@@ -7,6 +7,7 @@ namespace App\Modules\Edge\Services;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeDeliveryContext;
+use App\Modules\Edge\Support\EdgeHostMapAddons;
 use App\Modules\Edge\Support\EdgeEffectiveErrorPages;
 use App\Modules\Edge\Support\EdgeEffectiveFirewall;
 use App\Modules\Edge\Support\EdgeEffectiveImages;
@@ -338,6 +339,12 @@ class EdgeHostMapPublisher
                     $payload['origin_failover_html'] = $effOrigin['failover_html'];
                 }
             }
+        }
+
+        // Product add-ons (bot protection, rate limits, forms, waiting room,
+        // snippets, tags, jobs) — managed dply_edge only.
+        foreach (EdgeHostMapAddons::payload($site) as $key => $value) {
+            $payload[$key] = $value;
         }
 
         return $payload;

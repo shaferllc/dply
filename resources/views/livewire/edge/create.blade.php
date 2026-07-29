@@ -464,7 +464,7 @@
                                             <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 text-sm dark:border-brand-mist/20 dark:bg-zinc-900">
                                                 <input
                                                     type="radio"
-                                                    wire:model="form.repo_root"
+                                                    wire:model.live="form.repo_root"
                                                     value="{{ $package['path'] }}"
                                                     class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40"
                                                 />

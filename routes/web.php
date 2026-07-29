@@ -12,6 +12,7 @@ use App\Modules\Edge\Http\Controllers\EdgeLiveAccessLogPollController;
 use App\Modules\Edge\Http\Controllers\EdgeLogCsvDownloadController;
 use App\Modules\Edge\Http\Controllers\EdgeRepoConfigYamlDownloadController;
 use App\Modules\Edge\Http\Controllers\EdgeDeployHookController;
+use App\Modules\Edge\Http\Controllers\EdgeFormIngestController;
 use App\Modules\Edge\Http\Controllers\EdgeLogIngestController;
 use App\Modules\Edge\Http\Controllers\EdgeLogpushIngestController;
 use App\Modules\Edge\Http\Controllers\EdgePreviewAccessController;
@@ -286,6 +287,10 @@ Route::post('/hooks/edge/{site}/log', EdgeLogIngestController::class)
 Route::post('/hooks/edge/{site}/vitals', EdgeVitalsIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.edge.vitals');
+
+Route::post('/hooks/edge/{site}/forms', EdgeFormIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.edge.forms');
 
 Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
     ->middleware(['throttle:function-log-ingest'])

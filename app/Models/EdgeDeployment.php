@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Modules\Edge\Services\EdgeArtifactPublisher;
 use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
+use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -127,35 +128,35 @@ class EdgeDeployment extends Model
     public function readLocalBuildLogSince(int $offset, int $maxBytes = 32_000): array
     {
         $path = $this->resolveLocalBuildLogPath();
-        if ($path === null || ! is_readable($path)) {
-            return ['body' => '', 'offset' => $offset, 'exists' => false];
-        }
+        if ($path !== null && is_readable($path)) {
+            $size = @filesize($path);
+            if ($size !== false && $size > $offset) {
+                $bytesAvailable = $size - $offset;
+                $bytesToRead = (int) min($bytesAvailable, max(1, $maxBytes));
+                $handle = @fopen($path, 'rb');
+                if ($handle !== false) {
+                    try {
+                        if (@fseek($handle, $offset) === 0) {
+                            $body = (string) @fread($handle, $bytesToRead);
 
-        $size = @filesize($path);
-        if ($size === false || $size <= $offset) {
-            return ['body' => '', 'offset' => $offset, 'exists' => true];
-        }
-
-        $bytesAvailable = $size - $offset;
-        $bytesToRead = (int) min($bytesAvailable, max(1, $maxBytes));
-        $handle = @fopen($path, 'rb');
-        if ($handle === false) {
-            return ['body' => '', 'offset' => $offset, 'exists' => true];
-        }
-        try {
-            if (@fseek($handle, $offset) !== 0) {
+                            return [
+                                'body' => $body,
+                                'offset' => $offset + strlen($body),
+                                'exists' => true,
+                            ];
+                        }
+                    } finally {
+                        @fclose($handle);
+                    }
+                }
+            } elseif ($size !== false) {
                 return ['body' => '', 'offset' => $offset, 'exists' => true];
             }
-            $body = (string) @fread($handle, $bytesToRead);
-        } finally {
-            @fclose($handle);
         }
 
-        return [
-            'body' => $body,
-            'offset' => $offset + strlen($body),
-            'exists' => true,
-        ];
+        // Web tier on a split runtime cannot see the worker's local
+        // build.log — fall back to the Redis mirror written by EdgeBuildRunner.
+        return EdgeLiveBuildLog::readSince((string) $this->id, $offset, $maxBytes);
     }
 
     public function readBuildLog(?Site $site = null): ?string

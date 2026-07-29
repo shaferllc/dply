@@ -9,6 +9,7 @@ use App\Services\DeployContract\DeployContractPolicyLoader;
 use App\Modules\Edge\Services\Config\EdgeRepoConfigLinter;
 use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
 use App\Modules\Edge\Services\Ssr\EdgeSsrFrameworkRegistry;
+use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use App\Modules\Edge\Support\EdgeRepoRoot;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Process\ProcessResult;
@@ -18,6 +19,9 @@ use RuntimeException;
 
 class EdgeBuildRunner
 {
+    /** Deployment currently being built (for Redis live-log mirroring). */
+    private ?string $activeDeploymentId = null;
+
     /** Static / SSG sites — output is a directory of files served from R2. */
     public const MODE_STATIC = 'static';
 
@@ -86,16 +90,16 @@ class EdgeBuildRunner
         $checkoutRoot = $checkout;
         $artifactDir = $workRoot.'/out';
         $buildLog = $workRoot.'/build.log';
-        File::put($buildLog, '=== dply Edge build '.$deployment->id." ===\n");
+        $header = '=== dply Edge build '.$deployment->id." ===\n";
+        File::put($buildLog, $header);
 
-        // Expose the in-flight log path so the dashboard can tail it live
-        // from the local filesystem while the build is running. Cleared by
-        // the publish job once the log gets persisted to the remote disk.
-        //
-        // Caveat: assumes the queue worker and web process share a
-        // filesystem (true for single-host dply deployments). Multi-host
-        // setups will want a DB/Redis chunk stream instead — same UI on
-        // top, different backing store.
+        // Expose the in-flight log path for same-host tails, and mirror
+        // every append into Redis so the Build Journey UI on the web tier
+        // can stream output when builds run on a separate worker box.
+        $this->activeDeploymentId = (string) $deployment->id;
+        EdgeLiveBuildLog::clear($this->activeDeploymentId);
+        EdgeLiveBuildLog::append($this->activeDeploymentId, $header);
+
         $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
         $deployment->update([
             'meta' => array_merge($existingMeta, ['local_build_log_path' => $buildLog]),
@@ -664,6 +668,9 @@ class EdgeBuildRunner
     private function appendBuildLog(string $path, string $chunk): void
     {
         File::append($path, $chunk);
+        if ($this->activeDeploymentId !== null && $this->activeDeploymentId !== '') {
+            EdgeLiveBuildLog::append($this->activeDeploymentId, $chunk);
+        }
     }
 
     /**
@@ -789,12 +796,12 @@ class EdgeBuildRunner
 
         $stderr = trim($build->errorOutput());
         if ($stderr !== '') {
-            return 'Build failed (exit '.$exit.'): '.$this->tailLines($stderr, 12);
+            return 'Build failed (exit '.$exit.'): '.$this->tailLines($stderr, 40);
         }
 
         $stdout = trim($build->output());
         if ($stdout !== '') {
-            return 'Build failed (exit '.$exit.'): '.$this->tailLines($stdout, 12);
+            return 'Build failed (exit '.$exit.'): '.$this->tailLines($stdout, 40);
         }
 
         // Last resort — read the persisted build log file so we don't ship
@@ -802,7 +809,7 @@ class EdgeBuildRunner
         if (is_file($buildLogPath) && is_readable($buildLogPath)) {
             $tail = @file_get_contents($buildLogPath);
             if (is_string($tail) && trim($tail) !== '') {
-                return 'Build failed (exit '.$exit.'): '.$this->tailLines($tail, 12);
+                return 'Build failed (exit '.$exit.'): '.$this->tailLines($tail, 40);
             }
         }
 
@@ -886,7 +893,13 @@ class EdgeBuildRunner
             $rest,
         ) ?? $rest;
 
-        return $install.' && '.$rest;
+        // Echo phase markers so the journey UI isn't silent during long
+        // installs; unbuffer node tooling when possible for live chatter.
+        return 'export FORCE_COLOR=1 NPM_CONFIG_PROGRESS=true NPM_CONFIG_LOGLEVEL=info PNPM_LOG_LEVEL=info'
+            .' && echo "[dply] Installing dependencies…"'
+            .' && '.$install
+            .' && echo "[dply] Running build…"'
+            .' && '.$rest;
     }
 
     private function detectPackageManagerName(string $checkout): string
@@ -1191,8 +1204,17 @@ SH;
      */
     private function dockerEnvFlags(array $env): array
     {
+        // Defaults encourage npm/pnpm/vite to emit progress instead of
+        // buffering quietly in a non-TTY docker run. Site env wins on conflict.
+        $merged = array_merge([
+            'FORCE_COLOR' => '1',
+            'NPM_CONFIG_PROGRESS' => 'true',
+            'NPM_CONFIG_LOGLEVEL' => 'info',
+            'PNPM_LOG_LEVEL' => 'info',
+        ], $env);
+
         $flags = [];
-        foreach ($env as $key => $value) {
+        foreach ($merged as $key => $value) {
             if ($key === '') {
                 continue;
             }

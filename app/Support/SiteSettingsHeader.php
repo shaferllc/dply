@@ -195,6 +195,41 @@ final class SiteSettingsHeader
                 'description' => __('Allow or block traffic by country.'),
                 'icon' => 'heroicon-o-shield-check',
             ],
+            'edge-bot-protection' => [
+                'title' => __('Bot protection'),
+                'description' => __('Challenge bots on forms or every page.'),
+                'icon' => 'heroicon-o-finger-print',
+            ],
+            'edge-rate-limits' => [
+                'title' => __('Rate limits'),
+                'description' => __('Cap requests per IP; block or challenge.'),
+                'icon' => 'heroicon-o-no-symbol',
+            ],
+            'edge-waiting-room' => [
+                'title' => __('Waiting room'),
+                'description' => __('Queue visitors during high-traffic launches.'),
+                'icon' => 'heroicon-o-queue-list',
+            ],
+            'edge-forms' => [
+                'title' => __('Forms'),
+                'description' => __('Accept form POSTs and email the results.'),
+                'icon' => 'heroicon-o-inbox',
+            ],
+            'edge-jobs' => [
+                'title' => __('Jobs'),
+                'description' => __('Background queues for Edge workers.'),
+                'icon' => 'heroicon-o-rectangle-stack',
+            ],
+            'edge-snippets' => [
+                'title' => __('Snippets'),
+                'description' => __('Inject HTML into matching pages at the Edge.'),
+                'icon' => 'heroicon-o-code-bracket',
+            ],
+            'edge-tags' => [
+                'title' => __('Tags'),
+                'description' => __('Third-party scripts loaded from the Edge.'),
+                'icon' => 'heroicon-o-tag',
+            ],
             'edge-alerts' => [
                 'title' => __('Alerts'),
                 'description' => __('RUM and error thresholds for this Edge site.'),

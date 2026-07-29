@@ -417,7 +417,10 @@ class Create extends Component
             return;
         }
 
-        $key = 'edge-detect:'.sha1($url.'|'.$branch);
+        // Include repo_root so picking examples/basics doesn't reuse a
+        // cached framework-monorepo plan from the repository root.
+        $repoRoot = trim((string) ($this->form->repo_root ?? ''));
+        $key = 'edge-detect:'.sha1($url.'|'.$branch.'|'.$repoRoot);
         $this->runtimeDetectionKey = $key;
         $cached = Cache::get($key);
 

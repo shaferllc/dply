@@ -41,3 +41,15 @@ test('blocks long-running backend frameworks', function (array $plan, string $ro
     'php runtime' => [['runtime' => 'php', 'framework' => 'php'], 'cloud.create'],
     'go runtime' => [['runtime' => 'go', 'framework' => ''], 'servers.create'],
 ]);
+
+test('blocks framework monorepo package roots flagged not_a_site', function () {
+    $result = EdgeEligibility::evaluate([
+        'runtime' => 'node',
+        'framework' => 'astro',
+        'not_a_site' => true,
+    ]);
+
+    expect($result['eligible'])->toBeFalse()
+        ->and($result['alternative_route'])->toBeNull()
+        ->and($result['message'])->toContain('monorepo');
+});

@@ -145,7 +145,7 @@
                                             <pre
                                                 x-ref="logPre"
                                                 x-on:scroll.throttle.100ms="onScroll"
-                                                class="max-h-72 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2 pr-20 font-mono text-[11px] leading-relaxed text-brand-cream"
+                                                class="max-h-[28rem] overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2 pr-20 font-mono text-[11px] leading-relaxed text-brand-cream"
                                             >{{ $stepLog }}</pre>
                                         </div>
                                     </details>
