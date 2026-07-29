@@ -34,7 +34,8 @@ class BotProtection extends Component
         $this->enabled = (bool) ($cfg['enabled'] ?? false);
         $this->site_key = (string) ($cfg['site_key'] ?? '');
         $this->secret_key = (string) ($cfg['secret_key'] ?? '');
-        $this->mode = in_array(($cfg['mode'] ?? 'forms'), ['forms', 'all'], true) ? (string) $cfg['mode'] : 'forms';
+        $mode = (string) ($cfg['mode'] ?? 'forms');
+        $this->mode = in_array($mode, ['forms', 'all'], true) ? $mode : 'forms';
     }
 
     public function save(): void

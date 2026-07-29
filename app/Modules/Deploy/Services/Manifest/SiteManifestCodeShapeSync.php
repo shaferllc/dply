@@ -182,14 +182,20 @@ final class SiteManifestCodeShapeSync
      */
     private function reconcileProcesses(Site $site, array $processes): int
     {
-        SiteProcess::query()
-            ->where('site_id', $site->id)
-            ->where('managed_by_manifest', true)
-            ->delete();
+        $desiredNames = array_keys($processes);
 
-        if ($processes === []) {
+        // Drop manifest-owned rows that are no longer declared. Do not wipe
+        // everything first — a dashboard/UI process with the same name must
+        // be adopted via updateOrCreate (site_id+name is unique).
+        $stale = SiteProcess::query()
+            ->where('site_id', $site->id)
+            ->where('managed_by_manifest', true);
+        if ($desiredNames === []) {
+            $stale->delete();
+
             return 0;
         }
+        $stale->whereNotIn('name', $desiredNames)->delete();
 
         $known = [SiteProcess::TYPE_WEB, SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER];
         $count = 0;
@@ -198,17 +204,21 @@ final class SiteManifestCodeShapeSync
                 ? $process->type
                 : (in_array($name, $known, true) ? $name : SiteProcess::TYPE_CUSTOM);
 
-            SiteProcess::query()->create([
-                'site_id' => $site->id,
-                'type' => $type,
-                'name' => $name,
-                'command' => $process->command,
-                'scale' => $process->scale,
-                'env_vars' => $process->env !== [] ? $process->env : null,
-                'is_active' => true,
-                'managed_by_manifest' => true,
-                'meta' => $process->meta() !== [] ? $process->meta() : null,
-            ]);
+            SiteProcess::query()->updateOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'name' => $name,
+                ],
+                [
+                    'type' => $type,
+                    'command' => $process->command,
+                    'scale' => $process->scale,
+                    'env_vars' => $process->env !== [] ? $process->env : null,
+                    'is_active' => true,
+                    'managed_by_manifest' => true,
+                    'meta' => $process->meta() !== [] ? $process->meta() : null,
+                ],
+            );
             $count++;
         }
 

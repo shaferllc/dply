@@ -19,7 +19,12 @@
         {{ __('We are sorry, but something went wrong on our end. Our team has been notified and we are working to fix the issue. Please try again later.') }}
     </p>
 
-    @php($dplyRef = \App\Support\Debug\DebugReference::current())
+    @php
+        $dplyRef = \App\Support\Debug\DebugReference::current();
+        $dplyDetail = \App\Support\Debug\DebugExceptionDetail::viewerMaySee()
+            ? \App\Support\Debug\DebugExceptionDetail::current()
+            : null;
+    @endphp
     @if ($dplyRef)
         <p class="text-xs text-brand-mist mb-1">
             {{ __('Reference') }}
@@ -28,7 +33,26 @@
                 class="ml-1 font-mono text-brand-moss hover:text-brand-ink transition-colors cursor-pointer"
                 title="{{ __('Copy reference') }}">{{ $dplyRef }}</button>
         </p>
-        <p class="text-[11px] text-brand-mist/80 mb-8">{{ __('Quote this reference to support to help us find what happened.') }}</p>
+        <p class="text-[11px] text-brand-mist/80 {{ $dplyDetail ? 'mb-4' : 'mb-8' }}">{{ __('Quote this reference to support to help us find what happened.') }}</p>
+    @endif
+
+    @if ($dplyDetail)
+        <details class="mx-auto mb-8 max-w-lg rounded-xl border border-brand-ink/10 bg-brand-sand/30 text-left open:shadow-sm">
+            <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-brand-ink hover:bg-brand-sand/50">
+                {{ __('Technical details') }}
+            </summary>
+            <div class="space-y-2 border-t border-brand-ink/10 px-4 py-3">
+                <p class="break-words font-mono text-xs leading-relaxed text-brand-ink">{{ $dplyDetail['message'] }}</p>
+                <p class="font-mono text-[11px] text-brand-mist">{{ class_basename($dplyDetail['class']) }} · {{ $dplyDetail['file'] }}:{{ $dplyDetail['line'] }}</p>
+                <button
+                    type="button"
+                    onclick="navigator.clipboard && navigator.clipboard.writeText(@js($dplyDetail['message'].' ('.$dplyDetail['class'].' at '.$dplyDetail['file'].':'.$dplyDetail['line'].')'))"
+                    class="text-[11px] font-semibold text-brand-moss hover:text-brand-ink"
+                >
+                    {{ __('Copy details') }}
+                </button>
+            </div>
+        </details>
     @endif
 @endsection
 

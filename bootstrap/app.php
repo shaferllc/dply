@@ -99,6 +99,15 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Stash a short exception summary for the branded 500 page's
+        // collapsible "Technical details" panel (signed-in operators).
+        // Runs on every render path (return null = keep default handling).
+        $exceptions->render(function (\Throwable $e) {
+            \App\Support\Debug\DebugExceptionDetail::remember($e);
+
+            return null;
+        });
+
         // Friendly handler for cache/queue backend connection failures. With
         // CACHE_STORE=redis (or QUEUE_CONNECTION=redis) pointing at a managed
         // Redis box, an outage means every page render touches a dead Redis
