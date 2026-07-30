@@ -4,6 +4,28 @@
 
 <div>
     @unless ($edgeIsPreviewChild)
+        <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            @include('livewire.sites.edge.workspace.partials.feature-guide', [
+                'docSlug' => 'edge-previews',
+                'what' => __('Spin up PR and ad-hoc preview URLs for this production site — review, promote to prod, or split traffic without changing main.'),
+                'steps' => [
+                    __('Create an ad-hoc preview from a commit above, or open a PR so the GitHub webhook builds one.'),
+                    __('Open the preview URL when the build finishes (Fake Edge needs a local *.test hostname).'),
+                    __('Promote to prod, split traffic, set protection, or tear down when review is done.'),
+                ],
+                'setupLinks' => [
+                    [
+                        'label' => __('Deploy triggers / webhook'),
+                        'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploy-triggers']),
+                    ],
+                ],
+                'tips' => [
+                    __('Same commit SHA reuses the preview; a new SHA gets its own URL.'),
+                    __('Protection and the comment widget apply to preview URLs only — production stays public.'),
+                ],
+            ])
+        </section>
+
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
             <div class="min-w-0 text-sm">
                 <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auto-deploy') }}</span>

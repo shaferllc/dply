@@ -13,6 +13,8 @@ use App\Models\Site;
 use App\Modules\Edge\Services\EdgeGithubCheckRunService;
 use App\Modules\Edge\Services\EdgeGithubPullRequestCommenter;
 use App\Modules\Edge\Support\EdgeRepoRoot;
+use App\Modules\Edge\Support\EdgeTestingDomains;
+use App\Modules\Edge\Support\FakeEdgeProvision;
 use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -458,10 +460,23 @@ class CreateEdgePreviewSite
         return sprintf('%s preview (%s)', $parentName, $branch);
     }
 
+    /**
+     * Apex for the preview hostname.
+     *
+     * Under Fake Edge, never inherit a public on-dply.* apex from the parent —
+     * builds only write the local host map / disk, so those URLs hit Cloudflare
+     * with an empty HOST_MAP and look "broken". Use DPLY_EDGE_TESTING_DOMAINS
+     * (e.g. dply.test / edge.test) so Valet/dnsmasq can route traffic here.
+     */
     private static function apexForParent(Site $parent): string
     {
-        $hostnames = app(UnifiedPreviewHostname::class);
+        if (FakeEdgeProvision::enabled()) {
+            $local = EdgeTestingDomains::localDevApex();
+            if ($local !== '') {
+                return $local;
+            }
+        }
 
-        return $hostnames->apexForSite($parent);
+        return app(UnifiedPreviewHostname::class)->apexForSite($parent);
     }
 }

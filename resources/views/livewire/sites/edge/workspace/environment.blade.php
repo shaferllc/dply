@@ -10,6 +10,28 @@
             {{ __('Environment variables are managed on the parent Edge site.') }}
         </div>
     @else
+        <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+            @include('livewire.sites.edge.workspace.partials.feature-guide', [
+                'docSlug' => 'edge-environment',
+                'what' => __('Encrypted production secrets for this Edge site — injected into the build and middleware/SSR workers on the next deploy.'),
+                'steps' => [
+                    __('Set a key and value, then click Set.'),
+                    __('Values are write-only after save — you cannot read them back from the dashboard.'),
+                    __('Redeploy so the new secrets reach the build and Worker.'),
+                ],
+                'setupLinks' => [
+                    [
+                        'label' => __('Deploys'),
+                        'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']),
+                    ],
+                ],
+                'tips' => [
+                    __('Preview children inherit env from this parent — edit here, not on the preview site.'),
+                    __('Declare secret names in dply.yaml under Advanced; put values only in the dashboard.'),
+                ],
+            ])
+        </section>
+
         @include('livewire.sites.partials.edge.environment-settings')
 
         @if ($missingSecrets !== [])

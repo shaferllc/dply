@@ -130,7 +130,7 @@
                                     </div>
                                 @endif
 
-                                <div class="border-t border-indigo-100/80 px-4 py-2.5">
+                                <div class="border-t border-indigo-100/80 px-4 py-2.5 space-y-1.5">
                                     @if ($isPropagating && ! $journey['edgeJourneyHasFailed'])
                                         <p class="text-[11px] text-brand-moss">
                                             {{ __('Build finished — propagating to edge. Create unlocks once the URL is safe to open.') }}
@@ -138,6 +138,11 @@
                                     @else
                                         <p class="text-[11px] text-brand-moss">
                                             {{ __('Live build output below. Auto-refreshes; Create unlocks once the URL is safe to open.') }}
+                                        </p>
+                                    @endif
+                                    @if (\App\Modules\Edge\Support\FakeEdgeProvision::enabled())
+                                        <p class="text-[11px] text-amber-800 dark:text-amber-200">
+                                            {{ __('Local Fake Edge: the preview URL must resolve to this app (e.g. *.edge.test / *.dply.test via Valet). Public on-dply.site hostnames hit Cloudflare and will not see this build.') }}
                                         </p>
                                     @endif
                                 </div>
@@ -197,12 +202,37 @@
                         : [];
                     $previewCommitSubject = isset($previewCommitMeta['subject']) ? (string) $previewCommitMeta['subject'] : '';
                     $previewCommitAuthor = isset($previewCommitMeta['author']) ? (string) $previewCommitMeta['author'] : '';
+                    // live_url is assigned at create time — only treat the hostname
+                    // as openable after a successful publish (not while building/failed).
+                    $previewIsLive = $preview->status === \App\Models\Site::STATUS_EDGE_ACTIVE
+                        && $latestPreviewDeployment !== null
+                        && $latestPreviewDeployment->status === \App\Models\EdgeDeployment::STATUS_LIVE
+                        && $latestPreviewDeployment->storage_prefix !== null;
+                    $previewFailed = $preview->status === \App\Models\Site::STATUS_EDGE_FAILED
+                        || ($latestPreviewDeployment !== null
+                            && $latestPreviewDeployment->status === \App\Models\EdgeDeployment::STATUS_FAILED);
+                    $previewFailureReason = trim((string) (
+                        $latestPreviewDeployment?->failure_reason
+                        ?: ($preview->edgeMeta()['last_error'] ?? '')
+                    ));
                     // Suppress the URL while THIS row is the one we're still
                     // holding in the pending-grace window — Cloudflare's KV
                     // negative-cache window can serve "Host not configured"
                     // for the first ~30–60s after publish.
                     $rowIsPending = $edge_adhoc_preview_pending_site_id !== null
                         && $edge_adhoc_preview_pending_site_id === (string) $preview->id;
+                    $previewLogUrl = $latestPreviewDeployment !== null
+                        ? route('sites.edge.deployments.show', [
+                            'server' => $preview->server_id,
+                            'site' => $preview,
+                            'deployment' => $latestPreviewDeployment,
+                            'tab' => 'log',
+                        ])
+                        : route('sites.show', [
+                            'server' => $preview->server_id,
+                            'site' => $preview,
+                            'section' => 'edge-logs',
+                        ]);
                 @endphp
                 <li class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 sm:px-8">
                     <div class="min-w-0">
@@ -219,6 +249,11 @@
                                 <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">{{ __('Ad-hoc') }}</span>
                                 <span class="ms-1 text-xs font-normal text-brand-moss">· {{ substr($previewHeadSha, 0, 7) }}</span>
                             @endif
+                            @if ($previewFailed)
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{{ __('Failed') }}</span>
+                            @elseif (! $previewIsLive && ! $rowIsPending)
+                                <span class="ms-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/40 dark:text-amber-300">{{ __('Building') }}</span>
+                            @endif
                         </p>
                         @if ($previewCommitSubject !== '')
                             <p class="mt-1 truncate text-xs text-brand-moss" title="{{ $previewCommitSubject }}{{ $previewCommitAuthor !== '' ? ' — '.$previewCommitAuthor : '' }}">
@@ -233,19 +268,31 @@
                                 <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-indigo-600"></span>
                                 {{ __('Propagating to edge — URL will appear when safe to open') }}
                             </p>
-                        @elseif ($previewUrl)
+                        @elseif ($previewFailed)
+                            <p class="mt-1 text-xs text-rose-800 dark:text-rose-300">
+                                {{ $previewFailureReason !== '' ? \Illuminate\Support\Str::limit($previewFailureReason, 160) : __('Preview build failed.') }}
+                            </p>
+                            <a href="{{ $previewLogUrl }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-rose-900 hover:underline dark:text-rose-300">
+                                <x-heroicon-o-clipboard-document-list class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('View build log') }}
+                            </a>
+                        @elseif ($previewIsLive && $previewUrl)
                             <a href="{{ $previewUrl }}" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex items-center gap-1 font-mono text-xs text-brand-forest hover:underline dark:text-brand-sage">
                                 {{ $previewUrl }}
                                 <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
+                            </a>
+                        @else
+                            <p class="mt-1 inline-flex items-center gap-1.5 text-xs text-brand-moss">
+                                <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-amber-500"></span>
+                                {{ __('Build in progress — URL unlocks when the deploy is live.') }}
+                            </p>
+                            <a href="{{ $previewLogUrl }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-sage hover:underline">
+                                {{ __('View build log') }}
                             </a>
                         @endif
                     </div>
                     @can('update', $site)
                         @php
-                            $previewIsLive = $preview->status === \App\Models\Site::STATUS_EDGE_ACTIVE
-                                && $latestPreviewDeployment !== null
-                                && $latestPreviewDeployment->status === \App\Models\EdgeDeployment::STATUS_LIVE
-                                && $latestPreviewDeployment->storage_prefix !== null;
                             $parentSplit = is_array($site->edgeMeta()['split'] ?? null) ? $site->edgeMeta()['split'] : null;
                             $splitTargetsThisPreview = is_array($parentSplit)
                                 && ($parentSplit['enabled'] ?? false)

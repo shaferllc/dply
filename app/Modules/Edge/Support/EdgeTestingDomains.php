@@ -46,6 +46,28 @@ final class EdgeTestingDomains
         return self::all()[0] ?? self::PREFERRED_APEX;
     }
 
+    /**
+     * Apex for Fake Edge / Valet so hostnames resolve to this machine.
+     * Prefers non–on-dply entries (e.g. edge.test, dply.test), then the
+     * APP_URL .test host — never a public Cloudflare on-dply apex when a
+     * local option exists.
+     */
+    public static function localDevApex(): string
+    {
+        foreach (self::all() as $domain) {
+            if (! self::isOnDplyDomain($domain)) {
+                return $domain;
+            }
+        }
+
+        $appHost = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST)));
+        if ($appHost !== '' && (str_ends_with($appHost, '.test') || str_ends_with($appHost, '.localhost'))) {
+            return $appHost;
+        }
+
+        return self::defaultApex();
+    }
+
     public static function isOnDplyDomain(string $domain): bool
     {
         $domain = strtolower(trim($domain));
