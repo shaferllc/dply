@@ -186,7 +186,9 @@ final class DplySchedule
 
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
-        $schedule->command(CollectEdgeUsageCommand::class, ['--today' => true])
+        // Value-less flags must be scheduled as `--today` (not `--today => true`,
+        // which becomes `--today=1` and Symfony rejects). That bug left MTD at 0.
+        $schedule->command(CollectEdgeUsageCommand::class, ['--today'])
             ->hourly()
             ->name('edge-usage-today');
 
@@ -216,7 +218,7 @@ final class DplySchedule
             ->name('server-log-usage-today')
             ->withoutOverlapping();
 
-        $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday' => true])
+        $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday'])
             ->dailyAt('02:05')
             ->name('server-log-usage-finalize')
             ->withoutOverlapping();
@@ -355,7 +357,7 @@ final class DplySchedule
         $schedule->command(RevokeExpiredServerSshSessionsCommand::class)->everyFiveMinutes();
 
         $schedule->command(ProcessInsightDigestQueueCommand::class)->dailyAt('08:00');
-        $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly' => true])->weeklyOn(1, '08:15');
+        $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly'])->weeklyOn(1, '08:15');
 
         $schedule->command(DispatchServerInsightsCommand::class)
             ->hourly()

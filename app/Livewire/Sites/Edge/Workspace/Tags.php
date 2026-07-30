@@ -29,6 +29,61 @@ class Tags extends Component
     /** @var list<array{name: string, src: string, async: bool}> */
     public array $tools = [];
 
+    /**
+     * Starter script URLs operators can one-click add. Placeholders in the URL
+     * (G-XXXXXXXX, etc.) must be replaced before Save — Tags only injects
+     * `<script src>` loaders, not vendor config snippets.
+     *
+     * @return list<array{key: string, name: string, label: string, src: string, hint: string}>
+     */
+    public static function exampleCatalog(): array
+    {
+        return [
+            [
+                'key' => 'ga4',
+                'name' => 'Google Analytics',
+                'label' => 'GA4',
+                'src' => 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX',
+                'hint' => __('Replace G-XXXXXXXXXX with your Measurement ID.'),
+            ],
+            [
+                'key' => 'gtm',
+                'name' => 'Google Tag Manager',
+                'label' => 'GTM',
+                'src' => 'https://www.googletagmanager.com/gtm.js?id=GTM-XXXXXXX',
+                'hint' => __('Replace GTM-XXXXXXX with your container ID.'),
+            ],
+            [
+                'key' => 'meta',
+                'name' => 'Meta Pixel',
+                'label' => 'Meta',
+                'src' => 'https://connect.facebook.net/en_US/fbevents.js',
+                'hint' => __('Loader only — set your Pixel ID via Snippets or your CMP if needed.'),
+            ],
+            [
+                'key' => 'clarity',
+                'name' => 'Microsoft Clarity',
+                'label' => 'Clarity',
+                'src' => 'https://www.clarity.ms/tag/XXXXXXXXXX',
+                'hint' => __('Replace XXXXXXXXXX with your Clarity project ID.'),
+            ],
+            [
+                'key' => 'hotjar',
+                'name' => 'Hotjar',
+                'label' => 'Hotjar',
+                'src' => 'https://static.hotjar.com/c/hotjar-XXXXXXX.js?sv=6',
+                'hint' => __('Replace XXXXXXX with your Hotjar site ID.'),
+            ],
+            [
+                'key' => 'plausible',
+                'name' => 'Plausible',
+                'label' => 'Plausible',
+                'src' => 'https://plausible.io/js/script.js',
+                'hint' => __('Add data-domain via Snippets if your Plausible setup requires it.'),
+            ],
+        ];
+    }
+
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
@@ -52,6 +107,34 @@ class Tags extends Component
         $this->tools[] = ['name' => 'tag', 'src' => '', 'async' => true];
     }
 
+    public function addExample(string $key): void
+    {
+        $example = collect(self::exampleCatalog())->firstWhere('key', $key);
+        if (! is_array($example)) {
+            return;
+        }
+
+        $row = [
+            'name' => (string) $example['name'],
+            'src' => (string) $example['src'],
+            'async' => true,
+        ];
+
+        // Replace the empty default placeholder row so the first click doesn't
+        // leave a useless blank "analytics" entry behind.
+        $onlyBlankPlaceholder = count($this->tools) === 1
+            && trim((string) ($this->tools[0]['src'] ?? '')) === ''
+            && in_array(trim((string) ($this->tools[0]['name'] ?? '')), ['', 'analytics', 'tag'], true);
+
+        if ($onlyBlankPlaceholder) {
+            $this->tools = [$row];
+        } else {
+            $this->tools[] = $row;
+        }
+
+        $this->enabled = true;
+    }
+
     public function removeTool(int $index): void
     {
         unset($this->tools[$index]);
@@ -72,6 +155,12 @@ class Tags extends Component
             'tools.*.src' => ['nullable', 'url', 'starts_with:https://', 'max:500'],
         ]);
 
+        // Consent helper needs the tag manager on — otherwise KV never receives
+        // a tags block and window.__dplyTags never appears on the live site.
+        if ($this->consent_required) {
+            $this->enabled = true;
+        }
+
         $this->site->mergeEdgeMeta([
             'tags' => [
                 'enabled' => $this->enabled,
@@ -89,12 +178,17 @@ class Tags extends Component
 
     public function render(): View
     {
+        $repo = $this->edgeRepoConfigSection('tags');
+
         return view('livewire.sites.edge.workspace.tags', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-tags'),
             [
                 'server' => $this->server,
                 'site' => $this->site,
                 'managedDelivery' => $this->isManagedEdgeDelivery(),
+                'examples' => self::exampleCatalog(),
+                'sourcePath' => $repo['source_path'],
+                'repoTags' => $repo['section'],
             ],
         ));
     }

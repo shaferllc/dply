@@ -9,7 +9,6 @@
     $access = $edgeSiteAccess ?? null;
     $perf = is_array($access['performance'] ?? null) ? $access['performance'] : [];
     $vitals = is_array($access['web_vitals'] ?? null) ? $access['web_vitals'] : [];
-    $recentLogs = is_array($access['recent_logs'] ?? null) ? $access['recent_logs'] : [];
     $hasWorkerLogs = (bool) ($access['has_worker_logs'] ?? false);
     $hasWebVitals = (bool) ($access['has_web_vitals'] ?? false);
     $cacheHitRatio = $perf['cache_hit_ratio'] ?? null;
@@ -252,35 +251,7 @@
         </div>
     </section>
 
-    <section>
-        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent requests') }}</p>
-            <a
-                href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-logs']) }}"
-                wire:navigate
-                class="text-xs font-medium text-brand-sage hover:underline"
-            >
-                {{ __('Build logs') }}
-            </a>
-        </div>
-        @if ($recentLogs !== [])
-            <ul class="max-h-80 divide-y divide-brand-ink/8 overflow-auto">
-                @foreach ($recentLogs as $log)
-                    <li class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-5 py-2.5 text-xs sm:px-6" wire:key="edge-access-log-{{ md5(json_encode($log)) }}">
-                        <p class="min-w-0 truncate font-mono text-brand-ink" title="{{ $log['path'] ?? '' }}">
-                            <span class="tabular-nums text-brand-moss">{{ $log['status_code'] ?? '—' }}</span>
-                            {{ $log['path'] ?? '—' }}
-                        </p>
-                        <p class="shrink-0 text-brand-mist">
-                            {{ number_format($log['duration_ms'] ?? 0) }} ms
-                            · {{ $log['country'] ?: '—' }}
-                            · {{ isset($log['occurred_at']) ? \Illuminate\Support\Carbon::parse($log['occurred_at'])->timezone(config('app.timezone'))->format('M j g:i A') : '—' }}
-                        </p>
-                    </li>
-                @endforeach
-            </ul>
-        @else
-            <p class="px-5 py-6 text-sm text-brand-moss sm:px-6">{{ __('Per-request logs appear once the site is receiving visitor traffic with log ingest enabled.') }}</p>
-        @endif
-    </section>
+    @unless (($traffic['byo_cloudflare'] ?? false))
+        @include('livewire.sites.partials.edge.live-request-tail')
+    @endunless
 </div>

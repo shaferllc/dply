@@ -107,6 +107,9 @@ class EdgeRepoConfigLoader
             bindings: $this->normalizeBindings($parsed['bindings'] ?? null, $warnings),
             errorPages: $this->normalizeErrorPages($parsed['error_pages'] ?? null, $warnings),
             maintenance: $this->normalizeMaintenance($parsed['maintenance'] ?? null, $warnings),
+            tags: $this->normalizeTags($parsed['tags'] ?? null, $warnings),
+            snippets: $this->normalizeSnippets($parsed['snippets'] ?? null, $warnings),
+            forms: $this->normalizeForms($parsed['forms'] ?? null, $warnings),
             domains: $this->normalizeDomains($parsed['domains'] ?? null, $warnings),
             previews: $this->normalizePreviews($parsed['previews'] ?? null, $warnings),
             commentWidget: $this->normalizeCommentWidget($parsed['comment_widget'] ?? null, $warnings),
@@ -139,7 +142,7 @@ class EdgeRepoConfigLoader
      * dply values are "<kind>.<name>" refs to a sibling dply-managed
      * resource, resolved at deploy time by EdgeDplyResourceResolver.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>, dply?: array<string, string>}
      */
     private function normalizeBindings(mixed $value, array &$warnings): array
@@ -203,7 +206,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      */
     private function decode(string $sourcePath, string $raw, array &$warnings): mixed
     {
@@ -223,7 +226,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array<string, string>
      */
     private function normalizeBuild(mixed $value, array &$warnings): array
@@ -264,7 +267,7 @@ class EdgeRepoConfigLoader
      * into the env handed to Docker. Dashboard env vars win on conflict
      * (handled by the runner, not here).
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return list<string>
      */
     private function normalizeEnvFiles(mixed $value, array &$warnings): array
@@ -299,7 +302,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return list<array{from: string, to: string, status: int}>
      */
     private function normalizeRedirects(mixed $value, array &$warnings): array
@@ -334,7 +337,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return list<array{from: string, to: string}>
      */
     private function normalizeRewrites(mixed $value, array &$warnings): array
@@ -364,7 +367,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return list<array{for: string, values: array<string, string>}>
      */
     private function normalizeHeaders(mixed $value, array &$warnings): array
@@ -417,7 +420,7 @@ class EdgeRepoConfigLoader
      * file via `html_404_path` / `html_500_path`. The build runner
      * resolves paths to inline HTML before persisting on edgeMeta.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{html_404?: string, html_500?: string, html_404_path?: string, html_500_path?: string}
      */
     private function normalizeErrorPages(mixed $value, array &$warnings): array
@@ -454,7 +457,7 @@ class EdgeRepoConfigLoader
      * `html_path` (repo-relative file). When enabled, the worker
      * short-circuits every request with 503 + the configured HTML.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{enabled?: bool, html?: string, html_path?: string}
      */
     private function normalizeMaintenance(mixed $value, array &$warnings): array
@@ -486,12 +489,203 @@ class EdgeRepoConfigLoader
     }
 
     /**
+     * Third-party script tags (analytics / pixels) injected by the Worker.
+     *
+     *   tags:
+     *     enabled: true
+     *     consent_required: false
+     *     tools:
+     *       - name: GA4
+     *         src: https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX
+     *         async: true
+     *
+     * @param  array<string, mixed>  $warnings
+     * @return array{enabled?: bool, consent_required?: bool, tools?: list<array{name: string, src: string, async: bool}>}
+     */
+    private function normalizeTags(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['enabled'])) {
+            $out['enabled'] = (bool) $value['enabled'];
+        }
+        if (isset($value['consent_required'])) {
+            $out['consent_required'] = (bool) $value['consent_required'];
+        }
+
+        $tools = [];
+        foreach (is_array($value['tools'] ?? null) ? $value['tools'] : [] as $i => $tool) {
+            if (! is_array($tool)) {
+                $warnings[] = "tags.tools[{$i}] must be an object.";
+
+                continue;
+            }
+            $src = trim((string) ($tool['src'] ?? ''));
+            if ($src === '' || ! str_starts_with($src, 'https://')) {
+                $warnings[] = "tags.tools[{$i}].src must be an https:// URL.";
+
+                continue;
+            }
+            if (strlen($src) > 500) {
+                $warnings[] = "tags.tools[{$i}].src exceeds 500 characters.";
+
+                continue;
+            }
+            $tools[] = [
+                'name' => trim((string) ($tool['name'] ?? 'tag')) ?: 'tag',
+                'src' => $src,
+                'async' => (bool) ($tool['async'] ?? true),
+            ];
+        }
+        if ($tools !== []) {
+            $out['tools'] = array_slice($tools, 0, 20);
+            if (! array_key_exists('enabled', $out)) {
+                $out['enabled'] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Inline HTML snippets injected before </head> or </body>.
+     *
+     *   snippets:
+     *     enabled: true
+     *     items:
+     *       - name: Meta
+     *         phase: head
+     *         path: /*
+     *         html: '<meta name="description" content="…">'
+     *
+     * @param  array<string, mixed>  $warnings
+     * @return array{enabled?: bool, items?: list<array{name: string, phase: string, path: string, html: string}>}
+     */
+    private function normalizeSnippets(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['enabled'])) {
+            $out['enabled'] = (bool) $value['enabled'];
+        }
+
+        $items = [];
+        foreach (is_array($value['items'] ?? null) ? $value['items'] : [] as $i => $item) {
+            if (! is_array($item)) {
+                $warnings[] = "snippets.items[{$i}] must be an object.";
+
+                continue;
+            }
+            $phase = strtolower(trim((string) ($item['phase'] ?? '')));
+            if (! in_array($phase, ['head', 'body'], true)) {
+                $warnings[] = "snippets.items[{$i}].phase must be head or body.";
+
+                continue;
+            }
+            $html = trim((string) ($item['html'] ?? ''));
+            if ($html === '') {
+                $warnings[] = "snippets.items[{$i}].html must be a non-empty HTML string.";
+
+                continue;
+            }
+            if (strlen($html) > 8000) {
+                $warnings[] = "snippets.items[{$i}].html exceeds 8000 characters.";
+
+                continue;
+            }
+            $path = trim((string) ($item['path'] ?? '/*')) ?: '/*';
+            $items[] = [
+                'name' => trim((string) ($item['name'] ?? 'snippet')) ?: 'snippet',
+                'phase' => $phase,
+                'path' => str_starts_with($path, '/') ? $path : '/'.$path,
+                'html' => $html,
+            ];
+        }
+        if ($items !== []) {
+            $out['items'] = array_slice($items, 0, 50);
+            if (! array_key_exists('enabled', $out)) {
+                $out['enabled'] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Edge form endpoints (POST → email via control-plane ingest).
+     *
+     *   forms:
+     *     enabled: true
+     *     endpoints:
+     *       - path: /contact
+     *         to_email: you@example.com
+     *         honeypot: company
+     *         require_turnstile: true
+     *
+     * @param  array<string, mixed>  $warnings
+     * @return array{enabled?: bool, endpoints?: list<array{path: string, to_email: string, honeypot: string, require_turnstile: bool}>}
+     */
+    private function normalizeForms(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['enabled'])) {
+            $out['enabled'] = (bool) $value['enabled'];
+        }
+
+        $endpoints = [];
+        foreach (is_array($value['endpoints'] ?? null) ? $value['endpoints'] : [] as $i => $endpoint) {
+            if (! is_array($endpoint)) {
+                $warnings[] = "forms.endpoints[{$i}] must be an object.";
+
+                continue;
+            }
+            $path = trim((string) ($endpoint['path'] ?? ''));
+            $toEmail = trim((string) ($endpoint['to_email'] ?? ''));
+            if ($path === '') {
+                $warnings[] = "forms.endpoints[{$i}].path is required.";
+
+                continue;
+            }
+            if ($toEmail === '' || ! filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+                $warnings[] = "forms.endpoints[{$i}].to_email must be a valid email.";
+
+                continue;
+            }
+            $honeypot = trim((string) ($endpoint['honeypot'] ?? 'company')) ?: 'company';
+            $endpoints[] = [
+                'path' => str_starts_with($path, '/') ? $path : '/'.$path,
+                'to_email' => $toEmail,
+                'honeypot' => $honeypot,
+                'require_turnstile' => (bool) ($endpoint['require_turnstile'] ?? true),
+            ];
+        }
+        if ($endpoints !== []) {
+            $out['endpoints'] = array_slice($endpoints, 0, 20);
+            if (! array_key_exists('enabled', $out)) {
+                $out['enabled'] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Custom domains declared by the repo. On deploy, dply ensures each
      * listed hostname is attached to the site (no-op when already
      * attached). Removing a hostname from `domains:` does NOT detach
      * — detaches are explicit only, via dashboard or API.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return list<string>
      */
     private function normalizeDomains(mixed $value, array &$warnings): array
@@ -535,7 +729,7 @@ class EdgeRepoConfigLoader
      * is a blacklist applied after the whitelist — useful for the
      * production branch you never want previewed.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{enabled?: bool, pr_only?: bool, branches?: list<string>, exclude_branches?: list<string>}
      */
     private function normalizePreviews(mixed $value, array &$warnings): array
@@ -638,7 +832,7 @@ class EdgeRepoConfigLoader
      * warning. The value isn't dropped — the user might genuinely
      * have a public key — but they get nudged.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{public?: array<string, string>, secret?: list<string>}
      */
     private function normalizeEnv(mixed $value, array &$warnings): array
@@ -712,7 +906,7 @@ class EdgeRepoConfigLoader
      * are generated server-side on enable; the file only expresses
      * intent.
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{enabled?: bool}
      */
     private function normalizeCommentWidget(mixed $value, array &$warnings): array
@@ -746,7 +940,7 @@ class EdgeRepoConfigLoader
      * cron-legal characters) — Cloudflare is the source of truth for
      * semantics. Max 5 schedules per site (CF limit).
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return list<array{schedule: string, handler?: string}>
      */
     private function normalizeCrons(mixed $value, array &$warnings): array
@@ -790,7 +984,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{country_mode?: string, countries?: list<string>}
      */
     private function normalizeFirewall(mixed $value, array &$warnings): array
@@ -852,7 +1046,7 @@ class EdgeRepoConfigLoader
      *       enabled: true
      *       threshold: 50
      *
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array<string, array{enabled: bool, threshold: float|int}>
      */
     private function normalizeAlerts(mixed $value, array &$warnings): array
@@ -917,7 +1111,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{url?: string, routes?: list<string>, failover_html?: string}
      */
     private function normalizeOrigin(mixed $value, array &$warnings): array
@@ -966,7 +1160,7 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $warnings
      * @return array{allowed_hosts?: list<string>}
      */
     private function normalizeImages(mixed $value, array &$warnings): array

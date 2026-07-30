@@ -24,6 +24,50 @@ class Forms extends Component
     /** @var list<array{path: string, to_email: string, honeypot: string, require_turnstile: bool}> */
     public array $endpoints = [];
 
+    /**
+     * One-click endpoint starters. HTML samples are built in the view from the
+     * live Edge hostname + the saved path / honeypot.
+     *
+     * @return list<array{key: string, label: string, path: string, honeypot: string, require_turnstile: bool, hint: string}>
+     */
+    public static function exampleCatalog(): array
+    {
+        return [
+            [
+                'key' => 'contact',
+                'label' => 'Contact',
+                'path' => '/contact',
+                'honeypot' => 'company',
+                'require_turnstile' => true,
+                'hint' => __('General contact form → /contact with honeypot + bot check.'),
+            ],
+            [
+                'key' => 'newsletter',
+                'label' => 'Newsletter',
+                'path' => '/newsletter',
+                'honeypot' => 'website',
+                'require_turnstile' => true,
+                'hint' => __('Email signup endpoint at /newsletter.'),
+            ],
+            [
+                'key' => 'support',
+                'label' => 'Support',
+                'path' => '/api/support',
+                'honeypot' => 'fax',
+                'require_turnstile' => true,
+                'hint' => __('Support inbox at /api/support (good for rate-limit pairing).'),
+            ],
+            [
+                'key' => 'simple',
+                'label' => 'Simple (no bot check)',
+                'path' => '/feedback',
+                'honeypot' => 'company',
+                'require_turnstile' => false,
+                'hint' => __('Honeypot only — use when Turnstile is not set up yet.'),
+            ],
+        ];
+    }
+
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
@@ -47,10 +91,40 @@ class Forms extends Component
     {
         $this->endpoints[] = [
             'path' => '/contact',
-            'to_email' => '',
+            'to_email' => (string) (auth()->user()?->email ?? ''),
             'honeypot' => 'company',
             'require_turnstile' => true,
         ];
+    }
+
+    public function addExample(string $key): void
+    {
+        $example = collect(self::exampleCatalog())->firstWhere('key', $key);
+        if (! is_array($example)) {
+            return;
+        }
+
+        $defaultEmail = trim((string) ($this->endpoints[0]['to_email'] ?? ''))
+            ?: (string) (auth()->user()?->email ?? '');
+
+        $row = [
+            'path' => (string) $example['path'],
+            'to_email' => $defaultEmail,
+            'honeypot' => (string) $example['honeypot'],
+            'require_turnstile' => (bool) $example['require_turnstile'],
+        ];
+
+        $onlyDefaultPlaceholder = count($this->endpoints) === 1
+            && trim((string) ($this->endpoints[0]['path'] ?? '')) === '/contact'
+            && trim((string) ($this->endpoints[0]['to_email'] ?? '')) === '';
+
+        if ($onlyDefaultPlaceholder) {
+            $this->endpoints = [$row];
+        } else {
+            $this->endpoints[] = $row;
+        }
+
+        $this->enabled = true;
     }
 
     public function removeEndpoint(int $index): void
@@ -87,12 +161,34 @@ class Forms extends Component
 
     public function render(): View
     {
+        $liveUrl = rtrim((string) ($this->site->edgeLiveUrl() ?? ''), '/');
+        $primary = $this->endpoints[0] ?? null;
+        $samplePath = is_array($primary) ? (string) ($primary['path'] ?? '/contact') : '/contact';
+        if ($samplePath === '' || ! str_starts_with($samplePath, '/')) {
+            $samplePath = '/'.$samplePath;
+        }
+        $sampleHoneypot = is_array($primary)
+            ? (trim((string) ($primary['honeypot'] ?? '')) ?: 'company')
+            : 'company';
+        $sampleRequireBot = is_array($primary) ? (bool) ($primary['require_turnstile'] ?? false) : false;
+        $sampleAction = $liveUrl !== '' ? $liveUrl.$samplePath : 'https://your-site.on-dply.site'.$samplePath;
+
+        $repo = $this->edgeRepoConfigSection('forms');
+
         return view('livewire.sites.edge.workspace.forms', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-forms'),
             [
                 'server' => $this->server,
                 'site' => $this->site,
                 'managedDelivery' => $this->isManagedEdgeDelivery(),
+                'examples' => self::exampleCatalog(),
+                'sampleAction' => $sampleAction,
+                'samplePath' => $samplePath,
+                'sampleHoneypot' => $sampleHoneypot,
+                'sampleRequireBot' => $sampleRequireBot,
+                'liveHostname' => $liveUrl !== '' ? preg_replace('#^https?://#', '', $liveUrl) : null,
+                'sourcePath' => $repo['source_path'],
+                'repoForms' => $repo['section'],
             ],
         ));
     }

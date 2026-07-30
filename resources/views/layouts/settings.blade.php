@@ -63,25 +63,7 @@
 
         {{ $modals ?? '' }}
 
-        <div x-bind:class="regionClass" aria-live="polite">
-            <template x-for="toast in toasts" :key="toast.id">
-                <div
-                    x-show="true"
-                    x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0 translate-y-2"
-                    x-transition:enter-end="opacity-100 translate-y-0"
-                    :class="toast.type === 'error'
-                        ? 'bg-red-50 border-red-200 text-red-800'
-                        : toast.type === 'warning'
-                            ? 'bg-amber-50 border-amber-200 text-amber-950'
-                            : 'bg-brand-ink text-brand-cream'"
-                    class="rounded-lg border px-4 py-3 shadow-lg text-sm flex items-center gap-3 min-w-[200px]"
-                >
-                    <span x-text="toast.message"></span>
-                    <button type="button" @click="remove(toast.id)" class="shrink-0 opacity-70 hover:opacity-100" aria-label="Dismiss">&times;</button>
-                </div>
-            </template>
-        </div>
+        @include('partials.toast-stack')
 
         @include('partials.session-flash-toasts')
         @livewireScripts

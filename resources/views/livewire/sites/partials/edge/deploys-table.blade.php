@@ -169,11 +169,13 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3">
-                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {{ $depBadge }}">
+                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $depBadge }}">
                                     {{ str_replace('_', ' ', (string) $deployment->status) }}
                                 </span>
                                 @if ($isActive)
-                                    <span class="ms-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">{{ __('Current') }}</span>
+                                    <span class="ms-1 inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
+                                        {{ __('Production') }}
+                                    </span>
                                 @endif
                             </td>
                             <td class="px-4 py-3 font-mono text-xs">{{ $deployment->git_branch ?? $edgeBranch }}</td>

@@ -9,7 +9,7 @@ group: edge
 
 # Edge build & deploy logs
 
-**Build & deploy logs** shows CI output from clone-and-build jobs — not visitor HTTP logs (see **Traffic & analytics**).
+**Build & deploy logs** shows CI output from clone-and-build jobs — not visitor HTTP logs. For the live request tail, open **Traffic & analytics**.
 
 ## Deployment list
 

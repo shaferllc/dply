@@ -7,12 +7,12 @@ namespace App\Modules\Edge\Services;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeDeliveryContext;
-use App\Modules\Edge\Support\EdgeHostMapAddons;
 use App\Modules\Edge\Support\EdgeEffectiveErrorPages;
 use App\Modules\Edge\Support\EdgeEffectiveFirewall;
 use App\Modules\Edge\Support\EdgeEffectiveImages;
 use App\Modules\Edge\Support\EdgeEffectiveOrigin;
 use App\Modules\Edge\Support\EdgeEffectiveRouting;
+use App\Modules\Edge\Support\EdgeHostMapAddons;
 use App\Modules\Edge\Support\FakeEdgeProvision;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -103,7 +103,7 @@ class EdgeHostMapPublisher
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function writeKv(string $key, array $payload, EdgeDeliveryContext $context): void
     {
@@ -342,8 +342,9 @@ class EdgeHostMapPublisher
         }
 
         // Product add-ons (bot protection, rate limits, forms, waiting room,
-        // snippets, tags, jobs) — managed dply_edge only.
-        foreach (EdgeHostMapAddons::payload($site) as $key => $value) {
+        // snippets, tags, jobs) — managed dply_edge only. Tags/snippets/forms
+        // merge dashboard edgeMeta over dply.yaml via EdgeEffectiveProductAddons.
+        foreach (EdgeHostMapAddons::payload($site, $deployment) as $key => $value) {
             $payload[$key] = $value;
         }
 

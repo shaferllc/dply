@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Modules\Edge\Support;
 
+use App\Models\EdgeDeployment;
 use App\Models\Site;
 
 /**
- * Flatten Edge product add-ons from site meta into HOST_MAP fields for the Worker.
- * Managed `dply_edge` only — BYO delivery does not receive these keys.
+ * Flatten Edge product add-ons from site meta (+ optional repo_config)
+ * into HOST_MAP fields for the Worker. Managed `dply_edge` only — BYO
+ * delivery does not receive these keys.
  */
 final class EdgeHostMapAddons
 {
     /**
      * @return array<string, mixed>
      */
-    public static function payload(Site $site): array
+    public static function payload(Site $site, ?EdgeDeployment $deployment = null): array
     {
         if (($site->edge_backend ?? '') !== 'dply_edge') {
             return [];
@@ -66,7 +68,7 @@ final class EdgeHostMapAddons
             }
         }
 
-        $forms = is_array($meta['forms'] ?? null) ? $meta['forms'] : [];
+        $forms = EdgeEffectiveProductAddons::forms($site, $deployment);
         if ((bool) ($forms['enabled'] ?? false)) {
             $endpoints = [];
             foreach (is_array($forms['endpoints'] ?? null) ? $forms['endpoints'] : [] as $endpoint) {
@@ -111,7 +113,7 @@ final class EdgeHostMapAddons
             ];
         }
 
-        $snippets = is_array($meta['snippets'] ?? null) ? $meta['snippets'] : [];
+        $snippets = EdgeEffectiveProductAddons::snippets($site, $deployment);
         if ((bool) ($snippets['enabled'] ?? false)) {
             $items = [];
             foreach (is_array($snippets['items'] ?? null) ? $snippets['items'] : [] as $item) {
@@ -137,7 +139,7 @@ final class EdgeHostMapAddons
             }
         }
 
-        $tags = is_array($meta['tags'] ?? null) ? $meta['tags'] : [];
+        $tags = EdgeEffectiveProductAddons::tags($site, $deployment);
         if ((bool) ($tags['enabled'] ?? false)) {
             $tools = [];
             foreach (is_array($tags['tools'] ?? null) ? $tags['tools'] : [] as $tool) {
@@ -154,10 +156,13 @@ final class EdgeHostMapAddons
                     'async' => (bool) ($tool['async'] ?? true),
                 ];
             }
-            if ($tools !== []) {
+            $consentRequired = (bool) ($tags['consent_required'] ?? false);
+            // Consent helper can publish without any script URLs yet — otherwise
+            // an empty "analytics" row silently dropped the whole tags block.
+            if ($tools !== [] || $consentRequired) {
                 $payload['tags'] = [
                     'enabled' => true,
-                    'consent_required' => (bool) ($tags['consent_required'] ?? false),
+                    'consent_required' => $consentRequired,
                     'tools' => array_slice($tools, 0, 20),
                 ];
             }
@@ -175,7 +180,6 @@ final class EdgeHostMapAddons
     }
 
     /**
-     * @param  mixed  $value
      * @return list<string>
      */
     private static function stringList(mixed $value): array

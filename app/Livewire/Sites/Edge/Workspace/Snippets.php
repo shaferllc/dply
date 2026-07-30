@@ -24,6 +24,119 @@ class Snippets extends Component
     /** @var list<array{name: string, phase: string, path: string, html: string}> */
     public array $items = [];
 
+    /**
+     * Starter HTML operators can one-click add. Placeholders in the markup
+     * must be replaced before Save.
+     *
+     * @return list<array{key: string, name: string, label: string, phase: string, path: string, html: string, hint: string}>
+     */
+    public static function exampleCatalog(): array
+    {
+        return [
+            [
+                'key' => 'meta',
+                'name' => 'Basic SEO meta',
+                'label' => 'Meta',
+                'phase' => 'head',
+                'path' => '/*',
+                'html' => <<<'HTML'
+<meta name="description" content="Replace with your site description.">
+<meta property="og:title" content="Replace with your page title">
+<meta property="og:description" content="Replace with your social description.">
+HTML,
+                'hint' => __('Common description + Open Graph tags in <head>.'),
+            ],
+            [
+                'key' => 'noindex',
+                'name' => 'Noindex',
+                'label' => 'Noindex',
+                'phase' => 'head',
+                'path' => '/*',
+                'html' => '<meta name="robots" content="noindex, nofollow">',
+                'hint' => __('Keep staging / preview-like hosts out of search indexes.'),
+            ],
+            [
+                'key' => 'banner',
+                'name' => 'Announcement banner',
+                'label' => 'Banner',
+                'phase' => 'body',
+                'path' => '/*',
+                'html' => <<<'HTML'
+<div style="background:#111;color:#fff;text-align:center;padding:10px 16px;font:14px/1.4 system-ui,sans-serif">
+  Shipping something new — <a href="/blog" style="color:#fff;text-decoration:underline">read the update</a>.
+</div>
+HTML,
+                'hint' => __('Simple top-of-body notice. Narrow the path if you only want it on marketing pages.'),
+            ],
+            [
+                'key' => 'consent',
+                'name' => 'Consent flag helper',
+                'label' => 'Consent',
+                'phase' => 'head',
+                'path' => '/*',
+                'html' => <<<'HTML'
+<script>
+  // Pair with Tags → Consent helper. Your CMP can call grant() / revoke().
+  window.__dplyTags = window.__dplyTags || {};
+  window.__dplyTags.grant = function () {
+    localStorage.setItem('dply_tag_consent', '1');
+    window.__dplyTags.consent = true;
+  };
+  window.__dplyTags.revoke = function () {
+    localStorage.removeItem('dply_tag_consent');
+    window.__dplyTags.consent = false;
+  };
+</script>
+HTML,
+                'hint' => __('Exposes grant/revoke helpers for your CMP alongside Tags consent.'),
+            ],
+            [
+                'key' => 'ga4',
+                'name' => 'GA4 config',
+                'label' => 'GA4',
+                'phase' => 'head',
+                'path' => '/*',
+                'html' => <<<'HTML'
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+</script>
+HTML,
+                'hint' => __('Use with Tags → GA4 loader. Replace G-XXXXXXXXXX.'),
+            ],
+            [
+                'key' => 'plausible',
+                'name' => 'Plausible',
+                'label' => 'Plausible',
+                'phase' => 'head',
+                'path' => '/*',
+                'html' => '<script defer data-domain="your-domain.com" src="https://plausible.io/js/script.js"></script>',
+                'hint' => __('Replace your-domain.com. Prefer this over Tags when you need data-domain.'),
+            ],
+            [
+                'key' => 'jsonld',
+                'name' => 'JSON-LD Organization',
+                'label' => 'JSON-LD',
+                'phase' => 'head',
+                'path' => '/*',
+                'html' => <<<'HTML'
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Your Company",
+  "url": "https://example.com",
+  "logo": "https://example.com/logo.png"
+}
+</script>
+HTML,
+                'hint' => __('Structured data for search. Update name/url/logo.'),
+            ],
+        ];
+    }
+
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
@@ -46,6 +159,35 @@ class Snippets extends Component
     public function addItem(): void
     {
         $this->items[] = ['name' => 'snippet', 'phase' => 'head', 'path' => '/*', 'html' => ''];
+    }
+
+    public function addExample(string $key): void
+    {
+        $example = collect(self::exampleCatalog())->firstWhere('key', $key);
+        if (! is_array($example)) {
+            return;
+        }
+
+        $row = [
+            'name' => (string) $example['name'],
+            'phase' => in_array($example['phase'] ?? 'head', ['head', 'body'], true)
+                ? (string) $example['phase']
+                : 'head',
+            'path' => (string) ($example['path'] ?? '/*'),
+            'html' => (string) ($example['html'] ?? ''),
+        ];
+
+        $onlyBlankPlaceholder = count($this->items) === 1
+            && trim((string) ($this->items[0]['html'] ?? '')) === ''
+            && in_array(trim((string) ($this->items[0]['name'] ?? '')), ['', 'custom', 'snippet'], true);
+
+        if ($onlyBlankPlaceholder) {
+            $this->items = [$row];
+        } else {
+            $this->items[] = $row;
+        }
+
+        $this->enabled = true;
     }
 
     public function removeItem(int $index): void
@@ -73,7 +215,10 @@ class Snippets extends Component
         $this->site->mergeEdgeMeta([
             'snippets' => [
                 'enabled' => $this->enabled,
-                'items' => array_values($this->items),
+                'items' => array_values(array_filter(
+                    $this->items,
+                    static fn (array $i): bool => trim((string) ($i['html'] ?? '')) !== '',
+                )),
             ],
         ]);
         $this->site->save();
@@ -83,12 +228,17 @@ class Snippets extends Component
 
     public function render(): View
     {
+        $repo = $this->edgeRepoConfigSection('snippets');
+
         return view('livewire.sites.edge.workspace.snippets', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-snippets'),
             [
                 'server' => $this->server,
                 'site' => $this->site,
                 'managedDelivery' => $this->isManagedEdgeDelivery(),
+                'examples' => self::exampleCatalog(),
+                'sourcePath' => $repo['source_path'],
+                'repoSnippets' => $repo['section'],
             ],
         ));
     }

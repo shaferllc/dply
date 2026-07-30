@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Edge;
 
+use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
 use Livewire\Attributes\Locked;
@@ -44,5 +45,32 @@ trait MountsEdgeWorkspaceSection
 
         $this->server = $server;
         $this->site = $site;
+    }
+
+    /**
+     * Latest live (or most recent) deploy's repo_config section for Advanced UI.
+     *
+     * @return array{source_path: string, section: array<string, mixed>}
+     */
+    protected function edgeRepoConfigSection(string $key): array
+    {
+        $latest = EdgeDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', EdgeDeployment::STATUS_LIVE)
+            ->latest('id')
+            ->first()
+            ?: EdgeDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->whereNotNull('repo_config')
+                ->latest('id')
+                ->first();
+
+        $repo = is_array($latest?->repo_config) ? $latest->repo_config : [];
+        $section = is_array($repo[$key] ?? null) ? $repo[$key] : [];
+
+        return [
+            'source_path' => is_string($repo['source_path'] ?? null) ? (string) $repo['source_path'] : 'dply.yaml',
+            'section' => $section,
+        ];
     }
 }

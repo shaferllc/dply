@@ -252,12 +252,12 @@ final class SiteSettingsHeader
             ],
             'edge-traffic' => [
                 'title' => __('Traffic & analytics'),
-                'description' => __('CDN requests, bandwidth, and performance for this Edge site.'),
+                'description' => __('CDN requests, bandwidth, performance, and a live request tail.'),
                 'icon' => 'heroicon-o-signal',
             ],
             'edge-logs' => [
                 'title' => __('Build & deploy logs'),
-                'description' => __('Recent deploys, build output, and a live request tail.'),
+                'description' => __('Recent deploys and build output for this Edge site.'),
                 'icon' => 'heroicon-o-clipboard-document-list',
             ],
             'danger' => [

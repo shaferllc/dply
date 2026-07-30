@@ -32,6 +32,9 @@ final class EdgeRepoConfig
      * @param  array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>, dply?: array<string, string>}  $bindings
      * @param  array{html_404?: string, html_500?: string, html_404_path?: string, html_500_path?: string}  $errorPages
      * @param  array{enabled?: bool, html?: string, html_path?: string}  $maintenance
+     * @param  array{enabled?: bool, consent_required?: bool, tools?: list<array{name: string, src: string, async: bool}>}  $tags
+     * @param  array{enabled?: bool, items?: list<array{name: string, phase: string, path: string, html: string}>}  $snippets
+     * @param  array{enabled?: bool, endpoints?: list<array{path: string, to_email: string, honeypot: string, require_turnstile: bool}>}  $forms
      * @param  list<string>  $domains
      * @param  array{enabled?: bool, pr_only?: bool, branches?: list<string>, exclude_branches?: list<string>, protection?: array{mode?: string, allowed_emails?: list<string>}}  $previews
      * @param  array{enabled?: bool}  $commentWidget
@@ -53,6 +56,9 @@ final class EdgeRepoConfig
         public readonly array $bindings = [],
         public readonly array $errorPages = [],
         public readonly array $maintenance = [],
+        public readonly array $tags = [],
+        public readonly array $snippets = [],
+        public readonly array $forms = [],
         public readonly array $domains = [],
         public readonly array $previews = [],
         public readonly array $commentWidget = [],
@@ -89,6 +95,9 @@ final class EdgeRepoConfig
             'bindings' => $this->bindings,
             'error_pages' => $this->errorPages,
             'maintenance' => $this->maintenance,
+            'tags' => $this->tags,
+            'snippets' => $this->snippets,
+            'forms' => $this->forms,
             'domains' => $this->domains,
             'previews' => $this->previews,
             'comment_widget' => $this->commentWidget,
@@ -125,6 +134,9 @@ final class EdgeRepoConfig
             && $this->bindings === []
             && $this->errorPages === []
             && $this->maintenance === []
+            && $this->tags === []
+            && $this->snippets === []
+            && $this->forms === []
             && $this->domains === []
             && $this->previews === []
             && $this->commentWidget === []

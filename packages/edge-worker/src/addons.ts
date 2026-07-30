@@ -388,18 +388,27 @@ export function injectSnippets(html: string, pathname: string, config: SnippetsC
 }
 
 export function injectTags(html: string, config: TagsConfig | undefined): string {
-  if (!config?.enabled || !config.tools?.length || !html) return html;
-  const scripts = config.tools
+  if (!config?.enabled || !html) return html;
+
+  const tools = Array.isArray(config.tools) ? config.tools : [];
+  const scripts = tools
+    .filter((t) => typeof t.src === 'string' && t.src.startsWith('https://'))
     .map((t) => {
       const asyncAttr = t.async === false ? '' : ' async';
       return `<script src="${escapeAttr(t.src)}"${asyncAttr}></script>`;
     })
     .join('');
+
   let consent = '';
   if (config.consent_required) {
     consent = `<script>window.__dplyTags=window.__dplyTags||{consent:localStorage.getItem('dply_tag_consent')==='1'};</script>`;
   }
+
+  // Consent helper can ship alone (no script URLs yet). Skip only when
+  // there's nothing to inject.
   const block = consent + scripts;
+  if (block === '') return html;
+
   if (html.includes('</head>')) {
     return html.replace(/<\/head>/i, `${block}</head>`);
   }

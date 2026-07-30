@@ -32,11 +32,13 @@
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Edge deployment') }}</h2>
-                                    <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {{ $depBadge }}">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $depBadge }}">
                                         {{ str_replace('_', ' ', (string) $deployment->status) }}
                                     </span>
                                     @if ($isActiveDeployment)
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">{{ __('Current production') }}</span>
+                                        <span class="inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
+                                            {{ __('Production') }}
+                                        </span>
                                     @endif
                                     @if ($deployment->pruned_at)
                                         <span class="inline-flex rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pruned') }}</span>
@@ -44,7 +46,7 @@
                                 </div>
                                 <p class="mt-1 font-mono text-xs text-brand-moss break-all">{{ $deployment->id }}</p>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Status, commit, aliases, and build output for this deploy.') }}
+                                    {{ __('Build log, stable aliases, and deploy-specific detail.') }}
                                 </p>
                             </div>
                         </div>
@@ -79,24 +81,26 @@
                     </div>
                 @endif
 
-                <div class="border-b border-brand-ink/10 px-5 sm:px-6">
-                    <x-server-workspace-tablist :aria-label="__('Deployment sections')" class="!px-0">
-                        @foreach ([
-                            'overview' => __('Overview'),
-                            'aliases' => __('Aliases'),
-                            'log' => __('Build log'),
-                        ] as $tabKey => $tabLabel)
-                            <x-server-workspace-tab
-                                as="a"
-                                :href="route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => $tabKey])"
-                                wire:navigate
-                                :active="$tab === $tabKey"
-                            >
-                                {{ $tabLabel }}
-                            </x-server-workspace-tab>
-                        @endforeach
-                    </x-server-workspace-tablist>
-                </div>
+                <x-server-workspace-tablist
+                    :aria-label="__('Deployment sections')"
+                    :scroll="true"
+                    class="mb-0 rounded-none border-0 border-b border-brand-ink/10 bg-transparent p-2 shadow-none sm:px-4"
+                >
+                    @foreach ([
+                        'overview' => __('Overview'),
+                        'aliases' => __('Aliases'),
+                        'log' => __('Build log'),
+                    ] as $tabKey => $tabLabel)
+                        <x-server-workspace-tab
+                            as="a"
+                            :href="route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => $tabKey])"
+                            wire:navigate
+                            :active="$tab === $tabKey"
+                        >
+                            {{ $tabLabel }}
+                        </x-server-workspace-tab>
+                    @endforeach
+                </x-server-workspace-tablist>
 
                 @if ($tab === 'overview')
                     @if ($deploymentJourney !== null)
@@ -108,62 +112,51 @@
                         </div>
                     @endif
 
+                    {{-- Only fields the deploys list does not already show. --}}
                     <section class="border-b border-brand-ink/10">
                         <div class="px-5 py-3 sm:px-6">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Details') }}</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('More detail') }}</p>
                         </div>
                         <dl class="divide-y divide-brand-ink/8 border-t border-brand-ink/8 px-5 text-sm sm:px-6">
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Deployment ID') }}</dt>
-                                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $deployment->id }}</dd>
-                            </div>
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Commit') }}</dt>
-                                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $deployment->git_commit ?: '—' }}</dd>
-                            </div>
                             @if (! empty($commitMeta['subject']))
                                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                                    <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Subject') }}</dt>
+                                    <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Commit message') }}</dt>
                                     <dd class="min-w-0 flex-1 text-brand-ink">{{ $commitMeta['subject'] }}</dd>
                                 </div>
                             @endif
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Branch') }}</dt>
-                                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink">{{ $deployment->git_branch ?? $edgeBranch ?? '—' }}</dd>
-                            </div>
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Published') }}</dt>
-                                <dd class="min-w-0 flex-1 text-brand-ink">{{ $deployment->published_at?->toDayDateTimeString() ?? '—' }}</dd>
-                            </div>
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Storage prefix') }}</dt>
-                                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $deployment->storage_prefix ?: '—' }}</dd>
-                            </div>
-                        </dl>
-                    </section>
-
-                    @if ($deploymentAliases !== [])
-                        <section class="border-b border-brand-ink/10">
-                            <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3 sm:px-6">
-                                <div class="min-w-0">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stable aliases') }}</p>
-                                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Permanent URLs that always resolve to this build.') }}</p>
+                            @if (filled($deployment->git_commit))
+                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                                    <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Full SHA') }}</dt>
+                                    <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $deployment->git_commit }}</dd>
                                 </div>
-                                <a
-                                    href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'aliases']) }}"
-                                    wire:navigate
-                                    class="shrink-0 text-xs font-medium text-brand-sage hover:underline"
-                                >
-                                    {{ __('View all →') }}
-                                </a>
-                            </div>
-                            <ul class="divide-y divide-brand-ink/8 border-t border-brand-ink/8 px-5 sm:px-6">
-                                @foreach (array_slice($deploymentAliases, 0, 2) as $alias)
-                                    <li class="py-3 font-mono text-xs text-brand-ink">{{ $alias }}</li>
-                                @endforeach
-                            </ul>
-                        </section>
-                    @endif
+                            @endif
+                            @if (filled($deployment->storage_prefix))
+                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                                    <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Storage prefix') }}</dt>
+                                    <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $deployment->storage_prefix }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 border-t border-brand-ink/8 px-5 py-3 text-sm sm:px-6">
+                            <a
+                                href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'aliases']) }}"
+                                wire:navigate
+                                class="font-medium text-brand-sage hover:underline"
+                            >
+                                {{ __('Aliases') }}
+                                @if ($deploymentAliases !== [])
+                                    <span class="text-brand-mist">({{ count($deploymentAliases) }})</span>
+                                @endif
+                            </a>
+                            <a
+                                href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'log']) }}"
+                                wire:navigate
+                                class="font-medium text-brand-sage hover:underline"
+                            >
+                                {{ __('Build log') }}
+                            </a>
+                        </div>
+                    </section>
 
                     @if ($deployment->status === \App\Models\EdgeDeployment::STATUS_FAILED)
                         <div class="px-5 py-4 sm:px-6">
@@ -267,55 +260,6 @@
                             <pre class="max-h-[32rem] overflow-auto border-t border-brand-ink/8 bg-brand-ink px-5 py-4 font-mono text-xs leading-relaxed text-brand-cream sm:px-6">{{ $buildLog }}</pre>
                         @endif
                     </section>
-
-                    @if (! empty($recentDeployments))
-                        <section>
-                            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent deployments') }}</p>
-                                <a
-                                    href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}"
-                                    wire:navigate
-                                    class="text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage"
-                                >
-                                    {{ __('All deploys →') }}
-                                </a>
-                            </div>
-                            <ul class="divide-y divide-brand-ink/8">
-                                @foreach ($recentDeployments as $row)
-                                    @php
-                                        $isThis = $row->id === $deployment->id;
-                                        $statusTone = match ($row->status) {
-                                            \App\Models\EdgeDeployment::STATUS_LIVE => 'bg-emerald-100 text-emerald-800',
-                                            \App\Models\EdgeDeployment::STATUS_FAILED => 'bg-rose-100 text-rose-800',
-                                            \App\Models\EdgeDeployment::STATUS_BUILDING, \App\Models\EdgeDeployment::STATUS_PUBLISHING => 'bg-sky-100 text-sky-800',
-                                            default => 'bg-brand-sand/60 text-brand-moss',
-                                        };
-                                    @endphp
-                                    <li class="px-5 py-3 sm:px-6 {{ $isThis ? 'bg-brand-sand/30' : '' }}">
-                                        <div class="flex flex-wrap items-center justify-between gap-3">
-                                            <div class="min-w-0">
-                                                <a
-                                                    href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $row, 'tab' => 'log']) }}"
-                                                    wire:navigate
-                                                    class="font-mono text-xs text-brand-ink hover:underline {{ $isThis ? 'font-semibold' : '' }}"
-                                                >
-                                                    {{ substr($row->id, -10) }}
-                                                </a>
-                                                <p class="mt-0.5 text-[11px] text-brand-moss">
-                                                    {{ $row->git_commit ? substr($row->git_commit, 0, 7) : '—' }}
-                                                    · {{ $row->git_branch ?? 'main' }}
-                                                    · {{ $row->created_at?->diffForHumans() }}
-                                                </p>
-                                            </div>
-                                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusTone }}">
-                                                {{ str_replace('_', ' ', (string) $row->status) }}
-                                            </span>
-                                        </div>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </section>
-                    @endif
                 @endif
             </section>
         </div>

@@ -28,7 +28,7 @@ Shows **Repository**, **Production branch**, and optional **Repository root** fr
 
 ## Repo config (`dply.yaml`)
 
-When your repo ships a `dply.yaml` (or `dply.toml`), the latest deploy snapshot appears at the top of Build. Repo config can override dashboard build fields and defines redirects, rewrites, headers, and bindings. Edit the file in Git and redeploy — the dashboard is read-only for routing rules in v1.
+When your repo ships a `dply.yaml` (or `dply.toml`), the latest deploy snapshot appears at the top of Build. Repo config can override dashboard build fields and defines redirects, rewrites, headers, tags, snippets, forms, error pages, and more. Edit the file in Git and redeploy — routing rules stay read-only in the dashboard; tags/snippets/forms/error pages can also be edited in the UI (dashboard Save overrides the matching repo section).
 
 See **Edge routing** for a focused view of redirects, rewrites, and headers.
 

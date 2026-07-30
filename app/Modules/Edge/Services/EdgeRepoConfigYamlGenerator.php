@@ -12,6 +12,7 @@ use App\Modules\Edge\Support\EdgeEffectiveErrorPages;
 use App\Modules\Edge\Support\EdgeEffectiveFirewall;
 use App\Modules\Edge\Support\EdgeEffectiveImages;
 use App\Modules\Edge\Support\EdgeEffectiveOrigin;
+use App\Modules\Edge\Support\EdgeEffectiveProductAddons;
 use App\Modules\Edge\Support\EdgeEffectiveRouting;
 
 /**
@@ -158,6 +159,21 @@ final class EdgeRepoConfigYamlGenerator
             $sections[] = $this->renderMaintenance($effErrors['maintenance_enabled'], $effErrors['maintenance_html']);
         }
 
+        // Tags / snippets / forms — dashboard wins when the section was
+        // saved in the UI; otherwise emit the repo declaration.
+        $effTags = EdgeEffectiveProductAddons::tags($site, $deployment);
+        if ($effTags !== [] && ((bool) ($effTags['enabled'] ?? false) || ! empty($effTags['tools']))) {
+            $sections[] = $this->renderTags($effTags);
+        }
+        $effSnippets = EdgeEffectiveProductAddons::snippets($site, $deployment);
+        if ($effSnippets !== [] && ((bool) ($effSnippets['enabled'] ?? false) || ! empty($effSnippets['items']))) {
+            $sections[] = $this->renderSnippets($effSnippets);
+        }
+        $effForms = EdgeEffectiveProductAddons::forms($site, $deployment);
+        if ($effForms !== [] && ((bool) ($effForms['enabled'] ?? false) || ! empty($effForms['endpoints']))) {
+            $sections[] = $this->renderForms($effForms);
+        }
+
         if ($sections === []) {
             return "# dply.yaml — generated from {$site->name}\n# No declarative config (redirects / rewrites / headers / crons) on the latest deploy.\n# Add sections below; the worker reads this file on every deploy.\n";
         }
@@ -207,6 +223,74 @@ final class EdgeRepoConfigYamlGenerator
         $lines[] = '  enabled: '.($enabled ? 'true' : 'false');
         if (is_string($html) && $html !== '') {
             $lines[] = '  html: '.$this->quote($html);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /** @param  array<string, mixed>  $tags */
+    private function renderTags(array $tags): string
+    {
+        $lines = ['tags:'];
+        $lines[] = '  enabled: '.(((bool) ($tags['enabled'] ?? false)) ? 'true' : 'false');
+        if (isset($tags['consent_required'])) {
+            $lines[] = '  consent_required: '.(((bool) $tags['consent_required']) ? 'true' : 'false');
+        }
+        $tools = is_array($tags['tools'] ?? null) ? $tags['tools'] : [];
+        if ($tools !== []) {
+            $lines[] = '  tools:';
+            foreach ($tools as $tool) {
+                if (! is_array($tool)) {
+                    continue;
+                }
+                $lines[] = '    - name: '.$this->quote((string) ($tool['name'] ?? 'tag'));
+                $lines[] = '      src: '.$this->quote((string) ($tool['src'] ?? ''));
+                $lines[] = '      async: '.(((bool) ($tool['async'] ?? true)) ? 'true' : 'false');
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /** @param  array<string, mixed>  $snippets */
+    private function renderSnippets(array $snippets): string
+    {
+        $lines = ['snippets:'];
+        $lines[] = '  enabled: '.(((bool) ($snippets['enabled'] ?? false)) ? 'true' : 'false');
+        $items = is_array($snippets['items'] ?? null) ? $snippets['items'] : [];
+        if ($items !== []) {
+            $lines[] = '  items:';
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $lines[] = '    - name: '.$this->quote((string) ($item['name'] ?? 'snippet'));
+                $lines[] = '      phase: '.$this->quote((string) ($item['phase'] ?? 'head'));
+                $lines[] = '      path: '.$this->quote((string) ($item['path'] ?? '/*'));
+                $lines[] = '      html: '.$this->quote((string) ($item['html'] ?? ''));
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /** @param  array<string, mixed>  $forms */
+    private function renderForms(array $forms): string
+    {
+        $lines = ['forms:'];
+        $lines[] = '  enabled: '.(((bool) ($forms['enabled'] ?? false)) ? 'true' : 'false');
+        $endpoints = is_array($forms['endpoints'] ?? null) ? $forms['endpoints'] : [];
+        if ($endpoints !== []) {
+            $lines[] = '  endpoints:';
+            foreach ($endpoints as $endpoint) {
+                if (! is_array($endpoint)) {
+                    continue;
+                }
+                $lines[] = '    - path: '.$this->quote((string) ($endpoint['path'] ?? ''));
+                $lines[] = '      to_email: '.$this->quote((string) ($endpoint['to_email'] ?? ''));
+                $lines[] = '      honeypot: '.$this->quote((string) ($endpoint['honeypot'] ?? 'company'));
+                $lines[] = '      require_turnstile: '.(((bool) ($endpoint['require_turnstile'] ?? true)) ? 'true' : 'false');
+            }
         }
 
         return implode("\n", $lines);

@@ -983,6 +983,64 @@ class EdgeCloudflareClient
     }
 
     /**
+     * Create a Turnstile widget (Account.Turnstile Edit).
+     *
+     * @param  list<string>  $domains
+     * @return array{id: string, sitekey: string, secret: string, mode: string, name: string, domains: list<string>}
+     */
+    public function createTurnstileWidget(string $name, array $domains, string $mode = 'managed'): array
+    {
+        $accountId = trim($this->accountId);
+        if ($accountId === '') {
+            throw new RuntimeException('Cloudflare account id is not configured.');
+        }
+
+        $name = trim($name);
+        if ($name === '') {
+            throw new RuntimeException('Turnstile widget name is required.');
+        }
+
+        $domains = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $domain): string => strtolower(trim((string) $domain)),
+            $domains,
+        ), static fn (string $domain): bool => $domain !== '')));
+
+        if ($domains === []) {
+            throw new RuntimeException('At least one domain is required for a Turnstile widget.');
+        }
+
+        $mode = in_array($mode, ['managed', 'non-interactive', 'invisible'], true)
+            ? $mode
+            : 'managed';
+
+        $result = $this->decode(
+            Http::withToken($this->apiToken)
+                ->post(self::BASE.'/accounts/'.$accountId.'/challenges/widgets', [
+                    'name' => $name,
+                    'domains' => $domains,
+                    'mode' => $mode,
+                ]),
+        );
+
+        $sitekey = trim((string) ($result['sitekey'] ?? ''));
+        $secret = trim((string) ($result['secret'] ?? $result['client_token'] ?? ''));
+        if ($sitekey === '' || $secret === '') {
+            throw new RuntimeException('Cloudflare created a Turnstile widget without sitekey/secret.');
+        }
+
+        $resultDomains = is_array($result['domains'] ?? null) ? $result['domains'] : $domains;
+
+        return [
+            'id' => (string) ($result['sitekey'] ?? $result['id'] ?? ''),
+            'sitekey' => $sitekey,
+            'secret' => $secret,
+            'mode' => (string) ($result['mode'] ?? $mode),
+            'name' => (string) ($result['name'] ?? $name),
+            'domains' => array_values(array_filter(array_map('strval', $resultDomains))),
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */

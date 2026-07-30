@@ -17,6 +17,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Sites\SiteWorkspaceBreadcrumbs;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -74,7 +75,7 @@ test('edge breadcrumbs use edge not servers or infrastructure path', function ()
     [$user, $server, $site] = makeEdgeSiteForSettings();
 
     $labels = array_column(
-        \App\Support\Sites\SiteWorkspaceBreadcrumbs::items($server, $site, __('Overview')),
+        SiteWorkspaceBreadcrumbs::items($server, $site, __('Overview')),
         'label'
     );
 
@@ -194,8 +195,7 @@ test('edge traffic section shows request and bandwidth stats', function () {
         ->assertSee('12,500')
         ->assertSee('Performance')
         ->assertSee('Core Web Vitals')
-        ->assertSee('Recent requests')
-        ->assertSee('Build logs');
+        ->assertSee('Live requests');
 });
 
 test('edge logs section clarifies build logs vs visitor traffic', function () {
@@ -206,7 +206,8 @@ test('edge logs section clarifies build logs vs visitor traffic', function () {
         ->assertSee('Build & deploy logs')
         ->assertSee('not visitor HTTP logs')
         ->assertSee('Recent deploys')
-        ->assertSee('Live requests');
+        ->assertSee('are under Traffic')
+        ->assertDontSee('Streaming access logs in real time.');
 });
 
 test('edge build settings can be updated on build settings section', function () {

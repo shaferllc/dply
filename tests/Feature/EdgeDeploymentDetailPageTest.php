@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Enums\SiteType;
 use App\Livewire\Sites\Edge\Workspace\Previews;
 use App\Livewire\Sites\EdgeDeploymentDetail;
-use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
@@ -39,7 +38,8 @@ test('failed edge deployment detail does not show stable aliases', function () {
             'deployment' => $failed,
         ]))
         ->assertOk()
-        ->assertDontSee('Stable aliases', false)
+        ->assertSee('More detail', false)
+        ->assertSee('Storage prefix', false)
         ->assertDontSee('edge-app--d-', false);
 
     $this->actingAs($user)
@@ -63,7 +63,10 @@ test('edge deployment detail page renders overview and aliases tabs', function (
             'deployment' => $deployment,
         ]))
         ->assertOk()
-        ->assertSee('Stable aliases', false)
+        ->assertSee('More detail', false)
+        ->assertSee('Full SHA', false)
+        ->assertSee($deployment->git_commit, false)
+        ->assertSee('Storage prefix', false)
         ->assertSee($deployment->id, false);
 
     $this->actingAs($user)
@@ -74,6 +77,7 @@ test('edge deployment detail page renders overview and aliases tabs', function (
             'tab' => 'aliases',
         ]))
         ->assertOk()
+        ->assertSee('Stable per-deploy aliases', false)
         ->assertSee('Copy URL', false)
         ->assertSee('edge-app--abc1234.', false);
 });

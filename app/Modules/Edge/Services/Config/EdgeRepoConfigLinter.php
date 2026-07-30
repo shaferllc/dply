@@ -64,6 +64,9 @@ class EdgeRepoConfigLinter
                 'rewrites' => count($config->rewrites),
                 'headers' => count($config->headers),
                 'build_keys' => array_keys($config->build),
+                'tags' => count(is_array($config->tags['tools'] ?? null) ? $config->tags['tools'] : []),
+                'snippets' => count(is_array($config->snippets['items'] ?? null) ? $config->snippets['items'] : []),
+                'forms' => count(is_array($config->forms['endpoints'] ?? null) ? $config->forms['endpoints'] : []),
             ],
         ];
     }
@@ -89,6 +92,9 @@ class EdgeRepoConfigLinter
                 'rewrites' => 0,
                 'headers' => 0,
                 'build_keys' => [],
+                'tags' => 0,
+                'snippets' => 0,
+                'forms' => 0,
             ],
         ];
     }

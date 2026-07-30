@@ -24,13 +24,41 @@ Requires **Dply-hosted Edge delivery**.
 
 ## How to use it
 
-1. Enable snippets and add an item.
-2. Choose head vs body, set a path, paste HTML.
-3. **Save** — delivery republishes; visitors see the inject on the next request.
+1. Enable snippets (or click an **Example** — that enables it for you).
+2. Choose head vs body, set a path, paste HTML — or start from an example chip.
+3. Replace placeholders (`G-XXXXXXXXXX`, `your-domain.com`, etc.) before Save.
+4. **Save** — delivery republishes; visitors see the inject on the next request.
+
+## Example starters
+
+| Example | Inject | What it does |
+|---------|--------|----------------|
+| Meta | `</head>` | Description + Open Graph tags |
+| Noindex | `</head>` | `noindex, nofollow` for staging-like hosts |
+| Banner | `</body>` | Simple announcement bar |
+| Consent | `</head>` | `grant` / `revoke` helpers for Tags consent |
+| GA4 | `</head>` | `gtag('config', …)` — pair with Tags → GA4 |
+| Plausible | `</head>` | Script with `data-domain` |
+| JSON-LD | `</head>` | Organization structured data |
+
+## `dply.yaml`
+
+```yaml
+snippets:
+  enabled: true
+  items:
+    - name: Meta
+      phase: head   # head | body
+      path: /*
+      html: '<meta name="description" content="Acme — ship faster.">'
+```
+
+Dashboard **Save** overrides the repo for the whole `snippets` section.
 
 ## Tips
 
-- Prefer **Tags** for third-party `https://` script URLs; use Snippets for inline markup.
+- Prefer **Tags** for third-party `https://` script URLs; use Snippets for inline markup or attributes Tags can’t set (`data-domain`).
+- Empty HTML rows are ignored on Save.
 - Narrow paths keep marketing scripts off app routes.
 - Only inject HTML you trust — this runs in every matching visitor’s page.
 

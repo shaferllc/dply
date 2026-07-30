@@ -17,7 +17,7 @@
             'tips' => [
                 __('Only https:// sources are allowed. Prefer async for non-critical pixels.'),
                 __('For one-off HTML (not a remote script URL), use Snippets instead.'),
-                __('Get script URLs from your vendor (GA4, Meta Pixel, Intercom, etc.) — paste the https://…js URL here.'),
+                __('Repo config (dply.yaml) lives under Advanced.'),
             ],
         ])
 
@@ -33,9 +33,28 @@
                 <input type="checkbox" wire:model.live="consent_required" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage" @disabled(! $managedDelivery) />
                 <span>
                     <span class="block text-sm font-medium text-brand-ink">{{ __('Consent helper') }}</span>
-                    <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Exposes `window.__dplyTags.consent` for your CMP to flip via localStorage `dply_tag_consent`.') }}</span>
+                    <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Injects `window.__dplyTags.consent` on every HTML page (localStorage `dply_tag_consent`). Works without script URLs — Save republishes delivery. Saving with this on also enables the tag manager.') }}</span>
                 </span>
             </label>
+
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3 dark:bg-brand-sand/10 sm:px-4">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
+                <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Click to add a starter script URL, then replace the placeholder ID with yours before Save.') }}</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach ($examples as $example)
+                        <button
+                            type="button"
+                            wire:click="addExample('{{ $example['key'] }}')"
+                            @disabled(! $managedDelivery)
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/40 hover:bg-brand-sage/5 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900"
+                            title="{{ $example['hint'] }}"
+                        >
+                            {{ $example['label'] }}
+                            <span class="font-normal text-brand-mist">+</span>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
 
             @foreach ($tools as $i => $tool)
                 <div class="grid gap-3 rounded-xl border border-brand-ink/10 p-3 sm:grid-cols-3" wire:key="tag-{{ $i }}">
@@ -63,4 +82,43 @@
             </div>
         </div>
     </section>
+
+    @php
+        $hasRepoTags = $repoTags !== [];
+        $repoTagCount = count(is_array($repoTags['tools'] ?? null) ? $repoTags['tools'] : []);
+    @endphp
+    <x-edge-yaml-advanced
+        :site="$site"
+        :file="$sourcePath"
+        :has-repo="$hasRepoTags"
+        :repo-badge="$repoTagCount > 0 ? (string) $repoTagCount : null"
+        :hint="__('Commit at the repo root. Dashboard Save overrides this section.')"
+    >
+        <x-slot:status>
+            @if ($hasRepoTags)
+                <dl class="grid grid-cols-1 gap-y-1.5 text-xs sm:grid-cols-[8rem_1fr]">
+                    <dt class="text-brand-mist">{{ __('Enabled') }}</dt>
+                    <dd class="text-brand-moss">{{ ($repoTags['enabled'] ?? false) ? __('Yes') : __('No') }}</dd>
+                    @if ($repoTagCount > 0)
+                        <dt class="text-brand-mist">{{ __('Tools') }}</dt>
+                        <dd class="text-brand-moss">{{ $repoTagCount }}</dd>
+                    @endif
+                    @if (! empty($repoTags['consent_required']))
+                        <dt class="text-brand-mist">{{ __('Consent') }}</dt>
+                        <dd class="text-brand-moss">{{ __('Required in repo') }}</dd>
+                    @endif
+                </dl>
+                <p class="mt-2 text-[11px] text-brand-mist">{{ __('Dashboard values override the repo when both are set.') }}</p>
+            @else
+                <p class="text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
+            @endif
+        </x-slot:status>
+tags:
+  enabled: true
+  consent_required: false
+  tools:
+    - name: Google Analytics
+      src: "https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"
+      async: true
+    </x-edge-yaml-advanced>
 </div>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\EdgeBotProtectionPageTest;
 
 use App\Enums\SiteType;
+use App\Livewire\Sites\Edge\Workspace\BotProtection;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\Organization;
 use App\Models\Server;
@@ -15,7 +16,11 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-test('edge bot protection section renders without turnstile mode saved', function () {
+/**
+ * @return array{0: User, 1: Server, 2: Site}
+ */
+function edgeBotProtectionSite(): array
+{
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -46,6 +51,12 @@ test('edge bot protection section renders without turnstile mode saved', functio
         ],
     ]);
 
+    return [$user, $server, $site];
+}
+
+test('edge bot protection section renders without turnstile mode saved', function () {
+    [$user, $server, $site] = edgeBotProtectionSite();
+
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-bot-protection']))
         ->assertOk()
@@ -55,5 +66,24 @@ test('edge bot protection section renders without turnstile mode saved', functio
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-bot-protection'])
         ->assertSee('How this works')
         ->assertSee('Enable bot protection')
+        ->assertSee('Generate keys')
         ->assertSee('Site key (public)');
+});
+
+test('edge bot protection generates keys with fake edge', function () {
+    [$user, $server, $site] = edgeBotProtectionSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(BotProtection::class, ['server' => $server, 'site' => $site])
+        ->call('generateKeys')
+        ->assertSet('enabled', true);
+
+    expect((string) $component->get('site_key'))->toStartWith('0x4AAAAAAAFakeSite')
+        ->and((string) $component->get('secret_key'))->toStartWith('0x4AAAAAAAFakeSecret');
+
+    $site->refresh();
+    $turnstile = $site->edgeMeta()['turnstile'] ?? [];
+    expect($turnstile['enabled'] ?? false)->toBeTrue()
+        ->and($turnstile['generated'] ?? false)->toBeTrue()
+        ->and((string) ($turnstile['site_key'] ?? ''))->toStartWith('0x4AAAAAAAFakeSite');
 });

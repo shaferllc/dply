@@ -11,36 +11,92 @@ group: edge
 
 **Forms** turns a path on your Edge site into a mail-backed endpoint. Visitors POST; Dply emails you the fields. No app server or serverless function is required.
 
-Requires **Dply-hosted Edge delivery**.
+Requires **Dply-hosted Edge delivery** and a working **outbound mail** config for the organization.
 
-## What it does
+## How it works
 
-Each endpoint has:
+1. You enable Forms and save an endpoint (path + inbox + spam defenses).
+2. Save republishes the Edge host map — the Worker starts accepting `POST` on that path.
+3. A visitor submits a form (or JSON) to `https://{your-edge-host}{path}`.
+4. The Worker:
+   - Drops the request quietly if the **honeypot** field is filled (bots).
+   - Optionally verifies a **Turnstile** token when **Require bot check** is on.
+   - HMAC-signs the remaining fields and POSTs them to dply’s form ingest URL.
+5. dply verifies the signature and sends mail via the org’s outbound mailer.
+
+Successful HTML submissions get a simple “Thanks” page. JSON clients get `{"ok":true}`.
+
+## Endpoint fields
 
 | Field | Purpose |
 |-------|---------|
-| **Path** | URL path that accepts `POST` (e.g. `/api/contact`) |
+| **Path** | URL path that accepts `POST` (e.g. `/contact`, `/api/support`) |
 | **Email to** | Inbox that receives the submission |
 | **Honeypot field** | Hidden input name; bots that fill it are discarded |
 | **Require bot check** | When on, submissions need a valid bot-protection token |
 
-## How to use it
+## Dashboard examples
 
-1. Open **Forms**, enable Edge forms, and add an endpoint (path + email).
-2. In your HTML:
+The Forms page offers starter endpoints:
+
+| Example | Path | Notes |
+|---------|------|--------|
+| Contact | `/contact` | Honeypot `company` + bot check |
+| Newsletter | `/newsletter` | Honeypot `website` + bot check |
+| Support | `/api/support` | Good pair with Rate limits |
+| Simple | `/feedback` | Honeypot only (no Turnstile) |
+
+The live **HTML example** on the page updates from your first endpoint (hostname, path, honeypot, bot check).
+
+## HTML example
 
 ```html
-<form method="POST" action="https://your-site.on-dply.site/api/contact">
-  <input type="text" name="name" required />
-  <input type="email" name="email" required />
-  <!-- Honeypot: leave empty; hide with CSS -->
-  <input type="text" name="company" tabindex="-1" autocomplete="off" style="display:none" />
+<form method="POST" action="https://your-site.on-dply.site/contact">
+  <label>Name <input type="text" name="name" required></label>
+  <label>Email <input type="email" name="email" required></label>
+  <label>Message <textarea name="message" required></textarea></label>
+  <!-- Honeypot: leave empty; hide from humans -->
+  <input type="text" name="company" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+  <!-- If Require bot check is on: -->
+  <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY"></div>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <button type="submit">Send</button>
 </form>
 ```
 
-3. Match the honeypot `name` to the dashboard field (default `company`).
-4. Optional: enable **Bot protection** (Cloudflare [Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) site + secret keys), turn on **Require bot check**, and include the challenge token field (often `cf-turnstile-response`).
+Match the honeypot `name` to the dashboard field. Turnstile site key comes from **Bot protection** ([Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile)).
+
+## JSON example
+
+```bash
+curl -X POST "https://your-site.on-dply.site/contact" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"name":"Ada","email":"ada@example.com","message":"Hello","company":""}'
+```
+
+Include `cf-turnstile-response` or `turnstile_token` when bot check is required.
+
+## `dply.yaml`
+
+```yaml
+forms:
+  enabled: true
+  endpoints:
+    - path: /contact
+      to_email: you@example.com
+      honeypot: company
+      require_turnstile: true
+```
+
+Dashboard **Save** overrides the repo for the whole `forms` section. Ingest URL / HMAC key are injected by the platform at publish time (not in the file).
+
+## How to use it
+
+1. Open **Forms**, enable Edge forms, and add an endpoint (or click an example).
+2. Set **Email to**, match honeypot / bot check to your HTML.
+3. Optional: configure **Bot protection**, then enable **Require bot check**.
+4. Optional: add a **Rate limit** on the same path.
 5. **Save**, then test a real POST from the live hostname.
 
 ## Tips
@@ -48,8 +104,10 @@ Each endpoint has:
 - Use one endpoint per form. Remove unused endpoints so they stop accepting mail.
 - Paths apply after Save republishes delivery — no full rebuild required.
 - Spam still happens; honeypot + bot check is defense in depth, not a guarantee.
+- Put the form markup in your app, or inject it with **Snippets** while you prototype.
 
 ## Related sections
 
-- **Bot protection** — challenge keys and modes
-- **Rate limits** — cap abuse on form paths (e.g. `/api/contact`)
+- **Bot protection** — Turnstile site + secret keys
+- **Rate limits** — cap abuse on form paths (e.g. `/contact`)
+- **Snippets** — inject sample HTML while testing

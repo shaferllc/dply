@@ -29,14 +29,44 @@ Wire your consent UI to set that flag before marketing tags fire.
 
 ## How to use it
 
-1. Enable tag manager.
-2. Add each tool with name + `https://` script URL.
-3. Optional: enable Consent helper and connect your CMP.
-4. **Save** — scripts inject on subsequent page loads.
+1. Enable tag manager (or turn on Consent helper — that enables it for you).
+2. Add each tool with name + `https://` script URL, or click an **Example** chip (GA4, GTM, Meta, Clarity, Hotjar, Plausible).
+3. Replace any placeholder IDs in the URL (`G-XXXXXXXXXX`, etc.) with your real account values.
+4. Optional: enable Consent helper and connect your CMP.
+5. **Save** — scripts inject on subsequent page loads.
+
+## Example loaders
+
+These are starter `<script src>` URLs. Tags inject the loader only — some vendors also need a small config snippet (use **Snippets** for that).
+
+| Example | Starter URL |
+|---------|-------------|
+| Google Analytics (GA4) | `https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX` |
+| Google Tag Manager | `https://www.googletagmanager.com/gtm.js?id=GTM-XXXXXXX` |
+| Meta Pixel | `https://connect.facebook.net/en_US/fbevents.js` |
+| Microsoft Clarity | `https://www.clarity.ms/tag/XXXXXXXXXX` |
+| Hotjar | `https://static.hotjar.com/c/hotjar-XXXXXXX.js?sv=6` |
+| Plausible | `https://plausible.io/js/script.js` |
+
+## `dply.yaml`
+
+```yaml
+tags:
+  enabled: true
+  consent_required: false
+  tools:
+    - name: Google Analytics
+      src: "https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"
+      async: true
+```
+
+Dashboard **Save** overrides the repo for the whole `tags` section. Generate an export from **Build → Generate dply.yaml** when you want the dashboard state as the file baseline.
 
 ## Tips
 
 - Only `https://` sources are allowed.
+- Empty script URL rows are ignored on Save.
+- Consent helper can publish alone (no script URLs yet).
 - For one-off HTML (not a remote script), use **Snippets**.
 - Prefer async for non-critical pixels.
 

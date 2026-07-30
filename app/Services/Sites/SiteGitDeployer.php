@@ -8,9 +8,9 @@ use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
-use App\Services\Servers\SupervisorDeployRestarter;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
@@ -203,6 +203,11 @@ class SiteGitDeployer
         // unborn (no commits yet) — `git rev-parse HEAD` prints the literal
         // string "HEAD" in that case, which would fool the $sha !== '' check.
         $sha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $pathEsc), 30));
+        // Persist SHA as soon as clone resolves it so the deploy console
+        // can show the commit during build/release (not only at success).
+        if ($deployment !== null && $sha !== '' && ctype_xdigit($sha)) {
+            $deployment->forceFill(['git_sha' => $sha])->save();
+        }
 
         // Post-clone snapshot: confirm exactly what landed on disk.
         $cloneLog .= $ssh->exec(sprintf(

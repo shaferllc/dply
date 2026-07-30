@@ -9,9 +9,9 @@ use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
-use App\Services\Servers\SupervisorDeployRestarter;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
 
@@ -222,6 +222,11 @@ class AtomicSiteDeployer
 
             // Post-clone snapshot: confirm exactly what landed in the release dir.
             $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));
+            // Persist SHA as soon as clone resolves it so the deploy console
+            // can show the commit during build/release (not only at success).
+            if ($deployment !== null && $cloneSha !== '' && ctype_xdigit($cloneSha)) {
+                $deployment->forceFill(['git_sha' => $cloneSha])->save();
+            }
             $cloneLog .= $ssh->exec(sprintf(
                 'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
                 .'echo "[dply] whoami=$(whoami)"; '

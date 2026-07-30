@@ -43,33 +43,6 @@
                                     </p>
                                 </div>
                             </div>
-                            @if ($site->edgeLiveUrl())
-                                <div class="flex shrink-0 flex-wrap items-center gap-2">
-                                    <a
-                                        href="{{ $site->edgeLiveUrl() }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 font-mono text-[11px] text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800"
-                                        title="{{ __('Open the live edge site in a new tab') }}"
-                                    >
-                                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
-                                        {{ preg_replace('#^https?://#', '', $site->edgeLiveUrl()) }}
-                                    </a>
-                                    @can('update', $site)
-                                        <button
-                                            type="button"
-                                            wire:click="redeployEdge"
-                                            wire:loading.attr="disabled"
-                                            wire:target="redeployEdge"
-                                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                                        >
-                                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
-                                            <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
-                                            <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
-                                        </button>
-                                    @endcan
-                                </div>
-                            @endif
                         </div>
                     </div>
                 @endif

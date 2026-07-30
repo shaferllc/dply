@@ -19,6 +19,35 @@
         ])
     </section>
 
+    {{-- Starters — same pattern as Tags / Snippets examples. --}}
+    <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3 dark:bg-brand-sand/10 sm:px-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Examples') }}</p>
+            <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Fill 404, 500, and maintenance at once — then edit before Save. Self-contained HTML with inline CSS.') }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                @foreach ($templates as $key => $template)
+                    <button
+                        type="button"
+                        wire:click="applyAllTemplates('{{ $key }}')"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/40 hover:bg-brand-sage/5 dark:bg-zinc-900"
+                        title="{{ $template['hint'] }}"
+                    >
+                        {{ $template['label'] }}
+                        <span class="font-normal text-brand-mist">+</span>
+                    </button>
+                @endforeach
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2 border-t border-brand-ink/10 pt-3">
+                <span class="w-full text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Per page') }}</span>
+                @foreach ($templates as $key => $template)
+                    <button type="button" wire:click="applyTemplate('html_404', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900" title="{{ $template['hint'] }}">{{ __('404') }} · {{ $template['label'] }}</button>
+                    <button type="button" wire:click="applyTemplate('html_500', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900">{{ __('500') }} · {{ $template['label'] }}</button>
+                    <button type="button" wire:click="applyTemplate('maintenance', '{{ $key }}')" class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 dark:bg-zinc-900">{{ __('Maint') }} · {{ $template['label'] }}</button>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
     {{-- Maintenance — primary ops control (live host-map republish). --}}
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <label class="flex items-start gap-3">
@@ -115,23 +144,6 @@
 
         <div class="space-y-5 border-t border-brand-ink/10 px-5 py-4 sm:px-6">
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Starters') }}</p>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Fill all three pages at once, then edit before Save.') }}</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                    @foreach ($templates as $key => $template)
-                        <button
-                            type="button"
-                            wire:click="applyAllTemplates('{{ $key }}')"
-                            class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
-                            title="{{ $template['hint'] }}"
-                        >
-                            {{ $template['label'] }}
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-
-            <div>
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('From :file', ['file' => $sourcePath]) }}</p>
                     <a
@@ -166,9 +178,13 @@
                     <p class="mt-2 text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
                 @endif
 
-                <x-edge-yaml-example :file="$sourcePath" :hint="__('Inline HTML or a path relative to the repo root.')">
+                <x-edge-yaml-example :file="$sourcePath" :hint="__('Inline HTML or a path relative to the repo root. Dashboard values override when both are set.')">
 error_pages:
-  html_404: "<!doctype html><h1>Page not found</h1>"
+  # Short inline HTML, or point at a file in the repo:
+  html_404: |
+    <!doctype html><html lang="en"><head><meta charset="utf-8"><title>404</title>
+    <style>body{font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0}</style>
+    </head><body><main><h1>Page not found</h1><p>That link may be broken.</p></main></body></html>
   html_500_path: "public/500.html"
 
 maintenance:

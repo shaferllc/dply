@@ -21,9 +21,26 @@ group: edge
 
 ## How to use it
 
-1. Paste full HTML for 404 and/or 500, or leave blank for defaults.
-2. Turn on **Maintenance mode** for a hard stop during incidents or cutovers.
-3. **Save** to republish delivery. Changes apply on the next request — no rebuild.
+1. Click an **Example** (Minimal / Friendly / Enterprise) to fill 404, 500, and maintenance — or apply a single page from **Per page**.
+2. Edit the HTML, or leave a field blank for the built-in default.
+3. Turn on **Maintenance mode** for a hard stop during incidents or cutovers.
+4. **Save** to republish delivery. Changes apply on the next request — no rebuild.
+
+## `dply.yaml`
+
+```yaml
+error_pages:
+  html_404: |
+    <!doctype html><html lang="en"><head><meta charset="utf-8"><title>404</title></head>
+    <body><h1>Page not found</h1></body></html>
+  html_500_path: "public/500.html"
+
+maintenance:
+  enabled: false
+  html_path: "public/maintenance.html"
+```
+
+Path fields are inlined at build time into the deploy snapshot. Dashboard values override matching fields when both are set.
 
 ## Tips
 

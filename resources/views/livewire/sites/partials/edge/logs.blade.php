@@ -12,7 +12,8 @@
                 href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-traffic']) }}"
                 wire:navigate
                 class="font-medium text-brand-sage hover:underline"
-            >{{ __('Traffic') }}</a>
+            >{{ __('Live requests') }}</a>
+            {{ __('are under Traffic.') }}
         </p>
         <a
             href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-deploys']) }}"
@@ -109,6 +110,4 @@
             </ul>
         @endif
     </section>
-
-    @include('livewire.sites.partials.edge.live-request-tail')
 </div>
