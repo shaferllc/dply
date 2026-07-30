@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Edge\Console;
 
 use App\Modules\Edge\Services\EdgeCloudflareClient;
+use App\Modules\Edge\Support\EdgeBuildDockerBootstrap;
 use App\Modules\Edge\Support\EdgeLocalDevDiagnostics;
 use App\Modules\Edge\Support\EdgePlatformCredentials;
 use App\Modules\Edge\Support\EdgeTestingDomains;
@@ -83,6 +84,7 @@ class EdgeDoctorCommand extends Command
 
         $checks[] = $this->checkCloudflareToken();
         $checks[] = $this->checkUsageAnalyticsCollection();
+        $checks[] = $this->checkBuildDocker();
         $checks = array_merge($checks, $this->checkEdgeDeliveryZone());
 
         if ($this->option('probe')) {
@@ -151,6 +153,37 @@ class EdgeDoctorCommand extends Command
         }
 
         return $checks;
+    }
+
+    /**
+     * Docker must be reachable on the host that drains Edge build jobs.
+     *
+     * @return array<string, mixed>
+     */
+    private function checkBuildDocker(): array
+    {
+        if (app()->runningUnitTests()) {
+            return [
+                'name' => 'edge_build_docker',
+                'ok' => true,
+                'detail' => 'Skipped under PHPUnit — probe on the real Horizon / build host.',
+            ];
+        }
+
+        if (EdgeBuildDockerBootstrap::daemonReachable()) {
+            return [
+                'name' => 'edge_build_docker',
+                'ok' => true,
+                'detail' => 'Docker daemon reachable ('.EdgeBuildDockerBootstrap::probeDetail().').',
+            ];
+        }
+
+        return [
+            'name' => 'edge_build_docker',
+            'ok' => false,
+            'detail' => 'Docker daemon not reachable from this host ('.EdgeBuildDockerBootstrap::probeDetail()
+                .'). Edge builds fail until you run: sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>',
+        ];
     }
 
     /**

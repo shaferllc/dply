@@ -8,6 +8,7 @@ use App\Models\EdgeDeployment;
 use App\Modules\Edge\Services\Config\EdgeRepoConfigLinter;
 use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
 use App\Modules\Edge\Services\Ssr\EdgeSsrFrameworkRegistry;
+use App\Modules\Edge\Support\EdgeBuildDockerBootstrap;
 use App\Modules\Edge\Support\EdgeLiveBuildLog;
 use App\Modules\Edge\Support\EdgeRepoRoot;
 use App\Modules\Edge\Support\FakeEdgeProvision;
@@ -1254,98 +1255,70 @@ class EdgeBuildRunner
 
     private function assertDockerAvailable(string $buildLog): void
     {
-        if ($this->dockerReachable()) {
+        if (EdgeBuildDockerBootstrap::daemonReachable()) {
             return;
         }
 
-        // Local dev: we can't bootstrap Docker Desktop / OrbStack for the
-        // developer, so keep the actionable hint.
-        if (app()->environment('local')) {
+        $probe = EdgeBuildDockerBootstrap::probeDetail();
+        $this->appendBuildLog($buildLog, "[dply:docker] Daemon unreachable — {$probe}\n");
+
+        // macOS / local: get.docker.com + systemctl cannot install OrbStack /
+        // Docker Desktop. The CLI binary often exists while the daemon is
+        // asleep — autoinstall used to skip install, no-op systemctl, and
+        // mis-report "passwordless sudo".
+        if (EdgeBuildDockerBootstrap::isLocalDesktopEnvironment()) {
             throw new RuntimeException(
                 'Edge build requires Docker but the daemon is not reachable. '
-                .'Start OrbStack/Docker Desktop locally, or set DPLY_FAKE_EDGE=true in .env to skip real builds during development.'
+                .'Start OrbStack or Docker Desktop (confirm `docker version` shows a Server), then re-run the deploy. '
+                .'For local UI-only work set DPLY_FAKE_EDGE=true to skip real Docker builds. '
+                ."Detail: {$probe}"
             );
         }
 
-        // On a real build worker Docker *should* already be present. If it
-        // isn't (box provisioned without it, or the daemon died), self-heal
-        // by installing it inline rather than failing the deploy — the
-        // install is idempotent and future builds hit the fast path above.
         if (! (bool) config('edge.build.docker_autoinstall', true)) {
             throw new RuntimeException(
                 'Edge build requires Docker but the daemon is not reachable. '
-                .'Install Docker on this build worker (e.g. `curl -fsSL https://get.docker.com | sh && systemctl enable --now docker`). '
-                .'The runtime path still serves from Cloudflare; Docker only sandboxes the customer build.'
+                .'On the control-plane build worker run: '
+                .'`sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>` '
+                .'then `php artisan horizon:terminate`. '
+                ."Detail: {$probe}"
             );
         }
 
         $this->installDocker($buildLog);
 
-        if (! $this->dockerReachable()) {
-            throw new RuntimeException(
-                'Edge build tried to install Docker on this build worker but the daemon is still unreachable. '
-                .'Confirm the worker user has passwordless sudo, then re-run the deploy. '
-                .'The runtime path still serves from Cloudflare; Docker only sandboxes the customer build.'
-            );
+        if (EdgeBuildDockerBootstrap::daemonReachable()) {
+            return;
         }
+
+        $after = EdgeBuildDockerBootstrap::probeDetail();
+        throw new RuntimeException(
+            'Edge build could not start Docker on this production build worker. '
+            .'Horizon usually lacks passwordless sudo — fix once as root: '
+            .'`sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>` '
+            .'then recycle workers (`php artisan horizon:terminate`). '
+            .'Verify with `php artisan dply:edge:ensure-build-docker --check`. '
+            ."Detail: {$after}"
+        );
     }
 
     /**
-     * Probe the Docker daemon (server reachable, not just the client binary).
-     */
-    private function dockerReachable(): bool
-    {
-        return Process::timeout(10)
-            ->run(['docker', 'version', '--format', '{{.Server.Version}}'])
-            ->successful();
-    }
-
-    /**
-     * Best-effort inline Docker install for a build worker that came up
-     * without it. Uses the official convenience script, enables the daemon,
-     * and grants the (non-root) worker user immediate socket access via an
-     * ACL — so the current build can proceed without waiting for a fresh
-     * login to pick up docker-group membership. Requires passwordless sudo
-     * when the worker does not already run as root.
+     * Best-effort inline Docker install for a Linux build worker that came up
+     * without it. Prefer {@see EdgeEnsureBuildDockerCommand} on prod (root).
      */
     private function installDocker(string $buildLog): void
     {
-        $this->appendBuildLog(
-            $buildLog,
-            "[dply:docker] Docker daemon unreachable on this build worker — installing Docker…\n",
-        );
-
-        $script = <<<'SH'
-set -e
-if [ "$(id -u)" -ne 0 ]; then SUDO="sudo -n"; else SUDO=""; fi
-if ! command -v docker >/dev/null 2>&1; then
-  curl -fsSL https://get.docker.com -o /tmp/dply-get-docker.sh
-  $SUDO sh /tmp/dply-get-docker.sh
-fi
-$SUDO systemctl enable --now docker || true
-# Grant the worker user immediate socket access. usermod's group change only
-# applies on next login; an ACL on the socket takes effect right away so this
-# build can run without restarting the worker.
-if [ -n "$SUDO" ]; then
-  $SUDO usermod -aG docker "$(id -un)" || true
-  $SUDO setfacl -m "u:$(id -un):rw" /var/run/docker.sock 2>/dev/null || true
-fi
-SH;
-
-        $install = Process::timeout((int) config('edge.build.docker_install_timeout_seconds', 600))
-            ->run(
-                $script,
-                fn (string $type, string $chunk) => $this->appendBuildLog($buildLog, $chunk),
-            );
-
-        if (! $install->successful()) {
-            $this->appendBuildLog(
-                $buildLog,
-                '[dply:docker] Install script exited '.$install->exitCode().".\n",
-            );
-        } else {
-            $this->appendBuildLog($buildLog, "[dply:docker] Docker install completed.\n");
+        $user = function_exists('posix_geteuid') && function_exists('posix_getpwuid')
+            ? (string) (posix_getpwuid(posix_geteuid())['name'] ?? get_current_user())
+            : (string) get_current_user();
+        if (trim($user) === '') {
+            $user = 'forge';
         }
+
+        EdgeBuildDockerBootstrap::ensure(
+            $user,
+            fn (string $chunk) => $this->appendBuildLog($buildLog, $chunk),
+        );
     }
 
     private function assertArtifactContents(string $dir, string $outputDir): void

@@ -7,6 +7,7 @@ namespace App\Modules\Edge;
 use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
 use App\Modules\Edge\Console\CollectEdgeUsageCommand;
 use App\Modules\Edge\Console\EdgeDoctorCommand;
+use App\Modules\Edge\Console\EdgeEnsureBuildDockerCommand;
 use App\Modules\Edge\Console\EdgeEnsureDeliveryFeaturesCommand;
 use App\Modules\Edge\Console\EdgeEnsureGithubPreviewsCommand;
 use App\Modules\Edge\Console\EdgeEnsureHybridOriginsCommand;
@@ -48,6 +49,7 @@ class EdgeServiceProvider extends ServiceProvider
                 CheckEdgeRumAlertsCommand::class,
                 CollectEdgeUsageCommand::class,
                 EdgeDoctorCommand::class,
+                EdgeEnsureBuildDockerCommand::class,
                 EdgeEnsureDeliveryFeaturesCommand::class,
                 EdgeEnsureGithubPreviewsCommand::class,
                 EdgeEnsureHybridOriginsCommand::class,

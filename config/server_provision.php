@@ -212,7 +212,7 @@ return [
     // workers build Edge sites, so customer boxes don't get a container
     // runtime. Enable on dply's own workers to guarantee Docker is present
     // instead of leaning on the deploy-time self-heal in EdgeBuildRunner.
-    'edge_build_docker' => (bool) env('DPLY_PROVISION_EDGE_BUILD_DOCKER', false),
+    'edge_build_docker' => filter_var(env('DPLY_PROVISION_EDGE_BUILD_DOCKER', false), FILTER_VALIDATE_BOOLEAN),
 
     // Lock SSH down to key-only auth at the end of provisioning: disable
     // password authentication and reduce root to prohibit-password (key login

@@ -25,7 +25,7 @@ Customer Cloudflare tokens connected for DNS-only scopes are **not** sufficient 
   - Account → Workers KV Storage → Edit
   - Account → Workers R2 Storage → Edit
 - Wildcard DNS for Edge delivery domains (e.g. `*.on-dply.site`) routed to the Worker zone
-- Queue workers with **Docker** available for `BuildEdgeSiteJob`
+- Queue workers with **Docker** available for `BuildEdgeSiteJob` (bootstrap with `dply:edge:ensure-build-docker` — see [§6](#6-build-workers-docker-on-the-control-plane))
 
 ## 1. Bootstrap R2 + KV (API)
 
@@ -124,17 +124,35 @@ When `DPLY_EDGE_CF_ZONE_NAME` + `DPLY_EDGE_CF_WORKER_ROUTES` are set, `edge:work
 
 Custom domains attach per-site via the Edge dashboard; Laravel writes KV entries on publish.
 
-## 6. Build workers
+## 6. Build workers (Docker on the control plane)
 
-Edge builds run in Docker on queue workers:
+Edge builds (`BuildEdgeSiteJob`) run on the **same Linux host that drains Horizon**
+(queue `dply-provision` by default) — not on customer VMs. The Worker/R2 path still
+serves from Cloudflare; Docker only sandboxes the customer `npm`/`pnpm` build.
+
+If deploys fail with *passwordless sudo* / *daemon unreachable*, Docker was never
+bootstrapped for the Horizon user. Fix once as root on that host:
+
+```bash
+# Replace forge with the user that runs Horizon / queue:work
+sudo php artisan dply:edge:ensure-build-docker --user=forge
+php artisan horizon:terminate   # workers pick up the docker group
+php artisan dply:edge:ensure-build-docker --check
+php artisan dply:edge:warm-build-images   # optional: pre-pull node images
+```
+
+`dply:edge:doctor` also reports whether the Docker daemon is reachable from this host.
 
 ```dotenv
 DPLY_EDGE_BUILD_IMAGE=node:20-bookworm
 DPLY_EDGE_BUILD_TIMEOUT=900
 DPLY_EDGE_ARTIFACT_MAX_BYTES=524288000
+# Optional: default --user for ensure-build-docker when run without --user
+# DPLY_EDGE_BUILD_DOCKER_USER=forge
 ```
 
-Ensure queue workers can run `docker run` (socket mounted or remote builder).
+Deploy-time autoinstall still tries when the queue user has passwordless `sudo -n`;
+on typical Forge/prod hosts it does not — use the artisan command above.
 
 ## 7. Smoke test
 

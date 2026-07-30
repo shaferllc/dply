@@ -32,14 +32,34 @@ class SweepSiteHttpErrorsJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 60;
 
-    /** Lock auto-expires so a lost run can't wedge future sweeps. */
-    public int $uniqueFor = 300;
+    /**
+     * Contended {@see SerializeServerSsh} releases are not exceptions, but a real
+     * handler error must fail fast. Horizon supervisors use `tries => 1`, so without
+     * this + {@see retryUntil()} a single SSH-slot release becomes MaxAttemptsExceeded.
+     */
+    public int $maxExceptions = 1;
+
+    /**
+     * Lock auto-expires so a lost run can't wedge future sweeps. Keep larger than
+     * {@see retryUntil()} so waiting for an SSH slot can't drop uniqueness early.
+     */
+    public int $uniqueFor = 360;
 
     public function __construct(public string $siteId) {}
 
     public function uniqueId(): string
     {
         return 'sweep-http-errors:'.$this->siteId;
+    }
+
+    /**
+     * Bound how long the job waits for the server's SSH slot. Releases from the
+     * serialization middleware retry until this moment; a real handler error hits
+     * {@see $maxExceptions} first and fails immediately.
+     */
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addMinutes(3);
     }
 
     /** @return array<int, object> */
