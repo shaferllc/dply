@@ -2,23 +2,82 @@
     $repoMode = is_string($repoFirewall['country_mode'] ?? null) ? strtoupper((string) $repoFirewall['country_mode']) : 'OFF';
     $repoCountries = is_array($repoFirewall['countries'] ?? null) ? $repoFirewall['countries'] : [];
     $hasRepoFirewall = $repoFirewall !== [] && $repoCountries !== [];
+    $modeHelp = match ($country_mode) {
+        'allow' => __('Only the countries below can reach this site. Every other country gets HTTP 403.'),
+        'block' => __('Countries below are denied with HTTP 403. Everyone else passes through.'),
+        default => __('Geo rules are off — every country can reach the site. Add countries and switch mode when you need a fence.'),
+    };
 @endphp
 
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         @include('livewire.sites.edge.workspace.partials.feature-guide', [
             'docSlug' => 'edge-firewall',
-            'what' => __('Geo firewall allows or blocks visitors by country at the Edge — before your app or origin sees the request.'),
+            'what' => __('Geo firewall allows or blocks visitors by country at the Edge — using the request’s country code — before your pages, forms, or origin see the traffic. Blocked visitors get a plain HTTP 403 on the same URL.'),
             'steps' => [
-                __('Choose Off (allow all), Allow listed only, or Block listed.'),
+                __('Pick a mode: Off (everyone), Allow listed only (hard allowlist), or Block listed (deny these countries).'),
                 __('Search and add ISO country codes (e.g. US, DE). Remove chips to drop a country.'),
-                __('Save — blocked visitors receive HTTP 403 immediately after delivery republishes.'),
+                __('Save — Edge republishes the host map; blocked traffic is rejected immediately at the Worker.'),
+            ],
+            'setupLinks' => [
+                [
+                    'label' => __('Rate limits'),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-rate-limits']),
+                ],
+                [
+                    'label' => __('Bot protection'),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-bot-protection']),
+                ],
             ],
             'tips' => [
-                __('Allow listed only is a hard allowlist: every other country is denied.'),
-                __('Rules in dply.yaml can also declare countries; dashboard overrides show alongside repo config when present.'),
+                __('Country comes from Edge geo (ISO alpha-2). VPNs and privacy proxies can look like another country.'),
+                __('Allow listed only with an empty list does nothing — add at least one country or leave mode Off.'),
+                __('Geo is coarse; pair with Rate limits / Bot protection for abuse that isn’t country-shaped.'),
+                __('Requires Dply-hosted Edge delivery for Worker enforcement.'),
             ],
         ])
+
+        <div class="mb-5 rounded-2xl border border-brand-ink/10 bg-white px-4 py-4 dark:bg-zinc-900/40 sm:px-5">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Modes') }}</p>
+            <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                <div @class([
+                    'rounded-xl border px-3 py-3',
+                    'border-brand-forest/40 bg-brand-forest/5' => $country_mode === 'off',
+                    'border-brand-ink/10 bg-brand-sand/20' => $country_mode !== 'off',
+                ])>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Off') }}</p>
+                    <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Allow all') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('No country checks. Default for most sites.') }}</p>
+                </div>
+                <div @class([
+                    'rounded-xl border px-3 py-3',
+                    'border-brand-forest/40 bg-brand-forest/5' => $country_mode === 'allow',
+                    'border-brand-ink/10 bg-brand-sand/20' => $country_mode !== 'allow',
+                ])>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Allow listed only') }}</p>
+                    <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Hard allowlist') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Only listed countries enter. Everyone else is 403’d — easy to lock yourself out if the list is wrong.') }}</p>
+                </div>
+                <div @class([
+                    'rounded-xl border px-3 py-3',
+                    'border-brand-forest/40 bg-brand-forest/5' => $country_mode === 'block',
+                    'border-brand-ink/10 bg-brand-sand/20' => $country_mode !== 'block',
+                ])>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Block listed') }}</p>
+                    <p class="mt-1 text-sm font-medium text-brand-ink">{{ __('Deny these countries') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Safer default for geo fences: block a few countries; the rest of the world still works.') }}</p>
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-3">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('What blocked visitors see') }}</p>
+                <div class="mt-2 rounded-lg border border-brand-ink/10 bg-zinc-900 px-3 py-3 font-mono text-[11px] leading-relaxed text-zinc-100">
+                    <span class="text-rose-300">HTTP/1.1 403 Forbidden</span><br>
+                    <span class="text-zinc-400">Forbidden — content is not available in this region (XX).</span>
+                </div>
+                <p class="mt-2 text-xs text-brand-moss">{{ __('Plain text from Edge (not your build). Custom branded block pages are not available yet.') }}</p>
+            </div>
+        </div>
 
         <div class="mt-4 space-y-4">
             <div>
@@ -34,10 +93,20 @@
                     <option value="allow">{{ __('Allow listed only') }}</option>
                     <option value="block">{{ __('Block listed') }}</option>
                 </select>
+                <p class="mt-1.5 text-xs text-brand-moss">{{ $modeHelp }}</p>
             </div>
 
             <div>
                 <label class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Countries') }}</label>
+                <p class="mt-0.5 text-xs text-brand-moss">
+                    @if ($country_mode === 'allow')
+                        {{ __('These countries are allowed. Add every market you serve before enabling Allow listed only.') }}
+                    @elseif ($country_mode === 'block')
+                        {{ __('These countries are blocked. Leave the list empty only while drafting — empty + Block does not enforce yet.') }}
+                    @else
+                        {{ __('Optional until you switch mode. Search by name or ISO code, then Save.') }}
+                    @endif
+                </p>
                 <div
                     x-data="{
                         query: '',
@@ -77,7 +146,11 @@
                     @click.outside="open = false"
                     class="relative mt-1"
                 >
-                    <div class="flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 focus-within:border-brand-forest focus-within:ring-1 focus-within:ring-brand-forest dark:border-brand-mist/20 dark:bg-zinc-900">
+                    <div @class([
+                        'flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-lg border bg-white px-2 py-1.5 focus-within:border-brand-forest focus-within:ring-1 focus-within:ring-brand-forest dark:border-brand-mist/20 dark:bg-zinc-900',
+                        'border-brand-ink/15' => $country_mode !== 'off',
+                        'border-brand-ink/10 opacity-70' => $country_mode === 'off',
+                    ])>
                         <template x-for="code in (selected || [])" :key="code">
                             <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/70 px-2 py-0.5 font-mono text-xs font-semibold text-brand-ink">
                                 <span x-text="code"></span>
@@ -134,6 +207,11 @@
                     </p>
                 </div>
                 <p class="mt-1 text-[11px] text-brand-mist">{{ __('↑/↓ navigate · Enter add · Backspace remove last') }}</p>
+                @if ($country_mode !== 'off' && count($selected_codes) === 0)
+                    <p class="mt-2 rounded-lg border border-amber-500/25 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                        {{ __('No countries selected — this mode will not enforce until you add at least one code and Save.') }}
+                    </p>
+                @endif
             </div>
         </div>
     </section>
@@ -183,7 +261,7 @@
                 <p class="text-sm text-brand-moss">{{ __('None declared in :file yet.', ['file' => $sourcePath]) }}</p>
             @endif
 
-            <x-edge-yaml-example :file="$sourcePath">
+            <x-edge-yaml-example :file="$sourcePath" :hint="__('Commit geo rules in the repo, or set them above in the dashboard.')">
 firewall:
   country_mode: "block"   # off | allow | block
   countries:

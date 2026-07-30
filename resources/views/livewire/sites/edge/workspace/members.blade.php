@@ -1,4 +1,20 @@
 <div>
+    <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-members',
+            'what' => __('Grant site-scoped access on this Edge site without making someone an org admin. Org owners and admins already have full access.'),
+            'steps' => [
+                __('Pick an org user who is not already a site member.'),
+                __('Choose a role, then Add.'),
+                __('Remove a member when they no longer need this site — org roles stay unchanged.'),
+            ],
+            'tips' => [
+                __('Prefer site members for contractors who only touch one Edge app.'),
+                __('Deploy-oriented roles cannot change notification subscriptions or destructive settings.'),
+            ],
+        ])
+    </section>
+
     @can('manageMembers', $site)
         <form wire:submit="addMember" class="grid gap-3 border-b border-brand-ink/10 px-5 py-4 sm:grid-cols-[minmax(14rem,1fr)_10rem_auto] sm:items-end sm:px-6">
             <label class="block min-w-0">

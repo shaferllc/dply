@@ -14,6 +14,29 @@
 @endphp
 
 <div>
+    <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-bindings',
+            'what' => __('Attach KV, R2, D1, and Queues to your Edge Worker as env.NAME. Dashboard rows apply on the next deploy; wrangler.toml wins on name collision.'),
+            'steps' => [
+                __('Pick a binding name (JS identifier) and type.'),
+                __('Attach an existing resource id/name, or create a new one.'),
+                __('Redeploy so the Worker upload includes the binding.'),
+            ],
+            'setupLinks' => [
+                [
+                    'label' => __('Jobs'),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-jobs']),
+                ],
+            ],
+            'tips' => [
+                __('Needs middleware or SSR — pure static sites have no Worker env.'),
+                __('Detach removes the binding from the site; the resource stays.'),
+                __('Jobs can manage queue bindings in a modal without leaving that page.'),
+            ],
+        ])
+    </section>
+
     @unless ($hasWorker)
         <div class="border-b border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-900 sm:px-6 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
             {{ __('No worker on this site yet — bindings attach after you add middleware or enable SSR and redeploy.') }}

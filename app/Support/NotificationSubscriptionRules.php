@@ -18,7 +18,11 @@ class NotificationSubscriptionRules
             return Server::class;
         }
 
-        if (str_starts_with($eventKey, 'site.') || str_starts_with($eventKey, 'backup.')) {
+        if (
+            str_starts_with($eventKey, 'site.')
+            || str_starts_with($eventKey, 'backup.')
+            || str_starts_with($eventKey, 'edge.')
+        ) {
             return Site::class;
         }
 

@@ -255,3 +255,43 @@ test('container workspace group order', function () {
 
     expect($groupOrder)->toBe(['general', 'networking', 'deploy', 'runtime', 'background', 'observability', 'danger']);
 });
+
+function makeEdgeSidebarSite(string $runtimeMode = 'static'): Site
+{
+    $site = new Site;
+    $site->edge_backend = 'dply_edge';
+    $site->meta = [
+        'runtime_profile' => 'edge_web',
+        'edge' => [
+            'runtime_mode' => $runtimeMode,
+        ],
+    ];
+
+    return $site;
+}
+
+test('static edge site hides worker-only sidebar items', function () {
+    $server = makeVmServer();
+    $server->meta = ['host_kind' => Server::HOST_KIND_DPLY_EDGE];
+    $site = makeEdgeSidebarSite('static');
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->not->toContain('edge-bindings')
+        ->and($ids)->not->toContain('edge-crons')
+        ->and($ids)->not->toContain('edge-jobs')
+        ->and($ids)->toContain('edge-forms')
+        ->and($ids)->toContain('edge-firewall');
+});
+
+test('ssr edge site shows worker-only sidebar items', function () {
+    $server = makeVmServer();
+    $server->meta = ['host_kind' => Server::HOST_KIND_DPLY_EDGE];
+    $site = makeEdgeSidebarSite('ssr');
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('edge-bindings')
+        ->and($ids)->toContain('edge-crons')
+        ->and($ids)->toContain('edge-jobs');
+});

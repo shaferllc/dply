@@ -177,6 +177,15 @@ return [
         ],
         [
             'route' => 'sites.show',
+            'slug' => 'edge-crons',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-crons',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
             'slug' => 'edge-snippets',
             'group' => 'edge',
             'when' => 'edge_site',
@@ -195,18 +204,48 @@ return [
         ],
         [
             'route' => 'sites.show',
+            'slug' => 'edge-bindings',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-bindings',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-members',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-members',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-alerts',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-alerts',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
+            'slug' => 'edge-audit',
+            'group' => 'edge',
+            'when' => 'edge_site',
+            'params' => [
+                'section' => 'edge-audit',
+            ],
+        ],
+        [
+            'route' => 'sites.show',
             'slug' => 'edge-previews',
             'group' => 'edge',
             'when' => 'edge_site',
             'params' => [
                 'section' => 'edge-previews',
             ],
-        ],
-        [
-            'route' => 'sites.edge-bindings',
-            'slug' => 'edge-build',
-            'group' => 'edge',
-            'when' => 'edge_site',
         ],
         [
             'route' => 'sites.show',

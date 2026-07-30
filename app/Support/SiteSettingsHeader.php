@@ -187,7 +187,7 @@ final class SiteSettingsHeader
             ],
             'edge-firewall' => [
                 'title' => __('Firewall'),
-                'description' => __('Geo allow/block at the Edge — visitors outside your list never hit the app.'),
+                'description' => __('Allow or block by country at the Edge. Blocked visitors get HTTP 403 before your site runs.'),
                 'icon' => 'heroicon-o-shield-check',
             ],
             'edge-bot-protection' => [
@@ -197,12 +197,12 @@ final class SiteSettingsHeader
             ],
             'edge-rate-limits' => [
                 'title' => __('Rate limits'),
-                'description' => __('Limit requests per IP on a path — block with 429 or challenge when bot protection is on.'),
+                'description' => __('Cap requests per IP on a path. Excess traffic gets HTTP 429 or a bot challenge — not a waiting-room queue.'),
                 'icon' => 'heroicon-o-no-symbol',
             ],
             'edge-waiting-room' => [
                 'title' => __('Waiting room'),
-                'description' => __('Queue excess visitors during launches so active traffic stays within a safe cap.'),
+                'description' => __('Hold excess visitors on a “You’re in line” page on your Edge URL until capacity opens.'),
                 'icon' => 'heroicon-o-queue-list',
             ],
             'edge-forms' => [
@@ -232,7 +232,7 @@ final class SiteSettingsHeader
             ],
             'edge-alerts' => [
                 'title' => __('Alerts'),
-                'description' => __('RUM and error thresholds for this Edge site.'),
+                'description' => __('Route Edge events to notification channels, and set RUM / error thresholds.'),
                 'icon' => 'heroicon-o-bell-alert',
             ],
             'edge-audit' => [

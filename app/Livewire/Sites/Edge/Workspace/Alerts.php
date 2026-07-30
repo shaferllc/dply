@@ -4,26 +4,30 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
-use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
+use App\Livewire\Concerns\Edge\ManagesEdgeAlertsNotifications;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeEffectiveAlerts;
+use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Support\EdgeSiteNotificationKeys;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 /**
- * RUM-style alerting (P58). Per-site thresholds for LCP p75, 5xx rate,
- * and 5xx count. Values come from dply.yaml `alerts:` merged with
- * dashboard overrides ({@see EdgeEffectiveAlerts}). CheckEdgeRumAlertsCommand
- * runs hourly and publishes `edge.rum.breach` when a threshold is crossed.
+ * RUM-style alerting + channel subscriptions for Edge events.
+ * Thresholds merge with dply.yaml `alerts:` ({@see EdgeEffectiveAlerts});
+ * CheckEdgeRumAlertsCommand publishes `edge.rum.breach` when crossed.
+ * Channel routing uses the same subscription matrix as BYO site Notifications.
  */
 class Alerts extends Component
 {
-    use DispatchesToastNotifications;
+    use CreatesNotificationChannelInline;
+    use ManagesEdgeAlertsNotifications;
     use MountsEdgeWorkspaceSection;
 
     public bool $lcp_enabled = false;
@@ -44,6 +48,7 @@ class Alerts extends Component
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
+        $this->hydrateEdgeAlertNotificationPreferences();
 
         $effective = EdgeEffectiveAlerts::for($site);
         $this->lcp_enabled = $effective['lcp_p75_ms']['enabled'];
@@ -111,6 +116,11 @@ class Alerts extends Component
                 'site' => $this->site,
                 'repoAlerts' => $repoAlerts,
                 'sourcePath' => $sourcePath,
+                'assignableNotificationChannels' => AssignableNotificationChannels::forUser(
+                    auth()->user(),
+                    $this->site->organization,
+                ),
+                'notificationEventGroups' => EdgeSiteNotificationKeys::eventGroups(),
             ],
         ));
     }

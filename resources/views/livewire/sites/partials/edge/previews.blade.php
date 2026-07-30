@@ -92,71 +92,55 @@
                                 // so the user understands why the URL isn't shown yet
                                 // and the button still spins.
                                 $isPropagating = $journey['edgeJourneyIsDone'];
-                                $progressPercent = $isPropagating ? 90 : (int) $journey['edgeProgressPercent'];
-                                $headlineLabel = $isPropagating
-                                    ? __('Propagating to edge')
-                                    : $journey['edgeCurrentLabel'];
+                                $pendingDeployment = $journey['edgeLatestDeployment'] ?? null;
                             @endphp
-                            <div class="mt-3 rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/95 to-white px-4 py-4">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <div class="flex items-center gap-3 min-w-0">
-                                        @if ($journey['edgeJourneyHasFailed'])
-                                            <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-600 text-white">
-                                                <x-heroicon-s-x-mark class="h-4 w-4" aria-hidden="true" />
-                                            </span>
-                                        @else
-                                            {{-- Always-spinning icon while pending — only flips to a
-                                                 green check once the helper clears the pending ID,
-                                                 at which point this whole card has already unmounted. --}}
-                                            <span class="inline-flex h-7 w-7 shrink-0 animate-spin items-center justify-center rounded-full border-[3px] border-indigo-200 border-t-indigo-600" aria-hidden="true"></span>
-                                        @endif
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $headlineLabel }}</p>
-                                            <p class="mt-0.5 font-mono text-[11px] text-brand-moss">{{ __('Preview from commit :sha', ['sha' => $pendingSha]) }}</p>
-                                        </div>
+                            <div class="mt-3 overflow-hidden rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/95 to-white">
+                                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100/80 px-4 py-3">
+                                    <div class="min-w-0">
+                                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Preview build') }}</p>
+                                        <p class="mt-0.5 font-mono text-[11px] text-brand-moss">
+                                            @if ($pendingSha !== '')
+                                                {{ __('Preview from commit :sha', ['sha' => $pendingSha]) }}
+                                            @else
+                                                {{ __('Building preview…') }}
+                                            @endif
+                                        </p>
                                     </div>
-                                    <span class="shrink-0 text-sm font-semibold tabular-nums {{ $journey['edgeJourneyHasFailed'] ? 'text-red-700' : 'text-indigo-700' }}">{{ $progressPercent }}%</span>
+                                    @if ($pendingDeployment !== null)
+                                        <a
+                                            href="{{ route('sites.edge.deployments.show', ['server' => $pendingPreview->server_id, 'site' => $pendingPreview, 'deployment' => $pendingDeployment, 'tab' => 'log']) }}"
+                                            wire:navigate
+                                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-800 shadow-sm hover:bg-indigo-50"
+                                        >
+                                            <x-heroicon-o-clipboard-document-list class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Open full log') }}
+                                        </a>
+                                    @endif
                                 </div>
 
-                                <div class="mt-3 h-2 overflow-hidden rounded-full bg-brand-sand/80">
-                                    <div class="h-full rounded-full {{ $journey['edgeJourneyHasFailed'] ? 'bg-red-500' : 'bg-indigo-600' }} transition-[width] duration-300" style="width: {{ $progressPercent }}%"></div>
-                                </div>
-
-                                @if ($journey['edgeJourneyHasFailed'] && $journey['edgeProvisioningError'])
-                                    <div class="mt-3 rounded-xl border border-red-300 bg-white/80 px-3 py-2 text-xs">
-                                        <p class="font-semibold uppercase tracking-wide text-red-700">{{ __('Reason') }}</p>
-                                        <p class="mt-1 break-words font-mono leading-5 text-red-900">{{ $journey['edgeProvisioningError'] }}</p>
+                                @if ($pendingDeployment !== null)
+                                    {{-- Same streaming BuildJourney as Edge provisioning / deploy detail. --}}
+                                    <div class="bg-white/60">
+                                        @livewire('edge.build-journey', ['deploymentId' => (string) $pendingDeployment->id], key('edge-adhoc-preview-build-'.$pendingDeployment->id))
                                     </div>
                                 @else
-                                    <ol class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px]">
-                                        @foreach ($journey['edgeVisibleSteps'] as $key => $label)
-                                            @php
-                                                $loopIndex = array_search($key, $journey['edgeStepKeys'], true);
-                                                $isDone = ! $journey['edgeJourneyHasFailed'] && $loopIndex !== false && $loopIndex < $journey['edgeCurrentStepIndex'];
-                                                $isCurrent = $key === $journey['edgeProvisioningState'];
-                                                // During propagation, treat "live" as still in
-                                                // progress (pulsing) rather than checked, so the
-                                                // step list matches the headline / button label.
-                                                if ($isPropagating && $key === 'live') {
-                                                    $isDone = false;
-                                                    $isCurrent = true;
-                                                }
-                                            @endphp
-                                            <li class="inline-flex items-center gap-1.5 {{ $isCurrent ? 'text-indigo-800 font-semibold' : ($isDone ? 'text-emerald-700' : 'text-brand-mist') }}">
-                                                @if ($isDone)
-                                                    <x-heroicon-s-check class="h-3 w-3" />
-                                                @elseif ($isCurrent)
-                                                    <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-indigo-600"></span>
-                                                @else
-                                                    <span class="inline-flex h-2 w-2 rounded-full bg-brand-sand"></span>
-                                                @endif
-                                                <span>{{ $label }}</span>
-                                            </li>
-                                        @endforeach
-                                    </ol>
+                                    <div class="px-4 py-6 text-center text-xs text-brand-moss">
+                                        <span class="inline-flex h-5 w-5 animate-spin items-center justify-center rounded-full border-2 border-indigo-200 border-t-indigo-600" aria-hidden="true"></span>
+                                        <p class="mt-2">{{ __('Waiting for the build to start…') }}</p>
+                                    </div>
                                 @endif
 
-                                <p class="mt-3 text-[11px] text-brand-moss">{{ __('Auto-refreshes every 5 seconds. Create unlocks once the URL is safe to open.') }}</p>
+                                <div class="border-t border-indigo-100/80 px-4 py-2.5">
+                                    @if ($isPropagating && ! $journey['edgeJourneyHasFailed'])
+                                        <p class="text-[11px] text-brand-moss">
+                                            {{ __('Build finished — propagating to edge. Create unlocks once the URL is safe to open.') }}
+                                        </p>
+                                    @else
+                                        <p class="text-[11px] text-brand-moss">
+                                            {{ __('Live build output below. Auto-refreshes; Create unlocks once the URL is safe to open.') }}
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
                         @endif
                     @elseif ($edge_deploy_commit_branch !== null)

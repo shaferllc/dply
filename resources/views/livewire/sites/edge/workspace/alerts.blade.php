@@ -4,8 +4,95 @@
 
 <div>
     <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-alerts',
+            'what' => __('Route Edge events to notification channels, and set RUM / error thresholds that publish edge.rum.breach when crossed.'),
+            'steps' => [
+                __('Subscribe channels to Edge events (deploys, domains, usage, RUM), then Save subscriptions.'),
+                __('Optionally enable LCP / 5xx thresholds — checked hourly against the last 60 minutes.'),
+                __('Wire channels before a launch so failures and breaches reach someone.'),
+            ],
+            'setupLinks' => [
+                [
+                    'label' => __('Traffic & analytics'),
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-traffic']),
+                ],
+            ],
+            'tips' => [
+                __('Same channel system as BYO site notifications — create channels inline or under My channels.'),
+                __('In-app inbox still notifies stakeholders even without a Slack/email channel.'),
+            ],
+        ])
+    </section>
+
+    <section class="border-b border-brand-ink/10">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
+            <div class="flex min-w-0 items-start gap-3">
+                <x-icon-badge>
+                    <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Channels') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where alerts go') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Subscribe Slack, email, and other channels to Edge deploys, domains, usage, and RUM breaches — the same channel system as BYO sites.') }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a
+                    href="{{ route('profile.notification-channels') }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-bell class="h-4 w-4 shrink-0" />
+                    {{ __('My channels') }}
+                </a>
+                @if ($site->organization_id)
+                    <a
+                        href="{{ route('organizations.notification-channels', $site->organization_id) }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0" />
+                        {{ __('Organization channels') }}
+                    </a>
+                @endif
+            </div>
+        </div>
+
+        <div class="space-y-3 px-5 py-5 sm:px-6">
+            @include('livewire.partials.notification-channel-matrix', [
+                'channels' => $assignableNotificationChannels,
+                'eventGroups' => $notificationEventGroups,
+                'selections' => $channelEventSelections,
+                'model' => 'channelEventSelections',
+                'showFilter' => false,
+            ])
+        </div>
+
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+            <span wire:loading.inline-flex wire:target="saveEdgeAlertNotificationSubscriptions" class="mr-3 inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+                <x-spinner size="sm" variant="muted" />
+                {{ __('Saving…') }}
+            </span>
+            @can('update', $site)
+                <x-primary-button
+                    type="button"
+                    wire:click="saveEdgeAlertNotificationSubscriptions"
+                    wire:loading.attr="disabled"
+                    wire:target="saveEdgeAlertNotificationSubscriptions"
+                >
+                    <span wire:loading.remove wire:target="saveEdgeAlertNotificationSubscriptions">{{ __('Save subscriptions') }}</span>
+                    <span wire:loading wire:target="saveEdgeAlertNotificationSubscriptions">{{ __('Saving…') }}</span>
+                </x-primary-button>
+            @endcan
+        </div>
+    </section>
+
+    <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
         <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Thresholds') }}</p>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Checked hourly against the last 60 minutes. Breaches notify via your channels (6h cooldown per kind).') }}</p>
+        <p class="mt-1 text-sm text-brand-moss">{{ __('Checked hourly against the last 60 minutes. Breaches notify via the channels above (6h cooldown per kind).') }}</p>
 
         <div class="mt-4 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
             <div class="grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-[1fr_9rem] sm:items-center">
@@ -68,7 +155,7 @@
         </span>
         @can('update', $site)
             <button type="button" wire:click="save" wire:loading.attr="disabled" wire:target="save" class="rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60">
-                {{ __('Save') }}
+                {{ __('Save thresholds') }}
             </button>
         @endcan
     </div>
@@ -127,4 +214,6 @@ alerts:
             </x-edge-yaml-example>
         </div>
     </details>
+
+    @include('livewire.partials.create-notification-channel-modal')
 </div>

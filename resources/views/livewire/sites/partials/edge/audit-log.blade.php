@@ -21,6 +21,21 @@
 @endphp
 
 <div>
+    <section class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
+        @include('livewire.sites.edge.workspace.partials.feature-guide', [
+            'docSlug' => 'edge-audit',
+            'what' => __('Control-plane audit trail for this Edge site — who changed settings, bindings, firewall, members, and more.'),
+            'steps' => [
+                __('Scan recent events after an incident or unexpected config change.'),
+                __('Export CSV or JSON when you need a copy outside the dashboard.'),
+            ],
+            'tips' => [
+                __('This is the dply audit log, not Cloudflare’s account audit log.'),
+                __('Deploy history itself lives under Deploys / Build & deploy logs.'),
+            ],
+        ])
+    </section>
+
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-3 sm:px-6">
         <p class="text-xs text-brand-moss">{{ __('Last 100 events · read-only') }}</p>
         <div class="flex items-center gap-2">

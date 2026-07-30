@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Edge\Support\EdgeSiteHasWorker;
 use Laravel\Pennant\Feature;
 
 /**
@@ -252,17 +253,24 @@ final class SiteSettingsSidebar
         $edgeMeta = $site->edgeMeta();
         $isPreviewChild = ! empty($edgeMeta['preview_parent_site_id']);
 
+        $hasWorker = EdgeSiteHasWorker::for($site);
+
         // Group order follows first appearance: Deploy → Networking (CDN /
         // redirects) → Site (app features) → Background → Access → Observe.
+        // Bindings / Crons / Jobs need a per-site Worker (SSR or middleware).
         $items = [
             ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
             ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
             ['id' => 'edge-build', 'label' => __('Build'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
             ['id' => 'edge-environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'deploy'],
             ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],
-            ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'deploy'],
-            ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'],
         ];
+
+        if ($hasWorker) {
+            $items[] = ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'deploy'];
+        }
+
+        $items[] = ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'];
 
         if (! $isPreviewChild) {
             $items[] = ['id' => 'edge-delivery', 'label' => __('Delivery'), 'icon' => 'heroicon-o-cloud', 'group' => 'networking'];
@@ -275,8 +283,15 @@ final class SiteSettingsSidebar
             ['id' => 'edge-forms', 'label' => __('Forms'), 'icon' => 'heroicon-o-inbox', 'group' => 'site'],
             ['id' => 'edge-snippets', 'label' => __('Snippets'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'site'],
             ['id' => 'edge-tags', 'label' => __('Tags'), 'icon' => 'heroicon-o-tag', 'group' => 'site'],
-            ['id' => 'edge-crons', 'label' => __('Crons'), 'icon' => 'heroicon-o-clock', 'group' => 'background'],
-            ['id' => 'edge-jobs', 'label' => __('Jobs'), 'icon' => 'heroicon-o-rectangle-stack', 'group' => 'background'],
+        ];
+
+        if ($hasWorker) {
+            $items[] = ['id' => 'edge-crons', 'label' => __('Crons'), 'icon' => 'heroicon-o-clock', 'group' => 'background'];
+            $items[] = ['id' => 'edge-jobs', 'label' => __('Jobs'), 'icon' => 'heroicon-o-rectangle-stack', 'group' => 'background'];
+        }
+
+        $items = [
+            ...$items,
             ['id' => 'edge-firewall', 'label' => __('Firewall'), 'icon' => 'heroicon-o-shield-check', 'group' => 'access'],
             ['id' => 'edge-bot-protection', 'label' => __('Bot protection'), 'icon' => 'heroicon-o-finger-print', 'group' => 'access'],
             ['id' => 'edge-rate-limits', 'label' => __('Rate limits'), 'icon' => 'heroicon-o-no-symbol', 'group' => 'access'],
