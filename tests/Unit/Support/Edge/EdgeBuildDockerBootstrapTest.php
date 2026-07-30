@@ -17,3 +17,15 @@ test('local desktop environment detects testing/local app env', function () {
 
     expect(EdgeBuildDockerBootstrap::isLocalDesktopEnvironment())->toBeTrue();
 });
+
+test('queue user defaults to www-data for control-plane Horizon', function () {
+    config(['edge.build.docker_user' => 'www-data']);
+
+    expect(EdgeBuildDockerBootstrap::queueUser())->toBe('www-data');
+});
+
+test('queue user rejects invalid names', function () {
+    config(['edge.build.docker_user' => 'www-data;rm']);
+
+    expect(EdgeBuildDockerBootstrap::queueUser())->toBe('www-data');
+});

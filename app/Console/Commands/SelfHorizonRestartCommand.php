@@ -75,6 +75,10 @@ class SelfHorizonRestartCommand extends Command
             $this->warn('[dply] supervisor sync skipped: '.$e->getMessage());
         }
 
+        // Fail-soft: if this process can elevate (root / sudo -n), keep Docker
+        // ready for Edge builds (Horizon user = www-data on control-plane workers).
+        $this->maybeEnsureEdgeBuildDocker();
+
         try {
             Artisan::call('horizon:terminate');
             $this->info('[dply] horizon:terminate signalled; supervisor (Restart=always) relaunches it on the new release.');
@@ -113,5 +117,27 @@ class SelfHorizonRestartCommand extends Command
         }
 
         return $count;
+    }
+
+    private function maybeEnsureEdgeBuildDocker(): void
+    {
+        try {
+            $check = Artisan::call('dply:edge:ensure-build-docker', ['--check' => true]);
+            if ($check === self::SUCCESS) {
+                return;
+            }
+
+            $this->warn('[dply] Docker not ready for Edge builds — attempting ensure (needs root or passwordless sudo)…');
+            $exit = Artisan::call('dply:edge:ensure-build-docker');
+            $output = trim(Artisan::output());
+            if ($output !== '') {
+                $this->line($output);
+            }
+            if ($exit !== self::SUCCESS) {
+                $this->warn('[dply] Edge Docker ensure failed — run once as root on this worker: sudo php artisan dply:edge:ensure-build-docker');
+            }
+        } catch (Throwable $e) {
+            $this->warn('[dply] Edge Docker ensure skipped: '.$e->getMessage());
+        }
     }
 }

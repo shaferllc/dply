@@ -72,10 +72,25 @@ Web tier: nginx + php-fpm are **not** in these snippets — configure them separ
 3. **Worker 1** — pull → `horizon:terminate` → restart Horizon + `schedule:work`
 4. **Web** — pull → reload php-fpm (realtime is the Cloudflare relay — nothing to restart on-box)
 
+## Edge build Docker (workers)
+
+Horizon drains Edge builds as **`www-data`**. Each worker needs a working Docker
+daemon and socket access for that user (not the SSH user `dply`).
+
+```bash
+# Once per worker (as root), then recycle Horizon
+sudo php artisan dply:edge:ensure-build-docker
+php artisan horizon:terminate
+```
+
+Or provision workers with `DPLY_PROVISION_EDGE_BUILD_DOCKER=true`. Self-deploy's
+`dply:self-horizon-restart` will try to ensure Docker when the process can
+elevate; otherwise `dply:runtime:check` keeps failing until the one-shot above.
+
 ## Health checks
 
 - Supervisor auto-restart on each box
-- `php artisan dply:runtime:check` (included in worker supervisor templates every 5 minutes)
+- `php artisan dply:runtime:check` (included in worker supervisor templates every 5 minutes; includes Docker probe)
 - `php artisan dply:about` shows runtime mode and configuration warnings
 - Horizon dashboard on web for queue wait times and both worker masters
 

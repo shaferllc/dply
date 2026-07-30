@@ -1278,9 +1278,9 @@ class EdgeBuildRunner
         if (! (bool) config('edge.build.docker_autoinstall', true)) {
             throw new RuntimeException(
                 'Edge build requires Docker but the daemon is not reachable. '
-                .'On the control-plane build worker run: '
-                .'`sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>` '
-                .'then `php artisan horizon:terminate`. '
+                .'On the control-plane worker run: '
+                .'`sudo php artisan dply:edge:ensure-build-docker` '
+                .'(grants '.EdgeBuildDockerBootstrap::queueUser().') then `php artisan horizon:terminate`. '
                 ."Detail: {$probe}"
             );
         }
@@ -1292,11 +1292,12 @@ class EdgeBuildRunner
         }
 
         $after = EdgeBuildDockerBootstrap::probeDetail();
+        $user = EdgeBuildDockerBootstrap::queueUser();
         throw new RuntimeException(
-            'Edge build could not start Docker on this production build worker. '
-            .'Horizon usually lacks passwordless sudo — fix once as root: '
-            .'`sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>` '
-            .'then recycle workers (`php artisan horizon:terminate`). '
+            'Edge build could not start Docker on this control-plane worker. '
+            ."Horizon runs as {$user} and usually lacks passwordless sudo — fix once as root: "
+            .'`sudo php artisan dply:edge:ensure-build-docker` '
+            .'then `php artisan horizon:terminate`. '
             .'Verify with `php artisan dply:edge:ensure-build-docker --check`. '
             ."Detail: {$after}"
         );
@@ -1308,15 +1309,8 @@ class EdgeBuildRunner
      */
     private function installDocker(string $buildLog): void
     {
-        $user = function_exists('posix_geteuid') && function_exists('posix_getpwuid')
-            ? (string) (posix_getpwuid(posix_geteuid())['name'] ?? get_current_user())
-            : (string) get_current_user();
-        if (trim($user) === '') {
-            $user = 'forge';
-        }
-
         EdgeBuildDockerBootstrap::ensure(
-            $user,
+            EdgeBuildDockerBootstrap::queueUser(),
             fn (string $chunk) => $this->appendBuildLog($buildLog, $chunk),
         );
     }

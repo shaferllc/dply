@@ -182,7 +182,8 @@ class EdgeDoctorCommand extends Command
             'name' => 'edge_build_docker',
             'ok' => false,
             'detail' => 'Docker daemon not reachable from this host ('.EdgeBuildDockerBootstrap::probeDetail()
-                .'). Edge builds fail until you run: sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>',
+                .'). Edge builds fail until you run (as root on this worker): '
+                .'sudo php artisan dply:edge:ensure-build-docker --user='.EdgeBuildDockerBootstrap::queueUser(),
         ];
     }
 

@@ -48,15 +48,12 @@ trait BuildsProvisionRoles
 
     /**
      * Docker for the box that runs Edge builds. Edge builds compile the
-     * customer repo inside a throwaway container on whichever worker drains
-     * the queue (dply's own control-plane worker, not a customer server), so
-     * that box needs Docker present and the deploy user in the docker group.
+     * customer repo inside a throwaway container on dply's own control-plane
+     * workers (Horizon as www-data — deploy/supervisor/dply-worker*.conf),
+     * not on customer VMs.
      *
-     * Off by default — customer application/worker boxes never build Edge
-     * sites, so we don't want to install a container runtime on them. dply
-     * enables it (DPLY_PROVISION_EDGE_BUILD_DOCKER=true) on its own control-
-     * plane workers so Docker is guaranteed there instead of relying on the
-     * deploy-time self-heal in EdgeBuildRunner::installDocker().
+     * Off by default — enable with DPLY_PROVISION_EDGE_BUILD_DOCKER=true on
+     * control-plane workers that drain `dply-provision`.
      *
      * @return list<string>
      */
@@ -66,7 +63,22 @@ trait BuildsProvisionRoles
             return [];
         }
 
-        $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
+        // Horizon process user (www-data) — required for builds.
+        $horizonUser = trim((string) config('edge.build.docker_user', 'www-data'));
+        if ($horizonUser === '' || preg_match('/^[a-z_][a-z0-9_-]*\$?$/i', $horizonUser) !== 1) {
+            $horizonUser = 'www-data';
+        }
+        // SSH deploy account — useful for operator `docker` CLI over SSH.
+        $deployUser = trim((string) config('server_provision.deploy_ssh_user', 'dply'));
+
+        $groupLines = [
+            'id '.escapeshellarg($horizonUser).' >/dev/null 2>&1 && usermod -aG docker '.escapeshellarg($horizonUser).' || true',
+        ];
+        if ($deployUser !== '' && $deployUser !== $horizonUser) {
+            $groupLines[] = 'id '.escapeshellarg($deployUser).' >/dev/null 2>&1 && usermod -aG docker '.escapeshellarg($deployUser).' || true';
+        }
+        // Immediate socket ACL so the first build works before Horizon recycle.
+        $groupLines[] = 'if [ -S /var/run/docker.sock ]; then setfacl -m "u:'.$horizonUser.':rw" /var/run/docker.sock 2>/dev/null || true; fi';
 
         $lines = $this->withStep('Installing Docker for Edge builds', [
             ...$this->ensurePackagesInstalled(
@@ -74,14 +86,10 @@ trait BuildsProvisionRoles
                 '[dply] docker packages already installed; skipping package install.'
             ),
             'systemctl enable --now docker',
-            // Let the queue worker talk to the daemon socket without sudo. The
-            // group change applies on the worker's next login/restart; the
-            // runtime self-heal (setfacl on the socket) covers the very first
-            // build if the worker hasn't been recycled yet.
-            'id '.escapeshellarg($deployUser).' >/dev/null 2>&1 && usermod -aG docker '.escapeshellarg($deployUser).' || true',
+            ...$groupLines,
         ]);
 
-        $lines[] = 'echo '.escapeshellarg(self::VERIFY_PREFIX.'edge_build_docker :: ok :: Docker present for Edge builds');
+        $lines[] = 'echo '.escapeshellarg(self::VERIFY_PREFIX.'edge_build_docker :: ok :: Docker present for Edge builds (user '.$horizonUser.')');
 
         return $lines;
     }

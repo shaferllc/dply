@@ -13,6 +13,20 @@ use Illuminate\Support\Facades\Process;
  */
 final class EdgeBuildDockerBootstrap
 {
+    /**
+     * User that must reach the Docker socket (Horizon / warm-images).
+     * Defaults to www-data — see deploy/supervisor/dply-worker*.conf.
+     */
+    public static function queueUser(): string
+    {
+        $configured = trim((string) config('edge.build.docker_user', 'www-data'));
+        if ($configured !== '' && preg_match('/^[a-z_][a-z0-9_-]*\$?$/i', $configured) === 1) {
+            return $configured;
+        }
+
+        return 'www-data';
+    }
+
     public static function daemonReachable(): bool
     {
         return Process::timeout(10)

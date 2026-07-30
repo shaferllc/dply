@@ -126,33 +126,35 @@ Custom domains attach per-site via the Edge dashboard; Laravel writes KV entries
 
 ## 6. Build workers (Docker on the control plane)
 
-Edge builds (`BuildEdgeSiteJob`) run on the **same Linux host that drains Horizon**
-(queue `dply-provision` by default) — not on customer VMs. The Worker/R2 path still
-serves from Cloudflare; Docker only sandboxes the customer `npm`/`pnpm` build.
+Edge builds (`BuildEdgeSiteJob`) run on dply's **control-plane worker** VMs
+(`DPLY_RUNTIME=worker`, queue `dply-provision`) — not customer VMs. Horizon and
+warm-images run as **`www-data`** (`deploy/supervisor/dply-worker*.conf`). The
+SSH deploy account is usually `dply`; Docker access must be granted to
+**www-data**.
 
-If deploys fail with *passwordless sudo* / *daemon unreachable*, Docker was never
-bootstrapped for the Horizon user. Fix once as root on that host:
+If deploys fail with *passwordless sudo* / *daemon unreachable*, bootstrap once
+as root on each worker:
 
 ```bash
-# Replace forge with the user that runs Horizon / queue:work
-sudo php artisan dply:edge:ensure-build-docker --user=forge
-php artisan horizon:terminate   # workers pick up the docker group
+sudo php artisan dply:edge:ensure-build-docker          # defaults to www-data
+php artisan horizon:terminate
 php artisan dply:edge:ensure-build-docker --check
-php artisan dply:edge:warm-build-images   # optional: pre-pull node images
+php artisan dply:edge:warm-build-images                   # optional
 ```
 
-`dply:edge:doctor` also reports whether the Docker daemon is reachable from this host.
+New control-plane workers: set `DPLY_PROVISION_EDGE_BUILD_DOCKER=true` so
+provision installs Docker and adds `www-data` (+ `dply`) to the docker group.
+
+`dply:edge:doctor` and `dply:runtime:check` both probe the Docker daemon.
 
 ```dotenv
 DPLY_EDGE_BUILD_IMAGE=node:20-bookworm
 DPLY_EDGE_BUILD_TIMEOUT=900
 DPLY_EDGE_ARTIFACT_MAX_BYTES=524288000
-# Optional: default --user for ensure-build-docker when run without --user
-# DPLY_EDGE_BUILD_DOCKER_USER=forge
+# Horizon user on workers (default www-data — see deploy/supervisor/)
+# DPLY_EDGE_BUILD_DOCKER_USER=www-data
+# DPLY_PROVISION_EDGE_BUILD_DOCKER=true   # on control-plane workers only
 ```
-
-Deploy-time autoinstall still tries when the queue user has passwordless `sudo -n`;
-on typical Forge/prod hosts it does not — use the artisan command above.
 
 ## 7. Smoke test
 

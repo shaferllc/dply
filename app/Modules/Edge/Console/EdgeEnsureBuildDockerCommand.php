@@ -10,22 +10,26 @@ use Illuminate\Console\Command;
 /**
  * One-shot bootstrap for the Linux host that drains Edge build jobs.
  *
- * Horizon typically runs as forge/www-data/dply without passwordless sudo, so
- * deploy-time autoinstall in EdgeBuildRunner fails. Run this once as root on
- * the control-plane / build worker, then recycle queue workers.
+ * dply's own control-plane workers run Horizon as www-data
+ * ({@see deploy/supervisor/dply-worker-primary.conf}). Deploy-time autoinstall
+ * from that user fails without passwordless sudo — run this once as root on
+ * each worker, then recycle Horizon.
  *
- *   sudo php artisan dply:edge:ensure-build-docker --user=forge
+ *   sudo php artisan dply:edge:ensure-build-docker
+ *   php artisan horizon:terminate
  */
 class EdgeEnsureBuildDockerCommand extends Command
 {
     protected $signature = 'dply:edge:ensure-build-docker
-                            {--user= : Linux user that runs Horizon / queue:work (default: current user)}
+                            {--user= : Linux user that runs Horizon (default: edge.build.docker_user / www-data)}
                             {--check : Only probe the daemon; do not install}';
 
-    protected $description = 'Install/start Docker Engine on this host for Edge builds (run as root on prod workers)';
+    protected $description = 'Install/start Docker Engine on this host for Edge builds (run as root on control-plane workers)';
 
     public function handle(): int
     {
+        $user = $this->resolveUser();
+
         if ($this->option('check')) {
             if (EdgeBuildDockerBootstrap::daemonReachable()) {
                 $this->info('Docker daemon reachable ('.EdgeBuildDockerBootstrap::probeDetail().').');
@@ -34,14 +38,13 @@ class EdgeEnsureBuildDockerCommand extends Command
             }
 
             $this->error('Docker daemon not reachable: '.EdgeBuildDockerBootstrap::probeDetail());
-            $this->line('Fix: sudo php artisan dply:edge:ensure-build-docker --user=<horizon-user>');
+            $this->line('Fix (as root on this worker): sudo php artisan dply:edge:ensure-build-docker --user='.$user);
 
             return self::FAILURE;
         }
 
         if (EdgeBuildDockerBootstrap::daemonReachable()) {
             $this->info('Docker already reachable ('.EdgeBuildDockerBootstrap::probeDetail().').');
-            $user = $this->resolveUser();
             $this->line("Ensuring socket access for {$user}…");
         }
 
@@ -51,8 +54,7 @@ class EdgeEnsureBuildDockerCommand extends Command
             return self::FAILURE;
         }
 
-        $user = $this->resolveUser();
-        $this->info("Installing/starting Docker for queue user [{$user}]…");
+        $this->info("Installing/starting Docker for Horizon user [{$user}]…");
 
         $result = EdgeBuildDockerBootstrap::ensure(
             $user,
@@ -71,7 +73,7 @@ class EdgeEnsureBuildDockerCommand extends Command
 
         $this->newLine();
         $this->info('Docker ready ('.$result['detail'].').');
-        $this->warn('Restart Horizon / queue workers so they pick up the docker group: php artisan horizon:terminate');
+        $this->warn('Restart Horizon so workers pick up the docker group: php artisan horizon:terminate');
 
         return self::SUCCESS;
     }
@@ -83,20 +85,6 @@ class EdgeEnsureBuildDockerCommand extends Command
             return trim($option);
         }
 
-        $envUser = trim((string) env('DPLY_EDGE_BUILD_DOCKER_USER', ''));
-        if ($envUser !== '') {
-            return $envUser;
-        }
-
-        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
-            $pw = posix_getpwuid(posix_geteuid());
-            if (is_array($pw) && is_string($pw['name'] ?? null) && $pw['name'] !== '' && $pw['name'] !== 'root') {
-                return $pw['name'];
-            }
-        }
-
-        $current = trim((string) get_current_user());
-
-        return $current !== '' ? $current : 'forge';
+        return EdgeBuildDockerBootstrap::queueUser();
     }
 }
