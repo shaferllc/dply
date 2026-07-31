@@ -9,15 +9,32 @@ use Illuminate\Support\Str;
 |
 | Queues are defined here — no HORIZON_QUEUES env needed.
 |
-|   supervisor-heavy → Edge builds, BYO deploys, long work
-|   supervisor-fast  → notifications, insights, probes, short work
+|   supervisor-build  → Edge builds/publishes — CPU + RAM bound (docker run)
+|   supervisor-deploy → BYO deploys / remote tasks — I/O bound (blocked on SSH)
+|   supervisor-fast   → notifications, insights, probes, short work
+|
+| Build and deploy work used to share one `supervisor-heavy` pool. They want
+| opposite concurrency: builds saturate cores (keep processes ≈ vCPU), while
+| deploys sit idle waiting on SSH (over-subscribe freely). Pooling them also let
+| one long Astro build skew the `time` autoscaling maths and starve the other
+| queue. Keep them split.
+|
+| NOTE: the generic HORIZON_MAX_PROCESSES / HORIZON_MIN_PROCESSES /
+| HORIZON_BALANCE / HORIZON_TRIES / HORIZON_WORKER_MEMORY / HORIZON_JOB_TIMEOUT
+| env vars are NOT read here — they belong to the customer worker-pool feature
+| ({@see App\Support\WorkerPools\WorkerPoolHorizonConfig}), which templates them
+| onto customer boxes. The control plane's own knobs are the HORIZON_BUILD_* /
+| HORIZON_DEPLOY_* / HORIZON_FAST_* names below.
 |
 | Add a queue name below when you introduce a new Redis list.
 |
 */
 
-$heavyQueues = [
+$buildQueues = [
     'dply-provision', // Edge build/publish, server provision
+];
+
+$deployQueues = [
     'dply',           // BYO deploys, general control-plane work
 ];
 
@@ -81,11 +98,32 @@ return [
 
     'memory_limit' => 64,
 
+    /*
+     * balanceMaxShift / balanceCooldown: Horizon's defaults (1 process per 3s)
+     * mean a pool takes ~18s of sustained backlog to walk from min to max — so
+     * bursts shorter than that never reach max at all. Shift faster.
+     */
     'defaults' => [
-        'supervisor-heavy' => [
+        'supervisor-build' => [
             'connection' => 'redis',
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
+            'balanceMaxShift' => 5,
+            'balanceCooldown' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            // Build output/log streaming is held in PHP while docker does the
+            // real work — 128M leaves no headroom on a big build log.
+            'memory' => 256,
+            'tries' => 1,
+            'nice' => 0,
+        ],
+        'supervisor-deploy' => [
+            'connection' => 'redis',
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'balanceMaxShift' => 5,
+            'balanceCooldown' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
@@ -96,6 +134,8 @@ return [
             'connection' => 'redis',
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
+            'balanceMaxShift' => 5,
+            'balanceCooldown' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
@@ -107,29 +147,43 @@ return [
     'environments' => [
 
         'production' => [
-            'supervisor-heavy' => [
-                'queue' => $heavyQueues,
-                // Edge builds + provision are CPU/IO heavy — keep at least two
-                // processes ready so a long Astro build doesn't stall the queue.
-                'minProcesses' => (int) env('HORIZON_HEAVY_MIN_PROCESSES', 2),
-                'maxProcesses' => (int) env('HORIZON_HEAVY_MAX_PROCESSES', 8),
-                'timeout' => 7320,
+            // Builds saturate cores — keep maxProcesses at or below the worker
+            // box's vCPU count or concurrent `docker run` builds thrash.
+            'supervisor-build' => [
+                'queue' => $buildQueues,
+                'minProcesses' => (int) env('HORIZON_BUILD_MIN_PROCESSES', 2),
+                'maxProcesses' => (int) env('HORIZON_BUILD_MAX_PROCESSES', (int) env('HORIZON_HEAVY_MAX_PROCESSES', 4)),
+                'timeout' => (int) env('HORIZON_BUILD_TIMEOUT', 7320),
+            ],
+            // Deploys block on SSH round-trips, not CPU — over-subscribe.
+            'supervisor-deploy' => [
+                'queue' => $deployQueues,
+                'minProcesses' => (int) env('HORIZON_DEPLOY_MIN_PROCESSES', 2),
+                'maxProcesses' => (int) env('HORIZON_DEPLOY_MAX_PROCESSES', 16),
+                'timeout' => (int) env('HORIZON_DEPLOY_TIMEOUT', 3600),
             ],
             'supervisor-fast' => [
                 'queue' => $fastQueues,
-                'minProcesses' => 1,
-                'maxProcesses' => 10,
+                'minProcesses' => (int) env('HORIZON_FAST_MIN_PROCESSES', 1),
+                'maxProcesses' => (int) env('HORIZON_FAST_MAX_PROCESSES', 10),
                 'timeout' => 900,
             ],
         ],
 
         'local' => [
-            'supervisor-heavy' => [
-                'queue' => $heavyQueues,
+            'supervisor-build' => [
+                'queue' => $buildQueues,
                 'balance' => 'simple',
-                'minProcesses' => (int) env('HORIZON_HEAVY_MIN_PROCESSES', 1),
-                'maxProcesses' => (int) env('HORIZON_HEAVY_MAX_PROCESSES', 5),
-                'timeout' => 7320,
+                'minProcesses' => (int) env('HORIZON_BUILD_MIN_PROCESSES', 1),
+                'maxProcesses' => (int) env('HORIZON_BUILD_MAX_PROCESSES', (int) env('HORIZON_HEAVY_MAX_PROCESSES', 3)),
+                'timeout' => (int) env('HORIZON_BUILD_TIMEOUT', 7320),
+            ],
+            'supervisor-deploy' => [
+                'queue' => $deployQueues,
+                'balance' => 'simple',
+                'minProcesses' => 1,
+                'maxProcesses' => (int) env('HORIZON_DEPLOY_MAX_PROCESSES', 4),
+                'timeout' => (int) env('HORIZON_DEPLOY_TIMEOUT', 3600),
             ],
             'supervisor-fast' => [
                 'queue' => $fastQueues,

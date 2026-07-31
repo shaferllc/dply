@@ -16,6 +16,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Cloud\Services\VultrService;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -302,6 +303,38 @@ class StepWhere extends Component
         }
 
         $this->form->do_vpcs_loading = false;
+    }
+
+    public function loadVultrVpcs(): void
+    {
+        if ($this->form->type !== 'vultr' || $this->form->region === '' || $this->form->provider_credential_id === '') {
+            return;
+        }
+
+        $credential = ProviderCredential::query()->find($this->form->provider_credential_id);
+        if (! $credential || $credential->provider !== 'vultr') {
+            return;
+        }
+
+        $this->form->vultr_vpcs_loading = true;
+
+        try {
+            $vultr = new VultrService($credential);
+            $this->form->vultr_vpcs = array_map(
+                static fn (array $vpc): array => [
+                    'id' => $vpc['id'],
+                    'name' => $vpc['description'] !== '' ? $vpc['description'] : $vpc['id'],
+                    'ip_range' => $vpc['v4_subnet'] !== '' && $vpc['v4_subnet_mask'] > 0
+                        ? $vpc['v4_subnet'].'/'.$vpc['v4_subnet_mask']
+                        : '',
+                ],
+                $vultr->listVpcs($this->form->region),
+            );
+        } catch (\Throwable) {
+            $this->form->vultr_vpcs = [];
+        }
+
+        $this->form->vultr_vpcs_loading = false;
     }
 
     #[On('personal-ssh-key-created')]

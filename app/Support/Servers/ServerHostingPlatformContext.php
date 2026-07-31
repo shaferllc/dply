@@ -53,7 +53,7 @@ final readonly class ServerHostingPlatformContext
     {
         $key = $provider->value;
         $fallback = $provider === ServerProvider::Vultr
-            ? ['region' => 'ewr', 'image' => '2152']
+            ? ['region' => 'ewr', 'image' => '2284']
             : ['region' => 'fsn1', 'image' => 'ubuntu-24.04'];
 
         return new self(

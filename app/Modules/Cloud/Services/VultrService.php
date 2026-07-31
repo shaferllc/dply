@@ -71,14 +71,16 @@ class VultrService
     /**
      * Create a new instance and return its ID.
      *
-     * @param  array<string, mixed> $sshKeyIds  SSH key IDs from createSshKey()
+     * @param  list<string>  $sshKeyIds  SSH key IDs from createSshKey()
+     * @param  list<string>  $vpcIds  Optional VPC network IDs to attach at create (`vpc_ids`)
      */
     public function createInstance(
         string $region,
         string $plan,
         int $osId,
         string $label,
-        array $sshKeyIds = []
+        array $sshKeyIds = [],
+        array $vpcIds = [],
     ): string {
         $body = [
             'region' => $region,
@@ -88,6 +90,13 @@ class VultrService
         ];
         if ($sshKeyIds !== []) {
             $body['sshkey_id'] = $sshKeyIds;
+        }
+        $vpcIds = array_values(array_filter(array_map(
+            static fn (mixed $id): string => is_string($id) ? trim($id) : '',
+            $vpcIds,
+        )));
+        if ($vpcIds !== []) {
+            $body['vpc_ids'] = $vpcIds;
         }
 
         $response = $this->request('post', '/instances', $body);
@@ -104,10 +113,77 @@ class VultrService
     }
 
     /**
+     * Create a VPC network. Returns the new VPC id.
+     */
+    public function createVpc(
+        string $region,
+        string $description,
+        string $v4Subnet = '10.50.0.0',
+        int $v4SubnetMask = 24,
+    ): string {
+        $response = $this->request('post', '/vpcs', [
+            'region' => $region,
+            'description' => $description,
+            'v4_subnet' => $v4Subnet,
+            'v4_subnet_mask' => $v4SubnetMask,
+        ]);
+        $this->assertSuccess($response, 'create VPC');
+
+        $vpc = $response->json('vpc');
+        $id = is_array($vpc) ? ($vpc['id'] ?? null) : null;
+        if (! is_string($id) || trim($id) === '') {
+            throw new \RuntimeException('Vultr API did not return VPC id.');
+        }
+
+        return trim($id);
+    }
+
+    /**
+     * List VPC networks in the account (optionally filtered to a region).
+     *
+     * @return list<array{id: string, description: string, region: string, v4_subnet: string, v4_subnet_mask: int}>
+     */
+    public function listVpcs(?string $region = null): array
+    {
+        $response = $this->request('get', '/vpcs');
+        $this->assertSuccess($response, 'list VPCs');
+
+        $raw = $response->json('vpcs');
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $region = $region !== null ? trim($region) : '';
+        $out = [];
+        foreach ($raw as $vpc) {
+            if (! is_array($vpc)) {
+                continue;
+            }
+            $id = trim((string) ($vpc['id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $vpcRegion = trim((string) ($vpc['region'] ?? ''));
+            if ($region !== '' && $vpcRegion !== '' && $vpcRegion !== $region) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'description' => trim((string) ($vpc['description'] ?? $id)),
+                'region' => $vpcRegion,
+                'v4_subnet' => trim((string) ($vpc['v4_subnet'] ?? '')),
+                'v4_subnet_mask' => (int) ($vpc['v4_subnet_mask'] ?? 0),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Get instance by ID. Returns decoded JSON.
+     *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getInstance(string $id): array
     {
         $response = $this->request('get', '/instances/'.$id);
@@ -120,6 +196,92 @@ class VultrService
         }
 
         return $instance;
+    }
+
+    /**
+     * Find a firewall group by description (exact or contains). Null when missing.
+     */
+    public function findFirewallGroupByDescription(string $description): ?string
+    {
+        $needle = strtolower(trim($description));
+        if ($needle === '') {
+            return null;
+        }
+        $response = $this->request('get', '/firewalls');
+        $this->assertSuccess($response, 'list firewall groups');
+        foreach ($response->json('firewall_groups') ?? [] as $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+            $desc = strtolower(trim((string) ($group['description'] ?? '')));
+            $id = trim((string) ($group['id'] ?? ''));
+            if ($id !== '' && ($desc === $needle || str_contains($desc, $needle))) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create a firewall group. Returns group id.
+     */
+    public function createFirewallGroup(string $description): string
+    {
+        $response = $this->request('post', '/firewalls', [
+            'description' => $description,
+        ]);
+        $this->assertSuccess($response, 'create firewall group');
+        $group = $response->json('firewall_group');
+        $id = is_array($group) ? trim((string) ($group['id'] ?? '')) : '';
+        if ($id === '') {
+            throw new \RuntimeException('Vultr API did not return firewall group id.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * @param  array{protocol: string, port?: string, subnet: string, subnet_size: int, notes?: string, ip_type?: string}  $rule
+     */
+    public function createFirewallRule(string $firewallGroupId, array $rule): void
+    {
+        $body = [
+            'ip_type' => $rule['ip_type'] ?? 'v4',
+            'protocol' => $rule['protocol'],
+            'subnet' => $rule['subnet'],
+            'subnet_size' => $rule['subnet_size'],
+            'notes' => $rule['notes'] ?? '',
+        ];
+        $port = trim((string) ($rule['port'] ?? ''));
+        if ($port !== '' && ($rule['protocol'] ?? '') !== 'icmp') {
+            $body['port'] = $port;
+        }
+        $response = $this->request('post', '/firewalls/'.$firewallGroupId.'/rules', $body);
+        $this->assertSuccess($response, 'create firewall rule');
+    }
+
+    /**
+     * Attach a firewall group to an instance.
+     */
+    public function attachFirewallGroup(string $instanceId, string $firewallGroupId): void
+    {
+        $response = $this->request('patch', '/instances/'.$instanceId, [
+            'firewall_group_id' => $firewallGroupId,
+        ]);
+        $this->assertSuccess($response, 'attach firewall group');
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listInstances(): array
+    {
+        $response = $this->request('get', '/instances');
+        $this->assertSuccess($response, 'list instances');
+        $raw = $response->json('instances');
+
+        return is_array($raw) ? array_values(array_filter($raw, 'is_array')) : [];
     }
 
     /**
@@ -168,6 +330,13 @@ class VultrService
     {
         foreach ($instance['vpcs'] ?? [] as $vpc) {
             $id = is_array($vpc) ? ($vpc['id'] ?? null) : null;
+            if (is_string($id) && trim($id) !== '') {
+                return trim($id);
+            }
+        }
+
+        // Create responses often expose attached networks as a flat id list.
+        foreach ($instance['vpc_ids'] ?? [] as $id) {
             if (is_string($id) && trim($id) !== '') {
                 return trim($id);
             }

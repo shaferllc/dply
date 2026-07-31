@@ -35,7 +35,7 @@ const EDGE_COMMANDS = {
   open: { handler: commands.open, summary: 'Open live URL (--dashboard for workspace).' },
   rollback: { handler: commands.rollback, summary: 'Re-point production at a prior deployment.' },
   promote: { handler: commands.promote, summary: 'Promote a preview to production.' },
-  previews: { handler: commands.previews, summary: 'list | create --commit X | rm <id>' },
+  previews: { handler: commands.previews, summary: 'list | create [--commit|--branch] [--wait] | rm <id>' },
   domains: { handler: commands.domains, summary: 'list | add <host> | verify <host> | rm <host>' },
   aliases: { handler: commands.aliases, summary: 'List per-deploy stable URLs.' },
   purge: { handler: commands.purge, summary: 'Purge edge cache by tag (--tag X).' },

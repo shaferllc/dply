@@ -33,6 +33,8 @@ return [
                 'digitalocean' => 'ubuntu-24-04-x64',
                 'hetzner' => 'ubuntu-24.04',
                 'linode' => 'linode/ubuntu24.04',
+                // Vultr uses numeric os_id (see GET /v2/os); stringified for the catalog.
+                'vultr' => '2284',
             ],
         ],
 
@@ -43,6 +45,7 @@ return [
                 'digitalocean' => 'ubuntu-22-04-x64',
                 'hetzner' => 'ubuntu-22.04',
                 'linode' => 'linode/ubuntu22.04',
+                'vultr' => '1743',
             ],
         ],
 
@@ -53,6 +56,8 @@ return [
                 'digitalocean' => 'ubuntu-20-04-x64',
                 'hetzner' => 'ubuntu-20.04',
                 'linode' => 'linode/ubuntu20.04',
+                // Vultr retired 20.04 — fall back to 22.04 for create compatibility.
+                'vultr' => '1743',
             ],
         ],
 
@@ -63,6 +68,7 @@ return [
                 'digitalocean' => 'debian-12-x64',
                 'hetzner' => 'debian-12',
                 'linode' => 'linode/debian12',
+                'vultr' => '2136',
             ],
         ],
 
@@ -73,6 +79,7 @@ return [
                 'digitalocean' => 'debian-11-x64',
                 'hetzner' => 'debian-11',
                 'linode' => 'linode/debian11',
+                'vultr' => '477',
             ],
         ],
 

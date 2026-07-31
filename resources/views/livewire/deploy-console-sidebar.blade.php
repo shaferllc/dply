@@ -108,6 +108,11 @@
                                     {{ __('Launch a Deploy or Sync to stream progress here.') }}
                                 @endif
                             </p>
+                            <p class="mt-1.5">
+                                <x-docs-link slug="sites-and-deploy" class="text-xs">
+                                    {{ __('How deploys work') }}
+                                </x-docs-link>
+                            </p>
                         </div>
                     </div>
                     <button

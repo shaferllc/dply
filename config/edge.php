@@ -137,7 +137,7 @@ return [
         'warm_images_on_schedule' => filter_var(env('DPLY_EDGE_BUILD_WARM_IMAGES_SCHEDULE', true), FILTER_VALIDATE_BOOLEAN),
         // Skip `docker pull` when `docker image inspect` succeeds locally.
         'skip_pull_if_present' => filter_var(env('DPLY_EDGE_BUILD_SKIP_PULL_IF_PRESENT', true), FILTER_VALIDATE_BOOLEAN),
-        // Long-running clone/build/publish — Horizon supervisor-heavy.
+        // Long-running clone/build/publish — Horizon supervisor-build.
         'queue' => env('DPLY_EDGE_BUILD_QUEUE', 'dply-provision'),
         'timeout_seconds' => 900,
         'artifact_max_bytes' => 524_288_000,

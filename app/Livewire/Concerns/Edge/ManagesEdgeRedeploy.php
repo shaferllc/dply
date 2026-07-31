@@ -33,10 +33,21 @@ trait ManagesEdgeRedeploy
             return;
         }
 
-        // Stay on the current workspace page (overview / deploys list).
-        // The overview live-progress card and the deploys list both
-        // wire:poll, so the new build's status shows up in place —
-        // no need to bounce the user to the deployment-detail page.
         $this->toastSuccess(__('Deploy queued.'));
+
+        // Land on Deploys so the build journey + history are visible (BYO opens
+        // the Deploy Console; Edge progress lives on this section).
+        if (
+            property_exists($this, 'section')
+            && is_string($this->section ?? null)
+            && $this->section !== 'edge-deploys'
+            && isset($this->server)
+        ) {
+            $this->redirect(route('sites.show', [
+                'server' => $this->server,
+                'site' => $this->site,
+                'section' => 'edge-deploys',
+            ]), navigate: true);
+        }
     }
 }

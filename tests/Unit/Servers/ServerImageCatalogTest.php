@@ -24,9 +24,15 @@ test('returns null for unknown keys, blank keys, or unmapped providers', functio
     expect(ServerImageCatalog::resolveSlug('digitalocean', 'windows-2022'))->toBeNull();
     expect(ServerImageCatalog::resolveSlug('digitalocean', ''))->toBeNull();
     expect(ServerImageCatalog::resolveSlug('digitalocean', null))->toBeNull();
-    // Provider with no catalog entries falls through so the job uses its config default.
-    expect(ServerImageCatalog::resolveSlug('vultr', 'ubuntu-24-04'))->toBeNull();
-    expect(ServerImageCatalog::supportsProvider('vultr'))->toBeFalse();
+    expect(ServerImageCatalog::resolveSlug('custom', 'ubuntu-24-04'))->toBeNull();
+    expect(ServerImageCatalog::supportsProvider('custom'))->toBeFalse();
+});
+
+test('offers vultr os ids as stringified catalog slugs', function () {
+    expect(ServerImageCatalog::supportsProvider('vultr'))->toBeTrue();
+    expect(ServerImageCatalog::resolveSlug('vultr', 'ubuntu-24-04'))->toBe('2284');
+    expect(ServerImageCatalog::resolveSlug('vultr', 'debian-12'))->toBe('2136');
+    expect(ServerImageCatalog::defaultKeyForProvider('vultr'))->toBe('ubuntu-24-04');
 });
 
 test('default key for provider prefers the global default when supported', function () {

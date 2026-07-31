@@ -2,12 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Enums\ServerProvider;
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\PrivateNetwork;
 use App\Models\Server;
-use App\Services\Servers\ServerPrivateNetworkRecorder;
 use App\Modules\Cloud\Services\VultrService;
+use App\Services\Servers\ServerPrivateNetworkRecorder;
+use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -27,8 +29,8 @@ class PollVultrIpJob implements ShouldQueue
 
     public function handle(): void
     {
-        $credential = $this->server->providerCredential;
-        if (! $credential) {
+        $vultr = $this->resolveVultrClient();
+        if ($vultr === null) {
             $this->server->update(['status' => Server::STATUS_ERROR]);
 
             return;
@@ -38,7 +40,6 @@ class PollVultrIpJob implements ShouldQueue
             return;
         }
 
-        $vultr = new VultrService($credential);
         $instance = $vultr->getInstance($this->server->provider_id);
         $ip = VultrService::getPublicIp($instance);
 
@@ -73,5 +74,28 @@ class PollVultrIpJob implements ShouldQueue
         }
 
         $this->release($this->backoff);
+    }
+
+    /**
+     * BYO servers use the linked credential; managed (dply-hosted) Vultr VMs
+     * have no provider_credential_id and must use the platform token.
+     */
+    private function resolveVultrClient(): ?VultrService
+    {
+        $credential = $this->server->providerCredential;
+        if ($credential !== null && $credential->provider === 'vultr') {
+            return new VultrService($credential);
+        }
+
+        if (! $this->server->usesManagedHosting()) {
+            return null;
+        }
+
+        $platform = ServerHostingPlatformContext::forOrg($this->server->organization);
+        if ($platform->provider !== ServerProvider::Vultr || ! $platform->configured()) {
+            return null;
+        }
+
+        return $platform->vultr();
     }
 }

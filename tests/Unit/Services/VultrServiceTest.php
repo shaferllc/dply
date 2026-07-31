@@ -45,7 +45,7 @@ test('create instance sends ssh key ids not raw public keys', function () {
     $id = (new VultrService($credential))->createInstance(
         region: 'ewr',
         plan: 'vc2-1c-1gb',
-        osId: 2152,
+        osId: 2284,
         label: 'web-1',
         sshKeyIds: ['ssh-99'],
     );

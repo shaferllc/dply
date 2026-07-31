@@ -114,6 +114,14 @@ class ServerCreateForm extends Form
     /** Hetzner private network ID to attach at creation (gives a private IP on that network). */
     public string $hetzner_network_id = '';
 
+    /** Vultr VPC network ID to attach at creation (gives a private IP on that VPC). */
+    public string $vultr_vpc_id = '';
+
+    /** Cached VPC list for the Vultr VPC dropdown — populated by loadVultrVpcs(). */
+    public array $vultr_vpcs = [];
+
+    public bool $vultr_vpcs_loading = false;
+
     public string $do_tags = '';
 
     public string $do_user_data = '';

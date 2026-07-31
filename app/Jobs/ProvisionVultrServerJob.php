@@ -9,6 +9,7 @@ use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Modules\Cloud\Services\VultrService;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerHostingPlatformContext;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -69,16 +70,23 @@ class ProvisionVultrServerJob implements ShouldQueue
                 return;
             }
 
+            // Managed uses the platform default image; BYO honours the wizard
+            // OS picker (meta.os_image → numeric os_id) then services.vultr.default_os_id.
+            $resolvedOs = ServerImageCatalog::resolveForServer($this->server, 'vultr');
             $osId = $managed
-                ? (int) ($platform->defaultImage ?: config('services.vultr.default_os_id', 2152))
-                : (int) config('services.vultr.default_os_id', 2152);
+                ? (int) ($platform->defaultImage ?: config('services.vultr.default_os_id', 2284))
+                : (int) ($resolvedOs ?: config('services.vultr.default_os_id', 2284));
+
+            $vpcId = trim((string) data_get($this->server->meta, 'vultr.vpc_id', ''));
+            $vpcIds = $vpcId !== '' ? [$vpcId] : [];
 
             $id = $vultr->createInstance(
                 region: $this->server->region,
                 plan: $this->server->size,
                 osId: $osId,
                 label: $this->server->name,
-                sshKeyIds: [$sshKeyId]
+                sshKeyIds: [$sshKeyId],
+                vpcIds: $vpcIds,
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

@@ -37,8 +37,22 @@ Queues and process counts are defined in `config/horizon.php` (`$heavyQueues` / 
 
 | Supervisor | Queues | Purpose |
 |------------|--------|---------|
-| `supervisor-heavy` | `dply-provision`, `dply` | Edge builds, BYO deploys |
+| `supervisor-build` | `dply-provision` | Edge build/publish, server provision — CPU + RAM bound |
+| `supervisor-deploy` | `dply` | BYO deploys, general control-plane work — blocked on SSH |
 | `supervisor-fast` | `default`, `dply-control`, `dply-manage`, probes… | Notifications, insights, short jobs |
+
+Build and deploy work are deliberately **separate pools**. Builds saturate cores
+(`docker run`), so keep `HORIZON_BUILD_MAX_PROCESSES` at or below the worker
+box's vCPU count. Deploys spend their time waiting on SSH round-trips, so
+`HORIZON_DEPLOY_MAX_PROCESSES` can be over-subscribed well past core count.
+Pooling them (the old `supervisor-heavy`) let one long Astro build skew the
+`time` autoscaling maths and starve the other queue.
+
+The control plane reads `HORIZON_BUILD_*` / `HORIZON_DEPLOY_*` / `HORIZON_FAST_*`.
+The generic `HORIZON_MAX_PROCESSES`, `HORIZON_BALANCE`, `HORIZON_TRIES`,
+`HORIZON_WORKER_MEMORY`, `HORIZON_JOB_TIMEOUT` and `HORIZON_QUEUES` names belong
+to the **customer worker-pool** feature (`WorkerPoolHorizonConfig`) and are
+ignored here — setting them in the control-plane `.env` does nothing.
 
 Required for split deploys:
 

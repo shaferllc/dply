@@ -710,6 +710,15 @@ class StepWhat extends Component
                 ->where('provider', PrivateNetwork::PROVIDER_HETZNER)
                 ->where('provider_id', $this->form->hetzner_network_id)
                 ->value('ip_range');
+        } elseif ($this->form->type === 'vultr' && $this->form->vultr_vpc_id !== '') {
+            $vpc = collect($this->form->vultr_vpcs)->firstWhere('id', $this->form->vultr_vpc_id);
+            $networkCidr = is_array($vpc) ? ($vpc['ip_range'] ?? null) : null;
+            if (($networkCidr === null || $networkCidr === '') && $this->form->vultr_vpc_id !== '') {
+                $networkCidr = PrivateNetwork::query()
+                    ->where('provider', PrivateNetwork::PROVIDER_VULTR)
+                    ->where('provider_id', $this->form->vultr_vpc_id)
+                    ->value('ip_range');
+            }
         }
 
         // request()->ip() resolves the real client IP behind trusted proxies

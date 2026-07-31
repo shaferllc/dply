@@ -176,7 +176,11 @@ final class EdgeRepoCloner
 
     /**
      * Cone sparse-checkout keeps root files (lockfiles, workspace yaml)
-     * plus the selected package tree — enough for filtered installs.
+     * plus the selected package tree. Library monorepos that set
+     * preferWorkspacePackages (e.g. withastro/astro examples) are installed
+     * via leaf isolation in EdgeBuildRunner — sparse stays on the leaf only.
+     * App monorepos that need local workspace packages also sparse-include
+     * those package roots so filtered installs can link them.
      *
      * @param  list<string>  $log
      */
@@ -186,18 +190,122 @@ final class EdgeRepoCloner
             return;
         }
 
-        $log[] = "[git] Sparse-checkout cone: {$sparseRoot}";
+        $paths = $this->sparseCheckoutPaths($checkout, $sparseRoot);
+        $log[] = '[git] Sparse-checkout cone: '.implode(' ', $paths);
         $init = Process::timeout(60)->path($checkout)->run(['git', 'sparse-checkout', 'init', '--cone']);
         $log[] = trim($init->output().$init->errorOutput());
         if (! $init->successful()) {
             throw new RuntimeException('git sparse-checkout init failed: '.$init->errorOutput());
         }
 
-        $set = Process::timeout(120)->path($checkout)->run(['git', 'sparse-checkout', 'set', $sparseRoot]);
+        $set = Process::timeout(120)->path($checkout)->run(['git', 'sparse-checkout', 'set', ...$paths]);
         $log[] = trim($set->output().$set->errorOutput());
         if (! $set->successful()) {
             throw new RuntimeException('git sparse-checkout set failed: '.$set->errorOutput());
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function sparseCheckoutPaths(string $checkout, string $sparseRoot): array
+    {
+        // preferWorkspacePackages leaves resolve published registry deps
+        // (EdgeBuildRunner leaf isolation) — do not materialize packages/.
+        if ($this->prefersWorkspacePackages($checkout)) {
+            return [$sparseRoot];
+        }
+
+        $paths = [$sparseRoot];
+        foreach ($this->workspaceSparseRoots($checkout) as $root) {
+            if ($root === $sparseRoot || str_starts_with($sparseRoot, $root.'/')) {
+                continue;
+            }
+            $paths[] = $root;
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    private function prefersWorkspacePackages(string $checkout): bool
+    {
+        foreach (['pnpm-workspace.yaml', 'pnpm-workspace.yml'] as $file) {
+            $path = $checkout.'/'.$file;
+            if (! is_file($path) || ! is_readable($path)) {
+                continue;
+            }
+            $contents = (string) file_get_contents($path);
+            if (preg_match('/^\s*preferWorkspacePackages:\s*true\s*$/m', $contents) === 1) {
+                return true;
+            }
+            if (preg_match('/^\s*linkWorkspacePackages:\s*true\s*$/m', $contents) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Top-level dirs from pnpm-workspace.yaml / package.json workspaces that
+     * must be present for workspace-protocol filtered installs.
+     *
+     * @return list<string>
+     */
+    private function workspaceSparseRoots(string $checkout): array
+    {
+        $roots = [];
+        $hasWorkspaceManifest = false;
+
+        foreach (['pnpm-workspace.yaml', 'pnpm-workspace.yml'] as $file) {
+            $path = $checkout.'/'.$file;
+            if (! is_file($path) || ! is_readable($path)) {
+                continue;
+            }
+            $hasWorkspaceManifest = true;
+            $contents = (string) file_get_contents($path);
+            if (preg_match('/(?m)^packages:\s*\n((?:[ \t]+.+\n?)*)/', $contents, $block) !== 1) {
+                continue;
+            }
+            if (preg_match_all('/^\s*-\s*[\'"]?(?:\.\/)?([A-Za-z0-9_.-]+)/m', $block[1], $matches) > 0) {
+                foreach ($matches[1] as $segment) {
+                    if (in_array($segment, ['node_modules', '.', '..'], true)) {
+                        continue;
+                    }
+                    $roots[] = $segment;
+                }
+            }
+        }
+
+        $pkgPath = $checkout.'/package.json';
+        if (is_file($pkgPath) && is_readable($pkgPath)) {
+            $decoded = json_decode((string) file_get_contents($pkgPath), true);
+            $workspaces = $decoded['workspaces'] ?? null;
+            if (is_array($workspaces)) {
+                $hasWorkspaceManifest = true;
+                $patterns = isset($workspaces['packages']) && is_array($workspaces['packages'])
+                    ? $workspaces['packages']
+                    : $workspaces;
+                foreach ($patterns as $pattern) {
+                    if (! is_string($pattern) || $pattern === '' || str_starts_with($pattern, '!')) {
+                        continue;
+                    }
+                    $segment = explode('/', ltrim($pattern, './'), 2)[0] ?? '';
+                    $segment = trim($segment, '*');
+                    if ($segment !== '' && ! in_array($segment, ['node_modules', '.', '..'], true)) {
+                        $roots[] = $segment;
+                    }
+                }
+            }
+        }
+
+        if ($hasWorkspaceManifest) {
+            foreach (['packages', 'apps'] as $fallback) {
+                $roots[] = $fallback;
+            }
+        }
+
+        return array_values(array_unique($roots));
     }
 
     /**
@@ -240,8 +348,36 @@ final class EdgeRepoCloner
 
     private function ensureEmptyCheckout(string $checkout): void
     {
+        if (! is_dir($checkout)) {
+            return;
+        }
+
+        File::deleteDirectory($checkout);
+        if (! is_dir($checkout)) {
+            return;
+        }
+
+        // Docker builds can leave root-owned files in the mount; Laravel's
+        // recursive delete (and host rm as www-data) then can't clear the
+        // tree and the next clone dies with "destination path already exists".
+        Process::timeout(120)->run(['rm', '-rf', '--', $checkout]);
+        if (! is_dir($checkout)) {
+            return;
+        }
+
+        $parent = dirname($checkout);
+        $base = basename($checkout);
+        $dockerRm = Process::timeout(180)->run([
+            'docker', 'run', '--rm',
+            '-v', $parent.':/wipe',
+            'alpine:3.20',
+            'rm', '-rf', '--', '/wipe/'.$base,
+        ]);
         if (is_dir($checkout)) {
-            File::deleteDirectory($checkout);
+            throw new RuntimeException(
+                'Could not clear checkout directory '.$checkout
+                .($dockerRm->errorOutput() !== '' ? ': '.$dockerRm->errorOutput() : '')
+            );
         }
     }
 

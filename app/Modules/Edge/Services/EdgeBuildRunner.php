@@ -954,6 +954,16 @@ class EdgeBuildRunner
             $rest,
         ) ?? $rest;
 
+        // Install may `cd /src` for monorepo filtered installs. Docker sets
+        // `-w` to the package dir, but an explicit cd in the install script
+        // leaves the shell at the workspace root — so without this, `pnpm run
+        // build` executes the monorepo root turbo script instead of the
+        // selected package (e.g. examples/blog).
+        if ($repoRoot !== '') {
+            $packageWorkdir = '/src/'.trim(str_replace('\\', '/', $repoRoot), '/');
+            $rest = 'cd '.escapeshellarg($packageWorkdir).' && '.$rest;
+        }
+
         // Echo phase markers so the journey UI isn't silent during long
         // installs; unbuffer node tooling when possible for live chatter.
         return 'export FORCE_COLOR=1 NPM_CONFIG_PROGRESS=true NPM_CONFIG_LOGLEVEL=info PNPM_LOG_LEVEL=info'
@@ -1020,6 +1030,51 @@ class EdgeBuildRunner
      * When the repo pins `packageManager`, honor it — that's the most
      * explicit signal we have and a repo author knows their lockfile.
      */
+    /**
+     * Install a monorepo leaf from the registry, ignoring workspace linking.
+     *
+     * Used when pnpm-workspace.yaml sets preferWorkspacePackages /
+     * linkWorkspacePackages (library monorepos whose examples declare
+     * published semvers but would otherwise symlink to unbuilt source).
+     * Neutralizes root workspace + root tsconfig so Vite/TS don't walk into
+     * missing sibling project references under a sparse checkout.
+     */
+    private function corepackPnpmLeafIsolationInstall(string $repoRoot): string
+    {
+        $packageWorkdir = '/src/'.trim(str_replace('\\', '/', $repoRoot), '/');
+        $env = 'export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_DEFAULT_TO_LATEST=0 ASTRO_TELEMETRY_DISABLED=1';
+        $neutralize = 'cd /src && for f in pnpm-workspace.yaml pnpm-workspace.yml tsconfig.json tsconfig.base.json jsconfig.json; do'
+            .' [ -f "$f" ] && mv "$f" "$f.dply-bak" || true; done';
+        $allowlistScript = 'echo "[pnpm] leaf isolation (ignore-workspace) — registry deps for '.escapeshellarg($repoRoot).'"';
+        $pnpmFlags = '--ignore-workspace --config.dangerouslyAllowAllBuilds=true';
+        $install = 'cd '.escapeshellarg($packageWorkdir)
+            .' && { set -o pipefail; '.$allowlistScript.'; PNPM_LOG=$(mktemp);'
+            .' if pnpm install --frozen-lockfile '.$pnpmFlags.' 2>&1 | tee "$PNPM_LOG"; then :;'
+            .' else echo "[pnpm] frozen-lockfile unavailable in leaf — retrying without";'
+            .' pnpm install --no-frozen-lockfile '.$pnpmFlags.'; fi; }';
+
+        return $env.' && corepack enable && corepack prepare --activate && '.$neutralize.' && '.$install;
+    }
+
+    private function prefersWorkspacePackages(string $workspaceRoot): bool
+    {
+        foreach (['pnpm-workspace.yaml', 'pnpm-workspace.yml'] as $file) {
+            $path = $workspaceRoot.'/'.$file;
+            if (! is_file($path) || ! is_readable($path)) {
+                continue;
+            }
+            $contents = (string) file_get_contents($path);
+            if (preg_match('/^\s*preferWorkspacePackages:\s*true\s*$/m', $contents) === 1) {
+                return true;
+            }
+            if (preg_match('/^\s*linkWorkspacePackages:\s*true\s*$/m', $contents) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @param  ?string  $filterSpec  pnpm filter (e.g. "./apps/web...") run from /src
      */
@@ -1216,6 +1271,13 @@ class EdgeBuildRunner
         $filterPath = './'.trim($repoRoot, '/').'...';
 
         if ($pmName === 'pnpm' || is_file($workspaceRoot.'/pnpm-lock.yaml') || is_file($workspaceRoot.'/pnpm-workspace.yaml')) {
+            // Library monorepos (withastro/astro, etc.) force workspace links
+            // to unbuilt source packages. Isolate the leaf so install pulls
+            // published registry versions matching package.json semver.
+            if ($this->prefersWorkspacePackages($workspaceRoot)) {
+                return $this->corepackPnpmLeafIsolationInstall($repoRoot);
+            }
+
             return $this->corepackPnpmInstall($workspaceRoot, $filterPath);
         }
 

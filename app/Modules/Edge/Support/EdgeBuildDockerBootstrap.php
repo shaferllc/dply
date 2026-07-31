@@ -192,6 +192,17 @@ else
   echo "[dply:docker] WARNING: /var/run/docker.sock missing after start attempt." >&2
 fi
 
+# Re-apply socket ACL after dockerd recreates /var/run/docker.sock (common on restart).
+if command -v systemctl >/dev/null 2>&1; then
+  \$SUDO mkdir -p /etc/systemd/system/docker.service.d
+  \$SUDO tee /etc/systemd/system/docker.service.d/dply-edge-sock-acl.conf >/dev/null <<UNIT
+[Service]
+ExecStartPost=/bin/bash -c 'setfacl -m u:\${TARGET_USER}:rw /var/run/docker.sock || true'
+UNIT
+  \$SUDO systemctl daemon-reload || true
+  echo "[dply:docker] Installed systemd ExecStartPost ACL for \${TARGET_USER}."
+fi
+
 \$SUDO docker version || docker version || true
 SH;
     }

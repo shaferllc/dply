@@ -227,6 +227,14 @@ class CreateEdgePreviewSite
 
         $existing = self::findExistingByCommit($parent, $headSha);
         if ($existing !== null) {
+            // Same SHA after a failed build (e.g. worker Docker) — rebuild
+            // instead of returning a dead preview URL.
+            if ($this->adhocPreviewNeedsRebuild($existing)) {
+                app(RedeployEdgeSite::class)->handle($existing, $headSha);
+
+                return $existing->fresh();
+            }
+
             return $existing;
         }
 
@@ -410,10 +418,9 @@ class CreateEdgePreviewSite
 
     /**
      * Ad-hoc dedup key — same parent + same commit returns the existing
-     * preview. PR previews are excluded so a webhook-driven preview on the
-     * same branch can't accidentally satisfy an ad-hoc create request.
-     * Failed previews are also excluded so the operator can retry a busted
-     * SHA by clicking Create again without first tearing it down.
+     * preview (including failed ones so a retry rebuilds that row). PR
+     * previews are excluded so a webhook-driven preview on the same branch
+     * can't accidentally satisfy an ad-hoc create request.
      */
     public static function findExistingByCommit(Site $parent, string $headSha): ?Site
     {
@@ -423,10 +430,20 @@ class CreateEdgePreviewSite
         }
 
         return self::livePreviewQuery($parent)
-            ->where('status', '!=', Site::STATUS_EDGE_FAILED)
             ->whereJsonContains('meta->edge->preview_kind', self::KIND_ADHOC)
             ->whereJsonContains('meta->edge->preview_head_sha', $headSha)
             ->first();
+    }
+
+    private function adhocPreviewNeedsRebuild(Site $preview): bool
+    {
+        if ($preview->status === Site::STATUS_EDGE_FAILED) {
+            return true;
+        }
+
+        $latest = $preview->edgeDeployments()->latest('created_at')->first();
+
+        return $latest !== null && $latest->status === EdgeDeployment::STATUS_FAILED;
     }
 
     /**

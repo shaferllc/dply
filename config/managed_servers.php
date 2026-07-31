@@ -48,12 +48,12 @@ return [
 
     /*
     | Platform Vultr account, used when `provider` is set to "vultr". default_image
-    | is a Vultr os_id (2152 = Ubuntu 24.04 LTS).
+    | is a Vultr os_id (2284 = Ubuntu 24.04 LTS x64).
     */
     'vultr' => [
         'api_token' => env('DPLY_MANAGED_VULTR_API_TOKEN'),
         'default_region' => env('DPLY_MANAGED_VULTR_REGION', 'ewr'),
-        'default_image' => env('DPLY_MANAGED_VULTR_IMAGE', '2152'),
+        'default_image' => env('DPLY_MANAGED_VULTR_IMAGE', '2284'),
     ],
 
     /*

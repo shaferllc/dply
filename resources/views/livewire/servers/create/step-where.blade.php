@@ -365,8 +365,8 @@
                     </section>
                 @endif
 
-                {{-- Private network picker (DO VPC UUID / Hetzner Network ID) --}}
-                @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner'], true))
+                {{-- Private network picker (DO VPC UUID / Hetzner Network ID / Vultr VPC) --}}
+                @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner', 'vultr'], true))
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                             <x-icon-badge>
@@ -464,6 +464,47 @@
                                     </div>
 
                                     <x-input-error :messages="$errors->get('form.hetzner_network_id')" class="mt-1" />
+                                </div>
+                            @elseif ($form->type === 'vultr')
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <x-input-label for="vultr_vpc_id" :value="__('VPC')" />
+                                        @if ($form->region !== '' && $form->provider_credential_id !== '')
+                                            <button
+                                                type="button"
+                                                wire:click="loadVultrVpcs"
+                                                wire:loading.attr="disabled"
+                                                wire:target="loadVultrVpcs"
+                                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                            >
+                                                <span wire:loading.remove wire:target="loadVultrVpcs">{{ empty($form->vultr_vpcs) ? __('Load VPCs') : __('Refresh') }}</span>
+                                                <span wire:loading wire:target="loadVultrVpcs">{{ __('Loading…') }}</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @if (! empty($form->vultr_vpcs))
+                                        <select
+                                            id="vultr_vpc_id"
+                                            wire:model.live="form.vultr_vpc_id"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                        >
+                                            <option value="">{{ __('None — no private VPC') }}</option>
+                                            @foreach ($form->vultr_vpcs as $vpc)
+                                                <option value="{{ $vpc['id'] }}">{{ $vpc['name'] }}@if (! empty($vpc['ip_range'])) — {{ $vpc['ip_range'] }}@endif</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <x-text-input
+                                            id="vultr_vpc_id"
+                                            wire:model.live.debounce.300ms="form.vultr_vpc_id"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono"
+                                            placeholder="e.g. 08422775-5be0-4371-afba-64b03f9ad22d"
+                                            autocomplete="off"
+                                        />
+                                    @endif
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Attach a Vultr VPC so the instance gets a private IP. Click "Load VPCs" to pick from your account, or paste a VPC id.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.vultr_vpc_id')" class="mt-1" />
                                 </div>
                             @endif
                         </div>

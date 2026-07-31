@@ -159,6 +159,15 @@ trait StoresOtherProviderServers
 
         [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
 
+        $meta = $this->meta($form);
+        $vpcId = trim($form->vultr_vpc_id);
+        if ($vpcId !== '') {
+            $meta['vultr'] = array_merge(
+                is_array($meta['vultr'] ?? null) ? $meta['vultr'] : [],
+                ['vpc_id' => $vpcId],
+            );
+        }
+
         $server = $user->servers()->create([
             'organization_id' => $org->id,
             'name' => $form->name,
@@ -168,7 +177,7 @@ trait StoresOtherProviderServers
             'size' => $form->size,
             'setup_script_key' => $setupScriptKey,
             'setup_status' => $setupStatus,
-            'meta' => $this->meta($form),
+            'meta' => $meta,
             'status' => Server::STATUS_PENDING,
         ]);
 

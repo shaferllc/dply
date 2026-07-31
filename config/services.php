@@ -131,7 +131,7 @@ return [
     ],
 
     'vultr' => [
-        'default_os_id' => env('VULTR_DEFAULT_OS_ID', 2152), // Ubuntu 24.04 LTS
+        'default_os_id' => env('VULTR_DEFAULT_OS_ID', 2284), // Ubuntu 24.04 LTS x64
         'ssh_user' => env('VULTR_SSH_USER', 'root'),
 
         /*
