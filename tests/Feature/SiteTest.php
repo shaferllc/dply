@@ -1574,7 +1574,10 @@ test('site settings general section uses certificate summary for ssl status', fu
 
     $response->assertOk()
         ->assertSee('SSL')
-        ->assertSee('active');
+        // The Overview fact grid renders SSL as a tone-coded pill (ucfirst'd),
+        // so assert the capitalised form — plain "active" would also match the
+        // "Nginx active" provisioning pill and pass for the wrong reason.
+        ->assertSee('Active');
 });
 
 test('site settings section shows project context links', function () {
