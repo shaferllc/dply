@@ -531,7 +531,7 @@
                     class="space-y-4"
                 >
                     <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
+                        <div class="min-w-0">
                             <x-input-label for="binding_db_engine" :value="__('Engine')" />
                             <select id="binding_db_engine" x-model="engine" class="dply-input">
                                 <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
@@ -547,9 +547,25 @@
                                 <option value="sqlite">{{ __('SQLite') }}</option>
                             </select>
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <x-input-label for="binding_db_name" :value="__('Database name')" />
-                            <x-text-input id="binding_db_name" wire:model="bindingForm.name" class="mt-1 block w-full font-mono text-sm" placeholder="app_production" />
+                            {{-- Pre-seeded from the site name; Regenerate swaps in a random
+                                 adjective_noun, same idea as the server-create Identity card. --}}
+                            <div class="mt-1 flex items-stretch gap-2">
+                                <x-text-input id="binding_db_name" wire:model="bindingForm.name" class="block w-full min-w-0 font-mono text-sm" placeholder="app_production" />
+                                <button
+                                    type="button"
+                                    wire:click="regenerateBindingDatabaseName"
+                                    wire:loading.attr="disabled"
+                                    wire:target="regenerateBindingDatabaseName"
+                                    title="{{ __('Generate a random name') }}"
+                                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-2.5 text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="regenerateBindingDatabaseName" aria-hidden="true" />
+                                    <span class="sr-only">{{ __('Generate a random name') }}</span>
+                                </button>
+                            </div>
+                            <x-input-error :messages="$errors->get('bindingForm.name')" class="mt-2" />
                         </div>
                     </div>
 

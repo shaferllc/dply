@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Modules\Cloud\Services\AwsEc2ServiceFactory;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -57,6 +58,7 @@ class ProvisionAwsEc2ServerJob implements ShouldQueue
                 $keyName,
                 $this->server->name,
                 $securityGroupId,
+                ProviderResourceTags::labels($this->server),
             );
         } catch (Throwable $e) {
             if ($keyName !== null) {

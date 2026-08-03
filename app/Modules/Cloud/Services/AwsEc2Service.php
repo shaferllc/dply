@@ -159,6 +159,8 @@ class AwsEc2Service
 
     /**
      * Run an EC2 instance in the client's region. Returns instance ID.
+     *
+     * @param  array<string, mixed> $tags  Extra key/value tags, e.g. ProviderResourceTags::labels()
      */
     public function runInstances(
         string $imageId,
@@ -166,6 +168,7 @@ class AwsEc2Service
         string $keyName,
         ?string $nameTag = null,
         ?string $securityGroupId = null,
+        array $tags = [],
     ): string {
         $params = [
             'ImageId' => $imageId,
@@ -185,14 +188,23 @@ class AwsEc2Service
             ];
         }
 
+        $instanceTags = [];
         if ($nameTag !== null && $nameTag !== '') {
+            $instanceTags[] = ['Key' => 'Name', 'Value' => $nameTag];
+        }
+        foreach ($tags as $key => $value) {
+            $key = trim((string) $key);
+            if ($key === '' || $key === 'Name') {
+                continue;
+            }
+            $instanceTags[] = ['Key' => $key, 'Value' => (string) $value];
+        }
+        if ($instanceTags !== []) {
+            // Tag the volume too — an orphaned EBS volume outlives its instance
+            // and is otherwise untraceable back to the server that made it.
             $params['TagSpecifications'] = [
-                [
-                    'ResourceType' => 'instance',
-                    'Tags' => [
-                        ['Key' => 'Name', 'Value' => $nameTag],
-                    ],
-                ],
+                ['ResourceType' => 'instance', 'Tags' => $instanceTags],
+                ['ResourceType' => 'volume', 'Tags' => $instanceTags],
             ];
         }
 

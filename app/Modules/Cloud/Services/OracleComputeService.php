@@ -143,11 +143,15 @@ class OracleComputeService
         return self::defaultShapes();
     }
 
+    /**
+     * @param  array<string, mixed> $freeformTags  Instance tags, e.g. ProviderResourceTags::labels()
+     */
     public function launchInstance(
         string $displayName,
         string $availabilityDomain,
         string $shape,
         string $sshPublicKey,
+        array $freeformTags = [],
     ): string {
         $imageId = trim((string) config('services.oracle.default_image_id', ''));
         if ($imageId === '') {
@@ -163,11 +167,12 @@ class OracleComputeService
             method: 'POST',
             baseUrl: $this->computeBaseUrl,
             path: '/instances',
-            body: [
+            body: array_filter([
                 'compartmentId' => $this->compartmentId,
                 'displayName' => $displayName,
                 'availabilityDomain' => $availabilityDomain,
                 'shape' => $shape,
+                'freeformTags' => array_map(static fn (mixed $v): string => (string) $v, $freeformTags),
                 'sourceDetails' => [
                     'sourceType' => 'image',
                     'imageId' => $imageId,
@@ -179,7 +184,7 @@ class OracleComputeService
                     'assignPublicIp' => true,
                     'subnetId' => $subnetId,
                 ],
-            ],
+            ]),
         );
 
         $id = $payload['id'] ?? null;

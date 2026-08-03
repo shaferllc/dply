@@ -9,6 +9,7 @@ use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\BootHeadStartScript;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\HetznerCloudFirewallRules;
+use App\Support\Servers\ProviderResourceTags;
 use App\Support\Servers\ServerHostingPlatformContext;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -130,6 +131,7 @@ class ProvisionHetznerServerJob implements ShouldQueue
                     : '',
                 firewallIds: $firewallId !== null ? [$firewallId] : [],
                 networkId: $networkId,
+                labels: ProviderResourceTags::labels($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

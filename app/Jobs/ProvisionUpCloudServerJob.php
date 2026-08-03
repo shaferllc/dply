@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Modules\Cloud\Services\UpCloudService;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -51,7 +52,8 @@ class ProvisionUpCloudServerJob implements ShouldQueue
                 title: $this->server->name,
                 hostname: $hostname,
                 templateStorageUuid: $template,
-                sshPublicKeys: [$keys['recovery_public_key']]
+                sshPublicKeys: [$keys['recovery_public_key']],
+                labels: ProviderResourceTags::labels($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

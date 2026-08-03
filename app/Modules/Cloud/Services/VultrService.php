@@ -73,6 +73,7 @@ class VultrService
      *
      * @param  list<string>  $sshKeyIds  SSH key IDs from createSshKey()
      * @param  list<string>  $vpcIds  Optional VPC network IDs to attach at create (`vpc_ids`)
+     * @param  list<string>  $tags  Instance tags, e.g. ProviderResourceTags::tags()
      */
     public function createInstance(
         string $region,
@@ -81,6 +82,7 @@ class VultrService
         string $label,
         array $sshKeyIds = [],
         array $vpcIds = [],
+        array $tags = [],
     ): string {
         $body = [
             'region' => $region,
@@ -97,6 +99,13 @@ class VultrService
         )));
         if ($vpcIds !== []) {
             $body['vpc_ids'] = $vpcIds;
+        }
+        $tags = array_values(array_filter(array_map(
+            static fn (mixed $tag): string => is_string($tag) ? trim($tag) : '',
+            $tags,
+        )));
+        if ($tags !== []) {
+            $body['tags'] = $tags;
         }
 
         $response = $this->request('post', '/instances', $body);

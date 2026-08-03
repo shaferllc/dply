@@ -103,16 +103,22 @@
                  picking one runs the same attach path and it pops out as a card in
                  its proper group below. --}}
             @if ($availableCount > 0)
-                <div class="relative" x-data="{ open: false }">
-                    <button type="button" @click="open = ! open" :aria-expanded="open"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                        <x-heroicon-o-plus class="h-4 w-4" />
-                        {{ __('Add resource') }}
-                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-[10px] font-semibold">{{ $availableCount }}</span>
-                        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <div x-show="open" x-cloak x-transition x-on:click.outside="open = false"
-                        class="absolute right-0 z-30 mt-1 max-h-[28rem] w-80 overflow-y-auto rounded-xl border border-brand-ink/10 bg-white py-1.5 text-left shadow-xl">
+                {{-- Shared <x-dropdown> (teleports to <body>, fixed-positioned):
+                     this toolbar lives inside a `.dply-card … overflow-hidden`
+                     section, which clipped the old absolutely-positioned panel —
+                     on a narrow viewport the 20rem menu ran past the card's left
+                     edge and its icons/labels were sliced off. --}}
+                <x-dropdown align="right" width="20rem" contentClasses="py-1.5 max-h-[min(70vh,28rem)] overflow-y-auto text-left">
+                    <x-slot name="trigger">
+                        <button type="button" aria-haspopup="true"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                            <x-heroicon-o-plus class="h-4 w-4" />
+                            {{ __('Add resource') }}
+                            <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-[10px] font-semibold">{{ $availableCount }}</span>
+                            <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        </button>
+                    </x-slot>
+                    <x-slot name="content">
                         @foreach ($availableByGroup as $groupLabel => $items)
                             <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
                             @foreach ($items as $at)
@@ -137,7 +143,7 @@
                                         </span>
                                     </a>
                                 @else
-                                    <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')" @click="open = false"
+                                    <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')"
                                         class="flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-brand-sand/40">
                                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
                                             <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
@@ -150,8 +156,8 @@
                                 @endif
                             @endforeach
                         @endforeach
-                    </div>
-                </div>
+                    </x-slot>
+                </x-dropdown>
             @endif
             @if ($networkedAttached > 0)
                 <button type="button" wire:click="validateReachability" wire:loading.attr="disabled" wire:target="validateReachability"

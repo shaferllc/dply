@@ -31,8 +31,6 @@
     ][$postureTone];
 @endphp
 
-@vite(['resources/js/dply-passkeys-lazy.js'])
-
 <div
     x-data="{
         passwordSaved: false,
@@ -44,6 +42,11 @@
         },
     }"
 >
+    {{-- Must stay INSIDE the root: Livewire injects wire:id into the first tag
+         of the rendered view, so a @vite <link>/<script> above the root steals
+         it and orphans this div. --}}
+    @vite(['resources/js/dply-passkeys-lazy.js'])
+
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')

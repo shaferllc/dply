@@ -153,6 +153,8 @@ class AzureComputeService
 
     /**
      * @return list<array<string, int|string|null>>
+     *
+     * @param  array<string, mixed> $tags  Resource tags, e.g. ProviderResourceTags::labels()
      */
     public function createLinuxVm(
         string $resourceGroup,
@@ -161,6 +163,7 @@ class AzureComputeService
         string $size,
         string $adminUsername,
         string $sshPublicKey,
+        array $tags = [],
     ): array {
         $resourceGroup = trim($resourceGroup);
         if ($resourceGroup === '') {
@@ -180,15 +183,21 @@ class AzureComputeService
         $pipName = Str::limit($vmName.'-pip-'.$suffix, 80, '');
         $nicName = Str::limit($vmName.'-nic-'.$suffix, 80, '');
 
+        // Every resource in the trio carries the same tags — the NIC and public
+        // IP outlive a deleted VM in Azure, so they need the identity tag too or
+        // they become untraceable leftovers in the resource group.
+        $tags = array_map(static fn (mixed $v): string => (string) $v, $tags);
+
         $pipPath = $this->resourcePath($resourceGroup, 'Microsoft.Network/publicIPAddresses', $pipName);
-        $pipResponse = $this->request('PUT', $pipPath, [
+        $pipResponse = $this->request('PUT', $pipPath, array_filter([
             'location' => $location,
+            'tags' => $tags,
             'sku' => ['name' => 'Standard'],
             'properties' => [
                 'publicIPAllocationMethod' => 'Static',
                 'publicIPAddressVersion' => 'IPv4',
             ],
-        ], ['api-version' => '2023-09-01']);
+        ]), ['api-version' => '2023-09-01']);
         $this->assertSuccess($pipResponse, 'create public IP');
         $pipId = (string) ($pipResponse->json('id') ?? '');
         if ($pipId === '') {
@@ -196,8 +205,9 @@ class AzureComputeService
         }
 
         $nicPath = $this->resourcePath($resourceGroup, 'Microsoft.Network/networkInterfaces', $nicName);
-        $nicResponse = $this->request('PUT', $nicPath, [
+        $nicResponse = $this->request('PUT', $nicPath, array_filter([
             'location' => $location,
+            'tags' => $tags,
             'properties' => [
                 'ipConfigurations' => [[
                     'name' => 'ipconfig1',
@@ -207,7 +217,7 @@ class AzureComputeService
                     ],
                 ]],
             ],
-        ], ['api-version' => '2023-09-01']);
+        ]), ['api-version' => '2023-09-01']);
         $this->assertSuccess($nicResponse, 'create network interface');
         $nicId = (string) ($nicResponse->json('id') ?? '');
         if ($nicId === '') {
@@ -215,8 +225,9 @@ class AzureComputeService
         }
 
         $vmPath = $this->resourcePath($resourceGroup, 'Microsoft.Compute/virtualMachines', $vmName);
-        $vmResponse = $this->request('PUT', $vmPath, [
+        $vmResponse = $this->request('PUT', $vmPath, array_filter([
             'location' => $location,
+            'tags' => $tags,
             'properties' => [
                 'hardwareProfile' => [
                     'vmSize' => $size,
@@ -255,7 +266,7 @@ class AzureComputeService
                     ]],
                 ],
             ],
-        ], ['api-version' => '2023-09-01']);
+        ]), ['api-version' => '2023-09-01']);
         $this->assertSuccess($vmResponse, 'create virtual machine');
         $vmId = (string) ($vmResponse->json('id') ?? '');
         if ($vmId === '') {

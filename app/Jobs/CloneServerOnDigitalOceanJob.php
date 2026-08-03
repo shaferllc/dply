@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -169,7 +170,12 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
                     'vpc_uuid' => isset($doOpts['vpc_uuid']) && is_string($doOpts['vpc_uuid']) && $doOpts['vpc_uuid'] !== ''
                         ? $doOpts['vpc_uuid']
                         : null,
-                    'tags' => isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
+                    // Tags follow the CLONE, not the source — the identity tag
+                    // must point at the new server row.
+                    'tags' => ProviderResourceTags::mergeTags(
+                        $clone,
+                        isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
+                    ),
                     'user_data' => '',
                 ],
             );

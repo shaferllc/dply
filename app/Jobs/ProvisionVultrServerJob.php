@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Modules\Cloud\Services\VultrService;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use App\Support\Servers\ServerHostingPlatformContext;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -87,6 +88,7 @@ class ProvisionVultrServerJob implements ShouldQueue
                 label: $this->server->name,
                 sshKeyIds: [$sshKeyId],
                 vpcIds: $vpcIds,
+                tags: ProviderResourceTags::tags($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

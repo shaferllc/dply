@@ -27,6 +27,7 @@ use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
 use App\Modules\Deploy\Services\LookoutProvisioner;
 use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Support\Servers\DatabaseNameGenerator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
@@ -67,6 +68,19 @@ trait ManagesSiteBindingActions
         }
 
         $this->dispatch('open-modal', 'site-binding-modal');
+    }
+
+    /**
+     * Regenerate button on the provision-database form — mirrors the server
+     * create wizard's Identity card. Excludes the current value so a click
+     * always changes what the operator sees.
+     */
+    public function regenerateBindingDatabaseName(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $this->bindingForm['name'] = DatabaseNameGenerator::random((string) ($this->bindingForm['name'] ?? ''));
+        $this->resetErrorBag('bindingForm.name');
     }
 
     /**

@@ -55,6 +55,7 @@ trait ManagesHetznerInstances
     /**
      * @param  array<string, mixed> $sshKeyIds  Hetzner SSH key IDs or names
      * @param  array<string, mixed> $firewallIds  Cloud Firewall IDs to attach at boot (atomic — no unreachable window)
+     * @param  array<string, mixed> $labels  Hetzner labels (key/value), e.g. ProviderResourceTags::labels()
      */
     public function createInstance(
         string $name,
@@ -65,6 +66,7 @@ trait ManagesHetznerInstances
         string $userData = '',
         array $firewallIds = [],
         ?int $networkId = null,
+        array $labels = [],
     ): int {
         $body = [
             'name' => $name,
@@ -72,6 +74,9 @@ trait ManagesHetznerInstances
             'server_type' => $serverType,
             'image' => $image,
         ];
+        if ($labels !== []) {
+            $body['labels'] = array_map(static fn ($v): string => (string) $v, $labels);
+        }
         if ($sshKeyIds !== []) {
             $body['ssh_keys'] = $sshKeyIds;
         }

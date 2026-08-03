@@ -8,6 +8,7 @@ use App\Modules\Cloud\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\BootHeadStartScript;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -86,7 +87,12 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                     'vpc_uuid' => isset($doOpts['vpc_uuid']) && is_string($doOpts['vpc_uuid']) && $doOpts['vpc_uuid'] !== ''
                         ? $doOpts['vpc_uuid']
                         : null,
-                    'tags' => isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
+                    // Canonical dply/dply-<server id> tags always ride along with
+                    // whatever the user configured — see ProviderResourceTags.
+                    'tags' => ProviderResourceTags::mergeTags(
+                        $this->server,
+                        isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
+                    ),
                     // Prefer a user-supplied user_data; otherwise inject the boot
                     // head-start (apt warmup at boot) when enabled. No-op when off.
                     'user_data' => (isset($doOpts['user_data']) && is_string($doOpts['user_data']) && $doOpts['user_data'] !== '')

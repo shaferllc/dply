@@ -23,10 +23,13 @@
     ]);
 @endphp
 
-@vite(['resources/js/file-browser-editor-lazy.js'])
-
 {{-- Standalone Files page — merged chrome (no floating hero). --}}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{-- Must stay INSIDE the root: Livewire injects wire:id into the first tag
+         of the rendered view, so a @vite <link>/<script> above the root steals
+         it and orphans this div — no wire:click listeners bind at all. --}}
+    @vite(['resources/js/file-browser-editor-lazy.js'])
+
     <div
         wire:loading.flex
         wire:target="openFile, openEntry, startEdit, saveEdit, jumpTo, goUp"

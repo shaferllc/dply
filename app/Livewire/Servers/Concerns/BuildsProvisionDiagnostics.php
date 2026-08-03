@@ -380,7 +380,16 @@ trait BuildsProvisionDiagnostics
         // still tip into "looks stalled" sooner rather than later).
         $minutesSinceUpdate = (int) ceil($secondsSinceUpdate / 60);
         $minutesRunning = (int) ceil($secondsRunning / 60);
-        $stalled = $minutesSinceUpdate >= 3 || $minutesRunning >= 8;
+
+        // Silence — not elapsed time — is what makes a run look stalled. The
+        // long-run clause only makes the warning fire SOONER on a run that has
+        // been going a while; it must never latch it on. Gating both clauses on
+        // the same 30s quiet window as `last_output` means the banner clears on
+        // the next poll as soon as output starts flowing again. (Before this,
+        // `|| $minutesRunning >= 8` pinned the warning up permanently past the
+        // 8-minute mark even while steps kept completing.)
+        $quiet = $secondsSinceUpdate >= 30;
+        $stalled = $quiet && ($minutesSinceUpdate >= 3 || $minutesRunning >= 8);
 
         return [
             'eta' => $eta,

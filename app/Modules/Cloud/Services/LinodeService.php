@@ -52,13 +52,15 @@ class LinodeService
      * Create a new Linode instance and return its ID.
      *
      * @param  array<string, mixed> $authorizedKeys  SSH public key strings
+     * @param  array<int, mixed> $tags  Instance tags, e.g. ProviderResourceTags::tags()
      */
     public function createInstance(
         string $label,
         string $region,
         string $type,
         string $image,
-        array $authorizedKeys = []
+        array $authorizedKeys = [],
+        array $tags = []
     ): int {
         $body = [
             'label' => $label,
@@ -69,6 +71,15 @@ class LinodeService
         ];
         if ($authorizedKeys !== []) {
             $body['authorized_keys'] = $authorizedKeys;
+        }
+        // Linode tags must be 3-50 chars; anything shorter is rejected outright,
+        // so drop rather than let one bad tag fail the whole create.
+        $tags = array_values(array_filter(array_map(
+            static fn (mixed $tag): string => is_string($tag) ? trim($tag) : '',
+            $tags,
+        ), static fn (string $tag): bool => strlen($tag) >= 3 && strlen($tag) <= 50));
+        if ($tags !== []) {
+            $body['tags'] = $tags;
         }
 
         $response = $this->request('post', '/linode/instances', $body);

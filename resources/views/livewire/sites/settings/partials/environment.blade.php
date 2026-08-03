@@ -112,7 +112,17 @@
             }
         }
     }
-    $allEnvWarnings = app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMapForValidation);
+    // Only judge an env we actually have. On a brand-new site — nothing
+    // deployed, no .env synced or written yet — every check reads its key as
+    // absent, so the panel greets you with "APP_KEY is empty / APP_URL is
+    // empty" about an app that doesn't exist. There's nothing to fix and no
+    // way to tell a missing value from an unwritten one, so stay quiet until
+    // there's an .env on record or a deployment to judge it against.
+    // ($envMap first: the cheap check short-circuits the deployments query.)
+    $hasEnvToJudge = $envMap !== [] || $site->deployments()->exists();
+    $allEnvWarnings = $hasEnvToJudge
+        ? app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMapForValidation)
+        : [];
     $canIgnoreEnvWarnings = method_exists($this, 'ignoreEnvWarning');
     $suppressedEnvWarningKeys = $canIgnoreEnvWarnings ? $this->suppressedEnvWarningKeys() : [];
     $envWarnings = $suppressedEnvWarningKeys !== []

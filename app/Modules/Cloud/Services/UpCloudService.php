@@ -27,6 +27,7 @@ class UpCloudService
     /**
      * Create a server from template with SSH keys. Returns server UUID.
      * @param  array<string, mixed> $sshPublicKeys
+     * @param  array<string, mixed> $labels  Server labels (key/value), e.g. ProviderResourceTags::labels()
      */
     public function createServer(
         string $zone,
@@ -35,7 +36,8 @@ class UpCloudService
         string $hostname,
         string $templateStorageUuid,
         array $sshPublicKeys = [],
-        int $storageSizeGb = 25
+        int $storageSizeGb = 25,
+        array $labels = []
     ): string {
         $storageDevice = [
             'action' => 'clone',
@@ -55,6 +57,17 @@ class UpCloudService
                 ],
             ],
         ];
+        if ($labels !== []) {
+            // UpCloud nests labels one level deeper than every other provider:
+            // {"labels": {"label": [{"key": …, "value": …}]}}.
+            $body['server']['labels'] = [
+                'label' => array_map(
+                    static fn (string $key, mixed $value): array => ['key' => $key, 'value' => (string) $value],
+                    array_keys($labels),
+                    array_values($labels),
+                ),
+            ];
+        }
         if ($sshPublicKeys !== []) {
             $body['server']['login_user'] = [
                 'username' => 'root',

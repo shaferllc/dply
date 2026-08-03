@@ -52,7 +52,14 @@ return [
         ['key' => 'cert-inventory', 'route' => 'servers.cert-inventory', 'icon' => 'lock-closed', 'label' => 'Certificates', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cert_inventory'],
         // stacks — standalone resources (Databases, Caches, Services) lead, then
         // the Runtime (php/configuration/tools) and Web (webserver/edge-proxy/docker) clusters.
-        ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases', 'group' => 'stacks', 'requires_any_tags' => ['postgres', 'mysql'], 'except_host_kinds' => ['kubernetes']],
+        // No `requires_any_tags`: the Databases page IS the install surface for
+        // MySQL/MariaDB/PostgreSQL/SQLite (and the "Manage server databases" CTA
+        // on a site's Database tab points here precisely when no engine exists),
+        // so gating it on an already-installed engine dead-ends the operator.
+        // Same reasoning as `daemons` and its Install Supervisor CTA. Engines
+        // installed after provision never reach the stack_summary artifact the
+        // tags come from either, so the gate also went stale post-install.
+        ['key' => 'databases', 'route' => 'servers.databases', 'icon' => 'circle-stack', 'label' => 'Databases', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'caches', 'route' => 'servers.caches', 'icon' => 'bolt', 'label' => 'Caches', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.caches'],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.services'],
         ['key' => 'php', 'route' => 'servers.runtime', 'icon' => 'command-line', 'label' => 'Runtime', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],

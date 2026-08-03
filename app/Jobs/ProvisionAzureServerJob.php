@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Modules\Cloud\Services\AzureComputeService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -52,6 +53,7 @@ class ProvisionAzureServerJob implements ShouldQueue
                 size: $this->server->size,
                 adminUsername: $adminUsername,
                 sshPublicKey: $keys['recovery_public_key'],
+                tags: ProviderResourceTags::labels($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($e->getMessage());
