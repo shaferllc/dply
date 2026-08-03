@@ -1,6 +1,6 @@
 @php
-    $actionSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-    $actionPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto';
+    $actionSecondary = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
+    $actionPrimary = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto';
     $canEdit = auth()->user()->can('update', $site);
     // Only nginx has before/main/after snippet layers; every other engine edits
     // a single managed file, so the Layered/Full-file toggle + layer pipeline are
@@ -44,47 +44,34 @@
 
         <main class="min-w-0 lg:col-span-9">
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Web server config') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Edit, validate, and apply your :engine virtual host.', ['engine' => $config_paths['engine_label']]) }}
-                    </p>
-                </div>
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="flex min-w-0 items-center gap-2">
+                <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Web server config') }}</h2>
             </div>
+            <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                {{ __('Edit, validate, and apply your :engine virtual host.', ['engine' => $config_paths['engine_label']]) }}
+            </p>
         </div>
 
     @if ($core_changed_warning)
-        <div class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <x-icon-badge tone="amber">
-                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Out of sync') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Managed core changed') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}</p>
-                </div>
+        <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-amber-50/60 px-5 py-3 sm:px-6">
+            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+            <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-amber-950">{{ __('Managed core changed') }}</h2>
+                <p class="mt-0.5 text-xs leading-relaxed text-amber-900">{{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}</p>
             </div>
         </div>
     @endif
 
     @if ($health_hint)
-        <div class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver status') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $health_hint }}</p>
-                </div>
-            </div>
+        {{-- One dynamic sentence — an eyebrow AND a heading above it was two
+             labels for one line of text. --}}
+        <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+            <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+            <p class="min-w-0 text-xs leading-relaxed text-brand-moss">
+                <span class="font-semibold text-brand-ink">{{ __('Webserver status') }}</span> — {{ $health_hint }}
+            </p>
         </div>
     @endif
 
@@ -153,11 +140,13 @@
                     @endif
                 </div>
 
-                <div class="px-4 py-3 border-b border-brand-ink/10 bg-white">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Editing path') }}</p>
-                    <p class="mt-1 font-mono text-xs text-brand-ink break-all" title="{{ $editingPath }}">{{ $editingPath }}</p>
+                <div class="px-4 py-2.5 border-b border-brand-ink/10 bg-white">
+                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <p class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Editing path') }}</p>
+                        <p class="min-w-0 font-mono text-xs text-brand-ink break-all" title="{{ $editingPath }}">{{ $editingPath }}</p>
+                    </div>
                     @if ($isNginxLayeredUi && $active_layer === 'main' && $content_tab === 'edit')
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('The main snippet is merged into this virtual host before the “after” includes.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('The main snippet is merged into this virtual host before the “after” includes.') }}</p>
                     @endif
                 </div>
 
@@ -166,7 +155,7 @@
                         @if (! $canEdit)
                             <p class="text-sm text-brand-moss mb-4">{{ __('You can preview configuration. Ask an admin for site update access to edit.') }}</p>
                         @else
-                            <div class="mb-3 flex items-center justify-between gap-2">
+                            <div class="mb-2 flex items-center justify-between gap-2">
                                 <p class="hidden text-[11px] text-brand-moss sm:block">
                                     <kbd class="rounded border border-brand-ink/15 bg-white px-1 font-mono text-[10px]">⌘/Ctrl+S</kbd> {{ __('save draft') }}
                                     <span class="text-brand-mist">·</span>
@@ -175,7 +164,7 @@
                                     <kbd class="rounded border border-brand-ink/15 bg-white px-1 font-mono text-[10px]">⇧+Z</kbd> {{ __('redo') }}
                                 </p>
                                 <button type="button" x-on:click="$dispatch('open-modal', 'webserver-snippet-modal')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                    <x-heroicon-o-puzzle-piece class="h-4 w-4" aria-hidden="true" />
+                                    <x-heroicon-o-puzzle-piece class="h-3.5 w-3.5" aria-hidden="true" />
                                     {{ __('Insert snippet') }}
                                 </button>
                             </div>
@@ -222,9 +211,11 @@
                                     </div>
                                 </div>
                                 <textarea readonly rows="18" id="server-full-file" class="w-full rounded-lg border border-brand-ink/10 font-mono text-xs leading-relaxed text-brand-ink bg-brand-sand/20 min-h-[20rem]">{{ $effective_config_preview }}</textarea>
-                                <p class="mt-1.5 text-[11px] text-brand-moss leading-relaxed">{{ __('This is the complete vhost dply writes to :path. The managed sections (SSL, server_name, roots) are generated from your site settings, so they’re locked here — add your own directives in the main snippet below, or choose “Edit full file” to take over the entire vhost.', ['path' => $config_paths['main_vhost']]) }}</p>
+                                {{-- The path is already on the "Editing path" row above, so this
+                                     says "that path" instead of repeating it. --}}
+                                <p class="mt-1 text-[11px] text-brand-moss leading-relaxed">{{ __('The complete vhost dply writes to that path. The managed sections (SSL, server_name, roots) are generated from your site settings, so they’re locked here — add your own directives in the main snippet below, or choose “Edit full file” to take over the entire vhost.') }}</p>
 
-                                <label class="block text-xs font-semibold text-brand-moss mt-5 mb-2">{{ __('Main snippet — merged into the file above') }}</label>
+                                <label class="block text-xs font-semibold text-brand-moss mt-3 mb-1.5">{{ __('Main snippet — merged into the file above') }}</label>
                                 <textarea x-ref="cfgEditor" wire:model.live="main_snippet_body" rows="10" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[14rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
                             @endif
                         </div>
@@ -253,24 +244,21 @@
                     @endif
                 </div>
 
-                <div class="px-6 py-4 border-t border-brand-ink/10 bg-brand-sand/25 text-xs text-brand-moss leading-relaxed sm:px-7">
-                    {{ __('Edits are not live until you apply. Prefer validating on the server before applying.') }}
-                </div>
+                {{-- The "edits aren't live until you apply / validate first" strip that
+                     used to sit here said the same thing as the Check & publish
+                     description directly below it. --}}
             </div>
 
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <x-heroicon-o-check-badge class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
                     </div>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Edits are not live until you apply. Validate the pending config on the server first, then save or roll it out.') }}</p>
                 </div>
 
-                <div class="px-5 py-5 space-y-5">
+                <div class="px-5 py-4 space-y-4">
                     {{-- Worker console: live output from the queued apply job. Polls
                          while a run is in flight; the focus event scrolls it into
                          view the moment Apply is pressed. --}}
@@ -292,9 +280,9 @@
                     @endif
 
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss mb-3">{{ __('Validate') }}</p>
-                        <div class="flex flex-wrap items-center gap-3">
-                            <button type="button" wire:click="validateConfig" wire:loading.attr="disabled" wire:target="validateConfig" class="{{ $actionSecondary }} justify-center min-h-[2.75rem]">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss mb-2">{{ __('Validate') }}</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" wire:click="validateConfig" wire:loading.attr="disabled" wire:target="validateConfig" class="{{ $actionSecondary }} justify-center">
                                 <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" wire:loading.remove wire:target="validateConfig" />
                                 <svg wire:loading wire:target="validateConfig" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
                                 <span wire:loading.remove wire:target="validateConfig">{{ __('Validate') }}</span>
@@ -307,19 +295,19 @@
                                 </span>
                             @endif
                         </div>
-                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Runs the real config test on the server. If the server can’t be reached, dply falls back to a local syntax check where available.') }}</p>
+                        <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Runs the real config test on the server. If the server can’t be reached, dply falls back to a local syntax check where available.') }}</p>
                         @if ($validation_message)
-                            <pre class="mt-3 text-xs whitespace-pre-wrap text-brand-ink bg-brand-sand/30 rounded-lg p-3 border border-brand-ink/10 max-h-48 overflow-auto">{{ $validation_message }}</pre>
+                            <pre class="mt-2 text-xs whitespace-pre-wrap text-brand-ink bg-brand-sand/30 rounded-lg p-3 border border-brand-ink/10 max-h-48 overflow-auto">{{ $validation_message }}</pre>
                         @endif
                         @error('validate')
-                            <p class="mt-2 text-xs text-red-700">{{ $message }}</p>
+                            <p class="mt-1.5 text-xs text-red-700">{{ $message }}</p>
                         @enderror
                     </div>
 
                     @if ($canEdit)
-                        <div class="border-t border-brand-ink/10 pt-5">
-                            <div class="flex items-center justify-between gap-3 mb-3">
-                                <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Save & apply') }}</p>
+                        <div class="border-t border-brand-ink/10 pt-4">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Save & apply') }}</p>
                                 {{-- Live state: is the editor in sync with the server, or are there pending edits? --}}
                                 @if (! $last_applied_at)
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
@@ -336,8 +324,8 @@
                                 @endif
                             </div>
 
-                            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
-                                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+                                <div class="flex flex-wrap gap-2">
                                     <button type="button" x-on:click="$dispatch('open-modal', 'webserver-history-modal')" class="{{ $actionSecondary }}">
                                         <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
                                         {{ __('History') }}
@@ -372,7 +360,7 @@
                             </div>
 
                             {{-- Timestamps + plain-language explanation of the three save verbs. --}}
-                            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-moss">
+                            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-moss">
                                 @if ($draft_saved_at)
                                     <span class="inline-flex items-center gap-1"><x-heroicon-o-document-text class="h-3 w-3" aria-hidden="true" />{{ __('Draft saved :time', ['time' => $draft_saved_at->diffForHumans()]) }}</span>
                                 @endif
@@ -380,12 +368,12 @@
                                     <span class="inline-flex items-center gap-1"><x-heroicon-o-rocket-launch class="h-3 w-3" aria-hidden="true" />{{ __('Applied :time', ['time' => $last_applied_at->diffForHumans()]) }}</span>
                                 @endif
                             </div>
-                            <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            <p class="mt-1.5 text-[11px] leading-relaxed text-brand-moss">
                                 {{ __('Save draft keeps a single working copy (overwritten each save) so your edits survive a reload. Save revision adds a restorable checkpoint to History. Apply to server writes the config live — it stays locked until the config passes Validate, and a successful apply also records a revision.') }}
                             </p>
 
                             @error('apply')
-                                <p class="mt-3 text-sm text-red-700">{{ $message }}</p>
+                                <p class="mt-2 text-xs text-red-700">{{ $message }}</p>
                             @enderror
                         </div>
                     @endif
@@ -394,40 +382,40 @@
         </div>
 
         <aside class="min-w-0 w-full space-y-0 border-t border-brand-ink/10 px-5 py-5 md:col-span-1 md:sticky md:top-6 md:border-t-0 md:border-l md:px-4 md:py-5" aria-label="{{ __('Configuration pipeline') }}">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist mb-4">{{ __('Config pipeline') }}</p>
+            <p class="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Config pipeline') }}</p>
 
             @php
                 $flowActive = 'ring-2 ring-brand-forest border-brand-forest/40 bg-brand-sand/50';
-                $flowCard = 'rounded-xl border border-brand-ink/10 bg-white p-3 shadow-sm transition-colors';
+                $flowCard = 'rounded-lg border border-brand-ink/10 bg-white px-2.5 py-2 shadow-sm transition-colors';
             @endphp
 
             {{-- Step: request --}}
             <div class="flex gap-3">
-                <div class="flex flex-col items-center w-9 shrink-0">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-brand-sand/50 text-brand-ink">
+                <div class="flex w-7 shrink-0 flex-col items-center">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-brand-sand/50 text-brand-ink">
                         <x-heroicon-o-user class="h-4 w-4" aria-hidden="true" />
                     </span>
                     <span class="w-px flex-1 min-h-[12px] bg-brand-ink/15" aria-hidden="true"></span>
                 </div>
-                <div class="pb-5 min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Visitor request') }}</p>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">{{ __('Traffic hits your vhost. Optional caching may apply before config snippets.') }}</p>
+                <div class="min-w-0 flex-1 pb-3.5">
+                    <p class="text-xs font-semibold text-brand-ink">{{ __('Visitor request') }}</p>
+                    <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ __('Traffic hits your vhost. Optional caching may apply before config snippets.') }}</p>
                 </div>
             </div>
 
             @if ($showNginxLayerPipeline)
                 {{-- Before --}}
                 <div class="flex gap-3">
-                    <div class="flex flex-col items-center w-9 shrink-0">
+                    <div class="flex w-7 shrink-0 flex-col items-center">
                         <span class="w-px flex-1 min-h-[8px] bg-brand-ink/15" aria-hidden="true"></span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-ink">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-ink">
                             <x-heroicon-o-arrow-up-tray class="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span class="w-px flex-1 min-h-[12px] bg-brand-ink/15" aria-hidden="true"></span>
                     </div>
-                    <div class="pb-5 min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-brand-ink">{{ __('Before') }}</p>
-                        <p class="text-xs text-brand-moss mb-2">{{ __('Included first inside the server block.') }}</p>
+                    <div class="min-w-0 flex-1 pb-3.5">
+                        <p class="text-xs font-semibold text-brand-ink">{{ __('Before') }}</p>
+                        <p class="mb-1.5 text-[11px] text-brand-moss">{{ __('Included first inside the server block.') }}</p>
                         <button type="button" wire:click="$set('active_layer', 'before'); $set('content_tab', 'edit')" class="w-full text-left {{ $flowCard }} {{ $active_layer === 'before' && $content_tab === 'edit' ? $flowActive : 'hover:border-brand-ink/25' }}">
                             <span class="font-mono text-[11px] text-brand-ink break-all">before/10-dply-layer.conf</span>
                             @if ($active_layer === 'before' && $content_tab === 'edit')
@@ -440,19 +428,19 @@
 
             {{-- Server / core --}}
             <div class="flex gap-3">
-                <div class="flex flex-col items-center w-9 shrink-0">
+                <div class="flex w-7 shrink-0 flex-col items-center">
                     <span class="w-px flex-1 min-h-[8px] bg-brand-ink/15" aria-hidden="true"></span>
-                    <span class="flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-ink">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-ink">
                         <x-heroicon-o-server-stack class="h-4 w-4" aria-hidden="true" />
                     </span>
                     <span class="w-px flex-1 min-h-[12px] bg-brand-ink/15" aria-hidden="true"></span>
                 </div>
-                <div class="pb-5 min-w-0 flex-1 space-y-2">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Server') }}</p>
+                <div class="min-w-0 flex-1 space-y-1.5 pb-3.5">
+                    <p class="text-xs font-semibold text-brand-ink">{{ __('Server') }}</p>
                     @if ($showNginxLayerPipeline)
                         <button type="button" wire:click="$set('active_layer', 'main'); $set('content_tab', 'edit')" class="w-full text-left {{ $flowCard }} {{ $active_layer === 'main' && $content_tab === 'edit' ? $flowActive : 'hover:border-brand-ink/25' }}">
                             <span class="font-mono text-[11px] text-brand-ink break-all block">{{ $site->webserverConfigBasename() }}.conf</span>
-                            <span class="text-xs text-brand-moss mt-1 block">{{ __('Primary vhost · edit the main snippet merged into this file') }}</span>
+                            <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Primary vhost · edit the main snippet merged into this file') }}</span>
                             @if ($active_layer === 'main' && $content_tab === 'edit')
                                 <span class="mt-2 inline-flex text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Editing') }}</span>
                             @endif
@@ -460,7 +448,7 @@
                     @else
                         <button type="button" wire:click="$set('active_layer', '{{ $sidebarServerTargetLayer }}'); $set('content_tab', 'edit')" class="w-full text-left {{ $flowCard }} {{ (($mode === 'full_override' && $active_layer === 'full') || ($mode !== 'full_override' && $active_layer === 'main')) && $content_tab === 'edit' ? $flowActive : 'hover:border-brand-ink/25' }}">
                             <span class="font-mono text-[11px] text-brand-ink break-all block">{{ $config_paths['main_vhost'] }}</span>
-                            <span class="text-xs text-brand-moss mt-1 block">{{ $mode === 'full_override' ? __('Full configuration file') : __('Layered snippets (preview uses effective config)') }}</span>
+                            <span class="mt-0.5 block text-[11px] text-brand-moss">{{ $mode === 'full_override' ? __('Full configuration file') : __('Layered snippets (preview uses effective config)') }}</span>
                             @if ((($mode === 'full_override' && $active_layer === 'full') || ($mode !== 'full_override' && $active_layer === 'main')) && $content_tab === 'edit')
                                 <span class="mt-2 inline-flex text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Editing') }}</span>
                             @endif
@@ -478,16 +466,16 @@
 
             @if ($showNginxLayerPipeline)
                 <div class="flex gap-3">
-                    <div class="flex flex-col items-center w-9 shrink-0">
+                    <div class="flex w-7 shrink-0 flex-col items-center">
                         <span class="w-px flex-1 min-h-[8px] bg-brand-ink/15" aria-hidden="true"></span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-ink">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-white text-brand-ink">
                             <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span class="w-px flex-1 min-h-[12px] bg-brand-ink/15" aria-hidden="true"></span>
                     </div>
-                    <div class="pb-5 min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-brand-ink">{{ __('After') }}</p>
-                        <p class="text-xs text-brand-moss mb-2">{{ __('Included last inside the server block.') }}</p>
+                    <div class="min-w-0 flex-1 pb-3.5">
+                        <p class="text-xs font-semibold text-brand-ink">{{ __('After') }}</p>
+                        <p class="mb-1.5 text-[11px] text-brand-moss">{{ __('Included last inside the server block.') }}</p>
                         <button type="button" wire:click="$set('active_layer', 'after'); $set('content_tab', 'edit')" class="w-full text-left {{ $flowCard }} {{ $active_layer === 'after' && $content_tab === 'edit' ? $flowActive : 'hover:border-brand-ink/25' }}">
                             <span class="font-mono text-[11px] text-brand-ink break-all">after/10-dply-layer.conf</span>
                             @if (trim($after_body) === '')
@@ -503,15 +491,15 @@
 
             {{-- Result --}}
             <div class="flex gap-3">
-                <div class="flex flex-col items-center w-9 shrink-0">
+                <div class="flex w-7 shrink-0 flex-col items-center">
                     <span class="w-px flex-1 min-h-[8px] bg-brand-ink/15" aria-hidden="true"></span>
-                    <span class="flex h-9 w-9 items-center justify-center rounded-full border border-brand-ink/10 bg-brand-sand/50 text-brand-ink">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-full border border-brand-ink/10 bg-brand-sand/50 text-brand-ink">
                         <x-heroicon-o-computer-desktop class="h-4 w-4" aria-hidden="true" />
                     </span>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Response') }}</p>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">{{ __('The effective config your visitors receive after all includes and snippets are applied.') }}</p>
+                    <p class="text-xs font-semibold text-brand-ink">{{ __('Response') }}</p>
+                    <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ __('The effective config your visitors receive after all includes and snippets are applied.') }}</p>
                 </div>
             </div>
 
@@ -549,7 +537,7 @@
         </div>
     </x-modal>
 
-    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+    <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
         <x-cli-snippet tone="stub" />
     </div>
     </section>
