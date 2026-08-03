@@ -400,8 +400,8 @@
 
     <div class="{{ $card }}">
         @if ($aliasCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-link class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-link class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No aliases yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above to extend the webserver server_name list.') }}</p>
             </div>
@@ -412,7 +412,7 @@
                         $hasSsl = $coversWithSsl($alias->hostname);
                         $isEditing = $editing_alias_id === (string) $alias->id;
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="alias-row-{{ $alias->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="alias-row-{{ $alias->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedAlias" class="space-y-3">
                                 <div class="grid gap-3 sm:grid-cols-2">
@@ -441,9 +441,6 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-link class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $alias->hostname }}</span>
@@ -648,8 +645,8 @@
 
     <div class="{{ $card }}">
         @if ($redirectCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-arrow-uturn-right class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-arrow-uturn-right class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No redirects yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above or paste a list via Bulk import.') }}</p>
             </div>
@@ -661,7 +658,7 @@
                         $isInternal = $redirect->kind === \App\Enums\SiteRedirectKind::InternalRewrite;
                         $headerCount = is_array($redirect->response_headers) ? count($redirect->response_headers) : 0;
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="redirect-row-{{ $redirect->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="redirect-row-{{ $redirect->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedRedirect" class="space-y-3">
                                 <div class="grid gap-3 sm:grid-cols-[10rem_1fr_1fr_8rem]">
@@ -740,9 +737,6 @@
                         @else
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-arrow-uturn-right class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 break-all font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $redirect->from_path }}</span>
@@ -844,7 +838,7 @@
              doesn't clip it; the card just grows when open. --}}
         @can('update', $site)
             @if ($this->canAddManagedPreview())
-                <div x-show="addOpen" x-cloak class="flex flex-col gap-3 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-end sm:px-7">
+                <div x-show="addOpen" x-cloak class="flex flex-col gap-2 border-t border-brand-ink/10 px-5 py-3 sm:flex-row sm:items-end sm:px-6">
                     <div class="min-w-0 flex-1">
                         <x-input-label for="new_preview_label" :value="__('Label (optional)')" />
                         <input id="new_preview_label" type="text" wire:model="newPreviewLabel" maxlength="255" placeholder="{{ __('e.g. Client review') }}" class="dply-input mt-1 w-full text-sm" />
@@ -860,8 +854,8 @@
     </div>
 
     <div class="{{ $card }}">
-        <form wire:submit="savePreviewSettings" class="space-y-5 px-6 py-6 sm:px-8">
-            <div class="grid gap-4 sm:grid-cols-2">
+        <form wire:submit="savePreviewSettings" class="space-y-3 px-5 py-4 sm:px-6">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="preview_primary_hostname" :value="__('Primary preview hostname')" />
                     @if ($this->previewHostnameLocked())
@@ -879,12 +873,12 @@
                 </div>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
-                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="preview_auto_ssl" class="mt-1 rounded border-slate-300" />
+                <label class="flex items-start gap-2.5 rounded-lg border border-brand-ink/10 px-3 py-2 text-xs text-brand-ink">
+                    <input type="checkbox" wire:model="preview_auto_ssl" class="mt-0.5 rounded border-slate-300" />
                     <span>{{ __('Automatically request SSL once the preview domain is reachable.') }}</span>
                 </label>
-                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="preview_https_redirect" class="mt-1 rounded border-slate-300" />
+                <label class="flex items-start gap-2.5 rounded-lg border border-brand-ink/10 px-3 py-2 text-xs text-brand-ink">
+                    <input type="checkbox" wire:model="preview_https_redirect" class="mt-0.5 rounded border-slate-300" />
                     <span>{{ __('Redirect preview traffic to HTTPS once a preview certificate is active.') }}</span>
                 </label>
             </div>
@@ -897,9 +891,9 @@
         </form>
 
         @if ($previewCount > 0)
-            <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
-                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Known preview hosts') }}</p>
-                <ul class="mt-3 space-y-2">
+            <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Known preview hosts') }}</p>
+                <ul class="mt-2 space-y-1.5">
                     @foreach ($site->previewDomains as $previewDomain)
                         @php
                             $pdOnWildcard = $previewDomain->managed_by_dply
@@ -921,7 +915,7 @@
                                 };
                             }
                         @endphp
-                        <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
+                        <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-ink/10 px-3 py-2">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</span>
@@ -1093,8 +1087,8 @@
 
     <div class="{{ $card }}">
         @if ($tenantCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-building-office-2 class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-building-office-2 class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No tenant domains yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above or paste a list via Bulk import.') }}</p>
             </div>
@@ -1111,7 +1105,7 @@
                             default => ['label' => __('SSL missing'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-lock-open'],
                         };
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="tenant-row-{{ $tenantDomain->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="tenant-row-{{ $tenantDomain->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedTenantDomain" class="space-y-3">
                                 <div class="grid gap-3 sm:grid-cols-2">
@@ -1144,9 +1138,6 @@
                         @else
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-building-office-2 class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $tenantDomain->hostname }}</span>

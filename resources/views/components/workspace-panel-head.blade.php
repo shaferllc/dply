@@ -10,7 +10,9 @@
      Replaces the tall icon-badge + eyebrow + title + prose stack — the eyebrow
      it drops always either restated the title or said nothing ("Library"). --}}
 <div {{ $attributes->class(['flex flex-wrap items-start justify-between gap-x-4 gap-y-2 bg-brand-sand/20 px-5 py-3.5 sm:px-6']) }}>
-    <div class="min-w-0">
+    {{-- flex-1 with a basis floor: a long note wraps its own text instead of
+         pushing the actions onto their own row. --}}
+    <div class="min-w-0 flex-1 basis-72">
         <div class="flex flex-wrap items-center gap-2">
             <x-dynamic-component :component="$icon" class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
             <h2 class="text-sm font-semibold text-brand-ink">{{ $title }}</h2>
