@@ -4,6 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
+use App\Livewire\Concerns\DismissesDaemonSuggestions;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\ManagesSiteLogging;
@@ -43,6 +44,7 @@ class Settings extends Show
 {
     use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
+    use DismissesDaemonSuggestions;
     use ManagesContainerSite;
     use ManagesSiteAccessGate;
     use ManagesSiteAliases;

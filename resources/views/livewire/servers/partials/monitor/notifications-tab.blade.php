@@ -18,14 +18,14 @@
                 </p>
             </div>
         </div>
-        <x-secondary-button size="sm" href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}" wire:navigate>
-            {{ __('Manage in Settings') }}
+        <x-secondary-button size="sm" href="{{ route('servers.notifications', $server) }}" wire:navigate>
+            {{ __('Manage notifications') }}
             <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
         </x-secondary-button>
     </div>
 
     <p class="border-b border-brand-ink/10 px-5 py-3 text-xs leading-relaxed text-brand-moss sm:px-6">
-        {{ __('Routes fire when metrics go stale or server thresholds are breached — add a channel below or manage the full alert catalog in Settings.') }}
+        {{ __('Routes fire when metrics go stale or server thresholds are breached — add a channel below or manage the full alert catalog on the Notifications page.') }}
     </p>
 
     <div class="px-5 py-5 sm:px-6">

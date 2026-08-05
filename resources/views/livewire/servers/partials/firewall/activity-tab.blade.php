@@ -1,24 +1,17 @@
                 <div class="{{ $card }}">
-                    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                        <x-icon-badge>
-                            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Apply runs, rule edits, template applications, and imports — chronologically. Apply rows are expandable for the full UFW transcript.') }}</p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                    {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $activityCount, ['count' => $activityCount]) }}
-                                </span>
-                                @if ($latestActivity)
-                                    <span class="text-brand-mist/60">·</span>
-                                    <span>{{ __('latest :time', ['time' => $latestActivity->diffForHumans()]) }}</span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+                    {{-- Dense head, matching the rest of the workspace. Was an icon
+                         badge + "ACTIVITY" eyebrow + title + prose + a meta row;
+                         the eyebrow restated the tab and the count/recency now
+                         ride the count pill. --}}
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-clock"
+                        :title="__('Audit log')"
+                        :note="__('Apply runs, rule edits, template applications, and imports — chronologically. Apply rows are expandable for the full UFW transcript.')"
+                        :count="trans_choice('{0} no events|{1} :count event|[2,*] :count events', $activityCount, ['count' => $activityCount])
+                            . ($latestActivity ? ' · '.__('latest :time', ['time' => $latestActivity->diffForHumans()]) : '')"
+                        class="border-b border-brand-ink/10"
+                    />
 
                     @if ($activityCount > 0)
                         <div class="space-y-2 px-6 py-5 sm:px-8">

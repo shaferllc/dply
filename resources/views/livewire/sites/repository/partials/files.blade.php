@@ -1,15 +1,12 @@
 <section>
     <div class="border-b border-brand-ink/10">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Browse') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Files') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Browse the repository tree at the selected ref. Click a file to preview it inline.') }}</p>
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="min-w-0 flex-1 basis-72">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Repository files') }}</h2>
                 </div>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Browse the repository tree at the selected ref. Click a file to preview it inline.') }}</p>
             </div>
             <label class="flex shrink-0 items-center gap-2 text-xs text-brand-moss">
                 <span class="font-semibold uppercase tracking-[0.12em]">{{ __('Ref') }}</span>
@@ -21,7 +18,7 @@
                 />
             </label>
         </div>
-        <div class="bg-brand-cream/40 px-6 py-3 sm:px-7">
+        <div class="bg-brand-cream/40 px-5 py-2 sm:px-6">
             <nav aria-label="{{ __('Repository path') }}" class="min-w-0">
                 <ol class="flex flex-wrap items-center gap-1 text-sm">
                     @foreach ($filesBreadcrumb as $crumb)
@@ -74,7 +71,7 @@
 
     @if ($filesView !== null)
         <div class="border-b border-brand-ink/10">
-            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-2.5 sm:px-6">
                 <div class="min-w-0">
                     <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $filesOpenFile }}</p>
                     <p class="mt-0.5 text-xs text-brand-moss">

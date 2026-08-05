@@ -18,37 +18,30 @@
     <div class="dply-card min-w-0 overflow-hidden p-0" aria-busy="true" aria-live="polite">
         <span class="sr-only">{{ __('Loading console…') }}</span>
 
-        <div class="rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5" aria-hidden="true">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="flex min-w-0 items-center gap-2.5">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Console') }}</h2>
-                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Quick SSH for this server. Saved recipes live on Run.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex h-7 w-24 animate-pulse rounded-full bg-brand-ink/10"></span>
-                    <span class="inline-flex h-7 w-20 animate-pulse rounded-md bg-brand-ink/10"></span>
-                </div>
-            </div>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4" aria-hidden="true">
+            <h2 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                <x-heroicon-o-command-line class="h-4 w-4 text-brand-forest" aria-hidden="true" />
+                {{ __('Console') }}
+            </h2>
 
-            <div class="mt-3 flex flex-wrap items-center gap-1.5">
-                <span class="me-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Quick') }}</span>
+            <span class="h-4 w-px shrink-0 bg-brand-ink/10"></span>
+
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                 @foreach (range(1, 7) as $chip)
                     <span
                         @class([
-                            'inline-flex h-7 animate-pulse rounded-full bg-brand-ink/10',
+                            'inline-flex h-5 animate-pulse rounded-full bg-brand-ink/10',
                             'w-14' => $chip % 3 === 1,
                             'w-16' => $chip % 3 === 2,
                             'w-24' => $chip % 3 === 0,
                         ])
                     ></span>
                 @endforeach
+            </div>
+
+            <div class="flex shrink-0 items-center gap-2">
+                <span class="inline-flex h-5 w-16 animate-pulse rounded-full bg-brand-ink/10"></span>
+                <span class="inline-flex h-5 w-14 animate-pulse rounded-md bg-brand-ink/10"></span>
             </div>
         </div>
 

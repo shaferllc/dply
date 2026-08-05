@@ -12,7 +12,8 @@
     $routingTab = 'domains';
     $laravel_tab = 'commands';
 
-    $installedEngines = $this->installedEngines;
+    // Capability-backed; empty until loadDatabaseCapabilities() has run.
+    $installedEngines = $this->capabilitiesLoaded ? $this->installedEngines : [];
     $linked = $this->linkedDatabases;
     $linkable = $this->linkableDatabases;
     $isMysqlFamily = \App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($new_db_engine);
@@ -66,7 +67,7 @@
                     </div>
                 @endif
 
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist
                         :aria-label="__('Database sections')"
                         scroll
@@ -84,7 +85,18 @@
                     </x-server-workspace-tablist>
                 </div>
 
-                <div wire:key="db-panel-{{ $dbTab }}" class="min-w-0">
+                {{-- Engine capabilities are an SSH probe, so the panel paints a
+                     skeleton and wire:init fetches them after first paint. The
+                     same skeleton doubles as the tab-switch loading state. --}}
+                @unless ($capabilitiesLoaded)
+                    <div wire:init="loadDatabaseCapabilities">
+                        @include('livewire.sites.partials._panel-skeleton')
+                    </div>
+                @else
+                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setDatabaseTab">
+                    @include('livewire.sites.partials._panel-skeleton')
+                </div>
+                <div wire:key="db-panel-{{ $dbTab }}" class="min-w-0" wire:loading.class="hidden" wire:target="setDatabaseTab">
                 @if ($dbTab === 'notifications')
                     @include('livewire.sites.partials.database.notifications-tab')
                 @elseif (empty($installedEngines))
@@ -104,14 +116,11 @@
                 @else
                     @if ($dbTab === 'databases')
                     <section class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                            <x-icon-badge>
-                                <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
+                        <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+                            <x-heroicon-o-circle-stack class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Databases') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Databases for this site') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Databases linked to :site. Manage users, rotate the password, back up, or drop each one.', ['site' => $site->name]) }}</p>
+                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Databases for this site') }}</h3>
+                                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Databases linked to :site. Manage users, rotate the password, back up, or drop each one.', ['site' => $site->name]) }}</p>
                             </div>
                         </div>
 
@@ -126,7 +135,7 @@
                                         $family = \App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine);
                                         $supportsUsers = in_array($db->engine, ['mysql', 'mariadb', 'postgres'], true);
                                     @endphp
-                                    <li class="px-5 py-4 sm:px-6" wire:key="linked-{{ $db->id }}">
+                                    <li class="px-5 py-2.5 sm:px-6" wire:key="linked-{{ $db->id }}">
                                         <div class="flex flex-wrap items-center gap-3">
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-center gap-2">
@@ -245,18 +254,15 @@
 
                     @if ($dbTab === 'create')
                     <form wire:submit="createDatabase" class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                            <x-icon-badge>
-                                <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
+                        <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+                            <x-heroicon-o-plus-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provision') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a database') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('A user and password are generated automatically unless you set them.') }}</p>
+                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Create a database') }}</h3>
+                                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('A user and password are generated automatically unless you set them.') }}</p>
                             </div>
                         </div>
 
-                        <div class="space-y-5 px-5 py-5 sm:px-6">
+                        <div class="space-y-3 px-5 py-4 sm:px-6">
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label for="new_db_engine" class="{{ $labelCls }}">{{ __('Engine') }}</label>
@@ -341,17 +347,14 @@
 
                     @if ($linkable->isNotEmpty())
                         <form wire:submit="linkDatabase" class="border-b border-brand-ink/10">
-                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                                <x-icon-badge>
-                                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
+                            <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+                                <x-heroicon-o-link class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attach') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Link an existing database') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet.') }}</p>
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Link an existing database') }}</h3>
+                                    <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet.') }}</p>
                                 </div>
                             </div>
-                            <div class="flex flex-wrap items-end gap-3 px-5 py-5 sm:px-6">
+                            <div class="flex flex-wrap items-end gap-3 px-5 py-4 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <label for="link_database_id" class="{{ $labelCls }}">{{ __('Database') }}</label>
                                     <select id="link_database_id" wire:model="link_database_id" class="{{ $inputCls }}">
@@ -372,8 +375,9 @@
                     @endif
                 @endif
                 </div>
+                @endunless
 
-                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
                     <x-cli-snippet :commands="[
                         ['label' => __('List databases'), 'command' => 'dply sites:db:list '.$site->slug],
                         ['label' => __('Create database'), 'command' => 'dply sites:db:create '.$site->slug.' <name>'],

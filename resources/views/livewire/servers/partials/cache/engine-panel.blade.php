@@ -23,7 +23,7 @@
                         $activeSubtab = in_array($engine_subtab, $availableSubtabs, true) ? $engine_subtab : 'overview';
                     @endphp
 
-                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"
@@ -168,7 +168,7 @@
                          still shown in the status grid below. --}}
 
                     {{-- Sub-tab strip — group the per-engine cards so the page isn't a 9-card scroll. --}}
-                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"

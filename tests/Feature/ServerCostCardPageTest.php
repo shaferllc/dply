@@ -42,7 +42,7 @@ test('legacy server cost route redirects to settings governance', function (): v
 
     $this->actingAs($user)
         ->get(route('servers.cost', $server))
-        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'governance']).'#settings-cost-estimate');
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'tab' => 'governance']).'#settings-cost-estimate');
 });
 
 test('server cost page is hidden without feature flag', function (): void {
@@ -60,7 +60,7 @@ test('settings governance tab renders stack estimate', function (): void {
     [$user, $server] = costCardUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.settings', ['server' => $server, 'section' => 'governance']))
+        ->get(route('servers.settings', ['server' => $server, 'tab' => 'governance']))
         ->assertOk()
         ->assertSee(__('Stack estimate'))
         ->assertSee(__('Full stack'))

@@ -63,6 +63,21 @@ class Create extends Component
     #[Url]
     public string $mode = 'image';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setMode(string $value): void
+    {
+        if ($value === '' || $value === $this->mode) {
+            return;
+        }
+
+        $this->mode = $value;
+    }
+
+
     public string $name = '';
 
     public string $image = '';

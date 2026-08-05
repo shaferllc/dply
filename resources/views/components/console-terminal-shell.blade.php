@@ -44,7 +44,7 @@
 
     @isset($footer)
         <div @class([
-            'shrink-0 px-3 py-2.5 sm:px-4 sm:py-3',
+            'shrink-0 px-3 py-2 sm:px-4 sm:py-3',
             'border-t border-brand-ink/10 bg-[#0b1020]' => ! $isDark,
             'border-t border-white/10 bg-black/25' => $isDark,
         ])>

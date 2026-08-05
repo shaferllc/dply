@@ -88,11 +88,11 @@
                         {{ __('Add route') }}
                     </button>
                     <a
-                        href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}"
+                        href="{{ route('servers.notifications', $server) }}"
                         wire:navigate
                         class="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300/80 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-amber-900 shadow-sm transition-colors hover:bg-amber-100"
                     >
-                        {{ __('Manage in Settings') }}
+                        {{ __('Manage notifications') }}
                     </a>
                 </div>
             </div>

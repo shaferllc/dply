@@ -33,26 +33,19 @@
             ></div>
 
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Logs') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    icon="heroicon-o-document-text"
+                    :title="__('Logs')"
+                    :note="__('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.')"
+                    class="border-b border-brand-ink/10"
+                />
 
                 {{-- dply Logs app-log stream — only when a logging binding routes to it. --}}
                 @if ($hasDplyRealtime)
                     <livewire:sites.site-app-logs :site="$site" :embedded="true" wire:key="site-app-logs-{{ $site->id }}" />
                 @endif
 
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist
                         :aria-label="__('Logs workspace sections')"
                         scroll
@@ -88,7 +81,17 @@
                     </x-server-workspace-tablist>
                 </div>
 
-                <div class="relative min-w-0" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setLogsWorkspaceTab">
+                {{-- Skeleton swap, not a dim-and-lock. Fading the outgoing tab to
+                     opacity-60 left the previous tab's content legible on screen
+                     while a different tab was loading, which reads as "this is
+                     your data" — the shared panel skeleton the Repository /
+                     Deployments / Laravel / Monitor / Notifications tabs use says
+                     "new content incoming" instead. --}}
+                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setLogsWorkspaceTab">
+                    @include('livewire.sites.partials._panel-skeleton')
+                </div>
+
+                <div class="relative min-w-0" wire:loading.class="hidden" wire:target="setLogsWorkspaceTab">
                     @if ($logsTab === 'viewer')
                         @include('livewire.servers.partials.log-viewer-panel', ['logSources' => $logSources])
                     @endif

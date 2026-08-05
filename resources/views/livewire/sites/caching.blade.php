@@ -227,19 +227,27 @@
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Varnish') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Front cache settings') }}</h2>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                        {{ __('Default object TTL hint passed to the Varnish daemon for this site.') }}
+                                        {{ __('Varnish runs as one daemon in front of every site on this server — it has no per-site VCL, so TTL is not set here.') }}
                                     </p>
                                 </div>
                             </div>
 
-                            <div class="space-y-3 px-6 py-6 sm:px-7">
-                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="varnish_ttl_default">{{ __('Default object TTL') }}</label>
-                                        <input id="varnish_ttl_default" type="text" wire:model="varnish_ttl_default" class="{{ $inputCls }}">
+                            {{-- There is deliberately no per-site TTL input: the VCL
+                                 (HttpCacheDaemonInstallScripts) is server-wide and honours
+                                 the origin's Cache-Control, so a per-site box here would
+                                 save a value nothing reads. --}}
+                            <div class="space-y-2 px-6 py-6 sm:px-7">
+                                <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Fallback object TTL') }}</dt>
+                                        <dd class="mt-1 font-mono text-xs text-brand-ink">{{ __('120s (server-wide)') }}</dd>
                                     </div>
-                                </div>
-                                <p class="text-xs text-brand-moss">{{ __('Install or remove the Varnish daemon from the server Caches workspace.') }}</p>
+                                    <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Per-site TTL') }}</dt>
+                                        <dd class="mt-1 font-mono text-xs text-brand-ink">{{ __('Cache-Control from your app') }}</dd>
+                                    </div>
+                                </dl>
+                                <p class="text-xs text-brand-moss">{{ __('Varnish only falls back to its own TTL when your response sets no cache lifetime, so send Cache-Control headers to control it per route. Requests with Authorization, or a PHPSESSID / laravel_session / wordpress_logged_in_ cookie, bypass the cache. Install or remove the daemon from the server Caches workspace.') }}</p>
                             </div>
                         </section>
                     @endif

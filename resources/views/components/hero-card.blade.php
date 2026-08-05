@@ -11,6 +11,9 @@
     'tone' => 'auto',
     /** Icon badge size ('default', 'md', 'lg'). */
     'iconSize' => 'md',
+    /** Tighter padding and a smaller title, for pages whose own content carries
+        the identity (see x-server-workspace-layout's `page-header-compact`). */
+    'compact' => false,
 ])
 
 @php
@@ -39,7 +42,10 @@
 @endphp
 
 <section {{ $attributes->class(['dply-card overflow-hidden']) }}>
-    <div class="p-4 sm:p-5">
+    <div @class([
+        'p-4 sm:p-5' => ! $compact,
+        'px-4 py-3 sm:px-5 sm:py-3.5' => $compact,
+    ])>
         {{-- Top band: identity on the left, stat tiles (+ optional top action)
              pulled up to the right so the header reads as one dense row instead
              of leaving a gap between left actions and right stats. --}}
@@ -60,7 +66,9 @@
                         <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $eyebrow }}</p>
                     @endif
                     <h2 @class([
-                        'text-base font-semibold tracking-tight text-brand-ink',
+                        'font-semibold tracking-tight text-brand-ink',
+                        'text-base' => ! $compact,
+                        'text-[15px]' => $compact,
                         'mt-0.5' => filled($eyebrow),
                     ])>{{ $title }}</h2>
                     @if (filled($description))

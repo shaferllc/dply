@@ -211,17 +211,17 @@
 
         {{-- Tabs --}}
         <x-server-workspace-tablist :aria-label="__('Worker pool sections')" class="mt-6">
-            <x-server-workspace-tab :active="$tab === 'overview'" wire:click="$set('tab', 'overview')">
+            <x-server-workspace-tab :active="$tab === 'overview'" wire:click="setTab('overview')">
                 {{ __('Overview') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab :active="$tab === 'members'" wire:click="$set('tab', 'members')">
+            <x-server-workspace-tab :active="$tab === 'members'" wire:click="setTab('members')">
                 {{ __('Members') }}
                 <span class="ml-1 rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $members->count() }}</span>
             </x-server-workspace-tab>
-            <x-server-workspace-tab :active="$tab === 'horizon'" wire:click="$set('tab', 'horizon')">
+            <x-server-workspace-tab :active="$tab === 'horizon'" wire:click="setTab('horizon')">
                 {{ __('Horizon') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab :active="$tab === 'traffic'" wire:click="$set('tab', 'traffic')">
+            <x-server-workspace-tab :active="$tab === 'traffic'" wire:click="setTab('traffic')">
                 {{ __('Traffic & Redis') }}
             </x-server-workspace-tab>
         </x-server-workspace-tablist>

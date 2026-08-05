@@ -45,7 +45,7 @@
                 {{ __('Provisioning and SSH must be ready before Docker inventory and actions work.') }}
             </div>
         @else
-            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 <x-server-workspace-tablist :aria-label="__('Docker workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                     <x-server-workspace-tab
                         id="docker-tab-overview"

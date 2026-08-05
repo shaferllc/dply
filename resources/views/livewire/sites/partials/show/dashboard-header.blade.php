@@ -177,22 +177,22 @@
 
             {{-- Tablist ---------------------------------------------------------------------------- --}}
             <x-server-workspace-tablist :aria-label="__('Site dashboard sections')" class="mt-6">
-                <x-server-workspace-tab id="site-tab-overview" :active="$activeTab === 'overview'" wire:click="$set('dashboard_tab', 'overview')">
+                <x-server-workspace-tab id="site-tab-overview" :active="$activeTab === 'overview'" wire:click="setDashboardTab('overview')">
                     <span class="inline-flex items-center gap-1.5"><x-heroicon-o-rectangle-stack class="h-4 w-4" />{{ __('Overview') }}</span>
                 </x-server-workspace-tab>
-                <x-server-workspace-tab id="site-tab-deploys" :active="$activeTab === 'deploys'" wire:click="$set('dashboard_tab', 'deploys')">
+                <x-server-workspace-tab id="site-tab-deploys" :active="$activeTab === 'deploys'" wire:click="setDashboardTab('deploys')">
                     <span class="inline-flex items-center gap-1.5"><x-heroicon-o-code-bracket class="h-4 w-4" />{{ __('Deploys') }}</span>
                 </x-server-workspace-tab>
                 @if ($showRuntimeTab)
-                    <x-server-workspace-tab id="site-tab-runtime" :active="$activeTab === 'runtime'" wire:click="$set('dashboard_tab', 'runtime')">
+                    <x-server-workspace-tab id="site-tab-runtime" :active="$activeTab === 'runtime'" wire:click="setDashboardTab('runtime')">
                         <span class="inline-flex items-center gap-1.5"><x-heroicon-o-cube class="h-4 w-4" />{{ __('Runtime') }}</span>
                     </x-server-workspace-tab>
                 @endif
-                <x-server-workspace-tab id="site-tab-logs" :active="$activeTab === 'logs'" wire:click="$set('dashboard_tab', 'logs')">
+                <x-server-workspace-tab id="site-tab-logs" :active="$activeTab === 'logs'" wire:click="setDashboardTab('logs')">
                     <span class="inline-flex items-center gap-1.5"><x-heroicon-o-clipboard-document-list class="h-4 w-4" />{{ __('Logs') }}</span>
                 </x-server-workspace-tab>
                 @if ($showSslTab)
-                    <x-server-workspace-tab id="site-tab-ssl" :active="$activeTab === 'ssl'" wire:click="$set('dashboard_tab', 'ssl')">
+                    <x-server-workspace-tab id="site-tab-ssl" :active="$activeTab === 'ssl'" wire:click="setDashboardTab('ssl')">
                         <span class="inline-flex items-center gap-1.5"><x-heroicon-o-lock-closed class="h-4 w-4" />{{ __('SSL') }}</span>
                     </x-server-workspace-tab>
                 @endif

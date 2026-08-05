@@ -157,7 +157,7 @@
                             :empty-message="__('No probe error captured.')"
                         />
                         <div class="flex flex-wrap gap-3">
-                            <x-secondary-button size="sm" href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate>{{ __('Server connection settings') }}</x-secondary-button>
+                            <x-secondary-button size="sm" href="{{ route('servers.settings', $server) }}" wire:navigate>{{ __('Server connection settings') }}</x-secondary-button>
                             <x-primary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled">
                                 <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck SSH') }}</span>
                                 <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>
@@ -247,7 +247,7 @@
                 @endif
             </div>
         @else
-            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 <x-server-workspace-tablist :aria-label="__('Monitor workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                     <x-server-workspace-tab
                         id="monitor-tab-status"

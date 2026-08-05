@@ -49,7 +49,7 @@ if (! function_exists('reverb_health_check_url')) {
 
 if (! function_exists('server_workspace_nav_item_url')) {
     /**
-     * URL for a server workspace sidebar item (handles settings default tab segment).
+     * URL for a server workspace sidebar item.
      *
      * @param  array<string, mixed>  $item
      */
@@ -59,10 +59,6 @@ if (! function_exists('server_workspace_nav_item_url')) {
 
         if (! empty($item['preview_only']) && is_string($item['preview_route'] ?? null) && $item['preview_route'] !== '') {
             $routeName = $item['preview_route'];
-        }
-
-        if ($routeName === 'servers.settings') {
-            return route('servers.settings', ['server' => $server, 'section' => 'connection']);
         }
 
         return route($routeName, $server);

@@ -4,17 +4,13 @@
 @php $candidates = $this->syncCandidates; @endphp
 
 <section class="border-b border-brand-ink/10">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy together') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Sync deploy') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Select the sites to ship in one go — typically this site and its worker(s) sharing the same repository. Each is deployed in parallel, exactly like its own Deploy button.') }}</p>
-            </div>
-        </div>
+    <x-workspace-panel-head
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-arrows-right-left"
+        :title="__('Sync deploy')"
+        :note="__('Select the sites to ship in one go — typically this site and its worker(s) sharing the same repository. Each is deployed in parallel, exactly like its own Deploy button.')"
+    >
+        <x-slot:actions>
         @can('update', $site)
             <button
                 type="button"
@@ -22,16 +18,17 @@
                 wire:loading.attr="disabled"
                 wire:target="deployMultiple"
                 @disabled(count($syncSelectedSiteIds) === 0)
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-50"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-50"
             >
                 <x-heroicon-o-rocket-launch class="h-4 w-4" wire:loading.remove wire:target="deployMultiple" />
                 <span wire:loading wire:target="deployMultiple"><x-spinner variant="white" size="sm" /></span>
                 {{ __('Deploy selected (:n)', ['n' => count($syncSelectedSiteIds)]) }}
             </button>
         @endcan
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-5 sm:px-8">
+    <div class="px-5 py-4 sm:px-6">
         @if ($candidates->count() <= 1)
             <p class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
                 {{ __('No related sites found to deploy with this one. Sites are matched by shared Git repository (or the same server when no repo is set).') }}

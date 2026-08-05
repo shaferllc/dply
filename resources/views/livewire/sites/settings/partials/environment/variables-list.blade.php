@@ -8,41 +8,36 @@
     >
         {{-- Single merged header: identity + count/freshness on the left, every
              variables action on the right (Sync, Paste, View/edit all, Add). --}}
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Configuration') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        @if ($supportsEnvPush)
-                            {{ __('Key/value pairs written into the site\'s .env file. Edits push to the server automatically.') }}
-                        @else
-                            {{ __('Key/value pairs injected into the runtime on the next deploy.') }}
-                        @endif
-                    </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
-                        </span>
-                        @if ($workspaceVariables->isNotEmpty())
-                            <span class="text-brand-mist/60">·</span>
-                            <span class="inline-flex items-center gap-1"><x-heroicon-m-link class="h-3 w-3" />{{ trans_choice('{1} :count inherited|[2,*] :count inherited', $workspaceVariables->count(), ['count' => $workspaceVariables->count()]) }}</span>
-                        @endif
-                        @if ($freshnessLabel)
-                            <span class="text-brand-mist/60">·</span>
-                            <span>{{ $freshnessLabel }}</span>
-                        @endif
-                    </div>
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            {{-- Count moves onto the title row as a pill; the "Configuration"
+                 eyebrow said nothing the title didn't. --}}
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-heroicon-o-key class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">
+                        <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
+                        {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
+                    </span>
+                    @if ($workspaceVariables->isNotEmpty())
+                        <span class="inline-flex items-center gap-1 text-[11px] text-brand-mist"><x-heroicon-m-link class="h-3 w-3" />{{ trans_choice('{1} :count inherited|[2,*] :count inherited', $workspaceVariables->count(), ['count' => $workspaceVariables->count()]) }}</span>
+                    @endif
+                    @if ($freshnessLabel)
+                        <span class="text-[11px] text-brand-mist">· {{ $freshnessLabel }}</span>
+                    @endif
                 </div>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                    @if ($supportsEnvPush)
+                        {{ __('Key/value pairs written into the site\'s .env file. Edits push to the server automatically.') }}
+                    @else
+                        {{ __('Key/value pairs injected into the runtime on the next deploy.') }}
+                    @endif
+                </p>
             </div>
             {{-- Action toolbar: create actions on the left, the primary CTA
                  anchored right, and the occasional server / bulk-edit tools
                  tucked into a "More" menu so the bar stays tidy as it grows. --}}
-            <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-4">
+            <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-3">
                 {{-- Resource attach/configure lives on the Resources tab now. --}}
 
                 @if (method_exists($this, 'testSiteLoads'))
@@ -146,22 +141,22 @@
         </div>
 
         @if ($variableCount > 0 && $envAdvanced)
-            <div class="space-y-2 border-b border-brand-ink/10 bg-white px-6 py-3 sm:px-7">
+            <div class="space-y-1.5 border-b border-brand-ink/10 bg-white px-5 py-2 sm:px-6">
                 <div class="relative">
                     <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" />
                     <input
                         type="search"
                         wire:model.live.debounce.200ms="env_search"
                         placeholder="{{ __('Search variables…') }}"
-                        class="block w-full rounded-lg border border-brand-ink/15 bg-brand-cream/40 py-2 pl-9 pr-3 font-mono text-sm text-brand-ink focus:border-brand-sage focus:ring-brand-sage/30"
+                        class="block w-full rounded-lg border border-brand-ink/15 bg-brand-cream/40 py-1.5 pl-9 pr-3 font-mono text-sm text-brand-ink focus:border-brand-sage focus:ring-brand-sage/30"
                     />
                 </div>
                 @if (count($envGroups) > 1)
                     {{-- Auto-derived prefix groups (APP_, DB_, AWS_, …). Click to
                          filter the list to that group; combines with search. --}}
-                    <div class="flex flex-wrap gap-1.5">
+                    <div class="flex flex-wrap gap-1">
                         <button type="button" wire:click="$set('env_group', '')" @class([
-                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
                             'bg-brand-forest text-brand-cream' => $selectedEnvGroup === '',
                             'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== '',
                         ])>
@@ -169,7 +164,7 @@
                         </button>
                         @foreach ($envGroups as $g => $cnt)
                             <button type="button" wire:click="$set('env_group', @js($g))" @class([
-                                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold transition-colors',
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold transition-colors',
                                 'bg-brand-forest text-brand-cream' => $selectedEnvGroup === $g,
                                 'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== $g,
                             ])>
@@ -216,7 +211,7 @@
              in that binding are shown as a sub-section within the same group. --}}
         @if ($bindingManagedGroups !== [] || $overrideGroups !== [])
             <div class="border-b border-brand-ink/10 bg-sky-50/20">
-                <div class="flex items-center gap-2 px-6 py-2.5 sm:px-8">
+                <div class="flex items-center gap-2 px-5 py-1.5 sm:px-6">
                     <x-heroicon-o-link class="h-3.5 w-3.5 text-sky-700" aria-hidden="true" />
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800">{{ __('Managed by connected resources') }}</p>
                     <span class="text-[11px] text-brand-moss">{{ __('injected at deploy · editable as an override') }}</span>
@@ -233,12 +228,9 @@
                                 || ($gGroupOverrides && array_key_exists((string) $editing_env_key, $gGroupOverrides['keys'])));
                     @endphp
                     <div class="border-t border-sky-200/40" wire:key="managed-group-{{ md5($gBindingId) }}" x-data="{ expanded: @js($gHasEditing) }">
-                        <div class="flex flex-wrap items-center justify-between gap-2 bg-sky-50/60 px-6 py-2.5 sm:px-8">
+                        <div class="flex flex-wrap items-center justify-between gap-2 bg-sky-50/60 px-5 py-1.5 sm:px-6">
                             <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
                                 <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
-                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70">
-                                    <x-heroicon-o-link class="h-4 w-4" />
-                                </span>
                                 <span class="text-sm font-semibold text-brand-ink">{{ $gTypeLabel }}</span>
                                 @if ($group['name'])
                                     <span class="truncate font-mono text-xs text-brand-moss">· {{ $group['name'] }}</span>
@@ -322,7 +314,7 @@
                                     $mEditing = ($editing_env_key ?? null) === $mKey;
                                     $mSensitive = (bool) preg_match('/(PASSWORD|SECRET|TOKEN|KEY|URL|DSN)/i', (string) $mKey);
                                 @endphp
-                                <li class="px-6 py-2.5 sm:px-8" wire:key="managed-env-{{ md5($mKey) }}">
+                                <li class="px-5 py-1.5 sm:px-6" wire:key="managed-env-{{ md5($mKey) }}">
                                     @if ($mEditing)
                                         {{-- Override editor: writes a real .env key that beats the binding value. --}}
                                         <form wire:submit="saveEditedEnvVar" class="space-y-3">
@@ -377,7 +369,7 @@
                             {{-- User overrides for keys provided by this binding, shown inline
                                  within the same group so "Database · tracely" is one unit. --}}
                             @if ($gGroupOverrides)
-                                <li class="border-t border-amber-200/40 bg-amber-50/30 px-6 py-2 sm:px-8" wire:key="override-divider-{{ md5((string) $gBindingId) }}">
+                                <li class="border-t border-amber-200/40 bg-amber-50/30 px-5 py-1.5 sm:px-6" wire:key="override-divider-{{ md5((string) $gBindingId) }}">
                                     <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-800">{{ __('Your overrides · take precedence at deploy') }}</p>
                                 </li>
                                 @foreach ($gGroupOverrides['keys'] as $oKey => $oValue)
@@ -387,7 +379,7 @@
                                         $oValueLength = strlen($oValue);
                                         $oRowComment  = $envComments[$oKey] ?? null;
                                     @endphp
-                                    <li class="bg-amber-50/20 px-6 py-3 sm:px-8" wire:key="env-row-{{ md5($oKey) }}">
+                                    <li class="bg-amber-50/20 px-5 py-2 sm:px-6" wire:key="env-row-{{ md5($oKey) }}">
                                         @if ($oIsEditing)
                                             <form wire:submit="saveEditedEnvVar" class="space-y-3">
                                                 <div class="flex flex-wrap items-end gap-3">
@@ -477,12 +469,9 @@
                         $ogHasEditing = ($editing_env_key ?? null) !== null && array_key_exists((string) $editing_env_key, $ogGroup['keys']);
                     @endphp
                     <div class="border-t border-sky-200/40" wire:key="override-group-{{ md5((string) $ogBindingId) }}" x-data="{ expanded: @js($ogHasEditing) }">
-                        <div class="flex flex-wrap items-center gap-2 bg-sky-50/60 px-6 py-2.5 sm:px-8">
+                        <div class="flex flex-wrap items-center gap-2 bg-sky-50/60 px-5 py-1.5 sm:px-6">
                             <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
                                 <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
-                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70">
-                                    <x-heroicon-o-link class="h-4 w-4" />
-                                </span>
                                 <span class="text-sm font-semibold text-brand-ink">{{ $ogTypeLabel }}</span>
                                 @if ($ogGroup['name'])
                                     <span class="truncate font-mono text-xs text-brand-moss">· {{ $ogGroup['name'] }}</span>
@@ -498,7 +487,7 @@
                                     $oValueLength = strlen($oValue);
                                     $oRowComment  = $envComments[$oKey] ?? null;
                                 @endphp
-                                <li class="px-6 py-3 sm:px-8" wire:key="env-row-{{ md5($oKey) }}">
+                                <li class="px-5 py-2 sm:px-6" wire:key="env-row-{{ md5($oKey) }}">
                                     @if ($oIsEditing)
                                         <form wire:submit="saveEditedEnvVar" class="space-y-3">
                                             <div class="flex flex-wrap items-end gap-3">
@@ -533,9 +522,6 @@
                                     @else
                                         <div class="flex flex-wrap items-center justify-between gap-3">
                                             <div class="flex min-w-0 items-center gap-3">
-                                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                                    <x-heroicon-o-key class="h-4 w-4" />
-                                                </span>
                                                 <div class="min-w-0">
                                                     <p class="font-mono text-sm font-semibold text-brand-ink">{{ $oKey }}</p>
                                                     <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
@@ -580,7 +566,7 @@
         {{-- Bulk-action bar: appears once one or more rows are ticked. The whole
              selection is removed in a single cache write + single SSH push. --}}
         @if (method_exists($this, 'removeSelectedEnvVars') && count($selected_env_keys) > 0)
-            <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sage/10 px-6 py-3 sm:px-8">
+            <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sage/10 px-5 py-2 sm:px-6">
                 <span class="text-sm font-semibold text-brand-ink">
                     {{ trans_choice('{1} :count selected|[2,*] :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
                 </span>
@@ -608,7 +594,7 @@
         @endif
 
         @if ($variableCount === 0 && $bindingManagedEnv === [])
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
+            <div class="flex flex-col items-center justify-center gap-2 px-5 py-8 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
                     <x-heroicon-o-key class="h-6 w-6" />
                 </span>
@@ -618,7 +604,7 @@
         @elseif ($variableCount > 0)
             <ul class="divide-y divide-brand-ink/8">
                 @if ($filteredEnvMap === [] && ($envSearchTerm !== '' || $selectedEnvGroup !== ''))
-                    <li class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">{{ __('No variables match the current filter.') }}</li>
+                    <li class="px-5 py-8 text-center text-sm text-brand-moss sm:px-8">{{ __('No variables match the current filter.') }}</li>
                 @endif
                 @php $residencyMap = method_exists($this, 'secretResidencyMap') ? $this->secretResidencyMap() : []; @endphp
                 @foreach ($listEnvMap as $key => $value)
@@ -637,7 +623,7 @@
                         $escrowRevealed = $residency && array_key_exists($key, $revealed_escrow_values ?? []);
                         $canManageResidency = method_exists($this, 'escalateEnvVar');
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="env-row-{{ md5($key) }}">
+                    <li class="px-5 py-2 sm:px-6" wire:key="env-row-{{ md5($key) }}">
                         @if ($isEditing)
                             {{-- Inline edit form. Cancel reverts; Save writes and closes. --}}
                             <form wire:submit="saveEditedEnvVar" class="space-y-3">
@@ -697,9 +683,6 @@
                                             class="h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40"
                                         />
                                     @endif
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-key class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $key }}</span>
@@ -854,7 +837,7 @@
                     $envFrom = ($envCurrentPage - 1) * $envPerPage + 1;
                     $envTo = min($envCurrentPage * $envPerPage, $envFilteredCount);
                 @endphp
-                <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-6 py-3 sm:px-8">
+                <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-5 py-2 sm:px-6">
                     <span class="text-[11px] text-brand-mist">{{ __(':from–:to of :total', ['from' => $envFrom, 'to' => $envTo, 'total' => $envFilteredCount]) }}</span>
                     <div class="flex items-center gap-1.5">
                         <button type="button" wire:click="$set('env_page', {{ max(1, $envCurrentPage - 1) }})" @disabled($envCurrentPage <= 1) class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40">

@@ -11,7 +11,7 @@
 
 @php
     $sharedClasses = [
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-none transition',
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition',
         'bg-brand-ink text-brand-cream shadow-sm' => $active && $variant !== 'danger' && $subtabKey === null,
         'bg-red-700 text-white shadow-sm' => $active && $variant === 'danger' && $subtabKey === null,
         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $active && $variant !== 'danger' && $subtabKey === null,
@@ -51,21 +51,25 @@
         @if ($subtabKey === null)
             {{ $attributes->class($sharedClasses) }}
         @else
-            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-none transition') }}
+            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
                 ? (@js($variant === 'danger') ? @js($optimisticDangerActiveClass) : @js($optimisticActiveClass))
                 : @js($optimisticInactiveClass)"
         @endif
     >
+        {{-- The spinner is NOT gated on $icon: icon-less tabs (e.g. the Laravel
+             sub-tabs) still round-trip, and without this they showed no loading
+             state at all. With an icon it swaps in place; without one it just
+             appears ahead of the label. --}}
         @if ($icon)
             <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
                 <x-dynamic-component :component="$icon" class="h-3.5 w-3.5" aria-hidden="true" />
             </span>
-            @if ($wireTarget)
-                <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
-                    <x-spinner class="h-3.5 w-3.5" />
-                </span>
-            @endif
+        @endif
+        @if ($wireTarget)
+            <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
+                <x-spinner class="h-3.5 w-3.5" />
+            </span>
         @endif
         {{ $slot }}
     </a>
@@ -87,21 +91,25 @@
         @if ($subtabKey === null)
             {{ $attributes->class($sharedClasses) }}
         @else
-            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-none transition') }}
+            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
                 ? (@js($variant === 'danger') ? @js($optimisticDangerActiveClass) : @js($optimisticActiveClass))
                 : @js($optimisticInactiveClass)"
         @endif
     >
+        {{-- The spinner is NOT gated on $icon: icon-less tabs (e.g. the Laravel
+             sub-tabs) still round-trip, and without this they showed no loading
+             state at all. With an icon it swaps in place; without one it just
+             appears ahead of the label. --}}
         @if ($icon)
             <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
                 <x-dynamic-component :component="$icon" class="h-3.5 w-3.5" aria-hidden="true" />
             </span>
-            @if ($wireTarget)
-                <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
-                    <x-spinner class="h-3.5 w-3.5" />
-                </span>
-            @endif
+        @endif
+        @if ($wireTarget)
+            <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
+                <x-spinner class="h-3.5 w-3.5" />
+            </span>
         @endif
         {{ $slot }}
     </button>

@@ -140,7 +140,72 @@ final class SiteDaemonAdvisor
             );
         }
 
+        // Suggestions an operator has explicitly dismissed stay hidden until
+        // they restore them — see dismiss()/restoreAll().
+        $dismissed = self::dismissedKeys($site);
+        if ($dismissed !== []) {
+            $out = array_values(array_filter(
+                $out,
+                static fn (array $item): bool => ! in_array($item['key'], $dismissed, true),
+            ));
+        }
+
         return $out;
+    }
+
+    /**
+     * Keys the operator has dismissed for this site.
+     *
+     * @return list<string>
+     */
+    public static function dismissedKeys(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $keys = $meta['dismissed_daemon_suggestions'] ?? [];
+
+        return is_array($keys)
+            ? array_values(array_filter($keys, 'is_string'))
+            : [];
+    }
+
+    /**
+     * How many suggestions are currently hidden — drives the "restore" affordance
+     * so a dismissal is never a one-way door.
+     */
+    public static function dismissedCount(Site $site): int
+    {
+        return count(self::dismissedKeys($site));
+    }
+
+    public static function dismiss(Site $site, string $key): void
+    {
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+
+        $keys = self::dismissedKeys($site);
+        if (in_array($key, $keys, true)) {
+            return;
+        }
+
+        $keys[] = $key;
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['dismissed_daemon_suggestions'] = array_values($keys);
+        $site->meta = $meta;
+        $site->save();
+    }
+
+    public static function restoreAll(Site $site): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        if (! isset($meta['dismissed_daemon_suggestions'])) {
+            return;
+        }
+
+        unset($meta['dismissed_daemon_suggestions']);
+        $site->meta = $meta;
+        $site->save();
     }
 
     /**

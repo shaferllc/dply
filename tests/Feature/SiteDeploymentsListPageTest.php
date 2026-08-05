@@ -137,6 +137,83 @@ function makeFunctionsSite(): array
 
     return [$user, $server, $site];
 }
+test('vm site gets the recurring Schedule tab', function () {
+    [$user, $server, $site] = makeUserSite();
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSet('tab', DeploymentsList::TAB_DEPLOY)
+        ->call('setTab', DeploymentsList::TAB_SCHEDULE)
+        ->assertSet('tab', DeploymentsList::TAB_SCHEDULE)
+        ->assertSee(__('Recurring deploys'));
+});
+
+test('functions site cannot reach the Schedule tab', function () {
+    // RunDueDeploymentSchedulesCommand skips functions + edge runtimes, so a
+    // schedule created here would never fire — the tab must not be reachable.
+    [$user, $server, $site] = makeFunctionsSite();
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('setTab', DeploymentsList::TAB_SCHEDULE)
+        ->assertNotSet('tab', DeploymentsList::TAB_SCHEDULE);
+});
+
+test('direct ?tab=schedule url falls back to Deploy on a functions site', function () {
+    [$user, $server, $site] = makeFunctionsSite();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => DeploymentsList::TAB_SCHEDULE])
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSet('tab', DeploymentsList::TAB_DEPLOY);
+});
+
+test('deploy tab labels the one-off delay "Deploy later", not Schedule', function () {
+    // Two different features used to both read "Schedule" on this tab.
+    [$user, $server, $site] = makeUserSite();
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSee(__('Deploy later'))
+        ->assertDontSee(__('Scheduled deploys'));
+});
+
+test('skeleton and loaded tab rows agree for a functions site', function () {
+    // The placeholder used to hand-maintain its own tab list, so the row shifted
+    // when the real render landed (Pipeline flashed in, Releases popped in late).
+    [$user, $server, $site] = makeFunctionsSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->instance();
+
+    $visible = $component->tabVisibility();
+    $skeleton = array_column(array_values(array_filter(
+        $component->tabDefinitions(),
+        fn (array $e): bool => $visible[$e['id']] ?? true,
+    )), 'id');
+
+    expect($skeleton)->not->toContain(DeploymentsList::TAB_PIPELINE);
+    expect($skeleton)->not->toContain(DeploymentsList::TAB_SCHEDULE);
+    expect($skeleton)->not->toContain(DeploymentsList::TAB_RELEASES);
+    expect($skeleton)->toContain(DeploymentsList::TAB_DEPLOY);
+});
+
+test('vm atomic site keeps pipeline and releases in both rows', function () {
+    [$user, $server, $site] = makeUserSite();
+    $site->update(['deploy_strategy' => 'atomic']);
+
+    $component = Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site->fresh()])
+        ->instance();
+
+    $visible = $component->tabVisibility();
+
+    expect($visible[DeploymentsList::TAB_PIPELINE])->toBeTrue();
+    expect($visible[DeploymentsList::TAB_SCHEDULE])->toBeTrue();
+    expect($visible[DeploymentsList::TAB_RELEASES])->toBeTrue();
+});
+
 function makeUserSite(): array
 {
     $user = User::factory()->create();

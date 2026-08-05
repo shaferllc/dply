@@ -15,23 +15,16 @@
     @endphp
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Networking') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('All servers in your workspace — their private IPs, running services, and which databases are open to the network.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense page head, matching Settings / Logs / Files / Firewall. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-share"
+            :title="__('Networking')"
+            :note="__('All servers in your workspace — their private IPs, running services, and which databases are open to the network.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Networking sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
                 <x-server-workspace-tab id="net-tab-servers" icon="heroicon-o-share" :active="$networking_tab === 'servers'" wire:click="setNetworkingTab('servers')">
                     {{ __('Servers') }}
@@ -75,29 +68,28 @@
         />
 
         <section class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workspace servers') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server network map') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        {{ __('Every server in this workspace. Use private IPs in connection strings so traffic stays off the public internet.') }}
-                    </p>
-                </div>
-                @php $hasHetznerWithoutNetwork = $allServers->contains(fn ($s) => $s->provider->value === 'hetzner' && ! $s->private_ip_address); @endphp
+            @php $hasHetznerWithoutNetwork = $allServers->contains(fn ($s) => $s->provider->value === 'hetzner' && ! $s->private_ip_address); @endphp
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-share"
+                :title="__('Server network map')"
+                :note="__('Every server in this workspace. Use private IPs in connection strings so traffic stays off the public internet.')"
+                :count="trans_choice('{1} :count server|[2,*] :count servers', $allServers->count(), ['count' => $allServers->count()])"
+                class="border-b border-brand-ink/10"
+            >
                 @if ($hasHetznerWithoutNetwork)
-                    <button
-                        type="button"
-                        x-on:click="$dispatch('open-modal', 'create-network-modal')"
-                        class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4" />
-                        {{ __('Create private network') }}
-                    </button>
+                    <x-slot:actions>
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('open-modal', 'create-network-modal')"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90"
+                        >
+                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            {{ __('Create private network') }}
+                        </button>
+                    </x-slot:actions>
                 @endif
-            </div>
+            </x-workspace-panel-head>
 
             <div class="divide-y divide-brand-ink/8">
                 @foreach ($allServers as $s)
@@ -324,16 +316,14 @@
         {{-- ─── ATTACHED RESOURCES: remote DBs/caches this server reaches ──── --}}
         @if ($networking_tab === 'attached')
         <section class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attached resources') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resources on other servers') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Databases and caches hosted on other servers that sites here attach to — what this server reaches over the private network.') }}</p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-arrows-right-left"
+                :title="__('Resources on other servers')"
+                :note="__('Databases and caches hosted on other servers that sites here attach to — what this server reaches over the private network.')"
+                :count="trans_choice('{0} none|{1} :count resource|[2,*] :count resources', count($attachedRemoteResources), ['count' => count($attachedRemoteResources)])"
+                class="border-b border-brand-ink/10"
+            />
             @if (count($attachedRemoteResources) === 0)
                 <div class="px-6 py-6 sm:px-7">
                     <x-empty-state
@@ -428,18 +418,14 @@
         {{-- ─── THIS SERVER: PER-DATABASE ACCESS CONTROLS ─────────────────── --}}
         @if ($databaseEngines->isNotEmpty() || $databasesByEngine->flatten()->isNotEmpty())
             <section class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('This server') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Per-database remote access') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Open individual databases to a specific CIDR — e.g. a VPC subnet like 10.0.0.0/8 or your app server IP like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule and opens the UFW port only to that source.') }}
-                        </p>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-circle-stack"
+                    :title="__('Per-database remote access')"
+                    :note="__('Open individual databases to a specific CIDR — e.g. a VPC subnet like 10.0.0.0/8 or your app server IP like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule and opens the UFW port only to that source.')"
+                    :count="__('this server')"
+                    class="border-b border-brand-ink/10"
+                />
 
                 {{-- Iterate by the databases' own engine so a row whose engine
                      doesn't match a running engine (e.g. a mis-tagged or orphaned
@@ -603,18 +589,14 @@
         {{-- ─── CACHE ENGINES — inline expose / lockdown controls (#3) ───── --}}
         @if ($cacheServices->isNotEmpty())
             <section class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('This server') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cache remote access') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Expose Redis-family caches to a VPC subnet. An AUTH password must be set first. Full config (port, auth, switch engine) is in the Caches workspace.') }}
-                        </p>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-bolt"
+                    :title="__('Cache remote access')"
+                    :note="__('Expose Redis-family caches to a VPC subnet. An AUTH password must be set first. Full config (port, auth, switch engine) is in the Caches workspace.')"
+                    :count="__('this server')"
+                    class="border-b border-brand-ink/10"
+                />
                 <div class="divide-y divide-brand-ink/5">
                     @foreach ($cacheServices as $cache)
                         @php
@@ -693,25 +675,16 @@
         {{-- ─── NETWORK ROUTES ─────────────────────────────────────────────── --}}
         @if ($networking_tab === 'routes' && $networkId > 0 && $server->provider->value === 'hetzner')
             <section class="border-b border-brand-ink/10">
-                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="flex items-center gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-map class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Network routes') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                                {{ $networkInfo ? $networkInfo['name'] : 'Network '.$networkId }}
-                                @if ($networkInfo)
-                                    <span class="ml-1.5 font-mono text-xs font-normal text-brand-mist">{{ $networkInfo['ip_range'] }}</span>
-                                @endif
-                            </h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Routes tell the network fabric where to forward packets for a given destination. Add a route when a server on this network should act as a gateway — e.g. routing your office CIDR through a WireGuard server, or bridging two subnets.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                {{-- The network's IP range was a mono span inside the title; as a
+                     count pill it stays glanceable without stretching the head. --}}
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-map"
+                    :title="$networkInfo ? $networkInfo['name'] : 'Network '.$networkId"
+                    :note="__('Routes tell the network fabric where to forward packets for a given destination. Add a route when a server on this network should act as a gateway — e.g. routing your office CIDR through a WireGuard server, or bridging two subnets.')"
+                    :count="$networkInfo['ip_range'] ?? null"
+                    class="border-b border-brand-ink/10"
+                />
 
                 {{-- Existing routes --}}
                 @if (! empty($networkRoutes))

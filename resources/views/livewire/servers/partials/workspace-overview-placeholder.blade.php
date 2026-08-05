@@ -51,14 +51,14 @@
                     <dl class="divide-y divide-brand-ink/10 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                         <div class="grid grid-cols-3 divide-x divide-brand-ink/10">
                             @foreach ([__('Provider'), __('Region'), __('Size')] as $label)
-                                <div class="min-w-0 px-3 py-2.5 sm:px-4">
+                                <div class="min-w-0 px-3 py-2 sm:px-4">
                                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
                                     <dd class="mt-1.5 h-4 w-16 animate-pulse rounded bg-brand-ink/10"></dd>
                                 </div>
                             @endforeach
                         </div>
                         @foreach ([__('Status'), __('IP')] as $label)
-                            <div class="flex items-baseline justify-between gap-4 px-3 py-2.5 sm:px-4">
+                            <div class="flex items-baseline justify-between gap-4 px-3 py-2 sm:px-4">
                                 <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
                                 <dd class="h-4 w-24 animate-pulse rounded bg-brand-ink/10"></dd>
                             </div>

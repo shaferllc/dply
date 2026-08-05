@@ -13,8 +13,10 @@ use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
+use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
+use App\Livewire\Servers\SettingsCard;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
@@ -2325,7 +2327,7 @@ test('server show settings tab renders', function () {
         ->assertSee('Identity');
 });
 
-test('server settings redirects bare settings url to connection tab', function () {
+test('server settings bare url renders the default tab', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -2335,10 +2337,25 @@ test('server settings redirects bare settings url to connection tab', function (
 
     $this->actingAs($user)
         ->get(route('servers.settings', ['server' => $server]))
-        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'connection']));
+        ->assertOk()
+        // The bare URL is the default tab, and categories are never a
+        // /settings/{section} path — legacy links redirect to ?tab= instead.
+        ->assertDontSee('settings/keys');
 });
 
-test('server settings unknown section returns 404', function () {
+test('settings page shell holds no section state', function () {
+    // The split is the point: the page component must stay thin so a category
+    // switch can't drag the workspace shell (sidebar, breadcrumbs, palette and
+    // their queries) through a re-render. Every earlier attempt failed on that
+    // weight — an in-place action wedged when a second click arrived mid-flight,
+    // links avoided the wedge by re-fetching the whole document instead.
+    expect(property_exists(WorkspaceSettings::class, 'section'))
+        ->toBeFalse('Category belongs to SettingsCard — see both class docblocks.')
+        ->and(class_uses_recursive(WorkspaceSettings::class))
+        ->not->toContain(ManagesWorkspaceSettingsForm::class);
+});
+
+test('settings card switches section in place', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -2346,9 +2363,61 @@ test('server settings unknown section returns 404', function () {
         'organization_id' => $org->id,
     ]);
 
+    Livewire::actingAs($user)
+        ->test(SettingsCard::class, ['server' => $server])
+        ->assertSet('section', 'connection')
+        ->call('setSection', 'keys')
+        ->assertSet('section', 'keys')
+        // An unknown category falls back rather than rendering an empty panel.
+        ->call('setSection', 'bogus')
+        ->assertSet('section', 'connection');
+});
+
+test('settings card reads the requested section from the query string', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'export'])
+        ->test(SettingsCard::class, ['server' => $server])
+        ->assertSet('section', 'export');
+});
+
+test('server settings legacy tab path redirects to the query string', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    // Old bookmarks and deep links still land on the right tab.
     $this->actingAs($user)
-        ->get(route('servers.settings', ['server' => $server, 'section' => 'not-a-real-tab']))
-        ->assertNotFound();
+        ->get(route('servers.settings.legacy', ['server' => $server, 'section' => 'keys']))
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'tab' => 'keys']));
+
+    // The default tab drops the parameter rather than redirecting to ?tab=connection.
+    $this->actingAs($user)
+        ->get(route('servers.settings.legacy', ['server' => $server, 'section' => 'connection']))
+        ->assertRedirect(route('servers.settings', $server));
+});
+
+test('server settings unknown tab falls back to the default tab', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    // A typo in a query string shouldn't 404 the whole page out from under you.
+    $this->actingAs($user)
+        ->get(route('servers.settings', ['server' => $server, 'tab' => 'not-a-real-tab']))
+        ->assertOk();
 });
 
 test('server manage workspace renders', function () {

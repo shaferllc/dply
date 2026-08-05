@@ -4,18 +4,18 @@
          keyed warning filters the list to that variable on click. --}}
     @if ($envWarnings !== [])
         @php $hasDanger = collect($envWarnings)->contains(fn ($w) => $w['level'] === 'danger'); @endphp
-        <div class="flex items-start gap-3 {{ $hasDanger ? 'bg-rose-50/60' : 'bg-amber-50/60' }} px-5 py-4">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $hasDanger ? 'bg-rose-100 text-rose-700 ring-rose-200' : 'bg-amber-100 text-amber-700 ring-amber-200' }}">
-                    <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                </span>
+        {{-- "Configuration check" eyebrow dropped: this block already sits under
+             the panel's own "Needs attention" header, and the heading below
+             names the finding. --}}
+        <div class="flex items-start gap-2.5 {{ $hasDanger ? 'bg-rose-50/60' : 'bg-amber-50/60' }} px-5 py-3">
+                <x-heroicon-o-shield-exclamation class="mt-0.5 h-4 w-4 shrink-0 {{ $hasDanger ? 'text-rose-700' : 'text-amber-700' }}" aria-hidden="true" />
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] {{ $hasDanger ? 'text-rose-700' : 'text-amber-700' }}">{{ __('Configuration check') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold {{ $hasDanger ? 'text-rose-900' : 'text-amber-950' }}">
+                    <h3 class="text-sm font-semibold {{ $hasDanger ? 'text-rose-900' : 'text-amber-950' }}">
                         {{ trans_choice('{1} :count configuration warning|[2,*] :count configuration warnings', count($envWarnings), ['count' => count($envWarnings)]) }}
                     </h3>
-                    <ul class="mt-1.5 space-y-1.5">
+                    <ul class="mt-1 space-y-1">
                         @foreach ($envWarnings as $w)
-                            <li class="flex items-start justify-between gap-3 text-sm {{ $w['level'] === 'danger' ? 'text-rose-800' : ($w['level'] === 'warn' ? 'text-amber-900' : 'text-brand-moss') }}">
+                            <li class="flex items-start justify-between gap-3 text-xs {{ $w['level'] === 'danger' ? 'text-rose-800' : ($w['level'] === 'warn' ? 'text-amber-900' : 'text-brand-moss') }}">
                                 <span class="flex items-start gap-2">
                                     <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $w['level'] === 'danger' ? 'bg-rose-600' : ($w['level'] === 'warn' ? 'bg-amber-500' : 'bg-brand-mist') }}"></span>
                                     <span>{{ $w['message'] }}</span>

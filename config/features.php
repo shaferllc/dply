@@ -132,7 +132,7 @@ return [
         'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', false),
         'server_blueprint_preview' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT_PREVIEW', true),
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
-        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', false),
+        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
         'server_maintenance_preview' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE_PREVIEW', true),
         'patch_advisor' => env('FEATURE_WORKSPACE_PATCH_ADVISOR', true),
         'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', true),
@@ -149,8 +149,8 @@ return [
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
         'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
-        'cli' => env('FEATURE_WORKSPACE_CLI', false),
-        'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', true),
+        'cli' => env('FEATURE_WORKSPACE_CLI', true),
+        'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', false),
 
         'files' => env('FEATURE_WORKSPACE_FILES', true),
         'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', false),
@@ -170,10 +170,16 @@ return [
         'shared_host_preview' => env('FEATURE_WORKSPACE_SHARED_HOST_PREVIEW', true),
 
         'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),
-        'site_cdn' => env('FEATURE_WORKSPACE_SITE_CDN', false),
-        'site_cdn_preview' => env('FEATURE_WORKSPACE_SITE_CDN_PREVIEW', true),
-        'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', false),
-        'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', true),
+        // GA: the CDN / Edge workspace is on by default. Like site_caching the
+        // flag only reveals the surface — no site gets proxied until an
+        // operator enables it there with a Cloudflare credential.
+        'site_cdn' => env('FEATURE_WORKSPACE_SITE_CDN', true),
+        'site_cdn_preview' => env('FEATURE_WORKSPACE_SITE_CDN_PREVIEW', false),
+        // GA: the Caching workspace is on by default. The flag only reveals the
+        // surface — page caching stays off for every site until an operator
+        // toggles it there, so shipping this changes no site's behaviour.
+        'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', true),
+        'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', false),
         'deploy_pipeline_visual' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL', false),
         'deploy_pipeline_visual_preview' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL_PREVIEW', true),
         'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', true),

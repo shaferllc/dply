@@ -43,3 +43,7 @@ storage/blaze/traces/
 # Deptrac analysis cache
 .deptrac.cache
 storage/app/vultr-control-plane*.json
+
+**/caddy
+frankenphp
+frankenphp-worker.php

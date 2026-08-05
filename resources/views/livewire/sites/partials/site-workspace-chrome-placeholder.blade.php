@@ -51,7 +51,7 @@
                 </div>
 
                 @if ($tabs !== [])
-                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4" aria-hidden="true">
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4" aria-hidden="true">
                         <x-server-workspace-tablist :aria-label="$title" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
                             @foreach ($tabs as $tab)
                                 <x-server-workspace-tab

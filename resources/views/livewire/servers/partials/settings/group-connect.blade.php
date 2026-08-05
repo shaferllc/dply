@@ -6,29 +6,27 @@
         && $server->recoverySshPrivateKey() !== null
         && ($server->ssh_user ?? 'root') !== 'root';
 
-    $inputClass = 'mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30';
+    $inputClass = 'mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30';
     $monoInputClass = $inputClass.' font-mono';
 @endphp
 
 <section id="settings-group-connect" aria-labelledby="settings-group-connect-title">
     <div id="settings-connection" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Connect') }}</p>
-                <h2 id="settings-group-connect-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connection & identity') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Name, tags, workspace, and SSH details control how Dply reaches this server. Changes to host, port, user, or workspace are recorded in your organization audit log.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-link"
+            :title="__('Connection & identity')"
+            :note="__('Name, tags, workspace, and SSH details control how Dply reaches this server. Changes to host, port, user, or workspace are recorded in your organization audit log.')"
+            title-id="settings-group-connect-title"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
-            <form wire:submit="saveServerSettingsInfo" class="space-y-8">
+        <div class="px-5 py-4 sm:px-6">
+            <form wire:submit="saveServerSettingsInfo" class="space-y-5">
                 <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Identity') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('How this server is labelled and grouped in Dply.') }}</p>
-                    <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Identity') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('How this server is labelled and grouped in Dply.') }}</p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <div class="sm:col-span-2">
                             <x-input-label for="settings-name" value="{{ __('Server name') }}" />
                             <input
@@ -157,9 +155,9 @@
                 </div>
 
                 <div class="border-t border-brand-ink/10 pt-8">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Dply reaches this host for deploys and Manage actions over SSH at the address, port, and user below. (Internal IP is private-networking metadata — it is not the SSH target.)') }}</p>
-                    <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Dply reaches this host for deploys and Manage actions over SSH at the address, port, and user below. (Internal IP is private-networking metadata — it is not the SSH target.)') }}</p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="settings-ip" value="{{ __('IP address or hostname') }}" />
                             <input
@@ -300,25 +298,20 @@
     </div>
 
     <div id="settings-timezone" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Timezone') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Display timezone') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Used when showing times in this workspace. The guest OS keeps its own timezone unless you change it over SSH.') }}
-                </p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-clock"
+            :title="__('Display timezone')"
+            :note="__('Used when showing times in this workspace. The guest OS keeps its own timezone unless you change it over SSH.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
         <form wire:submit="saveServerTimezone" class="max-w-md">
             <x-input-label for="settings-tz" value="{{ __('Timezone') }}" />
             <select
                 id="settings-tz"
                 wire:model="settingsTimezone"
-                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                 @disabled(! $this->canEditServerSettings)
             >
                 @if ($this->settingsTimezone !== '' && ! in_array($this->settingsTimezone, $tzPreset, true))
@@ -337,25 +330,20 @@
     </div>
 
     <div id="settings-date-format" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Format') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Date format') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Controls how this server\'s timestamps render across the workspace — last sample, deploys, audit log, etc. Saved on the server, so different servers can use different formats.') }}
-                </p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-calendar-days"
+            :title="__('Date format')"
+            :note="__('Controls how this server\'s timestamps render across the workspace — last sample, deploys, audit log, etc. Saved on the server, so different servers can use different formats.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
         <form wire:submit="saveServerDateFormat" class="max-w-md">
             <x-input-label for="settings-date-format-select" value="{{ __('Format') }}" />
             <select
                 id="settings-date-format-select"
                 wire:model="settingsDateFormat"
-                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                 @disabled(! $this->canEditServerSettings)
             >
                 @foreach (config('server_settings.date_formats', []) as $key => $option)
@@ -380,19 +368,15 @@
 
     @if ($showRepairCard)
         <div id="settings-connection-repair" class="{{ $card }} scroll-mt-24">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <x-icon-badge tone="amber">
-                    <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Recovery') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repair SSH access') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('If the deploy user no longer accepts Dply’s operational key, repair access from the hidden root recovery key without changing your saved connection details.') }}
-                    </p>
-                </div>
-            </div>
-            <div class="px-6 py-5 sm:px-7" @if ($this->operationalSshProbing) wire:poll.3s="reloadOperationalSshStatus" @endif>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-wrench-screwdriver"
+                :title="__('Repair SSH access')"
+                :note="__('If the deploy user no longer accepts Dply’s operational key, repair access from the hidden root recovery key without changing your saved connection details.')"
+                tone="amber"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="px-5 py-3 sm:px-6" @if ($this->operationalSshProbing) wire:poll.3s="reloadOperationalSshStatus" @endif>
                 @php $rs = $this->recoverySshStatus; @endphp
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0 space-y-3">
@@ -461,17 +445,14 @@
     @endif
 
     <div id="settings-provider" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Provider & lifecycle') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Read-only provisioning metadata from when this server was created.') }}</p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-server-stack"
+            :title="__('Provider & lifecycle')"
+            :note="__('Read-only provisioning metadata from when this server was created.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
             @php
                 $statusReady = $server->status === 'ready';
                 $healthOk = in_array($server->health_status, ['reachable', 'healthy', 'ok'], true);

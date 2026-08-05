@@ -1,10 +1,16 @@
                 <div class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Templates') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Each card lists the exact rules it manages. Click to add the rules to this server’s list, or — when they’re all already present — to remove them again. The SSH rule is always kept so you can’t lock yourself out. Changes take effect on the next Apply.') }}</p>
-                    </div>
-                    <div class="space-y-8 px-6 py-5 sm:px-8">
+                    {{-- Dense head, matching the rest of the workspace. Was a
+                         "TEMPLATES" eyebrow + title + a four-line paragraph in a
+                         py-5 band; the eyebrow restated the tab. --}}
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-document-duplicate"
+                        :title="__('Bundled templates')"
+                        :note="__('Each card lists the exact rules it manages. Click to add the rules to this server’s list, or — when they’re all already present — to remove them again. The SSH rule is always kept so you can’t lock yourself out. Changes take effect on the next Apply.')"
+                        :count="trans_choice('{1} :count template|[2,*] :count templates', count($bundledTemplates), ['count' => count($bundledTemplates)])"
+                        class="border-b border-brand-ink/10"
+                    />
+                    <div class="space-y-8 px-6 py-4 sm:px-8">
                         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($bundledTemplates as $bKey => $b)
                                 @php
@@ -96,9 +102,12 @@
 
                         @if ($savedTemplates->isNotEmpty())
                             <div>
-                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Saved templates') }}</h2>
-                                <p class="mt-2 text-sm text-brand-moss">{{ __('Organization or server-scoped templates.') }}</p>
-                                <ul class="mt-4 space-y-2">
+                                {{-- In-body sub-heading, at the metrics Settings uses
+                                     for the same thing (h3 text-sm + text-xs note)
+                                     rather than a section-sized text-base + text-sm. --}}
+                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Saved templates') }}</h3>
+                                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Organization or server-scoped templates.') }}</p>
+                                <ul class="mt-3 space-y-2">
                                     @foreach ($savedTemplates as $tpl)
                                         <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-ink/10 px-3 py-2 text-sm">
                                             <span>

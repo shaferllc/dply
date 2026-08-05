@@ -24,9 +24,11 @@
 
     @if ($contextSiteModel ?? null)
         @php $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($contextSiteModel); @endphp
-        @if ($daemonSuggestions !== [])
+        @php $daemonSuggestionsDismissed = \App\Support\Sites\SiteDaemonAdvisor::dismissedCount($contextSiteModel); @endphp
+        @if ($daemonSuggestions !== [] || $daemonSuggestionsDismissed > 0)
             <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
                 <x-site-daemon-suggestions
+                    :dismissed-count="$daemonSuggestionsDismissed"
                     :suggestions="$daemonSuggestions"
                     mode="interactive"
                     :schedule-url="route('servers.cron', ['server' => $server, 'site' => $contextSiteModel])"
@@ -138,7 +140,7 @@
                 @include('livewire.servers.partials.daemons._banner')
             </div>
 
-            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 <x-server-workspace-tablist id="daemons-workspace-tablist" :aria-label="__('Workers workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
                     <x-server-workspace-tab id="daemons-tab-programs" icon="heroicon-o-cpu-chip" :active="$daemons_workspace_tab === 'programs'" wire:click="setDaemonsWorkspaceTab('programs')">
                         {{ __('Programs') }}

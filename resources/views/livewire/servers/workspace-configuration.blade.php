@@ -38,33 +38,28 @@
     @endif
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+        {{-- Dense head, matching the rest of the workspace. The scope filter chip
+             and its clear button move into the actions slot. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-document-text"
+            :title="__('Configuration')"
+            :note="__('Load → edit → validate → review diff → save. Saves snapshot the live file, atomically install, re-validate, and auto-restore when validation rejects the new file.')"
+            class="border-b border-brand-ink/10"
+        >
+            @if ($config_scope !== '')
+                <x-slot:actions>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-funnel class="h-3 w-3" />
+                        {{ __('Filtered: :scope', ['scope' => \Illuminate\Support\Str::headline($config_scope)]) }}
                     </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Configuration') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Load → edit → validate → review diff → save. Saves snapshot the live file, atomically install, re-validate, and auto-restore when validation rejects the new file.') }}
-                        </p>
-                    </div>
-                </div>
-                @if ($config_scope !== '')
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-funnel class="h-3 w-3" />
-                            {{ __('Filtered: :scope', ['scope' => \Illuminate\Support\Str::headline($config_scope)]) }}
-                        </span>
-                        <button type="button" wire:click="clearConfigScope" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
-                            <x-heroicon-o-x-mark class="h-3 w-3" />
-                            {{ __('Show all files') }}
-                        </button>
-                    </div>
-                @endif
-            </div>
-        </div>
+                    <button type="button" wire:click="clearConfigScope" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                        <x-heroicon-o-x-mark class="h-3 w-3" />
+                        {{ __('Show all files') }}
+                    </button>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
 
         @if ($configReturnContext)
             <div class="flex flex-col gap-3 border-b border-brand-sage/25 bg-brand-sage/10 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">

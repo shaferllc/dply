@@ -7,42 +7,38 @@
 
 {{-- Nested inside Monitor merged card — strip, no second page card. --}}
 <div class="min-w-0">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Uptime alerts') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Route a channel (email, Slack, Discord, webhook…) to this site\'s monitors — get paged when a check goes down, recovers, slows to degraded, or a TLS certificate is about to expire.') }}
-                </p>
-            </div>
-        </div>
-        <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
-            {{ __('Manage in Settings') }}
-            <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0" aria-hidden="true" />
-        </x-secondary-button>
-    </div>
+    <x-workspace-panel-head
+        icon="heroicon-o-bell-alert"
+        :title="__('Uptime alerts')"
+        :note="__('Route a channel (email, Slack, Discord, webhook…) to this site\'s monitors — get paged when a check goes down, recovers, slows to degraded, or a TLS certificate is about to expire.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <x-secondary-button size="xs" href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}" wire:navigate class="whitespace-nowrap">
+                {{ __('Manage in Settings') }}
+                <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            </x-secondary-button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-        <div class="flex items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-relaxed text-brand-moss">
-            <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-            <p>{{ __('Members of this organization always see uptime alerts in their in-app inbox — these channels add external delivery. "Down & recovered" pairs both edges; "Degraded" fires on slow responses; "SSL certificate expiring" warns before a cert lapses. Alerts fire once per transition, never on every repeated probe.') }}</p>
-        </div>
-    </div>
+    {{-- The delivery-semantics note is reference material you read once, not
+         something to re-scan on every visit — so it collapses by default
+         instead of occupying five lines above the list. --}}
+    <details class="group border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+        <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-brand-moss hover:text-brand-ink">
+            <x-heroicon-o-information-circle class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+            {{ __('How uptime alerts are delivered') }}
+        </summary>
+        <p class="mt-2 text-xs leading-relaxed text-brand-moss">{{ __('Members of this organization always see uptime alerts in their in-app inbox — these channels add external delivery. "Down & recovered" pairs both edges; "Degraded" fires on slow responses; "SSL certificate expiring" warns before a cert lapses. Alerts fire once per transition, never on every repeated probe.') }}</p>
+    </details>
 
     {{-- Current subscriptions --}}
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-5 py-4 sm:px-6">
         @if ($subscriptionsByChannel->isEmpty())
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
-                <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
-                <p class="mt-3 text-sm text-brand-moss">
-                    {{ __('No external channels are routed for uptime alerts yet.') }}
-                </p>
-                <p class="mt-1 text-xs text-brand-mist">
-                    {{ __('Add one below to get an email or chat message the moment a monitor changes state.') }}
+            <div class="flex items-center gap-2.5 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-2.5">
+                <x-heroicon-o-bell-slash class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
+                <p class="min-w-0 text-xs text-brand-moss">
+                    {{ __('No external channels routed yet — add one below to get an email or chat message the moment a monitor changes state.') }}
                 </p>
             </div>
         @else
@@ -75,16 +71,16 @@
     </div>
 
     {{-- Add subscription --}}
-    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
-        <p class="text-sm font-medium text-brand-ink">{{ __('Add a channel') }}</p>
-        <form wire:submit="addUptimeNotificationSubscription" class="mt-4 space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
+    <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
+        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Add a channel') }}</p>
+        <form wire:submit="addUptimeNotificationSubscription" class="mt-2.5 space-y-3">
+            <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="uptime-notif-channel" value="{{ __('Channel') }}" />
                     <select
                         id="uptime-notif-channel"
                         wire:model="uptime_notif_channel_id"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     >
                         <option value="">{{ __('Select a channel…') }}</option>
                         @foreach ($uptimeNotifChannels as $channel)
@@ -129,7 +125,7 @@
                 </div>
             </div>
             <div class="flex justify-end">
-                <x-primary-button type="submit" wire:loading.attr="disabled" :disabled="$uptimeNotifChannels->isEmpty()">
+                <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" :disabled="$uptimeNotifChannels->isEmpty()">
                     {{ __('Add subscription') }}
                 </x-primary-button>
             </div>

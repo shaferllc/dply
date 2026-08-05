@@ -77,7 +77,7 @@ class WorkspaceNotifications extends Component
     /**
      * Whether the current user may edit server-scoped settings (the per-server
      * webhook form gates on this). Deployers are read-only. Mirrors the same
-     * computed on {@see WorkspaceSettings}.
+     * computed on {@see SettingsCard}.
      */
     #[Computed]
     public function canEditServerSettings(): bool

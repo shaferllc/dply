@@ -12,6 +12,7 @@ use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerTags;
 use Database\Factories\ServerFactory;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -436,6 +438,9 @@ class Server extends Model
     /** Memoized request-lifetime cache for {@see cachedSitesCount()}. */
     private ?int $cachedSitesCount = null;
 
+    /** How long {@see cachedSitesCount()} may serve a stale count. */
+    private const SITES_COUNT_CACHE_TTL_SECONDS = 60;
+
     /**
      * Request-level cache for sites().count() — both the sidebar nav helper
      * and the shared-host report widget call this on the same Server
@@ -455,12 +460,27 @@ class Server extends Model
             return $this->cachedSitesCount = (int) $preloaded;
         }
 
-        return $this->cachedSitesCount = $this->sites()->count();
+        // Cross-request cache on top of the per-instance memo: the sidebar nav
+        // filter asks for this on every workspace page, and the answer only
+        // moves when a site is created or deleted. Short TTL because the nav's
+        // requires_min_sites gate reads it — a stale zero would briefly hide a
+        // row on a server that just got its first site.
+        return $this->cachedSitesCount = (int) Cache::remember(
+            $this->sitesCountCacheKey(),
+            self::SITES_COUNT_CACHE_TTL_SECONDS,
+            fn (): int => $this->sites()->count(),
+        );
     }
 
     public function flushCachedSitesCount(): void
     {
         $this->cachedSitesCount = null;
+        Cache::forget($this->sitesCountCacheKey());
+    }
+
+    private function sitesCountCacheKey(): string
+    {
+        return 'server:'.$this->id.':sites-count';
     }
 
     /** @return HasMany<ServerDatabase, $this> */
@@ -851,6 +871,28 @@ class Server extends Model
     }
 
     /**
+     * Query-side counterpart to {@see isDplyEdgeHost()}: drop the placeholder
+     * host rows dply creates to back Edge sites.
+     *
+     * These aren't machines — you don't provision, SSH into, or spec-tier them,
+     * and {@see \App\Livewire\Servers\WorkspaceOverview} already bounces them to
+     * /edge if you open one. Listing them in the fleet made "8 servers" count
+     * two Edge apps that live on the Edge surface, alongside a "Provisioning…"
+     * label and an empty metrics row that will never fill in.
+     *
+     * The `meta->>'host_kind' is null` leg matters: a plain `!=` comparison
+     * yields NULL for rows with no host_kind (every BYO VM), which would filter
+     * out the entire real fleet.
+     */
+    public function scopeWithoutEdgeHosts(EloquentBuilder $query): EloquentBuilder
+    {
+        return $query->where(function (EloquentBuilder $q): void {
+            $q->whereNull('meta->host_kind')
+                ->orWhere('meta->host_kind', '!=', self::HOST_KIND_DPLY_EDGE);
+        });
+    }
+
+    /**
      * Logical hosts for dply-managed products — never spec-tiered as BYO VMs.
      */
     public function isManagedProductHost(): bool
@@ -1094,12 +1136,37 @@ class Server extends Model
         return trim((string) $key) !== '';
     }
 
+    /**
+     * Derived OpenSSH public keys, memoized per request.
+     *
+     * phpseclib has to parse the private key and derive the public half, which
+     * is CPU-heavy. The Keys settings panel asks for the operational key twice
+     * (openSshPublicKeyFromPrivate and openSshPublicKeyFromOperationalPrivate
+     * are the same key by two names) and the SSH-keys preview does the same, so
+     * without this the same derivation ran repeatedly in one render.
+     *
+     * Keyed by a hash of the key material, never the material itself.
+     *
+     * @var array<string, string|null>
+     */
+    private array $openSshPublicKeyMemo = [];
+
     protected function openSshPublicKeyFromKey(?string $priv): ?string
     {
         if ($priv === null || trim($priv) === '') {
             return null;
         }
 
+        $memoKey = hash('xxh128', $priv);
+        if (array_key_exists($memoKey, $this->openSshPublicKeyMemo)) {
+            return $this->openSshPublicKeyMemo[$memoKey];
+        }
+
+        return $this->openSshPublicKeyMemo[$memoKey] = $this->deriveOpenSshPublicKey($priv);
+    }
+
+    private function deriveOpenSshPublicKey(string $priv): ?string
+    {
         try {
             $key = PublicKeyLoader::load($priv);
             if (! $key instanceof PrivateKey) {

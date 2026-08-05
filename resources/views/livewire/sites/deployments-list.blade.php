@@ -79,7 +79,7 @@
                     wire:key="deploy-hooks-{{ $site->id }}"
                 />
             @elseif ($isVmDeployHub ?? false)
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 @include('livewire.sites.partials.deployments._tabstrip')
             </div>
 
@@ -119,6 +119,8 @@
                         @include('livewire.sites.partials.deployments._webhook-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_HOOKS)
                         @include('livewire.sites.partials.deployments._hooks-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SCHEDULE)
+                        @include('livewire.sites.partials.deployments._schedule-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SETTINGS)
                         @include('livewire.sites.partials.deployments._settings-panel')
                     @else

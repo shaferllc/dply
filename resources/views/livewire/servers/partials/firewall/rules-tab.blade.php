@@ -1,27 +1,28 @@
-        <details class="{{ $card }}" open>
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Policies') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Default chain policies') }}</h2>
-                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('What UFW does with traffic that doesn\'t match any rule. "Use UFW default" leaves the host\'s current setting alone; a chosen value is pushed on the next Apply.') }}</p>
-                        @if ($defaultPolicies === [])
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('No overrides set — UFW defaults (deny incoming, allow outgoing, deny routed) apply.') }}</p>
-                        @else
-                            <p class="mt-1 text-[11px] font-mono text-brand-mist">
-                                @foreach ($defaultPolicies as $chain => $policy)
-                                    {{ $chain }}={{ $policy }}@if (! $loop->last)<span class="text-brand-mist/60"> · </span>@endif
-                                @endforeach
-                            </p>
-                        @endif
-                    </div>
-                </div>
-                <span class="text-brand-mist transition-transform group-open:rotate-180">
-                    <x-heroicon-o-chevron-down class="h-4 w-4" />
-                </span>
+        {{-- `group` on the details is what makes group-open:rotate-180 below fire;
+             the chevron never actually rotated without it. --}}
+        <details class="{{ $card }} group" open>
+            {{-- Dense panel head, same as the page chrome. Was an icon badge +
+                 "POLICIES" eyebrow + title + prose + a policy-state line, five
+                 stacked rows to introduce three selects. The eyebrow went (it
+                 restated the title) and the policy state became the count pill —
+                 the exact per-chain values are the selects in the body. --}}
+            <summary class="cursor-pointer list-none">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-adjustments-horizontal"
+                    :title="__('Default chain policies')"
+                    :note="__('What UFW does with traffic that doesn\'t match any rule. \'Use UFW default\' leaves the host\'s current setting alone; a chosen value is pushed on the next Apply.')"
+                    :count="$defaultPolicies === []
+                        ? __('UFW defaults')
+                        : trans_choice('{1} :count override|[2,*] :count overrides', count($defaultPolicies), ['count' => count($defaultPolicies)])"
+                    class="border-b border-brand-ink/10"
+                >
+                    <x-slot:actions>
+                        <span class="text-brand-mist transition-transform group-open:rotate-180">
+                            <x-heroicon-o-chevron-down class="h-4 w-4" />
+                        </span>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
             </summary>
             <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-8">
                 <div class="grid gap-4 sm:grid-cols-3">
@@ -50,8 +51,12 @@
                             @endif
                         </div>
                     @endforeach
-                </div>
-                <div class="mt-4 grid gap-4 sm:max-w-xs">
+
+                    {{-- Logging level is a fourth cell of the SAME grid, not its
+                         own `sm:max-w-xs` block below it. As a separate grid it
+                         rendered ~320px against the policy selects' ~264px, so
+                         four sibling selects came out two different widths. In the
+                         grid it lands under Incoming at an identical size. --}}
                     <div>
                         <x-input-label for="fw-logging" :value="__('Logging level')" />
                         <select
@@ -72,41 +77,34 @@
         </details>
 
         <div class="{{ $card }}">
-                    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                                <x-heroicon-o-shield-check class="h-5 w-5" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Rules') }}</p>
-                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply, applied to the server with UFW.') }}</p>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                    <span class="inline-flex items-center gap-1">
-                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                        {{ trans_choice('{0} no rules tracked|{1} :count rule tracked|[2,*] :count rules tracked', $ruleCount, ['count' => $ruleCount]) }}
-                                        @if ($enabledRuleCount !== $ruleCount && $ruleCount > 0)
-                                            ({{ __(':count enabled', ['count' => $enabledRuleCount]) }})
-                                        @endif
-                                    </span>
-                                    @if ($lastApplyLog)
-                                        <span class="text-brand-mist/60">·</span>
-                                        <span class="inline-flex items-center gap-1">
-                                            @if ($lastApplyLog->status === 'success')
-                                                <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
-                                                {{ __('applied :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}
-                                            @else
-                                                <x-heroicon-o-exclamation-triangle class="h-3 w-3 text-rose-600" />
-                                                {{ __('last apply failed :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}
-                                            @endif
-                                        </span>
-                                    @else
-                                        <span class="text-brand-mist/60">·</span>
-                                        <span>{{ __('not yet applied') }}</span>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
+                    @php
+                        // Rule count, plus the enabled subset when they differ.
+                        $rulesPill = trans_choice('{0} no rules|{1} :count rule|[2,*] :count rules', $ruleCount, ['count' => $ruleCount]);
+                        if ($enabledRuleCount !== $ruleCount && $ruleCount > 0) {
+                            $rulesPill .= ' · '.__(':count on', ['count' => $enabledRuleCount]);
+                        }
+
+                        // Never-applied is a plain fact about these rules, so it
+                        // rides the pill rather than taking a row of its own — as
+                        // its own strip it was a lone grey dot and three faint
+                        // words under a head that already had a pill, and read
+                        // like debug output. The applied / failed states DO keep
+                        // the strip below: their icon and colour carry tone that a
+                        // pill would flatten, and a failed apply is worth shouting.
+                        if (! $lastApplyLog) {
+                            $rulesPill .= ' · '.__('not applied');
+                        }
+                    @endphp
+
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-shield-check"
+                        :title="__('Firewall rules')"
+                        :note="__('Stored in Dply, applied to the server with UFW.')"
+                        :count="$rulesPill"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
                         <div class="flex shrink-0 flex-wrap items-center gap-2">
                             <button
                                 type="button"
@@ -235,7 +233,24 @@
                                 </x-slot>
                             </x-dropdown>
                         </div>
-                    </div>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+
+                    {{-- Only rendered once an apply has actually run. The icon and
+                         colour are the point — emerald for a clean apply, rose for
+                         a failure — which is why these two states get a row and
+                         the never-applied case rides the count pill instead. --}}
+                    @if ($lastApplyLog)
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 px-6 py-1.5 text-[11px] sm:px-8">
+                            @if ($lastApplyLog->status === 'success')
+                                <x-heroicon-o-check-circle class="h-3 w-3 shrink-0 text-emerald-600" aria-hidden="true" />
+                                <span class="text-brand-moss">{{ __('applied :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}</span>
+                            @else
+                                <x-heroicon-o-exclamation-triangle class="h-3 w-3 shrink-0 text-rose-600" aria-hidden="true" />
+                                <span class="font-medium text-rose-700">{{ __('last apply failed :time', ['time' => $lastApplyLog->created_at?->diffForHumans()]) }}</span>
+                            @endif
+                        </div>
+                    @endif
 
                     @if ($sshNotCovered ?? false)
                         <div class="mx-6 mt-4 rounded-xl border border-amber-300 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 sm:mx-8">
@@ -388,15 +403,19 @@
                                     <span class="pointer-events-none absolute inset-y-0 left-2 inline-flex items-center text-brand-mist">
                                         <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                                     </span>
+                                    {{-- h-8 rather than padding-derived height, so the
+                                         input and the action chips beside it are
+                                         exactly the same height instead of ~30px
+                                         against ~28px. --}}
                                     <input
                                         type="search"
                                         wire:model.live.debounce.250ms="rule_filter"
-                                        class="block w-full rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-8 pr-3 text-xs text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:ring-brand-forest"
+                                        class="block h-8 w-full rounded-lg border border-brand-ink/15 bg-white pl-8 pr-3 text-xs leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:ring-brand-forest"
                                         placeholder="{{ __('Search rules — name, port, source, profile, iface, tags…') }}"
                                         autocomplete="off"
                                     />
                                 </div>
-                                <div class="inline-flex rounded-lg border border-brand-ink/10 bg-white p-0.5 text-[11px] font-semibold" role="group" aria-label="{{ __('Filter by action') }}">
+                                <div class="inline-flex h-8 items-center rounded-lg border border-brand-ink/10 bg-white p-0.5 text-[11px] font-semibold" role="group" aria-label="{{ __('Filter by action') }}">
                                     @foreach (['' => __('All'), 'allow' => __('Allow'), 'deny' => __('Deny'), 'limit' => __('Limit')] as $key => $label)
                                         <button
                                             type="button"

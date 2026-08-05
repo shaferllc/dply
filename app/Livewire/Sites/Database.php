@@ -66,6 +66,13 @@ class Database extends Component
     #[Url(as: 'tab', except: 'databases')]
     public string $dbTab = 'databases';
 
+    /**
+     * Engine capabilities are probed over SSH, which must never run on the
+     * render/HTTP path (30s max_execution_time). The page paints a skeleton,
+     * then wire:init calls loadDatabaseCapabilities() to fill this in.
+     */
+    public bool $capabilitiesLoaded = false;
+
     public Server $server;
 
     public Site $site;
@@ -122,7 +129,8 @@ class Database extends Component
         $this->site = $site;
 
         $this->new_db_name = $this->suggestedName();
-        $this->new_db_engine = $this->defaultEngine();
+        // NOT defaultEngine() here — it reads capabilities() and would SSH
+        // during mount. loadDatabaseCapabilities() seeds it after first paint.
     }
 
     /**
@@ -131,7 +139,32 @@ class Database extends Component
     #[Computed]
     public function capabilities(): array
     {
+        // Before the deferred load, report "nothing known yet" rather than
+        // blocking the response on an SSH round-trip.
+        if (! $this->capabilitiesLoaded) {
+            return DatabaseWorkspaceEngines::defaultCapabilities();
+        }
+
         return app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
+    }
+
+    /**
+     * Deferred capability probe (wire:init). Runs the SSH check once, off the
+     * initial render, then seeds the create-form engine default now that we
+     * actually know what's installed.
+     */
+    public function loadDatabaseCapabilities(): void
+    {
+        if ($this->capabilitiesLoaded) {
+            return;
+        }
+
+        $this->capabilitiesLoaded = true;
+        unset($this->capabilities, $this->installedEngines);
+
+        if ($this->new_db_engine === '') {
+            $this->new_db_engine = $this->defaultEngine();
+        }
     }
 
     /**

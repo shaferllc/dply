@@ -3,30 +3,31 @@
          "No repository connected" card already explains the next steps. --}}
     @if ($currentRepositoryUrl !== '')
     <div class="border-b border-brand-ink/10">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $providerKind !== '' ? ucfirst($providerKind) : __('Repository') }}</p>
-                    <h2 class="mt-0.5 truncate text-base font-semibold text-brand-ink">
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="min-w-0 flex-1 basis-72">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <x-heroicon-o-code-bracket-square class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="min-w-0 truncate text-sm font-semibold text-brand-ink">
                         {{ $overviewCommits['remote_label'] ?? ($currentRepositoryUrl ?: __('No repository connected')) }}
                     </h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    {{-- Provider is real information, not an eyebrow — keep it as a pill. --}}
+                    @if ($providerKind !== '')
+                        <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">{{ ucfirst($providerKind) }}</span>
+                    @endif
+                </div>
+                <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                         {{ __('Deploy branch:') }}
                         <code class="font-mono text-brand-ink">{{ $currentBranch }}</code>
                         @if ($branchInUse !== $currentBranch)
                             <span class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-900">{{ __('viewing :ref', ['ref' => $branchInUse]) }}</span>
                         @endif
                     </p>
-                </div>
             </div>
             @if ($currentRepositoryUrl !== '')
                 <a href="{{ str_starts_with($currentRepositoryUrl, 'http') ? $currentRepositoryUrl : '#' }}"
                    target="_blank" rel="noopener noreferrer"
-                   class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                    <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                   class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
                     {{ __('Open on provider') }}
                 </a>
             @endif
@@ -34,22 +35,19 @@
     </div>
 
     <div class="border-b border-brand-ink/10">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent commits') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Latest five commits on the viewed branch. Open the Commits tab for the full history.') }}</p>
-                </div>
-            </div>
-            <button type="button" wire:click="$set('tab', 'commits')"
-               class="shrink-0 text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('See all →') }}</button>
-        </div>
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-clock"
+            :title="__('Recent commits')"
+            :note="__('Latest five commits on the viewed branch. Open the Commits tab for the full history.')"
+        >
+            <x-slot:actions>
+                <button type="button" wire:click="$set('tab', 'commits')"
+                   class="text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('See all →') }}</button>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
             @if (! empty($overviewCommits['notice']))
                 {{-- Non-fatal: the configured branch was missing, so we fell back to
                      the repo's default branch. Tell the operator they can pick another. --}}
@@ -116,23 +114,20 @@
     </div>
 
     <div class="border-b border-brand-ink/10">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Docs') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('README') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Rendered from the branch root. Markdown only — other formats display as plain text.') }}</p>
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="min-w-0 flex-1 basis-72">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('README') }}</h2>
                 </div>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Rendered from the branch root. Markdown only — other formats display as plain text.') }}</p>
             </div>
             @if (! empty($overviewReadme['name']))
                 <span class="shrink-0 font-mono text-xs text-brand-mist">{{ $overviewReadme['name'] }}</span>
             @endif
         </div>
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
             @if ($overviewReadme === null)
                 <div class="text-sm text-brand-moss">{{ __('Sign in to load the README.') }}</div>
             @elseif (! ($overviewReadme['ok'] ?? false))

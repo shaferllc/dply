@@ -33,25 +33,19 @@
     $rowH = $map['row_h'] ?? 58;
 @endphp
 <section class="border-b border-brand-ink/10">
+    {{-- Dense panel head, matching every other workspace section. Was an icon
+         badge + eyebrow + title + prose stack in a py-5 band. The `eyebrow` prop
+         is still accepted so callers don't break, but it now rides the count pill
+         rather than sitting above the title as a second, quieter heading. --}}
     @if ($title || $eyebrow || $description)
-        <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    @if ($eyebrow)
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $eyebrow }}</p>
-                    @endif
-                    @if ($title)
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $title }}</h2>
-                    @endif
-                    @if ($description)
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $description }}</p>
-                    @endif
-                </div>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-share"
+            :title="$title"
+            :note="$description"
+            :count="$eyebrow"
+            class="border-b border-brand-ink/10"
+        />
     @endif
 
     @if (! ($map['has_data'] ?? false))

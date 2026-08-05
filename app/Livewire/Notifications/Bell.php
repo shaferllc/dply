@@ -27,6 +27,19 @@ class Bell extends Component
     /** Filter the unread list to warning/critical/error/danger only. */
     public bool $alertsOnly = false;
 
+    /**
+     * Whether the dropdown's contents have been fetched. False until the bell
+     * is first opened — see {@see render()}. Every action below implies the
+     * panel is already open, so they all leave this true.
+     */
+    public bool $loaded = false;
+
+    /** Fetch the dropdown contents. Wired to the trigger. */
+    public function load(): void
+    {
+        $this->loaded = true;
+    }
+
     /** Toggle a category in/out of the active multi-select set. */
     public function toggleCategory(string $category): void
     {
@@ -109,6 +122,22 @@ class Bell extends Component
                 'unreadCount' => 0,
                 'items' => collect(),
                 'categories' => collect(),
+                'loaded' => true,
+            ]);
+        }
+
+        // Closed bell: the badge is the only visible part, so resolve the count
+        // and nothing else. The dropdown's contents — the category pluck, the
+        // filtered item page, and its event eager-load — cost three more
+        // queries on every authenticated page render, for a panel most of those
+        // renders never show. {@see load()} fills them in when it opens.
+        if (! $this->loaded) {
+            return view('livewire.notifications.bell', [
+                'ready' => true,
+                'unreadCount' => $this->base()->whereNull('read_at')->count(),
+                'items' => collect(),
+                'categories' => collect(),
+                'loaded' => false,
             ]);
         }
 

@@ -8,19 +8,17 @@
     @endif
 
     <div id="settings-cost" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cost') }}</p>
-                <h2 id="settings-group-governance-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cost') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stack estimates and finance notes for your team. Estimates are not invoiced amounts — save a cost note below to improve provider lines.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-currency-dollar"
+            :title="__('Cost')"
+            :note="__('Stack estimates and finance notes for your team. Estimates are not invoiced amounts — save a cost note below to improve provider lines.')"
+            title-id="settings-group-governance-title"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Cost & lifecycle') }}</h3>
+        <div class="px-5 py-4 sm:px-6">
+        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Cost & lifecycle') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Rough costs and renewal reminders for your team. Pull the catalog price from your provider when supported, or type your own number — for example a negotiated annual commit, a parent-account sub-allocation, or a chargeback total that includes data transfer.') }}
         </p>
@@ -60,7 +58,7 @@
                     id="settings-cost-note"
                     type="text"
                     wire:model="settingsCostMonthlyNote"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     placeholder="{{ __('e.g. ~$48/mo on annual commit') }}"
                     @disabled(! $this->canEditServerSettings)
                 />

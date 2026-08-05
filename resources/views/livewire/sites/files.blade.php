@@ -16,6 +16,12 @@
         }
     }
 
+    // One treatment for every control in the Actions column. Follow, View and
+    // Edit were bare text links (in two different colours) sitting next to a
+    // bordered Download button — three visual weights for the same class of
+    // per-row action.
+    $rowActionClass = 'inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 hover:text-brand-forest';
+
     $filesDescription = __('Browse the site tree over SSH as :user. Edit text files (≤:edit MB), download anything (≤:dl MB).', [
         'user' => $effectiveLoginUser,
         'edit' => (int) ($editMaxBytes / 1024 / 1024),
@@ -30,16 +36,9 @@
          it and orphans this div — no wire:click listeners bind at all. --}}
     @vite(['resources/js/file-browser-editor-lazy.js'])
 
-    <div
-        wire:loading.flex
-        wire:target="openFile, openEntry, startEdit, saveEdit, jumpTo, goUp"
-        class="fixed inset-0 z-[60] hidden items-center justify-center bg-brand-ink/40 backdrop-blur-sm"
-    >
-        <div class="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-xl ring-1 ring-brand-ink/10">
-            <x-spinner variant="forest" />
-            <span class="text-sm font-medium text-brand-ink">{{ __('Loading…') }}</span>
-        </div>
-    </div>
+    {{-- No full-page blocking overlay: navigating a directory is a routine
+         action and shouldn't dim and lock the whole page. The listing swaps to
+         an inline skeleton instead (see the table below). --}}
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
         'server' => $server,
         'site' => $site,
@@ -98,69 +97,87 @@
                         </div>
                     </div>
 
-                    <div class="space-y-2.5 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
-                        {{-- Path row: breadcrumbs + up + identity --}}
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-                                <button
-                                    type="button"
-                                    wire:click="goUp"
-                                    @disabled($path === $siteRoot)
-                                    title="{{ __('Parent directory') }}"
-                                    aria-label="{{ __('Parent directory') }}"
-                                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                    <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
-                                </button>
+                    {{-- One toolbar row: up · path · filter · identity. The path bar
+                         hugs its crumbs instead of stretching flex-1 (which left a
+                         wide empty white slab), and the filter rides alongside it
+                         rather than dropping to a second right-aligned row. --}}
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
+                        <button
+                            type="button"
+                            wire:click="goUp"
+                            @disabled($path === $siteRoot)
+                            title="{{ __('Parent directory') }}"
+                            aria-label="{{ __('Parent directory') }}"
+                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
+                        </button>
 
-                                <nav class="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-white px-1.5 py-1 shadow-sm" aria-label="{{ __('Current path') }}">
+                        <nav class="flex min-w-0 flex-wrap items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-white px-1 py-0.5 shadow-sm" aria-label="{{ __('Current path') }}">
+                            <button
+                                type="button"
+                                wire:click="jumpTo('{{ $siteRoot }}')"
+                                class="inline-flex h-7 items-center rounded-md px-2 font-mono text-xs text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
+                            >{{ basename($siteRoot) }}/</button>
+                            @foreach ($crumbs as $i => $crumb)
+                                <span class="select-none text-brand-mist" aria-hidden="true">/</span>
+                                @if ($i === count($crumbs) - 1)
+                                    <span class="inline-flex h-7 max-w-[12rem] items-center truncate rounded-md bg-brand-ink/8 px-2 font-mono text-xs font-semibold text-brand-ink" aria-current="page">{{ $crumb['name'] }}</span>
+                                @else
                                     <button
                                         type="button"
-                                        wire:click="jumpTo('{{ $siteRoot }}')"
-                                        class="inline-flex h-7 items-center rounded-md px-2 font-mono text-xs text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
-                                    >{{ basename($siteRoot) }}/</button>
-                                    @foreach ($crumbs as $i => $crumb)
-                                        <span class="select-none text-brand-mist" aria-hidden="true">/</span>
-                                        @if ($i === count($crumbs) - 1)
-                                            <span class="inline-flex h-7 max-w-[12rem] items-center truncate rounded-md bg-brand-ink/8 px-2 font-mono text-xs font-semibold text-brand-ink" aria-current="page">{{ $crumb['name'] }}</span>
-                                        @else
-                                            <button
-                                                type="button"
-                                                wire:click="jumpTo('{{ $crumb['path'] }}')"
-                                                class="inline-flex h-7 max-w-[10rem] items-center truncate rounded-md px-2 font-mono text-xs text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
-                                            >{{ $crumb['name'] }}</button>
-                                        @endif
-                                    @endforeach
-                                </nav>
-                            </div>
+                                        wire:click="jumpTo('{{ $crumb['path'] }}')"
+                                        class="inline-flex h-7 max-w-[10rem] items-center truncate rounded-md px-2 font-mono text-xs text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"
+                                    >{{ $crumb['name'] }}</button>
+                                @endif
+                            @endforeach
+                        </nav>
 
-                            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                                <span class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2.5 font-mono text-xs font-semibold text-brand-ink shadow-sm">
-                                    <x-heroicon-o-user class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
-                                    <span class="sr-only">{{ __('Running as') }}</span>
-                                    {{ $effectiveLoginUser }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                            <label class="relative block w-full sm:w-56 sm:shrink-0">
+                        <div class="ms-auto flex items-center gap-2">
+                            <label class="relative block w-40 shrink-0 sm:w-52">
                                 <span class="sr-only">{{ __('Filter (glob)') }}</span>
                                 <x-heroicon-o-magnifying-glass
-                                    class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist"
+                                    class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-mist"
                                     aria-hidden="true"
                                 />
                                 <input
                                     type="text"
                                     wire:model.live.debounce.300ms="filter"
                                     placeholder="{{ __('Filter… *.env') }}"
-                                    class="h-9 w-full rounded-lg border border-brand-ink/10 bg-white py-1.5 pe-3 ps-9 font-mono text-xs leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:outline-none focus:ring-1 focus:ring-brand-forest"
+                                    class="h-8 w-full rounded-lg border border-brand-ink/10 bg-white pe-2.5 ps-8 font-mono text-xs leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:outline-none focus:ring-1 focus:ring-brand-forest"
                                 >
                             </label>
+
+                            <span
+                                class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-brand-sand/50 px-2.5 font-mono text-xs font-semibold text-brand-moss ring-1 ring-inset ring-brand-ink/10"
+                                title="{{ __('Browsing as :user', ['user' => $effectiveLoginUser]) }}"
+                            >
+                                <x-heroicon-o-user class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                                <span class="sr-only">{{ __('Running as') }}</span>
+                                {{ $effectiveLoginUser }}
+                            </span>
+                        </div>
+                    </div>
+
+                    {{-- Inline swap: the row list dims to a skeleton while a
+                         directory change is in flight, so the chrome (path bar,
+                         filter, actions) stays live and clickable. --}}
+                    <div class="hidden" wire:loading.class.remove="hidden" wire:target="openEntry, jumpTo, goUp, filter">
+                        <div class="divide-y divide-brand-ink/10 px-5 py-1 sm:px-6" aria-busy="true" aria-live="polite">
+                            <span class="sr-only">{{ __('Loading…') }}</span>
+                            @for ($i = 0; $i < 6; $i++)
+                                <div class="flex items-center gap-4 py-2.5" aria-hidden="true">
+                                    <span class="h-3 animate-pulse rounded bg-brand-ink/15" style="width: {{ [34, 22, 41, 28, 37, 25][$i] }}%"></span>
+                                    <span class="ml-auto h-3 w-10 animate-pulse rounded bg-brand-ink/10"></span>
+                                    <span class="h-3 w-20 animate-pulse rounded bg-brand-ink/10"></span>
+                                    <span class="h-3 w-16 animate-pulse rounded bg-brand-ink/10"></span>
+                                </div>
+                            @endfor
                         </div>
                     </div>
 
                     @if ($listing)
+                    <div wire:loading.class="hidden" wire:target="openEntry, jumpTo, goUp, filter">
                         @if ($listing->truncated)
                             <div class="border-b border-amber-200/80 bg-amber-50/70 px-5 py-3 text-sm text-amber-900 sm:px-6">
                                 {{ __('Showing :shown of :total entries. Narrow the filter or use Manage → Run for the full listing.', ['shown' => count($listing->entries), 'total' => $listing->totalCount]) }}
@@ -171,7 +188,10 @@
                             <table class="min-w-full divide-y divide-brand-ink/10 text-left text-xs">
                                 <thead class="bg-brand-sand/30 text-brand-moss">
                                     <tr>
-                                        <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                        {{-- w-full here + max-w-0 on the cell makes Name the flexible column:
+                                             it absorbs the slack and truncates instead of forcing the table
+                                             wider than the card (which pushed Actions off the right edge). --}}
+                                        <th class="w-full px-4 py-2 font-medium">{{ __('Name') }}</th>
                                         <th class="px-4 py-2 font-medium">{{ __('Size') }}</th>
                                         <th class="px-4 py-2 font-medium">{{ __('Modified') }}</th>
                                         <th class="px-4 py-2 font-medium">{{ __('Mode') }}</th>
@@ -191,40 +211,72 @@
                                             } catch (\InvalidArgumentException) {
                                                 $entryDownloadUrl = null;
                                             }
+
+                                            // Symlink targets are absolute and nearly always inside the site
+                                            // root, so the head duplicates the crumb bar while the tail is the
+                                            // part you actually want. Printed in full they widened the Name
+                                            // column enough to push Actions off the edge of the card. Show the
+                                            // meaningful tail; the full path is on the title tooltip.
+                                            $linkFull = (string) $entry->linkTarget;
+                                            $linkDisplay = $linkFull;
+                                            $siteRootTrimmed = rtrim($siteRoot, '/');
+                                            if (str_starts_with($linkDisplay, $siteRootTrimmed.'/')) {
+                                                $linkDisplay = '…/'.substr($linkDisplay, strlen($siteRootTrimmed) + 1);
+                                            }
+                                            if (mb_strlen($linkDisplay) > 28) {
+                                                // Trim from the left: the tail identifies the target, the head
+                                                // is boilerplate, so a normal right-side truncate would cut
+                                                // away the only informative half.
+                                                $linkDisplay = '…'.mb_substr($linkDisplay, -27);
+                                            }
                                         @endphp
                                         <tr class="hover:bg-brand-sand/20">
-                                            <td class="whitespace-nowrap px-4 py-2 font-mono">
+                                            <td class="max-w-0 px-4 py-2 font-mono">
                                                 {{-- Links before dirs: FileBrowserEntry::isDir() is true for
                                                      directory symlinks, and we still want the → target + Follow UX. --}}
                                                 @if ($entry->isLink())
-                                                    @if ($entry->linkTargetIsDir)
-                                                        <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}', '{{ addslashes((string) $entry->linkTarget) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
-                                                            <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                            <span>{{ $entry->name }}/</span>
-                                                        </button>
-                                                    @else
-                                                        @if ($entryDownloadUrl)
-                                                            <a href="{{ $entryDownloadUrl }}" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
+                                                    {{-- Name and → target share one flex row. The name is an inline-flex
+                                                         (icon + label) whose baseline comes from the icon, not the text, so
+                                                         a plain inline target span next to it rendered a couple of pixels
+                                                         low. items-center puts both on the same centre line. --}}
+                                                    <span class="flex min-w-0 items-center gap-2">
+                                                        @if ($entry->linkTargetIsDir)
+                                                            <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}', '{{ addslashes((string) $entry->linkTarget) }}')" class="inline-flex min-w-0 shrink-0 items-center gap-2 text-brand-forest hover:underline" title="{{ $entry->name }}">
                                                                 <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                                <span>{{ $entry->name }}</span>
-                                                            </a>
+                                                                <span class="truncate">{{ $entry->name }}/</span>
+                                                            </button>
                                                         @else
-                                                            <span class="inline-flex items-center gap-2 text-brand-forest">
-                                                                <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                                <span>{{ $entry->name }}</span>
-                                                            </span>
+                                                            @if ($entryDownloadUrl)
+                                                                <a href="{{ $entryDownloadUrl }}" class="inline-flex min-w-0 shrink-0 items-center gap-2 text-brand-forest hover:underline" title="{{ $entry->name }}">
+                                                                    <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
+                                                                    <span class="truncate">{{ $entry->name }}</span>
+                                                                </a>
+                                                            @else
+                                                                <span class="inline-flex min-w-0 shrink-0 items-center gap-2 text-brand-forest" title="{{ $entry->name }}">
+                                                                    <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
+                                                                    <span class="truncate">{{ $entry->name }}</span>
+                                                                </span>
+                                                            @endif
                                                         @endif
-                                                    @endif
-                                                    <span class="ml-1 text-brand-moss">→ {{ $entry->linkTarget }}</span>
+                                                        {{-- Styled tooltip rather than a native title=: the bubble is
+                                                             teleported to <body> so the card's overflow-x-auto can't clip
+                                                             it, and it shows instantly instead of after the browser's
+                                                             ~1s title delay. Only symlink rows get an Alpine root —
+                                                             there are a handful per directory, whereas wrapping every
+                                                             name in a listing of up to 2,000 entries would not be free. --}}
+                                                        <x-tooltip :label="$linkFull" class="min-w-0">
+                                                            <span class="truncate text-brand-moss decoration-brand-mist decoration-dotted underline-offset-4 hover:cursor-help hover:text-brand-ink hover:underline">→ {{ $linkDisplay }}</span>
+                                                        </x-tooltip>
+                                                    </span>
                                                 @elseif ($entry->isDir())
-                                                    <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
+                                                    <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}')" class="flex min-w-0 items-center gap-2 text-brand-forest hover:underline" title="{{ $entry->name }}">
                                                         <x-heroicon-o-folder class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                        <span>{{ $entry->name }}/</span>
+                                                        <span class="truncate">{{ $entry->name }}/</span>
                                                     </button>
                                                 @else
-                                                    <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-ink hover:underline">
+                                                    <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="flex min-w-0 items-center gap-2 text-brand-ink hover:underline" title="{{ $entry->name }}">
                                                         <x-heroicon-o-document class="h-4 w-4 shrink-0 text-brand-mist" />
-                                                        <span>{{ $entry->name }}</span>
+                                                        <span class="truncate">{{ $entry->name }}</span>
                                                     </button>
                                                 @endif
                                             </td>
@@ -233,17 +285,23 @@
                                             <td class="whitespace-nowrap px-4 py-2 font-mono text-brand-moss">{{ $entry->mode }}</td>
                                             <td class="whitespace-nowrap px-4 py-2 text-right">
                                                 @if ($entry->isLink() && $entry->linkTargetIsDir)
-                                                    <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}', '{{ addslashes((string) $entry->linkTarget) }}')" class="font-semibold text-brand-forest hover:underline">{{ __('Follow') }}</button>
+                                                    <button type="button" wire:click="openEntry('{{ addslashes($entry->name) }}', '{{ addslashes((string) $entry->linkTarget) }}')" class="{{ $rowActionClass }}">
+                                                        <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                                                        {{ __('Follow') }}
+                                                    </button>
                                                 @elseif ($entry->isFile() || ($entry->isLink() && ! $entry->linkTargetIsDir))
-                                                    <div class="inline-flex items-center gap-3">
-                                                        <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="font-semibold text-brand-ink hover:underline">{{ __('View') }}</button>
-                                                        <button type="button" wire:click="startEdit('{{ addslashes($entry->name) }}')" class="font-semibold text-brand-ink hover:underline">{{ __('Edit') }}</button>
+                                                    <div class="inline-flex items-center gap-1.5">
+                                                        <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="{{ $rowActionClass }}">
+                                                            <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                                                            {{ __('View') }}
+                                                        </button>
+                                                        <button type="button" wire:click="startEdit('{{ addslashes($entry->name) }}')" class="{{ $rowActionClass }}">
+                                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                                                            {{ __('Edit') }}
+                                                        </button>
                                                         @if ($entryDownloadUrl)
-                                                            <a
-                                                                href="{{ $entryDownloadUrl }}"
-                                                                class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-sand/40"
-                                                            >
-                                                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" />
+                                                            <a href="{{ $entryDownloadUrl }}" class="{{ $rowActionClass }}">
+                                                                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
                                                                 {{ __('Download') }}
                                                             </a>
                                                         @endif
@@ -257,9 +315,53 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
                     @endif
                 </section>
             @endif
+        </div>
+    </div>
+
+    {{-- Opening a file is a real SSH round-trip (stat + mime sniff + cat), so
+         View/Edit land a second or two behind the click. Instead of leaving the
+         row inert, the destination modal appears immediately as a skeleton and
+         fills in when the payload arrives.
+
+         Scoped to openFile/startEdit only — directory navigation deliberately
+         has no overlay and swaps the listing to an inline skeleton instead. --}}
+    <div
+        class="fixed inset-0 z-[90] hidden"
+        wire:loading.class.remove="hidden"
+        wire:target="openFile, startEdit"
+        role="status"
+        aria-live="polite"
+    >
+        {{-- bg-black/50 to match x-modal's scrim exactly — the skeleton is
+             standing in for that modal, so it shouldn't read as a different
+             surface for the second it's up. --}}
+        <div class="absolute inset-0 bg-black/50" aria-hidden="true"></div>
+        <div class="relative flex h-full items-center justify-center overflow-y-auto px-4 py-6">
+            <div class="dply-modal-panel w-full max-w-4xl space-y-4 p-6 shadow-xl">
+                <span class="sr-only">{{ __('Reading the file over SSH…') }}</span>
+
+                <div class="flex items-start justify-between gap-3" aria-hidden="true">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs uppercase tracking-wide text-brand-moss">{{ __('Opening') }}</p>
+                        <span class="mt-1.5 block h-4 w-64 max-w-full animate-pulse rounded bg-brand-ink/15"></span>
+                        <span class="mt-2 block h-3 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></span>
+                    </div>
+                    <span class="inline-flex shrink-0 items-center gap-2 text-xs text-brand-moss">
+                        <x-spinner size="sm" variant="muted" />
+                        {{ __('Reading over SSH…') }}
+                    </span>
+                </div>
+
+                <div class="space-y-2.5 rounded-md border border-brand-ink/10 bg-brand-ink/5 p-3" aria-hidden="true">
+                    @foreach ([92, 68, 80, 44, 88, 72, 35, 84, 60, 76, 50, 66] as $width)
+                        <span class="block h-2.5 animate-pulse rounded bg-brand-ink/10" style="width: {{ $width }}%"></span>
+                    @endforeach
+                </div>
+            </div>
         </div>
     </div>
 
@@ -370,14 +472,41 @@
                         <p class="font-semibold">{{ __('Saving inside a release directory') }}</p>
                         <p class="mt-1 text-xs">{{ __('Confirm you want to save here. The next deploy will create a new release directory and this change will be wiped.') }}</p>
                         <div class="mt-3 flex gap-2">
-                            <x-primary-button size="sm" type="button" wire:click="saveEdit(true)" class="bg-amber-600 hover:bg-amber-700">{{ __('Save anyway') }}</x-primary-button>
+                            <x-primary-button
+                                size="sm"
+                                type="button"
+                                wire:click="saveEdit(true)"
+                                wire:target="saveEdit"
+                                wire:loading.attr="disabled"
+                                class="bg-amber-600 hover:bg-amber-700"
+                            >
+                                <span wire:loading.remove wire:target="saveEdit">{{ __('Save anyway') }}</span>
+                                <span class="inline-flex items-center gap-2" wire:loading wire:target="saveEdit">
+                                    <x-spinner size="sm" variant="cream" />
+                                    {{ __('Saving…') }}
+                                </span>
+                            </x-primary-button>
                             <x-secondary-button size="xs" type="button" wire:click="$set('pendingReleaseWarning', false)">{{ __('Back to editor') }}</x-secondary-button>
                         </div>
                     </div>
                 @else
+                    {{-- Writing is another SSH round-trip; without this the button
+                         just sat there and invited a second click. --}}
                     <div class="flex justify-end gap-2">
                         <x-secondary-button size="xs" type="button" wire:click="closeEditModal">{{ __('Cancel') }}</x-secondary-button>
-                        <x-primary-button size="sm" type="button" wire:click="saveEdit">{{ __('Save') }}</x-primary-button>
+                        <x-primary-button
+                            size="sm"
+                            type="button"
+                            wire:click="saveEdit"
+                            wire:target="saveEdit"
+                            wire:loading.attr="disabled"
+                        >
+                            <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
+                            <span class="inline-flex items-center gap-2" wire:loading wire:target="saveEdit">
+                                <x-spinner size="sm" variant="cream" />
+                                {{ __('Saving…') }}
+                            </span>
+                        </x-primary-button>
                     </div>
                 @endif
             </div>

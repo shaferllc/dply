@@ -1,20 +1,12 @@
 <section class="border-b border-brand-ink/10">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment history') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ trans_choice('{0} No deployments yet|{1} :count deployment|[2,*] :count deployments', $deployments->total(), ['count' => $deployments->total()]) }}
-                </p>
-            </div>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-clock"
+        :title="__('Deployment history')"
+        :count="trans_choice('{0} no deployments|{1} :count deployment|[2,*] :count deployments', $deployments->total(), ['count' => $deployments->total()])"
+    />
 
-    <div class="flex flex-wrap items-end gap-3 border-b border-brand-ink/10 bg-white px-6 py-4 sm:px-8">
+    <div class="flex flex-wrap items-end gap-3 border-b border-brand-ink/10 bg-white px-5 py-2.5 sm:px-6">
         <div>
             <label for="status_filter" class="block text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Status') }}</label>
             <select id="status_filter" wire:model.live="statusFilter" class="mt-1 rounded-lg border border-brand-ink/15 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
@@ -42,7 +34,7 @@
     </div>
 
     @if ($deployments->isEmpty())
-        <div class="px-6 py-12 text-center text-sm text-brand-moss sm:px-8">
+        <div class="px-5 py-8 text-center text-xs text-brand-moss sm:px-6">
             @if ($statusFilter !== '' || $triggerFilter !== '')
                 {{ __('No deployments match the current filters.') }}
             @else
@@ -175,7 +167,7 @@
         </ol>
 
         @if ($deployments->hasPages())
-            <div class="border-t border-brand-ink/10 bg-white px-6 py-4 sm:px-8">
+            <div class="border-t border-brand-ink/10 bg-white px-5 py-2.5 sm:px-6">
                 {{ $deployments->links() }}
             </div>
         @endif

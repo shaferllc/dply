@@ -196,6 +196,29 @@ class WorkspaceSchedule extends Component
             return view('livewire.servers.partials.workspace-placeholder-empty');
         }
 
+        // Read the site off the route, NOT off $this->siteDedicatedContext:
+        // Livewire renders a #[Lazy] placeholder before mount() runs, so that
+        // property is still its `false` default here. Trusting it sent every
+        // site-scoped /schedule URL down the server branch below, which wraps
+        // x-server-workspace-layout — so the page flashed server chrome (server
+        // sidebar + the org trial/pause banner, which only the shells render)
+        // and then swapped to the site layout once the component resolved.
+        $routeSite = request()->route('site');
+        $site = $routeSite instanceof Site
+            ? $routeSite
+            : ($this->context_site_id !== null ? Site::find($this->context_site_id) : null);
+
+        if ($site !== null && $site->server_id === $this->server->id) {
+            return view('livewire.sites.partials.site-workspace-chrome-placeholder', [
+                'server' => $this->server,
+                'site' => $site,
+                'title' => __('Schedule'),
+                'description' => __('Framework schedulers for this site. Tracks tick health and nudges you when one stops firing.'),
+                'icon' => 'heroicon-o-calendar-days',
+                'section' => 'schedule',
+            ]);
+        }
+
         if ($this->siteDedicatedContext) {
             return view('livewire.servers.partials.workspace-placeholder-empty');
         }

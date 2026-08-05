@@ -6,7 +6,7 @@
                 <h2 class="text-sm font-semibold text-brand-ink">{{ __('Pinned notes') }}</h2>
             </div>
             <a
-                href="{{ route('servers.settings', ['server' => $server, 'section' => 'notes']) }}"
+                href="{{ route('servers.settings', ['server' => $server, 'tab' => 'notes']) }}"
                 wire:navigate
                 class="text-xs font-medium text-brand-sage transition hover:text-brand-forest"
             >{{ __('All notes') }}</a>

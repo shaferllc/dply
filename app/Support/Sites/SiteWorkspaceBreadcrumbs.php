@@ -7,7 +7,6 @@ namespace App\Support\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Support\SiteSettingsHeader;
-use Laravel\Pennant\Feature;
 
 /**
  * Breadcrumb items for BYO / Edge site workspace sub-pages.
@@ -32,13 +31,11 @@ final class SiteWorkspaceBreadcrumbs
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
 
-        if ($server->workspace && Feature::active('surface.projects')) {
-            $items[] = [
-                'label' => $server->workspace->name,
-                'href' => route('projects.resources', $server->workspace),
-                'icon' => 'rectangle-group',
-            ];
-        }
+        // The project deliberately isn't a crumb here. This trail is already
+        // Dashboard → Servers → server → Sites → site → page; the project isn't
+        // a step on that path (you don't reach the site through it), and it made
+        // an eight-crumb bar that wrapped. The project is still reachable from
+        // the server overview and the Projects surface.
 
         $items[] = [
             'label' => $server->name,

@@ -75,6 +75,21 @@ class Show extends Component
     /** Active tab on the post-provisioning dashboard (overview|deploys|runtime|logs|ssl). */
     public string $dashboard_tab = 'overview';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setDashboardTab(string $value): void
+    {
+        if ($value === '' || $value === $this->dashboard_tab) {
+            return;
+        }
+
+        $this->dashboard_tab = $value;
+    }
+
+
     /** Recorded in site meta for Rails apps (e.g. production, staging). */
     public string $rails_env = 'production';
 

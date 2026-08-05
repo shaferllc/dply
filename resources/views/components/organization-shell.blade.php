@@ -243,7 +243,6 @@
         </a>
     </aside>
     <div {{ $attributes->merge(['class' => 'lg:col-span-9 min-w-0']) }}>
-        <x-trial-pause-banner :organization="$organization" />
 
         @if ($useMergedChrome)
             {{-- Merged chrome: one outer card. Stats live inside the sand identity
@@ -278,7 +277,7 @@
                 </div>
 
                 @isset($tabs)
-                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                         {{ $tabs }}
                     </div>
                 @endisset

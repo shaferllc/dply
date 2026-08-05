@@ -16,26 +16,23 @@
 
 <div>
     <div class="scroll-mt-24 border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <x-icon-badge>
-                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outbound webhook') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Register a URL to receive server-scoped events (created, provisioned, health changed, deleted, authorized keys synced, sites created/deleted). Every emitted event is recorded below — even when no URL is set, so you can audit what would be sent before wiring up.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-bolt"
+            :title="__('Outbound webhook')"
+            :note="__('Register a URL to receive server-scoped events (created, provisioned, health changed, deleted, authorized keys synced, sites created/deleted). Every emitted event is recorded below — even when no URL is set, so you can audit what would be sent before wiring up.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-5 py-6 sm:px-6">
-            <form wire:submit="saveServerWebhooks" class="space-y-5">
+        <div class="px-5 py-3 sm:px-6">
+            <form wire:submit="saveServerWebhooks" class="space-y-4">
             <div>
                 <x-input-label for="settings-webhook-url" value="{{ __('Webhook URL') }}" />
                 <input
                     id="settings-webhook-url"
                     type="url"
                     wire:model="settingsWebhookUrl"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     placeholder="https://"
                     @disabled(! $this->canEditServerSettings)
                 />
@@ -48,7 +45,7 @@
                     type="password"
                     wire:model="settingsWebhookSecret"
                     autocomplete="new-password"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     placeholder="{{ $webhookSecretStored ? __('Enter a new secret to replace the stored one') : __('Optional') }}"
                     @disabled(! $this->canEditServerSettings)
                 />
@@ -66,7 +63,7 @@
                         wire:click="sendTestWebhook"
                         wire:loading.attr="disabled"
                         wire:target="sendTestWebhook"
-                        class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
+                        class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
                     >
                         <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0 opacity-90" />
                         <span wire:loading.remove wire:target="sendTestWebhook">{{ __('Send test') }}</span>
@@ -80,22 +77,17 @@
     </div>
 
     <div class="scroll-mt-24 border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <x-icon-badge>
-                <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deliveries') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent deliveries') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Last 30 outbound webhook attempts for this server. “Would send” rows show the payload that would have fired with no URL configured.') }}
-                </p>
-            </div>
-            <span class="shrink-0 text-xs text-brand-moss">{{ __(':count rows', ['count' => $webhookDeliveries->count()]) }}</span>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-paper-airplane"
+            :title="__('Recent deliveries')"
+            :note="__('Last 30 outbound webhook attempts for this server. “Would send” rows show the payload that would have fired with no URL configured.')"
+            :count="$webhookDeliveries->count() ?: null"
+            class="border-b border-brand-ink/10"
+        />
 
         @if ($webhookDeliveries->isEmpty())
-            <div class="px-5 py-10 text-center text-sm text-brand-moss sm:px-6">
+            <div class="px-5 py-6 text-center text-xs text-brand-moss sm:px-6">
                 {{ __('No webhook deliveries yet. Click “Send test” above to fire one.') }}
             </div>
         @else

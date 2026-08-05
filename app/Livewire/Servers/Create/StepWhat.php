@@ -44,6 +44,20 @@ class StepWhat extends Component
     public ServerCreateForm $form;
 
     /**
+     * Explicit setter for the cluster-source toggle. It used to call
+     * `$set('form.do_kubernetes_source', …)`; `wire:target` can't match a magic
+     * $set, so the tab showed no loading state while the round-trip ran.
+     */
+    public function setKubernetesSource(string $value): void
+    {
+        if (! in_array($value, ['existing', 'new'], true) || $value === $this->form->do_kubernetes_source) {
+            return;
+        }
+
+        $this->form->do_kubernetes_source = $value;
+    }
+
+    /**
      * Slug of the preset that drove the current form values, when one
      * was applied. Empty when the user is hand-rolling the stack.
      */

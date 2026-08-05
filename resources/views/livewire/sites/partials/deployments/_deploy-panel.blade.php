@@ -425,14 +425,13 @@
     @endif
 
     <section class="border-b border-brand-ink/10">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:px-8">
-            <x-icon-badge>
-                <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ship the current branch') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="min-w-0 flex-1 basis-72">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ship the current branch') }}</h2>
+                </div>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
                     @if ($latest)
                         @if ($isRunning)
                             {{ __('A deploy is currently running. Watch the phase timeline below.') }}
@@ -448,8 +447,8 @@
                     @endif
                 </p>
             </div>
-            <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto">
-                <button type="button" wire:click="deployNow" wire:loading.attr="disabled" wire:target="deployNow" @disabled($deployInProgress) class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <button type="button" wire:click="deployNow" wire:loading.attr="disabled" wire:target="deployNow" @disabled($deployInProgress) class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
                     @if ($deployInProgress)
                         <x-spinner variant="white" size="sm" />
                         <span>{{ __('Deploying…') }}</span>
@@ -461,21 +460,23 @@
                     @endif
                 </button>
                 @if ($this->deploySyncPeerCount > 0)
-                    <button type="button" wire:click="queueDeploy" wire:loading.attr="disabled" wire:target="queueDeploy" title="{{ __('Also deploys :count linked site(s) in this deploy sync group.', ['count' => $this->deploySyncPeerCount]) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-50">
+                    <button type="button" wire:click="queueDeploy" wire:loading.attr="disabled" wire:target="queueDeploy" title="{{ __('Also deploys :count linked site(s) in this deploy sync group.', ['count' => $this->deploySyncPeerCount]) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-50">
                         <x-heroicon-o-queue-list class="h-4 w-4" />
                         {{ __('Deploy linked sites') }}
                     </button>
                 @endif
 
-                {{-- Schedule a one-off deploy for later (delay presets + custom time). --}}
+                {{-- ONE-OFF delayed deploy (delay presets + custom time). Labelled
+                     "Deploy later", not "Schedule" — recurring cron cadences are a
+                     different feature and live on the Schedule tab. --}}
                 <div x-data="{ open: false, custom: '' }" class="relative">
-                    <button type="button" x-on:click="open = ! open" title="{{ __('Schedule this deploy for later') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                        <x-heroicon-o-clock class="h-4 w-4" />
-                        {{ __('Schedule') }}
+                    <button type="button" x-on:click="open = ! open" title="{{ __('Run this deploy once at a later time') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                        <x-heroicon-o-clock class="h-3.5 w-3.5" />
+                        {{ __('Deploy later') }}
                         <x-heroicon-m-chevron-down class="h-3.5 w-3.5 opacity-60" />
                     </button>
                     <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-brand-ink/10 bg-white p-1.5 shadow-xl">
-                        <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploy in') }}</p>
+                        <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploy once, in') }}</p>
                         @foreach (['15' => __('15 minutes'), '60' => __('1 hour'), '180' => __('3 hours'), '720' => __('12 hours')] as $mins => $label)
                             <button type="button" wire:click="scheduleDeploy('{{ $mins }}')" x-on:click="open = false" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-clock class="h-3.5 w-3.5 text-brand-moss" />
@@ -488,7 +489,7 @@
                             <input type="datetime-local" x-model="custom" class="dply-input mt-1 w-full text-xs" />
                             <button type="button" x-on:click="if (custom) { $wire.scheduleDeploy(custom); open = false; custom = '' }" x-bind:disabled="! custom" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-50">
                                 <x-heroicon-o-clock class="h-3.5 w-3.5" />
-                                {{ __('Schedule deploy') }}
+                                {{ __('Deploy at this time') }}
                             </button>
                         </div>
                     </div>
@@ -499,7 +500,7 @@
         {{-- Pending delayed deploy banner. --}}
         @if ($this->pendingScheduledDeploy)
             @php $pendingSchedule = $this->pendingScheduledDeploy; @endphp
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 sm:px-8">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-2.5 sm:px-6">
                 <p class="flex items-center gap-2 text-sm text-amber-900">
                     <x-heroicon-o-clock class="h-4 w-4 shrink-0 text-amber-700" />
                     <span>
@@ -518,7 +519,7 @@
              so the four read as one continuous strip rather than four boxes,
              echoing the connected feel of the phase rail below. --}}
         <dl class="grid grid-cols-2 gap-px border-b border-brand-ink/10 bg-brand-ink/[0.06] text-sm sm:grid-cols-4">
-            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Deployed commit') }}
@@ -541,7 +542,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-signal class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Status') }}
@@ -569,7 +570,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-clock class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Duration') }}
@@ -584,7 +585,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+            <div class="min-w-0 bg-white px-5 py-2.5 sm:px-6">
                 <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                     <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Trigger') }}
@@ -593,7 +594,9 @@
             </div>
         </dl>
 
-        @include('livewire.sites.partials.deployments._schedule-panel')
+        {{-- Recurring cron schedules moved to their own Schedule tab — sharing
+             this panel with the header's one-off "Deploy later" control meant two
+             different things both labelled Schedule sat inches apart. --}}
 
         <div class="px-6 py-6 sm:px-8">
             {{-- While a deploy request is in flight, clear the previous run's

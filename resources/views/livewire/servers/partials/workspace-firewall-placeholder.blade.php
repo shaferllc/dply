@@ -11,19 +11,15 @@
     <section class="dply-card min-w-0 overflow-hidden p-0" aria-busy="true" aria-live="polite">
         <span class="sr-only">{{ __('Loading firewall…') }}</span>
 
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6" aria-hidden="true">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Firewall') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.') }}
-                    </p>
-                </div>
-            </div>
-        </div>
+        {{-- The same dense head the real page renders — keep the two in step or
+             the card resizes when the render swaps in. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-shield-check"
+            :title="__('Firewall')"
+            :note="__('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.')"
+            class="border-b border-brand-ink/10"
+        />
 
         <div class="flex flex-wrap gap-1.5 border-b border-brand-ink/10 px-4 py-2.5" aria-hidden="true">
             @foreach ([__('Rules'), __('Templates'), __('Activity'), __('Notifications')] as $i => $label)
@@ -35,25 +31,9 @@
             @endforeach
         </div>
 
-        <div class="border-b border-brand-ink/10" aria-hidden="true">
-            <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <span class="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                    <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="h-2.5 w-64 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <span class="h-8 w-20 animate-pulse rounded-lg bg-brand-ink/10"></span>
-                    <span class="h-8 w-16 animate-pulse rounded-lg bg-brand-ink/10"></span>
-                </div>
-            </div>
-            <div class="space-y-3 px-5 py-5 sm:px-6">
-                @foreach (range(1, 4) as $row)
-                    <div class="h-14 animate-pulse rounded-xl bg-brand-ink/10"></div>
-                @endforeach
-            </div>
-        </div>
+        {{-- Body reuses the same per-tab skeleton the tab switch renders, so
+             the two can't drift. Rules is the default landing tab. --}}
+        @include('livewire.servers.partials.firewall._tab-skeleton', ['tab' => 'rules'])
+
     </section>
 </x-server-workspace-layout>

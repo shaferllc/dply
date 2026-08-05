@@ -9,21 +9,16 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Firewall') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense panel head, matching Settings / Logs / Files. This was a tall
+             stack — 10x10 icon badge, 18px title, max-w-2xl paragraph, py-5 band
+             — spending roughly three times the height to say the same thing. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-shield-check"
+            :title="__('Firewall')"
+            :note="__('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.')"
+            class="border-b border-brand-ink/10"
+        />
 
         @if ($opsReady)
             <div @class([
@@ -32,36 +27,63 @@
                 @include('livewire.servers.partials.firewall._banner')
             </div>
 
-            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 <x-server-workspace-tablist :aria-label="__('Firewall workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
-                    <x-server-workspace-tab id="firewall-tab-rules" :active="$firewall_workspace_tab === 'rules'" wire:click="setFirewallWorkspaceTab('rules')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Rules') }}
-                        </span>
+                    <x-server-workspace-tab
+                        id="firewall-tab-rules"
+                        icon="heroicon-o-shield-check"
+                        :active="$firewall_workspace_tab === 'rules'"
+                        wire:click="setFirewallWorkspaceTab('rules')"
+                    >
+                        {{ __('Rules') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="firewall-tab-templates" :active="$firewall_workspace_tab === 'templates'" wire:click="setFirewallWorkspaceTab('templates')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Templates') }}
-                        </span>
+                    <x-server-workspace-tab
+                        id="firewall-tab-templates"
+                        icon="heroicon-o-document-duplicate"
+                        :active="$firewall_workspace_tab === 'templates'"
+                        wire:click="setFirewallWorkspaceTab('templates')"
+                    >
+                        {{ __('Templates') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="firewall-tab-activity" :active="$firewall_workspace_tab === 'activity'" wire:click="setFirewallWorkspaceTab('activity')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Activity') }}
-                        </span>
+                    <x-server-workspace-tab
+                        id="firewall-tab-activity"
+                        icon="heroicon-o-clock"
+                        :active="$firewall_workspace_tab === 'activity'"
+                        wire:click="setFirewallWorkspaceTab('activity')"
+                    >
+                        {{ __('Activity') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="firewall-tab-notifications" :active="$firewall_workspace_tab === 'notifications'" wire:click="setFirewallWorkspaceTab('notifications')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Notifications') }}
-                        </span>
+                    <x-server-workspace-tab
+                        id="firewall-tab-notifications"
+                        icon="heroicon-o-bell"
+                        :active="$firewall_workspace_tab === 'notifications'"
+                        wire:click="setFirewallWorkspaceTab('notifications')"
+                    >
+                        {{ __('Notifications') }}
                     </x-server-workspace-tab>
                 </x-server-workspace-tablist>
             </div>
 
-            <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setFirewallWorkspaceTab">
+            {{-- Skeleton while a tab switch is in flight, then the panel. Dimming
+                 the old panel was the only feedback before, which read as a
+                 frozen page on a slow round trip.
+
+                 Shape learned the hard way on Settings: the OUTER wrappers are
+                 stable and carry the loading directives, the tab key lives on an
+                 INNER div. The key stops Livewire's morph throwing when it
+                 patches one tab's DOM into another's (different shapes entirely),
+                 and keeping it inside a stable wrapper means any subtree the
+                 morph leaves behind is inside the hidden element rather than
+                 orphaned as a visible sibling. wire:loading.block, not bare
+                 wire:loading, or the skeleton shrink-wraps to inline-block. --}}
+            <div wire:loading.block wire:target="setFirewallWorkspaceTab" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                <div wire:key="firewall-skeleton-{{ $firewall_workspace_tab }}">
+                    @include('livewire.servers.partials.firewall._tab-skeleton', ['tab' => $firewall_workspace_tab])
+                </div>
+            </div>
+
+            <div class="relative" wire:loading.remove wire:target="setFirewallWorkspaceTab">
                 @if ($firewall_workspace_tab === 'rules')
                     <x-server-workspace-tab-panel
                         id="firewall-panel-rules"

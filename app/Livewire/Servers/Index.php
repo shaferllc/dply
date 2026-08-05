@@ -404,7 +404,12 @@ class Index extends Component
             return null;
         }
 
+        // Edge apps are backed by placeholder host rows, not machines. They have
+        // their own surface at /edge (where they already appear); counting them
+        // here inflated "8 servers" and rendered them as fleet entries with a
+        // stuck "Provisioning…" label and a metrics row that never fills in.
         $query = Server::query()
+            ->withoutEdgeHosts()
             ->where(function (Builder $q) use ($org) {
                 $q->where('organization_id', $org->id)
                     ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));
@@ -457,10 +462,28 @@ class Index extends Component
         $hasServersInScope = $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)
-                ->with(['sites', 'organization', 'team', 'workspace', 'databaseEngines', 'cacheServices'])
+                ->with(['sites', 'databaseEngines', 'cacheServices'])
                 ->withCount('sites')
                 ->get()
             : collect();
+
+        // organization / team / workspace are deliberately NOT eager-loaded above:
+        // $allInScope already carries them for every in-scope server, and $servers
+        // is a filtered subset of that same base query — so loading them again
+        // re-ran the identical `organizations` / `workspaces` / `teams` selects.
+        // Hand the already-hydrated instances across instead.
+        $inScopeById = $allInScope->keyBy('id');
+        foreach ($servers as $server) {
+            $loaded = $inScopeById->get($server->getKey());
+            if ($loaded === null) {
+                continue;
+            }
+            foreach (['organization', 'team', 'workspace'] as $relation) {
+                if ($loaded->relationLoaded($relation)) {
+                    $server->setRelation($relation, $loaded->getRelation($relation));
+                }
+            }
+        }
 
         // Per-server Deploy / Sync targets for the fleet card action buttons.
         $deployTargets = $this->buildDeployTargets($servers, $org);

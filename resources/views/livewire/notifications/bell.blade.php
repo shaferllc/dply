@@ -14,6 +14,8 @@
         <x-slot name="trigger">
             <button
                 type="button"
+                {{-- First open fetches the panel contents; see Bell::render(). --}}
+                @unless ($loaded) wire:click="load" @endunless
                 class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $notificationMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
                 aria-haspopup="menu"
             >
@@ -58,7 +60,7 @@
             {{-- Filters (category chips + alerts toggle) + Clear all. Shown
                  whenever there are unread items so the filter can be changed even
                  when the current filter has emptied the list. --}}
-            @if ($unreadCount > 0)
+            @if ($loaded && $unreadCount > 0)
                 @php
                     $chipBase = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold transition';
                     $chipOn = 'bg-brand-ink text-brand-cream';
@@ -92,6 +94,20 @@
 
             {{-- Unread items. --}}
             <div class="max-h-[26rem] overflow-y-auto">
+                @unless ($loaded)
+                    {{-- First open: the contents are in flight. --}}
+                    <div class="space-y-2 px-4 py-5" aria-busy="true">
+                        @foreach (range(1, min(3, max(1, (int) $unreadCount))) as $skeletonRow)
+                            <div class="flex items-start gap-3">
+                                <div class="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-brand-sand/60"></div>
+                                <div class="min-w-0 flex-1 space-y-1.5">
+                                    <div class="h-3 w-2/3 animate-pulse rounded bg-brand-sand/60"></div>
+                                    <div class="h-2.5 w-1/3 animate-pulse rounded bg-brand-sand/40"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
                 @forelse ($items as $notificationItem)
                     @php
                         $event = $notificationItem->event;
@@ -177,6 +193,7 @@
                         </div>
                     @endif
                 @endforelse
+                @endunless
             </div>
 
             {{-- Footer. --}}

@@ -1,20 +1,14 @@
 <section class="border-b border-brand-ink/10">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <x-icon-badge>
-            <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Releases') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Releases & rollback') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Atomic release folders kept on disk. The active release is symlinked into the document root; rolling back swaps the symlink to a previous folder.') }}</p>
-        </div>
-        <span class="ml-auto shrink-0 self-center text-xs text-brand-mist">
-            {{ trans_choice('{0} no releases|{1} :count release|[2,*] :count releases', $site->releases->count(), ['count' => $site->releases->count()]) }}
-        </span>
-    </div>
+    <x-workspace-panel-head
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-archive-box"
+        :title="__('Releases & rollback')"
+        :count="trans_choice('{0} no releases|{1} :count release|[2,*] :count releases', $site->releases->count(), ['count' => $site->releases->count()])"
+        :note="__('Atomic release folders kept on disk. The active release is symlinked into the document root; rolling back swaps the symlink to a previous folder.')"
+    />
 
     @if ($site->releases->isEmpty())
-        <p class="px-6 py-12 text-center text-sm text-brand-moss sm:px-8">
+        <p class="px-5 py-8 text-center text-xs text-brand-moss sm:px-6">
             {{ __('No releases on disk yet. Run a deploy with the atomic strategy and it will appear here.') }}
         </p>
     @else

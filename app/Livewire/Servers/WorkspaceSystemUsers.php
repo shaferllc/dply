@@ -45,6 +45,21 @@ class WorkspaceSystemUsers extends Component
     /** Active in-page sub-tab: 'accounts' (the user list) or 'notifications' (event routing). */
     public string $activeTab = 'accounts';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setActiveTab(string $value): void
+    {
+        if ($value === '' || $value === $this->activeTab) {
+            return;
+        }
+
+        $this->activeTab = $value;
+    }
+
+
     protected function consoleActionSubject(): Model
     {
         return $this->server;

@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\RunSupervisorOperationJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DismissesDaemonSuggestions;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
@@ -47,6 +48,7 @@ class WorkspaceDaemons extends Component
 {
     use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
+    use DismissesDaemonSuggestions;
     use EmitsPanelEvent;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
@@ -58,6 +60,14 @@ class WorkspaceDaemons extends Component
     use ManagesDaemonTemplates;
     use ManagesSupervisorPrograms;
     use RendersWorkspacePlaceholder;
+
+    /** Suggestions here are scoped to the currently selected context site. */
+    protected function daemonSuggestionSite(): ?\App\Models\Site
+    {
+        return $this->context_site_id !== null
+            ? \App\Models\Site::find($this->context_site_id)
+            : null;
+    }
     use RunsServerSupervisorHealthScan;
     use WithPagination;
 

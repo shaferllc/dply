@@ -30,6 +30,25 @@ class Index extends Component
     /** @var string One of {@see self::TABS}: filters the provider sidebar by capability. */
     public string $tab = 'all';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setTab(string $value): void
+    {
+        if ($value === '' || $value === $this->tab) {
+            return;
+        }
+
+        $this->tab = $value;
+
+        // Direct assignment doesn't fire Livewire's updated hook, and that hook
+        // validates the tab and repoints active_provider — call it explicitly.
+        $this->updatedTab($value);
+    }
+
+
     public function mount(?Organization $organization = null): void
     {
         $this->organization = $organization;

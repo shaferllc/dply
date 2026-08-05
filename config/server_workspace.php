@@ -78,7 +78,7 @@ return [
         // access (alphabetical by label)
         ['key' => 'ssh-access', 'route' => 'servers.ssh-access', 'preview_route' => 'servers.ssh-access', 'icon' => 'finger-print', 'label' => 'Access graph', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.ssh_access_graph', 'preview_feature' => 'workspace.ssh_access_graph_preview'],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
-        ['key' => 'load-balancers', 'route' => 'servers.load-balancers', 'icon' => 'arrows-right-left', 'label' => 'Load balancers', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'soon_badge' => true],
+        ['key' => 'load-balancers', 'route' => 'servers.load-balancers', 'icon' => 'arrows-right-left', 'label' => 'Load balancers', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'networking', 'route' => 'servers.networking', 'icon' => 'share', 'label' => 'Networking', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'system-users', 'route' => 'servers.system-users', 'icon' => 'user-group', 'label' => 'System users', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.system_users'],
@@ -95,7 +95,7 @@ return [
         ['key' => 'notifications', 'route' => 'servers.notifications', 'icon' => 'bell', 'label' => 'Notifications', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'maintenance', 'route' => 'servers.maintenance', 'preview_route' => 'servers.maintenance', 'icon' => 'wrench', 'label' => 'Maintenance', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_maintenance', 'preview_feature' => 'workspace.server_maintenance_preview'],
         ['key' => 'blueprint', 'route' => 'servers.blueprint', 'preview_route' => 'servers.blueprint', 'icon' => 'document-duplicate', 'label' => 'Blueprint', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_blueprint', 'preview_feature' => 'workspace.server_blueprint_preview'],
-        ['key' => 'cli', 'route' => 'servers.cli', 'preview_route' => 'servers.cli-preview', 'icon' => 'command-line', 'label' => 'CLI', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cli', 'preview_feature' => 'workspace.cli_preview', 'soon_badge' => true],
+        ['key' => 'cli', 'route' => 'servers.cli', 'preview_route' => 'servers.cli-preview', 'icon' => 'command-line', 'label' => 'CLI', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cli', 'preview_feature' => 'workspace.cli_preview'],
     ],
 
     /*
@@ -277,7 +277,12 @@ return [
     // (<x-workspace-coming-soon>) instead of their (not-yet-finished) real
     // content. Pages with a dedicated *-preview-panel + Pennant preview flag
     // (docker, ssh-access, files, …) handle their own teaser via that flag.
-    'coming_soon_keys' => ['load-balancers', 'edge-proxy'],
+    // load-balancers graduated: the real page ships create (Hetzner managed +
+    // HAProxy software), target add/remove, delete, and notification routing,
+    // backed by ProvisionHetznerLoadBalancerJob / ConfigureHAProxyLoadBalancerJob.
+    // Note it provisions billable Hetzner infrastructure and is Hetzner-only —
+    // createLoadBalancer() refuses other providers.
+    'coming_soon_keys' => ['edge-proxy'],
 
     'webserver_coming_soon' => ['apache', 'openlitespeed'],
 

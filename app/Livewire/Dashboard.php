@@ -4,11 +4,11 @@ namespace App\Livewire;
 
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Modules\Insights\Services\OrganizationInsightsMetricsService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -67,40 +67,47 @@ class Dashboard extends Component
             ->where('started_at', '<', now()->subMinutes(15))
             ->count();
 
-        // Failed-latest: count of sites whose most recent settled deploy was failed.
-        $failedLatest = 0;
-        foreach ($siteIds as $siteId) {
-            $latest = SiteDeployment::query()
-                ->where('site_id', $siteId)
-                ->whereIn('status', [
-                    SiteDeployment::STATUS_SUCCESS,
-                    SiteDeployment::STATUS_FAILED,
-                    SiteDeployment::STATUS_SKIPPED,
-                ])
-                ->orderByDesc('started_at')
-                ->first(['status']);
-            if ($latest !== null && $latest->status === SiteDeployment::STATUS_FAILED) {
-                $failedLatest++;
-            }
-        }
+        // Failed-latest: count of sites whose most recent settled deploy failed.
+        //
+        // This used to run one "latest settled deploy" query per site, so the
+        // dashboard's query count grew with the fleet. Postgres DISTINCT ON does
+        // the same latest-row-per-group pick in a single statement, and the
+        // `order by site_id, started_at desc` reproduces the old
+        // orderByDesc()->first() exactly — including Postgres's NULLS FIRST on a
+        // DESC sort, so a deploy with no started_at still wins its site.
+        $latestSettledPerSite = SiteDeployment::query()
+            ->selectRaw('distinct on (site_id) site_id, status')
+            ->whereIn('site_id', $siteIds)
+            ->whereIn('status', [
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_FAILED,
+                SiteDeployment::STATUS_SKIPPED,
+            ])
+            ->orderBy('site_id')
+            ->orderByDesc('started_at');
+
+        $failedLatest = DB::query()
+            ->fromSub($latestSettledPerSite, 'latest_settled')
+            ->where('status', SiteDeployment::STATUS_FAILED)
+            ->count();
 
         // Drift: cheap signal — sites pinned to engines not on their server.
-        $driftServers = 0;
-        $servers = Server::query()
-            ->whereIn('id', $serverIds)
-            ->with('databaseEngines')
-            ->get();
-        foreach ($servers as $server) {
-            $registered = $server->databaseEngines->pluck('engine')->all();
-            $hasDrift = Site::query()
-                ->where('server_id', $server->id)
-                ->whereNotNull('database_engine')
-                ->whereNotIn('database_engine', $registered)
-                ->exists();
-            if ($hasDrift) {
-                $driftServers++;
-            }
-        }
+        //
+        // Also collapsed from "fetch every server + its engines, then one exists()
+        // per server" to a single NOT EXISTS. Servers with no registered engines
+        // still count as drift, matching the old whereNotIn() against an empty
+        // list (which Laravel compiles to a tautology).
+        $driftServers = Site::query()
+            ->whereIn('server_id', $serverIds)
+            ->whereNotNull('database_engine')
+            ->whereNotExists(function ($query): void {
+                $query->select(DB::raw(1))
+                    ->from('server_database_engines')
+                    ->whereColumn('server_database_engines.server_id', 'sites.server_id')
+                    ->whereColumn('server_database_engines.engine', 'sites.database_engine');
+            })
+            ->distinct()
+            ->count('server_id');
 
         if ($failedLatest === 0 && $longRunning === 0 && $driftServers === 0) {
             return null;

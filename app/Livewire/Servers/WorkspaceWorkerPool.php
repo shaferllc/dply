@@ -59,6 +59,21 @@ class WorkspaceWorkerPool extends Component
     #[Url(as: 'tab')]
     public string $tab = 'overview';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setTab(string $value): void
+    {
+        if ($value === '' || $value === $this->tab) {
+            return;
+        }
+
+        $this->tab = $value;
+    }
+
+
     public string $pool_name = '';
 
     public int $desired_count = 1;

@@ -134,7 +134,11 @@ class Logs extends Component
 
     public function render(ServerSystemLogsReport $logsReport): View
     {
-        $this->server->refresh();
+        // No $this->server->refresh() here: Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time — refreshing again only doubled the
+        // `select * from servers` this page issues.
         $site = $this->scopedSite;
         $logSources = $this->availableLogSources();
         $runtimeMode = $site->runtimeTargetMode();

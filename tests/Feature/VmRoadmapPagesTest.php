@@ -153,5 +153,5 @@ test('server cost page redirects to settings governance', function (): void {
 
     $this->actingAs($user)
         ->get(route('servers.cost', $server))
-        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'governance']).'#settings-cost-estimate');
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'tab' => 'governance']).'#settings-cost-estimate');
 });

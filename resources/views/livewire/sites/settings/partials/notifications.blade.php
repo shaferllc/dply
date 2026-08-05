@@ -1,6 +1,6 @@
 {{-- Nested inside Settings Notifications merged card — flush tabs + strips. --}}
 <div class="min-w-0">
-    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
         <x-server-workspace-tablist
             :aria-label="__('Notifications sections')"
             scroll
@@ -25,56 +25,52 @@
         </x-server-workspace-tablist>
     </div>
 
+    {{-- Same skeleton-swap the Repository / Deployments / Laravel / Monitor tabs
+         use: on a tab switch wire:loading paints the shared panel skeleton
+         instantly (client-side, no extra request) instead of leaving the
+         previous tab's content frozen until the round-trip lands. --}}
+    <div class="hidden" wire:loading.class.remove="hidden" wire:target="setNotificationsTab">
+        @include('livewire.sites.partials._panel-skeleton')
+    </div>
+
+    <div wire:loading.class="hidden" wire:target="setNotificationsTab">
     @if ($notifTab === 'subscriptions')
         <section class="border-b border-brand-ink/10">
-            <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
-                <div class="flex min-w-0 items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy and uptime notifications') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss max-w-2xl">
-                            {{ __('Subscribe notification channels to site events. Dply delivers in-app notifications and routes to the channels you select here.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <a
-                        href="{{ route('profile.notification-channels') }}"
-                        wire:navigate
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-bell class="h-4 w-4 shrink-0" />
+            {{-- The "Errors → Notifications" cross-link used to be a sentence of
+                 prose below the header; as a head action it keeps the affordance
+                 and drops two lines. --}}
+            @php
+                $notifActionClass = 'inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40';
+            @endphp
+            <x-workspace-panel-head
+                icon="heroicon-o-bell-alert"
+                :title="__('Deploy and uptime notifications')"
+                :note="__('Subscribe channels to this site\'s events — expand one to pick what it receives. The Errors tab edits the same subscriptions.')"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    <a href="{{ route('profile.notification-channels') }}" wire:navigate class="{{ $notifActionClass }}">
+                        <x-heroicon-o-bell class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
                         {{ __('My channels') }}
                     </a>
                     @if ($site->organization_id)
-                        <a
-                            href="{{ route('organizations.notification-channels', $site->organization_id) }}"
-                            wire:navigate
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                        >
-                            <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0" />
-                            {{ __('Organization channels') }}
+                        <a href="{{ route('organizations.notification-channels', $site->organization_id) }}" wire:navigate class="{{ $notifActionClass }}">
+                            <x-heroicon-o-building-office-2 class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                            {{ __('Organization') }}
                         </a>
-                        <a
-                            href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}"
-                            wire:navigate
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                        >
-                            <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0" />
-                            {{ __('Advanced assignment') }}
+                        <a href="{{ route('profile.notification-channels.bulk-assign', ['site' => $site->id]) }}" wire:navigate class="{{ $notifActionClass }}">
+                            <x-heroicon-o-adjustments-horizontal class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                            {{ __('Advanced') }}
                         </a>
                     @endif
-                </div>
-            </div>
+                    <a href="{{ route('sites.errors', ['server' => $server, 'site' => $site, 'tab' => 'notifications']) }}" wire:navigate class="{{ $notifActionClass }}">
+                        <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                        {{ __('Errors') }}
+                    </a>
+                </x-slot:actions>
+            </x-workspace-panel-head>
 
-            <div class="space-y-3 px-5 py-5 sm:px-6">
-                <p class="text-xs text-brand-mist">
-                    {{ __('Each channel routes its own events — expand a channel to choose what it receives. Error-stream events are also editable from the') }}
-                    <a href="{{ route('sites.errors', ['server' => $server, 'site' => $site, 'tab' => 'notifications']) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ __('Errors → Notifications tab') }}</a>{{ __('; both edit the same subscriptions.') }}
-                </p>
+            <div class="px-5 py-4 sm:px-6">
                 @include('livewire.partials.notification-channel-matrix', [
                     'channels' => $assignableNotificationChannels,
                     'eventGroups' => $notificationEventGroups,
@@ -84,8 +80,9 @@
                 ])
             </div>
 
-            <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+            <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
                 <x-primary-button
+                    size="sm"
                     type="button"
                     wire:click="saveSiteNotificationSubscriptions"
                     wire:loading.attr="disabled"
@@ -100,20 +97,15 @@
 
     @if ($notifTab === 'webhooks')
         <section class="border-b border-brand-ink/10">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                <x-icon-badge>
-                    <x-heroicon-o-arrow-up-right class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outbound') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Integration webhooks') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss max-w-2xl">
-                        {{ __('Dply POSTs to these URLs when matching events occur for this site. Payloads are adapter-specific: Slack uses a text field, Discord uses content, and Microsoft Teams uses a MessageCard-style JSON body.') }}
-                    </p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                icon="heroicon-o-arrow-up-right"
+                :title="__('Integration webhooks')"
+                :note="__('Dply POSTs to these URLs when matching events occur. Payloads are adapter-specific: Slack uses text, Discord uses content, Teams uses a MessageCard body.')"
+                :count="$siteIntegrationWebhookDestinations->count() ?: null"
+                class="border-b border-brand-ink/10"
+            />
 
-            <div class="space-y-4 px-5 py-5 sm:px-6">
+            <div class="space-y-3 px-5 py-4 sm:px-6">
                 <form wire:submit="saveSiteIntegrationWebhookDestination" class="flex max-w-2xl flex-col gap-3">
                     <div class="flex flex-wrap gap-2">
                         <input type="text" wire:model="site_int_hook_name" placeholder="{{ __('Destination name') }}" required class="min-w-[140px] flex-1 rounded-md border-brand-ink/15 text-sm shadow-sm">
@@ -173,7 +165,9 @@
         </section>
     @endif
 
-    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+    </div>
+
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
         <x-cli-snippet tone="stub" />
     </div>
 

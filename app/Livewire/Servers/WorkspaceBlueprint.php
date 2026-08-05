@@ -15,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
@@ -38,6 +39,9 @@ class WorkspaceBlueprint extends Component
     public string $blueprint_name = '';
 
     public string $deleteBlueprintId = '';
+
+    /** Blueprint whose snapshot is open in the details modal. */
+    public string $viewingBlueprintId = '';
 
     public function mount(Server $server): void
     {
@@ -113,6 +117,49 @@ class WorkspaceBlueprint extends Component
         $this->blueprint_name = $this->server->name.' blueprint';
     }
 
+    /**
+     * Open the read-only snapshot for one saved blueprint. The table only shows
+     * the tagline, and what a blueprint would actually reproduce — firewall
+     * rules, daemons, runtime pins — is the thing you need before picking one
+     * in the create wizard.
+     */
+    public function openDetailModal(string $blueprintId): void
+    {
+        $this->authorize('view', $this->server);
+
+        $this->viewingBlueprintId = $blueprintId;
+        $this->dispatch('open-modal', 'blueprint-details');
+    }
+
+    public function closeDetailModal(): void
+    {
+        $this->viewingBlueprintId = '';
+        $this->dispatch('close-modal', 'blueprint-details');
+    }
+
+    /**
+     * The blueprint behind the details modal, scoped to the current org so an
+     * id from elsewhere resolves to nothing rather than to someone else's row.
+     */
+    #[Computed]
+    public function viewingBlueprint(): ?ServerBlueprint
+    {
+        if ($this->viewingBlueprintId === '') {
+            return null;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return null;
+        }
+
+        return ServerBlueprint::query()
+            ->where('organization_id', $org->id)
+            ->with('sourceServer:id,name')
+            ->whereKey($this->viewingBlueprintId)
+            ->first();
+    }
+
     public function openDeleteModal(string $blueprintId): void
     {
         $this->authorize('update', $this->server);
@@ -142,6 +189,10 @@ class WorkspaceBlueprint extends Component
             ->where('organization_id', $org->id)
             ->whereKey($this->deleteBlueprintId)
             ->delete();
+
+        if ($this->viewingBlueprintId === $this->deleteBlueprintId) {
+            $this->closeDetailModal();
+        }
 
         $this->closeDeleteModal();
         $this->toastSuccess(__('Blueprint deleted.'));

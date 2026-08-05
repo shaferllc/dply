@@ -30,51 +30,49 @@
      so it must not emit page chrome (no <x-server-workspace-layout>). --}}
 <div class="min-w-0">
 
-    {{-- Inline header replaces the page-layout title now that Activity is a tab. --}}
-    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Audit timeline') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Audit events for this server and its sites — who did what, when, and what changed.') }}
-                </p>
-            </div>
-
+    {{-- Inline header replaces the page-layout title now that Activity is a tab.
+         The "ACTIVITY" eyebrow restated the tab you clicked to get here. --}}
+    <x-workspace-panel-head
+        icon="heroicon-o-clipboard-document-list"
+        :title="__('Audit timeline')"
+        :note="__('Audit events for this server and its sites — who did what, when, and what changed.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             {{-- Feed / Trends switch — a light segmented control so it reads as a sub-view
                  of the Logs › Activity tab rather than a second, peer-level tab bar. --}}
             <div class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1" role="tablist" aria-label="{{ __('Activity sections') }}">
                 <button type="button" role="tab" id="activity-tab-feed" wire:click="setTab('feed')"
                     aria-selected="{{ $tab === 'feed' ? 'true' : 'false' }}"
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold leading-none transition-colors',
                         'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'feed',
                         'text-brand-moss hover:text-brand-ink' => $tab !== 'feed',
                     ])>
-                    <x-heroicon-o-list-bullet class="h-4 w-4" aria-hidden="true" />
+                    <x-heroicon-o-list-bullet class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Feed') }}
                 </button>
                 <button type="button" role="tab" id="activity-tab-trends" wire:click="setTab('trends')"
                     aria-selected="{{ $tab === 'trends' ? 'true' : 'false' }}"
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold leading-none transition-colors',
                         'bg-white text-brand-ink shadow-sm ring-1 ring-brand-ink/10' => $tab === 'trends',
                         'text-brand-moss hover:text-brand-ink' => $tab !== 'trends',
                     ])>
-                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
+                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Trends') }}
                 </button>
             </div>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     {{-- Filter card — shared across both subtabs so the URL state and the visual range stay coherent. --}}
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:px-8">
-            <div class="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <div class="flex flex-col gap-2.5 px-5 py-3 sm:px-6">
+            <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
                 <div>
                     <label for="activity_range" class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Range') }}</label>
-                    <select id="activity_range" wire:model.live="range" class="mt-1 rounded-md border-brand-ink/15 bg-white text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest">
+                    <select id="activity_range" wire:model.live="range" class="mt-1 rounded-md border-brand-ink/15 bg-white py-1 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest">
                         @foreach ($rangeOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
@@ -83,7 +81,7 @@
 
                 <div>
                     <label for="activity_actor" class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Actor') }}</label>
-                    <select id="activity_actor" wire:model.live="userId" class="mt-1 rounded-md border-brand-ink/15 bg-white text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest">
+                    <select id="activity_actor" wire:model.live="userId" class="mt-1 rounded-md border-brand-ink/15 bg-white py-1 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest">
                         <option value="">{{ __('Anyone') }}</option>
                         @foreach ($actors as $actor)
                             <option value="{{ $actor['id'] }}">{{ $actor['name'] }}</option>
@@ -93,24 +91,24 @@
 
                 @if ($hasFilters)
                     <button type="button" wire:click="clearFilters"
-                        class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                        <x-heroicon-o-x-mark class="h-4 w-4" />
+                        class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" />
                         {{ __('Clear filters') }}
                     </button>
                 @endif
             </div>
 
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-1.5">
                 <span class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Category') }}</span>
                 <div class="flex flex-wrap items-center gap-1.5">
                     <button type="button" wire:click="setCategory('')" @class([
-                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                        'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
                         'border-brand-forest bg-brand-forest text-brand-cream' => $category === '',
                         'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $category !== '',
                     ])>{{ __('All') }}</button>
                     @foreach ($categories as $key => $label)
                         <button type="button" wire:click="setCategory('{{ $key }}')" @class([
-                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
                             'border-brand-forest bg-brand-forest text-brand-cream' => $category === $key,
                             'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $category !== $key,
                         ])>
@@ -130,42 +128,32 @@
             :hidden="false"
         >
             <div class="{{ $card }}">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Feed') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Server, site, deploy, and insight events — chronologically. Click "Show" on a row to see the before/after diff.') }}
-                        </p>
-                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                            <span class="inline-flex items-center gap-1">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                {{ trans_choice('{0} no events in this range|{1} :count event|[2,*] :count events', $eventTotal, ['count' => $eventTotal]) }}
-                            </span>
-                            @if ($latestEventAt)
-                                <span class="text-brand-mist/60">·</span>
-                                <span>{{ __('latest :time', ['time' => $latestEventAt->diffForHumans()]) }}</span>
-                            @endif
-                            <span class="text-brand-mist/60">·</span>
-                            <span>{{ trans_choice('{1} last :count day|[2,*] last :count days', $rangeDays, ['count' => $rangeDays]) }}</span>
-                        </div>
-                    </div>
-                </div>
+                {{-- Counts fold into the head's note + pill instead of a third
+                     stacked meta row. --}}
+                @php
+                    $feedNote = __('Server, site, deploy, and insight events — chronologically. Click “Show diff” on a row to see the before/after.')
+                        .' · '.trans_choice('{1} last :count day|[2,*] last :count days', $rangeDays, ['count' => $rangeDays])
+                        .($latestEventAt ? ' · '.__('latest :time', ['time' => $latestEventAt->diffForHumans()]) : '');
+                @endphp
+                <x-workspace-panel-head
+                    icon="heroicon-o-clock"
+                    :title="__('Recent activity')"
+                    :note="$feedNote"
+                    :count="$eventTotal ?: null"
+                    class="border-b border-brand-ink/10"
+                />
 
-                <div class="px-6 py-6 sm:px-7">
+                <div class="px-5 py-3 sm:px-6">
                 @if ($events->isEmpty())
-                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
-                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-clock class="h-5 w-5" />
+                    <div class="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-6 text-center">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-clock class="h-4 w-4" />
                         </span>
-                        <p class="text-sm font-medium text-brand-ink">{{ __('Nothing recorded in this range.') }}</p>
-                        <p class="text-xs text-brand-moss">{{ __('Firewall edits, cron saves, SSH key changes, insight fixes, and deploys will all show up here.') }}</p>
+                        <p class="text-xs font-semibold text-brand-ink">{{ __('Nothing recorded in this range.') }}</p>
+                        <p class="text-[11px] text-brand-moss">{{ __('Firewall edits, cron saves, SSH key changes, insight fixes, and deploys will all show up here.') }}</p>
                     </div>
                 @else
-                    <div class="mt-6 space-y-2" x-data="{ openId: null }">
+                    <div class="space-y-1.5" x-data="{ openId: null }">
                         @foreach ($events as $event)
                             @php
                                 $cat = \App\Livewire\Servers\WorkspaceActivity::categorize((string) $event->action);
@@ -175,16 +163,16 @@
                             @endphp
                             <div wire:key="activity-{{ $event->id }}">
                                 <div class="overflow-hidden rounded-xl border border-brand-ink/8 bg-white">
-                                    <div class="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5 text-sm sm:px-4">
+                                    <div class="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2 text-xs sm:px-3.5">
                                         <span @class([
-                                            'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ring-brand-ink/10 text-white',
+                                            'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-1 ring-brand-ink/10 text-white',
                                             $categoryColor[$cat] ?? 'bg-zinc-400',
                                         ])>
-                                            <x-heroicon-m-bolt class="h-4 w-4" aria-hidden="true" />
+                                            <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
                                         </span>
                                         <div class="min-w-0 flex-1">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <span class="text-sm font-medium text-brand-ink">{{ $event->action_summary }}</span>
+                                                <span class="text-xs font-semibold text-brand-ink">{{ $event->action_summary }}</span>
                                                 <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss">
                                                     {{ __($categories[$cat] ?? $cat) }}
                                                 </span>
@@ -192,7 +180,7 @@
                                                     {{ $event->created_at?->diffForHumans() }}
                                                 </span>
                                             </div>
-                                            <p class="mt-1 text-[11px] text-brand-moss">
+                                            <p class="mt-0.5 text-[11px] text-brand-moss">
                                                 {{ __('by :actor', ['actor' => $actorName]) }}
                                                 @if ($subject)
                                                     <span class="ml-1 text-brand-mist">· {{ $subject }}</span>
@@ -211,7 +199,7 @@
                                     </div>
 
                                     @if ($hasDiff)
-                                        <div x-show="openId === '{{ $event->id }}'" x-cloak class="border-t border-brand-ink/8 bg-brand-sand/15 px-4 py-4 sm:px-5">
+                                        <div x-show="openId === '{{ $event->id }}'" x-cloak class="border-t border-brand-ink/8 bg-brand-sand/15 px-3 py-3 sm:px-4">
                                             <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-stretch">
                                                 <div class="overflow-hidden rounded-lg border border-rose-200/70 bg-rose-50/40">
                                                     <div class="flex items-center gap-1.5 border-b border-rose-200/60 bg-rose-50/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-800">
@@ -259,7 +247,7 @@
                         @endforeach
                     </div>
 
-                    <div class="mt-6">
+                    <div class="mt-3">
                         {{ $events->links() }}
                     </div>
                 @endif
@@ -273,38 +261,29 @@
             :hidden="false"
         >
             <div class="{{ $card }}">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trends') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Events per day') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Stacked by category. Hover any bar for the per-category breakdown.') }}
-                        </p>
-                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                            <span class="inline-flex items-center gap-1">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                {{ trans_choice('{1} last :count day|[2,*] last :count days', $rangeDays, ['count' => $rangeDays]) }}
-                            </span>
-                            <span class="text-brand-mist/60">·</span>
-                            <span>{{ __('peak :max events', ['max' => $chartMax]) }}</span>
-                        </div>
-                    </div>
-                </div>
+                @php
+                    $trendsNote = __('Stacked by category. Hover any bar for the per-category breakdown.')
+                        .' · '.trans_choice('{1} last :count day|[2,*] last :count days', $rangeDays, ['count' => $rangeDays])
+                        .' · '.__('peak :max events', ['max' => $chartMax]);
+                @endphp
+                <x-workspace-panel-head
+                    icon="heroicon-o-chart-bar"
+                    :title="__('Events per day')"
+                    :note="$trendsNote"
+                    class="border-b border-brand-ink/10"
+                />
 
-                <div class="px-6 py-6 sm:px-7">
+                <div class="px-5 py-3 sm:px-6">
                 @if (array_sum(array_column($trends['buckets'], 'total')) === 0)
-                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
-                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-chart-bar class="h-5 w-5" />
+                    <div class="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-6 text-center">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-chart-bar class="h-4 w-4" />
                         </span>
-                        <p class="text-sm font-medium text-brand-ink">{{ __('No events in this range yet.') }}</p>
-                        <p class="text-xs text-brand-moss">{{ __('Widen the range or change the category filter to see more.') }}</p>
+                        <p class="text-xs font-semibold text-brand-ink">{{ __('No events in this range yet.') }}</p>
+                        <p class="text-[11px] text-brand-moss">{{ __('Widen the range or change the category filter to see more.') }}</p>
                     </div>
                 @else
-                    <div class="mt-8 px-1 pt-12">
+                    <div class="px-1 pt-10">
                         <div class="flex items-end gap-1 h-48 sm:h-56" role="img" aria-label="{{ __('Stacked bar chart of events per day') }}">
                             @foreach ($trends['buckets'] as $bucket)
                                 @php
@@ -356,9 +335,9 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                    <div class="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
                         @foreach ($trends['totals'] as $key => $total)
-                            <div class="flex items-center gap-2 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 text-sm">
+                            <div class="flex items-center gap-2 rounded-lg border border-brand-ink/8 bg-white px-2.5 py-1.5 text-xs">
                                 <span @class(['h-2.5 w-2.5 rounded-full', $categoryColor[$key] ?? 'bg-zinc-400'])></span>
                                 <span class="text-brand-moss">{{ __($categories[$key] ?? $key) }}</span>
                                 <span class="ml-auto font-semibold text-brand-ink">{{ $total }}</span>

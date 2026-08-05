@@ -29,68 +29,62 @@
                - ok: nothing here; the chrome bar shows the green pill instead
         --}}
         @if ($probesLoaded && $cliState === 'missing')
-            <div class="mb-4 rounded-2xl border border-brand-sage/40 bg-brand-sage/10 p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="min-w-0 max-w-3xl">
-                        <p class="text-sm font-semibold text-brand-ink">{{ __('Install the dply CLI on this server') }}</p>
-                        <p class="mt-1 text-sm leading-6 text-brand-moss">
-                            {{ __('Adds /usr/local/bin/dply — a small bash wrapper for status, restart, tail, site list, and recipe run. Reads /etc/dply/state.json that we push alongside the install. Auditable: `cat $(which dply)`.') }}
-                        </p>
-                        @if ($cliInstallError)
-                            <p class="mt-2 text-xs text-rose-700">{{ $cliInstallError }}</p>
-                        @endif
-                    </div>
-                    <button
-                        type="button"
-                        wire:click="installCli"
-                        wire:loading.attr="disabled"
-                        wire:target="installCli"
-                        @disabled($cliInstalling)
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40 disabled:opacity-60"
-                    >
-                        <span wire:loading.remove wire:target="installCli">{{ __('Install dply CLI') }}</span>
-                        <span wire:loading wire:target="installCli">{{ __('Installing…') }}</span>
-                    </button>
-                </div>
+            <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-brand-sage/40 bg-brand-sage/10 px-3 py-2">
+                <p
+                    class="min-w-0 flex-1 text-xs leading-snug text-brand-moss"
+                    title="{{ __('Reads /etc/dply/state.json that we push alongside the install. Auditable: `cat $(which dply)`.') }}"
+                >
+                    <span class="font-semibold text-brand-ink">{{ __('Install the dply CLI') }}</span>
+                    <span class="text-brand-mist">·</span>
+                    {{ __('/usr/local/bin/dply — bash wrapper for status, restart, tail, site list, recipe run.') }}
+                </p>
+                <button
+                    type="button"
+                    wire:click="installCli"
+                    wire:loading.attr="disabled"
+                    wire:target="installCli"
+                    @disabled($cliInstalling)
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40 disabled:opacity-60"
+                >
+                    <span wire:loading.remove wire:target="installCli">{{ __('Install') }}</span>
+                    <span wire:loading wire:target="installCli">{{ __('Installing…') }}</span>
+                </button>
+                @if ($cliInstallError)
+                    <p class="basis-full text-[11px] text-rose-700">{{ $cliInstallError }}</p>
+                @endif
             </div>
         @elseif ($probesLoaded && $cliState === 'partial')
-            <div class="mb-4 rounded-2xl border border-amber-300/70 bg-amber-50/70 p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="min-w-0 max-w-3xl">
-                        <p class="text-sm font-semibold text-amber-900">{{ __('dply CLI install is incomplete') }}</p>
-                        <p class="mt-1 text-sm leading-6 text-amber-900/80">
-                            {{ __('The binary is on the server but supporting pieces are missing. Repair re-runs the installer (idempotent).') }}
-                        </p>
-                        <ul class="mt-2 space-y-0.5 text-xs text-amber-900/90">
-                            <li class="flex items-center gap-1.5">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliBinaryOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                                <span>/usr/local/bin/dply {{ $cliBinaryOk ? __('present') : __('missing') }}</span>
-                            </li>
-                            <li class="flex items-center gap-1.5">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliJqOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                                <span>jq {{ $cliJqOk ? __('installed') : __('missing — apt install jq') }}</span>
-                            </li>
-                            <li class="flex items-center gap-1.5">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliStateFileOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                                <span>/etc/dply/state.json {{ $cliStateFileOk ? __('readable') : __('missing or unreadable') }}</span>
-                            </li>
-                        </ul>
-                        @if ($cliInstallError)
-                            <p class="mt-2 text-xs text-rose-700">{{ $cliInstallError }}</p>
-                        @endif
-                    </div>
-                    <button
-                        type="button"
-                        wire:click="installCli"
-                        wire:loading.attr="disabled"
-                        wire:target="installCli"
-                        @disabled($cliInstalling)
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700/90 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-60"
-                    >
-                        <span wire:loading.remove wire:target="installCli">{{ __('Repair install') }}</span>
-                        <span wire:loading wire:target="installCli">{{ __('Repairing…') }}</span>
-                    </button>
-                </div>
+            <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-amber-300/70 bg-amber-50/70 px-3 py-2">
+                <p class="min-w-0 text-xs font-semibold leading-snug text-amber-900">{{ __('dply CLI install is incomplete') }}</p>
+                <ul class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-amber-900/90">
+                    <li class="flex items-center gap-1.5">
+                        <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliBinaryOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                        <span>{{ $cliBinaryOk ? __('binary') : __('binary missing') }}</span>
+                    </li>
+                    <li class="flex items-center gap-1.5">
+                        <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliJqOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                        <span>{{ $cliJqOk ? __('jq') : __('jq missing') }}</span>
+                    </li>
+                    <li class="flex items-center gap-1.5">
+                        <span class="inline-block h-1.5 w-1.5 rounded-full {{ $cliStateFileOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                        <span>{{ $cliStateFileOk ? __('state.json') : __('state.json unreadable') }}</span>
+                    </li>
+                </ul>
+                <button
+                    type="button"
+                    wire:click="installCli"
+                    wire:loading.attr="disabled"
+                    wire:target="installCli"
+                    @disabled($cliInstalling)
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-700/90 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-60"
+                    title="{{ __('Repair re-runs the installer (idempotent).') }}"
+                >
+                    <span wire:loading.remove wire:target="installCli">{{ __('Repair') }}</span>
+                    <span wire:loading wire:target="installCli">{{ __('Repairing…') }}</span>
+                </button>
+                @if ($cliInstallError)
+                    <p class="basis-full text-[11px] text-rose-700">{{ $cliInstallError }}</p>
+                @endif
             </div>
         @endif
 
@@ -125,74 +119,74 @@
                  paint outside the card boundary. We round the top/bottom
                  inner elements themselves so the card corners stay clean. --}}
             <div class="dply-card min-w-0 overflow-hidden p-0">
-                {{-- Title + quick actions + chrome in one header --}}
-                <div class="rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2.5">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0">
-                                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Console') }}</h2>
-                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
-                                        {{ __('Quick SSH for this server. Saved recipes live on Run.') }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            @if ($cliState === 'ok')
-                                <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-medium text-brand-ink" title="{{ __('Run `dply --help` on the box for subcommands.') }}">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                                    dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
-                                </span>
-                            @elseif ($cliState === 'partial')
-                                <span class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900" title="{{ __('dply CLI install is incomplete — see banner above.') }}">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
-                                    dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }} ({{ __('needs repair') }})
-                                </span>
-                            @endif
-                            @if (! empty($history))
-                                <button
-                                    type="button"
-                                    wire:click="clearHistory"
-                                    class="text-xs font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
-                                >
-                                    {{ __('Clear') }}
-                                </button>
-                            @endif
-                            <button
-                                type="button"
-                                x-on:click="toggle()"
-                                x-bind:aria-pressed="open ? 'true' : 'false'"
-                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
-                                title="{{ __('Toggle help sidebar') }}"
-                            >
-                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <circle cx="10" cy="10" r="7.5"/>
-                                    <path d="M8 7.5a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5V11"/>
-                                    <circle cx="10" cy="13.5" r="0.5" fill="currentColor"/>
-                                </svg>
-                                <span x-text="open ? @js(__('Hide help')) : @js(__('Show help'))"></span>
-                            </button>
-                        </div>
-                    </div>
+                {{-- Single-row header: title, quick actions, and chrome all inline. --}}
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                    <h2
+                        class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink"
+                        title="{{ __('Quick SSH for this server. Saved recipes live on Run.') }}"
+                    >
+                        <x-heroicon-o-command-line class="h-4 w-4 text-brand-forest" aria-hidden="true" />
+                        {{ __('Console') }}
+                    </h2>
 
-                    <div class="mt-3 flex flex-wrap items-center gap-1.5">
-                        <span class="me-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Quick') }}</span>
+                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+
+                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                         @foreach ($quickActions as $i => $action)
                             <button
                                 type="button"
                                 wire:click="runQuickAction({{ $i }})"
                                 wire:loading.attr="disabled"
-                                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink shadow-sm transition hover:border-brand-ink/20 hover:bg-brand-sand/40 disabled:opacity-50"
+                                class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px] font-medium text-brand-ink shadow-sm transition hover:border-brand-ink/20 hover:bg-brand-sand/40 disabled:opacity-50"
                                 title="{{ $action['cmd'] }}"
                             >
                                 {{ $action['label'] }}
                             </button>
                         @endforeach
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-2">
+                        @if ($cliState === 'ok')
+                            <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-medium text-brand-ink" title="{{ __('Run `dply --help` on the box for subcommands.') }}">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                                dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
+                            </span>
+                        @elseif ($cliState === 'partial')
+                            <span class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900" title="{{ __('dply CLI install is incomplete — see banner above.') }}">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+                                dply CLI{{ $cliVersion ? ' '.$cliVersion : '' }}
+                            </span>
+                        @endif
+                        <a
+                            href="{{ route('servers.run', $server) }}"
+                            wire:navigate
+                            class="text-[11px] font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
+                            title="{{ __('Save and re-run commands on the Run tab.') }}"
+                        >{{ __('Saved runs') }}</a>
+                        @if (! empty($history))
+                            <button
+                                type="button"
+                                wire:click="clearHistory"
+                                class="text-[11px] font-medium text-brand-moss underline-offset-2 hover:text-brand-ink hover:underline"
+                            >
+                                {{ __('Clear') }}
+                            </button>
+                        @endif
+                        <button
+                            type="button"
+                            x-on:click="toggle()"
+                            x-bind:aria-pressed="open ? 'true' : 'false'"
+                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 text-[11px] font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
+                            title="{{ __('Toggle help sidebar') }}"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="10" cy="10" r="7.5"/>
+                                <path d="M8 7.5a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5V11"/>
+                                <circle cx="10" cy="13.5" r="0.5" fill="currentColor"/>
+                            </svg>
+                            <span>{{ __('Help') }}</span>
+                        </button>
                     </div>
                 </div>
 
@@ -428,11 +422,6 @@
                 </div>
             </aside>
         </div>
-
-        <p class="mt-3 text-center text-xs text-brand-moss">
-            {{ __('Need to save and re-run?') }}
-            <a href="{{ route('servers.run', $server) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Open Run') }}</a>
-        </p>
     @else
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">

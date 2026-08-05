@@ -74,3 +74,60 @@ test('org can save blueprint from ready server', function (): void {
 
     expect(ServerBlueprint::query()->where('organization_id', $org->id)->count())->toBe(1);
 });
+
+test('clicking a blueprint name opens its snapshot details', function (): void {
+    [$user, $org, $server] = blueprintUserWithServer();
+
+    $blueprint = ServerBlueprint::query()->create([
+        'organization_id' => $org->id,
+        'source_server_id' => $server->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'golden web',
+        'snapshot' => [
+            'version' => 1,
+            'stack' => ['webserver' => 'nginx', 'php_version' => '8.4', 'database' => 'mysql84', 'cache_service' => 'redis'],
+            'server_role' => 'application',
+            'install_profile' => 'laravel',
+            'runtime_defaults' => ['node' => '22'],
+            'firewall_rules' => [
+                ['name' => 'HTTPS', 'port' => '443', 'protocol' => 'tcp', 'source' => 'any', 'action' => 'allow', 'enabled' => true],
+            ],
+            'supervisor_programs' => [
+                ['slug' => 'horizon', 'program_type' => 'horizon', 'command' => 'php artisan horizon', 'user' => 'dply', 'numprocs' => 1],
+            ],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceBlueprint::class, ['server' => $server])
+        // The name is a button, not static text.
+        ->assertSee('golden web')
+        ->call('openDetailModal', $blueprint->id)
+        ->assertSet('viewingBlueprintId', $blueprint->id)
+        // The detail the table can't carry: what rides along with the stack.
+        ->assertSee(__('Firewall rules'))
+        ->assertSee('HTTPS')
+        ->assertSee(__('Daemons'))
+        ->assertSee('horizon')
+        ->assertSee('Node 22')
+        ->call('closeDetailModal')
+        ->assertSet('viewingBlueprintId', '');
+});
+
+test('a blueprint from another organization is not viewable', function (): void {
+    [$user, , $server] = blueprintUserWithServer();
+
+    $otherOrg = Organization::factory()->create();
+    $foreign = ServerBlueprint::query()->create([
+        'organization_id' => $otherOrg->id,
+        'created_by_user_id' => $user->id,
+        'name' => 'someone elses blueprint',
+        'snapshot' => ['version' => 1, 'stack' => []],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceBlueprint::class, ['server' => $server])
+        ->call('openDetailModal', $foreign->id)
+        // Scoped to the current org, so the id resolves to nothing.
+        ->assertDontSee('someone elses blueprint');
+});

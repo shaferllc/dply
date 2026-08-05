@@ -1,32 +1,31 @@
+{{-- The Schedule tab: RECURRING cron-cadence deploys. The Deploy tab's
+     "Deploy later" dropdown is the one-off equivalent and stays there. --}}
 @php $schedules = $site->deploymentSchedules; @endphp
 
-<div class="border-b border-brand-ink/10 bg-white px-6 py-5 sm:px-8">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss ring-1 ring-inset ring-brand-ink/10">
-                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div class="min-w-0">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Scheduled deploys') }}</p>
-                <p class="mt-0.5 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Deploy the current branch automatically on a cron cadence. Runs on the dply scheduler — no server crontab needed.') }}
-                </p>
-            </div>
-        </div>
-        @unless ($show_add_schedule_form)
+<x-workspace-panel-head
+    class="border-b border-brand-ink/10"
+    icon="heroicon-o-calendar-days"
+    :title="__('Recurring deploys')"
+    :count="trans_choice('{0} no schedules|{1} :count schedule|[2,*] :count schedules', $schedules->count(), ['count' => $schedules->count()])"
+    :note="__('Deploy the current branch automatically on a cron cadence. Runs on the dply scheduler — no server crontab needed. To delay a single deploy instead, use “Deploy later” on the Deploy tab.')"
+>
+    @unless ($show_add_schedule_form)
+        <x-slot:actions>
             <button
                 type="button"
                 wire:click="openAddScheduleForm"
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-plus class="h-4 w-4" />
+                <x-heroicon-o-plus class="h-3.5 w-3.5" />
                 {{ __('Add schedule') }}
             </button>
-        @endunless
-    </div>
+        </x-slot:actions>
+    @endunless
+</x-workspace-panel-head>
 
+<div class="border-b border-brand-ink/10 bg-white px-5 py-4 sm:px-6">
     @if ($schedules->isNotEmpty())
-        <ul class="mt-4 space-y-2">
+        <ul class="space-y-2">
             @foreach ($schedules as $schedule)
                 <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5 transition-colors hover:border-brand-ink/15">
                     <div class="flex min-w-0 items-center gap-2.5">

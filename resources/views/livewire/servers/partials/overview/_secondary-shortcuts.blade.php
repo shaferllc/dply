@@ -39,12 +39,12 @@
     $sev = fn (?string $overall) => in_array($overall, ['critical', 'warning'], true) ? $overall : null;
 @endphp
 
-<div class="space-y-4">
+<div class="space-y-3">
 
 {{-- ── Needs attention ───────────────────────────────────────────── --}}
 @if ($hasAttention)
-    <section class="dply-card overflow-hidden">
-        <header class="border-b border-brand-ink/10 px-6 pt-4 pb-3 sm:px-7">
+    <section class="dply-card overflow-hidden p-0">
+        <header class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2 sm:px-6">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Needs attention') }}</p>
         </header>
         <div class="divide-y divide-brand-ink/8">
@@ -117,8 +117,8 @@
 
 {{-- ── Info ──────────────────────────────────────────────────────── --}}
 @if ($hasInfo)
-    <section class="dply-card overflow-hidden">
-        <header class="border-b border-brand-ink/10 px-6 pt-4 pb-3 sm:px-7">
+    <section class="dply-card overflow-hidden p-0">
+        <header class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2 sm:px-6">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Info') }}</p>
         </header>
         <div class="divide-y divide-brand-ink/8">
@@ -130,7 +130,7 @@
                     'headline' => $costCardSummary['nudge_title']
                         ? $costCardSummary['formatted_total'] . ' · ' . $costCardSummary['nudge_title']
                         : $costCardSummary['formatted_total'],
-                    'href' => route('servers.settings', ['server' => $server, 'section' => 'governance']) . '#settings-cost-estimate',
+                    'href' => route('servers.settings', ['server' => $server, 'tab' => 'governance']) . '#settings-cost-estimate',
                     'cta' => __('Open'),
                 ])
             @endif

@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
                 <x-server-workspace-tab
                     id="db-tab-basics"

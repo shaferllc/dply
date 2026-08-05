@@ -65,34 +65,29 @@
          origin cert to enable Cloudflare's Full (Strict) SSL mode.
          ================================================================= --}}
     <section class="{{ $card }}">
-        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed by Cloudflare') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('TLS terminated at Cloudflare’s edge') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('This site’s domain is proxied through Cloudflare, which serves HTTPS with its own edge certificate. dply doesn’t need to issue or renew an origin certificate for visitors to reach the site securely.') }}
-                        @if ($site->cloudflareTlsCheckedAt())
-                            <span class="ml-1 text-brand-mist">· {{ __('Checked :time', ['time' => \Illuminate\Support\Carbon::parse($site->cloudflareTlsCheckedAt())->diffForHumans()]) }}</span>
-                        @endif
-                    </p>
-                    <p class="mt-2 max-w-2xl text-xs leading-relaxed text-brand-mist">
-                        {{ __('Want end-to-end encryption? Request a certificate below and switch Cloudflare’s SSL/TLS mode to Full (Strict) so it validates the origin cert too.') }}
-                    </p>
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="min-w-0 flex-1 basis-72">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('TLS terminated at Cloudflare’s edge') }}</h2>
+                    @if ($site->cloudflareTlsCheckedAt())
+                        <span class="text-[11px] text-brand-mist">{{ __('Checked :time', ['time' => \Illuminate\Support\Carbon::parse($site->cloudflareTlsCheckedAt())->diffForHumans()]) }}</span>
+                    @endif
                 </div>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                    {{ __('This site’s domain is proxied through Cloudflare, which serves HTTPS with its own edge certificate. dply doesn’t need to issue or renew an origin certificate for visitors to reach the site securely.') }}
+                    {{ __('Want end-to-end encryption? Request a certificate below and switch Cloudflare’s SSL/TLS mode to Full (Strict) so it validates the origin cert too.') }}
+                </p>
             </div>
             <button
                 type="button"
                 wire:click="refreshCloudflareTlsStatus"
                 wire:loading.attr="disabled"
                 wire:target="refreshCloudflareTlsStatus"
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
             >
-                <span wire:loading.remove wire:target="refreshCloudflareTlsStatus" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
-                <span wire:loading wire:target="refreshCloudflareTlsStatus" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /></span>
+                <span wire:loading.remove wire:target="refreshCloudflareTlsStatus" class="inline-flex"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
+                <span wire:loading wire:target="refreshCloudflareTlsStatus" class="inline-flex"><x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" /></span>
                 {{ __('Recheck') }}
             </button>
         </div>
@@ -108,53 +103,50 @@
          60s) so the operator can still see the real issuer + expiry.
          ================================================================= --}}
     <section class="{{ $card }}" wire:init="loadCaddyManagedCerts">
-        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed by Caddy') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Automatic HTTPS') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Caddy obtains and renews this site’s certificate automatically — no certbot, no manual request needed. Details below are read live from the server.') }}
-                        @if ($caddy_managed_certs_scanned_at_iso)
-                            <span class="ml-1 text-brand-mist">· {{ __('Scanned :time', ['time' => \Illuminate\Support\Carbon::parse($caddy_managed_certs_scanned_at_iso)->diffForHumans()]) }}</span>
-                        @endif
-                    </p>
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="min-w-0 flex-1 basis-72">
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Automatic HTTPS (managed by Caddy)') }}</h2>
+                    @if ($caddy_managed_certs_scanned_at_iso)
+                        <span class="text-[11px] text-brand-mist">{{ __('Scanned :time', ['time' => \Illuminate\Support\Carbon::parse($caddy_managed_certs_scanned_at_iso)->diffForHumans()]) }}</span>
+                    @endif
                 </div>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                    {{ __('Caddy obtains and renews this site’s certificate automatically — no certbot, no manual request needed. Details below are read live from the server.') }}
+                </p>
             </div>
             <button
                 type="button"
                 wire:click="refreshCaddyManagedCerts"
                 wire:loading.attr="disabled"
                 wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts"
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
             >
-                <span wire:loading.remove wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
-                <span wire:loading wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /></span>
+                <span wire:loading.remove wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
+                <span wire:loading wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" /></span>
                 {{ __('Rescan') }}
             </button>
         </div>
 
         @if ($caddy_managed_certs_error)
-            <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-7">{{ $caddy_managed_certs_error }}</div>
+            <div class="border-b border-rose-200 bg-rose-50/70 px-5 py-2.5 text-xs text-rose-900 sm:px-6">{{ $caddy_managed_certs_error }}</div>
         @endif
 
         @if (! $caddy_managed_certs_loaded)
-            <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
+            <div class="px-5 py-6 text-center text-xs text-brand-moss sm:px-6" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
                 <span class="inline-flex items-center gap-2"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> {{ __('Reading Caddy certificate…') }}</span>
             </div>
         @else
             {{-- Replay the captured scan frames, then fade in the result. --}}
             <x-replay-log :frames="$caddy_managed_certs_progress">
                 @if ($caddy_managed_certs_unreadable)
-                    <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    <div class="px-5 py-6 text-center text-xs text-brand-moss sm:px-6">
                         {{ __('Could not read the certificate over SSH. Caddy still serves TLS — check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
                     </div>
                 @elseif (empty($caddy_managed_certs))
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center sm:px-7">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-clock class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-clock class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('Caddy hasn’t issued a certificate yet.') }}</p>
                 <p class="max-w-md text-xs text-brand-moss">{{ __('Caddy fetches the certificate on the first HTTPS request once DNS points at this server. Reload after the first visit.') }}</p>
             </div>
@@ -165,9 +157,9 @@
                         $urgency = (string) ($cert['urgency'] ?? 'unknown');
                         $days = $cert['days_until_expiry'] ?? null;
                     @endphp
-                    <li class="px-6 py-4 sm:px-7">
+                    <li class="px-5 py-2.5 sm:px-6">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
-                            <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><x-heroicon-o-lock-closed class="h-4 w-4" /></span>
+                            <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><x-heroicon-o-lock-closed class="h-3.5 w-3.5" /></span>
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $cert['subject'] ?: __('Caddy certificate') }}</p>
@@ -212,26 +204,24 @@
 @php $cloudflareOptionalCert = $site->cloudflareTerminatesTls(); @endphp
 <section @class([$card, 'opacity-70 transition-opacity hover:opacity-100 focus-within:opacity-100' => $cloudflareOptionalCert])>
     <form wire:submit="createCertificateRequest">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">
-                    {{ __('SSL') }}@if ($cloudflareOptionalCert) <span class="ml-1 text-brand-mist">· {{ __('Optional') }}</span>@endif
-                </p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    @if ($cloudflareOptionalCert)
-                        {{ __('Not required while Cloudflare terminates TLS — only needed if you want an origin certificate for Cloudflare’s Full (Strict) SSL mode.') }}
-                    @else
-                        {{ __('Create certificates against explicit customer or preview scopes so Dply never guesses which domains should receive SSL.') }}
-                    @endif
-                </p>
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
+                @if ($cloudflareOptionalCert)
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Optional') }}</span>
+                @endif
             </div>
+            <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
+                @if ($cloudflareOptionalCert)
+                    {{ __('Not required while Cloudflare terminates TLS — only needed if you want an origin certificate for Cloudflare’s Full (Strict) SSL mode.') }}
+                @else
+                    {{ __('Create certificates against explicit customer or preview scopes so Dply never guesses which domains should receive SSL.') }}
+                @endif
+            </p>
         </div>
 
-        <div class="space-y-5 px-6 py-6 sm:px-7">
+        <div class="space-y-3 px-5 py-4 sm:px-6">
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
                         <x-input-label for="new_certificate_scope" :value="__('Scope')" />
@@ -354,47 +344,40 @@
 </section>
 
 <section class="{{ $card }}">
-    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Existing certificates') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each certificate keeps its own scope, provider, challenge path, and last output for safer retries and cleanup.') }}</p>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                    <span class="inline-flex items-center gap-1">
-                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                        {{ trans_choice('{0} no certificates|{1} :count certificate|[2,*] :count certificates', $certificateCount, ['count' => $certificateCount]) }}
-                    </span>
+    {{-- The total used to appear three times here: a right-hand pill, a bullet
+         line under the description, and again inside the active/pending
+         breakdown. One count pill on the title row, one breakdown, done. --}}
+    <x-workspace-panel-head
+        class="border-b border-brand-ink/10"
+        icon="heroicon-o-lock-closed"
+        :title="__('Existing certificates')"
+        :count="trans_choice('{0} no certificates|{1} :count certificate|[2,*] :count certificates', $certificateCount, ['count' => $certificateCount])"
+        :note="__('Each certificate keeps its own scope, provider, challenge path, and last output for safer retries and cleanup.')"
+    >
+        @if ($activeCertificateCount > 0 || $pendingCertificateCount > 0)
+            <x-slot:actions>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                     @if ($activeCertificateCount > 0)
-                        <span class="text-brand-mist/60">·</span>
                         <span class="inline-flex items-center gap-1">
                             <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
                             {{ trans_choice('{1} :count active|[2,*] :count active', $activeCertificateCount, ['count' => $activeCertificateCount]) }}
                         </span>
                     @endif
                     @if ($pendingCertificateCount > 0)
-                        <span class="text-brand-mist/60">·</span>
                         <span class="inline-flex items-center gap-1">
                             <x-heroicon-o-clock class="h-3 w-3 text-amber-600" />
                             {{ trans_choice('{1} :count pending|[2,*] :count pending', $pendingCertificateCount, ['count' => $pendingCertificateCount]) }}
                         </span>
                     @endif
                 </div>
-            </div>
-        </div>
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
-            <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-            {{ trans_choice('{0} no certificates|{1} :count certificate|[2,*] :count certificates', $certificateCount, ['count' => $certificateCount]) }}
-        </span>
-    </div>
+            </x-slot:actions>
+        @endif
+    </x-workspace-panel-head>
 
     @if ($site->certificates->isEmpty())
-        <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-            <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
-                <x-heroicon-o-shield-check class="h-6 w-6" />
+        <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+            <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss">
+                <x-heroicon-o-shield-check class="h-5 w-5" />
             </span>
             <p class="text-sm font-medium text-brand-ink">{{ __('No certificates have been requested for this site yet.') }}</p>
             <p class="text-xs text-brand-moss">{{ __('Use the form above to request a Let’s Encrypt cert or install an existing one.') }}</p>

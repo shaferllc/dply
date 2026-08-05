@@ -32,25 +32,19 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Load balancers') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Load balancers that target this server. Manage all load balancers from the Networking section.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense page head, matching Settings / Logs / Files / Firewall / Networking. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-arrows-right-left"
+            :title="__('Load balancers')"
+            :note="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
+            :count="trans_choice('{0} none|{1} :count balancer|[2,*] :count balancers', $loadBalancers->count(), ['count' => $loadBalancers->count()])"
+            class="border-b border-brand-ink/10"
+        />
 
     {{-- In-page sub-tabs: the load-balancer list vs. notification routing for this
          server's load_balancer.* events. Mirrors the system-users page. --}}
-    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
         <x-server-workspace-tablist :aria-label="__('Load balancer sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
             <x-server-workspace-tab icon="heroicon-o-arrows-right-left" :active="$lb_workspace_tab === 'load_balancers'" wire:click="setLbWorkspaceTab('load_balancers')">
                 {{ __('Load balancers') }}
@@ -65,22 +59,21 @@
 
         {{-- ─── SECTION HEADER (always shown) ──────────────────────────────── --}}
         <section class="border-b border-brand-ink/10">
-            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-center gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Load balancers') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manage load balancers') }}</h3>
-                    </div>
-                </div>
-                <a href="{{ route('networking.index') }}?tab=load-balancers" wire:navigate
-                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                    <x-heroicon-o-arrows-right-left class="h-4 w-4" />
-                    {{ __('Manage in Networking →') }}
-                </a>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-arrows-right-left"
+                :title="__('Manage load balancers')"
+                :note="__('Software (HAProxy) balancers run on any server. Managed (Hetzner) balancers are redundant but billed by the provider.')"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    <a href="{{ route('networking.index') }}?tab=load-balancers" wire:navigate
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" />
+                        {{ __('Manage in Networking →') }}
+                    </a>
+                </x-slot:actions>
+            </x-workspace-panel-head>
             @if ($loadBalancers->isEmpty())
                 <div class="px-6 py-8 sm:px-7">
                     <x-empty-state

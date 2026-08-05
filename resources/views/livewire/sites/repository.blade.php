@@ -48,7 +48,7 @@
             @if ($currentRepositoryUrl === '')
                 @if (! $isEmbedded)
                 <section class="border-b border-brand-ink/10">
-                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-3.5 sm:px-6">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
                                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
@@ -100,7 +100,7 @@
                 @endphp
 
                 @unless ($isLocked)
-                    <div @class(['border-b border-brand-ink/10 px-3 py-2.5 sm:px-4' => ! $isEmbedded])>
+                    <div @class(['border-b border-brand-ink/10 px-3 py-2 sm:px-4' => ! $isEmbedded])>
                     <x-server-workspace-tablist :aria-label="__('Repository sections')" scroll @class(['!mb-0 w-full border-0 bg-transparent p-0 shadow-none' => ! $isEmbedded])>
                         @foreach ($tabs as $entry)
                             <x-server-workspace-tab
@@ -143,15 +143,17 @@
                 </div>
             @endif
 
-            <div @class([
-                'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => ! $isEmbedded,
-                'mt-6' => $isEmbedded,
-            ])>
-                <x-cli-snippet :commands="[
-                    ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
-                    ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
-                ]" />
-            </div>
+            {{-- Embedded (the Deployments page's Webhook / Settings tabs) the host
+                 page renders its own CLI snippet directly below this component —
+                 emitting one here too put two "CLI commands" rows on the page. --}}
+            @unless ($isEmbedded)
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                        ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                    ]" />
+                </div>
+            @endunless
 
 @if (! $isEmbedded)
             </section>

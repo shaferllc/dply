@@ -1,20 +1,14 @@
 <section>
     <div class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('When enabled, dply registers a push webhook with your Git provider and queues a deploy on every push to the deploy branch.') }}
-                </p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-bolt"
+            :title="__('Quick deploy')"
+            :note="__('When enabled, dply registers a push webhook with your Git provider and queues a deploy on every push to the deploy branch.')"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+        <div class="px-5 py-4 sm:px-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
                 <div class="min-w-0">
                     <p class="text-sm font-semibold text-brand-ink">
                         {{ $connectionQuickDeploy ? __('Quick deploy is enabled') : __('Quick deploy is disabled') }}

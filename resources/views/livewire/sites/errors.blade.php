@@ -48,7 +48,7 @@
                         </div>
                     </div>
 
-                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                         <x-server-workspace-tablist
                             :aria-label="__('Errors workspace sections')"
                             scroll

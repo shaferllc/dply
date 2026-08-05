@@ -60,10 +60,22 @@
                     @if ($sidebarTestingHostname !== '' && $sidebarTestingHostname !== $sidebarPrimaryHostname)
                         <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist" title="{{ $sidebarTestingHostname }}">{{ $sidebarTestingHostname }}</p>
                     @endif
-                    @if ($server->workspace)
+                    @php
+                        // Resolve through the request-scoped registry rather than
+                        // reading $server->workspace: the SitePolicy already fetched
+                        // this exact row for the site, and the server's belongsTo is a
+                        // separate relation on a separate instance, so touching it here
+                        // re-SELECTed `workspaces` on every workspace page. Priming the
+                        // relation keeps any later $server->workspace free too.
+                        $sidebarWorkspace = app(\App\Support\Workspaces\WorkspaceRegistry::class)->find($server->workspace_id);
+                        if ($sidebarWorkspace !== null && ! $server->relationLoaded('workspace')) {
+                            $server->setRelation('workspace', $sidebarWorkspace);
+                        }
+                    @endphp
+                    @if ($sidebarWorkspace)
                         @feature('surface.projects')
                             <p class="mt-0.5 truncate text-xs text-brand-moss">
-                                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
+                                <a href="{{ route('projects.resources', $sidebarWorkspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $sidebarWorkspace->name }}</a>
                             </p>
                         @endfeature
                     @endif

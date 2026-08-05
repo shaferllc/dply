@@ -155,6 +155,80 @@ class OrganizationBillingStateComputer
         return self::$desiredStateMemo[$key] = $this->computeFresh($organization);
     }
 
+    /**
+     * Does this org's fleet bill to nothing this cycle? Same answer as
+     * {@see compute()}->isFree(), reached without the full scan when it can be.
+     *
+     * The trial/pause banner asks this on every authenticated page render (see
+     * {@see Organization::owesNothingThisCycle}), and computeFresh() is
+     * expensive: site scan with a function_actions subquery, realtime + lookout
+     * reads, and three usage SUMs — nine queries for one boolean.
+     *
+     * The shortcut is exact, not an approximation. monthlyTotalCents is
+     * planPriceCents plus a series of subtotals that {@see
+     * DesiredBillingState::fromPlanAndUsage} each clamp with max(0, …), and no
+     * credit is ever subtracted. So a non-zero plan price alone forces the
+     * total above zero — nothing the rest of the scan could find would pull it
+     * back down to free. The flat plan is chosen purely by billable BYO server
+     * count, which is one already-memoized query.
+     *
+     * Orgs under the free server ceiling still fall through to the full
+     * compute: they may owe for serverless, Cloud, Edge, or metered usage, and
+     * only the scan can tell. Those are the smallest fleets, so the scan is
+     * cheapest exactly where it is still needed.
+     */
+    public function isFree(Organization $organization): bool
+    {
+        // Already computed this request — no reason to re-derive the plan.
+        $key = (string) $organization->id;
+        if (isset(self::$desiredStateMemo[$key])) {
+            return self::$desiredStateMemo[$key]->isFree();
+        }
+
+        $plan = $this->planResolver->resolveForServerCount(
+            $this->billableByoServerCountWithoutMetrics($organization),
+        );
+
+        if (max(0, (int) ($plan['price_cents'] ?? 0)) > 0) {
+            return false;
+        }
+
+        return $this->compute($organization)->isFree();
+    }
+
+    /**
+     * Billable BYO server count, skipping the latest-metric-snapshot eager load
+     * that {@see readyBillableServers} carries.
+     *
+     * The snapshot join is the single slowest query in the billing scan, and it
+     * exists for billingTier() and the managed-server cost calculators — a count
+     * needs none of it. The managed/product-host filters are PHP predicates, so
+     * the rows still have to be loaded; only the join is dropped.
+     *
+     * Deliberately does NOT populate $readyBillableServersMemo: these models
+     * lack the eager-loaded relation, and seeding the shared memo with them
+     * would push an N+1 onto every later tier read. A full compute() in the
+     * same request therefore re-queries with the join — one extra query on
+     * billing pages, in exchange for dropping the join from every page that
+     * only renders the trial banner.
+     */
+    private function billableByoServerCountWithoutMetrics(Organization $organization): int
+    {
+        $key = (string) $organization->id;
+        if (isset(self::$readyBillableServersMemo[$key])) {
+            return $this->billableByoServerCount($organization);
+        }
+
+        $ageCutoff = now()->subDays(max(0, (int) config('subscription.standard.min_billable_age_days', 1)));
+
+        return $organization->servers()
+            ->where('status', Server::STATUS_READY)
+            ->where('created_at', '<=', $ageCutoff)
+            ->get()
+            ->reject(fn (Server $server) => $server->isManagedProductHost() || $server->usesManagedHosting())
+            ->count();
+    }
+
     private function computeFresh(Organization $organization): DesiredBillingState
     {
         $tierQuantities = array_fill_keys(

@@ -54,7 +54,7 @@
                     <div class="border-b border-emerald-200/80 bg-emerald-50/70 px-5 py-3 text-sm text-emerald-900 sm:px-6">{{ session('success') }}</div>
                 @endif
 
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist
                         :aria-label="__('Monitor workspace sections')"
                         scroll
@@ -79,6 +79,15 @@
                     </x-server-workspace-tablist>
                 </div>
 
+                {{-- Same skeleton-swap the Repository / Deployments / Laravel tabs
+                     use: on a tab switch wire:loading paints the shared panel
+                     skeleton instantly (client-side, no extra request) instead of
+                     leaving the previous tab frozen until the round-trip lands. --}}
+                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setMonitorWorkspaceTab">
+                    @include('livewire.sites.partials._panel-skeleton')
+                </div>
+
+                <div wire:loading.class="hidden" wire:target="setMonitorWorkspaceTab">
                 @if ($monitorTab === 'monitors')
                     @if ($consoleActionRun)
                         <div class="border-b border-brand-ink/10">
@@ -94,29 +103,26 @@
                     @if (($runtimeMode ?? '') === 'serverless' && $functionStats)
                         @php $fnSummary = $functionStats['summary']; @endphp
                         <section class="border-b border-brand-ink/10">
-                            <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-                                <div class="flex min-w-0 items-start gap-3">
-                                    <x-icon-badge>
-                                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                                    </x-icon-badge>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
-                                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function activity') }}</h3>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invocations, errors, latency and cold starts — every recorded call to this function.') }}</p>
+                            <x-workspace-panel-head
+                                icon="heroicon-o-chart-bar"
+                                :title="__('Function activity')"
+                                :note="__('Invocations, errors, latency and cold starts — every recorded call to this function.')"
+                                class="border-b border-brand-ink/10"
+                            >
+                                <x-slot:actions>
+                                    <div class="flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-0.5">
+                                        @foreach (['1h' => __('1h'), '24h' => __('24h'), '7d' => __('7d')] as $rangeKey => $rangeLabel)
+                                            <button type="button" wire:click="setStatsRange('{{ $rangeKey }}')" @class([
+                                                'rounded-md px-2 py-0.5 text-xs font-semibold transition',
+                                                'bg-brand-sand/60 text-brand-ink shadow-sm' => $statsRange === $rangeKey,
+                                                'text-brand-moss hover:text-brand-ink' => $statsRange !== $rangeKey,
+                                            ])>{{ $rangeLabel }}</button>
+                                        @endforeach
                                     </div>
-                                </div>
-                                <div class="flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1">
-                                    @foreach (['1h' => __('1h'), '24h' => __('24h'), '7d' => __('7d')] as $rangeKey => $rangeLabel)
-                                        <button type="button" wire:click="setStatsRange('{{ $rangeKey }}')" @class([
-                                            'rounded-md px-2.5 py-1 text-xs font-semibold transition',
-                                            'bg-white text-brand-ink shadow-sm' => $statsRange === $rangeKey,
-                                            'text-brand-moss hover:text-brand-ink' => $statsRange !== $rangeKey,
-                                        ])>{{ $rangeLabel }}</button>
-                                    @endforeach
-                                </div>
-                            </div>
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
-                            <div class="space-y-5 px-5 py-5 sm:px-6">
+                            <div class="space-y-4 px-5 py-4 sm:px-6">
                                 @if ($fnSummary['invocations'] === 0)
                                     <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-4 py-6 text-center text-sm text-brand-moss">
                                         {{ __('No invocations in this window yet. Background ticks, test requests, and live traffic all land here.') }}
@@ -160,75 +166,45 @@
                         </section>
                     @endif
 
-                    {{-- Slim trigger strip. --}}
+                    {{-- One header, not two. "Uptime / Add a monitor" and "Checks /
+                         Monitors" were stacked panel heads describing the same list —
+                         two icon badges, two eyebrows and two titles above a single
+                         row. Merged: the add action and the target hostname ride in
+                         the head, the count is the head's pill. --}}
                     <section class="border-b border-brand-ink/10">
-                        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
-                            <div class="flex min-w-0 items-start gap-3">
-                                <x-icon-badge>
-                                    <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Uptime') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add a monitor') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                        {{ __('Check uptime and content over HTTP, or watch a TLS certificate. The first check runs immediately.') }}
-                                    </p>
-                                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                        <span class="inline-flex items-center gap-1">
-                                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                            {{ trans_choice('{0} no monitors yet|{1} :count monitor|[2,*] :count monitors', $monitorCount, ['count' => $monitorCount]) }}
-                                        </span>
-                                        @if ($resolvedBaseUrl !== null)
-                                            <span class="text-brand-mist/60">·</span>
-                                            <span class="font-mono">{{ $hostnameDisplay }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <x-workspace-panel-head
+                            icon="heroicon-o-signal"
+                            :title="__('Monitors')"
+                            :note="__('Check uptime and content over HTTP, or watch a TLS certificate. The first check runs immediately.')"
+                            :count="$monitorCount ?: null"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot:actions>
+                                @if ($resolvedBaseUrl !== null)
+                                    <span class="inline-flex items-center rounded-md bg-white px-2 py-1 font-mono text-[11px] text-brand-moss ring-1 ring-inset ring-brand-ink/10">{{ $hostnameDisplay }}</span>
+                                @endif
                                 <button
                                     type="button"
                                     wire:click="startAddMonitor"
                                     @disabled(! $canEdit || $resolvedBaseUrl === null)
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    <x-heroicon-o-plus class="h-4 w-4" />
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Add a monitor') }}
                                 </button>
-                            </div>
-                        </div>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
 
                         @if ($resolvedBaseUrl === null)
-                            <div class="bg-amber-50 px-5 py-4 sm:px-6">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">
-                                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Blocked') }}</p>
-                                        <h3 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('No public URL yet') }}</h3>
-                                        <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Add a primary domain, preview hostname, or publication URL before uptime checks can run.') }}</p>
-                                    </div>
-                                </div>
+                            <div class="flex items-start gap-2.5 border-b border-amber-200/70 bg-amber-50 px-5 py-3 sm:px-6">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                                <p class="min-w-0 text-xs leading-relaxed text-amber-900">
+                                    <span class="font-semibold text-amber-950">{{ __('No public URL yet.') }}</span>
+                                    {{ __('Add a primary domain, preview hostname, or publication URL before uptime checks can run.') }}
+                                </p>
                             </div>
                         @endif
-                    </section>
 
-                    <section class="border-b border-brand-ink/10">
-                        <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                            <div class="flex min-w-0 items-start gap-3">
-                                <x-icon-badge>
-                                    <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Checks') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Monitors') }}</h3>
-                                </div>
-                            </div>
-                            @if ($monitorCount > 0)
-                                <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[11px] font-semibold text-brand-ink">{{ $monitorCount }}</span>
-                            @endif
-                        </div>
                         @if ($site->uptimeMonitors->isEmpty())
                             <p class="px-5 py-10 text-center text-sm text-brand-moss sm:px-6">{{ __('No monitors yet — add one to start checking this site.') }}</p>
                         @else
@@ -242,22 +218,24 @@
                                         $sslDays = is_array($m->last_meta) ? ($m->last_meta['ssl_days_remaining'] ?? null) : null;
                                     @endphp
                                     <li wire:key="monitor-{{ $m->id }}">
-                                        <div class="flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-6">
+                                        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
                                             <div class="min-w-0">
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $style['bg'] }} {{ $style['text'] }} {{ $style['ring'] }}">
                                                         <span class="h-1.5 w-1.5 rounded-full {{ $style['dot'] }}"></span>
                                                         {{ $style['label'] }}
                                                     </span>
-                                                    <p class="font-medium text-brand-ink">{{ $m->label }}</p>
+                                                    <p class="text-sm font-medium text-brand-ink">{{ $m->label }}</p>
                                                     <span class="inline-flex items-center rounded bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $m->isSslCheck() ? __('SSL') : __('HTTP') }}</span>
+                                                    <span class="truncate font-mono text-xs text-brand-moss" title="{{ $hostnameDisplay }}{{ $m->normalizedPath() }}">{{ $hostnameDisplay }}{{ $m->isSslCheck() ? '' : ($m->normalizedPath() ?: '/') }}</span>
                                                 </div>
-                                                <p class="mt-0.5 truncate font-mono text-xs text-brand-moss" title="{{ $hostnameDisplay }}{{ $m->normalizedPath() }}">{{ $hostnameDisplay }}{{ $m->isSslCheck() ? '' : ($m->normalizedPath() ?: '/') }}</p>
-                                                <p class="mt-1 text-xs text-brand-moss">{{ $regionLabel }}</p>
-                                                @if ($m->last_checked_at)
-                                                    <p class="mt-2 text-xs text-brand-moss">
+                                                {{-- Region folded into the result line: it was its own line for one
+                                                     short label, and the two read as a single "where + what" fact. --}}
+                                                <p class="mt-1 text-xs text-brand-moss">
+                                                    {{ $regionLabel }}
+                                                    @if ($m->last_checked_at)
                                                         @if ($m->isSslCheck() && is_numeric($sslDays) && (int) $sslDays >= 0)
-                                                            {{ trans_choice('{0}Expires today|{1}Expires in :count day|[2,*]Expires in :count days', (int) $sslDays, ['count' => (int) $sslDays]) }}
+                                                            · {{ trans_choice('{0}Expires today|{1}Expires in :count day|[2,*]Expires in :count days', (int) $sslDays, ['count' => (int) $sslDays]) }}
                                                         @endif
                                                         @if ($m->last_http_status)
                                                             · HTTP {{ $m->last_http_status }}
@@ -266,21 +244,21 @@
                                                             · {{ $m->last_latency_ms }} ms
                                                         @endif
                                                         · {{ $m->last_checked_at->timezone(config('app.timezone'))->toDayDateTimeString() }}
-                                                    </p>
-                                                    @if ($m->last_error)
-                                                        <p class="mt-1 truncate text-xs {{ $state === 'degraded' ? 'text-amber-700' : 'text-red-700' }}" title="{{ $m->last_error }}">{{ $m->last_error }}</p>
+                                                    @else
+                                                        · {{ __('Not checked yet.') }}
                                                     @endif
-                                                @else
-                                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Not checked yet.') }}</p>
+                                                </p>
+                                                @if ($m->last_checked_at && $m->last_error)
+                                                    <p class="mt-1 truncate text-xs {{ $state === 'degraded' ? 'text-amber-700' : 'text-red-700' }}" title="{{ $m->last_error }}">{{ $m->last_error }}</p>
                                                 @endif
                                             </div>
                                             <div class="flex shrink-0 flex-wrap items-center gap-2">
                                                 <button
                                                     type="button"
                                                     wire:click="toggleHistory('{{ $m->id }}')"
-                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                                 >
-                                                    <x-heroicon-o-chart-bar class="h-4 w-4" />
+                                                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5 shrink-0 opacity-70" />
                                                     {{ $isExpanded ? __('Hide history') : __('History') }}
                                                 </button>
                                                 @if ($canEdit)
@@ -289,26 +267,26 @@
                                                         wire:click="runCheckNow('{{ $m->id }}')"
                                                         wire:loading.attr="disabled"
                                                         wire:target="runCheckNow"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
-                                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 opacity-70" />
                                                         <span wire:loading.remove wire:target="runCheckNow">{{ __('Check now') }}</span>
                                                         <span wire:loading wire:target="runCheckNow">{{ __('Queueing…') }}</span>
                                                     </button>
                                                     <button
                                                         type="button"
                                                         wire:click="editMonitor('{{ $m->id }}')"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                                     >
-                                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0 opacity-70" />
                                                         {{ __('Edit') }}
                                                     </button>
                                                     <button
                                                         type="button"
                                                         wire:click="confirmRemoveMonitor('{{ $m->id }}')"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50"
+                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50"
                                                     >
-                                                        <x-heroicon-o-trash class="h-4 w-4" />
+                                                        <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0 opacity-70" />
                                                         {{ __('Remove') }}
                                                     </button>
                                                 @endif
@@ -329,14 +307,14 @@
                         @endif
                     </section>
 
-                    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                        <p class="text-sm text-brand-moss">
+                    <div class="border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+                        <p class="text-xs text-brand-moss">
                             {{ __('Show monitors on a public') }}
                             <a href="{{ route('status-pages.index') }}" class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('status page') }}</a>.
                         </p>
                     </div>
 
-                    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
                         <x-cli-snippet :commands="[
                             ['label' => __('Check uptime'), 'command' => 'dply sites:uptime '.$site->slug],
                             ['label' => __('View history'), 'command' => 'dply sites:uptime:history '.$site->slug],
@@ -347,6 +325,7 @@
                 @if ($monitorTab === 'alerts')
                     @include('livewire.sites.partials.monitor.notifications-card')
                 @endif
+                </div>
             </section>
         </div>
     </div>

@@ -1010,13 +1010,24 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.cli')->group(function (): void {
         Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
     });
+    // Teaser gating lives in WorkspaceCliPreview::mount(), which is why that
+    // component must not be #[Lazy] — see the note on the class.
     Route::livewire('servers/{server}/cli-preview', WorkspaceCliPreview::class)->name('servers.cli-preview');
     // Tools — promoted from the dissolved Manage > Tools sub-tab to its own
     // peer workspace. servers.manage stays registered below purely as a
     // back-compat redirector for old /manage deep links + bookmarks.
     Route::livewire('servers/{server}/tools', WorkspaceTools::class)->name('servers.tools');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
-    Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
+    // Settings carries its tab in the query string (?tab=keys), the same shape
+    // servers.notifications uses — the bare URL is the page, the tab is a view
+    // of it. The default tab (connection) is omitted, so /settings is canonical.
+    Route::livewire('servers/{server}/settings', WorkspaceSettings::class)->name('servers.settings');
+    // The tab used to be a path segment; old deep links and bookmarks land here.
+    Route::get('servers/{server}/settings/{section}', function (Server $server, string $section) {
+        return redirect()->route('servers.settings', $section === 'connection'
+            ? ['server' => $server]
+            : ['server' => $server, 'tab' => $section]);
+    })->name('servers.settings.legacy');
 
     Route::get('credentials', function () {
         $user = auth()->user();

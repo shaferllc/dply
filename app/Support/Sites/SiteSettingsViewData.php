@@ -682,13 +682,9 @@ final class SiteSettingsViewData
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
 
-        if ($server->workspace) {
-            $items[] = [
-                'label' => $server->workspace->name,
-                'href' => route('projects.resources', $server->workspace),
-                'icon' => 'rectangle-group',
-            ];
-        }
+        // Project deliberately omitted — see SiteWorkspaceBreadcrumbs: it isn't a
+        // step on the Dashboard → Servers → server → site path, and it pushed the
+        // trail to eight crumbs. Still reachable from the server overview.
 
         $items[] = [
             'label' => $server->name,

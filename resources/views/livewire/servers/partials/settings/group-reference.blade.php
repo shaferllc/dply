@@ -1,17 +1,15 @@
 <section id="settings-group-reference" aria-labelledby="settings-group-reference-title">
     <div id="settings-notes" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notes') }}</p>
-                <h3 id="settings-group-reference-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Internal notes') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Free-form context: runbooks, customer IDs, things the next engineer should know. Markdown is supported — pin a note to surface it on the server overview.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-document-text"
+            :title="__('Internal notes')"
+            :note="__('Free-form context: runbooks, customer IDs, things the next engineer should know. Markdown is supported — pin a note to surface it on the server overview.')"
+            title-id="settings-group-reference-title"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="space-y-5 px-6 py-6 sm:px-7">
+        <div class="space-y-5 px-5 py-4 sm:px-6">
             {{-- Compose a new note --}}
             @if ($this->canEditServerSettings)
                 <form wire:submit="addServerNote" class="space-y-3">
@@ -19,7 +17,7 @@
                         wire:model="noteDraft"
                         rows="4"
                         placeholder="{{ __('Write a note… Markdown supported (e.g. **bold**, lists, `code`).') }}"
-                        class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     ></textarea>
                     <x-input-error :messages="$errors->get('noteDraft')" />
                     <div class="flex items-center justify-between gap-3">
@@ -46,7 +44,7 @@
                             <textarea
                                 wire:model="editingNoteBody"
                                 rows="5"
-                                class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                                class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                             ></textarea>
                             <x-input-error :messages="$errors->get('editingNoteBody')" />
                             <div class="flex items-center gap-2">

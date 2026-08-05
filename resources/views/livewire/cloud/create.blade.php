@@ -99,10 +99,10 @@
                 <div class="min-w-0 space-y-4 px-5 py-4 sm:px-6">
 
                         <x-server-workspace-tablist :aria-label="__('Deployment source')" class="!mb-0">
-                            <x-server-workspace-tab icon="heroicon-o-code-bracket" :active="$mode === 'source'" wire:click="$set('mode', 'source')">
+                            <x-server-workspace-tab icon="heroicon-o-code-bracket" :active="$mode === 'source'" wire:click="setMode('source')">
                                 {{ __('From repository') }}
                             </x-server-workspace-tab>
-                            <x-server-workspace-tab icon="heroicon-o-cube" :active="$mode === 'image'" wire:click="$set('mode', 'image')">
+                            <x-server-workspace-tab icon="heroicon-o-cube" :active="$mode === 'image'" wire:click="setMode('image')">
                                 {{ __('From image') }}
                             </x-server-workspace-tab>
                         </x-server-workspace-tablist>

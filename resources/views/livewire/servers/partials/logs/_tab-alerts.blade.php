@@ -6,65 +6,65 @@
     $agentRunning = (bool) $server->logAgent?->isRunning();
 @endphp
 
-<div class="space-y-6">
+<div>
     <section class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Add-on') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Log alerts') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Get notified when shipped logs cross a threshold — "more than N error lines in 5 minutes", or "a line matching OOMKilled appeared". Routed through your configured notification channels.') }}
-                </p>
-            </div>
+        {{-- The "ADD-ON" eyebrow said nothing the tab label didn't; rule count
+             moves to the head's pill. --}}
+        <x-workspace-panel-head
+            icon="heroicon-o-bell-alert"
+            :title="__('Log alerts')"
+            :note="__('Get notified when shipped logs cross a threshold — “more than N error lines in 5 minutes”, or “a line matching OOMKilled appeared”. Routed through your configured notification channels.')"
+            :count="$rules->count() ?: null"
+            class="border-b border-brand-ink/10"
+        >
             @if ($alertingAvailable)
-                <button
-                    type="button"
-                    wire:click="openLogAlertForm"
-                    class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-forest px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-forest/90"
-                >
-                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
-                    {{ __('New alert') }}
-                </button>
+                <x-slot:actions>
+                    <button
+                        type="button"
+                        wire:click="openLogAlertForm"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-forest/90"
+                    >
+                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('New alert') }}
+                    </button>
+                </x-slot:actions>
             @endif
-        </div>
+        </x-workspace-panel-head>
 
-        <div class="space-y-5 px-6 py-5 sm:px-7">
+        <div class="space-y-3 px-5 py-3 sm:px-6">
             {{-- Plan gate --}}
             @unless ($alertingAvailable)
-                <div class="rounded-xl border border-brand-sage/30 bg-brand-sage/5 px-5 py-6 text-center">
-                    <x-heroicon-o-lock-closed class="mx-auto h-7 w-7 text-brand-sage" aria-hidden="true" />
-                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Log alerting is a paid feature') }}</p>
-                    <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                {{-- Row, not a centred hero block: one line of gate copy plus the
+                     upgrade link reads the same in a quarter of the height. --}}
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-brand-sage/30 bg-brand-sage/5 px-3 py-2.5">
+                    <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                    <p class="min-w-0 flex-1 basis-64 text-xs leading-relaxed text-brand-moss">
+                        <span class="font-semibold text-brand-ink">{{ __('Log alerting is a paid feature.') }}</span>
                         {{ __('Upgrade to the Pro or Business plan to set up threshold and pattern alerts on your shipped logs.') }}
                     </p>
-                    <a href="{{ route('billing.show', ['organization' => $server->organization]) }}" wire:navigate class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-forest hover:bg-brand-sand/30">
-                        {{ __('View plans') }} <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
+                    <a href="{{ route('billing.show', ['organization' => $server->organization]) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/30">
+                        {{ __('View plans') }} <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     </a>
                 </div>
             @else
                 {{-- Shipping prerequisite hint --}}
                 @unless ($agentRunning)
-                    <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+                    <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 ring-1 ring-inset ring-amber-200">
                         {{ __('This server is not shipping logs yet, so alerts have nothing to evaluate. Enable log shipping on the dply Logs tab first.') }}
                     </div>
                 @endunless
 
                 {{-- Create / edit form --}}
                 @if ($logAlertFormOpen)
-                    <form wire:submit="saveLogAlertRule" class="space-y-4 rounded-xl border border-brand-ink/10 bg-brand-ink/[0.02] p-5">
-                        <div class="flex items-center justify-between">
-                            <h4 class="text-sm font-semibold text-brand-ink">
-                                {{ $logAlertEditingId ? __('Edit alert') : __('New alert') }}
-                            </h4>
-                        </div>
+                    <form wire:submit="saveLogAlertRule" class="space-y-3 rounded-xl border border-brand-ink/10 bg-brand-ink/[0.02] p-4">
+                        <h4 class="text-sm font-semibold text-brand-ink">
+                            {{ $logAlertEditingId ? __('Edit alert') : __('New alert') }}
+                        </h4>
 
                         <div>
                             <label class="block text-xs font-semibold text-brand-moss">{{ __('Name') }}</label>
                             <input type="text" wire:model="logAlertName" placeholder="{{ __('e.g. Error spike') }}"
-                                class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage" />
+                                class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage" />
                             @error('logAlertName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
@@ -83,10 +83,10 @@
                         </div>
 
                         {{-- Facets --}}
-                        <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="block text-xs font-semibold text-brand-moss">{{ __('Source') }}</label>
-                                <select wire:model="logAlertSource" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                                <select wire:model="logAlertSource" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage">
                                     <option value="">{{ __('Any source') }}</option>
                                     @foreach ($sourceCatalog as $srcKey => $srcLabel)
                                         <option value="{{ $srcKey }}">{{ $srcLabel }}</option>
@@ -97,7 +97,7 @@
                             <div>
                                 <label class="block text-xs font-semibold text-brand-moss">{{ __('Level') }}</label>
                                 <input type="text" wire:model="logAlertLevel" placeholder="{{ __('e.g. error (any if blank)') }}"
-                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage" />
+                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage" />
                                 @error('logAlertLevel') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
@@ -108,28 +108,28 @@
                                 @if ($logAlertType === 'pattern') <span class="text-rose-500">*</span> @endif
                             </label>
                             <input type="text" wire:model="logAlertSearch" placeholder="{{ __('e.g. OOMKilled, segfault, panic') }}"
-                                class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage" />
+                                class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage" />
                             @error('logAlertSearch') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         {{-- Thresholds --}}
-                        <div class="grid gap-4 sm:grid-cols-3">
+                        <div class="grid gap-3 sm:grid-cols-3">
                             <div @class(['opacity-50' => $logAlertType === 'pattern'])>
                                 <label class="block text-xs font-semibold text-brand-moss">{{ __('Threshold (lines)') }}</label>
                                 <input type="number" min="1" wire:model="logAlertThreshold" @disabled($logAlertType === 'pattern')
-                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage" />
+                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage" />
                                 @error('logAlertThreshold') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-brand-moss">{{ __('Window (minutes)') }}</label>
                                 <input type="number" min="1" wire:model="logAlertWindowMinutes"
-                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage" />
+                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage" />
                                 @error('logAlertWindowMinutes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-brand-moss">{{ __('Cooldown (minutes)') }}</label>
                                 <input type="number" min="0" wire:model="logAlertCooldownMinutes"
-                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-sage focus:ring-brand-sage" />
+                                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm focus:border-brand-sage focus:ring-brand-sage" />
                                 @error('logAlertCooldownMinutes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
@@ -138,14 +138,14 @@
                             <p class="text-xs text-brand-moss">{{ __('Pattern alerts fire as soon as one matching line is shipped.') }}</p>
                         @endif
 
-                        <div class="flex items-center gap-3 border-t border-brand-ink/10 pt-4">
+                        <div class="flex items-center gap-3 border-t border-brand-ink/10 pt-3">
                             <button type="submit" wire:loading.attr="disabled"
-                                class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-forest/90 disabled:opacity-50">
-                                <x-heroicon-o-check class="h-4 w-4" aria-hidden="true" />
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-forest/90 disabled:opacity-50">
+                                <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ $logAlertEditingId ? __('Save changes') : __('Create alert') }}
                             </button>
                             <button type="button" wire:click="cancelLogAlertForm"
-                                class="text-sm font-semibold text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
+                                class="text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                         </div>
                     </form>
                 @endif
@@ -153,7 +153,7 @@
                 {{-- Rules list --}}
                 @if ($rules->isEmpty())
                     @unless ($logAlertFormOpen)
-                        <div class="px-2 py-8 text-center text-sm text-brand-moss">
+                        <div class="px-2 py-6 text-center text-xs text-brand-moss">
                             <x-heroicon-o-bell-slash class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
                             <p class="mt-2 font-medium text-brand-ink">{{ __('No alerts yet') }}</p>
                             <p class="mt-0.5">{{ __('Create one to be notified when something looks wrong in your logs.') }}</p>
@@ -169,14 +169,14 @@
                                     $rule->search ? '“'.$rule->search.'”' : null,
                                 ]);
                             @endphp
-                            <div class="flex items-start gap-4 border-b border-brand-ink/5 px-4 py-3.5 last:border-b-0" wire:key="log-alert-{{ $rule->id }}">
+                            <div class="flex items-start gap-3 border-b border-brand-ink/5 px-3 py-2.5 last:border-b-0" wire:key="log-alert-{{ $rule->id }}">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-2">
                                         <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ $rule->enabled ? 'bg-emerald-500' : 'bg-brand-ink/20' }}" title="{{ $rule->enabled ? __('Active') : __('Paused') }}"></span>
-                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ $rule->name }}</p>
+                                        <p class="truncate text-xs font-semibold text-brand-ink">{{ $rule->name }}</p>
                                         <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $rule->type }}</span>
                                     </div>
-                                    <p class="mt-1 text-xs text-brand-moss">
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">
                                         @if ($rule->type === 'pattern')
                                             {{ __('A matching line appears within :mins min', ['mins' => $rule->window_minutes]) }}
                                         @else
@@ -185,7 +185,7 @@
                                         @if ($facetBits) · {{ implode(' · ', $facetBits) }} @endif
                                         · {{ __('cooldown :mins min', ['mins' => $rule->cooldown_minutes]) }}
                                     </p>
-                                    <p class="mt-1 text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 text-[11px] text-brand-mist">
                                         @if ($rule->last_evaluated_at)
                                             {{ __('Last checked :ago', ['ago' => $rule->last_evaluated_at->diffForHumans()]) }}
                                             @if ($rule->last_count !== null) · {{ __(':n matched', ['n' => $rule->last_count]) }} @endif

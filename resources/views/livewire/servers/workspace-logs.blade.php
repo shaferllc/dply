@@ -18,7 +18,7 @@
     :server="$server"
     active="logs"
     :title="__('Logs')"
-    :description="__('Dply activity and system log tailing for this server — live SSH reads with Reverb streaming.')"
+    :description="__('Dply activity and system log tailing for this server — live SSH reads.')"
     hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
@@ -33,44 +33,32 @@
     ></div>
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Logs') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Dply activity and system log tailing for this server — live SSH reads with Reverb streaming.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            icon="heroicon-o-document-text"
+            :title="__('Logs')"
+            :note="__('Dply activity and system log tailing for this server — live SSH reads.')"
+            class="border-b border-brand-ink/10"
+        />
 
+        {{-- One line, not a four-line eyebrow/title/prose stack: the "READ-ONLY /
+             Deployer role" heading pair only restated the sentence under it. --}}
         @if ($isDeployer)
-            <div class="flex items-start gap-3 border-b border-amber-200/80 bg-amber-50/60 px-5 py-5 sm:px-6">
-                <x-icon-badge tone="amber">
-                    <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Deployers can review Dply activity logs but cannot read server log files over SSH. Switch to Dply activity or ask an admin to grant broader access.') }}
-                    </p>
-                </div>
+            <div class="flex items-start gap-2 border-b border-amber-200/80 bg-amber-50/60 px-5 py-2.5 text-xs leading-relaxed text-amber-950 sm:px-6">
+                <x-heroicon-o-eye class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                <p class="min-w-0">
+                    <span class="font-semibold">{{ __('Read-only (deployer):') }}</span>
+                    {{ __('Deployers can review Dply activity logs but cannot read server log files over SSH. Switch to Dply activity or ask an admin to grant broader access.') }}
+                </p>
             </div>
         @endif
 
         @if (! $opsReady && $sshRequiredForActive && $logsTab !== 'activity')
-            <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
                 @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
             </div>
         @endif
 
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Logs workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
                 <x-server-workspace-tab
                     id="logs-tab-viewer"
@@ -137,7 +125,14 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div class="relative min-w-0" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setLogsWorkspaceTab">
+        {{-- Skeleton swap, not a dim-and-lock: dimming the outgoing tab left the
+             previous tab's rows legible while a different tab loaded, which reads
+             as "this is your data". Matches the site Logs page. --}}
+        <div class="hidden" wire:loading.class.remove="hidden" wire:target="setLogsWorkspaceTab">
+            @include('livewire.sites.partials._panel-skeleton')
+        </div>
+
+        <div class="relative min-w-0" wire:loading.class="hidden" wire:target="setLogsWorkspaceTab">
             @if ($logsTab === 'viewer')
                 @include('livewire.servers.partials.log-viewer-panel', ['logSources' => $logSources])
             @endif

@@ -4,6 +4,7 @@ namespace App\Support\Servers;
 
 use App\Models\Server;
 use App\Models\ServerProvisionArtifact;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Detect which managed services were actually installed on a server. Drives UI gating
@@ -40,10 +41,41 @@ class ServerInstalledServices
      */
     private static array $stackSummaryCache = [];
 
+    /**
+     * How long the cross-request stack-summary cache lives. The underlying
+     * artifact only changes when a server is (re)provisioned, so this is
+     * generous; {@see flushCaches} clears it outright on those paths.
+     */
+    private const STACK_SUMMARY_CACHE_TTL_SECONDS = 300;
+
+    /**
+     * Servers whose cross-request entry this process has touched, for flushing.
+     *
+     * @var array<string, true>
+     */
+    private static array $stackSummaryCacheKeys = [];
+
     /** Drop the cache between requests/tests when the same process handles many. */
     public static function flushCaches(): void
     {
+        foreach (array_keys(self::$stackSummaryCacheKeys) as $serverId) {
+            Cache::forget(self::stackSummaryCacheKey((string) $serverId));
+        }
+
+        self::$stackSummaryCacheKeys = [];
         self::$stackSummaryCache = [];
+    }
+
+    /** Drop one server's cached stack summary — call after (re)provision. */
+    public static function forgetStackSummary(string $serverId): void
+    {
+        unset(self::$stackSummaryCache[$serverId], self::$stackSummaryCacheKeys[$serverId]);
+        Cache::forget(self::stackSummaryCacheKey($serverId));
+    }
+
+    private static function stackSummaryCacheKey(string $serverId): string
+    {
+        return 'server:'.$serverId.':stack-summary';
     }
 
     /**
@@ -155,23 +187,35 @@ class ServerInstalledServices
             return self::$stackSummaryCache[$key];
         }
 
-        $artifact = ServerProvisionArtifact::query()
-            ->whereHas('run', fn ($q) => $q->where('server_id', $server->id))
-            ->where('type', 'stack_summary')
-            ->latest('id')
-            ->first();
+        self::$stackSummaryCacheKeys[$key] = true;
 
-        if (! $artifact instanceof ServerProvisionArtifact) {
-            return self::$stackSummaryCache[$key] = null;
-        }
+        // Cache::remember can't distinguish "no artifact" (null) from a miss, so
+        // the absent case is stored as false and mapped back on read.
+        $cached = Cache::remember(
+            self::stackSummaryCacheKey($key),
+            self::STACK_SUMMARY_CACHE_TTL_SECONDS,
+            static function () use ($server): array|false {
+                $artifact = ServerProvisionArtifact::query()
+                    ->whereHas('run', fn ($q) => $q->where('server_id', $server->id))
+                    ->where('type', 'stack_summary')
+                    ->latest('id')
+                    ->first();
 
-        $meta = $artifact->metadata;
-        if ($meta !== []) {
-            return self::$stackSummaryCache[$key] = $meta;
-        }
+                if (! $artifact instanceof ServerProvisionArtifact) {
+                    return false;
+                }
 
-        $decoded = json_decode((string) $artifact->content, true);
+                $meta = $artifact->metadata;
+                if ($meta !== []) {
+                    return $meta;
+                }
 
-        return self::$stackSummaryCache[$key] = is_array($decoded) ? $decoded : null;
+                $decoded = json_decode((string) $artifact->content, true);
+
+                return is_array($decoded) ? $decoded : false;
+            },
+        );
+
+        return self::$stackSummaryCache[$key] = is_array($cached) ? $cached : null;
     }
 }

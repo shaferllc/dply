@@ -240,13 +240,7 @@ final class SiteShowViewData
             $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
         } else {
             $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
-            if ($server->workspace) {
-                $siteHeaderBreadcrumbs[] = [
-                    'label' => $server->workspace->name,
-                    'href' => route('projects.resources', $server->workspace),
-                    'icon' => 'rectangle-group',
-                ];
-            }
+            // Project omitted — see SiteWorkspaceBreadcrumbs.
             $siteHeaderBreadcrumbs[] = [
                 'label' => $server->name,
                 'href' => route('servers.overview', $server),

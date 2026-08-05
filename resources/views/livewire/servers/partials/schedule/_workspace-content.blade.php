@@ -86,73 +86,41 @@
     </div>
 
     <div class="border-b border-brand-ink/10">
-        <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scheduler') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Schedulers at a glance') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        @if ($contextSiteModel && $schedulers_list_scope === 'site')
-                            {{ __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name]) }}
-                        @else
-                            {{ __('Counts across every monitored framework scheduler on this server.') }}
-                        @endif
-                    </p>
+        {{-- The "SCHEDULER" eyebrow restated the page hero directly above it. --}}
+        @php
+            $glanceNote = $contextSiteModel && $schedulers_list_scope === 'site'
+                ? __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name])
+                : __('Counts across every monitored framework scheduler on this server.');
+        @endphp
+        <x-workspace-panel-head
+            icon="heroicon-o-chart-bar"
+            :title="__('Schedulers at a glance')"
+            :note="$glanceNote"
+            class="border-b border-brand-ink/10"
+        />
+        <dl class="grid grid-cols-2 gap-2 px-5 py-3 sm:grid-cols-4 sm:px-6">
+            {{-- Two lines per tile, not three: the caption ("Monitored entries",
+                 "Recent heartbeat"…) now rides beside the number instead of on
+                 its own row under it. --}}
+            @foreach ([
+                ['label' => __('Schedulers'), 'value' => $scheduleStats['total'], 'unit' => __('total'), 'caption' => __('Monitored entries'), 'tone' => 'border-brand-sage/30 bg-brand-sage/8'],
+                ['label' => __('Healthy'), 'value' => $scheduleStats['healthy'], 'unit' => __('ticking'), 'caption' => __('Recent heartbeat'), 'tone' => 'border-emerald-200 bg-emerald-50/60'],
+                ['label' => __('Attention'), 'value' => $scheduleStats['attention'], 'unit' => trans_choice('item|items', $scheduleStats['attention']), 'caption' => __('Waiting, stale, or missing'), 'tone' => 'border-amber-200 bg-amber-50/60'],
+                ['label' => __('Paused'), 'value' => $scheduleStats['paused'], 'unit' => __('stopped'), 'caption' => __('Cron disabled in Dply'), 'tone' => 'border-brand-sand/80 bg-brand-sand/30'],
+            ] as $stat)
+                <div @class([
+                    'rounded-xl border px-3 py-2',
+                    $stat['tone'] => $stat['value'] > 0,
+                    'border-brand-ink/10 bg-brand-sand/15' => $stat['value'] === 0,
+                ])>
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $stat['label'] }}</dt>
+                    <dd class="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
+                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ $stat['unit'] }}</span>
+                        <span class="text-[11px] text-brand-mist">· {{ $stat['caption'] }}</span>
+                    </dd>
                 </div>
-            </div>
-        </div>
-        <dl class="grid grid-cols-2 gap-2 px-5 py-5 sm:grid-cols-4 sm:px-6">
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-brand-sage/30 bg-brand-sage/8' => $scheduleStats['total'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['total'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedulers') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['total'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $scheduleStats['total']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Monitored entries') }}</p>
-            </div>
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-emerald-200 bg-emerald-50/60' => $scheduleStats['healthy'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['healthy'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Healthy') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['healthy'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('ticking|ticking', $scheduleStats['healthy']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Recent heartbeat') }}</p>
-            </div>
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-amber-200 bg-amber-50/60' => $scheduleStats['attention'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['attention'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Attention') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['attention'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('item|items', $scheduleStats['attention']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Waiting, stale, or missing') }}</p>
-            </div>
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-brand-sand/80 bg-brand-sand/30' => $scheduleStats['paused'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['paused'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Paused') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['paused'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('stopped|stopped', $scheduleStats['paused']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Cron disabled in Dply') }}</p>
-            </div>
+            @endforeach
         </dl>
     </div>
 
@@ -184,7 +152,7 @@
             </div>
         @endif
 
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
                 <x-server-workspace-tab id="schedule-tab-schedulers" icon="heroicon-o-clock" :active="$schedule_workspace_tab === 'schedulers'" wire:click="setScheduleWorkspaceTab('schedulers')">
                     {{ __('Schedulers') }}
@@ -207,7 +175,16 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setScheduleWorkspaceTab">
+        {{-- Skeleton swap, not a dim-and-lock: fading the outgoing tab to
+             opacity-60 left the previous tab's rows legible while a different
+             tab loaded, which reads as "this is your data". Matches the
+             Repository / Deployments / Laravel / Monitor / Notifications / Logs
+             tab strips. --}}
+        <div class="hidden" wire:loading.class.remove="hidden" wire:target="setScheduleWorkspaceTab">
+            @include('livewire.sites.partials._panel-skeleton')
+        </div>
+
+        <div class="relative" wire:loading.class="hidden" wire:target="setScheduleWorkspaceTab">
             @if ($schedule_workspace_tab === 'overview')
                 <x-server-workspace-tab-panel id="schedule-panel-overview" labelled-by="schedule-tab-overview" panel-class="min-w-0">
                     @include('livewire.servers.partials.schedule._tab-overview', $scheduleTabContext)
@@ -244,7 +221,7 @@
     @endif
 
     @if ($contextSiteModel)
-        <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+        <div class="border-t border-brand-ink/10 px-5 py-2.5 sm:px-6">
             <x-cli-snippet :commands="[
                 ['label' => __('List all cron jobs (server)'), 'command' => 'dply:server:cron:list '.$server->id],
                 ['label' => __('Add a schedule:run cron entry for a site'), 'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\''],

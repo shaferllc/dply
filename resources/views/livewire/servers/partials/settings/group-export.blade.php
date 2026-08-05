@@ -1,16 +1,14 @@
 <section id="settings-group-export" aria-labelledby="settings-group-export-title">
     <div class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Export') }}</p>
-                <h3 id="settings-group-export-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manifest') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Download a JSON summary for runbooks or handoffs — server details, sites, and your notes. Secrets are never included. Account-to-account server transfer is not available yet.') }}</p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-arrow-down-tray"
+            :title="__('Manifest')"
+            :note="__('Download a JSON summary for runbooks or handoffs — server details, sites, and your notes. Secrets are never included. Account-to-account server transfer is not available yet.')"
+            title-id="settings-group-export-title"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
             <button
                 type="button"
                 wire:click="downloadServerManifest"

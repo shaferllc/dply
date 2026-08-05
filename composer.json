@@ -37,6 +37,7 @@
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
         "laravel/mcp": "^0.8.0",
+        "laravel/octane": "^2.18",
         "laravel/passkeys": "^0.2.1",
         "laravel/pennant": "^1.23",
         "laravel/pulse": "^1.7",
@@ -82,6 +83,11 @@
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         },
+        "exclude-from-classmap": [
+            "app/Actions/Attributes/tests/",
+            "app/Actions/Concerns/tests/",
+            "app/Actions/Decorators/tests/"
+        ],
         "files": [
             "app/helpers.php"
         ]

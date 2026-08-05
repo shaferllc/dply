@@ -6,23 +6,23 @@
 @endphp
 
 <div class="min-w-0">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-bell class="h-5 w-5" />
-            </span>
-            <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Snapshot alerts') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s snapshot events — images, database, and cache. Each row binds one channel to one event.') }}
-                </p>
-            </div>
-        </div>
-        <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
-            {{ __('Manage in Settings') }}
-            <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0" aria-hidden="true" />
-        </x-secondary-button>
-    </div>
+    {{-- Dense head with the escape hatch in the actions slot, matching the
+         other workspace Notifications tabs. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-bell"
+        :title="__('Snapshot alerts')"
+        :note="__('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s snapshot events — images, database, and cache. Each row binds one channel to one event.')"
+        :count="trans_choice('{0} none routed|{1} :count route|[2,*] :count routes', $notifSubscriptions->count(), ['count' => $notifSubscriptions->count()])"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
+                {{ __('Manage in Settings') }}
+                <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            </x-secondary-button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3.5 text-sm leading-relaxed text-brand-moss sm:px-6">
         <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />

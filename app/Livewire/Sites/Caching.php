@@ -65,8 +65,9 @@ class Caching extends Component
 
     public int $lscache_ttl = 120;
 
-    // Varnish per-site default TTL (the daemon is server-level; this drives
-    // the X-Dply-Varnish-Default-TTL hint header).
+    // Varnish is a server-level daemon with a single shared VCL — there is no
+    // per-site TTL knob to expose (the UI says so). The stored value is still
+    // round-tripped so older rows keep their data until per-site VCL lands.
     public bool $varnish_enabled = false;
 
     public string $varnish_ttl_default = '120s';

@@ -16,26 +16,22 @@
 
 <div>
     <section class="border-b border-brand-ink/10">
-        <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-            <x-icon-badge>
-                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trends') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Last :days days', ['days' => $m['window_days']]) }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('How deploys for this site have been going recently.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-chart-bar"
+            :title="__('Last :days days', ['days' => $m['window_days']])"
+            :note="__('How deploys for this site have been going recently.')"
+        />
 
         <dl class="grid grid-cols-2 gap-px bg-brand-ink/10 sm:grid-cols-4">
-            <div class="bg-white px-6 py-5 sm:px-8">
+            <div class="bg-white px-5 py-4 sm:px-6">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploys') }}</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
                     <span class="font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $m['total'] }}</span>
                     <span class="text-[11px] text-brand-moss">{{ __(':window-day total', ['window' => $m['window_days']]) }}</span>
                 </dd>
             </div>
-            <div class="bg-white px-6 py-5 sm:px-8">
+            <div class="bg-white px-5 py-4 sm:px-6">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Success rate') }}</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
                     @if ($m['success_rate'] !== null)
@@ -51,7 +47,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="bg-white px-6 py-5 sm:px-8">
+            <div class="bg-white px-5 py-4 sm:px-6">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Median duration') }}</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
                     @if ($m['median_duration_ms'] !== null)
@@ -61,7 +57,7 @@
                     @endif
                 </dd>
             </div>
-            <div class="bg-white px-6 py-5 sm:px-8">
+            <div class="bg-white px-5 py-4 sm:px-6">
                 <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Top failure phase') }}</dt>
                 <dd class="mt-2">
                     @if ($m['top_failure_phase'])
@@ -75,7 +71,7 @@
             </div>
         </dl>
 
-        <div class="border-t border-brand-ink/10 bg-white px-6 py-5 sm:px-8">
+        <div class="border-t border-brand-ink/10 bg-white px-5 py-4 sm:px-6">
             <div class="flex items-baseline justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploys per day') }}</p>
                 <p class="text-[11px] text-brand-mist">{{ __('peak :n', ['n' => $maxDaily]) }}</p>

@@ -185,7 +185,7 @@
                             foreach ($itemsInGroup as $gi) {
                                 $giPreview = (bool) ($gi['preview_only'] ?? false) || (bool) ($gi['soon_badge'] ?? false);
                                 if (($gi['key'] ?? null) === 'errors' && ! $giPreview) {
-                                    $groupAlertCount += \App\Models\ErrorEvent::undismissedCountForServer((string) $server->id);
+                                    $groupAlertCount += \App\Models\ErrorEvent::undismissedBadgeCountForServer((string) $server->id);
                                 }
                                 if ((bool) ($gi['needs_setup'] ?? false)) {
                                     $groupNeedsSetup = true;
@@ -370,7 +370,7 @@
                             {{-- Only show the open-error count when Errors is live —
                                  not while it's a "Soon" (preview_only) item. --}}
                             @if ($key === 'errors' && ! ($previewOnly || $soonBadge))
-                                @php $openErrorCount = \App\Models\ErrorEvent::undismissedCountForServer((string) $server->id); @endphp
+                                @php $openErrorCount = \App\Models\ErrorEvent::undismissedBadgeCountForServer((string) $server->id); @endphp
                                 @if ($openErrorCount > 0)
                                     <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
                                 @endif
@@ -406,7 +406,6 @@
             'min-w-0',
             'lg:col-span-9' => $showNavigation,
         ])>
-            <x-trial-pause-banner :organization="$server->organization" />
             {{ $slot }}
         </div>
     </div>

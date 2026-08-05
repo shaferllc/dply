@@ -104,8 +104,7 @@ trait ManagesOrganizationTrialState
     public function owesNothingThisCycle(): bool
     {
         return $this->owesNothingMemo ??= app(OrganizationBillingStateComputer::class)
-            ->compute($this)
-            ->isFree();
+            ->isFree($this);
     }
 
     /**

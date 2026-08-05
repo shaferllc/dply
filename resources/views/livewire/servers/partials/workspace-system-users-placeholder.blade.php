@@ -11,19 +11,14 @@
     <section class="dply-card min-w-0 overflow-hidden p-0" aria-busy="true" aria-live="polite">
         <span class="sr-only">{{ __('Loading system users…') }}</span>
 
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6" aria-hidden="true">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('System users') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user.') }}
-                    </p>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-user-group"
+            :title="__('System users')"
+            :note="__('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user.')"
+            class="border-b border-brand-ink/10"
+        />
 
         <div class="flex flex-wrap gap-1.5 border-b border-brand-ink/10 px-4 py-2.5" aria-hidden="true">
             @foreach ([__('Accounts'), __('Notifications')] as $i => $label)

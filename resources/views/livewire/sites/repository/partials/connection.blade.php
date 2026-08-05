@@ -1,22 +1,18 @@
 <section>
-    {{-- No overflow-hidden here: the Deploy-ref picker is an absolutely-positioned
-         dropdown that must escape the card bounds. Header/footer round their own
-         corners instead so the card still looks clipped. --}}
+    {{-- This panel is a tab body inside the Repository card, not the card itself:
+         the page header + tablist sit above it and the CLI snippet below, and the
+         card already carries its own rounding + overflow-hidden. The header/footer
+         used to round their own corners back when this partial WAS the card —
+         leaving that in punched a rounded notch under the tablist. --}}
     <div class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Source control') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connection') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Pick the account and repository dply deploys from, then choose the ref. Reads (commits, branches, files) use the account you select here.') }}
-                </p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-link"
+            :title="__('Source control connection')"
+            :note="__('Pick the account and repository dply deploys from, then choose the ref. Reads (commits, branches, files) use the account you select here.')"
+        />
 
-        <form wire:submit.prevent="saveConnection" class="space-y-4 px-6 py-6 sm:px-7">
+        <form wire:submit.prevent="saveConnection" class="space-y-3 px-5 py-4 sm:px-6">
             {{-- Rich picker: source toggle + account select + searchable repository
                  dropdown + manual URL (shared with choose-app / create-custom). --}}
             @include('livewire.sites.partials._git-repository-configurator', ['idPrefix' => 'conn', 'reposLoading' => ! $connectionReposPrimed])
@@ -57,13 +53,13 @@
             </div>
         </form>
 
-        <div class="flex justify-end rounded-b-2xl border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
             <button
                 type="button"
                 wire:click="saveConnection"
                 wire:loading.attr="disabled"
                 wire:target="saveConnection"
-                class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
             >
                 <x-heroicon-o-check class="h-4 w-4" />
                 <span wire:loading.remove wire:target="saveConnection">{{ __('Save connection') }}</span>

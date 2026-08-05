@@ -123,6 +123,10 @@ class DeploymentsList extends Component
 
     public const TAB_HOOKS = 'hooks';
 
+    /** Recurring cron-cadence deploys. Distinct from the Deploy tab's
+     *  one-off "Deploy later" delay, which schedules a single run. */
+    public const TAB_SCHEDULE = 'schedule';
+
     public const TABS = [
         self::TAB_OVERVIEW,
         self::TAB_REPOSITORY,
@@ -131,6 +135,7 @@ class DeploymentsList extends Component
         self::TAB_ENVIRONMENT,
         self::TAB_WEBHOOK,
         self::TAB_HOOKS,
+        self::TAB_SCHEDULE,
         // TAB_COMMITS / TAB_FILES / TAB_BRANCHES intentionally absent — they
         // live as sub-tabs under Repository now. Any ?tab=commits / =files
         // / =branches URL resets to TAB_DEPLOY via the in_array() guard in
@@ -184,14 +189,13 @@ class DeploymentsList extends Component
             return view('livewire.servers.partials.workspace-placeholder-empty');
         }
 
-        $tabs = [
-            ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
-            ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
-            ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
-            ['id' => self::TAB_WEBHOOK, 'label' => __('Webhook'), 'icon' => 'heroicon-o-bolt'],
-            ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
-            ['id' => self::TAB_HISTORY, 'label' => __('History'), 'icon' => 'heroicon-o-clock'],
-        ];
+        // Same definitions + gates the real render uses, so the tab row doesn't
+        // shift when the component finishes loading.
+        $visible = $this->tabVisibility();
+        $tabs = array_values(array_filter(
+            $this->tabDefinitions(),
+            fn (array $entry): bool => $visible[$entry['id']] ?? true,
+        ));
 
         return view('livewire.sites.partials.site-workspace-chrome-placeholder', [
             'server' => $this->server,
@@ -246,6 +250,9 @@ class DeploymentsList extends Component
         if ($this->tab === self::TAB_RELEASES && $site->deploy_strategy !== 'atomic') {
             $this->tab = self::TAB_DEPLOY;
         }
+        if ($this->tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys($site)) {
+            $this->tab = self::TAB_DEPLOY;
+        }
         if ($this->tab !== self::TAB_SETTINGS) {
             $this->settingsSection = '';
         } elseif (! in_array($this->settingsSection, self::SETTINGS_SECTIONS, true)) {
@@ -266,12 +273,86 @@ class DeploymentsList extends Component
         }
     }
 
+    /**
+     * Recurring deploys only run for VM hosts: RunDueDeploymentSchedulesCommand
+     * skips functions + edge runtimes outright, so surfacing the tab for them
+     * would offer a schedule that silently never fires.
+     */
+    private function supportsRecurringDeploys(?Site $site = null): bool
+    {
+        $site ??= $this->site;
+
+        return $site->runtimeTargetMode() === 'vm'
+            && ! $site->usesFunctionsRuntime()
+            && ! $site->usesEdgeRuntime();
+    }
+
+    /**
+     * Ordered tab definitions for the strip and the lazy-load skeleton.
+     * Single source of truth — the skeleton used to hand-maintain its own copy
+     * and drifted (it advertised Pipeline / hid Releases regardless of runtime,
+     * so the tab row visibly shifted the moment the real render landed).
+     *
+     * @return list<array{id: string, label: string, icon: string}>
+     */
+    public function tabDefinitions(): array
+    {
+        return [
+            ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
+            ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
+            ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
+            ['id' => self::TAB_WEBHOOK, 'label' => __('Webhook'), 'icon' => 'heroicon-o-bolt'],
+            ['id' => self::TAB_HOOKS, 'label' => __('Hooks'), 'icon' => 'heroicon-o-link'],
+            ['id' => self::TAB_SCHEDULE, 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days'],
+            ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
+            ['id' => self::TAB_RELEASES, 'label' => __('Releases'), 'icon' => 'heroicon-o-archive-box'],
+            ['id' => self::TAB_HISTORY, 'label' => __('History'), 'icon' => 'heroicon-o-clock'],
+        ];
+    }
+
+    /**
+     * Which tabs this site actually gets. Shared by placeholder() and render()
+     * so the skeleton and the loaded page always agree.
+     *
+     * @return array<string, bool>
+     */
+    public function tabVisibility(?Site $site = null): array
+    {
+        $site ??= $this->site;
+        $isVmDeployHub = $this->supportsRecurringDeploys($site);
+
+        return [
+            self::TAB_OVERVIEW => true,
+            self::TAB_REPOSITORY => true,
+            self::TAB_DEPLOY => true,
+            self::TAB_SYNC => true,
+            self::TAB_WEBHOOK => true,
+            // Hooks editor only applies to DigitalOcean Functions hosts.
+            self::TAB_HOOKS => (bool) $site->server?->isDigitalOceanFunctionsHost(),
+            self::TAB_SCHEDULE => $isVmDeployHub,
+            // Commits / Files / Branches live under Repository now.
+            self::TAB_COMMITS => false,
+            self::TAB_FILES => false,
+            self::TAB_BRANCHES => false,
+            self::TAB_PIPELINE => $isVmDeployHub,
+            // Rollout folded into Pipeline as a subtab.
+            self::TAB_ROLLOUT => false,
+            self::TAB_RELEASES => $isVmDeployHub && $site->deploy_strategy === 'atomic',
+            self::TAB_HISTORY => true,
+            // Settings consolidated up into Webhook + Hooks tabs.
+            self::TAB_SETTINGS => false,
+        ];
+    }
+
     public function setTab(string $tab): void
     {
         if (! in_array($tab, self::TABS, true)) {
             return;
         }
         if ($tab === self::TAB_RELEASES && $this->site->deploy_strategy !== 'atomic') {
+            return;
+        }
+        if ($tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys()) {
             return;
         }
         $this->tab = $tab;
@@ -778,25 +859,7 @@ class DeploymentsList extends Component
             }
         }
 
-        $tabsVisible = [
-            self::TAB_OVERVIEW => true,
-            self::TAB_REPOSITORY => true,
-            self::TAB_DEPLOY => true,
-            self::TAB_WEBHOOK => true,
-            // Hooks editor only applies to DigitalOcean Functions hosts.
-            self::TAB_HOOKS => (bool) $this->site->server?->isDigitalOceanFunctionsHost(),
-            // Commits / Files / Branches live under Repository now.
-            self::TAB_COMMITS => false,
-            self::TAB_FILES => false,
-            self::TAB_BRANCHES => false,
-            self::TAB_PIPELINE => $isVmDeployHub,
-            // Rollout folded into Pipeline as a subtab.
-            self::TAB_ROLLOUT => false,
-            self::TAB_RELEASES => $atomicReleases,
-            self::TAB_HISTORY => true,
-            // Settings consolidated up into Webhook + Hooks tabs.
-            self::TAB_SETTINGS => false,
-        ];
+        $tabsVisible = $this->tabVisibility();
 
         $overviewMetrics = $this->tab === self::TAB_OVERVIEW
             ? $this->computeOverviewMetrics()
@@ -832,6 +895,7 @@ class DeploymentsList extends Component
                 'atomicReleases' => $atomicReleases,
                 'latestDeployment' => $latestDeployment,
                 'tabsVisible' => $tabsVisible,
+                'tabDefinitions' => $this->tabDefinitions(),
                 'overviewMetrics' => $overviewMetrics,
                 'section' => 'deploy',
                 'routingTab' => 'domains',

@@ -26,21 +26,19 @@
 
 <section id="settings-group-inventory" aria-labelledby="settings-group-inventory-title">
     <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inventory') }}</p>
-                <h2 id="settings-group-inventory-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inventory & provider snapshot') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-clipboard-document-list"
+            :title="__('Inventory & provider snapshot')"
+            :note="__('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.')"
+            title-id="settings-group-inventory-title"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="max-w-2xl">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Run a fresh check over SSH to count upgradable packages, detect reboot flags, and optionally capture disk/memory/uptime. Apt actions and unattended-upgrades live on Patches.') }}
                 </p>
@@ -132,7 +130,7 @@
 
         <div class="mt-8 rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-5">
             <h4 class="text-sm font-semibold text-brand-ink">{{ __('Inventory scan depth') }}</h4>
-            <p class="mt-1 text-sm text-brand-moss">
+            <p class="mt-0.5 text-xs text-brand-moss">
                 {{ __('Basic: OS detection and apt preview. Extended: adds disk usage, memory, uptime, and fail2ban status (slightly longer SSH run).') }}
             </p>
             <form wire:submit="saveInventoryDepthPreference" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -141,7 +139,7 @@
                     <select
                         id="settings-inventory-depth"
                         wire:model="settingsInventoryDepth"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                         @disabled(! $this->canEditServerSettings)
                     >
                         @foreach ($inventoryDepths as $key => $label)
@@ -161,7 +159,7 @@
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h4 class="text-sm font-semibold text-brand-ink">{{ __('Pending updates') }}</h4>
-                        <p class="mt-1 text-sm text-brand-moss">
+                        <p class="mt-0.5 text-xs text-brand-moss">
                             @if ($upgrades !== null)
                                 {{ trans_choice(':count package can be updated.|:count packages can be updated.', $upgrades, ['count' => $upgrades]) }}
                             @endif

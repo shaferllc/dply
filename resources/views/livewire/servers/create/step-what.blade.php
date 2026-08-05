@@ -109,10 +109,10 @@
                     @if ($canCreateNew)
                         {{-- Source toggle: use existing vs create new. --}}
                         <x-server-workspace-tablist :aria-label="__('Cluster source')" class="!mb-0">
-                            <x-server-workspace-tab icon="heroicon-o-link" :active="! $isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'existing')">
+                            <x-server-workspace-tab icon="heroicon-o-link" :active="! $isCreatingNew" wire:click="setKubernetesSource('existing')">
                                 {{ __('Use existing cluster') }}
                             </x-server-workspace-tab>
-                            <x-server-workspace-tab icon="heroicon-o-plus" :active="$isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'new')">
+                            <x-server-workspace-tab icon="heroicon-o-plus" :active="$isCreatingNew" wire:click="setKubernetesSource('new')">
                                 {{ __('Create new') }}
                             </x-server-workspace-tab>
                         </x-server-workspace-tablist>

@@ -32,35 +32,46 @@
 
 <div id="settings-cost-estimate" class="scroll-mt-24">
     <div class="{{ $card }} overflow-hidden p-0">
-        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-calculator class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Estimate') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stack estimate') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Honest BYO VM math — provider estimate plus dply tier fee. Not invoiced totals; edit cost notes below to improve provider lines.') }}
-                    </p>
-                </div>
-            </div>
-            @if ($observatoryActive && $org)
-                <a href="{{ route('billing.analytics', $org) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                    {{ __('Org observatory') }}
-                    <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
-                </a>
-            @endif
-        </div>
+        {{-- Org observatory belongs in the head's actions slot, top-right, the
+             way every other workspace panel puts its escape hatch (Logs "Open
+             viewer", CLI "Sessions"). It used to sit loose under a self-closed
+             head, which gave a single small link its own full-width band and
+             read as a stray control between the title and the content.
 
-        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+             That placement came from mis-nesting rather than a typo in the
+             styling: the card wrapper closed immediately after the link, so
+             everything below — the overall strip, the alerts, the metric tiles —
+             rendered as a sibling of the card instead of inside it. Tag counts
+             balanced, which is why it never looked broken enough to notice. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-calculator"
+            :title="__('Stack estimate')"
+            :note="__('Honest BYO VM math — provider estimate plus dply tier fee. Not invoiced totals; edit cost notes below to improve provider lines.')"
+            class="border-b border-brand-ink/10"
+        >
+            @if ($observatoryActive && $org)
+                <x-slot:actions>
+                    <a
+                        href="{{ route('billing.analytics', $org) }}"
+                        wire:navigate
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        {{ __('Org observatory') }}
+                        <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                    </a>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
+
+        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3 sm:px-6">
             <div class="flex items-start gap-3">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
                     <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
-                    <h4 class="mt-0.5 text-base font-semibold text-brand-ink">
+                    <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">
                         @switch($report['overall'])
                             @case('critical') {{ __('Capacity constrained') }} @break
                             @case('warning') {{ __('Incomplete cost picture') }} @break
@@ -68,7 +79,7 @@
                             @default {{ __('Stack estimate healthy') }}
                         @endswitch
                     </h4>
-                    <p class="mt-1 text-sm text-brand-moss">
+                    <p class="mt-0.5 text-xs text-brand-moss">
                         {{ $report['totals']['formatted'] ?? '—' }}
                         · {{ trans_choice(':count site|:count sites', $summary['site_count'] ?? 0, ['count' => $summary['site_count'] ?? 0]) }}
                         · {{ __('Dply :tier tier', ['tier' => $report['dply']['tier_label'] ?? '—']) }}
@@ -88,7 +99,7 @@
                         $actionHref = null;
                         if (! empty($alert['action_route'])) {
                             if (($alert['action_route'] ?? '') === 'servers.settings') {
-                                $actionHref = route('servers.settings', ['server' => $server, 'section' => 'governance']);
+                                $actionHref = route('servers.settings', ['server' => $server, 'tab' => 'governance']);
                             } else {
                                 $actionHref = route($alert['action_route'], $server);
                             }
@@ -97,7 +108,7 @@
                             }
                         }
                     @endphp
-                    <li class="flex flex-wrap items-start justify-between gap-3 px-6 py-4 sm:px-7">
+                    <li class="flex flex-wrap items-start justify-between gap-3 px-5 py-2.5 sm:px-6">
                         <div class="flex min-w-0 items-start gap-3">
                             <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $alertTone }}">
                                 <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
@@ -161,7 +172,7 @@
         </div>
 
         @if ($stackCents > 0)
-            <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-7">
+            <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Stack split') }}</p>
                 <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-brand-sand/50 ring-1 ring-brand-ink/10">
                     @if ($breakdown['provider_pct'] > 0)
@@ -187,9 +198,9 @@
 
     <div class="grid gap-6 lg:grid-cols-2">
         <div class="{{ $card }} overflow-hidden p-0">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3 sm:px-6">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hardware & billing tier') }}</p>
-                <h4 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Detected specs') }}</h4>
+                <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Detected specs') }}</h4>
             </div>
             <dl class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-7">
                 <div>
@@ -218,7 +229,7 @@
                     </dd>
                 </div>
             </dl>
-            <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-7">
+            <div class="border-t border-brand-ink/10 px-5 py-3 sm:px-6">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tier ladder (monthly)') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @foreach ($report['tiers'] ?? [] as $tierRow)
@@ -236,10 +247,10 @@
         </div>
 
         <div class="{{ $card }} overflow-hidden p-0">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3 sm:px-6">
                 <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Utilization') }}</p>
-                <h4 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Capacity headroom') }}</h4>
-                <p class="mt-1 text-sm text-brand-moss">
+                <h4 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Capacity headroom') }}</h4>
+                <p class="mt-0.5 text-xs text-brand-moss">
                     @if ($metricsAt)
                         {{ __('Last snapshot :time', ['time' => $metricsAt->diffForHumans()]) }}
                     @else
@@ -278,7 +289,7 @@
                     </dd>
                 </div>
             </dl>
-            <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-7">
+            <div class="border-t border-brand-ink/10 px-5 py-2.5 sm:px-6">
                 <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
                     {{ __('Open Monitor for live metrics') }}
                     <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
@@ -288,12 +299,12 @@
     </div>
 
     <div class="{{ $card }} overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-            <h4 class="text-base font-semibold text-brand-ink">{{ __('Site allocation') }}</h4>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Even split of the full stack — useful for chargeback, not per-site invoicing.') }}</p>
+        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3 sm:px-6">
+            <h4 class="text-sm font-semibold text-brand-ink">{{ __('Site allocation') }}</h4>
+            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Even split of the full stack — useful for chargeback, not per-site invoicing.') }}</p>
         </div>
         @if (($summary['site_count'] ?? 0) === 0)
-            <p class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">{{ __('No sites on this server yet.') }}</p>
+            <p class="px-5 py-6 text-center text-xs text-brand-moss sm:px-7">{{ __('No sites on this server yet.') }}</p>
         @else
             <div class="overflow-x-auto">
                 <table class="min-w-full text-left text-xs">
@@ -320,6 +331,6 @@
                 </table>
             </div>
         @endif
-        <p class="border-t border-brand-ink/10 px-6 py-4 text-xs leading-relaxed text-brand-moss sm:px-7">{{ $report['disclaimer'] ?? '' }}</p>
+        <p class="border-t border-brand-ink/10 px-5 py-2.5 text-xs leading-relaxed text-brand-moss sm:px-7">{{ $report['disclaimer'] ?? '' }}</p>
     </div>
 </div>
