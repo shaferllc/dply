@@ -15,12 +15,14 @@
              new arriving, so the polling cost is just one round-trip with
              no UI change. --}}
         <main class="min-w-0 space-y-6 lg:col-span-9" wire:poll.15s>
-            <x-hero-card
-                :eyebrow="__('Site')"
-                :title="__('Schedule')"
-                :description="__('Engine-level scheduled invocations — cron-like rules that fire your function or run a command on a timer.')"
-                icon="clock"
-            />
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-clock"
+                    :title="__('Schedule')"
+                    :note="__('Engine-level scheduled invocations — cron-like rules that fire your function or run a command on a timer.')"
+                />
+            </section>
 
             @if ($secretMismatchDetected)
                 {{-- Function rejected the latest tick because its baked

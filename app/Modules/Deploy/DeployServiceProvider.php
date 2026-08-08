@@ -10,6 +10,7 @@ use App\Modules\Deploy\Console\EnableSiteQuickDeployCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
 use App\Modules\Deploy\Console\PredeployCommand;
 use App\Modules\Deploy\Console\RedeploySiteSystemdCommand;
+use App\Modules\Deploy\Console\PollQuickDeployCommitsCommand;
 use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
 use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
 use App\Modules\Deploy\Console\ShowSiteDeployCommand;
@@ -45,6 +46,7 @@ class DeployServiceProvider extends ServiceProvider
                 FlushDeployDigestCommand::class,
                 PredeployCommand::class,
                 RedeploySiteSystemdCommand::class,
+                PollQuickDeployCommitsCommand::class,
                 RunDueDeploymentSchedulesCommand::class,
                 RunDueScheduledDeploysCommand::class,
                 ShowSiteDeployCommand::class,

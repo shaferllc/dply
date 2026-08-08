@@ -21,6 +21,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\SiteRelease;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Services\Sites\DotEnvFileParser;
@@ -171,6 +172,23 @@ class DeploymentsList extends Component
     #[Url(as: 'trigger', except: '')]
     public string $triggerFilter = '';
 
+    /**
+     * Release selected in the Releases tab info modal (folder path, SHA, linked deploy).
+     *
+     * @var array{
+     *   id: string,
+     *   folder: string,
+     *   path: string,
+     *   current_symlink: string,
+     *   git_sha: ?string,
+     *   is_active: bool,
+     *   created_at: ?string,
+     *   created_at_human: ?string,
+     *   deployment_id: ?string,
+     * }|null
+     */
+    public ?array $releaseInfo = null;
+
     /** @var array<int, string> */
     public const ALLOWED_STATUSES = [
         SiteDeployment::STATUS_RUNNING,
@@ -301,7 +319,7 @@ class DeploymentsList extends Component
             ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
             ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
             ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
-            ['id' => self::TAB_WEBHOOK, 'label' => __('Webhook'), 'icon' => 'heroicon-o-bolt'],
+            ['id' => self::TAB_WEBHOOK, 'label' => __('Quick deploy'), 'icon' => 'heroicon-o-bolt'],
             ['id' => self::TAB_HOOKS, 'label' => __('Hooks'), 'icon' => 'heroicon-o-link'],
             ['id' => self::TAB_SCHEDULE, 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days'],
             ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
@@ -359,6 +377,62 @@ class DeploymentsList extends Component
         if ($tab !== self::TAB_SETTINGS) {
             $this->settingsSection = '';
         }
+        if ($tab === self::TAB_HISTORY) {
+            $this->resetPage();
+        }
+        if ($tab === self::TAB_RELEASES) {
+            $this->resetPage(pageName: 'releasesPage');
+            $this->releaseInfo = null;
+        }
+    }
+
+    /** Open the Releases tab detail modal for a single on-disk release folder. */
+    public function openReleaseInfo(string $releaseId): void
+    {
+        Gate::authorize('view', $this->site);
+
+        $release = SiteRelease::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($releaseId)
+            ->first();
+
+        if (! $release instanceof SiteRelease) {
+            $this->toastError(__('Release not found.'));
+
+            return;
+        }
+
+        $base = rtrim($this->site->effectiveRepositoryPath(), '/');
+        $sha = filled($release->git_sha) ? (string) $release->git_sha : null;
+
+        $deploymentId = null;
+        if ($sha !== null) {
+            $deploymentId = SiteDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->where('git_sha', $sha)
+                ->orderByDesc('started_at')
+                ->value('id');
+            $deploymentId = $deploymentId !== null ? (string) $deploymentId : null;
+        }
+
+        $this->releaseInfo = [
+            'id' => (string) $release->id,
+            'folder' => (string) $release->folder,
+            'path' => $base.'/releases/'.$release->folder,
+            'current_symlink' => $base.'/current',
+            'git_sha' => $sha,
+            'is_active' => (bool) $release->is_active,
+            'created_at' => $release->created_at?->toDayDateTimeString(),
+            'created_at_human' => $release->created_at?->diffForHumans(),
+            'deployment_id' => $deploymentId,
+        ];
+
+        $this->dispatch('open-modal', 'release-info');
+    }
+
+    public function closeReleaseInfo(): void
+    {
+        $this->releaseInfo = null;
     }
 
     /**
@@ -830,31 +904,30 @@ class DeploymentsList extends Component
 
         $atomicReleases = $isVmDeployHub && $this->site->deploy_strategy === 'atomic';
         $latestDeployment = null;
+        $releases = null;
+
+        // Paginated Releases tab list (named page so it doesn't collide with History).
+        if ($this->tab === self::TAB_RELEASES && $atomicReleases) {
+            $releases = SiteRelease::query()
+                ->where('site_id', $this->site->id)
+                ->orderByDesc('id')
+                ->paginate(15, pageName: 'releasesPage');
+        }
 
         // Eager-load only the relation the active panel actually reads: the
-        // releases list is Releases-only; the recent-deployments window (and the
-        // $latestDeployment it yields) is the Deploy panel only. The fallback
-        // tab also renders the Deploy panel, hence the in-array check. Other
-        // tabs (Environment, Webhook, Hooks, Pipeline…) load neither.
+        // recent-deployments window (and the $latestDeployment it yields) is the
+        // Deploy panel only. The fallback tab also renders the Deploy panel,
+        // hence the in-array check. Other tabs load neither.
         if ($isVmDeployHub) {
-            $load = [];
-            if ($this->tab === self::TAB_RELEASES) {
-                $load['releases'] = fn ($q) => $q->orderByDesc('id')->limit(30);
-            }
-
             $deployPanelTabs = [self::TAB_OVERVIEW, self::TAB_REPOSITORY, self::TAB_ENVIRONMENT, self::TAB_COMMITS,
                 self::TAB_FILES, self::TAB_BRANCHES, self::TAB_PIPELINE, self::TAB_ROLLOUT, self::TAB_RELEASES,
                 self::TAB_HISTORY, self::TAB_WEBHOOK, self::TAB_HOOKS, self::TAB_SETTINGS];
             $needsLatest = ! in_array($this->tab, $deployPanelTabs, true); // Deploy tab + unknown fallback
 
             if ($needsLatest) {
-                $load['deployments'] = fn ($q) => $q->orderByDesc('started_at')->limit(5);
-            }
-
-            if ($load !== []) {
-                $this->site->load($load);
-            }
-            if ($needsLatest) {
+                $this->site->load([
+                    'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
+                ]);
                 $latestDeployment = $this->site->deployments->first();
             }
         }
@@ -889,6 +962,7 @@ class DeploymentsList extends Component
             ),
             [
                 'deployments' => $deployments,
+                'releases' => $releases,
                 'triggers' => $triggers,
                 'statuses' => self::ALLOWED_STATUSES,
                 'isVmDeployHub' => $isVmDeployHub,

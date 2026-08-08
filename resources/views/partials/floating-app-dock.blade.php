@@ -106,24 +106,24 @@
 
 @if ($consolePreview)
     <div
-        x-data="{ open: false }"
-        x-on:keydown.escape.window="open = false"
-        x-on:dply-open-console-preview.window="open = true"
+        x-data="{ previewOpen: false }"
+        x-on:keydown.escape.window="previewOpen = false"
+        x-on:dply-open-console-preview.window="previewOpen = true"
     >
         <div
-            x-show="open"
+            x-show="previewOpen"
             x-cloak
             class="fixed inset-0 z-[100] overflow-y-auto"
             role="dialog"
             aria-modal="true"
             aria-labelledby="console-preview-modal-title"
         >
-            <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="open = false"></div>
+            <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="previewOpen = false"></div>
             <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
                 <div class="relative w-full max-w-xl">
                     <button
                         type="button"
-                        x-on:click="open = false"
+                        x-on:click="previewOpen = false"
                         class="absolute -top-3 end-0 z-10 inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
                         aria-label="{{ __('Close') }}"
                     >

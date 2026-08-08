@@ -26,7 +26,8 @@ use Livewire\Component;
  * It edits ONLY the freeform TYPE_CUSTOM portion of each phase — typed steps and
  * hooks authored in the visual builder are preserved and shown read-only (see
  * {@see DeployScriptComposer}). The simple editor is the live default while the
- * visual step builder is gated behind FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL;
+ * visual step builder is available via the Steps Script/Visual toggle
+ * (FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL);
  * in production it is the only deploy editor, so it carries hooks + atomic on its
  * own rather than deferring to the builder.
  */

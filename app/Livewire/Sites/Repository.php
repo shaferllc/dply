@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\PreflightSiteSetupJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
@@ -14,7 +14,6 @@ use App\Livewire\Sites\Concerns\ManagesRepositoryBrowsing;
 use App\Livewire\Sites\Concerns\ManagesRepositoryConnection;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDeployment;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
@@ -23,7 +22,6 @@ use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
@@ -49,6 +47,7 @@ class Repository extends Component
 {
     use BuildsRepositoryView;
     use ConfiguresGitRepository;
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesRepositoryBrowsing;
     use ManagesRepositoryConnection;

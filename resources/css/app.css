@@ -63,7 +63,15 @@
        sm — a card header's own actions (Add variable, Edit all).
        Both are fixed-height so a row of mixed buttons shares one baseline. */
     .dply-btn {
-        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    /* Alert/finding row. Matches the sub-row idiom used across the app —
+       rounded, bordered, padded, sitting on the card's tint — rather than the
+       square full-bleed rows this page briefly used, which read as a different
+       product. Severity rides a left border on top of the normal border. */
+    .dply-row {
+        @apply flex items-start gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 transition-colors hover:border-brand-ink/20;
     }
 
     .dply-btn-xs {

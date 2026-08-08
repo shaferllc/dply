@@ -72,7 +72,7 @@
          modal were removed: the picker above lists the account's repositories
          inline, so switching is just picking a different repo and saving. --}}
 
-    {{-- Quick deploy webhook lives as its own card in Deployments → Settings
+    {{-- Quick deploy lives as its own card in Deployments → Quick deploy
          (rendered by repository/partials/webhook.blade.php via lockedTab="webhook").
          "Disconnect repository & start over" lives on the Danger tab. --}}
 </section>

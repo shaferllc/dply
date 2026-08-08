@@ -34,19 +34,12 @@
 
         <div class="min-w-0 lg:col-span-9">
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Database') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-circle-stack"
+                    :title="__('Database')"
+                    :note="__('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.')"
+                />
 
                 @if ($watchedConsoleRunId)
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>

@@ -48,6 +48,9 @@ class SiteDeployment extends Model
 
     public const TRIGGER_SCHEDULE = 'schedule';
 
+    /** Control-plane poll found a new tip SHA on the deploy branch. */
+    public const TRIGGER_POLL = 'poll';
+
     public const TRIGGER_RESUME = 'resume';
 
     public const STATUS_RUNNING = 'running';

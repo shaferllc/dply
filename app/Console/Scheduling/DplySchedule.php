@@ -49,6 +49,7 @@ use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
 use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
 use App\Modules\Cloud\Console\CloudPollStatusCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
+use App\Modules\Deploy\Console\PollQuickDeployCommitsCommand;
 use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
 use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
 use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
@@ -161,6 +162,12 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('run-due-scheduled-deploys');
+
+        // Quick deploy poll mode: control-plane tip check (Git API, no SSH).
+        $schedule->command(PollQuickDeployCommitsCommand::class)
+            ->everyTwoMinutes()
+            ->withoutOverlapping()
+            ->name('poll-quick-deploy-commits');
 
         // Worker pools: autoscale by queue backlog, and alert when a pool's
         // primary is unhealthy (manual promote — see WorkerPoolPrimaryHealthCommand).

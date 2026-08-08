@@ -14,25 +14,37 @@
         <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
             @include('livewire.sites.settings.partials.sidebar')
 
-            <main class="min-w-0 space-y-6 lg:col-span-9">
+            <main class="min-w-0 lg:col-span-9">
+                <section class="dply-card min-w-0 overflow-hidden p-0">
+                    <x-workspace-panel-head
+                        class="border-b border-brand-ink/10"
+                        icon="heroicon-o-wrench-screwdriver"
+                        :title="__('Set up your site')"
+                        :note="__('Configure what :name needs, then deploy. Your site stays live on its preview URL the whole time.', ['name' => $site->name])"
+                    >
+                        <x-slot:actions>
+                            <button type="button" wire:click="configureLater" class="dply-btn dply-btn-xs dply-btn-outline">
+                                {{ __("I'll configure later") }}
+                            </button>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
 @else
-            <div class="space-y-6">
+                {{-- Embedded as the Repository "Set up" tab — host card already
+                     provides the page header, so keep a compact strip only. --}}
+                <div>
+                    <x-workspace-panel-head
+                        class="border-b border-brand-ink/10"
+                        icon="heroicon-o-wrench-screwdriver"
+                        :title="__('Set up your site')"
+                        :note="__('Configure what :name needs, then deploy. Your site stays live on its preview URL the whole time.', ['name' => $site->name])"
+                    >
+                        <x-slot:actions>
+                            <button type="button" wire:click="configureLater" class="dply-btn dply-btn-xs dply-btn-outline">
+                                {{ __("I'll configure later") }}
+                            </button>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
 @endif
-                {{-- Plain heading rather than x-page-header: this panel already
-                     sits under the Repository card's own title and the "Set up"
-                     tab, so the full page-header treatment was a third heading
-                     for the same thing and cost ~120px above the stepper. --}}
-                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                    <div class="min-w-0">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Set up your site') }}</h2>
-                        <p class="text-xs text-brand-moss">
-                            {{ __('Configure what :name needs, then deploy. Your site stays live on its preview URL the whole time.', ['name' => $site->name]) }}
-                        </p>
-                    </div>
-                    <button type="button" wire:click="configureLater" class="dply-btn dply-btn-xs dply-btn-outline">
-                        {{ __("I'll configure later") }}
-                    </button>
-                </div>
 
                 @if ($site->isPreflightScanning())
                     {{-- Analyzing: pre-flight clone + scan in flight. Live step
@@ -67,14 +79,11 @@
                         wire:poll.2s.visible="pollPreflight"
                         role="status"
                         aria-live="polite"
-                        class="relative overflow-hidden rounded-2xl border border-brand-ink/10 bg-white/80 shadow-sm"
+                        class="relative border-b border-brand-ink/10"
                     >
-                        {{-- Progress rides the card's own top edge as a hairline.
-                             The old chunky bar + "50%" competed with the timeline,
-                             which already says where we are — and the number read as
-                             precise when it only ever snaps in quarters. --}}
+                        {{-- Progress rides the strip's top edge as a hairline. --}}
                         <div
-                            class="absolute inset-x-0 top-0 h-1 bg-brand-sand/70"
+                            class="absolute inset-x-0 top-0 h-0.5 bg-brand-sand/70"
                             role="progressbar"
                             aria-valuenow="{{ $scanPct }}"
                             aria-valuemin="0"
@@ -84,29 +93,20 @@
                             <div class="h-full bg-brand-forest transition-[width] duration-700 ease-out" style="width: {{ $scanPct }}%"></div>
                         </div>
 
-                        <div class="p-6 pt-7 sm:p-8 sm:pt-9">
-                            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-                                <div class="flex min-w-0 items-center gap-3">
-                                    <span class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-sage/12 text-brand-forest">
-                                        <span class="absolute inset-0 rounded-full ring-1 ring-brand-sage/40 motion-safe:animate-ping" aria-hidden="true"></span>
-                                        <x-heroicon-o-magnifying-glass class="relative h-[18px] w-[18px]" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Analyzing your repository') }}</h2>
-                                        <p class="text-sm text-brand-moss">{{ __('Reading the code to detect the environment variables and resources it needs.') }}</p>
-                                    </div>
-                                </div>
-
-                                {{-- Step counter + elapsed clock. Without a clock the
-                                     only answer to "is this stuck?" was to wait out
-                                     the 45s stall threshold. --}}
-                                <div class="flex shrink-0 items-center gap-2 text-xs font-medium text-brand-moss">
-                                    <span class="rounded-full bg-brand-ink/[0.06] px-2.5 py-1 tabular-nums">
+                        <x-workspace-panel-head
+                            class="border-b border-brand-ink/10"
+                            icon="heroicon-o-magnifying-glass"
+                            :title="__('Analyzing your repository')"
+                            :note="__('Reading the code to detect the environment variables and resources it needs.')"
+                        >
+                            <x-slot:actions>
+                                <div class="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+                                    <span class="rounded-full bg-white px-2 py-0.5 tabular-nums ring-1 ring-brand-ink/10">
                                         {{ __('Step :n of :total', ['n' => $currentIdx + 1, 'total' => $stepCount]) }}
                                     </span>
                                     @if ($startedMs !== null)
                                         <span
-                                            class="flex items-center gap-1.5 rounded-full bg-brand-ink/[0.06] px-2.5 py-1 tabular-nums"
+                                            class="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 tabular-nums ring-1 ring-brand-ink/10"
                                             x-data="{
                                                 started: {{ $startedMs }},
                                                 now: Date.now(),
@@ -115,47 +115,41 @@
                                                 destroy() { clearInterval(this.timer) },
                                             }"
                                         >
-                                            <x-heroicon-o-clock class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-clock class="h-3 w-3" />
                                             <span x-text="new Date(Math.max(0, now - started)).toISOString().slice(14, 19)">0:00</span>
                                         </span>
                                     @endif
                                 </div>
-                            </div>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
 
-                            <ol class="mt-6">
+                        <div class="px-5 py-4 sm:px-6">
+                            <ol>
                                 @foreach ($stepKeys as $i => $key)
                                     @php
                                         $isDone = $i < $currentIdx;
                                         $isActive = $i === $currentIdx;
                                         $isLast = $i === $stepCount - 1;
                                     @endphp
-                                    <li class="relative flex gap-3 {{ $isLast ? '' : 'pb-5' }}">
+                                    <li class="relative flex gap-3 {{ $isLast ? '' : 'pb-3.5' }}">
                                         @unless ($isLast)
-                                            {{-- Connector rail: makes four rows read as
-                                                 one pipeline instead of four unrelated
-                                                 checkboxes, and shows how far the work
-                                                 has actually travelled. --}}
                                             <span
-                                                class="absolute bottom-0 left-3 top-7 w-px -translate-x-1/2 {{ $isDone ? 'bg-brand-forest/35' : 'bg-brand-ink/10' }}"
+                                                class="absolute bottom-0 left-2.5 top-6 w-px -translate-x-1/2 {{ $isDone ? 'bg-brand-forest/35' : 'bg-brand-ink/10' }}"
                                                 aria-hidden="true"
                                             ></span>
                                         @endunless
 
                                         <span class="relative z-10 mt-0.5 shrink-0">
                                             @if ($isDone)
-                                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-forest text-brand-cream">
-                                                    <x-heroicon-s-check class="h-3.5 w-3.5" />
+                                                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-brand-forest text-brand-cream">
+                                                    <x-heroicon-s-check class="h-3 w-3" />
                                                 </span>
                                             @elseif ($isActive)
-                                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-sage/15 ring-2 ring-brand-sage/40">
-                                                    <span class="h-2 w-2 rounded-full bg-brand-forest motion-safe:animate-pulse"></span>
+                                                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-brand-sage/15 ring-2 ring-brand-sage/40">
+                                                    <span class="h-1.5 w-1.5 rounded-full bg-brand-forest motion-safe:animate-pulse"></span>
                                                 </span>
                                             @else
-                                                {{-- Hollow, not numbered: the bare "3"/"4"
-                                                     added a third indicator shape for what
-                                                     is one status dimension, and the header
-                                                     already carries the numbering. --}}
-                                                <span class="block h-6 w-6 rounded-full border border-dashed border-brand-ink/20"></span>
+                                                <span class="block h-5 w-5 rounded-full border border-dashed border-brand-ink/20"></span>
                                             @endif
                                         </span>
 
@@ -165,10 +159,6 @@
                                                 'text-brand-ink' => $isDone || $isActive,
                                                 'text-brand-mist' => ! $isDone && ! $isActive,
                                             ])>{{ $scanSteps[$key]['label'] }}</p>
-                                            {{-- Always rendered. Showing the description
-                                                 for the active step only re-flowed the
-                                                 card at every transition and shoved the
-                                                 console down mid-read. --}}
                                             <p @class([
                                                 'mt-0.5 text-xs',
                                                 'text-brand-moss' => $isDone || $isActive,
@@ -180,54 +170,48 @@
                             </ol>
 
                             @if ($site->isPreflightStalled())
-                                {{-- The scan heartbeat has gone cold — the job likely
-                                     died mid-run. Offer a manual re-scan so the operator
-                                     can unstick it and proceed to deploy. --}}
-                                <div class="mt-6 flex flex-col gap-3 rounded-xl border border-brand-gold/40 bg-brand-gold/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div class="flex min-w-0 items-start gap-2.5">
-                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-brand-rust" />
-                                        <p class="text-xs text-brand-moss">{{ __('This is taking longer than expected. You can re-run the scan to try again.') }}</p>
+                                <div class="mt-4 flex flex-col gap-2.5 rounded-lg border border-amber-200 bg-amber-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="flex min-w-0 items-start gap-2">
+                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                                        <p class="text-xs text-amber-900">{{ __('This is taking longer than expected. You can re-run the scan to try again.') }}</p>
                                     </div>
                                     <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
-                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                        <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rescan" />
-                                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="rescan" />
+                                        class="dply-btn dply-btn-xs dply-btn-outline shrink-0">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rescan" />
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="rescan" />
                                         {{ __('Re-scan') }}
                                     </button>
                                 </div>
                             @endif
+                        </div>
 
-                            {{-- Live job console: the pre-flight job streams its progress
-                                 + any error here (polled with the timeline), so you can
-                                 watch what it's doing and see why it stalls. Always
-                                 mounted now — it is the only element carrying real
-                                 information, so it shouldn't pop in and shift the card. --}}
-                            <div class="mt-6 border-t border-brand-ink/10 pt-4">
-                                <div class="mb-2 flex items-center justify-between gap-2">
-                                    <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
-                                        <x-heroicon-o-command-line class="h-4 w-4" />
-                                        {{ __('Job console') }}
+                        {{-- Live job console — always mounted so the card doesn't
+                             reflow when the first line arrives. --}}
+                        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+                            <div class="mb-1.5 flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
+                                    <x-heroicon-o-command-line class="h-3.5 w-3.5" />
+                                    {{ __('Job console') }}
+                                </div>
+                                <span class="flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-brand-forest motion-safe:animate-pulse" aria-hidden="true"></span>
+                                    {{ __('Live') }}
+                                </span>
+                            </div>
+                            <div
+                                class="max-h-52 min-h-[3.5rem] overflow-y-auto rounded-lg border border-brand-ink/10 bg-white/70 p-2.5 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                x-data
+                                x-init="$el.scrollTop = $el.scrollHeight; new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, { childList: true, subtree: true })"
+                            >
+                                @forelse ($scanConsole as $entry)
+                                    @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
+                                    <div class="flex gap-2">
+                                        <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
+                                        <span class="{{ $isIndent ? 'text-brand-rust' : '' }} min-w-0 break-words">{{ $line }}</span>
                                     </div>
-                                    <span class="flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-brand-forest motion-safe:animate-pulse" aria-hidden="true"></span>
-                                        {{ __('Live') }}
-                                    </span>
-                                </div>
-                                <div
-                                    class="max-h-64 min-h-[4.5rem] overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.04] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
-                                    x-data
-                                    x-init="$el.scrollTop = $el.scrollHeight; new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, { childList: true, subtree: true })"
-                                >
-                                    @forelse ($scanConsole as $entry)
-                                        @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
-                                        <div class="flex gap-2">
-                                            <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
-                                            <span class="{{ $isIndent ? 'text-brand-rust' : '' }} min-w-0 break-words">{{ $line }}</span>
-                                        </div>
-                                    @empty
-                                        <p class="text-brand-mist">{{ __('Waiting for the first line…') }}</p>
-                                    @endforelse
-                                </div>
+                                @empty
+                                    <p class="text-brand-mist">{{ __('Waiting for the first line…') }}</p>
+                                @endforelse
                             </div>
                         </div>
                     </div>
@@ -254,12 +238,14 @@
                     @endphp
 
                     @if ($site->setupScanFailed())
-                        <div class="rounded-2xl border border-brand-gold/40 bg-brand-gold/10 px-5 py-4">
+                        <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-3.5 sm:px-6">
                             <div class="flex items-start gap-3">
-                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-brand-rust" />
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200">
+                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
+                                </span>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-semibold text-brand-ink">{{ __("Couldn't read your repository") }}</p>
-                                    <p class="mt-1 text-sm text-brand-moss">
+                                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                                         @switch($site->setupScanFailureReason())
                                             @case('auth')
                                                 {{ __('Access was denied — this looks like a private repository. Connect a source-control account or check the deploy credentials, then re-scan.') }}
@@ -277,13 +263,12 @@
                                                 {{ __('Something went wrong reading the repository. You can still enter variables manually, or re-scan.') }}
                                         @endswitch
                                     </p>
-                                    <div class="mt-3 flex flex-wrap gap-2">
-                                        <button type="button" wire:click="rescan"
-                                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-medium text-brand-cream hover:bg-brand-forest">
-                                            <x-heroicon-o-arrow-path class="h-4 w-4" /> {{ __('Re-scan') }}
+                                    <div class="mt-2.5 flex flex-wrap gap-1.5">
+                                        <button type="button" wire:click="rescan" class="dply-btn dply-btn-xs dply-btn-primary">
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" /> {{ __('Re-scan') }}
                                         </button>
                                         <a href="{{ route('sites.repository', [$server, $site]) }}" wire:navigate
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
+                                            class="dply-btn dply-btn-xs dply-btn-outline">
                                             {{ __('Repository settings') }}
                                         </a>
                                     </div>
@@ -293,14 +278,12 @@
 
                         @php $scanConsole = (array) data_get($site->meta, 'setup_console', []); @endphp
                         @if ($scanConsole !== [])
-                            {{-- The pre-flight job's console — the last line is usually the
-                                 exact reason it failed. --}}
-                            <div class="mt-4">
+                            <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
                                 <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
-                                    <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
+                                    <x-heroicon-o-command-line class="h-3.5 w-3.5" aria-hidden="true" />
                                     {{ __('Job console') }}
                                 </div>
-                                <div class="max-h-72 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                <div class="max-h-52 overflow-y-auto rounded-lg border border-brand-ink/10 bg-white/70 p-2.5 font-mono text-[11px] leading-relaxed text-brand-ink"
                                     x-data x-init="$el.scrollTop = $el.scrollHeight">
                                     @foreach ($scanConsole as $entry)
                                         @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
@@ -314,107 +297,102 @@
                         @endif
                     @endif
 
-                    {{-- Stepper as a segmented control rather than three full-width
-                         cards. Three steps is one linear position, not three
-                         destinations — the cards spent ~70px and the page's whole
-                         width restating what a single strip says, and their scale
-                         made every control below look undersized by comparison. --}}
-                    <nav class="inline-flex items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-0.5">
-                        @foreach ($steps as $s)
-                            <button type="button" wire:click="goToStep('{{ $s['id'] }}')" @class([
-                                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                                'bg-white text-brand-ink shadow-sm' => $step === $s['id'],
-                                'text-brand-moss hover:text-brand-ink' => $step !== $s['id'],
-                            ])>
-                                <span @class([
-                                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                                    'bg-brand-forest text-brand-cream' => $step === $s['id'],
-                                    'bg-brand-sage/25 text-brand-forest' => $step !== $s['id'] && $s['done'],
-                                    'bg-brand-ink/[0.08] text-brand-mist' => $step !== $s['id'] && ! $s['done'],
+                    {{-- Stepper as a compact segmented control in a flush strip. --}}
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                        <nav class="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-0.5">
+                            @foreach ($steps as $s)
+                                <button type="button" wire:click="goToStep('{{ $s['id'] }}')" @class([
+                                    'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors',
+                                    'bg-white text-brand-ink shadow-sm' => $step === $s['id'],
+                                    'text-brand-moss hover:text-brand-ink' => $step !== $s['id'],
                                 ])>
-                                    @if ($s['done'] && $step !== $s['id'])
-                                        <x-heroicon-s-check class="h-2.5 w-2.5" />
-                                    @else
-                                        {{ $s['n'] }}
-                                    @endif
-                                </span>
-                                {{ $s['label'] }}
-                            </button>
-                        @endforeach
-                    </nav>
+                                    <span @class([
+                                        'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                                        'bg-brand-forest text-brand-cream' => $step === $s['id'],
+                                        'bg-brand-sage/25 text-brand-forest' => $step !== $s['id'] && $s['done'],
+                                        'bg-brand-ink/[0.08] text-brand-mist' => $step !== $s['id'] && ! $s['done'],
+                                    ])>
+                                        @if ($s['done'] && $step !== $s['id'])
+                                            <x-heroicon-s-check class="h-2.5 w-2.5" />
+                                        @else
+                                            {{ $s['n'] }}
+                                        @endif
+                                    </span>
+                                    {{ $s['label'] }}
+                                </button>
+                            @endforeach
+                        </nav>
+                    </div>
 
                     {{-- Step body --}}
                     @if ($step === 'resources')
-                        {{-- Detection-driven resource suggestions, ordered BEFORE
-                             the variables editor so each connected binding adopts
-                             (and strips) its own keys before they'd be hand-typed. --}}
                         @include('livewire.sites.settings.partials.environment.resources-step')
                     @elseif ($step === 'environment')
-                        {{-- The Environment step IS the real Environment tab: variables
-                             (masked Show/Edit rows, filter chips, import) AND
-                             "Connect resource" (attach/provision databases, cache,
-                             queue, storage). One editor, identical to Deployments →
+                        {{-- Same merged-chrome Environment editor as Deployments →
                              Environment. Pushes are HELD until deploy (see
                              SiteSetup::autoPushAfterCacheMutation). --}}
-                        @include('livewire.sites.settings.partials.environment')
+                        @include('livewire.sites.settings.partials.environment', ['envMergedChrome' => true])
 
-                        <div class="flex items-center justify-end">
-                            <button type="button" wire:click="goToStep('review')"
-                                class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-medium text-brand-cream hover:bg-brand-forest">
+                        <div class="flex items-center justify-end border-t border-brand-ink/10 px-5 py-3 sm:px-6">
+                            <button type="button" wire:click="goToStep('review')" class="dply-btn dply-btn-sm dply-btn-primary">
                                 {{ __('Continue to review') }} <x-heroicon-o-arrow-right class="h-4 w-4" />
                             </button>
                         </div>
                     @else
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm">
-                            {{-- Review & deploy --}}
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Review & deploy') }}</h2>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Confirm and run the first deploy. Your environment is written to the server as the deploy runs.') }}</p>
+                        <div class="border-b border-brand-ink/10">
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                icon="heroicon-o-rocket-launch"
+                                :title="__('Review & deploy')"
+                                :note="__('Confirm and run the first deploy. Your environment is written to the server as the deploy runs.')"
+                            />
 
-                            <dl class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div class="rounded-xl border border-brand-ink/10 p-4">
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Repository') }}</dt>
-                                    <dd class="mt-1 truncate font-mono text-sm text-brand-ink">{{ $site->git_repository_url }}</dd>
-                                    <dd class="text-xs text-brand-moss">{{ __('Branch') }}: {{ $site->git_branch }}</dd>
-                                </div>
-                                <div class="rounded-xl border border-brand-ink/10 p-4">
-                                    <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Document root') }}</dt>
-                                    <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $site->document_root ?: '/' }}</dd>
-                                    <dd class="text-xs text-brand-moss">{{ __('Runtime') }}: {{ $site->runtime }}{{ $site->runtime_version ? ' '.$site->runtime_version : '' }}</dd>
-                                </div>
-                            </dl>
+                            <div class="px-5 py-4 sm:px-6">
+                                <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div class="rounded-lg border border-brand-ink/10 px-3 py-2.5">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Repository') }}</dt>
+                                        <dd class="mt-0.5 truncate font-mono text-sm text-brand-ink">{{ $site->git_repository_url }}</dd>
+                                        <dd class="text-xs text-brand-moss">{{ __('Branch') }}: {{ $site->git_branch }}</dd>
+                                    </div>
+                                    <div class="rounded-lg border border-brand-ink/10 px-3 py-2.5">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Document root') }}</dt>
+                                        <dd class="mt-0.5 font-mono text-sm text-brand-ink">{{ $site->document_root ?: '/' }}</dd>
+                                        <dd class="text-xs text-brand-moss">{{ __('Runtime') }}: {{ $site->runtime }}{{ $site->runtime_version ? ' '.$site->runtime_version : '' }}</dd>
+                                    </div>
+                                </dl>
 
-                            @error('deploy')<p class="mt-4 rounded-lg bg-brand-rust/10 px-3 py-2 text-sm text-brand-rust">{{ $message }}</p>@enderror
+                                @error('deploy')
+                                    <p class="mt-3 rounded-lg bg-brand-rust/10 px-3 py-2 text-xs text-brand-rust">{{ $message }}</p>
+                                @enderror
 
-                            @if (empty($missing))
-                                <div class="mt-4 flex items-center gap-2 rounded-xl border border-brand-sage/30 bg-brand-sage/10 px-4 py-3">
-                                    <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
-                                    <p class="text-sm text-brand-forest">{{ __('All required variables are set. Ready to deploy.') }}</p>
-                                </div>
-                            @else
-                                {{-- Warn, don't block: required vars are flagged but the operator
-                                     can deploy anyway and let it fail — their call. --}}
-                                <div class="mt-4 rounded-xl border border-brand-gold/40 bg-brand-gold/10 p-4">
-                                    <p class="text-sm font-semibold text-brand-ink">{{ __(':count required variable(s) still unset', ['count' => count($missing)]) }}</p>
-                                    <p class="mt-1 font-mono text-xs text-brand-moss">{{ implode(', ', $missing) }}</p>
-                                    <p class="mt-2 text-xs text-brand-moss">{{ __('You can deploy without them — the deploy will surface the failure if the app needs them.') }}</p>
-                                    <button type="button" wire:click="goToStep('environment')" class="mt-2 text-xs font-medium text-brand-rust hover:underline">{{ __('← Set them first') }}</button>
-                                </div>
-                            @endif
+                                @if (empty($missing))
+                                    <div class="mt-3 flex items-center gap-2 rounded-lg border border-brand-sage/30 bg-brand-sage/10 px-3 py-2">
+                                        <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                                        <p class="text-xs text-brand-forest">{{ __('All required variables are set. Ready to deploy.') }}</p>
+                                    </div>
+                                @else
+                                    {{-- Warn, don't block: required vars are flagged but the operator
+                                         can deploy anyway and let it fail — their call. --}}
+                                    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3">
+                                        <p class="text-xs font-semibold text-brand-ink">{{ __(':count required variable(s) still unset', ['count' => count($missing)]) }}</p>
+                                        <p class="mt-1 font-mono text-[11px] text-brand-moss">{{ implode(', ', $missing) }}</p>
+                                        <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('You can deploy without them — the deploy will surface the failure if the app needs them.') }}</p>
+                                        <button type="button" wire:click="goToStep('environment')" class="mt-1.5 text-[11px] font-semibold text-brand-forest hover:underline">{{ __('← Set them first') }}</button>
+                                    </div>
+                                @endif
 
-                            @if (! empty($unsatisfiedResources))
-                                {{-- Soft warn (dual-path): a detected resource is fine
-                                     to leave unconnected — its keys can be set by hand
-                                     or the resource added later. Never blocks deploy. --}}
-                                <div class="mt-4 rounded-xl border border-brand-gold/40 bg-brand-gold/10 p-4">
-                                    <p class="text-sm font-semibold text-brand-ink">{{ __(':count detected resource(s) not connected', ['count' => count($unsatisfiedResources)]) }}</p>
-                                    <p class="mt-1 text-xs text-brand-moss">{{ implode(', ', array_map(fn ($r) => $r['label'], $unsatisfiedResources)) }}</p>
-                                    <p class="mt-2 text-xs text-brand-moss">{{ __('You can deploy without them — set their variables by hand, or connect the resource now.') }}</p>
-                                    <button type="button" wire:click="goToStep('resources')" class="mt-2 text-xs font-medium text-brand-rust hover:underline">{{ __('← Connect resources') }}</button>
-                                </div>
-                            @endif
+                                @if (! empty($unsatisfiedResources))
+                                    <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-3">
+                                        <p class="text-xs font-semibold text-brand-ink">{{ __(':count detected resource(s) not connected', ['count' => count($unsatisfiedResources)]) }}</p>
+                                        <p class="mt-1 text-[11px] text-brand-moss">{{ implode(', ', array_map(fn ($r) => $r['label'], $unsatisfiedResources)) }}</p>
+                                        <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('You can deploy without them — set their variables by hand, or connect the resource now.') }}</p>
+                                        <button type="button" wire:click="goToStep('resources')" class="mt-1.5 text-[11px] font-semibold text-brand-forest hover:underline">{{ __('← Connect resources') }}</button>
+                                    </div>
+                                @endif
+                            </div>
 
-                            <div class="mt-6 flex items-center justify-between">
-                                <button type="button" wire:click="goToStep('environment')" class="text-sm font-medium text-brand-moss hover:text-brand-ink">{{ __('← Back') }}</button>
+                            <div class="flex items-center justify-between border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
+                                <button type="button" wire:click="goToStep('environment')" class="text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('← Back') }}</button>
                                 <button type="button" wire:loading.attr="disabled" wire:target="finishAndDeploy"
                                     @if (! empty($missing))
                                         wire:click="openConfirmActionModal('finishAndDeploy', [], @js(__('Deploy with required variables unset?')), @js(__('Deploy with :count required variable(s) unset? The app may fail to boot until you set them.', ['count' => count($missing)])), @js(__('Deploy anyway')), false, @js([['label' => __('Unset variables'), 'value' => implode(', ', $missing), 'mono' => true]]))"
@@ -422,9 +400,9 @@
                                         wire:click="finishAndDeploy"
                                     @endif
                                     @class([
-                                        'group inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
-                                        'bg-brand-forest text-brand-cream shadow-brand-forest/20 hover:bg-brand-forest/90 hover:shadow-md focus-visible:ring-brand-forest' => empty($missing),
-                                        'bg-brand-gold text-brand-ink shadow-brand-gold/30 hover:bg-brand-gold/90 hover:shadow-md focus-visible:ring-brand-gold' => ! empty($missing),
+                                        'dply-btn dply-btn-sm group',
+                                        'dply-btn-primary' => empty($missing),
+                                        'bg-brand-gold text-brand-ink hover:bg-brand-gold/90' => ! empty($missing),
                                     ])>
                                     <x-heroicon-o-rocket-launch class="h-4 w-4 transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" wire:loading.remove wire:target="finishAndDeploy" />
                                     <svg wire:loading wire:target="finishAndDeploy" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -435,12 +413,14 @@
                         </div>
                     @endif
                 @endif
+
 @if (! $isEmbedded)
+                </section>
             </main>
         </div>
     </div>
 @else
-            </div>
+                </div>
 @endif
 
 {{-- The env partial's Remove/Sync actions open the shared confirm modal; render

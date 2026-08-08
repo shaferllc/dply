@@ -8,6 +8,7 @@ use App\Jobs\RemoveSiteRepositoryJob;
 use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
 use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
 use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
+use App\Modules\Deploy\Services\SiteQuickDeployCommitPoller;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
@@ -46,6 +47,9 @@ trait ManagesSiteRepositoryConfig
     public string $git_source_control_account_id = '';
 
     public bool $quick_deploy_enabled_ui = false;
+
+    /** @var 'webhook'|'poll'|null */
+    public ?string $quick_deploy_mode_ui = null;
 
     /**
      * @var list<array{id: string, provider: string, label: string}>
@@ -218,11 +222,44 @@ trait ManagesSiteRepositoryConfig
             return;
         }
 
-        $result = $provisioner->enable($this->site->fresh(), $account);
+        $result = $provisioner->enable($this->site, $account);
         if (! $result['ok']) {
             $this->toastError($result['message']);
         } else {
             $this->toastSuccess($result['message']);
+        }
+        $this->syncFormFromSite();
+    }
+
+    public function enableQuickDeployPoll(RepositoryWebhookProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot enable Quick deploy.'));
+
+            return;
+        }
+
+        $user = request()->user();
+        $account = $this->git_source_control_account_id !== '' && $user !== null
+            ? app(GitIdentityResolver::class)->forId($user, $this->git_source_control_account_id)
+            : null;
+        if ($account === null) {
+            $this->toastError(__('Select a connected source control account first.'));
+
+            return;
+        }
+
+        $this->site->mergeRepositoryMeta([
+            'git_source_control_account_id' => $account->id(),
+        ]);
+        $this->site->save();
+
+        $result = $provisioner->enablePoll($this->site);
+        if (! ($result['ok'] ?? false)) {
+            $this->toastError((string) ($result['message'] ?? __('Could not enable poll mode.')));
+        } else {
+            $this->toastSuccess((string) $result['message']);
         }
         $this->site->refresh();
         $this->syncFormFromSite();
@@ -241,6 +278,57 @@ trait ManagesSiteRepositoryConfig
         $this->toastSuccess(__('Quick deploy disabled and provider hook removed when possible.'));
         $this->site->refresh();
         $this->syncFormFromSite();
+    }
+
+    /**
+     * Run one Quick deploy poll tick for this site (operators shouldn't wait
+     * for the scheduled ~2 minute command).
+     */
+    public function checkQuickDeployPollNow(SiteQuickDeployCommitPoller $poller): void
+    {
+        $this->authorize('update', $this->site);
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot run Quick deploy checks.'));
+
+            return;
+        }
+
+        $mode = (string) ($this->site->repositoryMeta()['quick_deploy_mode'] ?? '');
+        if (! ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? false) || $mode !== 'poll') {
+            $this->toastError(__('Enable poll delivery before checking for new commits.'));
+
+            return;
+        }
+
+        $result = $poller->poll($this->site->fresh() ?? $this->site);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+
+        if (! ($result['checked'] ?? false)) {
+            $this->toastError(__('Poll check skipped (:reason).', [
+                'reason' => (string) ($result['reason'] ?? __('unknown')),
+            ]));
+
+            return;
+        }
+
+        $message = is_string($result['message'] ?? null) && $result['message'] !== ''
+            ? (string) $result['message']
+            : __('Checked Git for new commits.');
+
+        if (($result['dispatched'] ?? false) || ($result['outcome'] ?? null) === 'deploy_queued') {
+            $this->toastSuccess($message);
+
+            return;
+        }
+
+        if (($result['outcome'] ?? null) === 'error') {
+            $this->toastError($message);
+
+            return;
+        }
+
+        $this->toastSuccess($message);
     }
 
     public function queueRemoveRemoteRepository(): void

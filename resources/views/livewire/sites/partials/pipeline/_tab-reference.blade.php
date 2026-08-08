@@ -1,30 +1,27 @@
 @php $referenceNested = (bool) ($isEmbedded ?? false); @endphp
 
-<div @class(['space-y-6' => ! $referenceNested, 'min-w-0' => $referenceNested])>
+<div class="min-w-0">
     @include('livewire.sites.partials.pipeline._step-catalog')
 
-    <details @class([
-        'border-b border-brand-ink/10 px-5 py-5 sm:px-6' => $referenceNested,
-        'rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8' => ! $referenceNested,
-    ])>
-        <summary class="cursor-pointer list-none">
-            <h3 class="inline text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>
-            <span class="ml-2 text-sm text-brand-moss">— {{ __('placeholders for custom steps, post-deploy commands, and hook scripts') }}</span>
+    <details class="group border-b border-brand-ink/10">
+        <summary class="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 marker:content-none sm:px-6">
+            <x-heroicon-m-chevron-right class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-open:rotate-90" aria-hidden="true" />
+            <span class="min-w-0">
+                <span class="block text-xs font-semibold text-brand-ink">{{ __('Deploy script variables') }}</span>
+                <span class="mt-0.5 block text-[11px] text-brand-moss">{{ __('Placeholders for custom steps, post-deploy commands, and hook scripts.') }}</span>
+            </span>
         </summary>
-        <dl class="mt-4 grid gap-px bg-brand-ink/10 md:grid-cols-2">
+        <dl class="grid gap-px border-t border-brand-ink/10 bg-brand-ink/10 md:grid-cols-2">
             @foreach ($deployVariableReference as $token => $description)
-                <div class="bg-white px-4 py-3">
-                    <dt class="font-mono text-sm text-brand-ink">{{ $token }}</dt>
-                    <dd class="mt-1 text-sm text-brand-moss">{{ $description }}</dd>
+                <div class="bg-white px-4 py-2 sm:px-5">
+                    <dt class="font-mono text-xs text-brand-ink">{{ $token }}</dt>
+                    <dd class="mt-0.5 text-[11px] text-brand-moss">{{ $description }}</dd>
                 </div>
             @endforeach
         </dl>
     </details>
 
-    <div @class([
-        'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6 space-y-3' => $referenceNested,
-        'space-y-3' => ! $referenceNested,
-    ])>
+    <div class="space-y-2.5 border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
         <x-cli-snippet
             :summary="__('dply CLI (from your laptop)')"
             :intro="__('Run `dply link --byo :id` once in your repo root, commit `.dply/site.json`, then deploy with bare `dply deploy`. Re-login with `dply auth refresh` if scopes are missing.', ['id' => $site->id])"

@@ -39,6 +39,33 @@ const toastRegionClasses = {
 };
 
 document.addEventListener('alpine:init', () => {
+    // Site header Deploy/Console/Sync drawers — store survives Livewire morph
+    // (local x-data on DeployControl is lost during poll/lazy clone).
+    if (! Alpine.store('deployControl')) {
+        Alpine.store('deployControl', {
+            deployDrawerOpen: false,
+            syncDrawerOpen: false,
+            openDeployDrawer() {
+                this.deployDrawerOpen = true;
+            },
+            closeDeployDrawer() {
+                this.deployDrawerOpen = false;
+            },
+            toggleDeployDrawer() {
+                this.deployDrawerOpen = ! this.deployDrawerOpen;
+            },
+            openSyncDrawer() {
+                this.syncDrawerOpen = true;
+            },
+            closeSyncDrawer() {
+                this.syncDrawerOpen = false;
+            },
+            toggleSyncDrawer() {
+                this.syncDrawerOpen = ! this.syncDrawerOpen;
+            },
+        });
+    }
+
     window.Alpine.data('toastStore', (config = {}) => {
         const positionKey = config.position ?? 'bottom_right';
         const savedClass =

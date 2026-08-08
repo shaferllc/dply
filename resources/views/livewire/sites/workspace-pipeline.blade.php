@@ -19,36 +19,28 @@
                 :contextual-doc-slug="$contextualDocSlug"
             />
 
-            <x-hero-card
-                :eyebrow="$workspaceTitle"
-                :title="$sectionHeader['title']"
-                :description="$sectionDescription"
-                class="mt-5"
-            >
-                <x-slot:leading>
-                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                        @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
-                    </span>
-                </x-slot:leading>
+            <section class="dply-card min-w-0 overflow-hidden p-0 mt-5">
+                <x-workspace-panel-head
+                    dense
+                    class="border-b border-brand-ink/10"
+                    :icon="$sectionHeader['icon']"
+                    :title="$sectionHeader['title']"
+                    :note="$sectionDescription"
+                >
+                    <x-slot:actions>
+                        <a
+                            href="{{ route('sites.deployments.index', [$server, $site]) }}"
+                            wire:navigate
+                            class="dply-btn dply-btn-xs dply-btn-outline"
+                        >
+                            {{ __('Open deployments') }}
+                            <x-heroicon-m-arrow-right class="h-3 w-3" aria-hidden="true" />
+                        </a>
+                        @include('livewire.sites.partials.header-role-badge')
+                    </x-slot:actions>
+                </x-workspace-panel-head>
 
-                @if ($headerRoleLabel !== null)
-                    <x-slot:topAction>
-                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                            @if ($headerIsDeployer)
-                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                            @elseif ($headerCanUpdateSite)
-                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                            @else
-                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                            @endif
-                            {{ $headerRoleLabel }}
-                        </span>
-                    </x-slot:topAction>
-                @endif
-            </x-hero-card>
-
-            <main class="min-w-0 space-y-6 mt-8">
+                <main class="min-w-0">
 @else
 {{-- Nested inside Deployments merged card — no outer spacing / second card. --}}
 <div class="min-w-0">
@@ -59,7 +51,8 @@
 
                 @include('livewire.sites.partials.pipeline._workspace-content')
 @if (! $isEmbedded)
-            </main>
+                </main>
+            </section>
         </div>
     </div>
 

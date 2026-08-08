@@ -16,7 +16,7 @@
 
 <div
     x-data="{
-        open: false,
+        drawerOpen: false,
         lockScroll() {
             document.body.classList.add('overflow-y-hidden');
         },
@@ -24,18 +24,18 @@
             document.body.classList.remove('overflow-y-hidden');
         },
         show() {
-            if (this.open) {
+            if (this.drawerOpen) {
                 return;
             }
-            this.open = true;
+            this.drawerOpen = true;
             this.lockScroll();
             window.dispatchEvent(new CustomEvent('dply-deploy-console-opened'));
         },
         hide() {
-            if (! this.open) {
+            if (! this.drawerOpen) {
                 return;
             }
-            this.open = false;
+            this.drawerOpen = false;
             this.unlockScroll();
             window.dispatchEvent(new CustomEvent('dply-deploy-console-closed'));
         },
@@ -46,11 +46,11 @@
         },
     }"
     x-on:dply-deploy-console-open.window="show()"
-    x-on:keydown.escape.window="if (open) hide()"
+    x-on:keydown.escape.window="if (drawerOpen) hide()"
     x-on:destroy="unlockScroll()"
 >
     <div
-        x-show="open"
+        x-show="drawerOpen"
         x-cloak
         class="fixed inset-0 z-50"
         style="display: none;"

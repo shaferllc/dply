@@ -10,12 +10,14 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-hero-card
-                :eyebrow="__('Deployments')"
-                :title="__('Commits')"
-                :description="__('Recent commits from your connected Git provider for this site’s repository and branch. Links open on GitHub, GitLab, or Bitbucket.')"
-                icon="code-bracket-square"
-            />
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-code-bracket-square"
+                    :title="__('Commits')"
+                    :note="__('Recent commits from your connected Git provider for this site’s repository and branch. Links open on GitHub, GitLab, or Bitbucket.')"
+                />
+            </section>
 
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">

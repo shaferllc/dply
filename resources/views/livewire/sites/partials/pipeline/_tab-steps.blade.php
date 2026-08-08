@@ -1,43 +1,51 @@
-@if (workspace_surface_coming_soon('deploy_pipeline_visual'))
-    {{-- The visual step builder is gated as "coming soon"; the simple text
-         deploy-script editor is the live default (embedded). --}}
-    <div class="space-y-4">
-        <div class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
-            <x-heroicon-o-sparkles class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" />
-            <span>{{ __('The visual pipeline builder is coming soon. For now, edit your deploy as a simple script — pick a preset and tweak.') }}</span>
+{{-- Mount Script OR Visual only (not both). Mode is Livewire-owned so the
+     inactive editor is not hydrated; localStorage restores Visual preference. --}}
+@php $stepsMode = $stepsMode ?? 'script'; @endphp
+<div
+    x-data="{
+        init() {
+            @if ($stepsMode !== 'visual' && ! request()->filled('steps_mode'))
+            try {
+                const stored = localStorage.getItem('dply.pipeline.steps_mode');
+                if (stored === 'visual' || stored === 'advanced') {
+                    $wire.setStepsMode('visual');
+                }
+            } catch (e) {}
+            @endif
+        },
+        remember(m) {
+            try { localStorage.setItem('dply.pipeline.steps_mode', m); } catch (e) {}
+        }
+    }"
+    class="space-y-3"
+>
+    <div class="border-b border-brand-ink/10 px-5 py-2 sm:px-6">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <div class="inline-flex rounded-lg border border-brand-ink/15 bg-white p-0.5 shadow-sm">
+                <button type="button"
+                    wire:click="setStepsMode('script')"
+                    x-on:click="remember('script')"
+                    @class([
+                        'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
+                        'bg-brand-ink text-brand-cream' => $stepsMode === 'script',
+                        'text-brand-ink hover:bg-brand-sand/40' => $stepsMode !== 'script',
+                    ])>{{ __('Script') }}</button>
+                <button type="button"
+                    wire:click="setStepsMode('visual')"
+                    x-on:click="remember('visual')"
+                    @class([
+                        'rounded-md px-2.5 py-1 text-[11px] font-semibold transition',
+                        'bg-brand-ink text-brand-cream' => $stepsMode === 'visual',
+                        'text-brand-ink hover:bg-brand-sand/40' => $stepsMode !== 'visual',
+                    ])>{{ __('Visual') }}</button>
+            </div>
+            <p class="text-[11px] text-brand-mist">{{ __('Script = phase commands. Visual = drag-and-drop steps & hooks.') }}</p>
         </div>
-        @livewire(\App\Livewire\Sites\DeployScript::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('deploy-script-'.$site->id))
     </div>
-@else
-    {{-- Visual builder enabled: let the user pick the Simple text editor or the
-         Advanced visual builder. The choice is per-visit only (URL-encoded,
-         not remembered) and defaults to Simple. --}}
-    <div
-        x-data="{
-            mode: (new URLSearchParams(window.location.search).get('steps_mode') === 'advanced') ? 'advanced' : 'simple',
-            setMode(m) {
-                this.mode = m;
-                let u = new URL(window.location);
-                m === 'advanced' ? u.searchParams.set('steps_mode', 'advanced') : u.searchParams.delete('steps_mode');
-                window.history.replaceState({}, '', u);
-            }
-        }"
-        class="space-y-4"
-    >
-        <div class="inline-flex rounded-xl border border-brand-ink/15 bg-white p-1 shadow-sm">
-            <button type="button" x-on:click="setMode('simple')"
-                :class="mode === 'simple' ? 'bg-brand-ink text-brand-cream' : 'text-brand-ink hover:bg-brand-sand/40'"
-                class="rounded-lg px-3 py-1.5 text-xs font-semibold transition">{{ __('Simple') }}</button>
-            <button type="button" x-on:click="setMode('advanced')"
-                :class="mode === 'advanced' ? 'bg-brand-ink text-brand-cream' : 'text-brand-ink hover:bg-brand-sand/40'"
-                class="rounded-lg px-3 py-1.5 text-xs font-semibold transition">{{ __('Advanced') }}</button>
-        </div>
 
-        <div x-show="mode === 'simple'">
-            @livewire(\App\Livewire\Sites\DeployScript::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('deploy-script-'.$site->id))
-        </div>
-
-        <div x-show="mode === 'advanced'" x-cloak>
+    @if ($stepsMode === 'script')
+        @livewire(\App\Livewire\Sites\DeployScript::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('deploy-script-'.$site->id))
+    @else
 @php
     $functionsHost = $functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy();
     $orderedSteps = ($editingDeploySteps ?? collect())->sortBy('sort_order')->values();
@@ -107,46 +115,40 @@
         ])
         x-data="deployPipelineWorkspace()"
     >
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Build') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('The pipeline runs top to bottom in four phases. Drag steps into Build or Release; drag hooks onto dashed slots in any phase.') }}
-                </p>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-rectangle-stack"
+            :title="__('Pipeline')"
+            :note="__('Four phases top to bottom. Drag steps into Build/Release; hooks onto dashed slots.')"
+        >
+            <x-slot:actions>
                 @if (method_exists($this, 'optimizePipeline'))
                     <button
                         type="button"
                         wire:click="optimizePipeline"
                         wire:loading.attr="disabled"
                         wire:target="optimizePipeline"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 disabled:opacity-60"
+                        class="dply-btn dply-btn-xs border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
                         title="{{ __('Read package.json / composer.json on the server and add every deploy step the repo needs.') }}"
                     >
-                        <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="optimizePipeline" />
-                        <span wire:loading wire:target="optimizePipeline" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                        <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
+                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
+                        <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize') }}</span>
                         <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
                     </button>
                 @endif
                 <button
                     type="button"
-                    x-on:click="$dispatch('open-modal', 'pipeline-share')"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                    wire:click="openPipelineShareModal"
+                    class="dply-btn dply-btn-xs dply-btn-outline"
                     title="{{ __('Export or import this pipeline') }}"
                 >
-                    <x-heroicon-o-share class="h-4 w-4" aria-hidden="true" />
+                    <x-heroicon-o-share class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Share') }}
                 </button>
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         @if (method_exists($this, 'applyPipelineOptimization'))
             @include('livewire.sites.partials.pipeline._optimize-preview-modal')
@@ -155,26 +157,26 @@
         {{-- Pipeline review also shown here (mirrors the Overview subtab) so
              warnings are visible while editing steps, not just on Overview. --}}
         @if (($pipelineActionableChecks ?? collect())->isNotEmpty())
-            <x-site-preflight-issues-panel
+                    <x-site-preflight-issues-panel
                 :checks="$pipelineActionableChecks"
                 :embedded="$pipelineStepsNested"
-                :compact="! $pipelineStepsNested"
+                :compact="true"
                 section-id="pipeline-advisor-steps"
                 :title="__('Pipeline review')"
                 :description="__('Adjust the flagged steps and hooks below.')"
             />
         @endif
 
-        <div class="space-y-6 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Pipelines') }}</span>
+        <div class="space-y-3 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Pipelines') }}</span>
                 @foreach ($site->deployPipelines as $pipeline)
                     @php $pipelineSelected = (string) $editingPipeline->id === (string) $pipeline->id; @endphp
                     <button
                         type="button"
                         wire:click="setEditingPipeline('{{ $pipeline->id }}')"
                         @class([
-                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                            'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition',
                             'border-brand-ink bg-brand-ink text-brand-cream shadow-sm' => $pipelineSelected,
                             'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $pipelineSelected,
                         ])
@@ -182,7 +184,7 @@
                         {{ $pipeline->name }}
                         @if ($pipeline->isActiveFor($site))
                             <span @class([
-                                'rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                                'rounded-full px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide',
                                 'bg-brand-cream/25 text-brand-cream ring-1 ring-brand-cream/30' => $pipelineSelected,
                                 'bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30' => ! $pipelineSelected,
                             ])>{{ __('Deploy') }}</span>
@@ -192,30 +194,30 @@
                 <button
                     type="button"
                     wire:click="openCreatePipelineForm"
-                    class="inline-flex items-center gap-1 rounded-full border border-dashed border-brand-sage/50 px-3 py-1.5 text-xs font-semibold text-brand-forest hover:bg-brand-sage/5"
+                    class="inline-flex items-center gap-1 rounded-full border border-dashed border-brand-sage/50 px-2.5 py-1 text-[11px] font-semibold text-brand-forest hover:bg-brand-sage/5"
                 >
-                    <x-heroicon-m-plus class="h-4 w-4" />
-                    {{ __('New pipeline') }}
+                    <x-heroicon-m-plus class="h-3.5 w-3.5" />
+                    {{ __('New') }}
                 </button>
             </div>
 
             {{-- Branch→pipeline routing only matters with 2+ pipelines; with a
                  single pipeline it always runs regardless, so hide the noise. --}}
             @if ($pipelineCount > 1)
-            <form wire:submit="saveEditingPipelineBranches" class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-                <label for="editing_pipeline_branches" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Git branches') }}</label>
-                <p class="mb-2 text-sm text-brand-moss">
-                    {{ __('Comma-separated branch names or patterns (e.g. main, develop, release/*). When the site deploys that branch, this pipeline is used—even if another pipeline is marked Deploy in the UI.') }}
+            <form wire:submit="saveEditingPipelineBranches" class="rounded-lg border border-brand-ink/10 bg-white p-3">
+                <label for="editing_pipeline_branches" class="mb-0.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Git branches') }}</label>
+                <p class="mb-1.5 text-[11px] text-brand-moss">
+                    {{ __('Comma-separated names or patterns (e.g. main, release/*). Matches route this pipeline on deploy.') }}
                 </p>
-                <div class="flex flex-wrap items-end gap-3">
+                <div class="flex flex-wrap items-end gap-2">
                     <input
                         type="text"
                         id="editing_pipeline_branches"
                         wire:model="editing_pipeline_branches"
-                        class="min-w-[14rem] flex-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"
+                        class="min-w-[12rem] flex-1 rounded-md border border-brand-ink/15 px-2.5 py-1.5 text-xs"
                         placeholder="{{ __('main, develop, staging/*') }}"
                     />
-                    <x-secondary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditingPipelineBranches">
+                    <x-secondary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="saveEditingPipelineBranches">
                         <span wire:loading.remove wire:target="saveEditingPipelineBranches">{{ __('Save branches') }}</span>
                         <span wire:loading wire:target="saveEditingPipelineBranches">{{ __('Saving…') }}</span>
                     </x-secondary-button>
@@ -229,55 +231,55 @@
                     <button
                         type="button"
                         wire:click="activateEditingDeployPipeline"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest"
+                        class="inline-flex items-center gap-1 rounded-md bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest"
                     >
-                        <x-heroicon-m-rocket-launch class="h-4 w-4" />
+                        <x-heroicon-m-rocket-launch class="h-3.5 w-3.5" />
                         {{ __('Use for deploys') }}
                     </button>
                 @else
-                    <span class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest">
-                        <x-heroicon-m-check-circle class="h-4 w-4" />
-                        {{ __('This pipeline runs on deploy') }}
+                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest">
+                        <x-heroicon-m-check-circle class="h-3.5 w-3.5" />
+                        {{ __('Runs on deploy') }}
                     </span>
                 @endunless
-                <button type="button" wire:click="duplicateEditingDeployPipeline" class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Duplicate') }}</button>
+                <button type="button" wire:click="duplicateEditingDeployPipeline" class="text-[11px] font-semibold text-brand-forest hover:underline">{{ __('Duplicate') }}</button>
                 @if ($pipelineCount > 1)
-                    <button type="button" wire:click="openDeletePipelineModal('{{ $editingPipeline->id }}')" class="text-xs font-semibold text-red-700 hover:underline">{{ __('Delete pipeline') }}</button>
+                    <button type="button" wire:click="openDeletePipelineModal('{{ $editingPipeline->id }}')" class="text-[11px] font-semibold text-red-700 hover:underline">{{ __('Delete') }}</button>
                 @endif
             </div>
 
             @if ($show_create_pipeline_form)
-                <form wire:submit="createDeployPipeline" class="flex flex-wrap items-end gap-3 rounded-2xl border border-brand-ink/10 bg-white p-4">
-                    <div class="min-w-[12rem] flex-1">
-                        <label for="new_pipeline_name" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Pipeline name') }}</label>
-                        <input type="text" id="new_pipeline_name" wire:model="new_pipeline_name" class="w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm" placeholder="{{ __('Staging build') }}" />
+                <form wire:submit="createDeployPipeline" class="flex flex-wrap items-end gap-2 rounded-lg border border-brand-ink/10 bg-white p-3">
+                    <div class="min-w-[10rem] flex-1">
+                        <label for="new_pipeline_name" class="mb-0.5 block text-[11px] font-medium text-brand-moss">{{ __('Pipeline name') }}</label>
+                        <input type="text" id="new_pipeline_name" wire:model="new_pipeline_name" class="w-full rounded-md border border-brand-ink/15 px-2.5 py-1.5 text-xs" placeholder="{{ __('Staging build') }}" />
                         <x-input-error :messages="$errors->get('new_pipeline_name')" class="mt-1" />
                     </div>
-                    <label class="flex items-center gap-2 text-sm text-brand-ink">
+                    <label class="flex items-center gap-1.5 text-[11px] text-brand-ink">
                         <input type="checkbox" wire:model="duplicate_current_on_create" class="rounded border-brand-ink/30" />
                         {{ __('Copy steps from current') }}
                     </label>
-                    <x-primary-button type="submit">{{ __('Create') }}</x-primary-button>
-                    <button type="button" wire:click="closeCreatePipelineForm" class="text-sm font-semibold text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
+                    <x-primary-button size="sm" type="submit">{{ __('Create') }}</x-primary-button>
+                    <button type="button" wire:click="closeCreatePipelineForm" class="text-[11px] font-semibold text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                 </form>
             @endif
         </div>
 
         @if (($pipelineStarters ?? []) !== [])
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Starter pipelines') }}</p>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('Full recipes: deploy strategy, health check defaults, steps, and hooks (safe Laravel). Replaces the target pipeline.') }}
+            <div class="border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Starter pipelines') }}</p>
+                <p class="mt-0.5 text-[11px] text-brand-moss">
+                    {{ __('Full recipes (strategy, health, steps, hooks). Replaces the target pipeline.') }}
                 </p>
-                <div class="mt-3 flex flex-wrap gap-2">
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
                     @foreach ($pipelineStarters as $starter)
                         <button
                             type="button"
                             wire:click="openApplyStarterModal('{{ $starter['key'] }}')"
                             title="{{ $starter['description'] }}"
-                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-sage/40 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:border-brand-forest/40 hover:bg-brand-sage/10"
+                            class="inline-flex items-center gap-1 rounded-full border border-brand-sage/40 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-brand-forest/40 hover:bg-brand-sage/10"
                         >
-                            <x-dynamic-component :component="$starter['icon']" class="h-4 w-4 text-brand-forest" />
+                            <x-dynamic-component :component="$starter['icon']" class="h-3.5 w-3.5 text-brand-forest" />
                             {{ $starter['label'] }}
                         </button>
                     @endforeach
@@ -286,46 +288,46 @@
         @endif
 
         @if ($pipelineSafetyBundleVisible ?? false)
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Safety presets') }}</p>
+            <div class="border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Safety presets') }}</p>
                 @php $safetyBundle = ($pipelineSafetyBundles ?? [])[\App\Support\Sites\DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1] ?? null; @endphp
                 @if ($safetyBundle)
-                    <p class="mt-1 text-sm text-brand-moss">{{ $safetyBundle['description'] }}</p>
+                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ $safetyBundle['description'] }}</p>
                     <button
                         type="button"
                         wire:click="applyLaravelSafetyPresetBundle"
                         wire:loading.attr="disabled"
                         wire:target="applyLaravelSafetyPresetBundle"
-                        class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                        class="mt-1.5 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
                     >
-                        <x-heroicon-m-shield-check class="h-4 w-4" wire:loading.remove wire:target="applyLaravelSafetyPresetBundle" />
-                        <x-heroicon-m-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="applyLaravelSafetyPresetBundle" />
+                        <x-heroicon-m-shield-check class="h-3.5 w-3.5" wire:loading.remove wire:target="applyLaravelSafetyPresetBundle" />
+                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="applyLaravelSafetyPresetBundle" />
                         <span wire:loading.remove wire:target="applyLaravelSafetyPresetBundle">{{ $safetyBundle['label'] }}</span>
                         <span wire:loading wire:target="applyLaravelSafetyPresetBundle">{{ __('Applying…') }}</span>
                     </button>
-                    <p class="mt-2 text-xs text-brand-moss">{{ __('Adds maintenance down/up hooks, migrate pretend, and a pre-migrate DB snapshot step. Add Migrate when you are ready to apply schema changes.') }}</p>
+                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('Adds maintenance down/up hooks, migrate pretend, and a pre-migrate DB snapshot step.') }}</p>
                 @endif
             </div>
         @endif
 
         @if (($deployPipelineTemplates ?? []) !== [])
-            <details class="group border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist marker:content-none">
-                    <span class="inline-flex items-center gap-1.5">
+            <details class="group border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+                <summary class="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist marker:content-none">
+                    <span class="inline-flex items-center gap-1">
                         <x-heroicon-m-chevron-right class="h-3.5 w-3.5 transition group-open:rotate-90" />
                         {{ __('Steps only (advanced)') }}
                     </span>
                 </summary>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('Replace steps on this pipeline without changing deploy strategy or health check settings.') }}</p>
-                <div class="mt-3 flex flex-wrap gap-2">
+                <p class="mt-1 text-[11px] text-brand-moss">{{ __('Replace steps without changing strategy or health check settings.') }}</p>
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
                     @foreach ($deployPipelineTemplates as $template)
                         <button
                             type="button"
                             wire:click="openApplyTemplateModal('{{ $template['key'] }}')"
                             title="{{ $template['description'] }}"
-                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:border-brand-sage/40 hover:bg-brand-sage/5"
+                            class="inline-flex items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-brand-sage/40 hover:bg-brand-sage/5"
                         >
-                            <x-heroicon-m-document-duplicate class="h-4 w-4 text-brand-forest" />
+                            <x-heroicon-m-document-duplicate class="h-3.5 w-3.5 text-brand-forest" />
                             {{ $template['label'] }}
                         </button>
                     @endforeach
@@ -334,17 +336,17 @@
         @endif
 
         {{-- Share pipeline moved to a modal opened from the pipeline header. --}}
-        <div class="space-y-4 px-6 pt-4 sm:px-8">
+        <div class="space-y-3 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
             @include('livewire.sites.partials.pipeline._pipeline-quick-commands')
         </div>
 
-        <div class="space-y-6 p-6 sm:p-8">
+        <div class="space-y-4 px-5 py-3 sm:px-6">
             <div class="relative">
             <div
-                class="dply-pipeline-timeline space-y-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:p-5"
+                class="dply-pipeline-timeline space-y-2.5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 sm:p-4"
                 role="list"
                 aria-label="{{ __('Deploy pipeline order') }}"
-                wire:key="pipeline-timeline-{{ $editingPipeline->id }}-{{ $stepCount }}-{{ $hookCount }}"
+                wire:key="pipeline-timeline-{{ $editingPipeline->id }}"
                 wire:loading.class.delay="opacity-50 pointer-events-none"
                 wire:target="addDeployPipelineStep,saveDeployPipelineStep,updateDeployPipelineStep,addDeployPipelineStepFromPalette,reorderDeployPipelineBuildSteps,reorderDeployPipelineReleaseSteps,addDeployPipelineHookFromPalette,saveDeployPipelineHook,addDeployPipelineHook,deleteDeployPipelineStep,appendQuickCommands,confirmAddDuplicatePipelineStep,openApplyStarterModal,confirmApplyStarterPipeline,confirmApplyDeployPipelineTemplate,applyLaravelSafetyPresetBundle"
             >
@@ -507,62 +509,62 @@
             @include('livewire.sites.partials.pipeline._pipeline-timeline-busy-overlay')
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-2">
-                <div class="space-y-4">
-                    <div class="flex flex-wrap items-center gap-2">
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="space-y-3">
+                    <div class="flex flex-wrap items-center gap-1.5">
                         <button
                             type="button"
                             wire:click="openAddPipelineStepForm"
-                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            class="inline-flex items-center gap-1 rounded-full border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-m-plus class="h-4 w-4" />
+                            <x-heroicon-m-plus class="h-3.5 w-3.5" />
                             {{ __('Add step') }}
                         </button>
                         <button
                             type="button"
                             wire:click="openAddPipelineStepForm('custom', 'build')"
-                            class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-sage/50 px-3 py-1.5 text-xs font-semibold text-brand-forest hover:bg-brand-sage/5"
+                            class="inline-flex items-center gap-1 rounded-full border border-dashed border-brand-sage/50 px-2.5 py-1 text-[11px] font-semibold text-brand-forest hover:bg-brand-sage/5"
                         >
-                            <x-heroicon-m-code-bracket class="h-4 w-4" />
+                            <x-heroicon-m-code-bracket class="h-3.5 w-3.5" />
                             {{ __('Custom command') }}
                         </button>
                         <button
                             type="button"
                             wire:click="setPipelineTab('reference')"
-                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                            class="inline-flex items-center gap-1 rounded-full border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-o-book-open class="h-4 w-4" />
-                            {{ __('Browse all steps') }}
+                            <x-heroicon-o-book-open class="h-3.5 w-3.5" />
+                            {{ __('Browse all') }}
                         </button>
                     </div>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Build palette') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Dependency installs and asset builds — runs in phase 2 above.') }}</p>
-                        <div x-ref="buildPalette" class="mt-3 flex flex-wrap gap-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Build palette') }}</p>
+                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Deps & assets — phase 2.') }}</p>
+                        <div x-ref="buildPalette" class="mt-1.5 flex flex-wrap gap-1.5">
                             @forelse ($buildPalette as $entry)
                                 @include('livewire.sites.partials.pipeline._step-palette-item', ['entry' => $entry])
                             @empty
-                                <p class="text-xs text-brand-moss">{{ __('No build presets for this runtime — use Custom command.') }}</p>
+                                <p class="text-[11px] text-brand-moss">{{ __('No build presets for this runtime — use Custom command.') }}</p>
                             @endforelse
                         </div>
                     </div>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Release palette') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Migrations, cache, and workers on the live path — phase 4 above.') }}</p>
-                        <div x-ref="releasePalette" class="mt-3 flex flex-wrap gap-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Release palette') }}</p>
+                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Migrations, cache, workers — phase 4.') }}</p>
+                        <div x-ref="releasePalette" class="mt-1.5 flex flex-wrap gap-1.5">
                             @forelse ($releasePalette as $entry)
                                 @include('livewire.sites.partials.pipeline._step-palette-item', ['entry' => $entry])
                             @empty
-                                <p class="text-xs text-brand-moss">{{ __('No release presets for this runtime — use Custom (release).') }}</p>
+                                <p class="text-[11px] text-brand-moss">{{ __('No release presets for this runtime — use Custom (release).') }}</p>
                             @endforelse
                         </div>
                     </div>
                 </div>
-                <div class="space-y-4">
+                <div class="space-y-3">
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hook types') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Drag onto any dashed hook slot in the timeline.') }}</p>
-                        <div x-ref="hookPalette" class="mt-3 flex flex-wrap gap-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Hook types') }}</p>
+                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Drag onto any dashed hook slot.') }}</p>
+                        <div x-ref="hookPalette" class="mt-1.5 flex flex-wrap gap-1.5">
                             @foreach (config('site_deploy_pipeline.hook_palette', []) as $entry)
                                 @include('livewire.sites.partials.pipeline._hook-palette-item', ['entry' => $entry])
                             @endforeach
@@ -570,16 +572,16 @@
                     </div>
                     @if (($pipelineHookPresets ?? []) !== [])
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Common hook shortcuts') }}</p>
-                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Opens the configure dialog with script and timing prefilled.') }}</p>
-                            <div class="mt-3 flex flex-wrap gap-2">
+                            <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Common hook shortcuts') }}</p>
+                            <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Opens configure with script and timing prefilled.') }}</p>
+                            <div class="mt-1.5 flex flex-wrap gap-1.5">
                                 @foreach ($pipelineHookPresets as $preset)
                                     <button
                                         type="button"
                                         wire:click="addDeployPipelineHookFromPreset(@js($preset))"
-                                        class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1.5 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100/80"
+                                        class="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[11px] font-semibold text-amber-950 shadow-sm hover:bg-amber-100/80"
                                     >
-                                        <x-dynamic-component :component="$preset['icon'] ?? 'heroicon-o-bolt'" class="h-4 w-4 shrink-0" />
+                                        <x-dynamic-component :component="$preset['icon'] ?? 'heroicon-o-bolt'" class="h-3.5 w-3.5 shrink-0" />
                                         {{ __($preset['label']) }}
                                     </button>
                                 @endforeach
@@ -597,6 +599,5 @@
 
     @include('livewire.sites.partials.pipeline._pipeline-modals')
 @endif
-        </div>{{-- mode === 'advanced' --}}
-    </div>{{-- steps mode toggle --}}
-@endif
+    @endif{{-- stepsMode visual --}}
+</div>{{-- steps mode toggle --}}

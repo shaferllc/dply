@@ -122,7 +122,7 @@
             @unless ($hideDrawer)
                 <div x-data="dplyConsoleDrawer">
                     <div
-                        x-show="open"
+                        x-show="drawerOpen"
                         x-cloak
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="translate-y-full opacity-0"

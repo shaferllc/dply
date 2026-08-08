@@ -204,6 +204,47 @@ trait ManagesSiteCertificates
         $this->closeQuickDomainSslModal();
     }
 
+    /**
+     * Prefill the Domains textarea with customer + alias hostnames that are not
+     * already covered by a pending/active certificate on this site.
+     */
+    public function loadUncoveredCertificateDomains(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->site->loadMissing('certificates');
+
+        $covered = $this->site->certificates
+            ->whereIn('status', [
+                SiteCertificate::STATUS_PENDING,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+                SiteCertificate::STATUS_ACTIVE,
+            ])
+            ->flatMap(fn (SiteCertificate $certificate) => $certificate->domainHostnames())
+            ->map(fn ($hostname) => strtolower((string) $hostname))
+            ->unique()
+            ->all();
+
+        $uncovered = collect($this->site->sslIssuanceHostnames())
+            ->reject(fn (string $hostname): bool => in_array(strtolower($hostname), $covered, true))
+            ->values()
+            ->all();
+
+        if ($uncovered === []) {
+            $this->toastWarning(__('Every customer domain already has a certificate (or one in progress).'));
+
+            return;
+        }
+
+        $this->new_certificate_domains = implode("\n", $uncovered);
+        $this->resetErrorBag('new_certificate_domains');
+        $this->toastSuccess(trans_choice(
+            '{1} Loaded :count domain without a certificate.|[2,*] Loaded :count domains without a certificate.',
+            count($uncovered),
+            ['count' => count($uncovered)],
+        ));
+    }
+
     public function createCertificateRequest(CertificateRequestService $certificateRequestService): void
     {
         $this->authorize('update', $this->site);

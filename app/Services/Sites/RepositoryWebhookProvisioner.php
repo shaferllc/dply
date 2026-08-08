@@ -56,18 +56,16 @@ class RepositoryWebhookProvisioner
         }
 
         if ($site->webhook_secret === null || $site->webhook_secret === '') {
-            $site->update(['webhook_secret' => Str::random(48)]);
-            $site->refresh();
+            $site->webhook_secret = Str::random(48);
+            $site->save();
         }
 
         $hookUrl = $site->deployHookUrl();
         $secret = (string) $site->webhook_secret;
 
-        $this->disable($site->fresh() ?? $site, $account);
-        $site = $site->fresh();
-        if ($site === null) {
-            return ['ok' => false, 'message' => __('Site not found.')];
-        }
+        // Reuse the caller-provided instance: disable() clears hook meta on this
+        // model, then we create the new hook and write meta back — no reload.
+        $this->disable($site, $account);
 
         $result = match ($kind) {
             'github' => $this->createGitHubHook($site, $account, $ref, $hookUrl, $secret),
@@ -82,15 +80,17 @@ class RepositoryWebhookProvisioner
 
         $site->mergeRepositoryMeta([
             'quick_deploy_enabled' => true,
+            'quick_deploy_mode' => 'webhook',
             'provider_hook' => [
                 'id' => $result['hook_id'],
                 'provider' => $kind,
                 'account_id' => $account->id(),
             ],
+            'poll_last_skip_reason' => null,
         ]);
         $site->save();
 
-        return ['ok' => true, 'message' => __('Quick deploy enabled. The provider will POST to your Dply deploy URL on push.')];
+        return ['ok' => true, 'message' => __('Quick deploy enabled with webhook delivery. The provider will POST to your Dply deploy URL on push.')];
     }
 
     /**
@@ -216,7 +216,13 @@ class RepositoryWebhookProvisioner
         $repo = $site->repositoryMeta();
         $hook = is_array($repo['provider_hook'] ?? null) ? $repo['provider_hook'] : null;
         if ($hook === null) {
-            $site->mergeRepositoryMeta(['quick_deploy_enabled' => false]);
+            $site->mergeRepositoryMeta([
+                'quick_deploy_enabled' => false,
+                'quick_deploy_mode' => null,
+                'poll_last_tip_sha' => null,
+                'poll_last_checked_at' => null,
+                'poll_last_skip_reason' => null,
+            ]);
             $site->save();
 
             return;
@@ -251,9 +257,66 @@ class RepositoryWebhookProvisioner
 
         $site->mergeRepositoryMeta([
             'quick_deploy_enabled' => false,
+            'quick_deploy_mode' => null,
             'provider_hook' => null,
+            'poll_last_tip_sha' => null,
+            'poll_last_checked_at' => null,
+            'poll_last_skip_reason' => null,
         ]);
         $site->save();
+    }
+
+    /**
+     * Enable Quick deploy in poll mode: dply checks the Git tip on a schedule
+     * (no provider push webhook). Removes any registered provider hook.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function enablePoll(Site $site): array
+    {
+        $kind = (string) ($site->repositoryMeta()['git_provider_kind'] ?? 'custom');
+        if ($kind === 'custom') {
+            $kind = $this->detectProviderKind((string) ($site->git_repository_url ?? ''));
+        }
+        if (! in_array($kind, ['github', 'gitlab', 'bitbucket'], true)) {
+            return ['ok' => false, 'message' => __('Poll mode needs a GitHub, GitLab, or Bitbucket repository.')];
+        }
+
+        if (trim((string) ($site->git_repository_url ?? '')) === '') {
+            return ['ok' => false, 'message' => __('Connect a repository before enabling Quick deploy.')];
+        }
+
+        // Drop any inbound provider hook; signed dply hook URL still works.
+        $this->disable($site->fresh() ?? $site);
+        $site = $site->fresh() ?? $site;
+
+        if ($site->webhook_secret === null || $site->webhook_secret === '') {
+            $site->update(['webhook_secret' => Str::random(48)]);
+            $site = $site->fresh() ?? $site;
+        }
+
+        $site->mergeRepositoryMeta([
+            'quick_deploy_enabled' => true,
+            'quick_deploy_mode' => 'poll',
+            'git_provider_kind' => $kind,
+            'provider_hook' => null,
+            'poll_last_skip_reason' => null,
+        ]);
+        $site->save();
+
+        return ['ok' => true, 'message' => __('Quick deploy enabled with poll delivery. dply will check for new commits on a short schedule.')];
+    }
+
+    private function detectProviderKind(string $url): string
+    {
+        $url = strtolower($url);
+
+        return match (true) {
+            str_contains($url, 'github.com') => 'github',
+            str_contains($url, 'gitlab') => 'gitlab',
+            str_contains($url, 'bitbucket.org') => 'bitbucket',
+            default => 'custom',
+        };
     }
 
     private function deleteGitHubHook(GitIdentity $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
@@ -305,6 +368,9 @@ class RepositoryWebhookProvisioner
     {
         $repo = $site->repositoryMeta();
         if (! ($repo['quick_deploy_enabled'] ?? false)) {
+            return;
+        }
+        if (($repo['quick_deploy_mode'] ?? 'webhook') !== 'webhook') {
             return;
         }
         $hook = is_array($repo['provider_hook'] ?? null) ? $repo['provider_hook'] : null;

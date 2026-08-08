@@ -1,4 +1,6 @@
-<div>
+{{-- Drawer open state lives in Alpine.store('deployControl') so Livewire morph
+     (poll / lazy load) cannot orphan x-show bindings from local x-data. --}}
+<div x-data x-on:deploy-console-open.window="$store.deployControl.openDeployDrawer()">
     @if ($this->canDeploy)
         @php
             $lock = $this->deployLockInfo;
@@ -38,8 +40,6 @@
         @endphp
 
         <div
-            x-data="{ open: false, syncOpen: false }"
-            x-on:deploy-console-open.window="open = true"
             class="flex items-center gap-2"
             @if ($inProgress || $fixerInFlight) wire:poll.3s @endif
         >
@@ -76,7 +76,7 @@
             {{-- Console toggle. --}}
             <button
                 type="button"
-                x-on:click="open = ! open"
+                x-on:click="$store.deployControl.toggleDeployDrawer()"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
             >
                 <x-heroicon-o-command-line class="h-4 w-4" />
@@ -94,7 +94,7 @@
             @if ($hasSyncPeers)
                 <button
                     type="button"
-                    x-on:click="syncOpen = ! syncOpen"
+                    x-on:click="$store.deployControl.toggleSyncDrawer()"
                     title="{{ __('Deploy this site together with its workers / repo peers.') }}"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                 >
@@ -112,8 +112,8 @@
             @endif
 
             {{-- Slide-over console: live phase timeline for the latest deploy. --}}
-            <div x-show="open" x-cloak class="fixed inset-0 z-50" style="display: none;">
-                <div class="absolute inset-0 bg-brand-ink/40" x-on:click="open = false" x-transition.opacity></div>
+            <div x-show="$store.deployControl.deployDrawerOpen" x-cloak class="fixed inset-0 z-50" style="display: none;">
+                <div class="absolute inset-0 bg-brand-ink/40" x-on:click="$store.deployControl.closeDeployDrawer()" x-transition.opacity></div>
                 <div
                     class="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
                     x-transition:enter="transition ease-out duration-200"
@@ -141,7 +141,7 @@
                                     <x-heroicon-o-rocket-launch class="h-4 w-4" /> {{ __('Deploy now') }}
                                 @endif
                             </button>
-                            <button type="button" x-on:click="open = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <button type="button" x-on:click="$store.deployControl.closeDeployDrawer()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                                 <x-heroicon-o-x-mark class="h-5 w-5" />
                             </button>
                         </div>
@@ -212,14 +212,15 @@
                                                             @endif
                                                         </div>
                                                         @if (($step['output'] ?? '') !== '')
-                                                            <div x-data="{ open: @js($stepFailed) }" class="mt-1">
-                                                                <button type="button" x-on:click="open = ! open"
-                                                                    class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline">
-                                                                    <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
-                                                                    <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
-                                                                </button>
-                                                                <pre x-show="open" x-cloak class="mt-1 max-h-96 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
-                                                            </div>
+                                                            <details @if ($stepFailed) open @endif class="mt-1 group">
+                                                                <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline [&::-webkit-details-marker]:hidden">
+                                                                    <span class="font-mono group-open:hidden">▸</span>
+                                                                    <span class="font-mono hidden group-open:inline">▾</span>
+                                                                    <span class="group-open:hidden">{{ __('Show output') }}</span>
+                                                                    <span class="hidden group-open:inline">{{ __('Hide output') }}</span>
+                                                                </summary>
+                                                                <pre class="mt-1 max-h-96 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
+                                                            </details>
                                                         @endif
                                                     </li>
                                                 @endforeach
@@ -292,8 +293,8 @@
             </div>
 
             {{-- Sync slide-over: pick the peers and ship them together. --}}
-            <div x-show="syncOpen" x-cloak class="fixed inset-0 z-50" style="display: none;">
-                <div class="absolute inset-0 bg-brand-ink/40" x-on:click="syncOpen = false" x-transition.opacity></div>
+            <div x-show="$store.deployControl.syncDrawerOpen" x-cloak class="fixed inset-0 z-50" style="display: none;">
+                <div class="absolute inset-0 bg-brand-ink/40" x-on:click="$store.deployControl.closeSyncDrawer()" x-transition.opacity></div>
                 <div
                     class="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
                     x-transition:enter="transition ease-out duration-200"
@@ -314,7 +315,7 @@
                                     <x-heroicon-o-arrow-left class="h-4 w-4" /> {{ __('New sync') }}
                                 </button>
                             @endif
-                            <button type="button" x-on:click="syncOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <button type="button" x-on:click="$store.deployControl.closeSyncDrawer()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                                 <x-heroicon-o-x-mark class="h-5 w-5" />
                             </button>
                         </div>

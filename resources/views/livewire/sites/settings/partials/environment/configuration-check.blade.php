@@ -25,8 +25,8 @@
                 )
                 : [];
         @endphp
-        <div class="px-5 py-3">
-                <div class="flex flex-wrap items-center gap-2">
+        <div class="px-5 pb-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2 pb-2">
                     <x-heroicon-o-shield-exclamation class="h-4 w-4 shrink-0 {{ $hasDanger ? 'text-rose-600' : 'text-amber-600' }}" />
                     <h3 class="text-xs font-semibold text-brand-ink">
                         {{ trans_choice('{1} :count configuration warning|[2,*] :count configuration warnings', count($envWarnings), ['count' => count($envWarnings)]) }}
@@ -95,7 +95,10 @@
                     }
                     $warningGroups = array_values($warningGroups);
                 @endphp
-                <ul class="mt-2 divide-y divide-brand-ink/5">
+                {{-- One bordered, rounded container with divided rows — the same
+                     shape the General page uses for its domain/health grids —
+                     rather than a stack of separate floating rows. --}}
+                <ul class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
                     @foreach ($warningGroups as $g)
                         @php
                             $isDanger = $g['level'] === 'danger';
@@ -103,17 +106,11 @@
                             $gKeys = $g['keys'];
                             $gMulti = count($gKeys) > 1;
                         @endphp
-                        {{-- Square rows, not rounded: a radius on a row that also
-                             carries a coloured left rail rounds the rail into a
-                             lozenge and reads as a stray blob. Note the rail sets
-                             `border-l-<colour>`, not `border-<colour>` — the
-                             latter also colours the divide-y rule, which drew a
-                             red line between every row. --}}
                         <li @class([
-                            'flex items-start gap-3 border-l-2 py-2 pl-3 pr-1 transition-colors hover:bg-brand-sand/20',
+                            'flex items-start gap-3 border-l-2 px-4 py-3 transition-colors hover:bg-brand-sand/15',
                             'border-l-rose-500' => $isDanger,
                             'border-l-amber-500' => $isWarn,
-                            'border-l-brand-mist/50' => ! $isDanger && ! $isWarn,
+                            'border-l-brand-mist' => ! $isDanger && ! $isWarn,
                         ])>
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs leading-5 text-brand-ink">
@@ -169,7 +166,7 @@
                         </li>
                     @endforeach
                 </ul>
-                <div class="mt-2">
+                <div class="mt-3">
                     @if ($suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings)
                         <p class="mt-2 text-[11px] text-brand-mist">
                             {{ trans_choice('{1} :count warning suppressed.|[2,*] :count warnings suppressed.', $suppressedEnvWarningCount, ['count' => $suppressedEnvWarningCount]) }}

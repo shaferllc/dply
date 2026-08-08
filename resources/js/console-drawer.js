@@ -4,11 +4,13 @@
  */
 export function registerConsoleDrawer(Alpine) {
     Alpine.data('dplyConsoleDrawer', () => ({
-        open: false,
+        // Prefer drawerOpen over `open` — bare `open` can resolve to window.open
+        // if Alpine scope is briefly lost during Livewire morph.
+        drawerOpen: false,
 
         init() {
-            this.open = localStorage.getItem('dply.consoleDrawer.open') === '1';
-            if (this.open) {
+            this.drawerOpen = localStorage.getItem('dply.consoleDrawer.open') === '1';
+            if (this.drawerOpen) {
                 this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
             }
 
@@ -18,14 +20,14 @@ export function registerConsoleDrawer(Alpine) {
                 if (e.key === '`' && ! inInput && ! e.metaKey && ! e.ctrlKey && ! e.altKey) {
                     e.preventDefault();
                     this.toggle();
-                } else if (e.key === 'Escape' && this.open) {
+                } else if (e.key === 'Escape' && this.drawerOpen) {
                     this.close();
                 }
             });
 
             window.addEventListener('dply-open-console-drawer', () => {
-                if (! this.open) {
-                    this.open = true;
+                if (! this.drawerOpen) {
+                    this.drawerOpen = true;
                     localStorage.setItem('dply.consoleDrawer.open', '1');
                     this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
                 }
@@ -35,9 +37,9 @@ export function registerConsoleDrawer(Alpine) {
         },
 
         toggle() {
-            this.open = ! this.open;
-            localStorage.setItem('dply.consoleDrawer.open', this.open ? '1' : '0');
-            if (this.open) {
+            this.drawerOpen = ! this.drawerOpen;
+            localStorage.setItem('dply.consoleDrawer.open', this.drawerOpen ? '1' : '0');
+            if (this.drawerOpen) {
                 this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
             } else {
                 window.dispatchEvent(new CustomEvent('dply-console-drawer-closed'));
@@ -45,10 +47,10 @@ export function registerConsoleDrawer(Alpine) {
         },
 
         close() {
-            if (! this.open) {
+            if (! this.drawerOpen) {
                 return;
             }
-            this.open = false;
+            this.drawerOpen = false;
             localStorage.setItem('dply.consoleDrawer.open', '0');
             window.dispatchEvent(new CustomEvent('dply-console-drawer-closed'));
         },

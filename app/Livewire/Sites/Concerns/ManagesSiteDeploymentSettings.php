@@ -258,7 +258,7 @@ trait ManagesSiteDeploymentSettings
         $this->toastSuccess(__('Ephemeral deploy credentials settings saved.'));
     }
 
-    public function saveDeploymentSettings(): void
+    public function saveDeploymentSettings(bool $toast = true): void
     {
         $this->authorize('update', $this->site);
         $this->site->refresh();
@@ -369,7 +369,10 @@ trait ManagesSiteDeploymentSettings
 
         $this->site->update($update);
         $this->syncFormFromSite();
-        $this->toastSuccess('Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.');
+
+        if ($toast) {
+            $this->toastSuccess(__('Rollout settings saved.'));
+        }
     }
 
     public function saveEngineHttpCache(): void

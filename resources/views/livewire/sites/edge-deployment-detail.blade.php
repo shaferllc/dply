@@ -23,57 +23,47 @@
             ]" class="mb-6" />
 
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-rocket-launch"
+                    :title="__('Edge deployment')"
+                    :note="__('Build log, stable aliases, and deploy-specific detail.')"
+                >
+                    <x-slot:actions>
+                        <span class="max-w-[10rem] truncate font-mono text-[10px] text-brand-mist" title="{{ $deployment->id }}">{{ $deployment->id }}</span>
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $depBadge }}">
+                            {{ str_replace('_', ' ', (string) $deployment->status) }}
+                        </span>
+                        @if ($isActiveDeployment)
+                            <span class="inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
+                                {{ __('Production') }}
                             </span>
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Edge deployment') }}</h2>
-                                    <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $depBadge }}">
-                                        {{ str_replace('_', ' ', (string) $deployment->status) }}
-                                    </span>
-                                    @if ($isActiveDeployment)
-                                        <span class="inline-flex rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss dark:bg-brand-sand/20">
-                                            {{ __('Production') }}
-                                        </span>
-                                    @endif
-                                    @if ($deployment->pruned_at)
-                                        <span class="inline-flex rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pruned') }}</span>
-                                    @endif
-                                </div>
-                                <p class="mt-1 font-mono text-xs text-brand-moss break-all">{{ $deployment->id }}</p>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Build log, stable aliases, and deploy-specific detail.') }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="flex shrink-0 flex-wrap items-center gap-2">
-                            <a
-                                href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}"
-                                wire:navigate
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800"
-                            >
-                                <x-heroicon-o-arrow-left class="h-3.5 w-3.5 opacity-70" />
-                                {{ __('All deploys') }}
-                            </a>
-                            @if (! $isActiveDeployment && in_array($deployment->status, [\App\Models\EdgeDeployment::STATUS_LIVE, \App\Models\EdgeDeployment::STATUS_SUPERSEDED], true) && $deployment->storage_prefix !== null)
-                                @can('update', $site)
-                                    <button
-                                        type="button"
-                                        wire:click="confirmRollbackEdgeDeployment('{{ $deployment->id }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90"
-                                    >
-                                        <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
-                                        {{ __('Roll back') }}
-                                    </button>
-                                @endcan
-                            @endif
-                        </div>
-                    </div>
-                </div>
+                        @endif
+                        @if ($deployment->pruned_at)
+                            <span class="inline-flex rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pruned') }}</span>
+                        @endif
+                        <a
+                            href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}"
+                            wire:navigate
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800"
+                        >
+                            <x-heroicon-o-arrow-left class="h-3.5 w-3.5 opacity-70" />
+                            {{ __('All deploys') }}
+                        </a>
+                        @if (! $isActiveDeployment && in_array($deployment->status, [\App\Models\EdgeDeployment::STATUS_LIVE, \App\Models\EdgeDeployment::STATUS_SUPERSEDED], true) && $deployment->storage_prefix !== null)
+                            @can('update', $site)
+                                <button
+                                    type="button"
+                                    wire:click="confirmRollbackEdgeDeployment('{{ $deployment->id }}')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90"
+                                >
+                                    <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                                    {{ __('Roll back') }}
+                                </button>
+                            @endcan
+                        @endif
+                    </x-slot:actions>
+                </x-workspace-panel-head>
 
                 @if ($deployment->status === \App\Models\EdgeDeployment::STATUS_FAILED)
                     <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">

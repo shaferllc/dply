@@ -34,19 +34,13 @@
                 />
             @else
                 <section class="dply-card min-w-0 overflow-hidden p-0">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
-                                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Errors') }}</h2>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Every failure for this site — deploys, SSL, connectivity, and more. Newest first. Dismiss what you’ve handled; retry where supported.') }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-exclamation-triangle"
+                    :title="__('Errors')"
+                    :note="__('Every failure for this site — deploys, SSL, connectivity, and more. Newest first. Dismiss what you’ve handled; retry where supported.')"
+                    tone="danger"
+                />
 
                     <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                         <x-server-workspace-tablist

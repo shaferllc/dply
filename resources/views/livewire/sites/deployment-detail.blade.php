@@ -12,12 +12,14 @@
 
         <div class="min-w-0 lg:col-span-9">
             <main class="min-w-0 space-y-6">
-            <x-hero-card
-                :eyebrow="__('Deployments')"
-                :title="__('Deployment detail')"
-                :description="__('Status, timeline, phase steps, and raw log output for a single deployment of this site.')"
-                icon="rocket-launch"
-            />
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-rocket-launch"
+                    :title="__('Deployment detail')"
+                    :note="__('Status, timeline, phase steps, and raw log output for a single deployment of this site.')"
+                />
+            </section>
 
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">

@@ -180,8 +180,8 @@ return [
         // toggles it there, so shipping this changes no site's behaviour.
         'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', true),
         'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', false),
-        'deploy_pipeline_visual' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL', false),
-        'deploy_pipeline_visual_preview' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL_PREVIEW', true),
+        'deploy_pipeline_visual' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL', true),
+        'deploy_pipeline_visual_preview' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL_PREVIEW', false),
         'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', true),
         'site_logs_preview' => env('FEATURE_WORKSPACE_SITE_LOGS_PREVIEW', false),
         'site_backends' => env('FEATURE_WORKSPACE_SITE_BACKENDS', false),

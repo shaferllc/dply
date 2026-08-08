@@ -128,68 +128,32 @@
                         @endif
                     @elseif ($section === 'settings')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
                             @include('livewire.sites.settings.partials.settings-tab')
                         </section>
                     @elseif ($section === 'routing')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
                             @include('livewire.sites.settings.partials.routing')
@@ -198,53 +162,28 @@
                         @livewire(\App\Livewire\Sites\Backends::class, ['server' => $server, 'site' => $site], key('backends-'.$site->id))
                     @elseif ($section === 'certificates')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
                             @include('livewire.sites.settings.partials.certificates')
                         </section>
                     @elseif ($section === 'repository')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex min-w-0 items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                        <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                            {{ $sectionDescription }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            />
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
                             @include('livewire.sites.settings.partials.repository')
                         </section>
@@ -264,34 +203,16 @@
                         @endif
                     @elseif ($section === 'runtime')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -324,34 +245,16 @@
                             />
                         @else
                             <section class="dply-card min-w-0 overflow-hidden p-0">
-                                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                    <div class="flex flex-wrap items-start justify-between gap-4">
-                                        <div class="flex min-w-0 items-start gap-3">
-                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                                <x-heroicon-o-user class="h-5 w-5" aria-hidden="true" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                    {{ $sectionDescription }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        @if ($headerRoleLabel !== null)
-                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                                  title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                                @if ($headerIsDeployer)
-                                                    <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                                @elseif ($headerCanUpdateSite)
-                                                    <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                                @else
-                                                    <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                                @endif
-                                                {{ $headerRoleLabel }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
+                                <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                                 @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -360,34 +263,16 @@
                         @endif
                     @elseif ($section === 'laravel-stack')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -403,34 +288,16 @@
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -471,34 +338,16 @@
                             @livewire('serverless.logs-panel', ['site' => $site], key('serverless-logs-'.$site->id))
                         @else
                             <section class="dply-card min-w-0 overflow-hidden p-0">
-                                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                    <div class="flex flex-wrap items-start justify-between gap-4">
-                                        <div class="flex min-w-0 items-start gap-3">
-                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                    {{ $sectionDescription }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        @if ($headerRoleLabel !== null)
-                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                                  title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                                @if ($headerIsDeployer)
-                                                    <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                                @elseif ($headerCanUpdateSite)
-                                                    <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                                @else
-                                                    <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                                @endif
-                                                {{ $headerRoleLabel }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
+                                <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                                 @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -530,34 +379,16 @@
                             />
                         @else
                             <section class="dply-card min-w-0 overflow-hidden p-0">
-                                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                    <div class="flex flex-wrap items-start justify-between gap-4">
-                                        <div class="flex min-w-0 items-start gap-3">
-                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                    {{ $sectionDescription }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        @if ($headerRoleLabel !== null)
-                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                                  title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                                @if ($headerIsDeployer)
-                                                    <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                                @elseif ($headerCanUpdateSite)
-                                                    <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                                @else
-                                                    <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                                @endif
-                                                {{ $headerRoleLabel }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
+                                <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                                 @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -566,34 +397,16 @@
                         @endif
                     @elseif ($section === 'basic-auth')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 
@@ -604,29 +417,23 @@
                             @include('livewire.sites.settings.partials.cli')
                         @else
                             <section class="dply-card min-w-0 overflow-hidden p-0">
-                                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                    <div class="flex flex-wrap items-start justify-between gap-4">
-                                        <div class="flex min-w-0 items-start gap-3">
-                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                                            </span>
-                                            <div class="min-w-0">
-                                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                    {{ __('Run commands here, or install the CLI on your machine.') }}
-                                                </p>
-                                            </div>
-                                        </div>
+                                <x-workspace-panel-head
+                                    class="border-b border-brand-ink/10"
+                                    :icon="$sectionHeader['icon']"
+                                    :title="$sectionHeader['title']"
+                                    :note="__('Run commands here, or install the CLI on your machine.')"
+                                >
+                                    <x-slot:actions>
                                         <a
                                             href="{{ route('profile.cli') }}"
                                             wire:navigate
-                                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                            class="dply-btn dply-btn-xs dply-btn-outline"
                                         >
                                             {{ __('Install & login') }}
                                             <x-heroicon-m-arrow-up-right class="h-3 w-3" />
                                         </a>
-                                    </div>
-                                </div>
+                                    </x-slot:actions>
+                                </x-workspace-panel-head>
 
                                 @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
                                 @include('livewire.sites.settings.partials.cli', ['cliNestedInShell' => true])
@@ -634,34 +441,16 @@
                         @endif
                     @elseif ($section === 'danger')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
-                            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                            <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $sectionHeader['title'] }}</h2>
-                                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                                {{ $sectionDescription }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($headerRoleLabel !== null)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                              title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                            @if ($headerIsDeployer)
-                                                <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                            @elseif ($headerCanUpdateSite)
-                                                <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                            @else
-                                                <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                            @endif
-                                            {{ $headerRoleLabel }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
+                            <x-workspace-panel-head
+                                class="border-b border-brand-ink/10"
+                                :icon="$sectionHeader['icon']"
+                                :title="$sectionHeader['title']"
+                                :note="$sectionDescription"
+                            >
+                                <x-slot:actions>
+                                    @include('livewire.sites.partials.header-role-badge')
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
                             @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
 

@@ -1,24 +1,14 @@
 {{-- Lean Overview identity — status, live URL, primary actions only. --}}
 <section class="border-b border-brand-ink/10">
-    <div class="flex flex-wrap items-start justify-between gap-4 bg-brand-sand/20 px-5 py-5 sm:px-6">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/20 dark:text-brand-sage">
-                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+    <x-workspace-panel-head
+        icon="heroicon-o-globe-alt"
+        :title="$site->name"
+        :note="$edgeSourceSpec ? $edgeSourceRef : null"
+    >
+        <x-slot:actions>
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $edgeStatusBadgeClass }}">
+                {{ $edgeStatusLabel }}
             </span>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overview') }}</p>
-                <div class="mt-0.5 flex flex-wrap items-center gap-2">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ $site->name }}</h2>
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $edgeStatusBadgeClass }}">
-                        {{ $edgeStatusLabel }}
-                    </span>
-                </div>
-                @if ($edgeSourceSpec)
-                    <p class="mt-1 font-mono text-xs text-brand-moss">{{ $edgeSourceRef }}</p>
-                @endif
-            </div>
-        </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
             @if ($edgeLiveUrl && ! empty($edgeActiveDeploymentId))
                 <a href="{{ $edgeLiveUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-white dark:border-brand-mist/25 dark:bg-zinc-800">
                     <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
@@ -39,8 +29,8 @@
                     <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
                 </button>
             @endcan
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     <div class="px-5 py-4 sm:px-6">
         @if ($edgeLiveUrl && ! empty($edgeActiveDeploymentId))

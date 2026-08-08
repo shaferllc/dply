@@ -20,6 +20,7 @@ export function registerDeployPipelineWorkspace(Alpine) {
         hookPaletteSortable: null,
         hookZoneSortables: [],
         morphHook: null,
+        bootTimer: null,
         dropBusy: false,
         dropBusyLabel: 'Updating pipeline…',
 
@@ -30,7 +31,12 @@ export function registerDeployPipelineWorkspace(Alpine) {
                 const componentId = this.$wire?.$id;
                 this.morphHook = ({ component }) => {
                     if (componentId && component.id === componentId) {
-                        requestAnimationFrame(() => this.boot());
+                        // Debounce: Livewire can fire morph.updated multiple times
+                        // per request; avoid teardown/recreate storms during DnD.
+                        clearTimeout(this.bootTimer);
+                        this.bootTimer = setTimeout(() => {
+                            requestAnimationFrame(() => this.boot());
+                        }, 50);
                     }
                 };
                 window.Livewire.hook('morph.updated', this.morphHook);
@@ -300,6 +306,16 @@ export function registerDeployPipelineWorkspace(Alpine) {
         },
 
         destroy() {
+            clearTimeout(this.bootTimer);
+            this.bootTimer = null;
+            if (this.morphHook && typeof window.Livewire?.hook === 'function') {
+                // Livewire 3 exposes removeHook when available; otherwise leave
+                // a no-op-safe reference clear so remounts don't stack handlers.
+                if (typeof window.Livewire.removeHook === 'function') {
+                    window.Livewire.removeHook('morph.updated', this.morphHook);
+                }
+                this.morphHook = null;
+            }
             this.teardown();
         },
     }));

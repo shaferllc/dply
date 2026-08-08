@@ -196,9 +196,25 @@ trait BuildsRepositoryView
         // $availableRepositories), not this payload. The old "Repositories on this
         // account" library card + its swap modal were removed; only the quick-deploy
         // / webhook keys remain (the locked webhook embed reuses them).
+        $repoMeta = $this->site->repositoryMeta();
+        $quickDeploy = (bool) ($repoMeta['quick_deploy_enabled'] ?? ($this->site->meta['quick_deploy_enabled'] ?? false));
+        $mode = (string) ($repoMeta['quick_deploy_mode'] ?? 'webhook');
+        if ($quickDeploy && ! in_array($mode, ['webhook', 'poll'], true)) {
+            $mode = 'webhook';
+        }
+
+        $pollLog = $repoMeta['poll_log'] ?? [];
+        if (! is_array($pollLog)) {
+            $pollLog = [];
+        }
+
         return [
-            'connectionQuickDeploy' => (bool) ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? ($this->site->meta['quick_deploy_enabled'] ?? false)),
+            'connectionQuickDeploy' => $quickDeploy,
+            'connectionQuickDeployMode' => $quickDeploy ? $mode : null,
             'connectionDeployHookUrl' => method_exists($this->site, 'deployHookUrl') ? $this->site->deployHookUrl() : null,
+            'connectionPollLastTipSha' => is_string($repoMeta['poll_last_tip_sha'] ?? null) ? (string) $repoMeta['poll_last_tip_sha'] : null,
+            'connectionPollLastCheckedAt' => is_string($repoMeta['poll_last_checked_at'] ?? null) ? (string) $repoMeta['poll_last_checked_at'] : null,
+            'connectionPollLog' => array_values($pollLog),
         ];
     }
 

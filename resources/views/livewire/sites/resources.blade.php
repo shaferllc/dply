@@ -25,27 +25,28 @@
         </ol>
     </nav>
 
-    <x-hero-card
-        :eyebrow="__('Site')"
-        :title="__('Resources')"
-        :description="$isContainer
-            ? __('Every backing service attached to this app. Attach more in one click; detach in place.')
-            : __('Background workers that keep this site\'s queue and Horizon running — on this server and any worker server on the same network.')"
-        icon="squares-2x2"
-        class="mb-6"
-    >
-        <x-slot:topAction>
-            @if ($isContainer)
-                <x-primary-button size="sm" type="button" wire:click="openAttach('attach')">
-                    + {{ __('Attach resource') }}
-                </x-primary-button>
-            @else
-                <x-primary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate>
-                    {{ __('Manage workers') }}
-                </x-primary-button>
-            @endif
-        </x-slot:topAction>
-    </x-hero-card>
+    <section class="dply-card min-w-0 overflow-hidden p-0 mb-6">
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-squares-2x2"
+            :title="__('Resources')"
+            :note="$isContainer
+                ? __('Every backing service attached to this app. Attach more in one click; detach in place.')
+                : __('Background workers that keep this site\'s queue and Horizon running — on this server and any worker server on the same network.')"
+        >
+            <x-slot:actions>
+                @if ($isContainer)
+                    <x-primary-button size="sm" type="button" wire:click="openAttach('attach')">
+                        + {{ __('Attach resource') }}
+                    </x-primary-button>
+                @else
+                    <x-primary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate>
+                        {{ __('Manage workers') }}
+                    </x-primary-button>
+                @endif
+            </x-slot:actions>
+        </x-workspace-panel-head>
+    </section>
 @else
 {{-- Nested in Settings merged card — toolbar strip only. --}}
 <div class="min-w-0">

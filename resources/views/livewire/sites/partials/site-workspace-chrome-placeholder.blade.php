@@ -1,8 +1,8 @@
 {{--
     Full-page Lazy skeleton for site workspace pages that use the merged
     dply-card chrome (Deployments, Repository, …). Renders breadcrumb + sidebar
-    + sand identity + tab stubs + panel skeleton so wire:navigate doesn't flash
-    the old hero + stacked-card layout.
+    + compact panel-head + tab stubs + panel skeleton so wire:navigate doesn't
+    flash a taller header than the live page.
 --}}
 @php
     $title = $title ?? __('Loading…');
@@ -36,19 +36,14 @@
 
         <div class="min-w-0 lg:col-span-9">
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6" aria-hidden="true">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-dynamic-component :component="$icon" class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $title }}</h2>
-                            @if ($description !== '')
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $description }}</p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
+                {{-- Same compact panel-head the live page uses (Logs / Repository),
+                     so the Lazy placeholder doesn't flash a taller icon-tile header. --}}
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    :icon="$icon"
+                    :title="$title"
+                    :note="$description !== '' ? $description : null"
+                />
 
                 @if ($tabs !== [])
                     <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4" aria-hidden="true">

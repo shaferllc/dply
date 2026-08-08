@@ -7,8 +7,8 @@
              then the payload. The 40px icon tile, the uppercase eyebrow and the
              two-line explainer were three separate ways of saying "missing
              variables" before the keys — which are the actual content — appeared. --}}
-        <div class="px-5 py-3">
-                <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div class="px-5 pb-4 sm:px-6">
+                <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pb-2">
                     <div class="flex min-w-0 items-center gap-2">
                         <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0 text-rose-600" />
                         <h3 class="text-xs font-semibold text-brand-ink">
@@ -51,10 +51,10 @@
                     </div>
                 </div>
 
-                <div class="mt-2 flex flex-wrap gap-1">
+                <div class="flex flex-wrap gap-1.5 rounded-xl border border-brand-ink/10 bg-white px-4 py-3">
                     @foreach (array_slice($missingEnv, 0, 24) as $entry)
                         <span
-                            class="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-800"
+                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800"
                             title="{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}"
                         >
                             {{ $entry['key'] }}
@@ -66,7 +66,7 @@
                         </span>
                     @endforeach
                     @if (count($missingEnv) > 24)
-                        <span class="inline-flex items-center rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-800">
+                        <span class="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
                             {{ __('+:count more', ['count' => count($missingEnv) - 24]) }}
                         </span>
                     @endif
@@ -77,7 +77,7 @@
     {{-- Required-env checks are off for this site (operator chose to ignore
          missing vars). Muted reminder with a one-click re-enable. --}}
     @if ($supportsEnvPush && $envGateOff)
-        <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-2 text-xs text-brand-moss">
+        <div class="mx-5 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-xs text-brand-moss sm:mx-6">
             <span class="inline-flex items-center gap-1.5">
                 <x-heroicon-o-no-symbol class="h-3.5 w-3.5 text-brand-mist" />
                 {{ __('Required-variable checks are off for this site — deploys won\'t be blocked by missing env.') }}

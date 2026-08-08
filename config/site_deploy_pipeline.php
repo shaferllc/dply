@@ -5,7 +5,7 @@ use App\Models\SiteDeployStep;
 return [
     'tabs' => [
         'overview' => 'Overview',
-        'steps' => 'Pipeline',
+        'steps' => 'Steps',
         'rollout' => 'Rollout',
         'reference' => 'Reference',
     ],

@@ -14,12 +14,14 @@
         ];
     @endphp
 
-    <x-hero-card
-        :eyebrow="__('Site')"
-        :title="__('Backends')"
-        :description="__('Serve this site from multiple app servers behind a load balancer, enabling Rolling and Canary deploys.')"
-        icon="server-stack"
-    />
+    <section class="dply-card min-w-0 overflow-hidden p-0">
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-server-stack"
+            :title="__('Backends')"
+            :note="__('Serve this site from multiple app servers behind a load balancer, enabling Rolling and Canary deploys.')"
+        />
+    </section>
 
     {{-- Live refresh while backends/LB are still coming up. --}}
     @if ($this->isConverging || ($lb && $lb->status === 'provisioning'))

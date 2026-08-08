@@ -2,8 +2,8 @@
     use App\Models\ConsoleAction;
     use App\Services\Sites\DotEnvFileParser;
 
-    // Nested inside Deployments / standalone Environment chrome → hairline strips.
-    // Standalone cards only when this partial is the page's only surface (setup).
+    // Nested inside Deployments / Environment / Setup chrome → hairline strips.
+    // Standalone cards only when this partial is rendered without host chrome.
     $envMergedChrome = (bool) ($envMergedChrome ?? false);
     $card = $envMergedChrome ? 'border-b border-brand-ink/10' : 'dply-card overflow-hidden';
 
@@ -279,11 +279,22 @@
 
     @if ($showAttention)
         <section @class([$card, 'overflow-hidden'])>
-            <div class="flex items-center gap-1.5 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-1.5">
-                <x-heroicon-o-bell-alert class="h-3.5 w-3.5 text-brand-sage" aria-hidden="true" />
-                <h2 class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Needs attention') }}</h2>
+            {{-- Header in the app's own idiom (see the General page): a tinted
+                 icon tile, title and description on white with real padding —
+                 not a tinted band with an uppercase eyebrow, which is a shape
+                 nothing else here uses. --}}
+            <div class="flex items-start gap-3 px-5 py-4 sm:px-6">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200/70">
+                    <x-heroicon-o-bell-alert class="h-4.5 w-4.5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold tracking-tight text-brand-ink">{{ __('Needs attention') }}</h2>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">
+                        {{ __('Configuration dply flagged before the first deploy. Fixing these here writes straight to the site\'s .env.') }}
+                    </p>
+                </div>
             </div>
-            <div class="divide-y divide-brand-ink/10">
+            <div>
                 @if ($attentionConsoleRun)
                     <div
                         id="site-console-action-banner"

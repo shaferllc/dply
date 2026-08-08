@@ -8,7 +8,7 @@
 
     {{-- Backdrop --}}
     <div
-        x-show="open"
+        x-show="drawerOpen"
         x-cloak
         x-transition.opacity
         class="fixed inset-0 z-40 bg-brand-ink/30 backdrop-blur-sm"
@@ -18,7 +18,7 @@
 
     {{-- Slide-over panel (right edge) --}}
     <div
-        x-show="open"
+        x-show="drawerOpen"
         x-cloak
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="translate-x-full opacity-0"

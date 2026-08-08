@@ -44,6 +44,13 @@ class WorkspacePipeline extends Show
     #[Url(as: 'pipeline_tab', except: 'overview')]
     public string $pipelineTab = 'overview';
 
+    /** Steps editor mode: `script` (DeployScript) or `visual` (DnD timeline). */
+    #[Url(as: 'steps_mode', except: 'script')]
+    public string $stepsMode = 'script';
+
+    /** Defer bash export until the Share modal is opened (avoids cost on every DnD). */
+    public bool $pipelineShareExportReady = false;
+
     public function mount(Server $server, Site $site): void
     {
         if ($site->usesEdgeRuntime()) {
@@ -76,12 +83,38 @@ class WorkspacePipeline extends Show
         if ($this->lockedTab !== '' && in_array($this->lockedTab, $allowed, true)) {
             $this->pipelineTab = $this->lockedTab;
         }
+
+        $this->normalizeStepsModeFromRequest();
     }
 
     public function setPipelineTab(string $tab): void
     {
         $allowed = array_keys(config('site_deploy_pipeline.tabs', []));
         $this->pipelineTab = in_array($tab, $allowed, true) ? $tab : 'overview';
+    }
+
+    public function setStepsMode(string $mode): void
+    {
+        $this->stepsMode = $this->normalizedStepsMode($mode);
+    }
+
+    public function openPipelineShareModal(): void
+    {
+        $this->pipelineShareExportReady = true;
+        $this->dispatch('open-modal', 'pipeline-share');
+    }
+
+    protected function normalizeStepsModeFromRequest(): void
+    {
+        $raw = request()->query('steps_mode');
+        if (is_string($raw) && $raw !== '') {
+            $this->stepsMode = $this->normalizedStepsMode($raw);
+        }
+    }
+
+    protected function normalizedStepsMode(string $mode): string
+    {
+        return in_array($mode, ['visual', 'advanced'], true) ? 'visual' : 'script';
     }
 
     public function savePostDeployCommand(): void
@@ -145,7 +178,8 @@ class WorkspacePipeline extends Show
 
         $this->savePipelineAnchorScripts();
         $this->saveOpenPipelineStepFromWorkspace();
-        $this->saveDeploymentSettings();
+        $this->saveDeploymentSettings(toast: false);
+        $this->toastSuccess(__('Pipeline settings saved.'));
     }
 
     /**
@@ -220,6 +254,7 @@ class WorkspacePipeline extends Show
         $editingPipeline = $this->editingDeployPipeline()->loadMissing(['steps', 'hooks']);
 
         $tab = $this->pipelineTab;
+        $stepsVisual = $tab === 'steps' && $this->stepsMode === 'visual';
 
         // The deployment contract + preflight are display data for deploy-config
         // surfaces and are NOT read anywhere in the pipeline view tree (verified).
@@ -229,10 +264,8 @@ class WorkspacePipeline extends Show
         $deploymentContract = null;
         $deploymentPreflight = [];
 
-        // The advisor (DB-backed) only feeds the Overview + Pipeline (steps) tabs;
-        // Rollout / Reference never read its output. Skip it (and the actionable-
-        // check resolution it drives) on those tabs.
-        $needsAdvisor = in_array($tab, ['overview', 'steps'], true);
+        // Advisor feeds Overview + Visual Steps only (Script mode does not render it).
+        $needsAdvisor = $tab === 'overview' || $stepsVisual;
         $pipelineAdvisor = $needsAdvisor
             ? app(DeployPipelineAdvisor::class)->analyze($this->site, $editingPipeline)
             : ['checks' => [], 'errors' => [], 'warnings' => []];
@@ -241,11 +274,19 @@ class WorkspacePipeline extends Show
             ? DeployPipelineIssueFixResolver::actionableChecks($this->site, $this->server, $pipelineAdvisorChecks)
             : collect();
 
-        // The bash export (DB-backed) only feeds the share modal on the Pipeline
-        // (steps) tab; no other sub-tab renders it.
-        $needsBashExport = $tab === 'steps';
+        // Bash export only when Share is opened on Visual Steps (not every DnD morph).
+        $needsBashExport = $stepsVisual && $this->pipelineShareExportReady;
         $pipelineBashFull = $needsBashExport ? app(DeployPipelineScriptExporter::class)->toFullBash($editingPipeline) : '';
         $pipelineBashCommands = $needsBashExport ? app(DeployPipelineScriptExporter::class)->toCommandsOnly($editingPipeline) : '';
+
+        $needsReferenceCatalogs = $tab === 'reference';
+        $emptyTimelineSplit = [
+            'prefix' => [],
+            'buildBlocks' => [],
+            'mid' => [],
+            'releaseBlocks' => [],
+            'suffix' => [],
+        ];
 
         return view('livewire.sites.workspace-pipeline', array_merge(
             SiteSettingsViewData::for(
@@ -262,32 +303,44 @@ class WorkspacePipeline extends Show
                 'laravel_tab' => 'commands',
                 'pipelineTabs' => config('site_deploy_pipeline.tabs', []),
                 'pipelineTabIcons' => config('site_deploy_pipeline.tab_icons', []),
-                'pipelinePalette' => DeployPipelinePalette::stepsFor($this->site),
-                'pipelineHookPresets' => DeployPipelinePalette::hookPresetsFor($this->site),
-                'pipelineStepCatalog' => DeployPipelinePalette::stepCatalogFor($this->site),
-                'pipelineStepTypeReference' => DeployPipelinePalette::stepTypeReference(),
-                'pipelineHookCatalog' => DeployPipelinePalette::hookCatalogFor($this->site),
-                'deployPipelineTemplates' => app(DeployPipelineTemplateCatalog::class)->templatesForSite($this->site),
+                'pipelinePalette' => $stepsVisual ? DeployPipelinePalette::stepsFor($this->site) : [],
+                'pipelineHookPresets' => $stepsVisual ? DeployPipelinePalette::hookPresetsFor($this->site) : [],
+                'pipelineStepCatalog' => $needsReferenceCatalogs ? DeployPipelinePalette::stepCatalogFor($this->site) : [],
+                'pipelineStepTypeReference' => $needsReferenceCatalogs ? DeployPipelinePalette::stepTypeReference() : [],
+                'pipelineHookCatalog' => $needsReferenceCatalogs ? DeployPipelinePalette::hookCatalogFor($this->site) : [],
+                'deployPipelineTemplates' => $stepsVisual
+                    ? app(DeployPipelineTemplateCatalog::class)->templatesForSite($this->site)
+                    : [],
                 'editingDeployPipeline' => $editingPipeline,
                 'editingDeploySteps' => $editingPipeline->steps,
-                'pipelineTimelineSplit' => DeployPipelineTimeline::splitForUi($editingPipeline),
-                'notificationChannels' => $this->notificationChannelsForSite(),
+                'pipelineTimelineSplit' => $stepsVisual
+                    ? DeployPipelineTimeline::splitForUi($editingPipeline)
+                    : $emptyTimelineSplit,
+                'notificationChannels' => ($stepsVisual || $tab === 'rollout')
+                    ? $this->notificationChannelsForSite()
+                    : collect(),
                 'deployHookAnchors' => SiteDeployHook::anchorLabels(),
                 'deployHookKinds' => SiteDeployHook::kindLabels(),
                 'contextualDocSlug' => app(ContextualDocResolver::class)->resolveForSiteSection($this->site, 'pipeline'),
                 'pipelineUnsavedTargets' => implode(',', $this->pipelineUnsavedTargetFields()),
-                'pipelineAnchorDefaultCloneHint' => app(PipelineAnchorScriptRunner::class)->defaultCloneScriptHint($this->site),
-                'pipelineAnchorDefaultActivateHint' => app(PipelineAnchorScriptRunner::class)->defaultActivateScriptHint($this->site),
+                'pipelineAnchorDefaultCloneHint' => $stepsVisual
+                    ? app(PipelineAnchorScriptRunner::class)->defaultCloneScriptHint($this->site)
+                    : '',
+                'pipelineAnchorDefaultActivateHint' => $stepsVisual
+                    ? app(PipelineAnchorScriptRunner::class)->defaultActivateScriptHint($this->site)
+                    : '',
                 'pipelineAdvisor' => $pipelineAdvisor,
                 'pipelineAdvisorErrors' => collect($pipelineAdvisor['errors']),
                 'pipelineAdvisorWarnings' => collect($pipelineAdvisor['warnings']),
                 'pipelineActionableChecks' => $pipelineActionableChecks,
-                'pipelineSafetyBundles' => DeployPipelineSafetyPresets::bundles(),
-                'pipelineSafetyBundleVisible' => DeployPipelineSafetyPresets::visibleForSite(
+                'pipelineSafetyBundles' => $stepsVisual ? DeployPipelineSafetyPresets::bundles() : [],
+                'pipelineSafetyBundleVisible' => $stepsVisual && DeployPipelineSafetyPresets::visibleForSite(
                     $this->site,
                     DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1,
                 ),
-                'pipelineStarters' => app(DeployPipelineStarterCatalog::class)->startersForSite($this->site),
+                'pipelineStarters' => $stepsVisual
+                    ? app(DeployPipelineStarterCatalog::class)->startersForSite($this->site)
+                    : [],
                 'pipelineBashFull' => $pipelineBashFull,
                 'pipelineBashCommands' => $pipelineBashCommands,
                 'pipelineOverviewStepCount' => $editingPipeline->steps->count(),

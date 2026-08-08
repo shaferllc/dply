@@ -16,7 +16,7 @@
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
                         {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
                     </span>
@@ -159,7 +159,7 @@
                          filter the list to that group; combines with search. --}}
                     <div class="flex min-w-0 flex-wrap gap-1">
                         <button type="button" wire:click="$set('env_group', '')" @class([
-                            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors',
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
                             'bg-brand-forest text-brand-cream' => $selectedEnvGroup === '',
                             'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== '',
                         ])>
@@ -167,7 +167,7 @@
                         </button>
                         @foreach ($envGroups as $g => $cnt)
                             <button type="button" wire:click="$set('env_group', @js($g))" @class([
-                                'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold transition-colors',
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold transition-colors',
                                 'bg-brand-forest text-brand-cream' => $selectedEnvGroup === $g,
                                 'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== $g,
                             ])>
@@ -273,7 +273,7 @@
                                         <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 shadow-lg">
                                             <x-input-label for="mailtest_to_{{ md5($gBindingId) }}" :value="__('Send test email to')" />
                                             <input id="mailtest_to_{{ md5($gBindingId) }}" type="email" wire:model="mailTestRecipient" placeholder="{{ auth()->user()?->email }}" class="dply-input mt-1 text-sm" />
-                                            <button type="button" wire:click="sendBindingTestEmail(@js((string) $gBindingId))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
+                                            <button type="button" wire:click="sendBindingTestEmail(@js((string) $gBindingId))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="dply-btn dply-btn-sm dply-btn-primary mt-2 w-full">
                                                 <x-heroicon-o-paper-airplane class="h-4 w-4" />
                                                 {{ __('Send test email') }}
                                             </button>
@@ -439,15 +439,15 @@
                                                     </div>
                                                 </div>
                                                 <div class="flex flex-wrap items-center gap-2">
-                                                    <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
+                                                    <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
                                                         @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" /> {{ __('Hide') }}
                                                         @else <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Show') }}
                                                         @endif
                                                     </button>
-                                                    <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
+                                                    <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Edit value') }}">
                                                         <x-heroicon-o-pencil-square class="h-4 w-4" /> {{ __('Edit') }}
                                                     </button>
-                                                    <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40" title="{{ __('Remove override') }}">
+                                                    <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove override') }}">
                                                         <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
                                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
                                                         {{ __('Remove') }}
@@ -542,15 +542,15 @@
                                                 </div>
                                             </div>
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
+                                                <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
                                                     @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" /> {{ __('Hide') }}
                                                     @else <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Show') }}
                                                     @endif
                                                 </button>
-                                                <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
+                                                <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Edit value') }}">
                                                     <x-heroicon-o-pencil-square class="h-4 w-4" /> {{ __('Edit') }}
                                                 </button>
-                                                <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40" title="{{ __('Remove override') }}">
+                                                <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="dply-btn dply-btn-xs dply-btn-outline hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove override') }}">
                                                     <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
                                                     <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
                                                     {{ __('Remove') }}
@@ -574,11 +574,11 @@
                     {{ trans_choice('{1} :count selected|[2,*] :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
                 </span>
                 <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-                    <button type="button" wire:click="toggleSelectAllEnvVars" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    <button type="button" wire:click="toggleSelectAllEnvVars" class="dply-btn dply-btn-xs dply-btn-outline">
                         <x-heroicon-o-check-circle class="h-4 w-4" />
                         {{ __('Select all') }}
                     </button>
-                    <button type="button" wire:click="clearEnvSelection" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    <button type="button" wire:click="clearEnvSelection" class="dply-btn dply-btn-xs dply-btn-outline">
                         <x-heroicon-o-x-mark class="h-4 w-4" />
                         {{ __('Clear') }}
                     </button>
@@ -587,7 +587,7 @@
                         wire:click="confirmRemoveSelectedEnvVars"
                         wire:loading.attr="disabled"
                         wire:target="confirmRemoveSelectedEnvVars"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                        class="dply-btn dply-btn-xs bg-red-600 text-white hover:bg-red-700"
                     >
                         <x-heroicon-o-trash class="h-4 w-4" />
                         {{ trans_choice('{1} Remove selected|[2,*] Remove :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
@@ -761,7 +761,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="revealEscrowedEnvVar('{{ $key }}')"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                class="dply-btn dply-btn-xs dply-btn-outline"
                                                 title="{{ $escrowRevealed ? __('Hide value') : __('Reveal value') }}"
                                             >
                                                 @if ($escrowRevealed)
@@ -777,7 +777,7 @@
                                                 wire:click="demoteEnvVar('{{ $key }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="demoteEnvVar('{{ $key }}')"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                                class="dply-btn dply-btn-xs dply-btn-outline"
                                                 title="{{ __('Move this secret back into the editable .env') }}"
                                             >
                                                 <x-heroicon-o-lock-open class="h-4 w-4" />{{ __('Move back') }}

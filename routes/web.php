@@ -197,6 +197,7 @@ use App\Livewire\Sites\Caching;
 use App\Livewire\Sites\Cdn;
 use App\Livewire\Sites\ChooseApp as SitesChooseApp;
 use App\Livewire\Sites\Create as SitesCreate;
+use App\Livewire\Sites\SiteSetup as SitesSetupWizard;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\Database as SitesDatabase;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
@@ -697,11 +698,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/choose-app', SitesChooseApp::class)->name('sites.choose-app');
-    // The first-deploy setup wizard was folded into the Repository page as a
-    // conditional tab. Keep the route name working by redirecting to it.
-    Route::get('servers/{server}/sites/{site}/setup', function (Server $server, Site $site) {
-        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'repo_tab' => 'setup']);
-    })->name('sites.setup');
+    // The first-deploy setup wizard normally rides along as the Repository
+    // page's conditional "Set up" tab, but it renders standalone too (the
+    // component's non-embedded branch brings its own breadcrumb + sidebar).
+    //
+    // Serving it directly rather than redirecting into the tab means the wizard
+    // stays reachable when the Repository page's lazy mount can't complete —
+    // which is exactly the state a local dev environment ends up in, leaving
+    // the wizard impossible to open at all. Same screen either way.
+    Route::livewire('servers/{server}/sites/{site}/setup', SitesSetupWizard::class)->name('sites.setup');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::middleware('feature:workspace.site_promote')->group(function (): void {
         Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');

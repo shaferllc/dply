@@ -220,6 +220,10 @@ class Show extends Component
         $this->git_provider_kind = in_array($kind, ['github', 'gitlab', 'bitbucket', 'custom'], true) ? $kind : 'custom';
         $this->git_source_control_account_id = (string) ($repoMeta['git_source_control_account_id'] ?? '');
         $this->quick_deploy_enabled_ui = (bool) ($repoMeta['quick_deploy_enabled'] ?? false);
+        $mode = (string) ($repoMeta['quick_deploy_mode'] ?? 'webhook');
+        $this->quick_deploy_mode_ui = $this->quick_deploy_enabled_ui && in_array($mode, ['webhook', 'poll'], true)
+            ? $mode
+            : null;
         $this->deploy_sync_include_peers_on_manual = (bool) ($repoMeta['deploy_sync_include_peers_on_manual'] ?? true);
     }
 
