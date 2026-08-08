@@ -1,7 +1,16 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} px-5 py-5 sm:px-6">
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-link"
+            :title="__('Connections')"
+            :note="__('Connection snippets, extra users, drift and credential sharing for this engine.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
         <x-empty-state
             borderless
+            compact
             icon="heroicon-o-link"
             tone="sage"
             :title="__('Connections unavailable')"
@@ -17,6 +26,7 @@
                 </button>
             </x-slot:actions>
         </x-empty-state>
+        </div>
     </div>
 @else
     @include('livewire.servers.partials.connection-snippet', [

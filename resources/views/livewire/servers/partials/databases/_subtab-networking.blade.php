@@ -5,9 +5,18 @@
 @endphp
 
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} px-5 py-5 sm:px-6">
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-share"
+            :title="__('Per-database remote access')"
+            :note="__('Each database gets its own remote-access controls once the engine is installed.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
         <x-empty-state
             borderless
+            compact
             icon="heroicon-o-share"
             tone="sage"
             :title="__('Networking unavailable')"
@@ -20,12 +29,21 @@
                 </button>
             </x-slot:actions>
         </x-empty-state>
+        </div>
     </div>
 @elseif ($engineDatabases->isEmpty())
     <div class="{{ $card }}">
-        <div class="px-5 py-5 sm:px-6">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-share"
+            :title="__('Per-database remote access')"
+            :note="__('Each database gets its own remote-access controls once it exists.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
             <x-empty-state
                 borderless
+                compact
                 icon="heroicon-o-share"
                 tone="sage"
                 :title="__('No databases yet')"
@@ -44,38 +62,33 @@
 @else
     {{-- Engine-level status banner --}}
     <div class="{{ $card }}">
-        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex items-center gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Networking') }}</p>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Per-database remote access') }}</h3>
-                </div>
-            </div>
-            @if ($anyExposed)
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">
-                    <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                    {{ __(':n exposed', ['n' => $engineDatabases->where('remote_access', true)->count()]) }}
-                </span>
-            @else
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
-                    <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                    {{ __('Localhost only') }}
-                </span>
-            @endif
-        </div>
-        <div class="px-5 py-5 sm:px-6">
-            <p class="max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Each database can be opened to a specific CIDR — a VPC subnet like 10.0.0.0/8 to allow only your own servers, or a single app server like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule (or MySQL GRANT) for that database only and opens the UFW rule for port :port to that source alone.', ['port' => $enginePort]) }}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-share"
+            :title="__('Per-database remote access')"
+            :tone="$anyExposed ? 'amber' : null"
+            :note="__('Each database can be opened to a specific CIDR — a VPC subnet like 10.0.0.0/8 to allow only your own servers, or a single app server like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule (or MySQL GRANT) for that database only and opens the UFW rule for port :port to that source alone.', ['port' => $enginePort])"
+            :class="$anyExposed && ! $engineRunning ? '' : 'border-b border-brand-ink/10'"
+        >
+            <x-slot:actions>
+                @if ($anyExposed)
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                        <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                        {{ __(':n exposed', ['n' => $engineDatabases->where('remote_access', true)->count()]) }}
+                    </span>
+                @else
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                        <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                        {{ __('Localhost only') }}
+                    </span>
+                @endif
+            </x-slot:actions>
+        </x-workspace-panel-head>
+        @if ($anyExposed && ! $engineRunning)
+            <p class="border-b border-brand-ink/10 px-4 py-2.5 text-xs text-amber-700 sm:px-5">
+                {{ __(':engine is not running — exposed databases are unreachable until the engine is started.', ['engine' => $dbEngineInfoForTab['label']]) }}
             </p>
-            @if ($anyExposed && ! $engineRunning)
-                <p class="mt-2 max-w-2xl text-sm text-amber-700">
-                    {{ __(':engine is not running — exposed databases are unreachable until the engine is started.', ['engine' => $dbEngineInfoForTab['label']]) }}
-                </p>
-            @endif
-        </div>
+        @endif
     </div>
 
     {{-- Per-database rows --}}
@@ -85,31 +98,28 @@
             $dbCidr = $db->allowed_from ?: __('no source set');
         @endphp
         <div class="{{ $card }}" wire:key="db-networking-{{ $db->id }}">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/10 px-5 py-4 sm:px-6">
-                <div class="flex items-center gap-3 min-w-0">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-circle-stack class="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</p>
-                        @if ($db->username)
-                            <p class="truncate font-mono text-[11px] text-brand-mist">{{ $db->username }}</p>
-                        @endif
-                    </div>
-                </div>
-                @if ($dbRemote)
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">
-                        <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                        {{ __('Exposed · :cidr', ['cidr' => $dbCidr]) }}
-                    </span>
-                @else
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sand/60 px-2.5 py-1 text-[11px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
-                        {{ __('Localhost only') }}
-                    </span>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/10 px-3 py-2 sm:px-4">
+                <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</p>
+                @if ($db->username)
+                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                    <p class="truncate font-mono text-[11px] text-brand-mist">{{ $db->username }}</p>
                 @endif
+                <div class="ml-auto flex shrink-0 items-center gap-1.5">
+                    @if ($dbRemote)
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                            {{ __('Exposed · :cidr', ['cidr' => $dbCidr]) }}
+                        </span>
+                    @else
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                            {{ __('Localhost only') }}
+                        </span>
+                    @endif
+                </div>
             </div>
 
-            <div class="px-5 py-5 sm:px-6">
+            <div class="px-4 py-3.5 sm:px-5">
                 @if ($dbRemote)
                     <p class="text-sm text-brand-moss">
                         {{ __('Connections to :name from :cidr on port :port are permitted.', ['name' => $db->name, 'cidr' => $dbCidr, 'port' => $enginePort]) }}

@@ -103,7 +103,10 @@ test('deploys page renders the deploy-windows editor', function (): void {
     $this->actingAs($user)
         ->get(route('servers.deploys', ['server' => $server, 'tab' => 'deploy-windows']))
         ->assertOk()
-        ->assertSee(__('Deploy window policy'))
+        // The "Deploy window policy" head this used to assert restated the head
+        // pill and the enforcement banner directly above it; the tab opens on
+        // the figure strip now, and the editor head carries the title.
+        ->assertSee(__('Deny rules'))
         ->assertSee(__('Edit policy'))
         ->assertSee(__('Enable deploy window policy'));
 });

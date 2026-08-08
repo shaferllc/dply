@@ -78,6 +78,7 @@
     </div>
 
     <x-hero-card
+        compact
         :title="$current['label']"
         :description="$current['description']"
         icon="rectangle-group"
@@ -86,14 +87,25 @@
             <x-slot:topAction>{{ $actions }}</x-slot:topAction>
         @endisset
         @if (! empty($current['help']))
+            {{-- Collapsed by default: the guide is reference, not something to
+                 read before every visit, and open it pushed the section's own
+                 content a full screen-third down. One summary line when shut. --}}
             <x-slot:footer>
-                <h3 class="text-base font-semibold text-brand-ink">{{ $current['help']['title'] }}</h3>
-                <p class="mt-2 text-sm leading-6 text-brand-moss">{{ $current['help']['body'] }}</p>
+                <details class="group -mx-4 -my-4 sm:-mx-5 sm:-my-5">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20 sm:px-5 [&::-webkit-details-marker]:hidden">
+                        <span class="inline-flex min-w-0 items-center gap-1.5">
+                            <x-heroicon-m-information-circle class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                            <span class="truncate">{{ $current['help']['title'] }}</span>
+                        </span>
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition group-open:rotate-180" aria-hidden="true" />
+                    </summary>
+                    <p class="border-t border-brand-ink/10 px-4 py-2.5 text-[11px] leading-relaxed text-brand-moss sm:px-5">{{ $current['help']['body'] }}</p>
+                </details>
             </x-slot:footer>
         @endif
     </x-hero-card>
 
-    <div class="mt-6 space-y-8 sm:mt-8">
+    <div class="mt-4 space-y-4">
         {{ $slot }}
     </div>
 </x-project-workspace-shell>

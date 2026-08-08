@@ -15,78 +15,57 @@
 @endphp
 
 <div>
-    {{-- Stat strip — nested in the merged Deploys card. --}}
-    <section>
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy window policy') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                    @switch($overall)
-                        @case('blocked') {{ __('Deploys blocked now') }} @break
-                        @case('allowed') {{ __('Deploys allowed now') }} @break
-                        @default {{ __('Policy disabled') }}
-                    @endswitch
-                </h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    @if ($overall === 'disabled')
-                        {{ __('Enable the policy below to enforce deny windows for every site on this server.') }}
-                    @elseif (! $currentAllowed && $blockReason)
-                        {{ $blockReason }}
-                        @if ($nextAllowedAt)
-                            · {{ __('Allowed again :time', ['time' => $nextAllowedAt->timezone($policyTz)->format('D H:i T')]) }}
-                        @endif
-                    @else
-                        {{ trans_choice(':count deny rule configured|:count deny rules configured', $summary['rule_count'] ?? 0, ['count' => $summary['rule_count'] ?? 0]) }}
-                        · {{ __('Timezone :tz', ['tz' => $policyTz]) }}
-                    @endif
-                </p>
-            </div>
-        </div>
-
-        <div class="grid gap-px border-b border-brand-ink/10 bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-5">
-            @foreach ([
-                ['label' => __('Policy'), 'value' => ($summary['enabled'] ?? false) ? __('On') : __('Off')],
-                ['label' => __('Deny rules'), 'value' => number_format((int) ($summary['rule_count'] ?? 0))],
-                ['label' => __('Active now'), 'value' => number_format((int) ($summary['active_rules_now'] ?? 0))],
-                ['label' => __('Sites covered'), 'value' => number_format((int) ($summary['total_sites'] ?? 0))],
-                ['label' => __('Skipped (7d)'), 'value' => number_format((int) ($summary['skipped_deploys_7d'] ?? 0))],
-            ] as $stat)
-                <div class="bg-white px-4 py-3.5">
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
-                    <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
-                </div>
-            @endforeach
-        </div>
-    </section>
+    {{-- The verdict + reason + rule count + timezone stack that used to open
+         this tab said exactly what the head pill and the enforcement banner
+         directly above already say — three copies of one fact. The figures go
+         straight into a strip; Policy on/off is the banner's whole message, so
+         it doesn't get a cell of its own. --}}
+    <x-workspace-stat-strip
+        class="border-b border-brand-ink/10"
+        :stats="[
+            [
+                'label' => __('Deny rules'),
+                'value' => number_format((int) ($summary['rule_count'] ?? 0)),
+            ],
+            [
+                'label' => __('Active now'),
+                'value' => number_format((int) ($summary['active_rules_now'] ?? 0)),
+                'tone' => ($summary['active_rules_now'] ?? 0) > 0 ? 'warn' : null,
+            ],
+            [
+                'label' => __('Sites covered'),
+                'value' => number_format((int) ($summary['total_sites'] ?? 0)),
+            ],
+            [
+                'label' => __('Skipped (7d)'),
+                'value' => number_format((int) ($summary['skipped_deploys_7d'] ?? 0)),
+                'tone' => ($summary['skipped_deploys_7d'] ?? 0) > 0 ? 'warn' : null,
+            ],
+        ]"
+    />
 
     @if ($canUpdate)
         {{-- Editor (absorbs the old Schedule tab). --}}
         <section>
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Editor') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edit policy') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Toggle enforcement, set timezone + skip message, and manage deny rules. Save to apply server-wide.') }}</p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-adjustments-horizontal"
+                :title="__('Edit policy')"
+                :note="__('Toggle enforcement, set timezone + skip message, and manage deny rules. Save to apply server-wide.')"
+                class="border-b border-brand-ink/10"
+            />
 
-            <form wire:submit="savePolicy" class="space-y-5 px-5 py-5 sm:px-6">
-                <label class="inline-flex items-center gap-2 text-sm font-medium text-brand-ink">
+            <form wire:submit="savePolicy" class="space-y-3.5 px-4 py-3.5 sm:px-5">
+                <label class="inline-flex items-center gap-2 text-xs font-semibold text-brand-ink">
                     <input type="checkbox" wire:model.live="policy_enabled" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40">
                     {{ __('Enable deploy window policy') }}
                 </label>
 
-                <div class="grid gap-5 lg:grid-cols-2">
+                <div class="grid gap-3 lg:grid-cols-2">
                     <div>
                         <x-input-label for="policy_timezone" :value="__('Timezone')" />
                         <x-text-input id="policy_timezone" wire:model="policy_timezone" class="mt-1 block w-full max-w-xs" />
-                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('Deny windows are evaluated in this timezone.') }}</p>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Deny windows are evaluated in this timezone.') }}</p>
                         <x-input-error :messages="$errors->get('policy_timezone')" class="mt-1" />
                     </div>
                     <div>
@@ -96,42 +75,48 @@
                     </div>
                 </div>
 
-                <div class="space-y-3">
+                <div class="space-y-2">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Deny windows') }}</h3>
-                        <div class="flex gap-2">
-                            <button type="button" wire:click="applyWeekendFreezePreset" class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Weekend freeze preset') }}</button>
-                            <button type="button" wire:click="addDenyRule" class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Add rule') }}</button>
+                        <h3 class="text-xs font-semibold text-brand-ink">{{ __('Deny windows') }}</h3>
+                        <div class="flex gap-1.5">
+                            <button type="button" wire:click="applyWeekendFreezePreset" class="inline-flex h-6 items-center rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">{{ __('Weekend freeze preset') }}</button>
+                            <button type="button" wire:click="addDenyRule" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                {{ __('Add rule') }}
+                            </button>
                         </div>
                     </div>
 
                     @forelse ($deny_rules as $index => $rule)
-                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-4" wire:key="deny-rule-{{ $index }}">
-                            <div class="flex flex-wrap gap-4">
+                        <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5" wire:key="deny-rule-{{ $index }}">
+                            <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
                                 <div class="min-w-[12rem] flex-1">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Days') }}</p>
-                                    <div class="mt-2 flex flex-wrap gap-2">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Days') }}</p>
+                                    <div class="mt-1 flex flex-wrap gap-1">
                                         @foreach ($dayOptions as $day)
-                                            <label class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-xs">
-                                                <input type="checkbox" value="{{ $day }}" wire:model="deny_rules.{{ $index }}.days" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40">
+                                            <label class="inline-flex items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-1.5 py-0.5 text-[11px]">
+                                                <input type="checkbox" value="{{ $day }}" wire:model="deny_rules.{{ $index }}.days" class="h-3 w-3 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40">
                                                 {{ $dayLabels[$day] ?? strtoupper($day) }}
                                             </label>
                                         @endforeach
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start') }}</p>
-                                    <input type="time" wire:model="deny_rules.{{ $index }}.start" class="mt-2 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-sm">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Start') }}</p>
+                                    <input type="time" wire:model="deny_rules.{{ $index }}.start" class="mt-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs">
                                 </div>
                                 <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('End') }}</p>
-                                    <input type="time" wire:model="deny_rules.{{ $index }}.end" class="mt-2 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-sm">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('End') }}</p>
+                                    <input type="time" wire:model="deny_rules.{{ $index }}.end" class="mt-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs">
                                 </div>
-                                <button type="button" wire:click="removeDenyRule({{ $index }})" class="self-end text-xs font-semibold text-rose-700 hover:text-rose-900">{{ __('Remove') }}</button>
+                                <button type="button" wire:click="removeDenyRule({{ $index }})" class="ml-auto text-[11px] font-semibold text-rose-700 hover:text-rose-900">{{ __('Remove') }}</button>
                             </div>
                         </div>
                     @empty
-                        <p class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center text-sm text-brand-moss">{{ __('No deny rules — deploys are never blocked by schedule until you add one.') }}</p>
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/15 px-3 py-2 text-[11px] text-brand-moss">
+                            <x-heroicon-m-calendar-days class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                            {{ __('No deny rules — deploys are never blocked by schedule until you add one.') }}
+                        </p>
                     @endforelse
                 </div>
 
@@ -141,48 +126,52 @@
     @else
         {{-- Read-only view for operators without `update` on this server. --}}
         <section>
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deny windows') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Configured deny windows') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('You have read-only access to this policy. Each rule blocks deploys on selected weekdays between start and end (server policy timezone).') }}</p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-clock"
+                :title="__('Configured deny windows')"
+                :count="count($ruleRows) > 0 ? count($ruleRows) : null"
+                :note="__('Read-only access. Each rule blocks deploys on selected weekdays between start and end, in the policy timezone.')"
+                class="border-b border-brand-ink/10"
+            />
 
             @if ($ruleRows === [])
-                <div class="px-5 py-10 text-center text-sm text-brand-moss sm:px-6">{{ __('No deny rules configured.') }}</div>
+                <x-empty-state
+                    borderless
+                    compact
+                    icon="heroicon-o-calendar-days"
+                    :title="__('No deny rules configured')"
+                    :description="__('Deploys on this server are never blocked by schedule.')"
+                />
             @else
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                        <thead class="bg-brand-sand/20 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">
+                    <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
+                        <thead class="bg-brand-sand/20 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">
                             <tr>
-                                <th scope="col" class="px-6 py-3">{{ __('Schedule') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ __('Days') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ __('Start') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ __('End') }}</th>
-                                <th scope="col" class="px-6 py-3">{{ __('Now') }}</th>
+                                <th scope="col" class="px-4 py-1.5 sm:px-5">{{ __('Schedule') }}</th>
+                                <th scope="col" class="px-3 py-1.5">{{ __('Days') }}</th>
+                                <th scope="col" class="px-3 py-1.5">{{ __('Start') }}</th>
+                                <th scope="col" class="px-3 py-1.5">{{ __('End') }}</th>
+                                <th scope="col" class="px-4 py-1.5 sm:px-5">{{ __('Now') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/8 bg-white">
                             @foreach ($ruleRows as $row)
                                 <tr wire:key="policy-rule-{{ $row['index'] }}">
-                                    <td class="px-6 py-3.5 font-medium text-brand-ink">{{ $row['summary'] }}</td>
-                                    <td class="px-4 py-3.5 text-brand-moss">{{ $row['days_label'] }}</td>
-                                    <td class="px-4 py-3.5 font-mono text-xs">{{ $row['start'] }}</td>
-                                    <td class="px-4 py-3.5 font-mono text-xs">
+                                    <td class="px-4 py-1.5 font-semibold text-brand-ink sm:px-5">{{ $row['summary'] }}</td>
+                                    <td class="px-3 py-1.5 text-brand-moss">{{ $row['days_label'] }}</td>
+                                    <td class="px-3 py-1.5 font-mono tabular-nums">{{ $row['start'] }}</td>
+                                    <td class="px-3 py-1.5 font-mono tabular-nums">
                                         {{ $row['end'] }}
                                         @if ($row['overnight'])
                                             <span class="ms-1 text-[10px] font-semibold uppercase text-brand-mist">{{ __('overnight') }}</span>
                                         @endif
                                     </td>
-                                    <td class="px-6 py-3.5">
+                                    <td class="px-4 py-1.5 sm:px-5">
                                         @if ($row['active_now'])
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tonePalette['amber'] }}">{{ __('Blocking') }}</span>
+                                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $tonePalette['amber'] }}">{{ __('Blocking') }}</span>
                                         @else
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tonePalette['mist'] }}">{{ __('Idle') }}</span>
+                                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $tonePalette['mist'] }}">{{ __('Idle') }}</span>
                                         @endif
                                     </td>
                                 </tr>

@@ -20,39 +20,37 @@
      dropdown can paint past the card boundary while keeping the rounded
      header/footer visuals intact. --}}
 <div class="{{ $card }} overflow-visible" wire:key="cache-repl-{{ $engine }}">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — interactive console', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run :engine-cli commands directly against the server. Read-only commands work anytime; mutating commands need the unlock below.', ['engine' => $engine]) }}</p>
-        </div>
-        <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-command-line"
+        :title="__(':engine — interactive console', ['engine' => $engineLabel])"
+        :note="__('Run :engine-cli commands directly against the server. Read-only commands work anytime; mutating commands need the unlock below.', ['engine' => $engine])"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             <button
                 type="button"
                 x-on:click="$dispatch('open-modal', @js($commandModalName))"
-                class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-book-open class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-book-open class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Command reference') }}
             </button>
             <button
                 type="button"
                 wire:click="clearReplHistory"
-                class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                 @disabled(empty($replHistory))
             >
-                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Clear') }}
             </button>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-4 py-3.5 sm:px-5">
 
-    <div class="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
+    <div class="flex flex-wrap items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-3 py-2">
         <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
             <input
                 type="checkbox"
@@ -60,9 +58,9 @@
                 @checked($replUnlocked)
                 class="h-4 w-4 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30"
             />
-            <span class="font-medium text-brand-ink">{{ __('Allow mutating commands') }}</span>
+            <span class="text-xs font-semibold text-brand-ink">{{ __('Allow mutating commands') }}</span>
         </label>
-        <span class="text-xs text-brand-moss">
+        <span class="text-[11px] text-brand-moss">
             @if ($replUnlocked)
                 {{ __('Unlocked — every command is recorded in the audit log.') }}
             @else
@@ -72,7 +70,7 @@
     </div>
 
     <div
-        class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"
+        class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100"
         x-data="{ pendingCmd: '' }"
         x-on:repl-submitting.window="pendingCmd = $event.detail?.cmd || ''"
     >
@@ -81,8 +79,8 @@
             {{-- Dark-theme variant of the same empty-state pattern the
                  light cards use: dashed border, centered icon, bold title,
                  helper copy with inline command chips. --}}
-            <div class="rounded-lg border border-dashed border-emerald-100/15 bg-emerald-100/[0.03] px-6 py-8 text-center" wire:loading.remove wire:target="runReplCommand">
-                <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100/10 text-emerald-200 ring-1 ring-emerald-100/15">
+            <div class="rounded-lg border border-dashed border-emerald-100/15 bg-emerald-100/[0.03] px-4 py-6 text-center" wire:loading.remove wire:target="runReplCommand">
+                <span class="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100/10 text-emerald-200 ring-1 ring-emerald-100/15">
                     <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <p class="mt-3 text-sm font-semibold text-emerald-100">{{ __('No commands run yet') }}</p>

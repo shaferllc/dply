@@ -25,7 +25,7 @@
                 wire:target="loadSlowlog"
                 class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
             >
-                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span wire:loading.remove wire:target="loadSlowlog">{{ __('Rescan') }}</span>
                 <span wire:loading wire:target="loadSlowlog">{{ __('Scanning…') }}</span>
             </button>
@@ -55,7 +55,7 @@
     @elseif ($entries === null)
         <p class="mt-4 text-xs text-brand-mist">{{ __('Loading…') }}</p>
     @elseif ($entries === [])
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
             </span>

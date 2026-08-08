@@ -37,9 +37,11 @@
         </section>
     @endif
 
-    <form wire:submit.prevent="next" class="mt-6">
-        {{-- Hero: step + intent. --}}
+    <form wire:submit.prevent="next" class="mt-4">
+        {{-- Hero: step + intent. Compact — the stepper above already carries the
+             step position, so the hero only has to name the goal. --}}
         <x-hero-card
+            compact
             icon="server-stack"
             iconSize="md"
             :eyebrow="__('Step :n of :total', ['n' => 1, 'total' => $totalSteps])"

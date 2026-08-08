@@ -9,38 +9,37 @@
 
 {{-- Nested inside the merged Databases card — same chrome as Health notifications. --}}
 <div>
-    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Database alerts') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s database events — databases, engines, and users. Each row binds one channel to one event.') }}
-                </p>
-            </div>
-        </div>
-        <a
-            href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
-            wire:navigate
-            class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-        >
-            {{ __('Manage in Settings') }}
-            <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        </a>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-bell"
+        :title="__('Database alerts')"
+        :count="$subscriptionsByChannel->isNotEmpty()
+            ? trans_choice('{1} :count channel|[2,*] :count channels', $subscriptionsByChannel->count(), ['count' => $subscriptionsByChannel->count()])
+            : null"
+        :note="__('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s database events — databases, engines, and users. Each row binds one channel to one event.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <a
+                href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
+                wire:navigate
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+            >
+                {{ __('Manage in Settings') }}
+                <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            </a>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <p class="border-b border-brand-ink/10 px-5 py-3 text-xs leading-relaxed text-brand-moss sm:px-6">
+    <p class="border-b border-brand-ink/10 px-4 py-2.5 text-[11px] leading-relaxed text-brand-moss sm:px-5">
         {{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry whenever a database is created or removed, an engine is installed or removed, or a database user is created or removed — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}
     </p>
 
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-4 py-3.5 sm:px-5">
         @if ($subscriptionsByChannel->isEmpty())
-            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
-                <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
-                <p class="mt-3 text-sm text-brand-moss">
+            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-5 text-center">
+                <x-heroicon-o-bell-slash class="mx-auto h-7 w-7 text-brand-mist" aria-hidden="true" />
+                <p class="mt-2 text-sm text-brand-moss">
                     {{ __('No external channels are routed for database events yet.') }}
                 </p>
                 <p class="mt-1 text-xs text-brand-mist">
@@ -51,7 +50,7 @@
             <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
                 @foreach ($subscriptionsByChannel as $channelId => $subs)
                     @php $channel = $subs->first()->channel; @endphp
-                    <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" wire:key="db-notif-ch-{{ $channelId }}">
+                    <li class="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between" wire:key="db-notif-ch-{{ $channelId }}">
                         <div class="min-w-0">
                             <p class="truncate text-sm font-medium text-brand-ink">{{ $channel?->label ?? __('(deleted channel)') }}</p>
                             <p class="text-xs text-brand-moss">{{ ucfirst((string) ($channel?->type ?? '—')) }}</p>
@@ -76,10 +75,10 @@
         @endif
     </div>
 
-    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+    <div class="border-t border-brand-ink/10 px-4 py-3.5 sm:px-5">
         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a channel') }}</p>
-        <form wire:submit="addDatabaseNotificationSubscription" class="mt-4 space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
+        <form wire:submit="addDatabaseNotificationSubscription" class="mt-3 space-y-3">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="db-notif-channel" value="{{ __('Channel') }}" />
                     <select

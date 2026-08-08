@@ -31,19 +31,28 @@
     $opsReady = $server->isReady() && $server->ip_address && $server->ssh_private_key;
     $isDeployer = auth()->user()->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
 
-    $statusBadge = static function (?string $value, array $good = [], array $bad = []) use ($tonePalette): string {
+    // Scan freshness used to be a whole "Overall" section under the tabs; it is
+    // one clause beside the verdict pill now.
+    $scanLabel = ($scan['checked_at'] ?? null)
+        ? __('Scanned :time', ['time' => $scan['checked_at']->diffForHumans()])
+            . (($scan['stale'] ?? false) ? ' · ' . __('stale after :hours h', ['hours' => $scan['stale_hours'] ?? 24]) : '')
+        : __('Never scanned');
+
+    // Tone keys for x-workspace-stat-strip ('ok' | 'warn' | 'bad' | null) —
+    // replaces the ring/bg badge classes the old tile grid needed.
+    $statusTone = static function (?string $value, array $good = [], array $bad = []): ?string {
         if ($value === null || $value === '') {
-            return $tonePalette['mist'];
+            return null;
         }
         $normalized = strtolower($value);
         if (in_array($normalized, $good, true)) {
-            return $tonePalette['emerald'];
+            return 'ok';
         }
         if (in_array($normalized, $bad, true)) {
-            return $tonePalette['amber'];
+            return 'warn';
         }
 
-        return $tonePalette['mist'];
+        return null;
     };
 
     $formatBoolish = static function (?string $value): string {
@@ -57,6 +66,13 @@
             default => $value,
         };
     };
+
+    $severityTone = match ($auth['severity'] ?? null) {
+        'critical' => 'bad',
+        'warning' => 'warn',
+        'ok' => 'ok',
+        default => null,
+    };
 @endphp
 
 <x-server-workspace-layout
@@ -69,34 +85,56 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200">
-                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Security') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('SSH auth failures, fail2ban jails, host firewall posture, and sshd hardening — a read-only digest over root SSH.') }}
-                        </p>
-                    </div>
-                </div>
-                <div @class(['inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1', $overallTone])>
+        {{-- Dense head, matching Docker / Databases / Cron. The icon-badge +
+             title + prose stack this replaced restated the breadcrumb, and the
+             verdict, scan age, and Refresh each had their own full-width row
+             below the tab strip — roughly 200px of chrome above the first
+             number. Refresh rides the head so it works from every sub-tab. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-shield-exclamation"
+            :tone="in_array($report['overall'], ['critical', 'warning'], true) ? 'amber' : null"
+            :title="__('Security')"
+            :note="__('SSH auth failures, fail2ban jails, host firewall posture, and sshd hardening — a read-only digest over root SSH.')"
+            class="border-b border-brand-ink/10"
+        >
+            <x-slot:actions>
+                <span @class(['inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-semibold ring-1', $overallTone])>
                     @switch($report['overall'])
                         @case('critical')
-                            <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             @break
                         @case('warning')
-                            <x-heroicon-o-exclamation-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-exclamation-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             @break
                         @default
-                            <x-heroicon-o-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     @endswitch
                     {{ $overallLabel }}
-                </div>
-            </div>
-        </div>
+                </span>
+
+                <span class="hidden whitespace-nowrap text-[11px] text-brand-mist sm:inline">{{ $scanLabel }}</span>
+
+                @if ($opsReady && ! $isDeployer)
+                    <button
+                        type="button"
+                        wire:click="refreshSecurityDigestScan"
+                        wire:loading.attr="disabled"
+                        wire:target="refreshSecurityDigestScan"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="refreshSecurityDigestScan" class="inline-flex">
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        </span>
+                        <span wire:loading wire:target="refreshSecurityDigestScan" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-spinner variant="forest" size="sm" />
+                        </span>
+                        <span wire:loading.remove wire:target="refreshSecurityDigestScan">{{ __('Refresh digest') }}</span>
+                        <span wire:loading wire:target="refreshSecurityDigestScan">{{ __('Scanning…') }}</span>
+                    </button>
+                @endif
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Security digest sections')" scroll bare class="!mb-0">
@@ -138,23 +176,17 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div wire:loading.block wire:target="setDigestTab" class="px-5 py-6 sm:px-6" aria-busy="true">
+        <div wire:loading.block wire:target="setDigestTab" class="px-4 py-3 sm:px-5" aria-busy="true">
             <span class="sr-only">{{ __('Loading…') }}</span>
-            <div class="space-y-3" aria-hidden="true">
-                <div class="flex items-start gap-3">
-                    <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                    <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="h-2.5 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                    </div>
+            <div class="space-y-2.5" aria-hidden="true">
+                <div class="flex items-center gap-2">
+                    <span class="h-4 w-4 shrink-0 animate-pulse rounded bg-brand-ink/10"></span>
+                    <span class="h-3 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></span>
                 </div>
-                @foreach (range(1, 4) as $row)
-                    <div class="flex items-start gap-3 border-t border-brand-ink/10 pt-3">
-                        <span class="mt-1 h-5 w-14 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
-                        <div class="min-w-0 flex-1 space-y-2">
-                            <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                            <div class="h-2.5 w-3/4 max-w-md animate-pulse rounded bg-brand-ink/10"></div>
-                        </div>
+                @foreach (range(1, 3) as $row)
+                    <div class="flex items-center gap-2 border-t border-brand-ink/10 pt-2.5">
+                        <span class="h-4 w-12 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
+                        <span class="h-3 w-2/3 max-w-sm animate-pulse rounded bg-brand-ink/10"></span>
                     </div>
                 @endforeach
             </div>
@@ -164,90 +196,37 @@
             @if ($digest_tab === 'overview')
                 <div>
                     @if ($isDeployer)
-                        <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-4 sm:px-6">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-900 ring-1 ring-amber-200">
-                                    <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can review the digest but cannot run SSH scans.') }}</p>
-                                </div>
-                            </div>
-                        </div>
+                        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                            <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Read-only — deployers can review the digest but cannot run SSH scans.') }}
+                        </p>
                     @endif
 
                     @if (! $opsReady)
-                        <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
+                        <div class="border-b border-brand-ink/10 px-4 py-3.5 sm:px-5">
                             @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
                         </div>
                     @endif
-
-                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
-                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                                    @switch($report['overall'])
-                                        @case('critical') {{ __('Immediate review recommended') }} @break
-                                        @case('warning') {{ __('Security signals need attention') }} @break
-                                        @case('info') {{ __('Posture looks mostly healthy') }} @break
-                                        @default {{ __('SSH surface looks calm') }}
-                                    @endswitch
-                                </h3>
-                                <p class="mt-1 text-sm text-brand-moss">
-                                    @if ($scan['checked_at'] ?? null)
-                                        {{ __('Last scan :time', ['time' => $scan['checked_at']->diffForHumans()]) }}
-                                        @if ($scan['stale'] ?? false)
-                                            · {{ __('Stale after :hours h', ['hours' => $scan['stale_hours'] ?? 24]) }}
-                                        @endif
-                                    @else
-                                        {{ __('No scan yet — refresh when SSH is ready') }}
-                                    @endif
-                                </p>
-                            </div>
-                        </div>
-                        @if ($opsReady && ! $isDeployer)
-                            <button
-                                type="button"
-                                wire:click="refreshSecurityDigestScan"
-                                wire:loading.attr="disabled"
-                                wire:target="refreshSecurityDigestScan"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="refreshSecurityDigestScan" aria-hidden="true" />
-                                <span wire:loading.remove wire:target="refreshSecurityDigestScan">{{ __('Refresh digest') }}</span>
-                                <span wire:loading wire:target="refreshSecurityDigestScan">{{ __('Scanning…') }}</span>
-                            </button>
-                        @endif
-                    </div>
 
                     @if (($report['alert_count'] ?? 0) > 0)
                         <ul class="divide-y divide-brand-ink/10 border-b border-brand-ink/10">
                             @foreach ($report['alerts'] as $alert)
                                 @php
-                                    $alertTone = match ($alert['severity']) {
-                                        'critical' => $tonePalette['rose'],
-                                        'warning' => $tonePalette['amber'],
-                                        default => $tonePalette['sky'],
+                                    $alertIconTone = match ($alert['severity']) {
+                                        'critical' => 'text-rose-600',
+                                        'warning' => 'text-amber-600',
+                                        default => 'text-sky-600',
                                     };
                                 @endphp
-                                <li class="flex flex-wrap items-start justify-between gap-3 px-5 py-4 sm:px-6">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $alertTone }}">
-                                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $alert['title'] }}</p>
-                                            <p class="mt-0.5 text-sm text-brand-moss">{{ $alert['message'] }}</p>
-                                        </div>
-                                    </div>
+                                <li class="flex flex-wrap items-start gap-x-2 gap-y-1 px-4 py-2 sm:px-5">
+                                    <x-heroicon-m-exclamation-triangle class="mt-px h-3.5 w-3.5 shrink-0 {{ $alertIconTone }}" aria-hidden="true" />
+                                    <p class="min-w-0 flex-1 text-[11px] leading-relaxed text-brand-moss">
+                                        <span class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</span>
+                                        <span class="text-brand-mist" aria-hidden="true">·</span>
+                                        {{ $alert['message'] }}
+                                    </p>
                                     @if ($alert['href'] && $alert['link_label'])
-                                        <a href="{{ $alert['href'] }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                                        <a href="{{ $alert['href'] }}" wire:navigate class="ml-auto inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-[11px] font-semibold text-brand-forest hover:underline">
                                             {{ $alert['link_label'] }}
                                             <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
                                         </a>
@@ -257,105 +236,119 @@
                         </ul>
                     @endif
 
-                    <div class="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('auth.log failures') }}</p>
-                            <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $auth['failed_lines'] ?? '—' }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Total Failed password + Invalid user') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Recent burst') }}</p>
-                            <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $auth['recent_lines'] ?? '—' }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Last ~5000 auth.log lines') }}</p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('fail2ban') }}</p>
-                            <p class="mt-1 text-lg font-semibold text-brand-ink">{{ $fail2ban['active'] ?? '—' }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">
-                                {{ trans_choice(':count jail|:count jails', $summary['jail_count'] ?? 0, ['count' => $summary['jail_count'] ?? 0]) }}
-                                · {{ trans_choice(':count banned now|:count banned now', $summary['banned_now'] ?? 0, ['count' => $summary['banned_now'] ?? 0]) }}
-                            </p>
-                        </div>
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('UFW firewall') }}</p>
-                            <p class="mt-1 text-lg font-semibold text-brand-ink">{{ $firewall['ufw_active'] ?? '—' }}</p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Host packet filter status') }}</p>
-                        </div>
-                    </div>
+                    {{-- Six figures in one hairline strip, replacing four `text-2xl`
+                         tiles that hid the jail and ban counts in a caption. --}}
+                    <x-workspace-stat-strip
+                        :columns="3"
+                        :stats="[
+                            [
+                                'label' => __('auth.log failures'),
+                                'value' => $auth['failed_lines'] ?? '—',
+                                'tone' => $severityTone,
+                                'hint' => __('Total Failed password + Invalid user'),
+                            ],
+                            [
+                                'label' => __('Recent burst'),
+                                'value' => $auth['recent_lines'] ?? '—',
+                                'hint' => __('Last ~5000 auth.log lines'),
+                            ],
+                            [
+                                'label' => __('fail2ban'),
+                                'value' => $fail2ban['active'] ?? '—',
+                                'tone' => $statusTone($fail2ban['active'] ?? null, ['active', 'running', 'yes'], ['inactive', 'missing', 'no']),
+                                'hint' => __('fail2ban service state during the scan'),
+                            ],
+                            [
+                                'label' => __('Jails'),
+                                'value' => number_format($summary['jail_count'] ?? 0),
+                                'hint' => __('Jails reported by fail2ban-client'),
+                            ],
+                            [
+                                'label' => __('Banned now'),
+                                'value' => number_format($summary['banned_now'] ?? 0),
+                                'tone' => ($summary['banned_now'] ?? 0) > 0 ? 'warn' : null,
+                                'hint' => __('IPs currently banned across all jails'),
+                            ],
+                            [
+                                'label' => __('UFW firewall'),
+                                'value' => $firewall['ufw_active'] ?? '—',
+                                'tone' => $statusTone($firewall['ufw_active'] ?? null, ['active', 'yes'], ['inactive', 'missing', 'no']),
+                                'hint' => __('Host packet filter status'),
+                            ],
+                        ]"
+                    />
                 </div>
             @endif
 
             @if ($digest_tab === 'auth')
                 <div>
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auth log breakdown') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Brute-force indicators') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">
-                                {{ __('Warning ≥ :warning · Critical ≥ :critical · Recent burst ≥ :recent', [
-                                    'warning' => $summary['warning_threshold'] ?? 50,
-                                    'critical' => $summary['critical_threshold'] ?? 200,
-                                    'recent' => config('server_security_digest.thresholds.auth_failed_recent_warning', 25),
-                                ]) }}
-                            </p>
-                        </div>
-                    </div>
-                    <dl class="grid gap-4 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-2 sm:px-6">
-                        <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Invalid user attempts') }}</dt>
-                            <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $auth['invalid_user_lines'] ?? '—' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Failed password attempts') }}</dt>
-                            <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $auth['failed_password_lines'] ?? '—' }}</dd>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Volume severity') }}</dt>
-                            <dd class="mt-1">
-                                @php
-                                    $authSeverity = $auth['severity'] ?? 'unknown';
-                                    $authTone = match ($authSeverity) {
-                                        'critical' => $tonePalette['rose'],
-                                        'warning' => $tonePalette['amber'],
-                                        'ok' => $tonePalette['emerald'],
-                                        default => $tonePalette['mist'],
-                                    };
-                                @endphp
-                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $authTone }}">
-                                    {{ $authSeverity }}
-                                </span>
-                            </dd>
-                        </div>
-                    </dl>
-                    <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                        <a href="{{ route('servers.logs', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                            {{ __('Open system logs') }}
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
-                        </a>
-                    </div>
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-document-text"
+                        :title="__('Brute-force indicators')"
+                        :note="__('Warning ≥ :warning · Critical ≥ :critical · Recent burst ≥ :recent', [
+                            'warning' => $summary['warning_threshold'] ?? 50,
+                            'critical' => $summary['critical_threshold'] ?? 200,
+                            'recent' => config('server_security_digest.thresholds.auth_failed_recent_warning', 25),
+                        ])"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <a
+                                href="{{ route('servers.logs', $server) }}"
+                                wire:navigate
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                {{ __('System logs') }}
+                                <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                            </a>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
 
-                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('fail2ban jails') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ban activity by jail') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">{{ __('Per-jail stats from fail2ban-client status during scan.') }}</p>
-                            </div>
-                        </div>
-                        <a href="{{ route('servers.firewall', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            {{ __('Firewall') }}
-                        </a>
-                    </div>
+                    <x-workspace-stat-strip
+                        class="border-b border-brand-ink/10"
+                        :columns="3"
+                        :stats="[
+                            [
+                                'label' => __('Invalid user attempts'),
+                                'value' => $auth['invalid_user_lines'] ?? '—',
+                            ],
+                            [
+                                'label' => __('Failed password attempts'),
+                                'value' => $auth['failed_password_lines'] ?? '—',
+                            ],
+                            [
+                                'label' => __('Volume severity'),
+                                'value' => $auth['severity'] ?? '—',
+                                'tone' => $severityTone,
+                            ],
+                        ]"
+                    />
+
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-shield-check"
+                        :title="__('fail2ban jails')"
+                        :count="count($fail2ban['jail_rows'] ?? []) > 0
+                            ? trans_choice('{1} :count jail|[2,*] :count jails', count($fail2ban['jail_rows']), ['count' => count($fail2ban['jail_rows'])])
+                            : null"
+                        :note="__('Per-jail stats from fail2ban-client status during scan.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <a
+                                href="{{ route('servers.firewall', $server) }}"
+                                wire:navigate
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                {{ __('Firewall') }}
+                            </a>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
 
                     @if (count($fail2ban['jail_rows'] ?? []) === 0)
-                        <div class="px-5 py-10 text-center sm:px-6">
-                            <p class="text-sm font-medium text-brand-ink">
+                        <div class="px-4 py-6 text-center sm:px-5">
+                            <p class="text-xs font-semibold text-brand-ink">
                                 @if ($scan['never_scanned'] ?? true)
                                     {{ __('Run a digest scan to populate jail stats') }}
                                 @elseif (($fail2ban['active'] ?? '') === 'missing')
@@ -364,30 +357,30 @@
                                     {{ __('No jail detail captured yet') }}
                                 @endif
                             </p>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Refresh digest when SSH is ready — sshd jail stats appear here automatically.') }}</p>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Refresh digest when SSH is ready — sshd jail stats appear here automatically.') }}</p>
                         </div>
                     @else
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-left text-xs">
                                 <thead class="bg-brand-sand/30 text-brand-moss">
                                     <tr>
-                                        <th class="px-3 py-2 font-semibold sm:px-5">{{ __('Jail') }}</th>
-                                        <th class="px-3 py-2 font-semibold text-right">{{ __('Banned now') }}</th>
-                                        <th class="px-3 py-2 font-semibold text-right">{{ __('Total banned') }}</th>
-                                        <th class="px-3 py-2 font-semibold text-right">{{ __('Failed now') }}</th>
-                                        <th class="px-3 py-2 font-semibold text-right">{{ __('Total failed') }}</th>
-                                        <th class="px-3 py-2 font-semibold sm:pr-5">{{ __('Banned IPs') }}</th>
+                                        <th class="px-3 py-1.5 font-semibold sm:px-5">{{ __('Jail') }}</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">{{ __('Banned now') }}</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">{{ __('Total banned') }}</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">{{ __('Failed now') }}</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">{{ __('Total failed') }}</th>
+                                        <th class="px-3 py-1.5 font-semibold sm:pr-5">{{ __('Banned IPs') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-brand-ink/5 bg-white">
                                     @foreach ($fail2ban['jail_rows'] as $jail)
                                         <tr @class(['bg-amber-50/30' => ($jail['currently_banned'] ?? 0) >= 1])>
-                                            <td class="px-3 py-2 font-medium text-brand-ink sm:px-5">{{ $jail['name'] }}</td>
-                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-ink">{{ $jail['currently_banned'] ?? '—' }}</td>
-                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-moss">{{ $jail['total_banned'] ?? '—' }}</td>
-                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-moss">{{ $jail['currently_failed'] ?? '—' }}</td>
-                                            <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-moss">{{ $jail['total_failed'] ?? '—' }}</td>
-                                            <td class="max-w-[14rem] px-3 py-2 font-mono text-[10px] text-brand-moss sm:pr-5">
+                                            <td class="px-3 py-1.5 font-medium text-brand-ink sm:px-5">{{ $jail['name'] }}</td>
+                                            <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-ink">{{ $jail['currently_banned'] ?? '—' }}</td>
+                                            <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $jail['total_banned'] ?? '—' }}</td>
+                                            <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $jail['currently_failed'] ?? '—' }}</td>
+                                            <td class="px-3 py-1.5 text-right font-mono tabular-nums text-brand-moss">{{ $jail['total_failed'] ?? '—' }}</td>
+                                            <td class="max-w-[14rem] px-3 py-1.5 font-mono text-[10px] text-brand-moss sm:pr-5">
                                                 @if (count($jail['banned_ips'] ?? []) > 0)
                                                     {{ implode(', ', array_slice($jail['banned_ips'], 0, 4)) }}
                                                     @if (count($jail['banned_ips']) > 4)
@@ -408,76 +401,84 @@
 
             @if ($digest_tab === 'hardening')
                 <div>
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('SSH hardening') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Effective sshd settings') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Sampled with sshd -T on the host during scan.') }}</p>
-                        </div>
-                    </div>
-                    <dl class="grid gap-4 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-2 sm:px-6">
-                        <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PasswordAuthentication') }}</dt>
-                            <dd class="mt-1">
-                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $statusBadge($sshd['password_authentication'] ?? null, ['no', 'false', '0'], ['yes', 'true', '1']) }}">
-                                    {{ $formatBoolish($sshd['password_authentication'] ?? null) }}
-                                </span>
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PermitRootLogin') }}</dt>
-                            <dd class="mt-1">
-                                <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $statusBadge($sshd['permit_root_login'] ?? null, ['no', 'false', '0', 'prohibit-password', 'without-password', 'forced-commands-only'], ['yes', 'true', '1']) }}">
-                                    {{ $sshd['permit_root_login'] ?? '—' }}
-                                </span>
-                            </dd>
-                        </div>
-                    </dl>
-                    <div class="flex flex-wrap gap-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                        <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                            {{ __('SSH keys') }}
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
-                        </a>
-                        @if ($sshAccessEnabled)
-                            <a href="{{ route('servers.ssh-access', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                                {{ __('Access graph') }}
-                                <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-lock-closed"
+                        :title="__('Effective sshd settings')"
+                        :note="__('Sampled with sshd -T on the host during scan.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <a
+                                href="{{ route('servers.ssh-keys', $server) }}"
+                                wire:navigate
+                                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                {{ __('SSH keys') }}
+                                <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
                             </a>
-                        @endif
-                    </div>
+                            @if ($sshAccessEnabled)
+                                <a
+                                    href="{{ route('servers.ssh-access', $server) }}"
+                                    wire:navigate
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    {{ __('Access graph') }}
+                                    <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                </a>
+                            @endif
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+
+                    {{-- The two sshd values carry their own verdict through the
+                         strip's tone, so they no longer need pill badges in a
+                         padded definition list. --}}
+                    <x-workspace-stat-strip
+                        :columns="2"
+                        :stats="[
+                            [
+                                'label' => __('PasswordAuthentication'),
+                                'value' => $formatBoolish($sshd['password_authentication'] ?? null),
+                                'tone' => $statusTone($sshd['password_authentication'] ?? null, ['no', 'false', '0'], ['yes', 'true', '1']),
+                                'hint' => __('Password logins should be off — keys only.'),
+                            ],
+                            [
+                                'label' => __('PermitRootLogin'),
+                                'value' => $sshd['permit_root_login'] ?? '—',
+                                'tone' => $statusTone($sshd['permit_root_login'] ?? null, ['no', 'false', '0', 'prohibit-password', 'without-password', 'forced-commands-only'], ['yes', 'true', '1']),
+                                'hint' => __('prohibit-password or no is the hardened setting.'),
+                            ],
+                        ]"
+                    />
 
                     @if ($sshAccessEnabled && $sshAccess)
-                        <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-5 sm:px-6">
-                            <div class="flex min-w-0 items-start gap-3">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                    <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access graph rollup') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                                        {{ trans_choice(':count authorized key|:count authorized keys', $sshAccess['total_keys'], ['count' => $sshAccess['total_keys']]) }}
-                                    </h3>
-                                    <p class="mt-1 text-sm text-brand-moss">
-                                        @if ($sshAccess['review_overdue'] > 0)
-                                            {{ trans_choice(':count overdue review|:count overdue reviews', $sshAccess['review_overdue'], ['count' => $sshAccess['review_overdue']]) }}
-                                        @elseif ($sshAccess['never_synced'] > 0)
-                                            {{ trans_choice(':count key never synced|:count keys never synced', $sshAccess['never_synced'], ['count' => $sshAccess['never_synced']]) }}
-                                        @else
-                                            {{ __('Key sync and review posture from the access graph') }}
-                                        @endif
-                                        @if ($sshAccess['active_sessions'] > 0)
-                                            · {{ trans_choice(':count active session|:count active sessions', $sshAccess['active_sessions'], ['count' => $sshAccess['active_sessions']]) }}
-                                        @endif
-                                    </p>
-                                </div>
-                            </div>
-                            <a href="{{ route('servers.ssh-access', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                {{ __('Open access graph') }}
-                            </a>
-                        </div>
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-key"
+                            :title="__('Access graph rollup')"
+                            :count="trans_choice('{1} :count key|[2,*] :count keys', $sshAccess['total_keys'], ['count' => $sshAccess['total_keys']])"
+                            :note="collect([
+                                $sshAccess['review_overdue'] > 0
+                                    ? trans_choice('{1} :count overdue review|[2,*] :count overdue reviews', $sshAccess['review_overdue'], ['count' => $sshAccess['review_overdue']])
+                                    : ($sshAccess['never_synced'] > 0
+                                        ? trans_choice('{1} :count key never synced|[2,*] :count keys never synced', $sshAccess['never_synced'], ['count' => $sshAccess['never_synced']])
+                                        : __('Key sync and review posture from the access graph')),
+                                $sshAccess['active_sessions'] > 0
+                                    ? trans_choice('{1} :count active session|[2,*] :count active sessions', $sshAccess['active_sessions'], ['count' => $sshAccess['active_sessions']])
+                                    : null,
+                            ])->filter()->join(' · ')"
+                            class="border-t border-brand-ink/10"
+                        >
+                            <x-slot:actions>
+                                <a
+                                    href="{{ route('servers.ssh-access', $server) }}"
+                                    wire:navigate
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    {{ __('Open access graph') }}
+                                </a>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
                     @endif
                 </div>
             @endif

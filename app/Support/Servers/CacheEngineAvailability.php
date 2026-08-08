@@ -22,11 +22,16 @@ final class CacheEngineAvailability
 {
     /**
      * Engines gated behind a `cache.{engine}` Pennant flag. Anything not listed
-     * here (redis, varnish) is always available.
+     * here is always available.
+     *
+     * Empty: every cache engine graduated — each ships its installer, the shared
+     * engine panels (overview / info / console / stats / configure) and its own
+     * probe, so none carry a "Soon" badge or an install block. Re-add a key here
+     * to gate one behind `cache.{engine}` again.
      *
      * @var list<string>
      */
-    public const GATED_ENGINES = ['valkey', 'memcached', 'keydb', 'dragonfly'];
+    public const GATED_ENGINES = [];
 
     public static function isComingSoon(string $engine): bool
     {

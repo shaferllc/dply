@@ -37,48 +37,54 @@
     $hasPrefix = $cachePrefixValue !== '';
 @endphp
 @if ($cacheService)
-    <div class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6" x-data="{ subtab: 'laravel' }">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine — connection snippet', ['engine' => $engineLabel]) }}</h2>
-        <p class="mt-2 text-sm text-brand-moss">
-            @if ($snippetIsExposed)
-                {{ __('Drop into apps connecting from outside this server. The host is the server\'s public IP, allowed by the network exposure rule on the Configure tab.') }}
-            @else
-                {{ __('Drop into your app on this server. The engine is bound to the loopback interface — expose it from the Configure tab if a remote app needs to connect.') }}
-            @endif
-        </p>
+    <div class="{{ $card ?? 'border-b border-brand-ink/10' }}" x-data="{ subtab: 'laravel' }">
+        {{-- Dense head: the "where does this connect from" caveat is reference
+             text, so it rides the note instead of two lines of body prose. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-code-bracket-square"
+            :title="__(':engine — connection snippet', ['engine' => $engineLabel])"
+            :note="$snippetIsExposed
+                ? __('Drop into apps connecting from outside this server. The host is the server\'s public IP, allowed by the network exposure rule on the Configure tab.')
+                : __('Drop into your app on this server. The engine is bound to the loopback interface — expose it from the Configure tab if a remote app needs to connect.')"
+            class="border-b border-brand-ink/10"
+        />
+
         @if ($isRedisFork)
-            <p class="mt-2 border-t border-brand-ink/10 pt-3 text-xs leading-relaxed text-brand-moss">
+            <p class="border-b border-brand-ink/10 px-4 py-2 text-[11px] leading-relaxed text-brand-moss sm:px-5">
                 {{ __(':engine speaks the Redis wire protocol — Laravel\'s `redis` driver and any Redis client library work as-is. The env vars stay REDIS_* on purpose.', ['engine' => $engineLabel]) }}
             </p>
         @endif
 
-        <x-server-workspace-tablist :aria-label="__('Connection snippet languages')" class="mt-4" scroll>
+        <div class="px-4 pt-2.5 sm:px-5">
+        <x-server-workspace-tablist :aria-label="__('Connection snippet languages')" class="!mb-0" scroll bare>
             @foreach (['laravel' => 'Laravel .env', 'node' => 'Node.js', 'python' => 'Python', 'docker' => 'Docker Compose'] as $tabKey => $tabLabel)
                 <x-server-workspace-tab :subtab-key="$tabKey">{{ $tabLabel }}</x-server-workspace-tab>
             @endforeach
         </x-server-workspace-tablist>
+        </div>
 
         @if ($isMemcached)
             <div x-show="subtab === 'laravel'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 CACHE_STORE=memcached
 MEMCACHED_HOST={{ $snippetHost }}
 MEMCACHED_PORT={{ $cacheService->port }}</pre>
             </div>
             <div x-show="subtab === 'node'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink">// Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5">// Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 // npm install memjs
 const memjs = require('memjs');
 const client = memjs.Client.create('{{ $snippetHost }}:{{ $cacheService->port }}');</pre>
             </div>
             <div x-show="subtab === 'python'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 # pip install pymemcache
 from pymemcache.client.base import Client
 client = Client(('{{ $snippetHost }}', {{ $cacheService->port }}))</pre>
             </div>
             <div x-show="subtab === 'docker'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 services:
   app:
     image: your-app:latest
@@ -100,7 +106,7 @@ services:
                 $pyPrefixComment = $hasPrefix ? "\n# Apply prefix in-app: r.set(f'{prefix}{key}', v) — redis-py has no built-in prefix.\nprefix = '".$cachePrefixValue."'" : '';
             @endphp
             <div x-show="subtab === 'laravel'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 CACHE_STORE=redis
 REDIS_HOST={{ $snippetHost }}
 REDIS_PORT={{ $cacheService->port }}
@@ -110,7 +116,7 @@ SESSION_DRIVER=redis
 QUEUE_CONNECTION=redis</pre>
             </div>
             <div x-show="subtab === 'node'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink">// Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5">// Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 // npm install ioredis
 import Redis from 'ioredis';
 const redis = new Redis({
@@ -119,7 +125,7 @@ const redis = new Redis({
 });</pre>
             </div>
             <div x-show="subtab === 'python'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 # pip install redis
 import redis
 r = redis.Redis(
@@ -129,7 +135,7 @@ r = redis.Redis(
 ){{ $pyPrefixComment }}</pre>
             </div>
             <div x-show="subtab === 'docker'" x-cloak>
-                <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
+                <pre class="mx-4 my-3 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-brand-ink sm:mx-5"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
 services:
   app:
     image: your-app:latest

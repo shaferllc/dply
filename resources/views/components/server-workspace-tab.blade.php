@@ -49,7 +49,10 @@
         @endif
         data-skip-busy="1"
         @if ($subtabKey === null)
-            {{ $attributes->class($sharedClasses) }}
+            {{-- except('wire:click'): the action is already emitted above from
+                 $wireClickAction, so passing the raw bag through duplicated the
+                 attribute on every tab that sets wire:click directly. --}}
+            {{ $attributesWithoutWireClick->class($sharedClasses) }}
         @else
             {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
@@ -89,7 +92,10 @@
         @endif
         data-skip-busy="1"
         @if ($subtabKey === null)
-            {{ $attributes->class($sharedClasses) }}
+            {{-- except('wire:click'): the action is already emitted above from
+                 $wireClickAction, so passing the raw bag through duplicated the
+                 attribute on every tab that sets wire:click directly. --}}
+            {{ $attributesWithoutWireClick->class($sharedClasses) }}
         @else
             {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)

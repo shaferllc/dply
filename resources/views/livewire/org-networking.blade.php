@@ -6,7 +6,10 @@
     $onNetworks = $tab === 'networks';
     $showLbShellActions = $onLoadBalancers && $lbCount > 0;
     $showNetworkShellActions = $onNetworks && $networkCount > 0;
+    // Full-size buttons stay for the empty states (they're the page's only call
+    // to action there); the head rides the dense 24px pill used workspace-wide.
     $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors';
+    $headBtn = 'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold shadow-sm transition';
 @endphp
 
 <div class="contents">
@@ -19,7 +22,11 @@
             ]"
         />
 
+        {{-- Dense head + a two-cell figure strip: the icon-badge stack and the
+             pair of bordered count tiles cost ~150px above the tab strip to
+             carry two numbers the tabs already badge. --}}
         <x-profile-shell
+            dense
             :title="__('Networking')"
             :description="__('Load balancers, private networks, and routes across your workspace.')"
             icon="heroicon-o-share"
@@ -29,17 +36,17 @@
                     <button
                         type="button"
                         x-on:click="$dispatch('open-modal', 'org-create-haproxy-lb-modal')"
-                        class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
+                        class="{{ $headBtn }} bg-brand-ink text-brand-cream hover:bg-brand-forest"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                         {{ __('Software (HAProxy)') }}
                     </button>
                     <button
                         type="button"
                         x-on:click="$dispatch('open-modal', 'org-create-hetzner-lb-modal')"
-                        class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+                        class="{{ $headBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                         {{ __('Managed (Hetzner)') }}
                     </button>
                 </x-slot:actions>
@@ -48,9 +55,9 @@
                     <button
                         type="button"
                         x-on:click="$dispatch('open-modal', 'create-network-modal')"
-                        class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
+                        class="{{ $headBtn }} bg-brand-ink text-brand-cream hover:bg-brand-forest"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                         {{ __('Create network') }}
                     </button>
                 </x-slot:actions>
@@ -58,22 +65,13 @@
 
             @if ($hasInventory)
                 <x-slot:stats>
-                    <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                                <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span class="truncate">{{ __('Load balancers') }}</span>
-                            </dt>
-                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $lbCount }}</dd>
-                        </div>
-                        <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                                <x-heroicon-o-share class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span class="truncate">{{ __('Networks') }}</span>
-                            </dt>
-                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $networkCount }}</dd>
-                        </div>
-                    </dl>
+                    <x-workspace-stat-strip
+                        :columns="2"
+                        :stats="[
+                            ['label' => __('Load balancers'), 'value' => $lbCount],
+                            ['label' => __('Networks'), 'value' => $networkCount],
+                        ]"
+                    />
                 </x-slot:stats>
             @endif
 
@@ -109,15 +107,14 @@
             {{-- ═══════════════════════════════════════════════════════════════════ --}}
             @if ($onLoadBalancers)
                 @if ($loadBalancers->isEmpty())
-                    <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="networking-lb-empty-heading">
-                        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-arrows-right-left class="h-6 w-6" aria-hidden="true" />
-                        </span>
-                        <h2 id="networking-lb-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No load balancers yet') }}</h2>
-                        <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
-                            {{ __('Software (HAProxy) LBs run on any server you already own — free. Managed Hetzner LBs are fully redundant but cost extra.') }}
-                        </p>
-                        <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
+                    <x-empty-state
+                        borderless
+                        compact
+                        icon="heroicon-o-arrows-right-left"
+                        :title="__('No load balancers yet')"
+                        :description="__('Software (HAProxy) LBs run on any server you already own — free. Managed Hetzner LBs are fully redundant but cost extra.')"
+                    >
+                        <x-slot:actions>
                             <button
                                 type="button"
                                 x-on:click="$dispatch('open-modal', 'org-create-haproxy-lb-modal')"
@@ -134,9 +131,11 @@
                                 <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Managed (Hetzner)') }}
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:actions>
+                    </x-empty-state>
                 @else
+                    {{-- One line per LB: name + kind badge, then addresses and
+                         region as the muted remainder, status and actions right. --}}
                     <div class="divide-y divide-brand-ink/10">
                         @foreach ($loadBalancers as $lb)
                             @php
@@ -146,34 +145,29 @@
                                     default        => ['dot' => 'bg-rose-500',    'text' => 'text-rose-700',    'label' => ucfirst($lb->status)],
                                 };
                             @endphp
-                            <div class="flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-6" wire:key="lb-{{ $lb->id }}">
-                                <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <p class="font-semibold text-brand-ink">{{ $lb->name }}</p>
-                                        @if ($lb->isSoftware())
-                                            <span class="rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">HAProxy · {{ $lb->server?->name }}</span>
-                                        @else
-                                            <span class="rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Hetzner</span>
-                                        @endif
-                                    </div>
-                                    <div class="mt-0.5 flex flex-wrap items-center gap-x-3 font-mono text-[11px] text-brand-mist">
-                                        @if ($lb->public_ipv4) <span>{{ $lb->public_ipv4 }}</span> @endif
-                                        @if ($lb->private_ip)  <span class="flex items-center gap-1"><x-heroicon-m-lock-closed class="h-2.5 w-2.5 text-emerald-500"/>{{ $lb->private_ip }}</span> @endif
-                                        <span>{{ strtoupper($lb->load_balancer_type) }} · {{ $lb->region }}</span>
-                                    </div>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:px-5" wire:key="lb-{{ $lb->id }}">
+                                <p class="shrink-0 text-xs font-semibold text-brand-ink">{{ $lb->name }}</p>
+                                @if ($lb->isSoftware())
+                                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">HAProxy · {{ $lb->server?->name }}</span>
+                                @else
+                                    <span class="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Hetzner</span>
+                                @endif
+                                <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-brand-mist">
+                                    @if ($lb->public_ipv4) <span>{{ $lb->public_ipv4 }}</span> @endif
+                                    @if ($lb->private_ip)  <span class="flex items-center gap-1"><x-heroicon-m-lock-closed class="h-2.5 w-2.5 shrink-0 text-emerald-500"/>{{ $lb->private_ip }}</span> @endif
+                                    <span>{{ strtoupper($lb->load_balancer_type) }} · {{ $lb->region }}</span>
                                 </div>
-                                <div class="flex items-center gap-3">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $pill['text'] }}">
-                                        <span class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
-                                        {{ $pill['label'] }}
-                                    </span>
-                                    <span class="text-[11px] text-brand-mist">{{ $lb->targets->count() }} {{ __('targets') }}</span>
-                                    <button type="button"
-                                        wire:click="deleteLoadBalancer('{{ $lb->id }}')"
-                                        class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
-                                        {{ __('Delete') }}
-                                    </button>
-                                </div>
+                                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-brand-ink/10 {{ $pill['text'] }}">
+                                    <span class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
+                                    {{ $pill['label'] }}
+                                </span>
+                                <span class="shrink-0 text-[11px] tabular-nums text-brand-mist">{{ $lb->targets->count() }} {{ __('targets') }}</span>
+                                <button type="button"
+                                    wire:click="deleteLoadBalancer('{{ $lb->id }}')"
+                                    class="inline-flex h-6 shrink-0 items-center rounded-md border border-red-200 bg-red-50 px-2 text-[11px] font-semibold text-red-700 transition hover:bg-red-100">
+                                    {{ __('Delete') }}
+                                </button>
                             </div>
                         @endforeach
                     </div>
@@ -185,15 +179,14 @@
             {{-- ═══════════════════════════════════════════════════════════════════ --}}
             @if ($onNetworks)
                 @if ($networks->isEmpty())
-                    <div class="flex flex-col items-center justify-center px-5 py-16 text-center sm:px-6" aria-labelledby="networking-networks-empty-heading">
-                        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                            <x-heroicon-o-share class="h-6 w-6" aria-hidden="true" />
-                        </span>
-                        <h2 id="networking-networks-empty-heading" class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No private networks yet') }}</h2>
-                        <p class="mt-1 max-w-md text-sm leading-relaxed text-brand-moss">
-                            {{ __('Create a private network to let your servers communicate on private IPs — keeping database, cache, and app traffic off the public internet.') }}
-                        </p>
-                        <div class="mt-5">
+                    <x-empty-state
+                        borderless
+                        compact
+                        icon="heroicon-o-share"
+                        :title="__('No private networks yet')"
+                        :description="__('Create a private network to let your servers communicate on private IPs — keeping database, cache, and app traffic off the public internet.')"
+                    >
+                        <x-slot:actions>
                             <button
                                 type="button"
                                 x-on:click="$dispatch('open-modal', 'create-network-modal')"
@@ -202,38 +195,39 @@
                                 <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Create network') }}
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:actions>
+                    </x-empty-state>
                 @else
                     <div class="divide-y divide-brand-ink/10">
                         @foreach ($networks as $network)
                             @php $routes = $routesByNetwork[$network->id] ?? []; @endphp
                             <div wire:key="net-{{ $network->id }}">
-                                {{-- Network header --}}
-                                <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-sand/10 px-5 py-4 sm:px-6">
-                                    <div>
-                                        <p class="font-semibold text-brand-ink">{{ $network->name }}
-                                            <span class="ml-2 font-mono text-xs font-normal text-brand-mist">{{ $network->ip_range }}</span>
-                                        </p>
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">
-                                            {{ ucfirst($network->provider) }} · ID {{ $network->provider_id ?? '—' }} · {{ $network->servers->count() }} {{ __('servers') }}
-                                        </p>
-                                    </div>
+                                {{-- Network header: name + range on one line, the
+                                     provider/ID/count line folded in beside it. --}}
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 bg-brand-sand/20 px-4 py-2 sm:px-5">
+                                    <p class="shrink-0 text-xs font-semibold text-brand-ink">{{ $network->name }}</p>
+                                    <code class="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">{{ $network->ip_range }}</code>
+                                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                                    <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist">
+                                        {{ ucfirst($network->provider) }} · ID {{ $network->provider_id ?? '—' }} · {{ trans_choice(':count server|:count servers', $network->servers->count(), ['count' => $network->servers->count()]) }}
+                                    </p>
                                     <button type="button"
                                         wire:click="deleteNetwork('{{ $network->id }}')"
-                                        class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
+                                        class="inline-flex h-6 shrink-0 items-center rounded-md border border-red-200 bg-red-50 px-2 text-[11px] font-semibold text-red-700 transition hover:bg-red-100">
                                         {{ __('Delete') }}
                                     </button>
                                 </div>
 
-                                {{-- Attached servers --}}
+                                {{-- Attached servers — chips rather than a grid of
+                                     bordered tiles; the pair of facts per server
+                                     fits on one line. --}}
                                 @if ($network->servers->isNotEmpty())
-                                    <div class="grid grid-cols-2 gap-2 border-t border-brand-ink/5 px-5 py-4 sm:grid-cols-3 sm:px-6 lg:grid-cols-4">
+                                    <div class="flex flex-wrap items-center gap-1.5 border-t border-brand-ink/5 px-4 py-2 sm:px-5">
                                         @foreach ($network->servers as $s)
-                                            <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5">
-                                                <p class="truncate text-xs font-semibold text-brand-ink">{{ $s->name }}</p>
-                                                <p class="font-mono text-[11px] text-brand-mist">{{ $s->private_ip_address ?? __('pending…') }}</p>
-                                            </div>
+                                            <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-2 py-0.5 text-[11px]">
+                                                <span class="font-semibold text-brand-ink">{{ $s->name }}</span>
+                                                <span class="font-mono text-[10px] text-brand-mist">{{ $s->private_ip_address ?? __('pending…') }}</span>
+                                            </span>
                                         @endforeach
                                     </div>
                                 @endif
@@ -242,26 +236,33 @@
                                      IP here so it can reach the other members. --}}
                                 @if ($network->isHetzner())
                                     @php $attachable = $this->attachableServers($network); @endphp
-                                    <div class="border-t border-brand-ink/5 px-5 py-4 sm:px-6">
-                                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add a server') }}</p>
+                                    {{-- Attach control as an inline strip; the
+                                         "gives the server a private IP" line is
+                                         the label's title, not a third row. --}}
+                                    <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/5 px-4 py-2 sm:px-5">
                                         @if ($attachable->isEmpty())
-                                            <p class="text-sm text-brand-mist">{{ __('All your Hetzner servers are already on this network.') }}</p>
+                                            <p class="text-[11px] text-brand-mist">{{ __('All your Hetzner servers are already on this network.') }}</p>
                                         @else
-                                            <div class="flex flex-wrap items-end gap-2">
-                                                <div class="min-w-[16rem] flex-1">
-                                                    <select wire:model="attach_server_id.{{ $network->id }}" class="block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-forest focus:ring-brand-forest">
-                                                        <option value="">{{ __('Choose a server…') }}</option>
-                                                        @foreach ($attachable as $cand)
-                                                            <option value="{{ $cand->id }}">{{ $cand->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('attach_server_id.'.$network->id)" class="mt-1" />
-                                                </div>
-                                                <button type="button" wire:click="addServerToNetwork('{{ $network->id }}')" wire:loading.attr="disabled" wire:target="addServerToNetwork('{{ $network->id }}')" class="rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-60">
-                                                    {{ __('Attach server') }}
-                                                </button>
-                                            </div>
-                                            <p class="mt-1.5 text-xs text-brand-mist">{{ __('Gives the server a private IP on this network so it can reach the others (database, cache, app).') }}</p>
+                                            <label
+                                                for="attach-server-{{ $network->id }}"
+                                                class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist"
+                                                title="{{ __('Gives the server a private IP on this network so it can reach the others (database, cache, app).') }}"
+                                            >{{ __('Add a server') }}</label>
+                                            <select
+                                                id="attach-server-{{ $network->id }}"
+                                                wire:model="attach_server_id.{{ $network->id }}"
+                                                class="min-w-0 flex-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-forest/30 sm:max-w-xs"
+                                            >
+                                                <option value="">{{ __('Choose a server…') }}</option>
+                                                @foreach ($attachable as $cand)
+                                                    <option value="{{ $cand->id }}">{{ $cand->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="button" wire:click="addServerToNetwork('{{ $network->id }}')" wire:loading.attr="disabled" wire:target="addServerToNetwork('{{ $network->id }}')" class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream transition hover:bg-brand-forest disabled:opacity-60">
+                                                <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Attach server') }}
+                                            </button>
+                                            <x-input-error :messages="$errors->get('attach_server_id.'.$network->id)" class="w-full" />
                                         @endif
                                     </div>
                                 @endif
@@ -269,25 +270,21 @@
                                 {{-- Routes --}}
                                 @if ($network->isHetzner())
                                     @php $gatewayServers = $network->servers->whereNotNull('private_ip_address'); @endphp
-                                    <div class="border-t border-brand-ink/5 px-5 py-4 sm:px-6">
-                                        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Routes') }}</p>
+                                    <div class="border-t border-brand-ink/5 px-4 py-2 sm:px-5">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Routes') }}</p>
                                         @if (! empty($routes))
-                                            <div class="mb-3 space-y-2">
+                                            <div class="mt-1.5 space-y-1">
                                                 @foreach ($routes as $route)
                                                     @php $gwServer = $orgServers->firstWhere('private_ip_address', $route['gateway']); @endphp
-                                                    <div class="flex items-center justify-between gap-4 rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
-                                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-brand-ink">
-                                                            <span class="text-brand-mist">{{ __('Traffic for') }}</span>
-                                                            <code class="font-mono text-brand-ink">{{ $route['destination'] }}</code>
-                                                            <span class="text-brand-mist">{{ __('goes through') }}</span>
-                                                            <span class="font-medium text-brand-ink">
-                                                                {{ $gwServer?->name ?? $route['gateway'] }}
-                                                                <span class="font-mono text-[11px] font-normal text-brand-mist">{{ $route['gateway'] }}</span>
-                                                            </span>
-                                                        </div>
+                                                    <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-md border border-brand-ink/10 bg-white px-2 py-1 text-[11px] text-brand-ink">
+                                                        <span class="text-brand-mist">{{ __('Traffic for') }}</span>
+                                                        <code class="font-mono font-semibold text-brand-ink">{{ $route['destination'] }}</code>
+                                                        <span class="text-brand-mist">{{ __('goes through') }}</span>
+                                                        <span class="font-semibold text-brand-ink">{{ $gwServer?->name ?? $route['gateway'] }}</span>
+                                                        <span class="font-mono text-[10px] text-brand-mist">{{ $route['gateway'] }}</span>
                                                         <button type="button"
                                                             wire:click="deleteRoute('{{ $network->id }}', '{{ $route['destination'] }}', '{{ $route['gateway'] }}')"
-                                                            class="shrink-0 text-[11px] font-medium text-rose-600 hover:underline">
+                                                            class="ml-auto shrink-0 font-semibold text-rose-600 hover:underline">
                                                             {{ __('Remove') }}
                                                         </button>
                                                     </div>
@@ -296,7 +293,7 @@
                                         @endif
 
                                         @if ($gatewayServers->isEmpty())
-                                            <p class="text-sm text-brand-mist">{{ __('Routes need at least one server on this network with a private IP to act as the gateway.') }}</p>
+                                            <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Routes need at least one server on this network with a private IP to act as the gateway.') }}</p>
                                         @else
                                             {{-- Add route — intent-first --}}
                                             <div
@@ -307,47 +304,45 @@
                                                     get cidrOk() { return /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/.test(this.dest.trim()) },
                                                     preset(v) { $wire.set('route_destination.{{ $network->id }}', v) },
                                                 }"
-                                                class="space-y-3"
+                                                class="mt-1.5 space-y-1.5"
                                             >
-                                                @if (empty($routes))
-                                                    <p class="text-sm text-brand-mist">{{ __('Add a route if you need a server to forward traffic for another range — for example a WireGuard VPN gateway.') }}</p>
-                                                @endif
-
-                                                {{-- Destination presets --}}
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <span class="text-[11px] font-medium text-brand-mist">{{ __('Common:') }}</span>
-                                                    <button type="button" x-on:click="preset('10.8.0.0/24')"
-                                                        class="rounded-full border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
-                                                        {{ __('WireGuard VPN clients') }}
-                                                    </button>
-                                                    <button type="button" x-on:click="preset('')"
-                                                        class="rounded-full border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
-                                                        {{ __('Custom range') }}
+                                                {{-- The sentence-framed row keeps its shape — it's
+                                                     what makes a route readable — on one line, with
+                                                     the presets riding the same row and the labels
+                                                     inline instead of stacked above each field. --}}
+                                                <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                                                    <label for="route-dest-{{ $network->id }}" class="shrink-0 text-[11px] text-brand-mist">{{ __('Send traffic for') }}</label>
+                                                    <x-text-input id="route-dest-{{ $network->id }}" wire:model.live="route_destination.{{ $network->id }}" class="!h-7 w-36 !px-2 !py-0 font-mono !text-xs" placeholder="192.168.1.0/24" />
+                                                    <span class="shrink-0 text-[11px] text-brand-mist">{{ __('through') }}</span>
+                                                    <select wire:model="route_gateway_server.{{ $network->id }}" class="min-w-0 flex-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-forest/30 sm:max-w-xs">
+                                                        <option value="">{{ __('Choose a server…') }}</option>
+                                                        @foreach ($gatewayServers as $s)
+                                                            <option value="{{ $s->id }}">{{ $s->name }} — {{ $s->private_ip_address }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <button type="button" wire:click="addRoute('{{ $network->id }}')"
+                                                        wire:loading.attr="disabled" wire:target="addRoute('{{ $network->id }}')"
+                                                        class="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-forest/90 disabled:opacity-50">
+                                                        <span wire:loading.remove wire:target="addRoute('{{ $network->id }}')">{{ __('Add route') }}</span>
+                                                        <span wire:loading wire:target="addRoute('{{ $network->id }}')" class="inline-flex items-center gap-1"><x-spinner variant="white" size="sm"/>{{ __('Adding…') }}</span>
                                                     </button>
                                                 </div>
 
-                                                {{-- Sentence-framed inputs: Send traffic for [CIDR] through [server] --}}
-                                                <div class="flex flex-wrap items-end gap-x-3 gap-y-2">
-                                                    <div class="grow basis-48">
-                                                        <x-input-label :value="__('Send traffic for')" />
-                                                        <x-text-input wire:model.live="route_destination.{{ $network->id }}" class="mt-1 block w-full font-mono" placeholder="192.168.1.0/24" />
-                                                    </div>
-                                                    <span class="pb-2.5 text-sm text-brand-mist">{{ __('through') }}</span>
-                                                    <div class="grow basis-48">
-                                                        <x-input-label :value="__('this server')" />
-                                                        <select wire:model="route_gateway_server.{{ $network->id }}" class="dply-input mt-1 block w-full">
-                                                            <option value="">{{ __('Choose a server…') }}</option>
-                                                            @foreach ($gatewayServers as $s)
-                                                                <option value="{{ $s->id }}">{{ $s->name }} — {{ $s->private_ip_address }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    <button type="button" wire:click="addRoute('{{ $network->id }}')"
-                                                        wire:loading.attr="disabled" wire:target="addRoute('{{ $network->id }}')"
-                                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50">
-                                                        <span wire:loading.remove wire:target="addRoute('{{ $network->id }}')">{{ __('Add route') }}</span>
-                                                        <span wire:loading wire:target="addRoute('{{ $network->id }}')" class="inline-flex items-center gap-2"><x-spinner variant="white" size="sm"/>{{ __('Adding…') }}</span>
+                                                <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Common:') }}</span>
+                                                    <button type="button" x-on:click="preset('10.8.0.0/24')"
+                                                        class="rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">
+                                                        {{ __('WireGuard VPN clients') }}
                                                     </button>
+                                                    <button type="button" x-on:click="preset('')"
+                                                        class="rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold text-brand-ink transition hover:bg-brand-sand/40">
+                                                        {{ __('Custom range') }}
+                                                    </button>
+                                                    @if (empty($routes))
+                                                        <span class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ __('Add a route if you need a server to forward traffic for another range — for example a WireGuard VPN gateway.') }}">
+                                                            {{ __('Add a route if you need a server to forward traffic for another range — for example a WireGuard VPN gateway.') }}
+                                                        </span>
+                                                    @endif
                                                 </div>
 
                                                 {{-- Live plain-language explanation --}}
@@ -362,8 +357,8 @@
                                                     {{ __("That doesn't look like a valid range — try 192.168.1.0/24.") }}
                                                 </p>
 
-                                                @error("route_destination.$network->id") <p class="text-xs text-rose-700">{{ $message }}</p> @enderror
-                                                @error("route_gateway_server.$network->id") <p class="text-xs text-rose-700">{{ $message }}</p> @enderror
+                                                @error("route_destination.$network->id") <p class="text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                                                @error("route_gateway_server.$network->id") <p class="text-[11px] text-rose-700">{{ $message }}</p> @enderror
                                             </div>
                                         @endif
                                     </div>

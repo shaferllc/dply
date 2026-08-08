@@ -1,6 +1,6 @@
             @if ($cacheServices->isEmpty())
                 <div class="{{ $card }} px-5 py-5 sm:px-6">
-                    <div class="px-6 py-6 sm:px-8">
+                    <div class="px-4 py-3.5 sm:px-5">
                         <x-empty-state
                             borderless
                             icon="heroicon-o-bolt"

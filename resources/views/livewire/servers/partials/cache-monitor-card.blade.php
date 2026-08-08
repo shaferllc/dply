@@ -17,28 +17,29 @@
 @endphp
 
 <div class="{{ $card }}" wire:key="cache-monitor-{{ $engine }}">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Monitor') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — live MONITOR', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Tails redis-cli MONITOR for a bounded window so you can watch traffic against this instance live. Auto-stops when the window ends.') }}</p>
-        </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-signal"
+        :title="__(':engine — live MONITOR', ['engine' => $engineLabel])"
+        :count="$running ? __('Live') : null"
+        :note="__('Tails redis-cli MONITOR for a bounded window so you can watch traffic against this instance live. Auto-stops when the window ends.')"
+        class="border-b border-brand-ink/10"
+    >
         @if (! $running && ($payload !== null))
+        <x-slot:actions>
             <button
                 type="button"
                 wire:click="clearMonitorOutput"
-                class="inline-flex shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Clear') }}
             </button>
+        </x-slot:actions>
         @endif
-    </div>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-4 py-3.5 sm:px-5">
     {{-- Default neutral tone to match the rest of the cache-workspace
          explainers (key browser, REPL, keyspace dashboard, advanced). MONITOR
          is read-only — no destructive action that warrants amber framing —
@@ -46,8 +47,8 @@
          was the original ask. --}}
 
     @if (! $running)
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-            <span class="text-xs text-brand-mist">{{ __('Window') }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[11px] text-brand-mist">{{ __('Window') }}</span>
             @foreach ([5, 10, 30] as $opt)
                 <button
                     type="button"
@@ -88,7 +89,7 @@
     @if ($payload === null)
         {{-- Pre-run idle state. Operator hasn't picked a window duration
              yet — body would otherwise be blank below the chip row. --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
             </span>

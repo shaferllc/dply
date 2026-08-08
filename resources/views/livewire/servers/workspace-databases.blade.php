@@ -30,21 +30,45 @@
     @endif
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-800 ring-1 ring-sky-200">
-                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Databases') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Create databases on this server, then reveal credentials and copy connection details for your apps.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching Caches / Cron / Firewall. The tall icon-badge +
+             title + prose stack this replaced restated the page title the
+             breadcrumb already shows. --}}
+        @php
+            $trackedDatabaseCount = $server->serverDatabases->count();
+            $anyEngineInstalled = in_array(true, $capabilities, true);
+        @endphp
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-circle-stack"
+            :title="__('Databases')"
+            :count="$trackedDatabaseCount > 0
+                ? trans_choice('{1} :count database|[2,*] :count databases', $trackedDatabaseCount, ['count' => $trackedDatabaseCount])
+                : null"
+            :note="__('Create databases on this server, then reveal credentials and copy connection details for your apps.')"
+            class="border-b border-brand-ink/10"
+        >
+            {{-- Create rides the page head instead of its own full-width section:
+                 it was a lone button under a header that restated the modal's own
+                 explainer. Gated on a detected engine — there is nothing to create
+                 a database on until one is installed. --}}
+            @if ($opsReady && $capabilitiesLoaded && $anyEngineInstalled)
+                <x-slot:actions>
+                    <button
+                        type="button"
+                        wire:click="openDatabaseCreate"
+                        wire:loading.attr="disabled"
+                        wire:target="openDatabaseCreate"
+                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <x-heroicon-m-plus wire:loading.remove wire:target="openDatabaseCreate" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span wire:loading wire:target="openDatabaseCreate" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-spinner variant="cream" size="sm" />
+                        </span>
+                        {{ __('Create database') }}
+                    </button>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll bare class="!mb-0">
@@ -123,22 +147,23 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div wire:loading.block wire:target="setWorkspaceTab" class="px-5 py-6 sm:px-6" aria-busy="true">
+        {{-- Tab-switch skeleton — same rhythm as the dense rows it replaces, so
+             switching tabs doesn't jump the card height. --}}
+        <div wire:loading.block wire:target="setWorkspaceTab" aria-busy="true">
             <span class="sr-only">{{ __('Loading…') }}</span>
-            <div class="space-y-3" aria-hidden="true">
-                <div class="flex items-start gap-3">
-                    <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                    <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="h-2.5 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                    </div>
+            <div aria-hidden="true">
+                <div class="border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
+                    <div class="h-2.5 w-72 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
                 </div>
                 @foreach (range(1, 3) as $row)
-                    <div class="flex items-start gap-3 border-t border-brand-ink/10 pt-3">
-                        <span class="mt-1 h-5 w-14 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
-                        <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex items-center gap-3 border-b border-brand-ink/10 py-3 pl-5 pr-3 sm:pl-6 sm:pr-4">
+                        <div class="min-w-0 flex-1">
                             <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                            <div class="h-2.5 w-3/4 max-w-md animate-pulse rounded bg-brand-ink/10"></div>
+                        </div>
+                        <div class="flex shrink-0 gap-1.5">
+                            @foreach (range(1, 3) as $btn)
+                                <span class="h-7 w-16 animate-pulse rounded-md bg-brand-ink/10"></span>
+                            @endforeach
                         </div>
                     </div>
                 @endforeach
@@ -147,7 +172,7 @@
 
         <div wire:loading.remove wire:target="setWorkspaceTab">
             @if (! $opsReady)
-                <div class="px-5 py-5 sm:px-6">
+                <div class="px-4 py-5 sm:px-5">
                     @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
                 </div>
             @else

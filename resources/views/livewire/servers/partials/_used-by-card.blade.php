@@ -11,19 +11,18 @@
     $showResource = $showResource ?? false;
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Used by') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attached sites') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Sites that have this :noun attached as a resource. Sites on another server reach it over the private network — those are flagged remote.', ['noun' => $resourceNoun]) }}</p>
-        </div>
-    </div>
-    <div class="px-6 py-6 sm:px-7">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-link"
+        :title="__('Attached sites')"
+        :count="count($rows) > 0 ? trans_choice('{1} :count site|[2,*] :count sites', count($rows), ['count' => count($rows)]) : null"
+        :note="__('Sites that have this :noun attached as a resource. Sites on another server reach it over the private network — those are flagged remote.', ['noun' => $resourceNoun])"
+        class="border-b border-brand-ink/10"
+    />
+    <div class="px-4 py-3.5 sm:px-5">
         @if (count($rows) === 0)
             <x-empty-state
+                compact
                 borderless
                 icon="heroicon-o-link"
                 tone="sage"
@@ -35,23 +34,23 @@
                 <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                     <thead class="bg-brand-cream/40">
                         <tr class="text-left text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
-                            <th class="px-4 py-2.5">{{ __('Site') }}</th>
-                            <th class="px-4 py-2.5">{{ __('Server') }}</th>
+                            <th class="px-3 py-2">{{ __('Site') }}</th>
+                            <th class="px-3 py-2">{{ __('Server') }}</th>
                             @if ($showResource)
-                                <th class="px-4 py-2.5">{{ __(ucfirst($resourceNoun)) }}</th>
+                                <th class="px-3 py-2">{{ __(ucfirst($resourceNoun)) }}</th>
                             @endif
-                            <th class="px-4 py-2.5">{{ __('Type') }}</th>
-                            <th class="px-4 py-2.5">{{ __('Reachability') }}</th>
+                            <th class="px-3 py-2">{{ __('Type') }}</th>
+                            <th class="px-3 py-2">{{ __('Reachability') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-brand-ink/5">
                         @foreach ($rows as $row)
                             <tr class="align-top">
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     <a href="{{ $row['site_url'] }}"
                                        class="font-medium text-brand-ink hover:text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     <span class="text-brand-moss">{{ $row['server_name'] }}</span>
                                     @if ($row['is_remote'])
                                         <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Remote') }}</span>
@@ -60,10 +59,10 @@
                                     @endif
                                 </td>
                                 @if ($showResource)
-                                    <td class="px-4 py-3 text-brand-moss">{{ $row['resource_name'] ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-brand-moss">{{ $row['resource_name'] ?? '—' }}</td>
                                 @endif
-                                <td class="px-4 py-3 text-brand-moss">{{ ucfirst($row['type']) }}</td>
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2 text-brand-moss">{{ ucfirst($row['type']) }}</td>
+                                <td class="px-3 py-2">
                                     @if ($row['reachable'] === true)
                                         <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
                                             <x-heroicon-s-check-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Reachable') }}

@@ -12,21 +12,18 @@
 
 @if ($isManageable)
     <div class="{{ $card }}">
-        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex items-center gap-3">
-                <x-icon-badge>
-                    <x-dynamic-component :component="$engineIcon" class="h-5 w-5 text-brand-forest" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
-                    <h3 class="text-lg font-semibold text-brand-ink">{{ $dbEngineInfoForTab['label'] }}</h3>
-                    @if ($engineRow && filled($engineRow->version))
-                        <p class="font-mono text-[11px] text-brand-mist">{{ $engineRow->version }}</p>
-                    @elseif (! $engineRow)
-                        <p class="mt-0.5 text-[12px] text-brand-moss">{{ $dbEngineInfoForTab['tagline'] }}</p>
-                    @endif
-                </div>
-            </div>
+        @php
+            $engineHeadNote = $engineRow && filled($engineRow->version)
+                ? __('Version :version · port :port', ['version' => $engineRow->version, 'port' => $engineRow->port])
+                : $dbEngineInfoForTab['tagline'];
+        @endphp
+        <x-workspace-panel-head
+            dense
+            :icon="$engineIcon"
+            :title="$dbEngineInfoForTab['label']"
+            :note="$engineHeadNote"
+            class="border-b border-brand-ink/10"
+        >
             @if ($engineRow)
                 @php
                     $statusPill = match ($engineRow->status) {
@@ -36,18 +33,20 @@
                         default => ['classes' => 'text-sky-800', 'dot' => 'bg-sky-500', 'label' => __('Working')],
                     };
                 @endphp
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $statusPill['classes'] }}">
-                    @if ($engineInFlight)
-                        <x-spinner variant="forest" size="sm" />
-                    @else
-                        <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusPill['dot'] }}"></span>
-                    @endif
-                    {{ $statusPill['label'] }}
-                </span>
+                <x-slot:actions>
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold ring-1 ring-brand-ink/10 {{ $statusPill['classes'] }}">
+                        @if ($engineInFlight)
+                            <x-spinner variant="forest" size="sm" />
+                        @else
+                            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusPill['dot'] }}"></span>
+                        @endif
+                        {{ $statusPill['label'] }}
+                    </span>
+                </x-slot:actions>
             @endif
-        </div>
+        </x-workspace-panel-head>
 
-        <div class="px-5 py-5 sm:px-6">
+        <div class="px-4 py-3.5 sm:px-5">
             {{-- Gated "coming soon" engines never reach this panel — the engine
                  dispatcher routes all their tabs (bar Info) to the shared
                  <x-workspace-coming-soon> teaser. This branch handles available
@@ -74,7 +73,7 @@
                     <button
                         type="button"
                         wire:click="setEngineSubtab('info')"
-                        class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-information-circle class="h-4 w-4" aria-hidden="true" />
                         {{ __('Learn more') }}
@@ -88,29 +87,17 @@
                     <button
                         type="button"
                         wire:click="openConfirmActionModal('stopAndRevertDatabaseEngineInstall', ['{{ $engine }}'], @js(__('Stop and revert :engine install?', ['engine' => $dbEngineInfoForTab['label']])), @js(__('Marks the install as failed and runs apt purge on the server to clean up any partial state. Use this when the install has stalled.')), @js(__('Stop & revert')), true)"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50"
+                        class="inline-flex h-7 items-center gap-1 rounded-md border border-rose-300 bg-white px-2 text-[11px] font-semibold text-rose-800 shadow-sm transition hover:bg-rose-50"
                     >
-                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
+                        <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" />
                         {{ __('Stop & revert') }}
                     </button>
                 </div>
             @else
-                <dl class="grid gap-4 sm:grid-cols-3">
-                    <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                        <dd class="mt-1 text-sm text-brand-ink">{{ ucfirst($engineRow->status) }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
-                        <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $engineRow->version ?: '—' }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
-                        <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $engineRow->port }}</dd>
-                    </div>
-                </dl>
+                {{-- Status, version and port ride the dense head above — repeating
+                     them in a three-up definition list was the same three facts twice. --}}
                 @if ($engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_FAILED && filled($engineRow->error_message))
-                    <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">
+                    <p class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">
                         {{ $engineRow->error_message }}
                     </p>
                     <div class="mt-4">
@@ -130,10 +117,10 @@
                     \App\Models\ServerDatabaseEngine::STATUS_RUNNING,
                     \App\Models\ServerDatabaseEngine::STATUS_STOPPED,
                 ], true))
-                    <div class="mt-5 flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-2">
                         @if ($engineRow->is_default)
-                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/20 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest">
-                                <x-heroicon-o-check-badge class="h-4 w-4" aria-hidden="true" />
+                            <span class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-forest/20 bg-brand-forest/10 px-2 text-[11px] font-semibold text-brand-forest">
+                                <x-heroicon-o-check-badge class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Primary engine') }}
                             </span>
                         @else
@@ -143,9 +130,9 @@
                                 wire:loading.attr="disabled"
                                 wire:target="setPrimaryEngine"
                                 title="{{ __('Make :engine the default engine for new sites on this server.', ['engine' => $dbEngineInfoForTab['label']]) }}"
-                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                             >
-                                <x-heroicon-o-star class="h-4 w-4" aria-hidden="true" />
+                                <x-heroicon-o-star class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Make primary') }}
                             </button>
                         @endif
@@ -153,9 +140,9 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('setDatabaseEngineActivation', ['{{ $engine }}', false], @js(__('Deactivate :engine?', ['engine' => $dbEngineInfoForTab['label']])), @js(__('Stops the engine and disables it from starting at boot. Sites connected to it will lose their database until you activate it again. Data and binaries on the server are left untouched.')), @js(__('Deactivate')), true)"
-                                class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100"
                             >
-                                <x-heroicon-o-pause-circle class="h-4 w-4" aria-hidden="true" />
+                                <x-heroicon-o-pause-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Deactivate') }}
                             </button>
                         @else
@@ -164,16 +151,16 @@
                                 wire:click="setDatabaseEngineActivation('{{ $engine }}', true)"
                                 wire:loading.attr="disabled"
                                 wire:target="setDatabaseEngineActivation('{{ $engine }}', true)"
-                                class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
                             >
-                                <x-heroicon-o-play-circle class="h-4 w-4" aria-hidden="true" />
+                                <x-heroicon-o-play-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Activate') }}
                             </button>
                         @endif
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('uninstallDatabaseEngine', ['{{ $engine }}'], @js(__('Uninstall :engine', ['engine' => $dbEngineInfoForTab['label']])), @js(__('apt purge will remove the engine and its data dirs from the server. Existing tracked databases stay in Dply but won\'t have a live engine to talk to.')), @js(__('Uninstall')), true)"
-                            class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
+                            class="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 text-[11px] font-semibold text-red-700 transition hover:bg-red-100"
                         >
                             {{ __('Uninstall') }}
                         </button>
@@ -181,9 +168,9 @@
                             <button
                                 type="button"
                                 wire:click="setEngineSubtab('databases')"
-                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                class="inline-flex h-7 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-o-circle-stack class="h-4 w-4" aria-hidden="true" />
+                                <x-heroicon-o-circle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Manage databases') }}
                             </button>
                         @endif
@@ -195,24 +182,57 @@
 
     {{-- Remote access is managed per-database on the Networking tab. --}}
 @elseif ($engine === 'sqlite' && ($capabilities['sqlite'] ?? false))
-    <div class="{{ $card }} px-5 py-5 sm:px-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="max-w-2xl">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
-                <h3 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ $dbEngineInfoForTab['label'] }}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $dbEngineInfoForTab['description'] }}</p>
-            </div>
-            <span class="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">{{ __('Active') }}</span>
-        </div>
-        <div class="mt-5">
-            <button
-                type="button"
-                wire:click="setEngineSubtab('databases')"
-                class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            :icon="$engineIcon"
+            :title="$dbEngineInfoForTab['label']"
+            :note="$dbEngineInfoForTab['description']"
+            class="border-b border-brand-ink/10"
+        >
+            <x-slot:actions>
+                <span class="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">{{ __('Active') }}</span>
+                <button
+                    type="button"
+                    wire:click="setEngineSubtab('databases')"
+                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-m-circle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Manage databases') }}
+                </button>
+            </x-slot:actions>
+        </x-workspace-panel-head>
+    </div>
+@else
+    {{-- SQLite that the capability probe hasn't found on the box. This branch used
+         to be missing entirely, so the Overview subtab rendered a blank card. --}}
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            :icon="$engineIcon"
+            :title="$dbEngineInfoForTab['label']"
+            :note="$dbEngineInfoForTab['description']"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
+            <x-empty-state
+                borderless
+                compact
+                icon="heroicon-o-archive-box"
+                tone="sage"
+                :title="__(':engine not detected on this server', ['engine' => $dbEngineInfoForTab['label']])"
+                :description="__('The sqlite3 binary was not found. Open Advanced → Server sync and click Recheck engines after installing it.')"
             >
-                <x-heroicon-o-circle-stack class="h-4 w-4" aria-hidden="true" />
-                {{ __('Manage databases') }}
-            </button>
+                <x-slot:actions>
+                    <button
+                        type="button"
+                        wire:click="setWorkspaceTab('advanced')"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    >
+                        {{ __('Open Advanced') }}
+                    </button>
+                </x-slot:actions>
+            </x-empty-state>
         </div>
     </div>
 @endif

@@ -200,13 +200,18 @@ test('install refuses second redis family engine on same server', function () {
         'engine' => 'valkey',
     ]);
 });
-test('install refuses a coming soon engine before queueing', function () {
-    // Valkey is now GA by default; force it coming-soon so the install action
-    // refuses without creating a row or queueing a job.
+test('every cache engine installs — none are gated coming soon', function () {
+    // CacheEngineAvailability::GATED_ENGINES is now empty: every engine
+    // graduated, so the Pennant flag no longer blocks an install. Turning the
+    // flag off must NOT refuse any more — re-adding a key to GATED_ENGINES is
+    // what re-enables the guard (isComingSoon() still honours the const).
     Queue::fake();
     config(['features.cache.valkey' => false]);
     Feature::flushCache();
     [$user, $server] = actingOwnerWithServer();
+
+    expect(\App\Support\Servers\CacheEngineAvailability::GATED_ENGINES)->toBe([]);
+    expect(\App\Support\Servers\CacheEngineAvailability::isComingSoon('valkey'))->toBeFalse();
 
     $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
         $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
@@ -218,11 +223,7 @@ test('install refuses a coming soon engine before queueing', function () {
         ->test(WorkspaceCaches::class, ['server' => $server])
         ->call('installCacheService', 'valkey');
 
-    Queue::assertNotPushed(InstallCacheServiceJob::class);
-    $this->assertDatabaseMissing('server_cache_services', [
-        'server_id' => $server->id,
-        'engine' => 'valkey',
-    ]);
+    Queue::assertPushed(InstallCacheServiceJob::class);
 });
 test('install blocks when another install is in flight', function () {
     // The new server-wide busy guard blocks even cross-engine installs while apt is

@@ -26,37 +26,33 @@
             x-init="setTimeout(() => hidePassword(), 90000)"
         @endif
     >
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <x-icon-badge>
-                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Just created') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('New database credentials') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    @if ($credentialsEmailed)
-                        {{ __('Save these now. Credentials for :name were emailed to you and shown here once — the password hides automatically.', ['name' => $generated_database_credentials['name']]) }}
-                    @else
-                        {{ __('Save these now. Dply generated credentials for :name and shows the password here once — copy it before it hides.', ['name' => $generated_database_credentials['name']]) }}
-                    @endif
-                </p>
-            </div>
-            <button type="button" wire:click="dismissGeneratedDatabaseCredentials" class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Dismiss') }}
-            </button>
-        </div>
-        <dl class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6">
-            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-key"
+            :title="__('New database credentials')"
+            :note="$credentialsEmailed
+                ? __('Save these now. Credentials for :name were emailed to you and shown here once — the password hides automatically.', ['name' => $generated_database_credentials['name']])
+                : __('Save these now. Dply generated credentials for :name and shows the password here once — copy it before it hides.', ['name' => $generated_database_credentials['name']])"
+            class="border-b border-brand-ink/10"
+        >
+            <x-slot:actions>
+                <button type="button" wire:click="dismissGeneratedDatabaseCredentials" class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                    <x-heroicon-m-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Dismiss') }}
+                </button>
+            </x-slot:actions>
+        </x-workspace-panel-head>
+        <dl class="grid gap-2 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
+            <div class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2 shadow-sm">
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</dt>
                 <dd class="mt-0.5 font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['name'] }}</dd>
             </div>
-            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+            <div class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2 shadow-sm">
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</dt>
                 <dd class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $engineLabels[$generated_database_credentials['engine']] ?? ucfirst((string) $generated_database_credentials['engine']) }}</dd>
             </div>
             @if (filled($generated_database_credentials['username']))
-                <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
                     <dd class="mt-0.5 font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['username'] }}</dd>
                     @if ($generated_database_credentials['username_generated'])
@@ -65,7 +61,7 @@
                 </div>
             @endif
             @if (filled($plainPassword) || $passwordHidden)
-                <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <div class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2 shadow-sm">
                     <div class="flex items-center justify-between gap-2">
                         <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
                         @if ($showPasswordOnce)

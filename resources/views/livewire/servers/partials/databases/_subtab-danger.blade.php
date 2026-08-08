@@ -1,7 +1,17 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} px-5 py-5 sm:px-6">
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            tone="danger"
+            icon="heroicon-o-trash"
+            :title="__('Destructive actions')"
+            :note="__('Drop or detach tracked databases for this engine.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
         <x-empty-state
             borderless
+            compact
             icon="heroicon-o-exclamation-triangle"
             tone="rose"
             :title="__('Danger zone unavailable')"
@@ -17,21 +27,22 @@
                 </button>
             </x-slot:actions>
         </x-empty-state>
+        </div>
     </div>
 @elseif ($engineDatabases->isEmpty())
     <div class="{{ $card }} border-rose-200/80">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-5 py-5 sm:px-6">
-            <x-icon-badge tone="danger">
-                <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Danger zone') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Destructive actions') }}</h3>
-            </div>
-        </div>
-        <div class="px-5 py-5 sm:px-6">
+        <x-workspace-panel-head
+            dense
+            tone="danger"
+            icon="heroicon-o-trash"
+            :title="__('Destructive actions')"
+            :note="__('Dropping a database removes it from the server and from Dply. There is no undo.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-3.5 sm:px-5">
             <x-empty-state
                 borderless
+                compact
                 icon="heroicon-o-shield-check"
                 tone="rose"
                 :title="__('Nothing to remove yet')"

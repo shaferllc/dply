@@ -1,7 +1,16 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} px-5 py-5 sm:px-6">
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-puzzle-piece"
+            :title="__('Optional extensions')"
+            :note="__('Install apt packages and run CREATE EXTENSION on this server.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
         <x-empty-state
             borderless
+            compact
             icon="heroicon-o-puzzle-piece"
             tone="sage"
             :title="__('Extensions unavailable')"
@@ -13,22 +22,23 @@
                 </button>
             </x-slot:actions>
         </x-empty-state>
+        </div>
     </div>
 @else
     <div class="{{ $card }}" wire:init="loadPostgresExtensions">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PostgreSQL') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Optional extensions') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Install apt packages and run CREATE EXTENSION on this server. Use for geospatial (PostGIS), embeddings (pgvector), or time-series (TimescaleDB).') }}
-            </p>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-puzzle-piece"
+            :title="__('Optional extensions')"
+            :note="__('Install apt packages and run CREATE EXTENSION on this server. Use for geospatial (PostGIS), embeddings (pgvector), or time-series (TimescaleDB).')"
+            class="border-b border-brand-ink/10"
+        />
         <ul class="divide-y divide-brand-ink/10">
             @foreach (\App\Support\Servers\PostgresExtensionCatalog::all() as $key => $meta)
                 @php
                     $installed = in_array($meta['extension'], $postgres_installed_extensions ?? [], true);
                 @endphp
-                <li class="flex flex-wrap items-start justify-between gap-4 px-5 py-5 sm:px-6">
+                <li class="flex flex-wrap items-start justify-between gap-4 px-4 py-3 sm:px-5">
                     <div class="min-w-0 max-w-xl">
                         <div class="flex flex-wrap items-center gap-2">
                             <h4 class="text-sm font-semibold text-brand-ink">{{ $meta['label'] }}</h4>

@@ -3,19 +3,21 @@
     $backups = $backups ?? collect();
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Backups') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent backups') }}</h2>
-        </div>
-    </div>
-    <div class="px-6 py-6 sm:px-7">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-archive-box"
+        :title="__('Recent backups')"
+        :count="$backups->isNotEmpty()
+            ? trans_choice('{1} :count backup|[2,*] :count backups', $backups->count(), ['count' => $backups->count()])
+            : null"
+        :note="__('Completed exports for this engine — download or delete them here.')"
+        class="border-b border-brand-ink/10"
+    />
+    <div class="px-4 py-3.5 sm:px-5">
     @if ($backups->isEmpty())
         <x-empty-state
             borderless
+            compact
             icon="heroicon-o-archive-box"
             tone="sage"
             :title="__('No backups yet')"

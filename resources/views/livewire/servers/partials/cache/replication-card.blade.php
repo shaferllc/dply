@@ -144,7 +144,7 @@
                     </table>
                 </div>
             @else
-                <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+                <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                     </span>

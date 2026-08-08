@@ -23,107 +23,72 @@
     <div class="space-y-4">
         {{-- Merged: page identity + directory in one card (same pattern as Run/Console). --}}
         <section class="dply-card min-w-0 overflow-hidden p-0">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            @switch($siteType)
-                                @case('container')
-                                    <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @case('php')
-                                    <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @case('static')
-                                    <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @case('node')
-                                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @default
-                                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                            @endswitch
-                        </span>
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">
-                                    {{ $isContainerHost ? __('Container apps') : __('Sites') }}
-                                </h2>
-                                <span class="rounded-md bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
-                                    {{ ucfirst($siteType) }}
-                                </span>
-                            </div>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                @switch($siteType)
-                                    @case('container')
-                                        {{ __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.') }}
-                                        @break
-                                    @case('php')
-                                        {{ __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.') }}
-                                        @break
-                                    @case('static')
-                                        {{ __('Host static sites from Git with zero-config builds.') }}
-                                        @break
-                                    @case('node')
-                                        {{ __('Deploy Node.js apps from Git, with build and NPM support.') }}
-                                        @break
-                                    @default
-                                        {{ __('Manage sites on this server — deploys, env, and settings per workspace.') }}
-                                @endswitch
-                            </p>
-                            <p class="mt-2 text-xs text-brand-mist">
-                                <span class="font-mono font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</span>
-                                {{ $isContainerHost ? __('on this host') : __('on this server') }}
-                                ·
-                                @switch($siteType)
-                                    @case('container')
-                                        {{ __('Container') }}
-                                        @break
-                                    @case('php')
-                                        {{ __('VM · PHP') }}
-                                        @break
-                                    @case('static')
-                                        {{ __('VM · Static') }}
-                                        @break
-                                    @case('node')
-                                        {{ __('VM · Node') }}
-                                        @break
-                                    @default
-                                        {{ ucfirst((string) $server->hostKind()) }}
-                                @endswitch
-                            </p>
-                            @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
-                                <div class="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-900">
-                                    <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    <span>{{ $this->addSiteBlockedReason }}</span>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        @if ($this->canAddSite)
-                            <button
-                                type="button"
-                                wire:click="openAddSiteModal"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-                            >
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $addCtaLabel }}
-                            </button>
-                        @else
-                            <span
-                                class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-brand-mist/30 px-3 py-1.5 text-xs font-semibold text-brand-moss"
-                                title="{{ $this->addSiteBlockedReason }}"
-                            >
-                                <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $addCtaLabel }}
-                            </span>
-                        @endif
-                    </div>
-                </div>
-            </div>
+            @php
+                $sitesIcon = match ($siteType) {
+                    'container' => 'heroicon-o-cube-transparent',
+                    'php' => 'heroicon-o-code-bracket',
+                    'static' => 'heroicon-o-photo',
+                    'node' => 'heroicon-o-bolt',
+                    default => 'heroicon-o-globe-alt',
+                };
+                $sitesNote = match ($siteType) {
+                    'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
+                    'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
+                    'static' => __('Host static sites from Git with zero-config builds.'),
+                    'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
+                    default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
+                };
+                $sitesRuntimeLabel = match ($siteType) {
+                    'container' => __('Container'),
+                    'php' => __('VM · PHP'),
+                    'static' => __('VM · Static'),
+                    'node' => __('VM · Node'),
+                    default => ucfirst((string) $server->hostKind()),
+                };
+            @endphp
 
-            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+            {{-- Dense head, matching the rest of the workspace. The site count,
+                 runtime label and type badge were three separate lines under the
+                 title; they're the pill + note now. --}}
+            <x-workspace-panel-head
+                dense
+                :icon="$sitesIcon"
+                :title="$isContainerHost ? __('Container apps') : __('Sites')"
+                :count="trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $siteCount, ['count' => $siteCount])
+                    .' · '.$sitesRuntimeLabel"
+                :note="$sitesNote"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    @if ($this->canAddSite)
+                        <button
+                            type="button"
+                            wire:click="openAddSiteModal"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                        >
+                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $addCtaLabel }}
+                        </button>
+                    @else
+                        <span
+                            class="inline-flex h-6 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-md bg-brand-mist/30 px-2 text-[11px] font-semibold text-brand-moss"
+                            title="{{ $this->addSiteBlockedReason }}"
+                        >
+                            <x-heroicon-m-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $addCtaLabel }}
+                        </span>
+                    @endif
+                </x-slot:actions>
+            </x-workspace-panel-head>
+
+            @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
+                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                    <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>{{ $this->addSiteBlockedReason }}</span>
+                </p>
+            @endif
+
+            <div class="border-b border-brand-ink/10 px-4 py-2 sm:px-5">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
@@ -144,7 +109,7 @@
 
             @php $bulkSelectedCount = count(array_filter($selectedSiteIds ?? [])); @endphp
             @if ($bulkActionsEnabled && ! $isContainerHost && $bulkSelectedCount > 0)
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-4 py-2 sm:px-5">
                     <span class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ trans_choice(':count site selected|:count sites selected', $bulkSelectedCount, ['count' => $bulkSelectedCount]) }}</span>
                     <button
                         type="button"
@@ -196,7 +161,7 @@
             @endif
 
             @if ($server->sites->isEmpty())
-                <div class="px-5 py-12 text-center sm:px-6">
+                <div class="px-4 py-8 text-center sm:px-5">
                     <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
                         @if ($isContainerHost)
                             <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
@@ -267,7 +232,7 @@
                             <a
                                 href="{{ route('sites.show', [$server, $s]) }}"
                                 wire:navigate
-                                class="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 pr-6 transition-colors hover:bg-brand-sand/15 sm:pr-7 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-4 sm:pl-5' : 'px-6 sm:px-7' }}"
+                                class="flex min-w-0 flex-1 items-center justify-between gap-4 py-3 pr-4 transition-colors hover:bg-brand-sand/15 sm:pr-5 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-4 sm:pl-5' : 'px-4 sm:px-5' }}"
                             >
                                 <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-sand/40 text-sm font-semibold text-brand-moss">
                                     @if ($s->logoUrl())
@@ -415,23 +380,23 @@
                 focusable
             >
                 <form wire:submit="addSite" x-data="{ showAdvanced: false }" class="flex min-h-0 flex-1 flex-col">
-                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                         <x-icon-badge>
                             <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('New site') }}</p>
                             {{-- $sites is not passed to this view; the rest of the file reads $server->sites (eager-loaded in render()). --}}
                             @if($server->sites->count() > 0)
-                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
-                                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
+                                <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">
                                     {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
                                 </p>
                             @endif
                         </div>
                     </div>
 
-                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3.5 sm:px-5">
                         <div>
                             <x-input-label for="add-site-hostname" :value="__('Primary domain')" />
                             <x-text-input
@@ -582,7 +547,7 @@
                         </div>
                     </div>
 
-                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                         <x-secondary-button type="button" wire:click="closeAddSiteModal">
                             {{ __('Cancel') }}
                         </x-secondary-button>
@@ -608,7 +573,7 @@
 
         @if ($bulkActionsEnabled && ! $isContainerHost)
             <x-modal name="redeploy-all-sites" maxWidth="lg" overlayClass="bg-brand-ink/40">
-                <div class="relative border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="relative border-b border-brand-ink/10 bg-brand-cream/40 px-4 py-3 sm:px-5">
                     <div class="flex items-start gap-3 pr-10">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
@@ -626,7 +591,7 @@
                     </button>
                 </div>
                 @if (count($this->selectedBulkPreview['site_names'] ?? []) > 0)
-                    <div class="max-h-48 overflow-y-auto border-b border-brand-ink/10 px-6 py-4 sm:px-7">
+                    <div class="max-h-48 overflow-y-auto border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sites included') }}</p>
                         <ul class="mt-2 space-y-1 text-sm text-brand-moss">
                             @foreach ($this->selectedBulkPreview['site_names'] as $siteName)
@@ -635,7 +600,7 @@
                         </ul>
                     </div>
                 @endif
-                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 sm:px-5">
                     <button type="button" wire:click="closeRedeployAllModal" class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                         {{ __('Cancel') }}
                     </button>

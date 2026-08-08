@@ -145,6 +145,10 @@
                         :active="$workspace_tab === $engine"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
+                        {{-- Icon only — no spinner here. x-server-workspace-tab
+                             already renders one for any tab with a wire:target,
+                             so a hand-rolled one made every engine tab show two
+                             spinners side by side while it loaded. --}}
                         <span class="inline-flex items-center gap-2">
                             <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
                                 @switch($engine)
@@ -163,9 +167,6 @@
                                     @default
                                         <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
                                 @endswitch
-                            </span>
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="setWorkspaceTab('{{ $engine }}')">
-                                <x-spinner class="h-4 w-4" />
                             </span>
                             {{ $engineLabels[$engine] }}
                             @if (($comingSoonEngines[$engine] ?? false) && ! $row)

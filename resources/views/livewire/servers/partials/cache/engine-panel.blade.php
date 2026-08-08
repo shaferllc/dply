@@ -93,52 +93,63 @@
                             $unsupportedReason = $engineUnsupportedReasons[$engine] ?? null;
                         @endphp
                         {{-- Overview when not installed: the install affordance. --}}
-                        <div class="{{ $card }} px-5 py-5 sm:px-6">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
-                            <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
+                        <div class="{{ $card }}">
+                            <x-workspace-panel-head
+                                dense
+                                icon="heroicon-o-cloud-arrow-down"
+                                :title="__('Install :engine', ['engine' => $info['label']])"
+                                :note="__('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.')"
+                                class="border-b border-brand-ink/10"
+                            />
+
+                            {{-- Preview what the workspace gives you once it's
+                                 running, so the tab isn't just a button. --}}
+                            @include('livewire.servers.partials.cache._engine-preview', [
+                                'engine' => $engine,
+                                'engineLabel' => $info['label'],
+                            ])
+
+                            <div class="px-4 py-3.5 sm:px-5">
                             @if ($unsupportedReason)
                                 {{-- Distro gate: the host's /etc/os-release codename isn't in the engine's
                                      supported list (e.g. KeyDB on Ubuntu 24.04 — upstream doesn't ship
                                      for noble). Disable the button instead of letting apt fail later. --}}
-                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                                    <p class="flex items-start gap-2">
-                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
-                                        <span>{{ $unsupportedReason }}</span>
-                                    </p>
-                                </div>
-                                <div class="mt-4 flex flex-wrap items-center gap-3">
+                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                                    <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <span>{{ $unsupportedReason }}</span>
+                                </p>
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
                                     <button
                                         type="button"
                                         disabled
                                         title="{{ $unsupportedReason }}"
-                                        class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-brand-forest/40 px-4 py-2 text-sm font-medium text-white opacity-60"
+                                        class="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-lg bg-brand-ink/40 px-3 text-xs font-semibold text-white opacity-60"
                                     >
-                                        <x-heroicon-o-no-symbol class="h-4 w-4" />
+                                        <x-heroicon-m-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Install :engine', ['engine' => $info['label']]) }}
                                     </button>
                                 </div>
                             @elseif ($cacheBusy)
-                                <div class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-                                    <p class="flex items-start gap-2">
-                                        <x-spinner variant="forest" class="mt-0.5 shrink-0" />
-                                        <span>{{ __('Apt is busy with another cache change — wait for the running operation to finish before installing :new.', ['new' => $info['label']]) }}</span>
-                                    </p>
-                                </div>
+                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-900">
+                                    <x-spinner variant="forest" class="shrink-0" />
+                                    <span>{{ __('Apt is busy with another cache change — wait for the running operation to finish before installing :new.', ['new' => $info['label']]) }}</span>
+                                </p>
                             @else
-                                <div class="mt-4 flex flex-wrap items-center gap-3">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <button
                                         type="button"
                                         wire:click="installCacheService('{{ $engine }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="installCacheService"
-                                        class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                        class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-ink px-3 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-50"
                                     >
-                                        <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
+                                        <x-heroicon-m-cloud-arrow-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         <span wire:loading.remove wire:target="installCacheService">{{ __('Install :engine', ['engine' => $info['label']]) }}</span>
                                         <span wire:loading wire:target="installCacheService">{{ __('Queueing install…') }}</span>
                                     </button>
                                 </div>
                             @endif
+                            </div>
                         </div>
                     @else
                         {{-- Overview when in-flight: small status note pointing at the
@@ -228,11 +239,17 @@
 
                     @if ($activeSubtab === 'overview')
                     {{-- Installed and idle: status grid + action row. --}}
-                    <div class="{{ $card }} px-5 py-5 sm:px-6">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
-                        <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div class="{{ $card }}">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-bolt"
+                            :title="__(':engine status', ['engine' => $engineLabels[$engine]])"
+                            :note="__('Live state from the last SSH probe — service status, reachability, version, and bind address.')"
+                            class="border-b border-brand-ink/10"
+                        />
+                        <dl class="grid gap-3 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
                             <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                                 <dd class="mt-1">
                                     @switch($row->status)
                                         @case(\App\Models\ServerCacheService::STATUS_RUNNING)
@@ -250,7 +267,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
                                 <dd class="mt-1">
                                     {{-- Three-state badge. "Status: Running, Probe: Not reachable"
                                          used to surface because the SSH-probe couldn't get a PONG
@@ -274,7 +291,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
                                 <dd class="mt-1 flex flex-wrap items-center gap-2 font-mono text-sm text-brand-ink">
                                     <span>{{ $row->version ?: '—' }}</span>
                                     @if (! $row->version && $row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
@@ -294,7 +311,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
                                 <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $row->port }}</dd>
                             </div>
                         </dl>
@@ -433,7 +450,7 @@
                                             </button>
                                         @endif
                                         <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="{{ $btnLifecycle }}">
-                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
                                             <span wire:loading wire:target="restartCacheService">{{ __('Restarting…') }}</span>
                                         </button>
@@ -809,9 +826,9 @@
                                     <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
                                         @if ($cacheMemoryLoaded)
-                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Reload') }}</span>
                                         @else
                                             <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
@@ -883,7 +900,7 @@
                                         wire:click="loadCacheMemorySettings"
                                         wire:loading.attr="disabled"
                                         wire:target="loadCacheMemorySettings"
-                                        class="mt-4 block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                        class="mt-4 block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
@@ -1027,32 +1044,31 @@
                              below a border-b separator. --}}
                         @if ($activeSubtab === 'stats')
                         <div class="{{ $card }}">
-                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <x-icon-badge>
-                                    <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Clients') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand, then kept live — auto-refreshes every 10 seconds once loaded.') }}</p>
-                                </div>
-                                <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+                            <x-workspace-panel-head
+                                dense
+                                icon="heroicon-o-users"
+                                :title="__(':engine — connected clients', ['engine' => $engineLabels[$engine]])"
+                                :count="is_array($cacheClients) ? (string) count($cacheClients) : null"
+                                :note="__('Snapshot of CLIENT LIST. Pulled on demand, then kept live — auto-refreshes every 10 seconds once loaded.')"
+                                class="border-b border-brand-ink/10"
+                            >
+                                <x-slot:actions>
                                     @if ($cacheClients === null && $cacheClientsError === null)
-                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-users class="h-4 w-4" aria-hidden="true" />
+                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-m-users class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheClients">{{ __('Load clients') }}</span>
                                             <span wire:loading wire:target="loadCacheClients">{{ __('Loading…') }}</span>
                                         </button>
                                     @else
-                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                                        <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Refresh') }}
                                         </button>
                                     @endif
-                                </div>
-                            </div>
+                                </x-slot:actions>
+                            </x-workspace-panel-head>
 
-                            <div class="px-6 py-6 sm:px-7">
+                            <div class="px-4 py-3.5 sm:px-5">
 
                             {{-- In-body loading indicator. CLIENT LIST takes 1-2s over SSH
                                  (longer with --no-auth-warning'd retries) and the button only
@@ -1210,7 +1226,7 @@
                                     wire:click="loadCacheClients"
                                     wire:loading.attr="disabled"
                                     wire:target="loadCacheClients"
-                                    class="block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                         <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
@@ -1339,7 +1355,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="loadCacheConfig"
                                     x-on:click="$dispatch('open-modal', @js($configModalName))"
-                                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                                 >
                                     <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
                                     <span wire:loading.remove wire:target="loadCacheConfig">@if ($cacheConfigContent !== null){{ __('Reopen viewer') }}@else{{ __('View config') }}@endif</span>
@@ -1383,7 +1399,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="loadCacheConfig"
                                     x-on:click="$dispatch('open-modal', @js($configModalName))"
-                                    class="mt-4 block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="mt-4 block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                         <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
@@ -1428,8 +1444,8 @@
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     @if (! $cacheConfigEditing)
-                                        <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                                        <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50">
+                                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Refresh') }}</span>
                                             <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
                                         </button>

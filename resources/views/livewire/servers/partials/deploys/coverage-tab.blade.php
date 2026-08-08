@@ -14,39 +14,45 @@
     };
 
     $siteRows = $report['site_rows'] ?? [];
+    $blockedCount = count(array_filter($siteRows, static fn (array $row): bool => ($row['status'] ?? null) === 'blocked'));
 @endphp
 
+{{-- Nested inside the merged Deploys card — dense head over hairline rows. Each
+     site was a three-line stack (name / hostname / detail) with a stacked pill
+     and link beside it; it's one line now. --}}
 <div>
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Coverage') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site coverage') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Every site on this server inherits the same deploy window policy.') }}</p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-globe-alt"
+        :tone="$blockedCount > 0 ? 'amber' : null"
+        :title="__('Site coverage')"
+        :count="$siteRows !== [] ? count($siteRows) : null"
+        :note="__('Every site on this server inherits the same deploy window policy.')"
+        class="border-b border-brand-ink/10"
+    />
 
     @if ($siteRows === [])
-        <div class="px-5 py-8 text-center text-sm text-brand-moss sm:px-6">{{ __('No sites on this server yet.') }}</div>
+        <x-empty-state
+            borderless
+            compact
+            icon="heroicon-o-globe-alt"
+            :title="__('No sites on this server yet')"
+            :description="__('Sites added here inherit the deploy window policy automatically.')"
+        />
     @else
         <ul class="divide-y divide-brand-ink/8">
             @foreach ($siteRows as $row)
-                <li wire:key="policy-site-{{ $row['id'] }}" class="flex items-start justify-between gap-3 px-5 py-3.5 sm:px-6">
-                    <div class="min-w-0">
-                        <p class="font-medium text-brand-ink">{{ $row['name'] }}</p>
-                        <p class="mt-0.5 truncate font-mono text-xs text-brand-moss">{{ $row['primary_hostname'] }}</p>
-                        @if ($row['detail'])
-                            <p class="mt-1 text-xs text-amber-900">{{ $row['detail'] }}</p>
-                        @endif
-                    </div>
-                    <div class="flex shrink-0 flex-col items-end gap-1.5">
-                        <span @class(['inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1', $statusTone($row['status'])])>
-                            {{ $row['status_label'] }}
-                        </span>
-                        <a href="{{ $row['show_url'] }}" wire:navigate class="text-[11px] font-semibold text-brand-moss hover:text-brand-ink">{{ __('Workspace') }}</a>
-                    </div>
+                <li wire:key="policy-site-{{ $row['id'] }}" class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:px-5">
+                    <p class="shrink-0 text-xs font-semibold text-brand-ink">{{ $row['name'] }}</p>
+                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                    <p class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-mist" title="{{ $row['primary_hostname'] }}">{{ $row['primary_hostname'] }}</p>
+                    @if ($row['detail'])
+                        <p class="min-w-0 shrink truncate text-[11px] text-amber-900" title="{{ $row['detail'] }}">{{ $row['detail'] }}</p>
+                    @endif
+                    <span @class(['ml-auto inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1', $statusTone($row['status'])])>
+                        {{ $row['status_label'] }}
+                    </span>
+                    <a href="{{ $row['show_url'] }}" wire:navigate class="shrink-0 text-[11px] font-semibold text-brand-moss hover:text-brand-ink">{{ __('Workspace') }}</a>
                 </li>
             @endforeach
         </ul>

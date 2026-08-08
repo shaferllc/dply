@@ -32,18 +32,16 @@
      The header still uses bg-brand-sand/20 + border-b which naturally
      respects rounded corners, so visually nothing else changes. --}}
 <div class="{{ $card }} overflow-visible" wire:key="cache-key-browser-{{ $engine }}">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keys') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — key browser', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.') }}</p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-magnifying-glass"
+        :title="__(':engine — key browser', ['engine' => $engineLabel])"
+        :count="$loaded && is_array($keys) ? (string) count($keys) : null"
+        :note="__('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.')"
+        class="border-b border-brand-ink/10"
+    />
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-4 py-3.5 sm:px-5">
 
     <div
         class="relative mt-4"
@@ -242,7 +240,7 @@
         {{-- Matches-empty empty state. Same dashed-border pattern as the
              other cards' idle/empty surfaces so the operator immediately
              recognises this as a "no data" state rather than "load failed". --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
             </span>
@@ -258,7 +256,7 @@
     @if (! $loaded && empty($keys) && ! $error)
         {{-- Pre-search idle state. Hides during wire:loading so the
              scanning skeleton above takes over the moment Search fires. --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
             </span>

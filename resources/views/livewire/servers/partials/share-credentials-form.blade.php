@@ -4,19 +4,17 @@
     $orgAllowsCredentialShares = $orgAllowsCredentialShares ?? true;
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Share') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Share credentials (read-only link)') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Hand a tracked database\'s credentials to a teammate via a single-use link with an expiry and view cap.') }}</p>
-        </div>
-    </div>
-    <div class="px-6 py-6 sm:px-7">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-share"
+        :title="__('Share credentials (read-only link)')"
+        :note="__('Hand a tracked database\'s credentials to a teammate via a single-use link with an expiry and view cap.')"
+        class="border-b border-brand-ink/10"
+    />
+    <div class="px-4 py-3.5 sm:px-5">
     @if (! $orgAllowsCredentialShares)
         <x-empty-state
+            compact
             borderless
             icon="heroicon-o-lock-closed"
             tone="amber"
@@ -25,6 +23,7 @@
         />
     @elseif ($databases->isEmpty())
         <x-empty-state
+            compact
             borderless
             icon="heroicon-o-share"
             tone="sage"
