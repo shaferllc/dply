@@ -3,75 +3,73 @@
          keys the deployed code expects but that aren't set here, with a
          one-click modal to add them. --}}
     @if ($supportsEnvPush && $envAdvanced && $missingEnv !== [] && ! $envGateOff)
-        <div class="flex flex-col gap-3 bg-rose-50/60 px-5 py-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-100 text-rose-700 ring-rose-200">
-                            <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Missing variables') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-rose-900">
-                                {{ trans_choice('{1} :count required variable is missing|[2,*] :count required variables are missing', count($missingEnv), ['count' => count($missingEnv)]) }}
-                            </h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-rose-900">
-                                {{ __('These are referenced by the deployed code (.env.example, plus env() usage in app code and config/) but aren\'t set here. The app may error until they have values.') }}
-                            </p>
-                            <div class="mt-2 flex flex-wrap gap-1.5">
-                                @foreach (array_slice($missingEnv, 0, 24) as $entry)
-                                    <span
-                                        class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200"
-                                        title="{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}"
-                                    >
-                                        {{ $entry['key'] }}
-                                        @if ($canIgnoreEnv)
-                                            <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
-                                                <x-heroicon-o-x-mark class="h-3 w-3" />
-                                            </button>
-                                        @endif
-                                    </span>
-                                @endforeach
-                                @if (count($missingEnv) > 24)
-                                    <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
-                                        {{ __('+:count more', ['count' => count($missingEnv) - 24]) }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
+        {{-- Same compact grammar as the config-check row above it: heading line,
+             then the payload. The 40px icon tile, the uppercase eyebrow and the
+             two-line explainer were three separate ways of saying "missing
+             variables" before the keys — which are the actual content — appeared. --}}
+        <div class="px-5 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0 text-rose-600" />
+                        <h3 class="text-xs font-semibold text-brand-ink">
+                            {{ trans_choice('{1} :count required variable is missing|[2,*] :count required variables are missing', count($missingEnv), ['count' => count($missingEnv)]) }}
+                        </h3>
+                        <span class="text-[11px] text-brand-moss">{{ __('referenced by the deployed code but not set here') }}</span>
                     </div>
-                    <div class="flex shrink-0 flex-nowrap items-center gap-2 whitespace-nowrap">
+
+                    <div class="flex shrink-0 flex-nowrap items-center gap-1.5 whitespace-nowrap">
                         <button
                             type="button"
                             wire:click="rescanEnvRequirements"
                             wire:loading.attr="disabled"
                             wire:target="rescanEnvRequirements"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex items-center gap-1 rounded border border-brand-ink/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-ink transition hover:border-brand-ink/25 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                             title="{{ __('Re-scan the deployed code for required variables.') }}"
                         >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rescanEnvRequirements" />
-                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            <x-heroicon-o-arrow-path class="h-3 w-3" wire:loading.remove wire:target="rescanEnvRequirements" />
+                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-3 w-3 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Re-scan') }}
                         </button>
                         <button
                             type="button"
                             wire:click="openMissingEnvModal"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
+                            class="inline-flex items-center gap-1 rounded bg-rose-700 px-1.5 py-0.5 text-[11px] font-semibold text-white transition-colors hover:bg-rose-800"
                         >
-                            <x-heroicon-o-plus class="h-4 w-4" />
-                            {{ __('Add missing variables') }}
+                            <x-heroicon-o-plus class="h-3 w-3" />
+                            {{ __('Add all') }}
                         </button>
                         @if ($canIgnoreEnv)
                             <button
                                 type="button"
                                 wire:click="confirmIgnoreMissingEnv"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="rounded px-1.5 py-0.5 text-[11px] font-medium text-brand-mist transition hover:bg-white hover:text-brand-moss"
                                 title="{{ __('Stop warning/blocking on missing required variables for this site.') }}"
                             >
-                                <x-heroicon-o-no-symbol class="h-4 w-4" />
                                 {{ __('Ignore all') }}
                             </button>
                         @endif
                     </div>
+                </div>
+
+                <div class="mt-2 flex flex-wrap gap-1">
+                    @foreach (array_slice($missingEnv, 0, 24) as $entry)
+                        <span
+                            class="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-800"
+                            title="{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}"
+                        >
+                            {{ $entry['key'] }}
+                            @if ($canIgnoreEnv)
+                                <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
+                                    <x-heroicon-o-x-mark class="h-3 w-3" />
+                                </button>
+                            @endif
+                        </span>
+                    @endforeach
+                    @if (count($missingEnv) > 24)
+                        <span class="inline-flex items-center rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-800">
+                            {{ __('+:count more', ['count' => count($missingEnv) - 24]) }}
+                        </span>
+                    @endif
                 </div>
             </div>
     @endif

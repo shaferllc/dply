@@ -96,6 +96,33 @@ class LinodeService
     }
 
     /**
+     * Every Linode on the account. The create wizard's scan-and-import mode
+     * uses this to find hosts dply doesn't manage yet. Linode pages at 100 and
+     * reports `pages`, so follow that count (bounded).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listInstances(): array
+    {
+        $instances = [];
+        $page = 1;
+        $pages = 1;
+
+        do {
+            $response = $this->request('get', '/linode/instances', ['page' => $page, 'page_size' => 100]);
+            $this->assertSuccess($response, 'list instances');
+
+            $batch = $response->json('data');
+            $instances = array_merge($instances, is_array($batch) ? array_values(array_filter($batch, 'is_array')) : []);
+
+            $pages = (int) ($response->json('pages') ?? 1);
+            $page++;
+        } while ($page <= $pages && $page <= 20);
+
+        return $instances;
+    }
+
+    /**
      * Get instance by ID. Returns decoded JSON.
      * @return array<string, mixed>
      */

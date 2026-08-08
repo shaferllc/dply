@@ -9,18 +9,13 @@
 
 @if ($existingProviderServers !== [])
     <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-map-pin class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Existing fleet') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where your servers are installed') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Servers already on this provider. Pick a nearby region or co-locate with an existing role.') }}
-                </p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-map-pin"
+            :title="__('Where your servers are installed')"
+            :note="__('Servers already on this provider. Pick a nearby region or co-locate with an existing role.')"
+            class="border-b border-brand-ink/10"
+        />
         <div class="divide-y divide-brand-ink/8">
             @foreach ($existingProviderServers as $server)
                 @php

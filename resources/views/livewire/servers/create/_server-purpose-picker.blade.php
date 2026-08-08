@@ -18,18 +18,18 @@
 @endphp
 
 <section class="dply-card overflow-visible">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7 rounded-t-2xl">
-        <x-icon-badge>
-            <x-heroicon-o-flag class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Purpose') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What is this server for?') }}</h3>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Plan sizes are tuned to this choice. App servers pick a stack template next; dedicated roles review what gets installed.') }}</p>
-        </div>
-        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
-    </div>
-    <div class="p-6 sm:p-7">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-flag"
+        :title="__('What is this server for?')"
+        :note="__('Plan sizes are tuned to this choice. App servers pick a stack template next; dedicated roles review what gets installed.')"
+        class="rounded-t-2xl border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <span class="inline-flex h-6 shrink-0 items-center rounded-full bg-brand-sand/60 px-2 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+        </x-slot:actions>
+    </x-workspace-panel-head>
+    <div class="px-4 py-3.5 sm:px-5">
         <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             @foreach ($roles as $role)
                 @php

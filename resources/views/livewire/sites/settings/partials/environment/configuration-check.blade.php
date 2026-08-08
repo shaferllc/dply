@@ -7,34 +7,96 @@
         {{-- "Configuration check" eyebrow dropped: this block already sits under
              the panel's own "Needs attention" header, and the heading below
              names the finding. --}}
-        <div class="flex items-start gap-2.5 {{ $hasDanger ? 'bg-rose-50/60' : 'bg-amber-50/60' }} px-5 py-3">
-                <x-heroicon-o-shield-exclamation class="mt-0.5 h-4 w-4 shrink-0 {{ $hasDanger ? 'text-rose-700' : 'text-amber-700' }}" aria-hidden="true" />
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-sm font-semibold {{ $hasDanger ? 'text-rose-900' : 'text-amber-950' }}">
+        @php
+            $dangerCount = collect($envWarnings)->where('level', 'danger')->count();
+            $warnCount = count($envWarnings) - $dangerCount;
+        @endphp
+        {{-- Tint lives on the per-row severity rail, not the whole block. A
+             full-bleed rose wash over seven findings read as one undifferentiated
+             wall of alarm and buried which ones actually break the request path. --}}
+        <div class="px-5 py-3">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-shield-exclamation class="h-4 w-4 shrink-0 {{ $hasDanger ? 'text-rose-600' : 'text-amber-600' }}" />
+                    <h3 class="text-xs font-semibold text-brand-ink">
                         {{ trans_choice('{1} :count configuration warning|[2,*] :count configuration warnings', count($envWarnings), ['count' => count($envWarnings)]) }}
                     </h3>
-                    <ul class="mt-1 space-y-1">
-                        @foreach ($envWarnings as $w)
-                            <li class="flex items-start justify-between gap-3 text-xs {{ $w['level'] === 'danger' ? 'text-rose-800' : ($w['level'] === 'warn' ? 'text-amber-900' : 'text-brand-moss') }}">
-                                <span class="flex items-start gap-2">
-                                    <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $w['level'] === 'danger' ? 'bg-rose-600' : ($w['level'] === 'warn' ? 'bg-amber-500' : 'bg-brand-mist') }}"></span>
-                                    <span>{{ $w['message'] }}</span>
-                                </span>
-                                @if (! empty($w['key']) && $envAdvanced)
-                                    <span class="flex shrink-0 items-center gap-1.5">
-                                        <button type="button" wire:click="openFixEnvVar(@js($w['key']))" class="whitespace-nowrap rounded-md border border-black/10 bg-white/60 px-2 py-0.5 text-[11px] font-semibold underline-offset-2 hover:bg-white hover:underline" title="{{ __('Fix :key', ['key' => $w['key']]) }}">
-                                            {{ __('Fix :key', ['key' => $w['key']]) }}
-                                        </button>
-                                        @if ($canIgnoreEnvWarnings)
-                                            <button type="button" wire:click="ignoreEnvWarning(@js($w['key']))" class="whitespace-nowrap rounded-md border border-black/10 bg-white/60 px-2 py-0.5 text-[11px] font-semibold text-brand-mist underline-offset-2 hover:bg-white hover:underline" title="{{ __('Suppress this warning') }}">
-                                                {{ __('Ignore') }}
-                                            </button>
-                                        @endif
-                                    </span>
+                    {{-- Severity split up front: "7 warnings" alone doesn't say how
+                         many are boot-breaking versus merely untidy. --}}
+                    <span class="flex items-center gap-1.5 text-[11px] font-medium">
+                        @if ($dangerCount > 0)
+                            <span class="rounded-full bg-rose-100 px-1.5 py-0.5 tabular-nums text-rose-700">{{ __(':n breaking', ['n' => $dangerCount]) }}</span>
+                        @endif
+                        @if ($warnCount > 0)
+                            <span class="rounded-full bg-amber-100 px-1.5 py-0.5 tabular-nums text-amber-800">{{ __(':n advisory', ['n' => $warnCount]) }}</span>
+                        @endif
+                    </span>
+                </div>
+
+                {{-- One row per finding: severity rail, key, one-line consequence,
+                     actions. Anything longer than the line goes behind the row's
+                     own disclosure rather than wrapping to three lines and pushing
+                     its own buttons out of alignment. --}}
+                <ul class="mt-2 space-y-px">
+                    @foreach ($envWarnings as $w)
+                        @php
+                            $isDanger = $w['level'] === 'danger';
+                            $isWarn = $w['level'] === 'warn';
+                            $detail = $w['detail'] ?? null;
+                        @endphp
+                        <li @class([
+                            'group/row flex items-start gap-2.5 rounded-r border-l-2 py-1.5 pl-2.5 pr-1 transition-colors',
+                            'border-rose-400 hover:bg-rose-50/50' => $isDanger,
+                            'border-amber-400 hover:bg-amber-50/50' => $isWarn,
+                            'border-brand-mist/50 hover:bg-brand-sand/20' => ! $isDanger && ! $isWarn,
+                        ])>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs leading-5 text-brand-ink">
+                                    @if (! empty($w['key']))
+                                        <span class="font-mono text-[11px] font-semibold {{ $isDanger ? 'text-rose-700' : ($isWarn ? 'text-amber-800' : 'text-brand-moss') }}">{{ $w['key'] }}</span>
+                                        <span class="text-brand-mist" aria-hidden="true">·</span>
+                                    @endif
+                                    {{-- The key is already the row's own label, so strip
+                                         the ":key is …" prefix the message repeats. --}}
+                                    {{ ! empty($w['key']) && str_starts_with($w['message'], $w['key'].' ')
+                                        ? substr($w['message'], strlen($w['key']) + 1)
+                                        : $w['message'] }}
+                                </p>
+                                @if ($detail)
+                                    <details class="group/detail mt-0.5">
+                                        <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-brand-moss hover:text-brand-ink [&::-webkit-details-marker]:hidden">
+                                            <x-heroicon-o-chevron-right class="h-3 w-3 transition-transform group-open/detail:rotate-90" />
+                                            {{ __('How to fix') }}
+                                        </summary>
+                                        <p class="mt-1 pl-4 text-[11px] leading-relaxed text-brand-moss">{{ $detail }}</p>
+                                    </details>
                                 @endif
-                            </li>
-                        @endforeach
-                    </ul>
+                            </div>
+
+                            @if (! empty($w['key']) && $envAdvanced)
+                                {{-- Fixed-width action cluster. The old labels embedded
+                                     the key ("Fix REVERB_APP_SECRET"), so every row's
+                                     buttons were a different width and none lined up. --}}
+                                <span class="flex shrink-0 items-center gap-1">
+                                    <button type="button" wire:click="openFixEnvVar(@js($w['key']))"
+                                        class="rounded border border-brand-ink/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-ink transition hover:border-brand-ink/25 hover:bg-white"
+                                        title="{{ __('Fix :key', ['key' => $w['key']]) }}">
+                                        {{ __('Fix') }}
+                                        <span class="sr-only">{{ $w['key'] }}</span>
+                                    </button>
+                                    @if ($canIgnoreEnvWarnings)
+                                        <button type="button" wire:click="ignoreEnvWarning(@js($w['key']))"
+                                            class="rounded px-1.5 py-0.5 text-[11px] font-medium text-brand-mist transition hover:bg-white hover:text-brand-moss"
+                                            title="{{ __('Suppress this warning') }}">
+                                            {{ __('Ignore') }}
+                                            <span class="sr-only">{{ $w['key'] }}</span>
+                                        </button>
+                                    @endif
+                                </span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+                <div class="mt-2">
                     @if ($suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings)
                         <p class="mt-2 text-[11px] text-brand-mist">
                             {{ trans_choice('{1} :count warning suppressed.|[2,*] :count warnings suppressed.', $suppressedEnvWarningCount, ['count' => $suppressedEnvWarningCount]) }}

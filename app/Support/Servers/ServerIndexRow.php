@@ -66,6 +66,8 @@ final readonly class ServerIndexRow
         public array $related = [],
         public ?array $provisioning = null,
         public ?string $journeyHref = null,
+        /** @var array{state: string, label: string, detail: string|null}|null */
+        public ?array $adopted = null,
     ) {}
 
     /**
@@ -383,6 +385,7 @@ final readonly class ServerIndexRow
             related: $related,
             provisioning: $provisioning,
             journeyHref: $journeyHref,
+            adopted: isset($row['adopted']) && is_array($row['adopted']) ? $row['adopted'] : null,
         );
     }
 

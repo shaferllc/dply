@@ -1,4 +1,13 @@
 @theme {
+    /* Workspace width. Every page frames itself with `max-w-7xl` (101 views), so
+       the cap is retuned here rather than swept through all of them — one token,
+       one consistent width, and reverting is deleting this line.
+       Tailwind's stock 80rem left the content column ~900px once the 3/12
+       settings sidebar took its share, which is what made dense pages (the env
+       variables table, the config-check list) run tall and cramped while a wide
+       monitor sat empty on both sides. */
+    --container-7xl: 90rem;
+
     /* App font (matches Bunny font loaded in Blade layouts) */
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';

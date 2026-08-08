@@ -116,6 +116,7 @@ use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
 use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
 use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
+use App\Livewire\Servers\Create\StepScan as ServerCreateStepScan;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
@@ -624,6 +625,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         // and bills all-in cost-plus. Gated by surface.managed_servers in mount().
         Route::livewire('servers/create/managed', ServerCreateManaged::class)->name('servers.create.managed');
         Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
+        // Import mode's second (and last) step — scan a provider account for
+        // machines dply doesn't manage yet and adopt one.
+        Route::livewire('servers/create/scan', ServerCreateStepScan::class)->name('servers.create.scan');
         Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
         Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');
         Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');

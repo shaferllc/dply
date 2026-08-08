@@ -120,7 +120,7 @@
                         </p>
                     </div>
                 </div>
-                <div class="p-6 sm:p-7">
+                <div class="px-4 py-3.5 sm:px-5">
                     <ul class="divide-y divide-amber-200/70 rounded-xl bg-white/60 ring-1 ring-amber-200">
                         @foreach ($sourceSites as $site)
                             @php
@@ -163,17 +163,14 @@
 
         {{-- 1. SUMMARY — chip-strip pattern matching step-what's "Template filled in" panel --}}
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-clipboard-document-check class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What you are creating') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Final shape of the server. Anything missing here came from a step you can still go back to.') }}</p>
-                </div>
-            </div>
-            <div class="p-6 sm:p-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-clipboard-document-check"
+                :title="__('What you are creating')"
+                :note="__('Final shape of the server. Anything missing here came from a step you can still go back to.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="px-4 py-3.5 sm:px-5">
                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/40 p-5">
                     <div class="flex flex-wrap gap-1.5 text-xs">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
@@ -326,20 +323,16 @@
         @if ($form->mode === 'provider' && $form->type === 'digitalocean')
             <section class="dply-card overflow-hidden">
                 <details class="group">
-                    <summary class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Advanced') }}</p>
-                            <div class="flex items-baseline justify-between gap-3">
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Advanced DigitalOcean options') }}</h3>
-                                <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                            </div>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('IPv6, automated backups, monitoring agent, tags, cloud-init user-data.') }}</p>
-                        </div>
+                    <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                        <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ __('Advanced DigitalOcean options') }}
+                        </h3>
+                        <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist">{{ __('IPv6, automated backups, monitoring agent, tags, cloud-init user-data.') }}</p>
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    <div class="p-6 sm:p-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
                                 <input type="checkbox" wire:model.live="form.do_ipv6" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
@@ -370,20 +363,16 @@
         @if ($isVmShaped)
             <section class="dply-card overflow-hidden">
                 <details class="group">
-                    <summary class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recipe') }}</p>
-                            <div class="flex items-baseline justify-between gap-3">
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Optional setup-script recipe') }}</h3>
-                                <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                            </div>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Run a recipe defined in config/setup_scripts.php after the base provision.') }}</p>
-                        </div>
+                    <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                        <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ __('Optional setup-script recipe') }}
+                        </h3>
+                        <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                        <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist">{{ __('Run a recipe defined in config/setup_scripts.php after the base provision.') }}</p>
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    <div class="p-6 sm:p-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                         <x-input-label for="setup_script_key" :value="__('Recipe key')" />
                         <x-text-input id="setup_script_key" wire:model.live="form.setup_script_key" type="text" class="mt-1 block w-full font-mono" placeholder="none" />
                         <p class="mt-2 text-xs text-brand-mist">{{ __('Leave blank or "none" to skip.') }}</p>

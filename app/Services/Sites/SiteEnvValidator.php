@@ -18,7 +18,13 @@ use App\Jobs\TestSiteHealthJob;
  *            mail to the log in prod, S3 disk without keys, http:// URLs, …
  *
  * Pure + stateless: give it the parsed KEY => value map, get findings back.
- * Each finding is { level: danger|warn|info, key: ?string, message }.
+ * Each finding is { level: danger|warn|info, key: ?string, message, detail }.
+ *
+ * `message` is the one-line consequence and is the only part a compact list
+ * has room to show; `detail` (optional) carries the remediation prose that
+ * used to be tacked onto the end of it. Splitting them is what lets the
+ * config-check list render one row per finding instead of a paragraph each —
+ * the UI shows `detail` behind a per-row disclosure.
  *
  * Scope: only what's derivable from the env map. Server-state traps (stale
  * config cache, un-built Vite assets, missing PHP extensions) are checked by
@@ -73,9 +79,17 @@ class SiteEnvValidator
         // before it can even render an error page.
         $appKey = $get('APP_KEY');
         if ($appKey === null || $appKey === '') {
-            $findings[] = $this->danger('APP_KEY', __('APP_KEY is empty — the app cannot encrypt sessions/cookies and will error. Generate one.'));
+            $findings[] = $this->danger(
+                'APP_KEY',
+                __('APP_KEY is empty — the app cannot encrypt sessions/cookies and will error.'),
+                __('Generate one with `php artisan key:generate`, or use Fix to have dply write a fresh key.'),
+            );
         } elseif (! $this->looksLikeValidAppKey($appKey)) {
-            $findings[] = $this->danger('APP_KEY', __('APP_KEY is set but not a valid "base64:" 32-byte key — encryption will fail. Regenerate it.'));
+            $findings[] = $this->danger(
+                'APP_KEY',
+                __('APP_KEY is not a valid "base64:" 32-byte key — encryption will fail.'),
+                __('Regenerate it with `php artisan key:generate`. Note that rotating the key invalidates existing sessions and any data encrypted with the old one.'),
+            );
         }
 
         // Debug in production is the classic foot-gun: stack traces + env dumps
@@ -88,7 +102,11 @@ class SiteEnvValidator
         // refuse. Keep the wording loud so it still stands out in the push report.
         if ($this->isTruthy($get('APP_DEBUG'))) {
             $findings[] = $isProd
-                ? $this->warn('APP_DEBUG', __('APP_DEBUG is true while APP_ENV is production — this exposes stack traces and secrets to visitors. Turn it on only to debug, then set it back to false.'))
+                ? $this->warn(
+                    'APP_DEBUG',
+                    __('APP_DEBUG is true while APP_ENV is production — stack traces and secrets leak to visitors.'),
+                    __('Turn it on only while diagnosing a problem, then set it back to false and redeploy.'),
+                )
                 : $this->warn('APP_DEBUG', __('APP_DEBUG is true — fine for local, but make sure it is false in production.'));
         }
 
@@ -102,7 +120,11 @@ class SiteEnvValidator
         // URLs and broadcasting — wrong/empty value breaks all of them.
         $appUrl = (string) $get('APP_URL');
         if ($appUrl === '') {
-            $findings[] = $this->warn('APP_URL', __('APP_URL is empty — generated links, emails, signed URLs and assets will point at localhost. Set it to the site\'s URL.'));
+            $findings[] = $this->warn(
+                'APP_URL',
+                __('APP_URL is empty — generated links, emails, signed URLs and assets point at localhost.'),
+                __("Set it to the site's own URL, including the scheme."),
+            );
         } elseif (str_starts_with(strtolower($appUrl), 'http://') && $isProd) {
             $findings[] = $this->warn('APP_URL', __('APP_URL uses http:// in production — generated links and cookies should be https://.'));
         }
@@ -144,7 +166,11 @@ class SiteEnvValidator
 
         if (! $hasUrl) {
             if (! $this->filled($get('DB_HOST'))) {
-                $findings[] = $this->danger('DB_HOST', __('DB_HOST is empty for a :c database — the app cannot connect and will error on the first query (and on every request if session/cache use the database).', ['c' => $conn]));
+                $findings[] = $this->danger(
+                    'DB_HOST',
+                    __('DB_HOST is empty for a :c database — the app cannot connect.', ['c' => $conn]),
+                    __('It errors on the first query, and on every request if session or cache use the database driver. Connecting a managed database fills this in for you.'),
+                );
             }
             if (! $this->filled($get('DB_DATABASE'))) {
                 $findings[] = $this->danger('DB_DATABASE', __('DB_DATABASE is empty for a :c database — no schema to connect to.', ['c' => $conn]));
@@ -300,7 +326,11 @@ class SiteEnvValidator
         $findings = [];
         foreach ($needs as $key) {
             if (! $this->filled($get($key))) {
-                $findings[] = $this->danger($key, __(':key is empty while BROADCAST_CONNECTION=:b — the broadcaster cannot be constructed and the app errors on every request. Set it (then clear the config cache or redeploy). If you don\'t use broadcasting, set BROADCAST_CONNECTION=log.', ['key' => $key, 'b' => $broadcast]));
+                $findings[] = $this->danger(
+                    $key,
+                    __(':key is empty while BROADCAST_CONNECTION=:b — the app errors on every request.', ['key' => $key, 'b' => $broadcast]),
+                    __('The broadcaster is constructed eagerly, so a missing credential throws on boot. Set it, then clear the config cache or redeploy. If you don\'t use broadcasting, set BROADCAST_CONNECTION=log.'),
+                );
             }
         }
 
@@ -363,19 +393,19 @@ class SiteEnvValidator
     }
 
     /**
-     * @return array{level: string, key: ?string, message: string}
+     * @return array{level: string, key: ?string, message: string, detail: ?string}
      */
-    private function danger(?string $key, string $message): array
+    private function danger(?string $key, string $message, ?string $detail = null): array
     {
-        return ['level' => 'danger', 'key' => $key, 'message' => $message];
+        return ['level' => 'danger', 'key' => $key, 'message' => $message, 'detail' => $detail];
     }
 
     /**
-     * @return array{level: string, key: ?string, message: string}
+     * @return array{level: string, key: ?string, message: string, detail: ?string}
      */
-    private function warn(?string $key, string $message): array
+    private function warn(?string $key, string $message, ?string $detail = null): array
     {
-        return ['level' => 'warn', 'key' => $key, 'message' => $message];
+        return ['level' => 'warn', 'key' => $key, 'message' => $message, 'detail' => $detail];
     }
 
     private function filled(?string $v): bool

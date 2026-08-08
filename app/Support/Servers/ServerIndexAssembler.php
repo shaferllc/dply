@@ -136,6 +136,9 @@ final class ServerIndexAssembler
                 'step_total' => $digest->stepTotal,
                 'elapsed_human' => $digest->elapsedHuman(),
             ] : null,
+            // Adopted hosts get a discovery line in place of the journey they
+            // will never run: what dply found already installed.
+            'adopted' => AdoptedServerDigest::forServer($server),
         ];
     }
 

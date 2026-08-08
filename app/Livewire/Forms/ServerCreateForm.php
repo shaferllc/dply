@@ -8,8 +8,11 @@ use Livewire\Form;
 class ServerCreateForm extends Form
 {
     /**
-     * Wizard mode: 'provider' (Provision with a provider) or 'custom' (Custom/BYO).
+     * Wizard mode: 'provider' (Provision with a provider), 'custom' (Custom/BYO),
+     * or 'import' (adopt a machine that already exists on a provider account —
+     * like custom, except the details come from the provider API).
      * Set on Step 1 of the create wizard; drives branching on Step 2 and 3.
+     * Import mode leaves the build path at step 1 for servers/create/scan.
      */
     public string $mode = 'provider';
 

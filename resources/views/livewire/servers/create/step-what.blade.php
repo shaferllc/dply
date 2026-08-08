@@ -93,19 +93,14 @@
 
             {{-- K8s host: pick an existing cluster OR have dply create one. --}}
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $isCreatingNew
-                            ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in "provisioning" until it\'s ready.')
-                            : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
-                    </div>
-                </div>
-                <div class="space-y-5 p-6 sm:p-7">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-server-stack"
+                    :title="$isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster')"
+                    :note="$isCreatingNew ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in “provisioning” until it\'s ready.') : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.')"
+                    class="border-b border-brand-ink/10"
+                />
+                <div class="space-y-3 px-4 py-3.5 sm:px-5">
                     @if ($canCreateNew)
                         {{-- Source toggle: use existing vs create new. --}}
                         <x-server-workspace-tablist :aria-label="__('Cluster source')" class="!mb-0">
@@ -299,16 +294,13 @@
 
         {{-- 1. THE CHOICE: stack template (was "preset"). --}}
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a stack template') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.') }}</p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-cube"
+                :title="__('Pick a stack template')"
+                :note="__('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.')"
+                class="border-b border-brand-ink/10"
+            />
             <div class="relative space-y-5 p-6 sm:p-7">
                 @if ($orgBlueprints->isNotEmpty())
                     <div class="space-y-3">
@@ -434,17 +426,14 @@
              masquerade as a chosen template before any click. --}}
         @if ($selectedPreset !== '')
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filled in') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Template filled in') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Override below if needed') }}</p>
-                    </div>
-                </div>
-                <div class="p-6 sm:p-7">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-sparkles"
+                    :title="__('Template filled in')"
+                    :note="__('Override below if needed')"
+                    class="border-b border-brand-ink/10"
+                />
+                <div class="px-4 py-3.5 sm:px-5">
                     <div class="flex flex-wrap gap-1.5 text-xs">
                         @if ($selectedInstallProfile)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
@@ -514,17 +503,14 @@
         {{-- 2b. OPERATING SYSTEM: only for provider-provisioned VMs (catalog-backed). --}}
         @if ($showOsImagePicker)
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Operating system') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Choose an OS image') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The base image the VM boots from. Ubuntu LTS is the dply default — pick Debian or an older Ubuntu if your app needs it.') }}</p>
-                </div>
-            </div>
-            <div class="p-6 sm:p-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-server-stack"
+                :title="__('Choose an OS image')"
+                :note="__('The base image the VM boots from. Ubuntu LTS is the dply default — pick Debian or an older Ubuntu if your app needs it.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="px-4 py-3.5 sm:px-5">
                 <div class="sm:max-w-md">
                     @include('livewire.servers.create._rich-select', [
                         'id' => 'os_image',
@@ -550,22 +536,18 @@
             >
                 <summary
                     x-on:click.prevent="open = ! open"
-                    class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7"
+                    class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4"
                 >
-                    <x-icon-badge>
-                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overrides') }}</p>
-                        <div class="flex items-baseline justify-between gap-3">
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Override the template') }}</h3>
-                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                        </div>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</p>
-                    </div>
+                    <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Override the template') }}
+                    </h3>
+                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                    <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</p>
+                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
 
-                <div class="space-y-6 p-6 sm:p-7">
+                <div class="space-y-3.5 px-4 py-3.5 sm:px-5">
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('High-level controls') }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ __('Profile bundles a default package set; role narrows what actually installs (web vs db node vs LB).') }}</p>

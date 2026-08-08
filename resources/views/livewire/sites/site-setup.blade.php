@@ -44,96 +44,190 @@
                             'detecting' => ['label' => __('Detecting resources'), 'desc' => __('Checking which boot-critical variables need values before the first deploy.')],
                         ];
                         $stepKeys = array_keys($scanSteps);
+                        $stepCount = count($stepKeys);
                         $currentStep = (string) data_get($site->meta, 'setup.scan_step', '');
                         $currentIdx = in_array($currentStep, $stepKeys, true) ? (int) array_search($currentStep, $stepKeys, true) : 0;
-                        $scanPct = (int) round((($currentIdx + 1) / count($stepKeys)) * 100);
+                        $scanPct = (int) round((($currentIdx + 1) / $stepCount) * 100);
+                        $scanConsole = (array) data_get($site->meta, 'setup_console', []);
+
+                        // Elapsed time needs a start instant. `rescan` writes
+                        // setup.started_at, but the *first* run is kicked off by
+                        // PreflightSiteSetupJob, which doesn't — so fall back to the
+                        // first console line, stamped as that run begins.
+                        $startedAtRaw = data_get($site->meta, 'setup.started_at') ?? data_get($scanConsole, '0.at');
+                        try {
+                            $startedMs = $startedAtRaw ? \Illuminate\Support\Carbon::parse($startedAtRaw)->getTimestampMs() : null;
+                        } catch (\Throwable) {
+                            $startedMs = null;
+                        }
                     @endphp
-                    <div wire:poll.2s.visible="pollPreflight" class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm sm:p-8">
-                        <div class="flex items-center gap-3">
-                            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-sage/12 text-brand-forest">
-                                <x-heroicon-o-magnifying-glass class="h-5 w-5 animate-pulse" />
-                            </div>
-                            <div class="min-w-0">
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Analyzing your repository…') }}</h2>
-                                <p class="text-sm text-brand-moss">{{ __('Reading the code to detect the environment variables and resources it needs.') }}</p>
-                            </div>
+                    <div
+                        wire:poll.2s.visible="pollPreflight"
+                        role="status"
+                        aria-live="polite"
+                        class="relative overflow-hidden rounded-2xl border border-brand-ink/10 bg-white/80 shadow-sm"
+                    >
+                        {{-- Progress rides the card's own top edge as a hairline.
+                             The old chunky bar + "50%" competed with the timeline,
+                             which already says where we are — and the number read as
+                             precise when it only ever snaps in quarters. --}}
+                        <div
+                            class="absolute inset-x-0 top-0 h-1 bg-brand-sand/70"
+                            role="progressbar"
+                            aria-valuenow="{{ $scanPct }}"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-label="{{ __('Repository analysis progress') }}"
+                        >
+                            <div class="h-full bg-brand-forest transition-[width] duration-700 ease-out" style="width: {{ $scanPct }}%"></div>
                         </div>
 
-                        <div class="mt-5 flex items-center gap-3">
-                            <div class="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-sand/70">
-                                <div class="h-full rounded-full bg-brand-forest transition-[width] duration-500" style="width: {{ $scanPct }}%"></div>
-                            </div>
-                            <span class="shrink-0 text-xs font-semibold tabular-nums text-brand-forest">{{ $scanPct }}%</span>
-                        </div>
-
-                        <ol class="mt-5 space-y-2.5">
-                            @foreach ($stepKeys as $i => $key)
-                                @php $isDone = $i < $currentIdx; $isActive = $i === $currentIdx; @endphp
-                                <li class="flex items-start gap-3">
-                                    <span @class([
-                                        'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-                                        'bg-brand-forest text-brand-cream' => $isDone,
-                                        'bg-brand-sage/15 text-brand-forest ring-2 ring-brand-sage/30' => $isActive,
-                                        'bg-brand-ink/[0.06] text-brand-mist' => ! $isDone && ! $isActive,
-                                    ])>
-                                        @if ($isDone)
-                                            <x-heroicon-s-check class="h-4 w-4" />
-                                        @elseif ($isActive)
-                                            <span class="h-2 w-2 animate-pulse rounded-full bg-brand-forest"></span>
-                                        @else
-                                            {{ $i + 1 }}
-                                        @endif
+                        <div class="p-6 pt-7 sm:p-8 sm:pt-9">
+                            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <span class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-sage/12 text-brand-forest">
+                                        <span class="absolute inset-0 rounded-full ring-1 ring-brand-sage/40 motion-safe:animate-ping" aria-hidden="true"></span>
+                                        <x-heroicon-o-magnifying-glass class="relative h-[18px] w-[18px]" />
                                     </span>
                                     <div class="min-w-0">
-                                        <p class="text-sm font-medium {{ $isDone || $isActive ? 'text-brand-ink' : 'text-brand-mist' }}">{{ $scanSteps[$key]['label'] }}</p>
-                                        @if ($isActive)
-                                            <p class="text-xs text-brand-moss">{{ $scanSteps[$key]['desc'] }}</p>
-                                        @endif
+                                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Analyzing your repository') }}</h2>
+                                        <p class="text-sm text-brand-moss">{{ __('Reading the code to detect the environment variables and resources it needs.') }}</p>
                                     </div>
-                                </li>
-                            @endforeach
-                        </ol>
+                                </div>
 
-                        @if ($site->isPreflightStalled())
-                            {{-- The scan heartbeat has gone cold — the job likely
-                                 died mid-run. Offer a manual re-scan so the operator
-                                 can unstick it and proceed to deploy. --}}
-                            <div class="mt-6 flex flex-col gap-2 border-t border-brand-ink/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                                <p class="text-xs text-brand-moss">{{ __('This is taking longer than expected. You can re-run the scan to try again.') }}</p>
-                                <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
-                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rescan" />
-                                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="rescan" />
-                                    {{ __('Re-scan') }}
-                                </button>
+                                {{-- Step counter + elapsed clock. Without a clock the
+                                     only answer to "is this stuck?" was to wait out
+                                     the 45s stall threshold. --}}
+                                <div class="flex shrink-0 items-center gap-2 text-xs font-medium text-brand-moss">
+                                    <span class="rounded-full bg-brand-ink/[0.06] px-2.5 py-1 tabular-nums">
+                                        {{ __('Step :n of :total', ['n' => $currentIdx + 1, 'total' => $stepCount]) }}
+                                    </span>
+                                    @if ($startedMs !== null)
+                                        <span
+                                            class="flex items-center gap-1.5 rounded-full bg-brand-ink/[0.06] px-2.5 py-1 tabular-nums"
+                                            x-data="{
+                                                started: {{ $startedMs }},
+                                                now: Date.now(),
+                                                timer: null,
+                                                init() { this.timer = setInterval(() => this.now = Date.now(), 1000) },
+                                                destroy() { clearInterval(this.timer) },
+                                            }"
+                                        >
+                                            <x-heroicon-o-clock class="h-3.5 w-3.5" />
+                                            <span x-text="new Date(Math.max(0, now - started)).toISOString().slice(14, 19)">0:00</span>
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
-                        @endif
 
-                        @php $scanConsole = (array) data_get($site->meta, 'setup_console', []); @endphp
-                        @if ($scanConsole !== [])
-                            {{-- Live job console: the pre-flight job streams its
-                                 progress + any error here (polled with the timeline),
-                                 so you can watch what it's doing and see why it stalls. --}}
+                            <ol class="mt-6">
+                                @foreach ($stepKeys as $i => $key)
+                                    @php
+                                        $isDone = $i < $currentIdx;
+                                        $isActive = $i === $currentIdx;
+                                        $isLast = $i === $stepCount - 1;
+                                    @endphp
+                                    <li class="relative flex gap-3 {{ $isLast ? '' : 'pb-5' }}">
+                                        @unless ($isLast)
+                                            {{-- Connector rail: makes four rows read as
+                                                 one pipeline instead of four unrelated
+                                                 checkboxes, and shows how far the work
+                                                 has actually travelled. --}}
+                                            <span
+                                                class="absolute bottom-0 left-3 top-7 w-px -translate-x-1/2 {{ $isDone ? 'bg-brand-forest/35' : 'bg-brand-ink/10' }}"
+                                                aria-hidden="true"
+                                            ></span>
+                                        @endunless
+
+                                        <span class="relative z-10 mt-0.5 shrink-0">
+                                            @if ($isDone)
+                                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-forest text-brand-cream">
+                                                    <x-heroicon-s-check class="h-3.5 w-3.5" />
+                                                </span>
+                                            @elseif ($isActive)
+                                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-sage/15 ring-2 ring-brand-sage/40">
+                                                    <span class="h-2 w-2 rounded-full bg-brand-forest motion-safe:animate-pulse"></span>
+                                                </span>
+                                            @else
+                                                {{-- Hollow, not numbered: the bare "3"/"4"
+                                                     added a third indicator shape for what
+                                                     is one status dimension, and the header
+                                                     already carries the numbering. --}}
+                                                <span class="block h-6 w-6 rounded-full border border-dashed border-brand-ink/20"></span>
+                                            @endif
+                                        </span>
+
+                                        <div class="min-w-0">
+                                            <p @class([
+                                                'text-sm font-medium',
+                                                'text-brand-ink' => $isDone || $isActive,
+                                                'text-brand-mist' => ! $isDone && ! $isActive,
+                                            ])>{{ $scanSteps[$key]['label'] }}</p>
+                                            {{-- Always rendered. Showing the description
+                                                 for the active step only re-flowed the
+                                                 card at every transition and shoved the
+                                                 console down mid-read. --}}
+                                            <p @class([
+                                                'mt-0.5 text-xs',
+                                                'text-brand-moss' => $isDone || $isActive,
+                                                'text-brand-mist/70' => ! $isDone && ! $isActive,
+                                            ])>{{ $scanSteps[$key]['desc'] }}</p>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ol>
+
+                            @if ($site->isPreflightStalled())
+                                {{-- The scan heartbeat has gone cold — the job likely
+                                     died mid-run. Offer a manual re-scan so the operator
+                                     can unstick it and proceed to deploy. --}}
+                                <div class="mt-6 flex flex-col gap-3 rounded-xl border border-brand-gold/40 bg-brand-gold/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="flex min-w-0 items-start gap-2.5">
+                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-brand-rust" />
+                                        <p class="text-xs text-brand-moss">{{ __('This is taking longer than expected. You can re-run the scan to try again.') }}</p>
+                                    </div>
+                                    <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
+                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rescan" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="rescan" />
+                                        {{ __('Re-scan') }}
+                                    </button>
+                                </div>
+                            @endif
+
+                            {{-- Live job console: the pre-flight job streams its progress
+                                 + any error here (polled with the timeline), so you can
+                                 watch what it's doing and see why it stalls. Always
+                                 mounted now — it is the only element carrying real
+                                 information, so it shouldn't pop in and shift the card. --}}
                             <div class="mt-6 border-t border-brand-ink/10 pt-4">
-                                <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
-                                    <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
-                                    {{ __('Job console') }}
+                                <div class="mb-2 flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
+                                        <x-heroicon-o-command-line class="h-4 w-4" />
+                                        {{ __('Job console') }}
+                                    </div>
+                                    <span class="flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-brand-forest motion-safe:animate-pulse" aria-hidden="true"></span>
+                                        {{ __('Live') }}
+                                    </span>
                                 </div>
                                 <div
-                                    class="max-h-72 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                    class="max-h-64 min-h-[4.5rem] overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.04] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
                                     x-data
                                     x-init="$el.scrollTop = $el.scrollHeight; new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, { childList: true, subtree: true })"
                                 >
-                                    @foreach ($scanConsole as $entry)
+                                    @forelse ($scanConsole as $entry)
                                         @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
                                         <div class="flex gap-2">
                                             <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
                                             <span class="{{ $isIndent ? 'text-brand-rust' : '' }} min-w-0 break-words">{{ $line }}</span>
                                         </div>
-                                    @endforeach
+                                    @empty
+                                        <p class="text-brand-mist">{{ __('Waiting for the first line…') }}</p>
+                                    @endforelse
                                 </div>
                             </div>
-                        @endif
+                        </div>
                     </div>
                 @else
                     @php

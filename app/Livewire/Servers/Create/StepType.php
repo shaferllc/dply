@@ -60,7 +60,7 @@ class StepType extends Component
             if ($this->form->name === '') {
                 $this->form->name = ServerNameGenerator::generate();
             }
-            if ($this->form->mode === '' || ! in_array($this->form->mode, ['provider', 'custom'], true)) {
+            if ($this->form->mode === '' || ! in_array($this->form->mode, ['provider', 'custom', 'import'], true)) {
                 $this->form->mode = 'provider';
             }
 
@@ -183,20 +183,46 @@ class StepType extends Component
         $this->form->type = 'custom';
     }
 
+    /**
+     * Adopt a machine that already exists on a provider account. Like custom
+     * mode in that dply doesn't create the VM, but the name, address, region
+     * and size come from the provider API instead of being typed in.
+     */
+    public function chooseImportMode(): void
+    {
+        $this->form->mode = 'import';
+        // The provider is chosen on the scan step, alongside the credential.
+        if ($this->form->type === 'custom') {
+            $this->form->type = '';
+        }
+    }
+
     public function next(): mixed
     {
         $this->authorize('create', Server::class);
 
-        $this->validate([
-            'form.mode' => ['required', Rule::in(['provider', 'custom'])],
-            'form.name' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'],
-        ], attributes: [
+        // Import mode adopts the provider's own name, so there is nothing to
+        // validate here — the name field isn't even shown.
+        $rules = ['form.mode' => ['required', Rule::in(['provider', 'custom', 'import'])]];
+        if ($this->form->mode !== 'import') {
+            $rules['form.name'] = ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'];
+        }
+
+        $this->validate($rules, attributes: [
             'form.mode' => __('server type'),
             'form.name' => __('server name'),
         ]);
 
         if ($this->form->mode === 'custom' && $this->form->type !== 'custom') {
             $this->form->type = 'custom';
+        }
+
+        // Import mode leaves the draft wizard here: the remaining steps ask
+        // what to build, and there is nothing to build — the machine exists.
+        if ($this->form->mode === 'import') {
+            $this->saveDraftFromForm($this->form, advanceTo: 1);
+
+            return $this->redirect(route('servers.create.scan'), navigate: true);
         }
 
         $draft = $this->saveDraftFromForm($this->form, advanceTo: 2);

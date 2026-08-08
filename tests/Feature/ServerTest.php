@@ -869,7 +869,9 @@ test('servers create step where shows role-aware size guidance for redis', funct
         ->call('chooseServerRole', 'redis')
         ->assertSet('form.server_role', 'redis')
         ->assertSet('form.install_profile', 'redis_server')
-        ->assertSee('Sizing recommendations are tuned for Cache / key-value server.')
+        // The role-tuning note is a pill beside the Region & size head now, so
+        // the sentence it used to spell out is shorter.
+        ->assertSee('Sized for Cache / key-value server')
         ->assertSee('Too small for Cache / key-value server');
 });
 

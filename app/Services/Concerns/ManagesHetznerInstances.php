@@ -106,6 +106,32 @@ trait ManagesHetznerInstances
     }
 
     /**
+     * Every server on the account. The create wizard's scan-and-import mode
+     * uses this to find hosts dply doesn't manage yet. The API pages at 50, so
+     * walk until a short page comes back (bounded, so a bad `next` can't spin).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listInstances(): array
+    {
+        $servers = [];
+        $page = 1;
+
+        do {
+            $response = $this->request('get', '/servers', ['page' => $page, 'per_page' => 50]);
+            $this->assertSuccess($response, 'list servers');
+
+            $batch = $response->json('servers');
+            $batch = is_array($batch) ? array_values(array_filter($batch, 'is_array')) : [];
+            $servers = array_merge($servers, $batch);
+
+            $page++;
+        } while (count($batch) === 50 && $page <= 20);
+
+        return $servers;
+    }
+
+    /**
      * Get instance (server) by ID. Returns decoded JSON server object.
      */
     /** @return array<string, mixed> */

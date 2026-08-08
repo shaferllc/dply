@@ -128,6 +128,28 @@
                         </a>
                     @endif
                 </div>
+            @elseif ($server->adopted)
+                {{-- Adopted hosts never run a provisioning journey, so say what
+                     dply found on the box instead of advertising setup that is
+                     never coming. --}}
+                @php $adopted = $server->adopted; @endphp
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss sm:ps-12">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-forest ring-1 ring-brand-sage/25">
+                        @if ($adopted['state'] === 'scanning')
+                            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-sage"></span>
+                        @else
+                            <x-heroicon-m-check class="h-3 w-3" aria-hidden="true" />
+                        @endif
+                        {{ $adopted['label'] }}
+                    </span>
+                    @if ($adopted['detail'])
+                        <span class="min-w-0 text-brand-ink">{{ $adopted['detail'] }}</span>
+                    @endif
+                    <a href="{{ $server->manageHref }}" @if ($server->manageExternal) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline sm:ms-auto">
+                        {{ __('Review') }}
+                        <x-heroicon-m-arrow-right class="h-3 w-3" />
+                    </a>
+                </div>
             @elseif ($server->provisioning)
                 @php $digest = $server->provisioning; @endphp
                 <div class="sm:ps-12">

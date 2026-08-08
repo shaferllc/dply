@@ -79,18 +79,18 @@
             @if ($isProvider)
                 {{-- Provider host kind --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Traditional VM, Docker-only host, or register a managed Kubernetes cluster.') }}</p>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
-                    </div>
-                    <div class="p-6 sm:p-7">
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-cube"
+                        :title="__('Host kind')"
+                        :note="__('Traditional VM, Docker-only host, or register a managed Kubernetes cluster.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-4 py-3.5 sm:px-5">
                         <div class="grid gap-3 sm:grid-cols-3">
                             @foreach ([
                                 ['kind' => 'vm', 'icon' => 'server', 'label' => __('Traditional VM'), 'desc' => __('A traditional VPS — install whatever software and stack you need.')],
@@ -148,23 +148,23 @@
 
                 {{-- Provider tile picker --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick the cloud — connect an account right here if one is missing.') }}</p>
-                        </div>
-                        <x-add-provider-credential-link
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-cloud"
+                        :title="$form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider')"
+                        :note="__('Pick the cloud — connect an account right here if one is missing.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <x-add-provider-credential-link
                             class="!inline-flex !items-center !gap-1.5 !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!underline-offset-0 hover:!no-underline whitespace-nowrap shrink-0"
-                        >
+                            >
                             <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Connect provider') }}
-                        </x-add-provider-credential-link>
-                    </div>
-                    <div class="p-6 sm:p-7">
+                            </x-add-provider-credential-link>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-4 py-3.5 sm:px-5">
                         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             @foreach ($providerCards as $card)
                                 @php
@@ -265,27 +265,27 @@
 
                 {{-- Account / credential picker --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Use which API credential?') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a stored token, or connect a fresh one without leaving this step.') }}</p>
-                        </div>
-                        @if ($form->type !== '' && $form->type !== 'custom')
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-key"
+                        :title="__('Use which API credential?')"
+                        :note="__('Pick a stored token, or connect a fresh one without leaving this step.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            @if ($form->type !== '' && $form->type !== 'custom')
                             @php $credentialProvider = str_replace('_kubernetes', '', $form->type); @endphp
                             <x-add-provider-credential-link
-                                :provider="$credentialProvider"
-                                class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
+                            :provider="$credentialProvider"
+                            class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
                             >
-                                <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Add new') }}
+                            <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Add new') }}
                             </x-add-provider-credential-link>
-                        @endif
-                    </div>
-                    <div class="p-6 sm:p-7">
+                            @endif
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-4 py-3.5 sm:px-5">
                         @if ($catalog['credentials']->isEmpty())
                             <div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
                                 <div class="flex items-start gap-3">
@@ -339,22 +339,26 @@
                 {{-- Region + size (VM / Docker hosts only). --}}
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Placement') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Region & size') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick where the VM lives and how big it should be.') }}</p>
-                                @if ($selectedServerRole)
-                                    <p class="mt-2 text-xs font-medium text-brand-forest">
-                                        {{ __('Sizing recommendations are tuned for :role.', ['role' => $selectedServerRole['label'] ?? $form->server_role]) }}
-                                    </p>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 sm:items-start sm:p-7">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-globe-alt"
+                            :title="__('Region & size')"
+                            :note="__('Pick where the VM lives and how big it should be.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            {{-- The role-tuning line is a live consequence of an
+                                 earlier choice, so it stays visible — as a pill
+                                 beside the title rather than a fourth line. --}}
+                            @if ($selectedServerRole)
+                                <x-slot:actions>
+                                    <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-brand-sage/15 px-2 text-[10px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                                        <x-heroicon-m-sparkles class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {{ __('Sized for :role', ['role' => $selectedServerRole['label'] ?? $form->server_role]) }}
+                                    </span>
+                                </x-slot:actions>
+                            @endif
+                        </x-workspace-panel-head>
+                        <div class="grid grid-cols-1 gap-4 px-4 py-3.5 sm:grid-cols-2 sm:items-start sm:px-5">
                             @include('livewire.servers.create._provider-region-picker', [
                                 'existingServersByRegion' => $existingServersByRegion ?? [],
                             ])
@@ -368,20 +372,18 @@
                 {{-- Private network picker (DO VPC UUID / Hetzner Network ID / Vultr VPC) --}}
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner', 'vultr'], true))
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Networking') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Private network') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Attach this server to a private network so it can reach other servers (Redis, database, workers) on a private IP without exposing ports to the internet. Optional — leave blank to skip.') }}
-                                </p>
-                            </div>
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
-                        </div>
-                        <div class="p-6 sm:p-7">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-share"
+                            :title="__('Private network')"
+                            :note="__('Attach this server to a private network so it can reach other servers (Redis, database, workers) on a private IP without exposing ports to the internet. Optional — leave blank to skip.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot:actions>
+                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
+                        <div class="px-4 py-3.5 sm:px-5">
                             @if ($form->type === 'digitalocean')
                                 <div>
                                     <div class="flex items-center justify-between">
@@ -515,35 +517,30 @@
                 @if ($form->provider_host_kind === 'kubernetes' && $form->provider_credential_id !== '')
                     @php $k8sProviderLabel = $form->type === 'aws_kubernetes' ? __('AWS EKS') : __('DigitalOcean DOKS'); @endphp
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a cluster on the next step') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                    {{ __('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel]) }}
-                                </p>
-                            </div>
-                        </div>
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-server-stack"
+                            :title="__('Pick a cluster on the next step')"
+                            :note="__('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel])"
+                            class="border-b border-brand-ink/10"
+                        />
                     </section>
                 @endif
             @else
                 {{-- Custom (BYO) host kind --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Traditional VM/VPS over SSH, or a Docker host for container workloads.') }}</p>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
-                    </div>
-                    <div class="p-6 sm:p-7">
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-cube"
+                        :title="__('Host kind')"
+                        :note="__('Traditional VM/VPS over SSH, or a Docker host for container workloads.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-4 py-3.5 sm:px-5">
                         <div class="grid gap-3 sm:grid-cols-2">
                             @foreach ([
                                 ['kind' => 'vm', 'icon' => 'server', 'label' => __('Traditional VM / VPS'), 'desc' => __('Your server — install whatever software and stack you need.')],
@@ -594,17 +591,14 @@
 
                 {{-- SSH connection --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Connection') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('We connect read-only first to verify access. Private key is stored encrypted at rest.') }}</p>
-                        </div>
-                    </div>
-                    <div class="space-y-5 p-6 sm:p-7">
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-lock-closed"
+                        :title="__('SSH connection')"
+                        :note="__('We connect read-only first to verify access. Private key is stored encrypted at rest.')"
+                        class="border-b border-brand-ink/10"
+                    />
+                    <div class="space-y-3 px-4 py-3.5 sm:px-5">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="ip_address" :value="__('IP address or hostname')" />

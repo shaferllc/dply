@@ -8,14 +8,15 @@
     >
         {{-- Single merged header: identity + count/freshness on the left, every
              variables action on the right (Sync, Paste, View/edit all, Add). --}}
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6">
-            {{-- Count moves onto the title row as a pill; the "Configuration"
-                 eyebrow said nothing the title didn't. --}}
-            <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
+        {{-- Identity and actions share one line. They were stacked as two rows
+             split by a border, which cost ~40px of header before a single
+             variable appeared. --}}
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-2.5 sm:px-6">
+            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <x-heroicon-o-key class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">
                         <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
                         {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
                     </span>
@@ -26,18 +27,10 @@
                         <span class="text-[11px] text-brand-mist">· {{ $freshnessLabel }}</span>
                     @endif
                 </div>
-                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">
-                    @if ($supportsEnvPush)
-                        {{ __('Key/value pairs written into the site\'s .env file. Edits push to the server automatically.') }}
-                    @else
-                        {{ __('Key/value pairs injected into the runtime on the next deploy.') }}
-                    @endif
-                </p>
-            </div>
             {{-- Action toolbar: create actions on the left, the primary CTA
                  anchored right, and the occasional server / bulk-edit tools
                  tucked into a "More" menu so the bar stays tidy as it grows. --}}
-            <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-3">
+            <div class="flex flex-wrap items-center gap-1.5">
                 {{-- Resource attach/configure lives on the Resources tab now. --}}
 
                 @if (method_exists($this, 'testSiteLoads'))
@@ -48,11 +41,11 @@
                         wire:click="testSiteLoads"
                         wire:loading.attr="disabled"
                         wire:target="testSiteLoads"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-forest/10 disabled:opacity-60"
+                        class="inline-flex items-center gap-1 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2 py-1 text-[11px] font-semibold text-brand-forest transition-colors hover:bg-brand-forest/10 disabled:opacity-60"
                         title="{{ __('Request the live site and confirm it loads (HTTP check + server log on failure).') }}"
                     >
-                        <x-heroicon-o-beaker class="h-4 w-4" wire:loading.remove wire:target="testSiteLoads" />
-                        <span wire:loading wire:target="testSiteLoads" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="testSiteLoads" />
+                        <span wire:loading wire:target="testSiteLoads" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                         <span wire:loading.remove wire:target="testSiteLoads">{{ __('Test site') }}</span>
                         <span wire:loading wire:target="testSiteLoads">{{ __('Testing…') }}</span>
                     </button>
@@ -64,11 +57,11 @@
                         type="button"
                         x-on:click="open = ! open"
                         x-on:click.outside="open = false"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-m-ellipsis-horizontal class="h-4 w-4 text-brand-mist" />
+                        <x-heroicon-m-ellipsis-horizontal class="h-3.5 w-3.5 text-brand-mist" />
                         {{ __('More') }}
-                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 text-brand-mist" />
+                        <x-heroicon-m-chevron-down class="h-3 w-3 text-brand-mist" />
                     </button>
                     <div
                         x-show="open"
@@ -123,40 +116,50 @@
                     <button
                         type="button"
                         wire:click="openEditAllEnv"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:ml-auto"
+                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
                         {{ __('Edit all') }}
                     </button>
                 @endif
                 <button
                     type="button"
                     x-on:click="$dispatch('open-modal', 'add-env-modal')"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 {{ $envAdvanced ? '' : 'sm:ml-auto' }}"
+                    class="inline-flex items-center gap-1 rounded-lg bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                 >
-                    <x-heroicon-o-plus class="h-4 w-4" />
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add variable') }}
                 </button>
             </div>
+            </div>
+            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                @if ($supportsEnvPush)
+                    {{ __('Key/value pairs written into the site\'s .env file. Edits push to the server automatically.') }}
+                @else
+                    {{ __('Key/value pairs injected into the runtime on the next deploy.') }}
+                @endif
+            </p>
         </div>
 
         @if ($variableCount > 0 && $envAdvanced)
-            <div class="space-y-1.5 border-b border-brand-ink/10 bg-white px-5 py-2 sm:px-6">
-                <div class="relative">
-                    <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" />
+            {{-- Search and the prefix filters share a line: the search field was
+                 full-width on its own row above the chips for no reason. --}}
+            <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-5 py-1.5 sm:px-6">
+                <div class="relative w-full sm:w-56">
+                    <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-brand-mist" />
                     <input
                         type="search"
                         wire:model.live.debounce.200ms="env_search"
                         placeholder="{{ __('Search variables…') }}"
-                        class="block w-full rounded-lg border border-brand-ink/15 bg-brand-cream/40 py-1.5 pl-9 pr-3 font-mono text-sm text-brand-ink focus:border-brand-sage focus:ring-brand-sage/30"
+                        class="block w-full rounded-lg border border-brand-ink/15 bg-brand-cream/40 py-1 pl-8 pr-2 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-brand-sage/30"
                     />
                 </div>
                 @if (count($envGroups) > 1)
                     {{-- Auto-derived prefix groups (APP_, DB_, AWS_, …). Click to
                          filter the list to that group; combines with search. --}}
-                    <div class="flex flex-wrap gap-1">
+                    <div class="flex min-w-0 flex-wrap gap-1">
                         <button type="button" wire:click="$set('env_group', '')" @class([
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+                            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors',
                             'bg-brand-forest text-brand-cream' => $selectedEnvGroup === '',
                             'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== '',
                         ])>
@@ -164,7 +167,7 @@
                         </button>
                         @foreach ($envGroups as $g => $cnt)
                             <button type="button" wire:click="$set('env_group', @js($g))" @class([
-                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold transition-colors',
+                                'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold transition-colors',
                                 'bg-brand-forest text-brand-cream' => $selectedEnvGroup === $g,
                                 'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== $g,
                             ])>
@@ -623,7 +626,7 @@
                         $escrowRevealed = $residency && array_key_exists($key, $revealed_escrow_values ?? []);
                         $canManageResidency = method_exists($this, 'escalateEnvVar');
                     @endphp
-                    <li class="px-5 py-2 sm:px-6" wire:key="env-row-{{ md5($key) }}">
+                    <li class="px-5 py-1 transition-colors hover:bg-brand-sand/15 sm:px-6" wire:key="env-row-{{ md5($key) }}">
                         @if ($isEditing)
                             {{-- Inline edit form. Cancel reverts; Save writes and closes. --}}
                             <form wire:submit="saveEditedEnvVar" class="space-y-3">
@@ -672,89 +675,87 @@
                                 </div>
                             </form>
                         @else
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div class="flex min-w-0 items-center gap-3">
+                            {{-- Key and value share one line, with the key column a
+                                 fixed width so values align into a scannable column.
+                                 Stacking value under key doubled every row's height —
+                                 25 rows of that is most of the page. --}}
+                            <div class="flex items-center gap-3">
+                                <div class="flex min-w-0 flex-1 items-center gap-2.5">
                                     @if (method_exists($this, 'removeSelectedEnvVars'))
                                         <input
                                             type="checkbox"
                                             value="{{ $key }}"
                                             wire:model.live="selected_env_keys"
                                             aria-label="{{ __('Select :key for bulk actions', ['key' => $key]) }}"
-                                            class="h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40"
+                                            class="h-3.5 w-3.5 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40"
                                         />
                                     @endif
-                                    <div class="min-w-0">
-                                        <p class="flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
-                                            <span>{{ $key }}</span>
-                                            @if ($showDiscoveredBadge)
-                                                <span
-                                                    class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70"
-                                                    title="{{ __('Imported from the live .env on the server.') }}"
-                                                >
-                                                    <x-heroicon-m-magnifying-glass class="h-3 w-3" />
-                                                    {{ __('Discovered') }}
-                                                </span>
-                                            @endif
-                                            @if ($isInherited)
-                                                <span
-                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70"
-                                                    title="{{ __('This site key overrides a workspace-inherited variable.') }}"
-                                                >
-                                                    <x-heroicon-m-link class="h-3 w-3" />
-                                                    {{ __('Override') }}
-                                                </span>
-                                            @endif
-                                            @if ($overridesBinding)
-                                                <span
-                                                    class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70"
-                                                    title="{{ __('This .env value overrides the :type binding\'s connection variable.', ['type' => $bindingTypeLabelsInline[$overridesBinding['type']] ?? $overridesBinding['type']]) }}"
-                                                >
-                                                    <x-heroicon-m-link class="h-3 w-3" />
-                                                    {{ __('Overrides :type', ['type' => $bindingTypeLabelsInline[$overridesBinding['type']] ?? $overridesBinding['type']]) }}
-                                                </span>
-                                            @endif
-                                            @if ($residency)
-                                                <span
-                                                    class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-forest ring-1 ring-inset ring-brand-forest/20"
-                                                    title="{{ $residency['mode'] === 'external' ? __('Value is referenced from an external secret store; it is never stored in dply.') : __('Value is encrypted under your organization key, not stored in the plaintext .env.') }}"
-                                                >
-                                                    <x-heroicon-m-lock-closed class="h-3 w-3" />
-                                                    {{ $residency['mode'] === 'external' ? __('External') : __('Org key') }}
-                                                </span>
-                                            @endif
-                                        </p>
-                                        <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
-                                            @if ($residency)
-                                                @if ($escrowRevealed)
-                                                    {{ $revealed_escrow_values[$key] === '' ? '(empty)' : $revealed_escrow_values[$key] }}
-                                                @elseif ($residency['mode'] === 'external')
-                                                    <span class="text-brand-mist">{{ __('resolved from external store at deploy') }}</span>
-                                                @else
-                                                    <span class="text-brand-mist">{{ __('held in the organization key') }}</span>
-                                                @endif
-                                            @elseif ($isRevealed)
-                                                {{ $value === '' ? '(empty)' : $value }}
-                                            @else
-                                                @if ($valueLength === 0)
-                                                    <span class="text-brand-mist">(empty)</span>
-                                                @else
-                                                    {{ str_repeat('•', min(24, max(4, $valueLength))) }}
-                                                @endif
-                                            @endif
-                                        </p>
-                                        @if ($rowComment !== null && $rowComment !== '')
-                                            {{-- Comment shows in plain (not mono) so it visually
-                                                 separates from the KEY/value mono pair. The pre-line
-                                                 white-space preserves multi-line comments without
-                                                 breaking the grid layout. --}}
-                                            <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist">
-                                                # {{ $rowComment }}
-                                            </p>
+                                    <div class="flex min-w-0 shrink-0 items-center gap-1 sm:w-64">
+                                        <span class="truncate font-mono text-xs font-semibold text-brand-ink" title="{{ $key }}">{{ $key }}</span>
+                                        {{-- Badges are icon-only with the label in the
+                                             tooltip and sr-only text. Four uppercase,
+                                             letter-spaced pills on one row crowded out
+                                             the value they were annotating. --}}
+                                        @if ($showDiscoveredBadge)
+                                            <span
+                                                class="inline-flex shrink-0 items-center rounded bg-sky-50 p-0.5 text-sky-800 ring-1 ring-inset ring-sky-200/70"
+                                                title="{{ __('Discovered — imported from the live .env on the server.') }}"
+                                            >
+                                                <x-heroicon-m-magnifying-glass class="h-3 w-3" />
+                                                <span class="sr-only">{{ __('Discovered') }}</span>
+                                            </span>
+                                        @endif
+                                        @if ($isInherited)
+                                            <span
+                                                class="inline-flex shrink-0 items-center rounded bg-amber-50 p-0.5 text-amber-900 ring-1 ring-inset ring-amber-200/70"
+                                                title="{{ __('Override — this site key overrides a workspace-inherited variable.') }}"
+                                            >
+                                                <x-heroicon-m-link class="h-3 w-3" />
+                                                <span class="sr-only">{{ __('Override') }}</span>
+                                            </span>
+                                        @endif
+                                        @if ($overridesBinding)
+                                            <span
+                                                class="inline-flex shrink-0 items-center rounded bg-sky-50 p-0.5 text-sky-800 ring-1 ring-inset ring-sky-200/70"
+                                                title="{{ __('This .env value overrides the :type binding\'s connection variable.', ['type' => $bindingTypeLabelsInline[$overridesBinding['type']] ?? $overridesBinding['type']]) }}"
+                                            >
+                                                <x-heroicon-m-link class="h-3 w-3" />
+                                                <span class="sr-only">{{ __('Overrides :type', ['type' => $bindingTypeLabelsInline[$overridesBinding['type']] ?? $overridesBinding['type']]) }}</span>
+                                            </span>
+                                        @endif
+                                        @if ($residency)
+                                            <span
+                                                class="inline-flex shrink-0 items-center rounded bg-brand-forest/10 p-0.5 text-brand-forest ring-1 ring-inset ring-brand-forest/20"
+                                                title="{{ $residency['mode'] === 'external' ? __('External — value is referenced from an external secret store; it is never stored in dply.') : __('Org key — value is encrypted under your organization key, not stored in the plaintext .env.') }}"
+                                            >
+                                                <x-heroicon-m-lock-closed class="h-3 w-3" />
+                                                <span class="sr-only">{{ $residency['mode'] === 'external' ? __('External') : __('Org key') }}</span>
+                                            </span>
                                         @endif
                                     </div>
+
+                                    <p class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-moss">
+                                        @if ($residency)
+                                            @if ($escrowRevealed)
+                                                {{ $revealed_escrow_values[$key] === '' ? '(empty)' : $revealed_escrow_values[$key] }}
+                                            @elseif ($residency['mode'] === 'external')
+                                                <span class="text-brand-mist">{{ __('resolved from external store at deploy') }}</span>
+                                            @else
+                                                <span class="text-brand-mist">{{ __('held in the organization key') }}</span>
+                                            @endif
+                                        @elseif ($isRevealed)
+                                            {{ $value === '' ? '(empty)' : $value }}
+                                        @else
+                                            @if ($valueLength === 0)
+                                                <span class="text-brand-mist">(empty)</span>
+                                            @else
+                                                {{ str_repeat('•', min(24, max(4, $valueLength))) }}
+                                            @endif
+                                        @endif
+                                    </p>
                                 </div>
 
-                                <div class="flex flex-wrap items-center gap-2">
+                                <div class="flex shrink-0 items-center gap-1">
                                     @if ($residency)
                                         @if ($residency['mode'] !== 'external' && $residency['can_reveal'])
                                             <button
@@ -784,29 +785,31 @@
                                         @endif
                                     @else
                                     {{-- Show + Edit stay inline; Import / Remove / Move-to-org-key
-                                         collapse into a kebab so the row stays to two buttons. --}}
+                                         collapse into a kebab so the row stays to two buttons.
+                                         Icon-only: the labels repeated identically down all 25
+                                         rows and ate the width the value column needed. --}}
                                     <button
                                         type="button"
                                         wire:click="toggleRevealEnvVar('{{ $key }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="rounded p-1 text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink"
                                         title="{{ $isRevealed ? __('Hide value') : __('Reveal value') }}"
                                     >
                                         @if ($isRevealed)
                                             <x-heroicon-o-eye-slash class="h-4 w-4" />
-                                            {{ __('Hide') }}
+                                            <span class="sr-only">{{ __('Hide :key', ['key' => $key]) }}</span>
                                         @else
                                             <x-heroicon-o-eye class="h-4 w-4" />
-                                            {{ __('Show') }}
+                                            <span class="sr-only">{{ __('Show :key', ['key' => $key]) }}</span>
                                         @endif
                                     </button>
                                     <button
                                         type="button"
                                         wire:click="editEnvVar('{{ $key }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        class="rounded p-1 text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink"
                                         title="{{ __('Edit value') }}"
                                     >
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
-                                        {{ __('Edit') }}
+                                        <span class="sr-only">{{ __('Edit :key', ['key' => $key]) }}</span>
                                     </button>
                                     <x-overflow-menu>
                                         <button type="button" wire:click="$set('env_import_key', '{{ $key }}')" x-on:click="$dispatch('open-modal', 'env-import-modal')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Import :key from another site', ['key' => $key]) }}">
@@ -827,6 +830,14 @@
                                     @endif
                                 </div>
                             </div>
+                            @if ($rowComment !== null && $rowComment !== '')
+                                {{-- Comment sits under the row (plain, not mono, so it
+                                     separates from the KEY/value pair) and only costs a
+                                     line on the few rows that carry one. --}}
+                                <p class="mt-0.5 whitespace-pre-line pl-6 text-[11px] italic text-brand-mist">
+                                    # {{ $rowComment }}
+                                </p>
+                            @endif
                         @endif
                     </li>
                 @endforeach
