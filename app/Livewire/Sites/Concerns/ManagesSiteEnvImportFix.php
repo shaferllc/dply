@@ -210,16 +210,47 @@ trait ManagesSiteEnvImportFix
      */
     public function applySuggestedEnvFix(): void
     {
-        $key = strtoupper(trim((string) $this->fixing_env_key));
-        $this->fixing_env_value = match ($key) {
+        $suggested = $this->suggestedEnvFixValue(
+            (string) $this->fixing_env_key,
+            (string) $this->fixing_env_value,
+        );
+
+        if ($suggested !== null) {
+            $this->fixing_env_value = $suggested;
+        }
+    }
+
+    /**
+     * The value this key *should* have, or null when only the operator can know
+     * it (DB_PASSWORD, MAIL_USERNAME, …).
+     *
+     * Single source of truth for the one-key "Use suggested" button, the
+     * suggestion label, and {@see fixAllEnvWarnings()} — they drifted apart
+     * when each carried its own copy of the map.
+     *
+     * Note this is NOT deterministic for the generated keys (APP_KEY, the
+     * broadcaster credentials): each call mints a fresh secret, so callers that
+     * only need to know *whether* a suggestion exists must use
+     * {@see envFixSuggestionLabel()} rather than calling this on every render.
+     */
+    public function suggestedEnvFixValue(string $key, string $current): ?string
+    {
+        return match (strtoupper(trim($key))) {
             'APP_DEBUG' => 'false',
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'true',
             'APP_KEY' => $this->freshAppKey(),
-            'APP_URL' => str_starts_with(strtolower($this->fixing_env_value), 'http://')
-                ? 'https://'.substr($this->fixing_env_value, 7)
-                : $this->fixing_env_value,
-            default => $this->fixing_env_value,
+            // Reverb/Pusher app credentials are values *you* choose and then
+            // hand to the broadcaster — there is nothing to look up, which is
+            // why `artisan install:broadcasting` simply generates them. Same
+            // shapes here: a numeric app id and two random secrets.
+            'REVERB_APP_ID', 'PUSHER_APP_ID' => (string) random_int(100000, 999999),
+            'REVERB_APP_KEY', 'REVERB_APP_SECRET',
+            'PUSHER_APP_KEY', 'PUSHER_APP_SECRET' => Str::lower(Str::random(20)),
+            'APP_URL' => str_starts_with(strtolower($current), 'http://')
+                ? 'https://'.substr($current, 7)
+                : null,
+            default => null,
         };
     }
 

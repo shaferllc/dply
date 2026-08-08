@@ -36,18 +36,23 @@
                      actions. Anything longer than the line goes behind the row's
                      own disclosure rather than wrapping to three lines and pushing
                      its own buttons out of alignment. --}}
-                <ul class="mt-2 space-y-px">
+                <ul class="mt-2 divide-y divide-brand-ink/5">
                     @foreach ($envWarnings as $w)
                         @php
                             $isDanger = $w['level'] === 'danger';
                             $isWarn = $w['level'] === 'warn';
                             $detail = $w['detail'] ?? null;
                         @endphp
+                        {{-- Square rows, not rounded: a radius on a row that also
+                             carries a coloured left rail rounds the rail into a
+                             lozenge and reads as a stray blob. The rail is the
+                             severity cue; hover stays neutral so it doesn't
+                             double as a second one. --}}
                         <li @class([
-                            'group/row flex items-start gap-2.5 rounded-r border-l-2 py-1.5 pl-2.5 pr-1 transition-colors',
-                            'border-rose-400 hover:bg-rose-50/50' => $isDanger,
-                            'border-amber-400 hover:bg-amber-50/50' => $isWarn,
-                            'border-brand-mist/50 hover:bg-brand-sand/20' => ! $isDanger && ! $isWarn,
+                            'flex items-start gap-3 border-l-2 py-2 pl-3 pr-1 transition-colors hover:bg-brand-sand/20',
+                            'border-rose-500' => $isDanger,
+                            'border-amber-500' => $isWarn,
+                            'border-brand-mist/50' => ! $isDanger && ! $isWarn,
                         ])>
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs leading-5 text-brand-ink">
@@ -78,14 +83,14 @@
                                      buttons were a different width and none lined up. --}}
                                 <span class="flex shrink-0 items-center gap-1">
                                     <button type="button" wire:click="openFixEnvVar(@js($w['key']))"
-                                        class="rounded border border-brand-ink/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-ink transition hover:border-brand-ink/25 hover:bg-white"
+                                        class="dply-btn dply-btn-xs dply-btn-outline"
                                         title="{{ __('Fix :key', ['key' => $w['key']]) }}">
                                         {{ __('Fix') }}
                                         <span class="sr-only">{{ $w['key'] }}</span>
                                     </button>
                                     @if ($canIgnoreEnvWarnings)
                                         <button type="button" wire:click="ignoreEnvWarning(@js($w['key']))"
-                                            class="rounded px-1.5 py-0.5 text-[11px] font-medium text-brand-mist transition hover:bg-white hover:text-brand-moss"
+                                            class="dply-btn dply-btn-xs dply-btn-ghost"
                                             title="{{ __('Suppress this warning') }}">
                                             {{ __('Ignore') }}
                                             <span class="sr-only">{{ $w['key'] }}</span>
@@ -139,8 +144,8 @@
                             <span class="text-[11px] font-medium text-brand-moss">{{ __('Manage the resource instead:') }}</span>
                             @foreach ($resourceActions as $type => $meta)
                                 <button type="button" wire:click="openBindingModal(@js($type))"
-                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-brand-ink underline-offset-2 transition hover:bg-white hover:underline">
-                                    <x-dynamic-component :component="$meta['icon']" class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                    class="dply-btn dply-btn-xs dply-btn-outline whitespace-nowrap">
+                                    <x-dynamic-component :component="$meta['icon']" class="h-3.5 w-3.5 text-brand-moss" />
                                     {{ __('Manage :resource', ['resource' => $meta['label']]) }}
                                 </button>
                             @endforeach

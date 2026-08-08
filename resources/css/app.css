@@ -52,6 +52,56 @@
         @apply rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm sm:p-5;
     }
 
+    /* ── Control scale ────────────────────────────────────────────────────
+       Two button sizes and one radius, so a dense page reads as one system.
+       Hand-tuned call sites had drifted to four scales (px-1.5/py-0.5 up to
+       px-3/py-1.5) and five radii (rounded, -md, -lg, -xl, -full) sitting
+       side by side, which is what made the page look unfinished rather than
+       merely busy.
+
+       xs — inline actions inside a row or alert (Fix, Ignore, Re-scan).
+       sm — a card header's own actions (Add variable, Edit all).
+       Both are fixed-height so a row of mixed buttons shares one baseline. */
+    .dply-btn {
+        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .dply-btn-xs {
+        @apply h-6 px-2 text-[11px];
+    }
+
+    .dply-btn-sm {
+        @apply h-7 px-2.5 text-xs;
+    }
+
+    /* Tones. Outline is the default for secondary work; ghost for tertiary
+       (Ignore/dismiss), which should recede until hovered. */
+    .dply-btn-outline {
+        @apply border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-ink/30 hover:bg-brand-sand/40;
+    }
+
+    .dply-btn-ghost {
+        @apply text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink;
+    }
+
+    .dply-btn-primary {
+        @apply bg-brand-forest text-brand-cream hover:bg-brand-forest/90;
+    }
+
+    .dply-btn-danger {
+        @apply bg-rose-700 text-white hover:bg-rose-800;
+    }
+
+    /* Icon-only control, square so it lines up with the button heights. */
+    .dply-icon-btn {
+        @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink;
+    }
+
+    /* Inline token: an env key, a prefix filter, a count. */
+    .dply-chip {
+        @apply inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold;
+    }
+
     /* Global "this button is talking to the server" affordance, toggled by
        the click handler in app.js for any wire:click element.
        Approach: hide the button's contents during the round-trip (so the

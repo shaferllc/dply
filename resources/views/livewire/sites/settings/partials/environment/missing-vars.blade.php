@@ -23,26 +23,26 @@
                             wire:click="rescanEnvRequirements"
                             wire:loading.attr="disabled"
                             wire:target="rescanEnvRequirements"
-                            class="inline-flex items-center gap-1 rounded border border-brand-ink/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-ink transition hover:border-brand-ink/25 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            class="dply-btn dply-btn-xs dply-btn-outline"
                             title="{{ __('Re-scan the deployed code for required variables.') }}"
                         >
-                            <x-heroicon-o-arrow-path class="h-3 w-3" wire:loading.remove wire:target="rescanEnvRequirements" />
-                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-3 w-3 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rescanEnvRequirements" />
+                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Re-scan') }}
                         </button>
                         <button
                             type="button"
                             wire:click="openMissingEnvModal"
-                            class="inline-flex items-center gap-1 rounded bg-rose-700 px-1.5 py-0.5 text-[11px] font-semibold text-white transition-colors hover:bg-rose-800"
+                            class="dply-btn dply-btn-xs dply-btn-danger"
                         >
-                            <x-heroicon-o-plus class="h-3 w-3" />
+                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
                             {{ __('Add all') }}
                         </button>
                         @if ($canIgnoreEnv)
                             <button
                                 type="button"
                                 wire:click="confirmIgnoreMissingEnv"
-                                class="rounded px-1.5 py-0.5 text-[11px] font-medium text-brand-mist transition hover:bg-white hover:text-brand-moss"
+                                class="dply-btn dply-btn-xs dply-btn-ghost"
                                 title="{{ __('Stop warning/blocking on missing required variables for this site.') }}"
                             >
                                 {{ __('Ignore all') }}
