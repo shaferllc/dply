@@ -18,16 +18,18 @@
 @else
             <div class="space-y-6">
 @endif
-                <div class="flex items-start justify-between gap-4">
-                    <x-page-header
-                        :title="__('Set up your site')"
-                        :description="__('Configure what :name needs, then deploy. Your site stays live on its preview URL the whole time.', ['name' => $site->name])"
-                        :show-documentation="false"
-                        flush
-                        compact
-                    />
-                    <button type="button" wire:click="configureLater"
-                        class="shrink-0 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink">
+                {{-- Plain heading rather than x-page-header: this panel already
+                     sits under the Repository card's own title and the "Set up"
+                     tab, so the full page-header treatment was a third heading
+                     for the same thing and cost ~120px above the stepper. --}}
+                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Set up your site') }}</h2>
+                        <p class="text-xs text-brand-moss">
+                            {{ __('Configure what :name needs, then deploy. Your site stays live on its preview URL the whole time.', ['name' => $site->name]) }}
+                        </p>
+                    </div>
+                    <button type="button" wire:click="configureLater" class="dply-btn dply-btn-xs dply-btn-outline">
                         {{ __("I'll configure later") }}
                     </button>
                 </div>
@@ -312,27 +314,31 @@
                         @endif
                     @endif
 
-                    {{-- Stepper --}}
-                    <nav class="flex items-center gap-2">
+                    {{-- Stepper as a segmented control rather than three full-width
+                         cards. Three steps is one linear position, not three
+                         destinations — the cards spent ~70px and the page's whole
+                         width restating what a single strip says, and their scale
+                         made every control below look undersized by comparison. --}}
+                    <nav class="inline-flex items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-0.5">
                         @foreach ($steps as $s)
                             <button type="button" wire:click="goToStep('{{ $s['id'] }}')" @class([
-                                'flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
-                                'border-brand-forest bg-white shadow-sm ring-1 ring-brand-sage/30' => $step === $s['id'],
-                                'border-brand-ink/10 bg-white/60 hover:border-brand-ink/20' => $step !== $s['id'],
+                                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                                'bg-white text-brand-ink shadow-sm' => $step === $s['id'],
+                                'text-brand-moss hover:text-brand-ink' => $step !== $s['id'],
                             ])>
                                 <span @class([
-                                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
                                     'bg-brand-forest text-brand-cream' => $step === $s['id'],
-                                    'bg-brand-sage/15 text-brand-forest' => $step !== $s['id'] && $s['done'],
-                                    'bg-brand-ink/[0.06] text-brand-mist' => $step !== $s['id'] && ! $s['done'],
+                                    'bg-brand-sage/25 text-brand-forest' => $step !== $s['id'] && $s['done'],
+                                    'bg-brand-ink/[0.08] text-brand-mist' => $step !== $s['id'] && ! $s['done'],
                                 ])>
                                     @if ($s['done'] && $step !== $s['id'])
-                                        <x-heroicon-s-check class="h-4 w-4" />
+                                        <x-heroicon-s-check class="h-2.5 w-2.5" />
                                     @else
                                         {{ $s['n'] }}
                                     @endif
                                 </span>
-                                <span class="text-sm font-medium {{ $step === $s['id'] ? 'text-brand-ink' : 'text-brand-moss' }}">{{ $s['label'] }}</span>
+                                {{ $s['label'] }}
                             </button>
                         @endforeach
                     </nav>

@@ -41,7 +41,7 @@
                         wire:click="testSiteLoads"
                         wire:loading.attr="disabled"
                         wire:target="testSiteLoads"
-                        class="inline-flex items-center gap-1 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2 py-1 text-[11px] font-semibold text-brand-forest transition-colors hover:bg-brand-forest/10 disabled:opacity-60"
+                        class="dply-btn dply-btn-sm border border-brand-forest/30 bg-brand-forest/5 text-brand-forest hover:bg-brand-forest/10"
                         title="{{ __('Request the live site and confirm it loads (HTTP check + server log on failure).') }}"
                     >
                         <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="testSiteLoads" />
@@ -57,7 +57,7 @@
                         type="button"
                         x-on:click="open = ! open"
                         x-on:click.outside="open = false"
-                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40"
+                        class="dply-btn dply-btn-sm dply-btn-outline"
                     >
                         <x-heroicon-m-ellipsis-horizontal class="h-3.5 w-3.5 text-brand-mist" />
                         {{ __('More') }}
@@ -116,7 +116,7 @@
                     <button
                         type="button"
                         wire:click="openEditAllEnv"
-                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink transition-colors hover:bg-brand-sand/40"
+                        class="dply-btn dply-btn-sm dply-btn-outline"
                     >
                         <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
                         {{ __('Edit all') }}
@@ -125,7 +125,7 @@
                 <button
                     type="button"
                     x-on:click="$dispatch('open-modal', 'add-env-modal')"
-                    class="inline-flex items-center gap-1 rounded-lg bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                    class="dply-btn dply-btn-sm dply-btn-primary"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add variable') }}
@@ -250,13 +250,13 @@
                             </button>
                             <div class="flex shrink-0 items-center gap-1.5">
                                 @if (($gConn['ok'] ?? null) === false && method_exists($this, 'fixBindingConnectivity'))
-                                    <button type="button" wire:click="startFixBinding(@js((string) $gBindingId))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50" title="{{ __('Fix the private-network connectivity for this resource.') }}">
+                                    <button type="button" wire:click="startFixBinding(@js((string) $gBindingId))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')" class="dply-btn dply-btn-xs border border-rose-200 bg-white text-rose-700 hover:bg-rose-50" title="{{ __('Fix the private-network connectivity for this resource.') }}">
                                         <x-heroicon-o-wrench-screwdriver class="h-3 w-3" />
                                         {{ __('Fix') }}
                                     </button>
                                 @endif
                                 @if (in_array($group['type'], ['database', 'redis'], true) && method_exists($this, 'verifyBinding'))
-                                    <button type="button" wire:click="verifyBinding(@js((string) $gBindingId))" wire:loading.attr="disabled" wire:target="verifyBinding" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Probe the connection from the server now.') }}">
+                                    <button type="button" wire:click="verifyBinding(@js((string) $gBindingId))" wire:loading.attr="disabled" wire:target="verifyBinding" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Probe the connection from the server now.') }}">
                                         <x-heroicon-o-signal class="h-3 w-3" />
                                         {{ __('Verify') }}
                                     </button>
@@ -266,7 +266,7 @@
                                          transport. Recipient defaults to the operator's email
                                          (left blank → the job uses it); editable in the popover. --}}
                                     <div class="relative" x-data="{ open: false }" wire:key="mailtest-{{ md5($gBindingId) }}">
-                                        <button type="button" x-on:click="open = !open" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Send a test email from the server using this transport.') }}">
+                                        <button type="button" x-on:click="open = !open" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Send a test email from the server using this transport.') }}">
                                             <x-heroicon-o-paper-airplane class="h-3 w-3" />
                                             {{ __('Send test') }}
                                         </button>
@@ -363,7 +363,7 @@
                                                     </p>
                                                 </div>
                                             </div>
-                                            <button type="button" wire:click="overrideManagedEnvVar(@js($mKey))" class="shrink-0 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Set a .env value that overrides the binding.') }}">{{ __('Override') }}</button>
+                                            <button type="button" wire:click="overrideManagedEnvVar(@js($mKey))" class="dply-btn dply-btn-xs dply-btn-outline" title="{{ __('Set a .env value that overrides the binding.') }}">{{ __('Override') }}</button>
                                         </div>
                                     @endif
                                 </li>
@@ -851,12 +851,12 @@
                 <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-5 py-2 sm:px-6">
                     <span class="text-[11px] text-brand-mist">{{ __(':from–:to of :total', ['from' => $envFrom, 'to' => $envTo, 'total' => $envFilteredCount]) }}</span>
                     <div class="flex items-center gap-1.5">
-                        <button type="button" wire:click="$set('env_page', {{ max(1, $envCurrentPage - 1) }})" @disabled($envCurrentPage <= 1) class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40">
+                        <button type="button" wire:click="$set('env_page', {{ max(1, $envCurrentPage - 1) }})" @disabled($envCurrentPage <= 1) class="dply-btn dply-btn-xs dply-btn-outline">
                             <x-heroicon-o-chevron-left class="h-3 w-3" />
                             {{ __('Prev') }}
                         </button>
                         <span class="px-1 text-[11px] font-semibold text-brand-moss">{{ __('Page :p / :n', ['p' => $envCurrentPage, 'n' => $envTotalPages]) }}</span>
-                        <button type="button" wire:click="$set('env_page', {{ min($envTotalPages, $envCurrentPage + 1) }})" @disabled($envCurrentPage >= $envTotalPages) class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40">
+                        <button type="button" wire:click="$set('env_page', {{ min($envTotalPages, $envCurrentPage + 1) }})" @disabled($envCurrentPage >= $envTotalPages) class="dply-btn dply-btn-xs dply-btn-outline">
                             {{ __('Next') }}
                             <x-heroicon-o-chevron-right class="h-3 w-3" />
                         </button>

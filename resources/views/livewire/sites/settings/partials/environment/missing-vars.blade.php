@@ -77,12 +77,12 @@
     {{-- Required-env checks are off for this site (operator chose to ignore
          missing vars). Muted reminder with a one-click re-enable. --}}
     @if ($supportsEnvPush && $envGateOff)
-        <div class="flex flex-wrap items-center justify-between gap-2 bg-brand-sand/10 px-5 py-4 text-sm text-brand-moss">
-            <span class="inline-flex items-center gap-2">
-                <x-heroicon-o-no-symbol class="h-4 w-4 text-brand-mist" />
+        <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-2 text-xs text-brand-moss">
+            <span class="inline-flex items-center gap-1.5">
+                <x-heroicon-o-no-symbol class="h-3.5 w-3.5 text-brand-mist" />
                 {{ __('Required-variable checks are off for this site — deploys won\'t be blocked by missing env.') }}
             </span>
-            <button type="button" wire:click="enableEnvGate" class="font-semibold text-brand-forest hover:underline">
+            <button type="button" wire:click="enableEnvGate" class="dply-btn dply-btn-xs dply-btn-outline">
                 {{ __('Re-enable') }}
             </button>
         </div>

@@ -279,9 +279,9 @@
 
     @if ($showAttention)
         <section @class([$card, 'overflow-hidden'])>
-            <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
-                <x-heroicon-o-bell-alert class="h-4 w-4 text-brand-sage" aria-hidden="true" />
-                <h2 class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Needs attention') }}</h2>
+            <div class="flex items-center gap-1.5 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-1.5">
+                <x-heroicon-o-bell-alert class="h-3.5 w-3.5 text-brand-sage" aria-hidden="true" />
+                <h2 class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Needs attention') }}</h2>
             </div>
             <div class="divide-y divide-brand-ink/10">
                 @if ($attentionConsoleRun)
