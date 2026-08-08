@@ -36,38 +36,32 @@
         wire:key="caddy-modules-panel"
     >
         <div class="{{ $card }}">
-            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Modules') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Caddy modules') }}</h3>
-                    <p class="mt-1 max-w-3xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Community plugins compile into the Caddy binary via xcaddy — they are not runtime toggles like Apache modules. Add plugins here, rebuild, and validate against your Caddyfile before restart.') }}
-                        <a href="https://caddyserver.com/docs/modules" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-forest underline-offset-2 hover:underline">{{ __('Browse all modules') }}</a>
-                    </p>
-                    @if ($caddy_modules_caddy_version)
-                        <p class="mt-1 text-[11px] tabular-nums text-brand-mist">
-                            {{ __('Installed binary: :version', ['version' => $caddy_modules_caddy_version]) }}
-                            @if ($caddy_modules_custom_binary)
-                                <span class="ml-1 inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-900 ring-1 ring-amber-200">{{ __('Custom build') }}</span>
-                            @else
-                                <span class="ml-1 inline-flex rounded-full bg-brand-sand/80 px-1.5 py-0.5 font-semibold text-brand-moss ring-1 ring-brand-ink/10">{{ __('Package default') }}</span>
-                            @endif
-                        </p>
-                    @endif
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
+            {{-- Binary version + build kind ride the head's note line; the
+                 "MODULES" eyebrow restated the sub-tab. --}}
+            @php
+                $caddyModulesNote = __('Community plugins compile into the Caddy binary via xcaddy — they are not runtime toggles like Apache modules. Add plugins here, rebuild, and validate against your Caddyfile before restart.');
+                if ($caddy_modules_caddy_version) {
+                    $caddyModulesNote .= ' · '.__('Installed binary: :version', ['version' => $caddy_modules_caddy_version])
+                        .' ('.($caddy_modules_custom_binary ? __('Custom build') : __('Package default')).')';
+                }
+            @endphp
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-puzzle-piece"
+                :title="__('Caddy modules')"
+                :note="$caddyModulesNote"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
                     <button
                         type="button"
                         wire:click="openAddCaddyModuleForm"
                         wire:loading.attr="disabled"
                         wire:target="{{ $caddyModulesBusyTargets }}"
                         @disabled($isDeployer || $actionInFlight)
-                        class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4" />
+                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" />
                         {{ __('Add plugin') }}
                     </button>
                     <button
@@ -75,21 +69,21 @@
                         wire:click="refreshCaddyModulesInventory"
                         wire:loading.attr="disabled"
                         wire:target="{{ $caddyModulesBusyTargets }}"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="{{ $caddyModulesBusyTargets }}" class="inline-flex">
-                            <x-heroicon-o-arrow-path class="h-4 w-4" />
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
                         </span>
                         <span wire:loading wire:target="{{ $caddyModulesBusyTargets }}" class="inline-flex">
-                            <x-spinner class="h-4 w-4" />
+                            <x-spinner class="h-3.5 w-3.5" />
                         </span>
                         <span wire:loading wire:target="{{ $caddyModulesBusyTargets }}">{{ __('Refreshing…') }}</span>
                         <span wire:loading.remove wire:target="{{ $caddyModulesBusyTargets }}">{{ __('Refresh inventory') }}</span>
                     </button>
-                </div>
-            </div>
+                </x-slot:actions>
+            </x-workspace-panel-head>
 
-            <div class="px-6 py-6 sm:px-7">
+            <div class="px-4 py-3.5 sm:px-5">
                 @if ($caddyModulesBuilding)
                     <div
                         class="mb-4 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-4 text-sm text-amber-950 shadow-sm"
@@ -474,7 +468,7 @@
                                 $compiledTotal = count($caddy_modules_installed);
                             @endphp
                             <div
-                                class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/10 px-6 py-10 text-center sm:px-8"
+                                class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/10 px-4 py-8 text-center sm:px-5"
                                 role="status"
                                 aria-live="polite"
                             >

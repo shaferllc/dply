@@ -30,24 +30,21 @@
 <x-server-workspace-tab-panel id="snapshots-panel-databases" labelled-by="snapshots-tab-databases" panel-class="min-w-0">
     {{-- Take a database snapshot. --}}
     <section class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database snapshot') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Take a snapshot now') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('A point-in-time dump of a site’s database, stored to your S3 destination when configured or the server disk otherwise. Restorable from History below.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-circle-stack"
+            :title="__('Take a snapshot now')"
+            :note="__('A point-in-time dump of a site’s database, stored to your S3 destination when configured or the server disk otherwise. Restorable from History below.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-4 py-3.5 sm:px-5">
             @if ($sites->isEmpty())
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
-                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                    <span class="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                        <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No sites on this server') }}</p>
+                    <p class="mt-2.5 text-sm font-semibold text-brand-ink">{{ __('No sites on this server') }}</p>
                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                         {{ __('Database snapshots capture a site’s database. Deploy a site to this server first, then return to snapshot it.') }}
                     </p>
@@ -77,24 +74,22 @@
 
     {{-- History. Polls while a dump is still running, then goes quiet. --}}
     <section class="border-b border-brand-ink/10" @if ($snapshotsInFlight) wire:poll.10s @endif>
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent database snapshots') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Restore overwrites the live database with the captured data — always destructive.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-archive-box"
+            :title="__('Recent database snapshots')"
+            :count="$siteSnapshots->isEmpty() ? null : (string) $siteSnapshots->count()"
+            :note="__('Restore overwrites the live database with the captured data — always destructive.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-4 py-3.5 sm:px-5">
             @if ($siteSnapshots->isEmpty())
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
-                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                    <span class="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-archive-box class="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No database snapshots yet') }}</p>
+                    <p class="mt-2.5 text-sm font-semibold text-brand-ink">{{ __('No database snapshots yet') }}</p>
                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ __('Take one above. Snapshots taken automatically before destructive operations also surface here.') }}</p>
                 </div>
             @else
@@ -102,14 +97,14 @@
                     <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
                         <thead class="bg-brand-sand/40 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
                             <tr>
-                                <th class="px-4 py-3">{{ __('Taken') }}</th>
-                                <th class="px-4 py-3">{{ __('Site') }}</th>
-                                <th class="px-4 py-3">{{ __('Reason') }}</th>
-                                <th class="px-4 py-3">{{ __('Status') }}</th>
-                                <th class="px-4 py-3 text-right">{{ __('Size') }}</th>
-                                <th class="px-4 py-3 text-right">{{ __('Est. cost') }}</th>
-                                <th class="px-4 py-3">{{ __('Where') }}</th>
-                                <th class="px-4 py-3 text-right"></th>
+                                <th class="px-3 py-2">{{ __('Taken') }}</th>
+                                <th class="px-3 py-2">{{ __('Site') }}</th>
+                                <th class="px-3 py-2">{{ __('Reason') }}</th>
+                                <th class="px-3 py-2">{{ __('Status') }}</th>
+                                <th class="px-3 py-2 text-right">{{ __('Size') }}</th>
+                                <th class="px-3 py-2 text-right">{{ __('Est. cost') }}</th>
+                                <th class="px-3 py-2">{{ __('Where') }}</th>
+                                <th class="px-3 py-2 text-right"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/10 bg-white">
@@ -123,21 +118,21 @@
                                     $isPending = $snap->status === \App\Models\Snapshot::STATUS_PENDING;
                                 @endphp
                                 <tr wire:key="site-snapshot-{{ $snap->id }}">
-                                    <td class="px-4 py-3 text-brand-moss" title="{{ $snap->created_at?->toDateTimeString() }}">{{ $snap->created_at?->diffForHumans() }}</td>
-                                    <td class="px-4 py-3 font-medium text-brand-ink">{{ $snap->site?->name ?: $snap->site?->slug ?: '—' }}</td>
-                                    <td class="px-4 py-3 text-brand-moss">{{ str($snap->reason)->replace('_', ' ')->ucfirst() }}</td>
-                                    <td class="px-4 py-3">
+                                    <td class="px-3 py-2 text-brand-moss" title="{{ $snap->created_at?->toDateTimeString() }}">{{ $snap->created_at?->diffForHumans() }}</td>
+                                    <td class="px-3 py-2 font-medium text-brand-ink">{{ $snap->site?->name ?: $snap->site?->slug ?: '—' }}</td>
+                                    <td class="px-3 py-2 text-brand-moss">{{ str($snap->reason)->replace('_', ' ')->ucfirst() }}</td>
+                                    <td class="px-3 py-2">
                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $snapStatusClass($snap->status) }}">{{ $snap->status }}</span>
                                         @if ($snap->status === \App\Models\Snapshot::STATUS_FAILED && $snap->error_message)
                                             <p class="mt-1 max-w-xs truncate text-[11px] text-rose-700" title="{{ $snap->error_message }}">{{ $snap->error_message }}</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-ink">{{ $snap->bytes !== null ? \Illuminate\Support\Number::fileSize((int) $snap->bytes) : '—' }}</td>
-                                    <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-moss" @if ($snapCostTitle) title="{{ $snapCostTitle }}" @endif>{{ $snapCost ?? '—' }}</td>
-                                    <td class="px-4 py-3">
+                                    <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-ink">{{ $snap->bytes !== null ? \Illuminate\Support\Number::fileSize((int) $snap->bytes) : '—' }}</td>
+                                    <td class="px-3 py-2 text-right font-mono tabular-nums text-brand-moss" @if ($snapCostTitle) title="{{ $snapCostTitle }}" @endif>{{ $snapCost ?? '—' }}</td>
+                                    <td class="px-3 py-2">
                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $whereClass }}">{{ $snap->destination === \App\Models\Snapshot::DESTINATION_S3 ? __('S3') : __('Disk') }}</span>
                                     </td>
-                                    <td class="px-4 py-3 text-right">
+                                    <td class="px-3 py-2 text-right">
                                         @if ($isPending)
                                             <span class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
                                                 <x-spinner size="sm" />

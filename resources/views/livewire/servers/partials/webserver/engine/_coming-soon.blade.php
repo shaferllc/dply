@@ -23,7 +23,7 @@
     // `heroicon-o-`), mirroring <x-workspace-coming-soon>'s expected shape.
     $engineHighlights = match ($key) {
         'nginx' => [
-            ['icon' => 'bolt', 'title' => __('FastCGI cache'), 'body' => __('RunCloud-style page caching with shared FastCGI/proxy zones.')],
+            ['icon' => 'bolt', 'title' => __('FastCGI cache'), 'body' => __('Shared FastCGI/proxy zones for full-page caching at the edge.')],
             ['icon' => 'server', 'title' => __('Upstreams'), 'body' => __('Load-balanced backend pools in nginx.conf.')],
             ['icon' => 'puzzle-piece', 'title' => __('Dynamic modules'), 'body' => __('Install and enable libnginx-mod-* packages from the dashboard.')],
             ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate nginx config with backups.')],

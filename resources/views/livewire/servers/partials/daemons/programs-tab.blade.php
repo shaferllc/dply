@@ -42,106 +42,99 @@
 {{-- Programs list card. Header carries the primary actions (Sync, Restart all,
      Add program) and a count chip; rows below. --}}
 <section class="border-b border-brand-ink/10" wire:init="loadProgramStatuses">
-    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        {{-- Top row: icon + title + buttons --}}
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ $contextSiteModel ? __('Programs for this site') : __('Programs on this server') }}</h3>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                @if ($programsTotal > 0)
-                    <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $programsTotal }}</span>
-                @endif
-                <button
-                    type="button"
-                    wire:click="loadProgramStatuses"
-                    wire:loading.attr="disabled"
-                    wire:target="loadProgramStatuses"
-                    @disabled($supervisor_installed !== true)
-                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    <x-heroicon-m-arrow-path class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Refresh') }}
-                </button>
-                <button
-                    type="button"
-                    wire:click="runPreflightPathCheck"
-                    wire:loading.attr="disabled"
-                    wire:target="runPreflightPathCheck"
-                    @disabled($supervisor_installed !== true)
-                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    <x-heroicon-m-folder class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Path check') }}
-                </button>
-                <button
-                    type="button"
-                    wire:click="openConfirmActionModal(
-                        'restartAllPrograms',
-                        [true],
-                        @js(__('Restart all programs')),
-                        @js($restartAllConfirmMessage !== '' ? $restartAllConfirmMessage : __('Restart every active Supervisor program on this server. In-flight jobs will be interrupted.')),
-                        @js(__('Restart all')),
-                        true
-                    )"
-                    wire:loading.attr="disabled"
-                    wire:target="restartAllPrograms"
-                    @disabled($supervisor_installed !== true)
-                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    <span wire:loading.remove wire:target="restartAllPrograms" class="inline-flex items-center gap-1.5">
-                        <x-heroicon-m-arrow-path-rounded-square class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Restart all') }}
-                    </span>
-                    <span wire:loading wire:target="restartAllPrograms" class="inline-flex items-center gap-1.5 whitespace-nowrap">
-                        <x-spinner variant="forest" size="sm" />
-                        {{ __('Working…') }}
-                    </span>
-                </button>
-                <button
-                    type="button"
-                    wire:click="openConfirmActionModal(
-                        'syncSupervisor',
-                        [],
-                        @js(__('Sync Supervisor')),
-                        @js(__('Write all active program configs to the server and run supervisorctl update. Programs added or removed since the last sync will be picked up.')),
-                        @js(__('Sync')),
-                        false
-                    )"
-                    wire:loading.attr="disabled"
-                    wire:target="syncSupervisor"
-                    @disabled($supervisor_installed !== true)
-                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    <span wire:loading.remove wire:target="syncSupervisor" class="inline-flex items-center gap-1.5">
-                        <x-heroicon-m-cloud-arrow-up class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Sync') }}
-                    </span>
-                    <span wire:loading wire:target="syncSupervisor" class="inline-flex items-center gap-1.5 whitespace-nowrap">
-                        <x-spinner variant="forest" size="sm" />
-                        {{ __('Working…') }}
-                    </span>
-                </button>
-                <button
-                    type="button"
-                    wire:click="openCreateDaemonModal"
-                    @disabled($supervisor_installed !== true)
-                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Add program') }}
-                </button>
-            </div>
-        </div>
-        {{-- Description — full width below the row --}}
-        <p class="mt-3 text-sm leading-relaxed text-brand-moss">{{ __('Add a new Supervisor program or edit / start / stop / restart / delete an existing one. Sync afterwards to apply changes on the server.') }}</p>
-    </div>
+    {{-- Dense head: the icon-badge + "LIBRARY" eyebrow + title + full-width
+         description stack stood taller than a program row. Count becomes the
+         pill, the description the note, and the five actions ride the slot. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-rectangle-stack"
+        :title="$contextSiteModel ? __('Programs for this site') : __('Programs on this server')"
+        :count="$programsTotal > 0 ? (string) $programsTotal : null"
+        :note="__('Add a new Supervisor program or edit / start / stop / restart / delete an existing one. Sync afterwards to apply changes on the server.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <button
+                type="button"
+                wire:click="loadProgramStatuses"
+                wire:loading.attr="disabled"
+                wire:target="loadProgramStatuses"
+                @disabled($supervisor_installed !== true)
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Refresh') }}
+            </button>
+            <button
+                type="button"
+                wire:click="runPreflightPathCheck"
+                wire:loading.attr="disabled"
+                wire:target="runPreflightPathCheck"
+                @disabled($supervisor_installed !== true)
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                <x-heroicon-m-folder class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Path check') }}
+            </button>
+            <button
+                type="button"
+                wire:click="openConfirmActionModal(
+                    'restartAllPrograms',
+                    [true],
+                    @js(__('Restart all programs')),
+                    @js($restartAllConfirmMessage !== '' ? $restartAllConfirmMessage : __('Restart every active Supervisor program on this server. In-flight jobs will be interrupted.')),
+                    @js(__('Restart all')),
+                    true
+                )"
+                wire:loading.attr="disabled"
+                wire:target="restartAllPrograms"
+                @disabled($supervisor_installed !== true)
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                <span wire:loading.remove wire:target="restartAllPrograms" class="inline-flex items-center gap-1">
+                    <x-heroicon-m-arrow-path-rounded-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Restart all') }}
+                </span>
+                <span wire:loading wire:target="restartAllPrograms" class="inline-flex items-center gap-1 whitespace-nowrap">
+                    <x-spinner variant="forest" size="sm" />
+                    {{ __('Working…') }}
+                </span>
+            </button>
+            <button
+                type="button"
+                wire:click="openConfirmActionModal(
+                    'syncSupervisor',
+                    [],
+                    @js(__('Sync Supervisor')),
+                    @js(__('Write all active program configs to the server and run supervisorctl update. Programs added or removed since the last sync will be picked up.')),
+                    @js(__('Sync')),
+                    false
+                )"
+                wire:loading.attr="disabled"
+                wire:target="syncSupervisor"
+                @disabled($supervisor_installed !== true)
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                <span wire:loading.remove wire:target="syncSupervisor" class="inline-flex items-center gap-1">
+                    <x-heroicon-m-cloud-arrow-up class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Sync') }}
+                </span>
+                <span wire:loading wire:target="syncSupervisor" class="inline-flex items-center gap-1 whitespace-nowrap">
+                    <x-spinner variant="forest" size="sm" />
+                    {{ __('Working…') }}
+                </span>
+            </button>
+            <button
+                type="button"
+                wire:click="openCreateDaemonModal"
+                @disabled($supervisor_installed !== true)
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Add program') }}
+            </button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     @if ($contextSiteModel)
         <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">
@@ -162,21 +155,24 @@
     @endif
 
     @if ($server->supervisorPrograms->isEmpty())
-        <div class="px-6 py-12 text-center sm:px-7">
-            <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                <x-heroicon-o-cpu-chip class="h-6 w-6" aria-hidden="true" />
+        {{-- Empty state on one line: with the head above already carrying an
+             "Add program" button, the centred 12/py-12 tile was the tallest
+             block on a server that has nothing to show. --}}
+        <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-4 py-6 text-center sm:px-5">
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
             </span>
-            <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('No programs yet') }}</p>
-            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+            <p class="text-xs text-brand-moss">
+                <span class="font-semibold text-brand-ink">{{ __('No programs yet.') }}</span>
                 {{ __('Add one, then sync to write configs and reload Supervisor.') }}
             </p>
             <button
                 type="button"
                 wire:click="openCreateDaemonModal"
                 @disabled($supervisor_installed !== true)
-                class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2.5 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
             >
-                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Add program') }}
             </button>
         </div>

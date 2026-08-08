@@ -9,7 +9,15 @@
                  $unit, $pill, $version, $actionTriad, $isBlocked,
                  $blockerReason, $hasControls) are set in the dispatcher
                  (engine-panel.blade.php) so every sub-partial sees them. --}}
-            <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])" scroll class="w-full">
+            {{-- Padded wrapper + neutral strip, same as every other workspace tab
+                 row. Without it the sub-tabs sat flush against the card edges
+                 (this strip was the only one carrying its own border/bg box). --}}
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+            <x-server-workspace-tablist
+                :aria-label="__(':engine workspace sections', ['engine' => $info['label']])"
+                scroll
+                bare class="!mb-0 w-full"
+            >
                 <x-server-workspace-tab
                     :id="'ws-subtab-'.$key.'-overview'"
                     :active="$engine_subtab === 'overview'"
@@ -154,3 +162,4 @@
                     {{ __('Info') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
+            </div>

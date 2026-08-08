@@ -15,33 +15,29 @@
 --}}
 {{-- Nested strip inside the Access graph workspace card (not a second page card). --}}
 <section class="border-b border-brand-ink/10">
-    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access map') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Who can act on this box, and as whom') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('SSH key sources authenticate as a Linux account; each account owns the sites, worker processes, and cron jobs that run as it. Hover a node to trace its connections.') }}
-                </p>
-            </div>
-        </div>
-    </div>
+    {{-- Dense head, matching the rest of the workspace. The eyebrow said "Access
+         map" while the h2 asked the question, so the label becomes the title and
+         the question folds into the note. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-share"
+        :title="__('Access map')"
+        :note="__('Who can act on this box, and as whom. Key sources authenticate as a Linux account; each account owns the sites, workers, and cron jobs that run as it. Hover a node to trace its connections.')"
+        class="border-b border-brand-ink/10"
+    />
 
     @if (! ($map['has_data'] ?? false))
-        <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-            <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
-                <x-heroicon-o-share class="h-6 w-6" />
+        <div class="flex flex-col items-center justify-center gap-1.5 px-6 py-8 text-center sm:px-8">
+            <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss">
+                <x-heroicon-o-share class="h-4 w-4" />
             </span>
-            <p class="text-sm font-medium text-brand-ink">{{ __('No access paths to map yet.') }}</p>
-            <p class="text-xs text-brand-moss">{{ __('Once authorized keys are synced, their accounts and workloads appear here.') }}</p>
+            <p class="text-xs font-semibold text-brand-ink">{{ __('No access paths to map yet.') }}</p>
+            <p class="text-[11px] text-brand-moss">{{ __('Once authorized keys are synced, their accounts and workloads appear here.') }}</p>
         </div>
     @else
-        <div class="px-4 py-6 sm:px-6" x-data="{ hot: null }">
+        <div class="px-4 py-4 sm:px-5" x-data="{ hot: null }">
             {{-- Column headers --}}
-            <div class="mb-3 grid grid-cols-3 gap-2 text-center">
+            <div class="mb-2 grid grid-cols-3 gap-2 text-center">
                 <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['sources'] }}</p>
                 <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['accounts'] }}</p>
                 <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $map['columns']['workloads'] }}</p>

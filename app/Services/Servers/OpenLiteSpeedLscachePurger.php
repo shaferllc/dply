@@ -9,7 +9,7 @@ use App\Services\SshConnection;
 
 /**
  * Purge server-level LiteSpeed Cache storage. Mirrors managed-panel "purge
- * all" actions (RunCloud-style) without requiring the WordPress LSCache plugin.
+ * all" actions without requiring the WordPress LSCache plugin.
  */
 class OpenLiteSpeedLscachePurger
 {

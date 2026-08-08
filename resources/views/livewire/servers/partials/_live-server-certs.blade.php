@@ -14,48 +14,69 @@
     $liveCertsDescription ??= __('Actual certs on disk — including Caddy automatic-HTTPS certs that aren\'t in the managed records — with real expiry from openssl.');
     $liveCertsWrapperClass ??= 'dply-card overflow-hidden';
 @endphp
+@php
+    // Head tone + count pill track the worst urgency once the sweep lands, so
+    // an expiring cert is visible without opening the table.
+    $liveCertsHeadCounts = ['expired' => 0, 'danger' => 0, 'warn' => 0, 'ok' => 0, 'unknown' => 0];
+    foreach (($liveCertsLoaded ? $liveCerts : []) as $liveCertRow) {
+        $liveCertsHeadUrgency = (string) ($liveCertRow['urgency'] ?? 'unknown');
+        $liveCertsHeadCounts[$liveCertsHeadUrgency] = ($liveCertsHeadCounts[$liveCertsHeadUrgency] ?? 0) + 1;
+    }
+    $liveCertsHeadTone = match (true) {
+        $liveCertsHeadCounts['expired'] > 0 => 'danger',
+        $liveCertsHeadCounts['danger'] > 0 || $liveCertsHeadCounts['warn'] > 0 => 'amber',
+        default => null,
+    };
+@endphp
 <section class="{{ $liveCertsWrapperClass }}" wire:init="loadLiveCerts">
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-        <div class="min-w-0">
-            <h3 class="text-sm font-semibold text-brand-ink">{{ $liveCertsTitle }}</h3>
-            <p class="mt-0.5 text-xs text-brand-moss">
-                {{ $liveCertsDescription }}
-                @if ($liveCertsScannedAtIso)
-                    <span class="ml-1 text-brand-mist">· {{ __('Scanned :time', ['time' => \Illuminate\Support\Carbon::parse($liveCertsScannedAtIso)->diffForHumans()]) }}</span>
-                @endif
-            </p>
-        </div>
-        <button
-            type="button"
-            wire:click="refreshLiveCerts"
-            wire:loading.attr="disabled"
-            wire:target="refreshLiveCerts,loadLiveCerts"
-            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
-        >
-            <span wire:loading.remove wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
-                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
-            </span>
-            <span wire:loading wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
-                <x-spinner class="h-4 w-4" />
-            </span>
-            {{ __('Rescan') }}
-        </button>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-lock-closed"
+        :title="$liveCertsTitle"
+        :tone="$liveCertsHeadTone"
+        :count="$liveCertsLoaded && $liveCerts !== []
+            ? trans_choice('{1} :count cert|[2,*] :count certs', count($liveCerts), ['count' => count($liveCerts)])
+            : null"
+        :note="$liveCertsDescription
+            .($liveCertsScannedAtIso ? ' '.__('Scanned :time', ['time' => \Illuminate\Support\Carbon::parse($liveCertsScannedAtIso)->diffForHumans()]) : '')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <button
+                type="button"
+                wire:click="refreshLiveCerts"
+                wire:loading.attr="disabled"
+                wire:target="refreshLiveCerts,loadLiveCerts"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+            >
+                <span wire:loading.remove wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
+                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </span>
+                <span wire:loading wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
+                    <x-spinner class="h-3.5 w-3.5" />
+                </span>
+                {{ __('Rescan') }}
+            </button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     @if ($liveCertsError)
-        <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-7">{{ $liveCertsError }}</div>
+        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-rose-200 bg-rose-50/70 px-4 py-2 text-[11px] text-rose-900 sm:px-5">
+            <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {{ $liveCertsError }}
+        </p>
     @endif
 
     @if ($liveCertsTimedOut)
         {{-- Poll budget exhausted (no result cached in time — usually a stopped worker).
              Stop spinning and offer an explicit retry instead of polling forever. --}}
-        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
-            <x-heroicon-o-clock class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
-            <p class="mt-2 font-medium text-brand-ink">{{ __('Scan didn\'t return in time') }}</p>
+        <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
+            <x-heroicon-o-clock class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
+            <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Scan didn\'t return in time') }}</p>
             <p class="mt-1">{{ __('The certificate scan was queued but no result came back. The scan worker may be busy or offline.') }}</p>
             @if (! empty($liveCertsProgress))
                 {{-- Show how far the sweep got before the poll budget ran out. --}}
-                <div class="mx-auto mt-4 max-h-40 max-w-xl overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 text-left font-mono text-[11px] leading-relaxed text-brand-ink/70">
+                <div class="mx-auto mt-3 max-h-40 max-w-xl overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 text-left font-mono text-[11px] leading-relaxed text-brand-ink/70">
                     @foreach ($liveCertsProgress as $entry)
                         <div class="break-all">{{ $entry['line'] ?? '' }}</div>
                     @endforeach
@@ -66,33 +87,56 @@
                 wire:click="refreshLiveCerts"
                 wire:loading.attr="disabled"
                 wire:target="refreshLiveCerts"
-                class="mt-4 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                class="mt-3 inline-flex h-7 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
             >
-                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Retry scan') }}
             </button>
         </div>
     @elseif (! $liveCertsLoaded)
         {{-- Scanning: poll until the job caches a result (or the budget runs out and
              pollLiveCerts flips to the timed-out state above). The worker's captured
-             frames are replayed once the result lands (below), so this stays a simple
-             spinner — a ~1.7s scan is too fast to animate via polling anyway. --}}
-        <div class="px-6 py-8 sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
-            <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
-                <x-spinner class="h-4 w-4" /> {{ __('Scanning certificates on the server…') }}
-            </span>
+             frames are replayed once the result lands (below), so the progress
+             itself isn't animated here — a ~1.7s scan is too fast to animate via
+             polling anyway. Just the status line and a stub of the table. --}}
+        <div @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif aria-busy="true" aria-live="polite">
+            @php $bar = 'animate-pulse rounded bg-brand-ink/10'; @endphp
+            <p class="flex items-center gap-2 border-b border-brand-ink/10 px-4 py-2 text-[11px] text-brand-moss sm:px-5">
+                <x-spinner class="h-3.5 w-3.5 shrink-0" />
+                {{ __('Scanning certificates on the server…') }}
+            </p>
+            {{-- Stub the result table rather than leaving the card empty under
+                 the spinner — the sweep lands into exactly this shape. --}}
+            <div class="px-4 py-3.5 sm:px-5" aria-hidden="true">
+                <div class="overflow-hidden rounded-xl border border-brand-ink/10">
+                    <div class="flex items-center gap-3 bg-brand-sand/30 px-3 py-2">
+                        @foreach ([28, 20, 18, 12, 14] as $width)
+                            <span class="h-2 shrink-0 {{ $bar }}" style="width: {{ $width * 4 }}px;"></span>
+                        @endforeach
+                    </div>
+                    <div class="divide-y divide-brand-ink/5 bg-white">
+                        @foreach (range(1, 4) as $row)
+                            <div class="flex items-center gap-3 px-3 py-2">
+                                @foreach ([28, 20, 18, 12, 14] as $width)
+                                    <span class="h-2.5 shrink-0 {{ $bar }}" style="width: {{ $width * 4 }}px;"></span>
+                                @endforeach
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
         </div>
     @else
         {{-- Replay the worker's captured frames, then fade in the result — so the
              steps are always visible no matter how fast the scan finished. --}}
         <x-replay-log :frames="$liveCertsProgress">
             @if ($liveCertsUnreadable)
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
                     {{ __('Could not run the cert scan over SSH. Check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
                 </div>
             @elseif (empty($liveCerts))
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
-                    <x-heroicon-o-shield-check class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
+                    <x-heroicon-o-shield-check class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
                     <p class="mt-2">{{ __('No server certificates found under the scanned paths.') }}</p>
                 </div>
             @else
@@ -103,7 +147,7 @@
                 $liveUrgencyCounts[$u] = ($liveUrgencyCounts[$u] ?? 0) + 1;
             }
         @endphp
-        <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-6 py-3 text-[11px] sm:px-7">
+        <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-[11px] sm:px-5">
             <span class="text-brand-moss">{{ __(':n cert(s)', ['n' => count($liveCerts)]) }}</span>
             @if ($liveUrgencyCounts['expired'] > 0)
                 <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">

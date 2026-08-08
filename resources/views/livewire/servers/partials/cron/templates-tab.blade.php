@@ -10,19 +10,15 @@
 
 @if (! empty($bundledCronJobs))
     <div class="{{ $card }}">
-        <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-            <x-icon-badge>
-                <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Templates') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Built-in bundles') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('One-click starters for things people normally schedule. Each adds rows to the Jobs tab — review and edit (paths/domains), then sync the crontab.') }}
-                </p>
-            </div>
-        </div>
-        <div class="grid gap-3 px-6 py-5 sm:grid-cols-2 sm:px-8 lg:grid-cols-3">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-sparkles"
+            :title="__('Built-in bundles')"
+            :count="(string) count($bundledCronJobs)"
+            :note="__('One-click starters for things people normally schedule. Each adds rows to the Jobs tab — review and edit (paths/domains), then sync the crontab.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="grid gap-2 px-4 py-3.5 sm:grid-cols-2 sm:px-5 lg:grid-cols-3">
             @foreach ($bundledCronJobs as $bundleKey => $bundle)
                 <div class="flex flex-col gap-3 rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
                     <div class="flex min-w-0 items-start justify-between gap-2">
@@ -74,18 +70,14 @@
 @endif
 
 <div class="{{ $card }}">
-    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <x-icon-badge>
-            <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Templates') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization templates') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('Reusable cron recipes saved for your team. Click Apply to load one into the Add Cron Job form on the Jobs tab — review and save to install it on this server.') }}
-            </p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-document-duplicate"
+        :title="__('Organization templates')"
+        :count="$orgCronTemplates->isEmpty() ? null : (string) $orgCronTemplates->count()"
+        :note="__('Reusable cron recipes saved for your team. Click Apply to load one into the Add Cron Job form on the Jobs tab — review and save to install it on this server.')"
+        class="border-b border-brand-ink/10"
+    />
 
     @if ($orgCronTemplates->isEmpty())
         <p class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">

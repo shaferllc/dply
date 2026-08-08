@@ -32,7 +32,7 @@
         />
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Settings categories')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Settings categories')" scroll bare class="!mb-0 w-full">
                 @foreach ($tabs as $slug => $meta)
                     <x-server-workspace-tab
                         as="a"

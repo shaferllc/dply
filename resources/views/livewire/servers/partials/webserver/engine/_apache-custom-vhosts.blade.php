@@ -4,22 +4,28 @@
                     class="space-y-4 mb-6"
                     wire:key="apache-custom-vhosts-config"
                 >
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom Apache vhosts') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">
-                                    {{ __('Add ad-hoc VirtualHost blocks as `dply-custom-*.conf` under sites-available. Dply-managed site vhosts are provisioned separately — use this for standalone hostnames, legacy configs, or quick tests.') }}
-                                </p>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
+                    {{-- Panel chrome matches the other engine sub-tabs: the shared
+                         dense head (icon + title + truncated note + actions) rather
+                         than a hand-rolled h3 + prose block inside p-8, which made
+                         this the only card in the workspace with its own header
+                         metric. Body padding is the standard px-4 py-3.5. --}}
+                    <div class="{{ $card }} overflow-hidden">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-server-stack"
+                            :title="__('Custom Apache vhosts')"
+                            :count="$apache_custom_vhosts_loaded ? (string) count($apache_custom_vhosts_form) : null"
+                            :note="__('Add ad-hoc VirtualHost blocks as `dply-custom-*.conf` under sites-available. dply-managed site vhosts are provisioned separately — use this for standalone hostnames, legacy configs, or quick tests.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot:actions>
                                 <button
                                     type="button"
                                     wire:click="openAddApacheCustomVhostForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-plus class="h-4 w-4" />
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
                                     {{ __('Add vhost') }}
                                 </button>
                                 <button
@@ -27,30 +33,43 @@
                                     wire:click="loadApacheCustomVhostsConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadApacheCustomVhostsConfig"
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadApacheCustomVhostsConfig" class="inline-flex">
-                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
                                     </span>
                                     <span wire:loading wire:target="loadApacheCustomVhostsConfig" class="inline-flex">
-                                        <x-spinner class="h-4 w-4" />
+                                        <x-spinner class="h-3.5 w-3.5" />
                                     </span>
                                     {{ __('Reload from server') }}
                                 </button>
-                            </div>
-                        </div>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
 
+                        @php
+                            // Once the vhosts are loaded and non-empty their editor
+                            // cards render below this panel, so the body here can be
+                            // genuinely empty — don't paint a bare padded strip
+                            // under the head in that case.
+                            $customVhostsHasBody = $apache_custom_vhosts_flash
+                                || $apache_custom_vhosts_error
+                                || $apache_custom_vhosts_show_add
+                                || ! $apache_custom_vhosts_loaded
+                                || $apache_custom_vhosts_form === [];
+                        @endphp
+                        @if ($customVhostsHasBody)
+                        <div class="px-4 py-3.5 sm:px-5">
                         @if ($apache_custom_vhosts_flash)
-                            <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $apache_custom_vhosts_flash }}</div>
+                            <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $apache_custom_vhosts_flash }}</div>
                         @endif
                         @if ($apache_custom_vhosts_error)
-                            <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                            <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
                                 <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $apache_custom_vhosts_error }}</pre>
                             </div>
                         @endif
 
                         @if ($apache_custom_vhosts_show_add)
-                            <form wire:submit.prevent="submitAddApacheCustomVhost" class="mt-5 rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4 sm:p-5">
+                            <form wire:submit.prevent="submitAddApacheCustomVhost" class="rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4 sm:p-5">
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('Add custom vhost') }}</p>
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Creates sites-available/dply-custom-{slug}.conf, symlinks it into sites-enabled, validates with apachectl configtest, and reloads Apache.') }}</p>
 
@@ -89,17 +108,64 @@
                             </form>
                         @endif
 
+                        {{-- Not-yet-loaded and loaded-but-empty are different states
+                             and now look it: the first is an unread panel you
+                             prompt into loading, the second a real empty result.
+                             Both were flat sentences hanging off the card before. --}}
                         @if (! $apache_custom_vhosts_loaded)
-                            <p class="mt-5 text-sm text-brand-moss">
-                                <span wire:loading wire:target="loadApacheCustomVhostsConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-4 w-4" /> {{ __('Reading custom vhost files…') }}
-                                </span>
-                                <span wire:loading.remove wire:target="loadApacheCustomVhostsConfig">
-                                    {{ __('Click "Reload from server" to fetch custom vhosts, or add one above.') }}
-                                </span>
-                            </p>
+                            {{-- .block, not bare wire:loading — Livewire's default
+                                 reveal is inline-block, which shrink-wraps the
+                                 empty state to its text width. --}}
+                            <div wire:loading.block wire:target="loadApacheCustomVhostsConfig" class="@if ($apache_custom_vhosts_show_add) mt-4 @endif">
+                                <x-empty-state
+                                    compact
+                                    icon="heroicon-o-arrow-path"
+                                    :title="__('Reading custom vhost files…')"
+                                    :description="__('Fetching sites-available/dply-custom-*.conf from the server.')"
+                                />
+                            </div>
+                            <div wire:loading.remove wire:target="loadApacheCustomVhostsConfig" class="@if ($apache_custom_vhosts_show_add) mt-4 @endif">
+                                <x-empty-state
+                                    compact
+                                    icon="heroicon-o-server-stack"
+                                    :title="__('Custom vhosts not loaded yet')"
+                                    :description="__('Reading vhost files runs over SSH, so it isn\'t done automatically. Reload from the server to see what\'s there, or add a new vhost.')"
+                                >
+                                    <x-slot:actions>
+                                        <button
+                                            type="button"
+                                            wire:click="loadApacheCustomVhostsConfig"
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        >
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                            {{ __('Reload from server') }}
+                                        </button>
+                                    </x-slot:actions>
+                                </x-empty-state>
+                            </div>
                         @elseif ($apache_custom_vhosts_form === [])
-                            <p class="mt-5 text-sm text-brand-moss">{{ __('No custom vhosts yet — add one above or create a site from the Sites workspace.') }}</p>
+                            <div class="@if ($apache_custom_vhosts_show_add) mt-4 @endif">
+                                <x-empty-state
+                                    compact
+                                    icon="heroicon-o-server-stack"
+                                    :title="__('No custom vhosts')"
+                                    :description="__('Nothing matches dply-custom-*.conf on this server. Add one above, or create a site from the Sites workspace to have its vhost provisioned for you.')"
+                                >
+                                    <x-slot:actions>
+                                        <button
+                                            type="button"
+                                            wire:click="openAddApacheCustomVhostForm"
+                                            @disabled($isDeployer || $actionInFlight)
+                                            class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <x-heroicon-o-plus class="h-4 w-4" />
+                                            {{ __('Add vhost') }}
+                                        </button>
+                                    </x-slot:actions>
+                                </x-empty-state>
+                            </div>
+                        @endif
+                        </div>
                         @endif
                     </div>
 

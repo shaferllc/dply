@@ -7,31 +7,31 @@
 @endphp
 
 <div class="{{ $card }}">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-6">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Alerts') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver alerts') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s webserver events — engine switches, rollbacks, and config saves. Each row binds one channel to one event.') }}
-                </p>
-            </div>
-        </div>
-        <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
-            {{ __('Manage in Settings') }}
-            <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0" aria-hidden="true" />
-        </x-secondary-button>
-    </div>
+    {{-- Dense head with the escape hatch in the actions slot, matching the
+         other workspace Notifications tabs. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-bell"
+        :title="__('Webserver alerts')"
+        :count="trans_choice('{0} none routed|{1} :count route|[2,*] :count routes', $notifSubscriptions->count(), ['count' => $notifSubscriptions->count()])"
+        :note="__('Route a notification channel (email, Slack, Discord, webhook…) to this server\'s webserver events — engine switches, rollbacks, and config saves. Each row binds one channel to one event.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <x-secondary-button size="sm" href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="shrink-0 whitespace-nowrap">
+                {{ __('Manage in Settings') }}
+                <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            </x-secondary-button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="border-b border-brand-ink/10 px-5 py-3.5 text-sm leading-relaxed text-brand-moss sm:px-6">
+    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-4 py-2.5 text-xs leading-relaxed text-brand-moss sm:px-5">
+        <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
         <p>{{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry whenever the webserver engine is switched (or the switch fails or is reverted) or a config file is saved — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}</p>
     </div>
 
     {{-- Current subscriptions --}}
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-4 py-3.5 sm:px-5">
         @if ($subscriptionsByChannel->isEmpty())
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
@@ -72,10 +72,10 @@
     </div>
 
     {{-- Add subscription --}}
-    <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
+    <div class="border-t border-brand-ink/10 px-4 py-3.5 sm:px-5">
         <p class="text-sm font-medium text-brand-ink">{{ __('Add a channel') }}</p>
-        <form wire:submit="addWebserverNotificationSubscription" class="mt-4 space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
+        <form wire:submit="addWebserverNotificationSubscription" class="mt-3 space-y-3">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="ws-notif-channel" value="{{ __('Channel') }}" />
                     <select

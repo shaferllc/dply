@@ -89,7 +89,7 @@
         </x-slot:stats>
 
         <x-slot:tabs>
-            <x-server-workspace-tablist :aria-label="__('Settings sections')" class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Settings sections')" bare class="!mb-0 w-full">
                 <x-server-workspace-tab
                     as="a"
                     :href="route('settings.profile')"

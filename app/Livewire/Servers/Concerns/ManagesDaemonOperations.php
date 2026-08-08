@@ -28,6 +28,20 @@ trait ManagesDaemonOperations
     }
 
     /**
+     * Explicit setter for the Sync sub-tabs, so they have a concrete wire:target.
+     *
+     * These used to call the magic `$set('daemons_sync_subtab', …)`, which
+     * `wire:target` cannot match — so the sub-tab's own inline spinner never
+     * fired and there was nothing to hang a loading skeleton off. The panel just
+     * vanished for the length of the round-trip.
+     */
+    public function setDaemonsSyncSubtab(string $subtab): void
+    {
+        $allowed = ['preview', 'drift', 'output'];
+        $this->daemons_sync_subtab = in_array($subtab, $allowed, true) ? $subtab : 'preview';
+    }
+
+    /**
      * Whether this site can use Dply-managed Supervisor on the VM.
      */
     protected function siteSupportsVmManagedDaemons(Site $site): bool

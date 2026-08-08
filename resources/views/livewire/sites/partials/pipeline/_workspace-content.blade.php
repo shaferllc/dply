@@ -58,7 +58,7 @@
         :aria-label="__('Pipeline sections')"
         :scroll="$nested"
         @class([
-            '!mb-0 w-full border-0 bg-transparent p-0 shadow-none' => $nested,
+            '!mb-0 w-full' => $nested,
         ])
     >
         @foreach ($pipelineTabs as $tabId => $tabLabel)

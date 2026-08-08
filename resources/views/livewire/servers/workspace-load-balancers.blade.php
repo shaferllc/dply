@@ -45,7 +45,7 @@
     {{-- In-page sub-tabs: the load-balancer list vs. notification routing for this
          server's load_balancer.* events. Mirrors the system-users page. --}}
     <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-        <x-server-workspace-tablist :aria-label="__('Load balancer sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+        <x-server-workspace-tablist :aria-label="__('Load balancer sections')" scroll bare class="!mb-0 w-full">
             <x-server-workspace-tab icon="heroicon-o-arrows-right-left" :active="$lb_workspace_tab === 'load_balancers'" wire:click="setLbWorkspaceTab('load_balancers')">
                 {{ __('Load balancers') }}
             </x-server-workspace-tab>
@@ -55,7 +55,22 @@
         </x-server-workspace-tablist>
     </div>
 
-    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'load_balancers'])>
+    {{-- Skeleton while a tab switch is in flight. Both panels are rendered and
+         toggled with `hidden`, so the swap still costs a round trip with no
+         feedback until the response lands.
+
+         Same shape as the firewall strip: wire:loading.block (bare wire:loading
+         reveals as inline-block and shrink-wraps), a stable outer wrapper
+         carrying the directive, and the tab key on an inner div so a morph can't
+         orphan the previous tab's subtree outside the hidden element. --}}
+    <div wire:loading.block wire:target="setLbWorkspaceTab" aria-busy="true" aria-live="polite">
+        <span class="sr-only">{{ __('Loading section…') }}</span>
+        <div wire:key="lb-skeleton-{{ $lb_workspace_tab }}">
+            @include('livewire.servers.partials.load-balancers._tab-skeleton', ['tab' => $lb_workspace_tab])
+        </div>
+    </div>
+
+    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'load_balancers']) wire:loading.remove wire:target="setLbWorkspaceTab">
 
         {{-- ─── SECTION HEADER (always shown) ──────────────────────────────── --}}
         <section class="border-b border-brand-ink/10">
@@ -248,7 +263,7 @@
 
     </div>
 
-    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'notifications'])>
+    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'notifications']) wire:loading.remove wire:target="setLbWorkspaceTab">
         @include('livewire.servers.partials.load-balancers.notifications-tab')
     </div>
     </section>

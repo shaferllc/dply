@@ -9,27 +9,26 @@
 
         @if ($activeInfo !== null)
             <div class="{{ $card }}">
-                {{-- Engine header — icon + label + version + status pill, all
-                     more prominent than the old inline arrangement. --}}
-                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10">
-                            <x-dynamic-component :component="$activeInfo['icon']" class="h-5 w-5 text-brand-forest" />
-                        </div>
-                        <div class="min-w-0">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ $activeInfo['label'] }}</h3>
-                            @if ($activeVersion !== '')
-                                <p class="font-mono text-[11px] text-brand-mist">{{ $activeVersion }}</p>
-                            @endif
-                        </div>
-                    </div>
+                {{-- Engine head — dense, like every other panel head in the
+                     workspace: icon + engine, version as the count pill, the
+                     systemd state pill riding the actions slot. --}}
+                <x-workspace-panel-head
+                    dense
+                    :icon="$activeInfo['icon']"
+                    :title="$activeInfo['label']"
+                    :count="$activeVersion !== '' ? $activeVersion : null"
+                    :note="__('Active on port :port. Lifecycle actions below act on this engine.', ['port' => 80])"
+                    class="border-b border-brand-ink/10"
+                >
                     @if ($activeUnit !== null)
-                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $activePill['classes'] }}">
-                            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $activePill['dot'] }}"></span>
-                            {{ $activePill['label'] }}
-                        </span>
+                        <x-slot:actions>
+                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $activePill['classes'] }}">
+                                <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $activePill['dot'] }}"></span>
+                                {{ $activePill['label'] }}
+                            </span>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-workspace-panel-head>
 
                 @if ($opsReady && ! $isDeployer && ! empty($activeLifecycleGroups))
                     {{-- Lifecycle action groups in sub-cards. Each group gets
@@ -54,15 +53,15 @@
                                 ));
                             @endphp
                             @if (! empty($visibleRows))
-                            <div class="bg-white px-6 py-4 sm:px-8">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="bg-white px-4 py-3 sm:px-5">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div class="min-w-0">
                                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
                                         @if ($header['sub'] !== '')
-                                            <p class="mt-0.5 text-[12px] text-brand-mist">{{ $header['sub'] }}</p>
+                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ $header['sub'] }}</p>
                                         @endif
                                     </div>
-                                    <div class="flex flex-wrap gap-2">
+                                    <div class="flex flex-wrap gap-1.5">
                                         @foreach ($visibleRows as [$actionKey, $dangerous])
                                             @if (! empty($serviceActions[$actionKey]))
                                                 @php $action = $serviceActions[$actionKey]; @endphp
@@ -86,13 +85,13 @@
                                  quieter than the lifecycle rows above (the buttons
                                  lose their drop shadow + sit in a tinted bg) so it
                                  doesn't compete with the lifecycle group hierarchy. --}}
-                            <div class="bg-brand-sand/15 px-6 py-4 sm:px-8">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="bg-brand-sand/15 px-4 py-3 sm:px-5">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div class="min-w-0">
                                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
-                                        <p class="mt-0.5 text-[12px] text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Read-only diagnostics — version, config dumps, module list, etc.') }}</p>
                                     </div>
-                                    <div class="flex flex-wrap gap-2">
+                                    <div class="flex flex-wrap gap-1.5">
                                         @foreach ($activeCliTools as [$actionKey, $dangerous])
                                             @if (! empty($serviceActions[$actionKey]))
                                                 @php $action = $serviceActions[$actionKey]; @endphp
@@ -114,31 +113,31 @@
             </div>
         @endif
 
-        <div class="grid gap-2 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-2 sm:px-6">
+        <div class="grid gap-2 border-b border-brand-ink/10 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
             <button
                 type="button"
                 wire:click="setWorkspaceTab('change')"
-                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
             >
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">
                     <span class="block text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Change webserver') }}</span>
-                    <span class="mt-1 block text-[13px] leading-5 text-brand-moss">{{ __('Switch nginx, Caddy, Apache, or OpenLiteSpeed on port :80.', ['port' => 80]) }}</span>
+                    <span class="mt-0.5 block text-[12px] leading-5 text-brand-moss">{{ __('Switch nginx, Caddy, Apache, or OpenLiteSpeed on port :80.', ['port' => 80]) }}</span>
                 </span>
             </button>
             <a
                 href="{{ route('servers.edge-proxy', $server) }}"
                 wire:navigate
-                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 transition hover:border-brand-forest/30 hover:bg-brand-sand/30"
             >
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">
                     <span class="block text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Edge proxy') }}</span>
-                    <span class="mt-1 block text-[13px] leading-5 text-brand-moss">
+                    <span class="mt-0.5 block text-[12px] leading-5 text-brand-moss">
                         @if ($activeEdgeProxy !== null)
                             {{ __(':name is routing :80 — open controls or remove.', ['name' => $edgeProxyCatalog[$activeEdgeProxy]['label'] ?? ucfirst($activeEdgeProxy), 'port' => 80]) }}
                         @else
@@ -150,21 +149,21 @@
             <button
                 type="button"
                 wire:click="setWorkspaceTab('health')"
-                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30 sm:col-span-2"
+                class="group flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 text-left transition hover:border-brand-forest/30 hover:bg-brand-sand/30 sm:col-span-2"
             >
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-forest ring-1 ring-brand-ink/10">
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span class="min-w-0">
                     <span class="block text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Health checks') }}</span>
-                    <span class="mt-1 block text-[13px] leading-5 text-brand-moss">{{ __('TLS inventory, site smoke tests, and config drift against dply templates.') }}</span>
+                    <span class="mt-0.5 block text-[12px] leading-5 text-brand-moss">{{ __('TLS inventory, site smoke tests, and config drift against dply templates.') }}</span>
                 </span>
             </button>
         </div>
 
         @if ($activeInfo !== null)
-            <div class="{{ $card }} px-5 py-4 sm:px-6">
-                <p class="text-sm text-brand-moss">
+            <div class="{{ $card }} px-4 py-2.5 sm:px-5">
+                <p class="text-xs text-brand-moss">
                     {{ __('Deep config, logs, and live-state inspectors for :engine live on the :engine tab.', ['engine' => $activeInfo['label']]) }}
                     <button type="button" wire:click="setWorkspaceTab('{{ $activeWebserver }}')" class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">
                         {{ __('Open :engine workspace', ['engine' => $activeInfo['label']]) }}

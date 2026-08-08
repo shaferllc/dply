@@ -1,25 +1,27 @@
-        <div class="{{ $card }} px-5 py-5 sm:px-6">
-            <div class="max-w-2xl">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Switch webserver') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('One webserver per box. Switching reprovisions all sites under the new webserver — parallel install on :8080, then a brief service-swap to :80 (under 1 second blip).') }}
-                </p>
-            </div>
+        <div class="{{ $card }}">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-arrow-path"
+                :title="__('Switch webserver')"
+                :note="__('One webserver per box. Switching reprovisions all sites under the new webserver — parallel install on :8080, then a brief service-swap to :80 (under 1 second blip).')"
+                class="border-b border-brand-ink/10"
+            />
 
             @if ($inflightSwitch)
-                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
                     {{ __('A webserver switch is currently running. Switch buttons are disabled until it settles — watch the progress banner at the top of this page.') }}
-                </div>
+                </p>
             @endif
 
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-2 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
                 @foreach ($webserverCatalog as $key => $info)
                     @continue($key === $activeWebserver)
                     @php
                         $isBlocked = $preflight->isBlocked($server, $key);
                         $isComingSoon = ! empty($info['coming_soon']);
                     @endphp
-                    <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
+                    <div class="rounded-xl border border-brand-ink/10 bg-white p-3">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex min-w-0 items-start gap-2">
                                 <x-dynamic-component :component="$info['icon']" class="mt-0.5 h-5 w-5 shrink-0 text-brand-forest" />

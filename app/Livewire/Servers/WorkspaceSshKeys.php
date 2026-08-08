@@ -2,44 +2,30 @@
 
 namespace App\Livewire\Servers;
 
-use App\Jobs\PreviewDriftJob;
-use App\Jobs\SyncAuthorizedKeysJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\EmitsPanelEvent;
-use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\DeploysSharedKeys;
+use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesAuthorizedKeys;
 use App\Livewire\Servers\Concerns\ManagesSshKeyNotifications;
 use App\Livewire\Servers\Concerns\ManagesSshKeyProfile;
-use App\Livewire\Servers\Concerns\SyncsAuthorizedKeys;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use App\Livewire\Servers\Concerns\SyncsAuthorizedKeys;
 use App\Models\OrganizationSshKey;
 use App\Models\Server;
-use App\Models\ServerAuthorizedKey;
-use App\Models\ServerSshKeyAuditEvent;
 use App\Models\TeamSshKey;
 use App\Models\UserSshKey;
-use App\Modules\Notifications\Services\ServerSshKeyNotificationDispatcher;
-use App\Services\Servers\OrganizationTeamSshKeyServerDeployer;
-use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
-use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\Servers\SshKeyLabelTemplate;
 use App\Services\Servers\SshPublicKeyFingerprint;
-use App\Support\OpenSshEd25519KeyPairGenerator;
 use App\Support\Servers\SshKeysWorkspaceViewData;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Request;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -48,18 +34,35 @@ class WorkspaceSshKeys extends Component
 {
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
+    use DeploysSharedKeys;
     use EmitsPanelEvent;
     use HandlesServerRemovalFlow;
-    use DeploysSharedKeys;
     use InteractsWithServerWorkspace;
     use ManagesAuthorizedKeys;
     use ManagesSshKeyNotifications;
     use ManagesSshKeyProfile;
-    use SyncsAuthorizedKeys;
     use RendersWorkspacePlaceholder;
+    use SyncsAuthorizedKeys;
+
+    public const DEFAULT_TAB = 'keys';
+
+    /**
+     * The allow-list was duplicated in setSshWorkspaceTab() and render(); with
+     * ?tab= now reaching the property directly, both need the same guard.
+     *
+     * @var list<string>
+     */
+    public const TABS = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
+
+    public const ACTIVITY_PER_PAGE = 15;
 
     /** @var 'keys'|'preview'|'advanced'|'activity'|'notifications' */
-    public string $ssh_workspace_tab = 'keys';
+    #[Url(as: 'tab', except: self::DEFAULT_TAB, history: true)]
+    public string $ssh_workspace_tab = self::DEFAULT_TAB;
+
+    /** Audit-log page. Not #[Url]-bound: a page number is transient state that
+     *  shouldn't outlive the tab in a shared link. */
+    public int $activityPage = 1;
 
     public string $new_auth_name = '';
 
@@ -113,8 +116,16 @@ class WorkspaceSshKeys extends Component
 
     public function setSshWorkspaceTab(string $tab): void
     {
-        $allowed = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
-        $this->ssh_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'keys';
+        $this->ssh_workspace_tab = in_array($tab, self::TABS, true) ? $tab : self::DEFAULT_TAB;
+    }
+
+    /**
+     * Audit-log paging. render() clamps the upper bound (it's the only place
+     * that knows the total), so this just needs to stay >= 1.
+     */
+    public function setActivityPage(int $page): void
+    {
+        $this->activityPage = max(1, $page);
     }
 
     /**
@@ -128,7 +139,6 @@ class WorkspaceSshKeys extends Component
         $this->ssh_workspace_tab = 'notifications';
         $this->notif_channel_id = $channelId;
     }
-
 
     /**
      * Conditional gate for {@see syncAuthorizedKeys}. The explainer banner promises that the
@@ -157,27 +167,40 @@ class WorkspaceSshKeys extends Component
      *  the job died mid-flight without writing meta, or a deploy interrupted the run. */
     public const SYNC_STALE_THRESHOLD_SECONDS = 300;
 
-
     /**
      * Merged SSH keys card skeleton (hide-hero) so lazy load matches the page
      * instead of flashing a separate title card + generic pulses.
      */
     public function placeholder(): View
     {
+        // Required in every override: #[Lazy] renders this before #[Url] is
+        // applied, so without it a deep-linked ?tab=activity paints the Keys
+        // skeleton and then jumps.
+        $this->seedUrlPropertiesFromRequest();
+
         if ($this->server === null) {
             return view('livewire.servers.partials.workspace-placeholder-empty');
         }
 
+        // Passed as `skeletonTab`, deliberately NOT as `ssh_workspace_tab`:
+        // SupportLazyLoading regenerates this view from the component's own
+        // public properties, so a key that collides with one gets clobbered.
+        $tab = in_array($this->ssh_workspace_tab, self::TABS, true)
+            ? $this->ssh_workspace_tab
+            : self::DEFAULT_TAB;
+
         return view('livewire.servers.partials.workspace-ssh-keys-placeholder', [
             'server' => $this->server,
+            'skeletonTab' => $tab,
         ]);
     }
 
     public function render(): View
     {
-        $allowedTabs = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
-        if (! in_array($this->ssh_workspace_tab, $allowedTabs, true)) {
-            $this->ssh_workspace_tab = 'keys';
+        // ?tab= is user input now, so an unknown value lands here rather than
+        // being filtered by setSshWorkspaceTab().
+        if (! in_array($this->ssh_workspace_tab, self::TABS, true)) {
+            $this->ssh_workspace_tab = self::DEFAULT_TAB;
         }
 
         $tab = $this->ssh_workspace_tab;
@@ -226,8 +249,36 @@ class WorkspaceSshKeys extends Component
             }
         }
 
+        $activityPagination = null;
+
         if ($needsActivity) {
-            $auditEvents = $this->server->sshKeyAuditEvents()->with('user')->limit(100)->get();
+            // Was a flat limit(100): every switch to Activity rendered up to a
+            // hundred rows, which is what made this tab slow to hydrate. Count
+            // first so the head shows the real total rather than the capped
+            // size of the loaded collection.
+            $activityTotal = $this->server->sshKeyAuditEvents()->count();
+            $totalPages = max(1, (int) ceil($activityTotal / self::ACTIVITY_PER_PAGE));
+
+            // Clamp: ?activity_page= is user input, and deleting events can
+            // strand the operator past the end.
+            $page = max(1, min($this->activityPage, $totalPages));
+            if ($page !== $this->activityPage) {
+                $this->activityPage = $page;
+            }
+
+            $auditEvents = $this->server->sshKeyAuditEvents()
+                ->with('user')
+                ->forPage($page, self::ACTIVITY_PER_PAGE)
+                ->get();
+
+            $activityPagination = [
+                'page' => $page,
+                'total_pages' => $totalPages,
+                'total' => $activityTotal,
+                'per_page' => self::ACTIVITY_PER_PAGE,
+                'from' => $activityTotal === 0 ? 0 : (($page - 1) * self::ACTIVITY_PER_PAGE) + 1,
+                'to' => min($page * self::ACTIVITY_PER_PAGE, $activityTotal),
+            ];
         }
 
         $viewData = SshKeysWorkspaceViewData::for(
@@ -237,6 +288,7 @@ class WorkspaceSshKeys extends Component
             includePreviewContext: $needsPreview,
             includeActivityContext: $needsActivity,
             auditEvents: $needsActivity ? $auditEvents : null,
+            activityTotal: $activityPagination['total'] ?? null,
         );
 
         return view('livewire.servers.workspace-ssh-keys', array_merge($viewData, [
@@ -248,6 +300,7 @@ class WorkspaceSshKeys extends Component
             'orgKeys' => $orgKeys,
             'teamKeys' => $teamKeys,
             'auditEvents' => $auditEvents,
+            'activityPagination' => $activityPagination,
             'fingerprints' => $fingerprints,
             'notifChannels' => $needsNotifications ? $this->assignableSshKeyNotificationChannels() : collect(),
             'notifSubscriptions' => $needsNotifications ? $this->sshKeyNotificationSubscriptions() : collect(),

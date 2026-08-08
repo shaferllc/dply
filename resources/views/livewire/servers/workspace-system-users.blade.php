@@ -58,7 +58,7 @@
              for this server's system_user.* events. Keeps "set up alerts" one click
              away instead of bouncing the operator out to global settings. --}}
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('System users sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('System users sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="setActiveTab('accounts')">
                     {{ __('Accounts') }}
                 </x-server-workspace-tab>
@@ -68,60 +68,64 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div @class(['min-w-0', 'hidden' => $activeTab !== 'accounts'])>
+        {{-- Tab-switch skeleton, same treatment as the SSH keys page: setActiveTab()
+             round-trips, and without this the panel below just blanks.
+
+             $activeTab is still the OUTGOING tab while the request is in flight, and
+             with exactly two tabs a switch can only be heading to the other one — so
+             the skeleton is shaped from the inverse. Add a third tab and this needs
+             the real target instead (Alpine state here does not survive the morph).
+
+             wire:loading.block, not bare wire:loading, or the skeleton shrink-wraps
+             to inline-block. --}}
+        <div wire:loading.block wire:target="setActiveTab" aria-busy="true" aria-live="polite">
+            <span class="sr-only">{{ __('Loading section…') }}</span>
+            @include('livewire.servers.partials.system-users._tab-skeleton', [
+                'tab' => $activeTab === 'accounts' ? 'notifications' : 'accounts',
+                'rows' => count($remote_rows),
+            ])
+        </div>
+
+        <div wire:loading.remove wire:target="setActiveTab" @class(['min-w-0', 'hidden' => $activeTab !== 'accounts'])>
             <section class="{{ $card }}">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Accounts') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                {{ __('Loaded from /etc/passwd over SSH. Click a row to expand UID, home, shell, groups, and assigned sites.') }}
-                            </p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                    {{ trans_choice('{0} no accounts|{1} :count account|[2,*] :count accounts', count($remote_rows), ['count' => count($remote_rows)]) }}
-                                </span>
-                                @if ($orphanRows->count() > 0)
-                                    <span class="text-brand-mist/60">·</span>
-                                    <span class="inline-flex items-center gap-1 text-amber-800">
-                                        <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
-                                        {{ trans_choice('{1} :count orphan|[2,*] :count orphans', $orphanRows->count(), ['count' => $orphanRows->count()]) }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                {{-- Dense head, matching the Notifications tab and the SSH keys page:
+                     count as a pill, the /etc/passwd explainer as the one-line note,
+                     Add + Sync in the actions slot. Orphans get the amber strip
+                     below rather than a second copy of the count up here. --}}
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-users"
+                    :title="__('Accounts on this server')"
+                    :count="trans_choice('{0} none|{1} :count account|[2,*] :count accounts', count($remote_rows), ['count' => count($remote_rows)])"
+                    :note="__('Loaded from /etc/passwd over SSH. Expand a row for UID, home, shell, groups, and assigned sites.')"
+                    :tone="$orphanRows->count() > 0 ? 'amber' : null"
+                    class="border-b border-brand-ink/10"
+                >
+                    <x-slot:actions>
                         <button
                             type="button"
                             wire:click="openCreateModal"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
-                            <x-heroicon-o-plus class="h-4 w-4" />
+                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Add a user') }}
                         </button>
-                        <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
                         <button
                             type="button"
                             wire:click="loadUsers"
                             wire:loading.attr="disabled"
                             wire:target="loadUsers"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="loadUsers" />
-                            <span wire:loading wire:target="loadUsers" class="inline-flex h-4 w-4 items-center justify-center">
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="loadUsers" aria-hidden="true" />
+                            <span wire:loading wire:target="loadUsers" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                                 <x-spinner variant="forest" size="sm" />
                             </span>
                             <span wire:loading.remove wire:target="loadUsers">{{ __('Sync now') }}</span>
                             <span wire:loading wire:target="loadUsers">{{ __('Syncing…') }}</span>
                         </button>
-                    </div>
-                </div>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
 
                 @if ($remote_rows !== [] && $orphanRows->count() > 0)
                     <div class="flex flex-col gap-3 border-b border-amber-200 bg-amber-50/70 px-6 py-3 text-sm text-amber-900 sm:flex-row sm:items-start sm:justify-between sm:px-8">
@@ -329,7 +333,7 @@
             </section>
         </div>
 
-        <div @class(['min-w-0', 'hidden' => $activeTab !== 'notifications'])>
+        <div wire:loading.remove wire:target="setActiveTab" @class(['min-w-0', 'hidden' => $activeTab !== 'notifications'])>
             @include('livewire.servers.partials.system-users.notifications-tab', [
                 'notifChannels' => $notifChannels,
                 'notifSubscriptions' => $notifSubscriptions,

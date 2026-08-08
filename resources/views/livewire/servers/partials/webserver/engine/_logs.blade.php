@@ -11,76 +11,94 @@
                     $hasErrorLog = ! empty($layout['error_log']);
                     $hasJournal = ! empty($layout['journal_unit']);
                 @endphp
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div class="max-w-2xl">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine logs', ['engine' => $info['label']]) }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Tail the last N lines of the access / error log. Toggle Live to poll every 4 s.') }}</p>
-                        </div>
-                        @if ($log_live)
-                            <div wire:poll.4s="refreshWebserverLog" class="hidden" aria-hidden="true"></div>
-                        @endif
-                    </div>
+                <div class="{{ $card }}">
+                    @if ($log_live)
+                        <div wire:poll.4s="refreshWebserverLog" class="hidden" aria-hidden="true"></div>
+                    @endif
+
+                    {{-- Dense head; the Live state rides the count pill so it
+                         reads at a glance without hunting for the toggle. --}}
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-document-text"
+                        :title="__(':engine logs', ['engine' => $info['label']])"
+                        :count="$log_live ? __('Live') : null"
+                        :note="__('Tail the last N lines of the access / error log. Toggle Live to poll every 4 s.')"
+                        class="border-b border-brand-ink/10"
+                    />
 
                     @if (! $opsReady || $isDeployer)
-                        <p class="mt-4 text-sm text-brand-moss">{{ __('Logs require ready ops access and a non-deployer role.') }}</p>
+                        {{-- Same gate as the Config sub-tab — name the one blocker
+                             that actually applies rather than listing both. --}}
+                        <div class="px-4 py-3.5 sm:px-5">
+                            <x-empty-state
+                                compact
+                                tone="amber"
+                                icon="heroicon-o-lock-closed"
+                                :title="$isDeployer ? __('Read-only for your role') : __('Server isn\'t ready for ops')"
+                                :description="$isDeployer
+                                    ? __('Deploy-only members can view :engine but can\'t tail its logs. Ask an owner or admin to change your role.', ['engine' => $info['label']])
+                                    : __('dply needs a ready ops connection to this server before it can tail :engine logs. Check the server\'s connection status, then reopen this tab.', ['engine' => $info['label']])"
+                            />
+                        </div>
                     @else
-                        <div class="mt-5 flex flex-wrap items-center gap-2">
-                            @if ($hasAccessLog)
-                                <button type="button" wire:click="refreshWebserverLog('access')" @class([
-                                    'rounded-md border px-3 py-1.5 text-xs font-medium',
-                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_kind === 'access',
-                                    'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $log_kind !== 'access',
-                                ])>{{ __('Access') }}</button>
-                            @endif
-                            @if ($hasErrorLog)
-                                <button type="button" wire:click="refreshWebserverLog('error')" @class([
-                                    'rounded-md border px-3 py-1.5 text-xs font-medium',
-                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_kind === 'error',
-                                    'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $log_kind !== 'error',
-                                ])>{{ __('Error') }}</button>
-                            @endif
-                            @if ($hasJournal)
-                                <button type="button" wire:click="refreshWebserverLog('journal')" @class([
-                                    'rounded-md border px-3 py-1.5 text-xs font-medium',
-                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_kind === 'journal',
-                                    'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $log_kind !== 'journal',
-                                ])>{{ __('journalctl') }}</button>
+                        @php $accessLog = $log_kind === 'access' ? $this->parsedAccessLog : ['structured' => false]; @endphp
+                        {{-- Toolbar: source picker as a segmented control, then the
+                             actions, with the line budget pinned right. --}}
+                        <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-4 py-2 sm:px-5">
+                            @php
+                                $logKinds = array_filter([
+                                    $hasAccessLog ? ['key' => 'access', 'label' => __('Access')] : null,
+                                    $hasErrorLog ? ['key' => 'error', 'label' => __('Error')] : null,
+                                    $hasJournal ? ['key' => 'journal', 'label' => __('journalctl')] : null,
+                                ]);
+                            @endphp
+                            @if ($logKinds !== [])
+                                <div class="inline-flex items-center gap-0.5 rounded-lg border border-brand-ink/10 bg-white p-0.5 shadow-sm" role="group" aria-label="{{ __('Log source') }}">
+                                    @foreach ($logKinds as $logKind)
+                                        <button type="button" wire:click="refreshWebserverLog('{{ $logKind['key'] }}')" @class([
+                                            'inline-flex h-6 items-center rounded-md px-2 text-[11px] font-semibold transition',
+                                            'bg-brand-ink text-brand-cream shadow-sm' => $log_kind === $logKind['key'],
+                                            'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $log_kind !== $logKind['key'],
+                                        ])>{{ $logKind['label'] }}</button>
+                                    @endforeach
+                                </div>
                             @endif
 
-                            <span class="mx-2 hidden h-5 w-px bg-brand-ink/10 sm:inline-block" aria-hidden="true"></span>
-
-                            <button type="button" wire:click="refreshWebserverLog" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-arrow-path class="h-4 w-4" />
+                            <button type="button" wire:click="refreshWebserverLog" wire:loading.attr="disabled" wire:target="refreshWebserverLog" class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60">
+                                <span wire:loading.remove wire:target="refreshWebserverLog" class="inline-flex">
+                                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                </span>
+                                <span wire:loading wire:target="refreshWebserverLog" class="inline-flex">
+                                    <x-spinner class="h-3.5 w-3.5" />
+                                </span>
                                 {{ __('Refresh') }}
                             </button>
                             <button type="button" wire:click="toggleWebserverLogLive" @class([
-                                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium',
+                                'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold shadow-sm transition',
                                 'border-emerald-300 bg-emerald-50 text-emerald-900' => $log_live,
                                 'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $log_live,
                             ])>
                                 @if ($log_live)
                                     <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" aria-hidden="true"></span>
-                                    {{ __('Live') }}
                                 @else
-                                    <x-heroicon-o-play class="h-4 w-4" />
-                                    {{ __('Live') }}
+                                    <x-heroicon-m-play class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 @endif
+                                {{ __('Live') }}
                             </button>
-                            @php $accessLog = $log_kind === 'access' ? $this->parsedAccessLog : ['structured' => false]; @endphp
                             @if ($log_kind === 'access' && ($accessLog['structured'] || $log_raw) && $log_output !== '')
                                 <button type="button" wire:click="toggleWebserverLogRaw" @class([
-                                    'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium',
-                                    'border-brand-forest bg-brand-forest text-brand-cream' => $log_raw,
+                                    'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold shadow-sm transition',
+                                    'border-brand-ink bg-brand-ink text-brand-cream' => $log_raw,
                                     'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $log_raw,
                                 ])>
-                                    <x-heroicon-o-code-bracket class="h-4 w-4" />
+                                    <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Raw') }}
                                 </button>
                             @endif
                             <span class="ml-auto inline-flex items-center gap-1 text-[11px] text-brand-moss">
                                 {{ __('Lines:') }}
-                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="rounded-md border border-brand-ink/15 bg-white py-0.5 pl-2 pr-7 text-[11px] font-medium text-brand-ink">
+                                <select wire:change="refreshWebserverLog(null, $event.target.value)" class="h-6 rounded-md border border-brand-ink/15 bg-white py-0 pl-2 pr-7 text-[11px] font-semibold text-brand-ink">
                                     @foreach ([100, 300, 500, 1000, 2000] as $n)
                                         <option value="{{ $n }}" @selected($log_lines === $n)>{{ $n }}</option>
                                     @endforeach
@@ -123,7 +141,7 @@
                                 }, $accessLog['rows']);
                             @endphp
 
-                            <div class="mt-4" x-data="{
+                            <div class="px-4 py-3.5 sm:px-5" x-data="{
                                 q: '',
                                 rows: @js($clientRows),
                                 statusStyle(c) {
@@ -235,7 +253,11 @@
                                 </div>
                             </div>
                         @else
-                            <pre class="mt-4 max-h-[60vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-4 font-mono text-xs leading-relaxed text-emerald-100" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">{{ $log_output !== '' ? $log_output : __('Click Refresh (or toggle Live) to fetch the log.') }}</pre>
+                            {{-- Full-bleed pane: the terminal runs edge to edge like
+                                 a real tail, instead of floating as an inset card
+                                 inside an already-bordered panel. Squared off and
+                                 hairlined at the top so it reads as the panel body. --}}
+                            <pre class="max-h-[60vh] overflow-auto whitespace-pre-wrap break-all border-t border-brand-ink/10 bg-brand-ink/95 px-4 py-3 font-mono text-xs leading-relaxed text-emerald-100 sm:px-5" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">{{ $log_output !== '' ? $log_output : __('Click Refresh (or toggle Live) to fetch the log.') }}</pre>
                         @endif
                     @endif
                 </div>

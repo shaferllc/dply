@@ -37,20 +37,22 @@
         />
 
         @if ($isDeployer)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('Deployer role.') }}</span>
                 {{ __('Deployers can view this page but cannot add, remove, or run edge proxy actions.') }}
-            </div>
+            </p>
         @endif
 
         @if (! $opsReady)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Provisioning and SSH must be ready before edge proxy actions can run.') }}
-            </div>
+            </p>
         @endif
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Edge proxy workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Edge proxy workspace sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab
                     id="ep-tab-overview"
                     :active="$workspace_tab === 'overview'"
@@ -105,7 +107,22 @@
             </x-server-workspace-tablist>
         </div>
 
-        <x-workspace-tab-panel-loading>
+        {{-- Skeleton swap, not a dim-and-lock — same treatment as the Webserver
+             workspace, and it shares that page's shapes (the engine tabs render
+             the very same engine-panel partials). --}}
+        @php
+            $edgeSkeletonTabs = array_merge(['overview', 'change'], array_keys($engineTabCatalog));
+        @endphp
+        @foreach ($edgeSkeletonTabs as $skeletonTab)
+            <div class="hidden" wire:loading.class.remove="hidden" wire:target="setWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                @include('livewire.servers.partials.webserver._tab-skeleton', [
+                    'tab' => in_array($skeletonTab, ['overview', 'change'], true) ? $skeletonTab : 'engine',
+                ])
+            </div>
+        @endforeach
+
+        <div class="relative" wire:loading.class="hidden" wire:target="setWorkspaceTab">
         @if ($workspace_tab === 'overview')
             <x-server-workspace-tab-panel id="ep-panel-overview" labelled-by="ep-tab-overview" panel-class="min-w-0">
                 @include('livewire.servers.partials.edge-proxy.overview-tab')
@@ -127,7 +144,7 @@
             @endif
         @endforeach
 
-        </x-workspace-tab-panel-loading>
+        </div>
     </section>
 
     <x-slot name="modals">

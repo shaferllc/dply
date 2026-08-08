@@ -430,3 +430,35 @@
 .ws-tip {
     display: none;
 }
+
+/* Horizontally-scrolling tab strips (x-server-workspace-tablist scroll).
+   macOS "always show scrollbars" paints the bar INSIDE the scroll box, so with
+   the strip's own p-1 the bar sat on top of the tab row. Reserve its height
+   here rather than in a utility class: unlayered rules beat Tailwind's layered
+   utilities, so callers that pass p-0 (strips inside an already-padded wrapper)
+   still keep the clearance. Split the reservation across BOTH block edges: as
+   bottom-only padding it knocked the pills ~10px above centre inside the row's
+   symmetric py-2 (visible on every workspace sub-tab strip). Same total height,
+   same scrollbar clearance, tabs actually centred. */
+.dply-tablist-scroll {
+    padding-block: 0.3125rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(104 132 121 / 0.35) transparent;
+}
+
+.dply-tablist-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.dply-tablist-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dply-tablist-scroll::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: rgb(104 132 121 / 0.3);
+}
+
+.dply-tablist-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(104 132 121 / 0.5);
+}

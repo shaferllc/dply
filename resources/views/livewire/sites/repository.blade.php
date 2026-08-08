@@ -101,7 +101,7 @@
 
                 @unless ($isLocked)
                     <div @class(['border-b border-brand-ink/10 px-3 py-2 sm:px-4' => ! $isEmbedded])>
-                    <x-server-workspace-tablist :aria-label="__('Repository sections')" scroll @class(['!mb-0 w-full border-0 bg-transparent p-0 shadow-none' => ! $isEmbedded])>
+                    <x-server-workspace-tablist :aria-label="__('Repository sections')" scroll :bare="! $isEmbedded" @class(['!mb-0 w-full' => ! $isEmbedded])>
                         @foreach ($tabs as $entry)
                             <x-server-workspace-tab
                                 id="repository-tab-{{ $entry['id'] }}"

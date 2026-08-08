@@ -4,35 +4,27 @@
 @endphp
 
 <section class="border-b border-brand-ink/10">
-    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        {{-- Top row: icon + title + actions --}}
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ $contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server') }}</h3>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                @if ($schedulersTotal > 0)
-                    <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $schedulersFiltered }}</span>
-                @endif
-                <button
-                    type="button"
-                    wire:click="openEnableSchedulerModal"
-                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                >
-                    <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Enable scheduler') }}
-                </button>
-            </div>
-        </div>
-        {{-- Description — full width below --}}
-        <p class="mt-3 text-sm leading-relaxed text-brand-moss">{{ __('Monitor tick health, run schedule:run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.') }}</p>
-    </div>
+    {{-- Dense head: the icon-badge + "LIBRARY" eyebrow + title + full-width
+         description stack stood taller than a scheduler row. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-clock"
+        :title="$contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server')"
+        :count="$schedulersTotal > 0 ? (string) $schedulersFiltered : null"
+        :note="__('Monitor tick health, run schedule:run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
+            <button
+                type="button"
+                wire:click="openEnableSchedulerModal"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+            >
+                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Enable scheduler') }}
+            </button>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
     @if ($contextSiteModel && ! ($scheduleSiteRouteLocked ?? false))
         <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">

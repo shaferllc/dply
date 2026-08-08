@@ -17,7 +17,7 @@
             dense
             icon="heroicon-o-share"
             :title="__('Networking')"
-            :note="__('All servers in your workspace — their private IPs, running services, and which databases are open to the network.')"
+            :note="__('Servers sharing this server\'s private network — their private IPs, running services, and which databases are open to the network.')"
             class="border-b border-brand-ink/10"
         />
 

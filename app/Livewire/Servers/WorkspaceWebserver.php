@@ -108,6 +108,20 @@ class WorkspaceWebserver extends WorkspaceManage
     #[Url(as: 'sub', except: 'overview')]
     public string $engine_subtab = 'overview';
 
+    /**
+     * Local-only panel preview. Renders a non-active engine's sub-tab panels
+     * (Routes / Snippets / Modules / Admin …) so their layouts can be reviewed
+     * without switching the server's webserver, which is a destructive,
+     * multi-minute operation.
+     *
+     * Read-only by construction: {@see previewingEnginePanels()} is the single
+     * gate, panels treat preview like the deployer role (every mutating control
+     * disabled), and the sub-tab data boot is skipped so nothing SSHes to an
+     * engine that isn't installed. Ignored outside the local environment.
+     */
+    #[Url(as: 'preview', except: false)]
+    public bool $engine_preview = false;
+
     // ---- Config editor state -----------------------------------------
 
     // ---- Log viewer state --------------------------------------------
@@ -203,6 +217,29 @@ class WorkspaceWebserver extends WorkspaceManage
     public function setEngineSubtab(string $subtab): void
     {
         $this->engine_subtab = $subtab;
+    }
+
+    /** Local-only: is the panel-preview escape hatch available at all? */
+    public function enginePanelPreviewAvailable(): bool
+    {
+        return app()->environment('local');
+    }
+
+    /** Local-only: are we rendering a non-active engine's panels read-only? */
+    public function previewingEnginePanels(): bool
+    {
+        return $this->engine_preview && $this->enginePanelPreviewAvailable();
+    }
+
+    public function toggleEnginePanelPreview(): void
+    {
+        if (! $this->enginePanelPreviewAvailable()) {
+            $this->engine_preview = false;
+
+            return;
+        }
+
+        $this->engine_preview = ! $this->engine_preview;
     }
 
     public function updatedEngineSubtab(): void

@@ -9,19 +9,15 @@
 --}}
 
 <div class="{{ $card }}">
-    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <x-icon-badge tone="amber">
-            <x-heroicon-o-wrench class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Maintenance') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization cron pause window') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('When set, Dply omits managed cron lines from every server in the organization on the next sync until the pause ends. Manual “Run now” is blocked while active. Use during deploys, migrations, or scheduled maintenance.') }}
-            </p>
-        </div>
-    </div>
-    <div class="space-y-6 p-6 sm:p-8">
+    <x-workspace-panel-head
+        dense
+        tone="amber"
+        icon="heroicon-o-wrench"
+        :title="__('Organization cron pause window')"
+        :note="__('When set, Dply omits managed cron lines from every server in the organization on the next sync until the pause ends. Manual “Run now” is blocked while active. Use during deploys, migrations, or scheduled maintenance.')"
+        class="border-b border-brand-ink/10"
+    />
+    <div class="space-y-4 px-4 py-3.5 sm:px-5">
         @if ($server->organization?->cron_maintenance_until && now()->lt($server->organization->cron_maintenance_until))
             <div class="rounded-xl border border-amber-300/80 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
                 <p class="font-semibold">{{ __('Cron pause active') }}</p>

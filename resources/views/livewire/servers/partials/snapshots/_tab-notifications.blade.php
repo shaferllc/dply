@@ -24,13 +24,13 @@
         </x-slot:actions>
     </x-workspace-panel-head>
 
-    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3.5 text-sm leading-relaxed text-brand-moss sm:px-6">
+    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-4 py-2.5 text-xs leading-relaxed text-brand-moss sm:px-5">
         <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
         <p>{{ __('Owners and org admins already get an in-app notification (the bell) and inbox entry whenever a snapshot is created, restored, or deleted — no setup needed. Add a channel below only to also send email / chat / webhook alerts.') }}</p>
     </div>
 
     {{-- Current subscriptions --}}
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-4 py-3.5 sm:px-5">
         @if ($subscriptionsByChannel->isEmpty())
             <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-6 text-center">
                 <x-heroicon-o-bell-slash class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
@@ -71,10 +71,10 @@
     </div>
 
     {{-- Add subscription --}}
-    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+    <div class="border-t border-brand-ink/10 px-4 py-3.5 sm:px-5">
         <p class="text-sm font-medium text-brand-ink">{{ __('Add a channel') }}</p>
-        <form wire:submit="addSnapshotNotificationSubscription" class="mt-4 space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
+        <form wire:submit="addSnapshotNotificationSubscription" class="mt-3 space-y-3">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="snap-notif-channel" value="{{ __('Channel') }}" />
                     <select

@@ -45,6 +45,6 @@
         @endif
 
         {{-- Inline SSH ops (start/stop/restart one program, service actions) --}}
-        <div wire:loading wire:target="startOneProgram,stopOneProgram,restartOneProgram,supervisorServiceAction" class="mb-4">
+        <div wire:loading.block wire:target="startOneProgram,stopOneProgram,restartOneProgram,supervisorServiceAction" class="mb-4">
             <x-workspace-console-banner status="running" :message="__('Running supervisorctl command…')" :busy="true" />
         </div>

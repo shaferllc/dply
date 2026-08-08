@@ -66,8 +66,14 @@ return [
         ['key' => 'configuration', 'route' => 'servers.configuration', 'icon' => 'document-text', 'label' => 'Configuration', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'tools', 'route' => 'servers.tools', 'icon' => 'wrench-screwdriver', 'label' => 'Tools', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'webserver', 'route' => 'servers.webserver', 'icon' => 'globe-alt', 'label' => 'Webserver', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
-        ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'soon_badge' => true],
-        ['key' => 'docker', 'route' => 'servers.docker', 'preview_route' => 'servers.docker', 'icon' => 'square-3-stack-3d', 'label' => 'Docker', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.docker', 'preview_feature' => 'workspace.docker_preview', 'soon_badge' => true],
+        // No soon_badge: the edge proxy workspace is live (see coming_soon_keys /
+        // edge_proxy_coming_soon below — both empty), so the nav must not still
+        // advertise it as upcoming.
+        ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
+        // No hardcoded soon_badge: orgs on `workspace.docker_preview` still get the
+        // badge via the dynamic preview_only flag, while orgs with the full
+        // `workspace.docker` feature see the workspace without a "Soon" label.
+        ['key' => 'docker', 'route' => 'servers.docker', 'preview_route' => 'servers.docker', 'icon' => 'square-3-stack-3d', 'label' => 'Docker', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.docker', 'preview_feature' => 'workspace.docker_preview'],
         // background (alphabetical by label)
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
@@ -282,13 +288,30 @@ return [
     // backed by ProvisionHetznerLoadBalancerJob / ConfigureHAProxyLoadBalancerJob.
     // Note it provisions billable Hetzner infrastructure and is Hetzner-only —
     // createLoadBalancer() refuses other providers.
-    'coming_soon_keys' => ['edge-proxy'],
+    // edge-proxy graduated: the real workspace ships overview, add/remove with
+    // switch-without-remove, per-engine panels (config editor, logs, live-state
+    // probes) reusing the webserver engine partials, and removal that restores
+    // the previous webserver on :80. Per-engine availability is still gated by
+    // `edge_proxy_coming_soon` below.
+    'coming_soon_keys' => [],
 
-    'webserver_coming_soon' => ['apache', 'openlitespeed'],
+    // Apache and OpenLiteSpeed graduated: both ship their global/module config
+    // editors, per-vhost (and for OLS, listener + extapp) panels, cache controls,
+    // and live-state probes — so neither carries the "Soon" badge or the switch
+    // block any more. Empty means every engine in the catalog is switchable;
+    // re-add a key here to gate one again.
+    'webserver_coming_soon' => [],
 
     /*
     | Edge proxy engines listed here show "Coming soon" in the overview picker
     | and render preview tabs until removed. Active installs keep full controls.
+    |
+    | All four graduated: each ships an installer, the shared engine panels
+    | (overview / logs / config editor / info) and its own live-state probe —
+    | Traefik routers+services+middlewares+entrypoints, HAProxy frontends/
+    | backends/ssl/runtime, Envoy listeners/clusters/stats, OpenResty servers/
+    | upstreams/runtime. Re-add a key here to gate one again; installable-
+    | ness is derived from this list (installableEdgeProxies()).
     */
-    'edge_proxy_coming_soon' => ['traefik', 'haproxy', 'envoy', 'openresty'],
+    'edge_proxy_coming_soon' => [],
 ];

@@ -4,57 +4,51 @@
                 class="space-y-4 mb-6"
             >
             <div class="{{ $card }} overflow-hidden">
-                {{-- Header — engine icon + name + version + status pill.
-                     Matches the redesigned Overview-tab panel for consistency. --}}
-                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                    <div class="flex items-center gap-3">
-                        <x-icon-badge>
-                            <x-dynamic-component :component="$info['icon']" class="h-5 w-5 text-brand-forest" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ $info['label'] }}</h3>
-                            @if ($version !== '')
-                                <p class="font-mono text-[11px] text-brand-mist">{{ $version }}</p>
-                            @endif
-                            @if (! $isActive)
-                                @php
-                                    $inactiveEngineHint = app(\App\Support\Servers\SystemdServiceStandbyReasonResolver::class)
-                                        ->inactiveEngineHint($server, $key, $isEdgeProxyPanel);
-                                @endphp
-                                <p class="mt-0.5 text-[12px] text-brand-moss">
-                                    {{ $inactiveEngineHint ?? ($isEdgeProxyPanel
-                                        ? __('Not the active edge proxy on this server.')
-                                        : __('Not the active webserver on this server.')) }}
-                                </p>
-                            @endif
-                            @if (! $isActive && ! $isEdgeProxyPanel)
-                                @php
-                                    // Short engine elevator pitch shown on non-active panels so the
-                                    // operator knows what switching to this engine actually gets them.
-                                    // Kept here (rather than in $info) so the catalog stays a thin
-                                    // identity record and the copy is colocated with where it renders.
-                                    $engineBlurb = match ($key) {
-                                        'nginx' => __('Mature HTTP server + reverse proxy. Excellent static-file performance, predictable config, very low memory footprint. Default for most production deployments.'),
-                                        'caddy' => __('Automatic HTTPS out of the box, simple Caddyfile syntax, HTTP/3 by default. Great for opinionated setups where you want sensible defaults over fine-grained tuning.'),
-                                        'apache' => __('Battle-tested with the broadest module catalog and per-directory `.htaccess` support. Higher per-request footprint than nginx but unbeatable compatibility with legacy stacks.'),
-                                        'openlitespeed' => __('LSAPI for the fastest PHP execution, built-in LSCache module with per-vhost cache rules, and a familiar Apache-style config. The standard pick for WordPress-heavy hosting.'),
-                                        default => '',
-                                    };
-                                @endphp
-                                @if ($engineBlurb !== '')
-                                    <p class="mt-2 max-w-prose text-[12px] leading-snug text-brand-moss">{{ $engineBlurb }}</p>
-                                @endif
-                            @endif
-                        </div>
-                    </div>
+                {{-- Engine head — dense, like every other panel head in the
+                     workspace: the version rides the count pill, the systemd
+                     state pill the actions slot. On a non-active panel the note
+                     carries the standby reason and the engine's pitch instead. --}}
+                @php
+                    $inactiveEngineHint = $isActive
+                        ? null
+                        : app(\App\Support\Servers\SystemdServiceStandbyReasonResolver::class)
+                            ->inactiveEngineHint($server, $key, $isEdgeProxyPanel);
+
+                    // Short engine elevator pitch shown on non-active panels so the
+                    // operator knows what switching to this engine actually gets them.
+                    // Kept here (rather than in $info) so the catalog stays a thin
+                    // identity record and the copy is colocated with where it renders.
+                    $engineBlurb = (! $isActive && ! $isEdgeProxyPanel) ? match ($key) {
+                        'nginx' => __('Mature HTTP server + reverse proxy. Excellent static-file performance, predictable config, very low memory footprint. Default for most production deployments.'),
+                        'caddy' => __('Automatic HTTPS out of the box, simple Caddyfile syntax, HTTP/3 by default. Great for opinionated setups where you want sensible defaults over fine-grained tuning.'),
+                        'apache' => __('Battle-tested with the broadest module catalog and per-directory `.htaccess` support. Higher per-request footprint than nginx but unbeatable compatibility with legacy stacks.'),
+                        'openlitespeed' => __('LSAPI for the fastest PHP execution, built-in LSCache module with per-vhost cache rules, and a familiar Apache-style config. The standard pick for WordPress-heavy hosting.'),
+                        default => '',
+                    } : '';
+
+                    $engineHeadNote = $isActive
+                        ? __('Active on this server — lifecycle actions below act on this engine.')
+                        : trim(($inactiveEngineHint ?? ($isEdgeProxyPanel
+                            ? __('Not the active edge proxy on this server.')
+                            : __('Not the active webserver on this server.'))).' '.$engineBlurb);
+                @endphp
+                <x-workspace-panel-head
+                    dense
+                    :icon="$info['icon']"
+                    :title="$info['label']"
+                    :count="$version !== '' ? $version : null"
+                    :note="$engineHeadNote"
+                    class="border-b border-brand-ink/10"
+                >
                     @if ($isActive && $unit !== null)
-                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $pill['classes'] }}">
-                            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
-                            {{ $pill['label'] }}
-                        </span>
+                        <x-slot:actions>
+                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $pill['classes'] }}">
+                                <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $pill['dot'] }}"></span>
+                                {{ $pill['label'] }}
+                            </span>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-workspace-panel-head>
 
                 @if ($isActive)
                     @if ($opsReady && ! $isDeployer)
@@ -78,7 +72,7 @@
                                         ));
                                     @endphp
                                     @if (! empty($visibleRows))
-                                    <div class="bg-white px-6 py-4 sm:px-8">
+                                    <div class="bg-white px-4 py-3 sm:px-5">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div class="min-w-0">
                                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ $header['title'] }}</p>
@@ -106,7 +100,7 @@
                                 @endforeach
 
                                 @if (! empty($tools))
-                                    <div class="bg-brand-sand/15 px-6 py-4 sm:px-8">
+                                    <div class="bg-brand-sand/15 px-4 py-3 sm:px-5">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div class="min-w-0">
                                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Tools') }}</p>
@@ -134,7 +128,7 @@
                     @endif
                 @else
                     {{-- Non-active engine panel: blocker (if any) + switch CTA, or edge-proxy add/remove. --}}
-                    <div class="space-y-4 bg-white px-6 py-5 sm:px-8">
+                    <div class="space-y-4 bg-white px-4 py-3.5 sm:px-5">
                         @if ($isEdgeProxyPanel)
                             @php
                                 $isActiveEdge = $key === $activeEdgeProxy;
@@ -219,7 +213,7 @@
                             ['icon' => 'heroicon-o-server-stack', 'title' => __('Vhosts & listeners'), 'body' => __('Inspect virtual hosts, listeners, and hostname maps.'), 'subtab' => 'vhosts'],
                         ],
                         'nginx' => [
-                            ['icon' => 'heroicon-o-bolt', 'title' => __('FastCGI page cache'), 'body' => __('Shared FastCGI/proxy cache zones — RunCloud-style PHP page caching at the edge.'), 'subtab' => 'cache'],
+                            ['icon' => 'heroicon-o-bolt', 'title' => __('FastCGI page cache'), 'body' => __('Shared FastCGI/proxy cache zones — full-page PHP caching at the edge.'), 'subtab' => 'cache'],
                             ['icon' => 'heroicon-o-server', 'title' => __('Upstreams & proxy'), 'body' => __('Reverse-proxy backends and load-balanced upstream pools.'), 'subtab' => 'upstreams'],
                             ['icon' => 'heroicon-o-shield-check', 'title' => __('Security modules'), 'body' => __('WAF, rate limiting, and TLS modules via the Modules tab.'), 'subtab' => 'modules'],
                             ['icon' => 'heroicon-o-server-stack', 'title' => __('Hosts & certs'), 'body' => __('Custom server blocks, hostname inventory, and certificate expiry.'), 'subtab' => 'hosts'],
@@ -234,7 +228,10 @@
                     };
                 @endphp
                 @if ($engineCapabilities !== [])
-                <ul class="grid gap-3 sm:grid-cols-2">
+                {{-- Inset to the panel's rhythm (px-4/sm:px-5, py-3.5), same as
+                     the Overview tab's nav tiles. Unpadded, the cards ran flush
+                     into the card edges and sat right under the Tools row. --}}
+                <ul class="grid gap-3 px-4 py-3.5 sm:grid-cols-2 sm:px-5">
                     @foreach ($engineCapabilities as $capability)
                         <li>
                             <button
@@ -278,15 +275,14 @@
                     ];
                 @endphp
                 <div class="{{ $card }}" wire:key="health-{{ $key }}-{{ $engine_metrics_range }}">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — recent health', ['engine' => $info['label']]) }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live counters from the dply metrics agent. Charts show min/max band, line is the bucket average.') }}</p>
-                        </div>
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-chart-bar"
+                        :title="__(':engine — recent health', ['engine' => $info['label']])"
+                        :note="__('Live counters from the dply metrics agent. Charts show min/max band, line is the bucket average.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
                         <div
                             x-data="{
                                 range: @js($engine_metrics_range),
@@ -307,7 +303,7 @@
                                 },
                             }"
                             x-init="init()"
-                            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1 shadow-sm"
+                            class="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-brand-ink/10 bg-white p-0.5 shadow-sm"
                             role="group"
                             aria-label="{{ __('Time range') }}"
                         >
@@ -316,17 +312,18 @@
                                     type="button"
                                     @click="pick(@js($opt))"
                                     :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
-                                    class="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors"
+                                    class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors"
                                 >
                                     {{ $rangeLabels[$opt] ?? $opt }}
                                 </button>
                             @endforeach
                         </div>
-                    </div>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
 
-                    <div class="px-6 py-6 sm:px-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                     @if ($latestBlock === null)
-                        <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-center text-xs text-brand-moss">
                             <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
                             <p class="mt-2">{{ __('No health data yet. The agent will start posting :engine metrics on the next push.', ['engine' => $info['label']]) }}</p>
                             @if ($key === 'caddy')

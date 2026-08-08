@@ -20,33 +20,29 @@
     @endif
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-800 ring-1 ring-sky-200">
-                        <x-heroicon-o-square-3-stack-3d class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Docker') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Manage Docker Engine on this server — containers, images, volumes, networks, compose projects, and cleanup.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-square-3-stack-3d"
+            :title="__('Docker')"
+            :note="__('Manage Docker Engine on this server — containers, images, volumes, networks, compose projects, and cleanup.')"
+            class="border-b border-brand-ink/10"
+        />
 
         @if ($isDeployer)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span class="font-semibold">{{ __('Deployer role.') }}</span>
                 {{ __('Deployers have read-only access to this workspace.') }}
-            </div>
+            </p>
         @elseif (! $opsReady)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-900 sm:px-5">
+                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Provisioning and SSH must be ready before Docker inventory and actions work.') }}
-            </div>
+            </p>
         @else
             <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-                <x-server-workspace-tablist :aria-label="__('Docker workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tablist :aria-label="__('Docker workspace sections')" scroll bare class="!mb-0">
                     <x-server-workspace-tab
                         id="docker-tab-overview"
                         :active="$workspace_tab === 'overview'"
@@ -106,33 +102,46 @@
                 </x-server-workspace-tablist>
             </div>
 
-            @if ($workspace_tab === 'overview')
-                @include('livewire.servers.partials.docker.overview-tab')
-            @endif
+            {{-- Tab-switch skeletons. This page had no loading treatment at all,
+                 so the outgoing tab sat there until the response landed. One
+                 wrapper per tab, each targeting the call WITH its argument —
+                 only the tab actually being opened paints. --}}
+            @foreach (['overview', 'containers', 'images', 'volumes', 'networks', 'compose', 'maintenance'] as $skeletonTab)
+                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                    <span class="sr-only">{{ __('Loading section…') }}</span>
+                    @include('livewire.servers.partials.docker._tab-skeleton', ['tab' => $skeletonTab])
+                </div>
+            @endforeach
 
-            @if ($workspace_tab === 'containers')
-                @include('livewire.servers.partials.docker.containers-tab')
-            @endif
+            <div wire:loading.class="hidden" wire:target="setWorkspaceTab">
+                @if ($workspace_tab === 'overview')
+                    @include('livewire.servers.partials.docker.overview-tab')
+                @endif
 
-            @if ($workspace_tab === 'images')
-                @include('livewire.servers.partials.docker.images-tab')
-            @endif
+                @if ($workspace_tab === 'containers')
+                    @include('livewire.servers.partials.docker.containers-tab')
+                @endif
 
-            @if ($workspace_tab === 'volumes')
-                @include('livewire.servers.partials.docker.volumes-tab')
-            @endif
+                @if ($workspace_tab === 'images')
+                    @include('livewire.servers.partials.docker.images-tab')
+                @endif
 
-            @if ($workspace_tab === 'networks')
-                @include('livewire.servers.partials.docker.networks-tab')
-            @endif
+                @if ($workspace_tab === 'volumes')
+                    @include('livewire.servers.partials.docker.volumes-tab')
+                @endif
 
-            @if ($workspace_tab === 'compose')
-                @include('livewire.servers.partials.docker.compose-tab')
-            @endif
+                @if ($workspace_tab === 'networks')
+                    @include('livewire.servers.partials.docker.networks-tab')
+                @endif
 
-            @if ($workspace_tab === 'maintenance')
-                @include('livewire.servers.partials.docker.maintenance-tab')
-            @endif
+                @if ($workspace_tab === 'compose')
+                    @include('livewire.servers.partials.docker.compose-tab')
+                @endif
+
+                @if ($workspace_tab === 'maintenance')
+                    @include('livewire.servers.partials.docker.maintenance-tab')
+                @endif
+            </div>
         @endif
     </section>
 

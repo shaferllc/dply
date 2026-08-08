@@ -24,7 +24,7 @@
                     @endphp
 
                     <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])" bare class="!mb-0">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"
                             :active="$activeSubtab === 'overview'"
@@ -169,7 +169,7 @@
 
                     {{-- Sub-tab strip — group the per-engine cards so the page isn't a 9-card scroll. --}}
                     <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-                    <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])" class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+                    <x-server-workspace-tablist :aria-label="__(':engine sections', ['engine' => $engineLabels[$engine]])" bare class="!mb-0">
                         <x-server-workspace-tab
                             :id="'cache-subtab-'.$engine.'-overview'"
                             icon="heroicon-o-presentation-chart-line"

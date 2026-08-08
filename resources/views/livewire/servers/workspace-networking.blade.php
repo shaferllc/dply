@@ -2,7 +2,7 @@
     :server="$server"
     active="networking"
     :title="__('Networking')"
-    :description="__('All servers in your workspace — their private IPs, running services, and which databases are open to the network.')"
+    :description="__('Servers sharing this server\'s private network — their private IPs, running services, and which databases are open to the network.')"
     hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
@@ -20,12 +20,12 @@
             dense
             icon="heroicon-o-share"
             :title="__('Networking')"
-            :note="__('All servers in your workspace — their private IPs, running services, and which databases are open to the network.')"
+            :note="__('Servers sharing this server\'s private network — their private IPs, running services, and which databases are open to the network.')"
             class="border-b border-brand-ink/10"
         />
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Networking sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Networking sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab id="net-tab-servers" icon="heroicon-o-share" :active="$networking_tab === 'servers'" wire:click="setNetworkingTab('servers')">
                     {{ __('Servers') }}
                 </x-server-workspace-tab>
@@ -73,7 +73,7 @@
                 dense
                 icon="heroicon-o-share"
                 :title="__('Server network map')"
-                :note="__('Every server in this workspace. Use private IPs in connection strings so traffic stays off the public internet.')"
+                :note="__('Servers on the same private network as this one. Use these private IPs in connection strings so traffic stays off the public internet.')"
                 :count="trans_choice('{1} :count server|[2,*] :count servers', $allServers->count(), ['count' => $allServers->count()])"
                 class="border-b border-brand-ink/10"
             >

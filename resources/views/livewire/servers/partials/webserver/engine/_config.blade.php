@@ -15,20 +15,17 @@
                 @endphp
                 <div @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'config'" x-cloak @endif>
                 <div class="{{ $card }} overflow-hidden">
-                    {{-- Section header — matches the Overview / Live-state panels:
-                         icon badge + eyebrow + title + description on a tinted bar. --}}
-                    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config editor') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine configuration', ['engine' => $info['label']]) }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Edit → Review diff → Validate (dry-run) → Save. Save snapshots the live file to _dply_backups/, atomically installs, re-validates, and auto-restores the snapshot if validation rejects the new file. Saved revisions support diff and one-click rollback.') }}</p>
-                        </div>
-                    </div>
+                    {{-- Section head — dense, matching the Overview / Live-state
+                         panels and the rest of the workspace. --}}
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-pencil-square"
+                        :title="__(':engine configuration', ['engine' => $info['label']])"
+                        :note="__('Edit → Review diff → Validate (dry-run) → Save. Save snapshots the live file to _dply_backups/, atomically installs, re-validates, and auto-restores the snapshot if validation rejects the new file. Saved revisions support diff and one-click rollback.')"
+                        class="border-b border-brand-ink/10"
+                    />
 
-                    <div class="px-6 py-6 sm:px-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                     {{-- Pickup poll: while a read/write/validate is queued, keep the
                          component re-rendering (2s, matching the standalone config
                          page) so pickupQueuedConfig*() drains the worker result into
@@ -38,12 +35,24 @@
                         <div wire:poll.2s class="hidden" aria-hidden="true"></div>
                     @endif
                     @if ($configOptimisticPending)
-                        <div class="flex items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-sm text-brand-moss">
+                        <div class="flex items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-sm text-brand-moss">
                             <x-spinner variant="forest" class="h-4 w-4" />
                             {{ __('Loading config files…') }}
                         </div>
                     @elseif (! $opsReady || $isDeployer)
-                        <p class="text-sm text-brand-moss">{{ __('Editing config requires ready ops access and a non-deployer role.') }}</p>
+                        {{-- Gated. Two distinct blockers used to collapse into one
+                             flat sentence that named both and resolved neither —
+                             split them so the operator knows whether to fix the
+                             connection or ask for a role change. --}}
+                        <x-empty-state
+                            compact
+                            tone="amber"
+                            icon="heroicon-o-lock-closed"
+                            :title="$isDeployer ? __('Read-only for your role') : __('Server isn\'t ready for ops')"
+                            :description="$isDeployer
+                                ? __('Deploy-only members can view :engine but can\'t edit its config files. Ask an owner or admin to change your role.', ['engine' => $info['label']])
+                                : __('dply needs a ready ops connection to this server before it can read or write :engine config. Check the server\'s connection status, then reopen this tab.', ['engine' => $info['label']])"
+                        />
                     @else
                         <div class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
                             {{-- File picker --}}
@@ -130,7 +139,7 @@
                             {{-- Editor --}}
                             <div class="min-w-0">
                                 @if ($config_selected_path === null)
-                                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-center text-sm text-brand-moss">
+                                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-center text-sm text-brand-moss">
                                         <x-heroicon-o-arrow-left class="mx-auto h-5 w-5 text-brand-mist" />
                                         <p class="mt-2">{{ __('Pick a file on the left to start editing.') }}</p>
                                     </div>

@@ -1,19 +1,15 @@
             <div class="{{ $card }}">
-                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                    <x-icon-badge>
-                        <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Recent daemon-related actions on this server (program changes, sync, restarts, copies).') }}
-                        </p>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-clipboard-document-list"
+                    :title="__('Audit log')"
+                    :count="$auditLogs->isEmpty() ? null : trans_choice('{1} :count entry|[2,*] :count entries', $auditLogs->count(), ['count' => $auditLogs->count()])"
+                    :note="__('Recent daemon-related actions on this server (program changes, sync, restarts, copies).')"
+                    class="border-b border-brand-ink/10"
+                />
 
                 @if ($auditLogs->isEmpty())
-                    <div class="px-6 py-10 text-center sm:px-8">
+                    <div class="px-4 py-6 text-center sm:px-5">
                         <p class="text-sm text-brand-moss">{{ __('No activity recorded yet.') }}</p>
                     </div>
                 @else

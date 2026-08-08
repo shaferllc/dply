@@ -147,7 +147,7 @@
         @endif
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Insights sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Insights sections')" scroll bare class="!mb-0">
                 <x-server-workspace-tab id="insights-tab-overview" icon="heroicon-o-list-bullet" wire:click="setTab('overview')" :active="$tab === 'overview'">
                     {{ __('Overview') }}
                 </x-server-workspace-tab>

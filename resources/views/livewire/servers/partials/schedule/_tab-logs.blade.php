@@ -1,55 +1,45 @@
 <div class="{{ $card }}">
-    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron daemon log') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Tail of the system cron daemon (journalctl -u cron, falling back to syslog). Confirms cron itself is invoking the scheduler entries — independent of what schedule:run prints.') }}
-            </p>
-        </div>
-    </div>
-    <div class="space-y-4 p-6 sm:p-7">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-sm text-brand-moss">{{ __('Loads the last 200 lines.') }}</p>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-document-text"
+        :title="__('Cron daemon log')"
+        :note="__('Tail of the system cron daemon (journalctl -u cron, falling back to syslog). Confirms cron itself is invoking the scheduler entries — independent of what schedule:run prints. Loads the last 200 lines.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             <button
                 type="button"
                 wire:click="loadCronDaemonLog"
                 wire:loading.attr="disabled"
                 wire:target="loadCronDaemonLog"
                 @disabled(! $opsReady)
-                class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
-                <span wire:loading.remove wire:target="loadCronDaemonLog" class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-arrow-path class="h-4 w-4" />
+                <span wire:loading.remove wire:target="loadCronDaemonLog" class="inline-flex items-center gap-1">
+                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Load cron log') }}
                 </span>
-                <span wire:loading wire:target="loadCronDaemonLog" class="inline-flex items-center gap-2">
+                <span wire:loading wire:target="loadCronDaemonLog" class="inline-flex items-center gap-1">
                     <x-spinner variant="forest" size="sm" />
                     {{ __('Loading…') }}
                 </span>
             </button>
-        </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
+    <div class="space-y-3 px-4 py-3.5 sm:px-5">
         <pre class="max-h-[min(55vh,28rem)] overflow-auto whitespace-pre-wrap break-all rounded-xl bg-zinc-950 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-100 [scrollbar-color:rgb(82_82_91/0.45)_transparent]">@if ($cron_daemon_log_body !== null){{ $cron_daemon_log_body }}@else{{ __('Click "Load cron log".') }}@endif</pre>
     </div>
 </div>
 
 {{-- Per-scheduler output history — analog to the daemons per-program log card. --}}
 <div class="{{ $card }}">
-    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Output') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scheduler output history') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Recent runs per scheduler. Failures are always recorded; successful-run output is kept only when capture is enabled. Run-now invocations appear tagged Manual.') }}
-            </p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-command-line"
+        :title="__('Scheduler output history')"
+        :note="__('Recent runs per scheduler. Failures are always recorded; successful-run output is kept only when capture is enabled. Run-now invocations appear tagged Manual.')"
+        class="border-b border-brand-ink/10"
+    />
 
     @if ($logSchedulers->isEmpty())
         <div class="px-6 py-10 text-center sm:px-7">

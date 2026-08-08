@@ -71,62 +71,58 @@
 @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
 <section class="dply-card min-w-0 overflow-hidden p-0">
-    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Schedule') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $scheduleDescription }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- Dense head, matching the rest of the workspace (and the lazy
+         placeholder, which has always painted this shape). --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-calendar-days"
+        :title="__('Schedule')"
+        :note="$scheduleDescription"
+        class="border-b border-brand-ink/10"
+    />
 
-    <div class="border-b border-brand-ink/10">
-        {{-- The "SCHEDULER" eyebrow restated the page hero directly above it. --}}
-        @php
-            $glanceNote = $contextSiteModel && $schedulers_list_scope === 'site'
-                ? __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name])
-                : __('Counts across every monitored framework scheduler on this server.');
-        @endphp
-        <x-workspace-panel-head
-            icon="heroicon-o-chart-bar"
-            :title="__('Schedulers at a glance')"
-            :note="$glanceNote"
-            class="border-b border-brand-ink/10"
-        />
-        <dl class="grid grid-cols-2 gap-2 px-5 py-3 sm:grid-cols-4 sm:px-6">
-            {{-- Two lines per tile, not three: the caption ("Monitored entries",
-                 "Recent heartbeat"…) now rides beside the number instead of on
-                 its own row under it. --}}
-            @foreach ([
-                ['label' => __('Schedulers'), 'value' => $scheduleStats['total'], 'unit' => __('total'), 'caption' => __('Monitored entries'), 'tone' => 'border-brand-sage/30 bg-brand-sage/8'],
-                ['label' => __('Healthy'), 'value' => $scheduleStats['healthy'], 'unit' => __('ticking'), 'caption' => __('Recent heartbeat'), 'tone' => 'border-emerald-200 bg-emerald-50/60'],
-                ['label' => __('Attention'), 'value' => $scheduleStats['attention'], 'unit' => trans_choice('item|items', $scheduleStats['attention']), 'caption' => __('Waiting, stale, or missing'), 'tone' => 'border-amber-200 bg-amber-50/60'],
-                ['label' => __('Paused'), 'value' => $scheduleStats['paused'], 'unit' => __('stopped'), 'caption' => __('Cron disabled in Dply'), 'tone' => 'border-brand-sand/80 bg-brand-sand/30'],
-            ] as $stat)
-                <div @class([
-                    'rounded-xl border px-3 py-2',
-                    $stat['tone'] => $stat['value'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $stat['value'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $stat['label'] }}</dt>
-                    <dd class="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
-                        <span class="font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ $stat['unit'] }}</span>
-                        <span class="text-[11px] text-brand-mist">· {{ $stat['caption'] }}</span>
-                    </dd>
-                </div>
-            @endforeach
-        </dl>
-    </div>
+    @php
+        $glanceNote = $contextSiteModel && $schedulers_list_scope === 'site'
+            ? __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name])
+            : __('Counts across every monitored framework scheduler on this server.');
+    @endphp
+
+    {{-- Dense head + stat strip, same treatment as the Workers snapshot and the
+         Cron crontab-at-a-glance. The per-tile captions ("Monitored entries",
+         "Recent heartbeat"…) become hover hints — they were a third line of
+         prose on every tile. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-chart-bar"
+        :title="__('Schedulers at a glance')"
+        :note="$glanceNote"
+        class="border-b border-brand-ink/10"
+    />
+
+    <x-workspace-stat-strip class="border-b border-brand-ink/10" :stats="[
+        ['label' => __('Schedulers'), 'value' => $scheduleStats['total'], 'hint' => __('Monitored entries')],
+        [
+            'label' => __('Healthy'),
+            'value' => $scheduleStats['healthy'],
+            'tone' => $scheduleStats['healthy'] > 0 ? 'ok' : null,
+            'hint' => __('Recent heartbeat'),
+        ],
+        [
+            'label' => __('Attention'),
+            'value' => $scheduleStats['attention'],
+            'tone' => $scheduleStats['attention'] > 0 ? 'warn' : null,
+            'hint' => __('Waiting, stale, or missing'),
+        ],
+        [
+            'label' => __('Paused'),
+            'value' => $scheduleStats['paused'],
+            'hint' => __('Cron disabled in Dply'),
+        ],
+    ]" />
 
     @if ($opsReady)
         {{-- Console banner for scheduler actions (enable, pause, run-now, cadence save) --}}
-        <div wire:loading wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow" class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+        <div wire:loading.block wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow" class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
             <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
         </div>
         @if ($panel_event_message !== '')
@@ -153,7 +149,7 @@
         @endif
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab id="schedule-tab-schedulers" icon="heroicon-o-clock" :active="$schedule_workspace_tab === 'schedulers'" wire:click="setScheduleWorkspaceTab('schedulers')">
                     {{ __('Schedulers') }}
                     @if ($scheduleStats['total'] > 0)
@@ -177,12 +173,22 @@
 
         {{-- Skeleton swap, not a dim-and-lock: fading the outgoing tab to
              opacity-60 left the previous tab's rows legible while a different
-             tab loaded, which reads as "this is your data". Matches the
-             Repository / Deployments / Laravel / Monitor / Notifications / Logs
-             tab strips. --}}
-        <div class="hidden" wire:loading.class.remove="hidden" wire:target="setScheduleWorkspaceTab">
-            @include('livewire.sites.partials._panel-skeleton')
-        </div>
+             tab loaded, which reads as "this is your data".
+
+             One wrapper per tab, each targeting the call WITH its argument —
+             Livewire matches wire:target params, so only the tab actually being
+             opened paints. The shared sites `_panel-skeleton` this replaced drew
+             the same generic list for all four, so Logs and Overview resized on
+             arrival. --}}
+        @foreach (['schedulers', 'overview', 'logs', 'activity'] as $skeletonTab)
+            <div class="hidden" wire:loading.class.remove="hidden" wire:target="setScheduleWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                @include('livewire.servers.partials.schedule._tab-skeleton', [
+                    'tab' => $skeletonTab,
+                    'rows' => $scheduleStats['total'],
+                ])
+            </div>
+        @endforeach
 
         <div class="relative" wire:loading.class="hidden" wire:target="setScheduleWorkspaceTab">
             @if ($schedule_workspace_tab === 'overview')

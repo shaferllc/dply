@@ -59,7 +59,7 @@
         @endif
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Logs workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Logs workspace sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab
                     id="logs-tab-viewer"
                     icon="heroicon-o-command-line"
@@ -125,12 +125,16 @@
             </x-server-workspace-tablist>
         </div>
 
-        {{-- Skeleton swap, not a dim-and-lock: dimming the outgoing tab left the
-             previous tab's rows legible while a different tab loaded, which reads
-             as "this is your data". Matches the site Logs page. --}}
-        <div class="hidden" wire:loading.class.remove="hidden" wire:target="setLogsWorkspaceTab">
-            @include('livewire.sites.partials._panel-skeleton')
-        </div>
+        {{-- Skeleton swap, not a dim-and-lock. One shape per tab rather than the
+             shared generic list stub: Activity arrives as an audit timeline
+             (filters + trend bars + event feed) and Viewer as a dark tail pane,
+             so a single stub resized on arrival for both. --}}
+        @foreach (['viewer', 'overview', 'sources', 'shipping', 'alerts', 'activity'] as $skeletonTab)
+            <div class="hidden" wire:loading.class.remove="hidden" wire:target="setLogsWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                @include('livewire.servers.partials.logs._tab-skeleton', ['tab' => $skeletonTab])
+            </div>
+        @endforeach
 
         <div class="relative min-w-0" wire:loading.class="hidden" wire:target="setLogsWorkspaceTab">
             @if ($logsTab === 'viewer')

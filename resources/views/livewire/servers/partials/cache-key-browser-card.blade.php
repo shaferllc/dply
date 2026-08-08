@@ -209,7 +209,7 @@
          on the button. This block surfaces the pattern, an explainer line so
          the operator knows SCAN is non-blocking, and a skeleton table that
          lines up with the real result table that lands next. --}}
-    <div wire:loading wire:target="searchKeyBrowser,loadKeyBrowserPage" class="mt-4">
+    <div wire:loading.block wire:target="searchKeyBrowser,loadKeyBrowserPage" class="mt-4">
         <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
             <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <circle cx="12" cy="12" r="10" opacity="0.25" />

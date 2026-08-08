@@ -8,19 +8,15 @@
 @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
 <section class="dply-card min-w-0 overflow-hidden p-0">
-    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Workers') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $workersDescription }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- Dense head, matching the rest of the workspace (and the lazy placeholder,
+         which has always painted this shape). --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-server-stack"
+        :title="__('Workers')"
+        :note="$workersDescription"
+        class="border-b border-brand-ink/10"
+    />
 
     @if ($contextSiteModel ?? null)
         @php $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($contextSiteModel); @endphp
@@ -40,77 +36,34 @@
     @if ($daemonSloReport ?? null)
         @include('livewire.servers.partials.daemons._slo-overview')
     @else
-        {{-- At-a-glance counts. Match the Background-group convention used by Backups / Schedule. --}}
-        <div class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Supervisor') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Programs at a glance') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            @if ($contextSiteModel ?? null)
-                                {{ __('Counts for :site\'s supervisord programs. Switch the list scope to “All programs on server” to see the whole block.', ['site' => $contextSiteModel->name]) }}
-                            @else
-                                {{ __('Counts across the dply-managed supervisord block on this server.') }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <dl class="grid grid-cols-2 gap-2 px-5 py-5 sm:grid-cols-4 sm:px-6">
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-brand-sage/30 bg-brand-sage/8' => $daemonsStats['total'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $daemonsStats['total'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Programs') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['total'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $daemonsStats['total']) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Configured units') }}</p>
-                </div>
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-emerald-200 bg-emerald-50/60' => $daemonsStats['active'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $daemonsStats['active'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['active'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('running|running', $daemonsStats['active']) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Currently supervised') }}</p>
-                </div>
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-amber-200 bg-amber-50/60' => $daemonsStats['inactive'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $daemonsStats['inactive'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['inactive'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('stopped|stopped', $daemonsStats['inactive']) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Not currently running') }}</p>
-                </div>
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-brand-sage/30 bg-brand-sage/8' => $daemonsStats['total_processes'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $daemonsStats['total_processes'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Processes') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['total_processes'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('worker|workers', $daemonsStats['total_processes']) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Sum of numprocs') }}</p>
-                </div>
-            </dl>
-        </div>
+        {{-- At-a-glance counts. Same dense head + stat strip the SLO branch uses,
+             so the two paths don't look like different pages. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-cpu-chip"
+            :title="__('Programs at a glance')"
+            :note="($contextSiteModel ?? null)
+                ? __('Counts for :site\'s supervisord programs. Switch the list scope to “All programs on server” to see the whole block.', ['site' => $contextSiteModel->name])
+                : __('Counts across the dply-managed supervisord block on this server.')"
+            class="border-b border-brand-ink/10"
+        />
+
+        <x-workspace-stat-strip class="border-b border-brand-ink/10" :stats="[
+            ['label' => __('Programs'), 'value' => $daemonsStats['total'], 'hint' => __('Configured units')],
+            [
+                'label' => __('Active'),
+                'value' => $daemonsStats['active'],
+                'tone' => $daemonsStats['active'] > 0 ? 'ok' : null,
+                'hint' => __('Currently supervised'),
+            ],
+            [
+                'label' => __('Inactive'),
+                'value' => $daemonsStats['inactive'],
+                'tone' => $daemonsStats['inactive'] > 0 ? 'warn' : null,
+                'hint' => __('Not currently running'),
+            ],
+            ['label' => __('Processes'), 'value' => $daemonsStats['total_processes'], 'hint' => __('Sum of numprocs')],
+        ]" />
     @endif
 
     @if ($siteContextUnavailable)
@@ -136,12 +89,27 @@
         </div>
     @elseif ($opsReady)
         <div @if ($server->supervisor_package_status === null) wire:init="refreshSupervisorInstallStatus" @endif>
-            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+            {{-- The banner is empty most of the time, but this wrapper still drew
+                 its border and padding — an unexplained ~30px band between the
+                 snapshot strip and the tab row. Hidden until there's something to
+                 show; Livewire un-hides it for the duration of an inline SSH op
+                 via the class.remove below. --}}
+            @php
+                $daemonBannerVisible = $supervisor_installed === null
+                    || $supervisor_installed === false
+                    || $daemon_op_busy
+                    || $panel_event_message !== '';
+            @endphp
+            <div
+                @class(['border-b border-brand-ink/10 px-4 py-2.5 sm:px-5', 'hidden' => ! $daemonBannerVisible])
+                wire:loading.class.remove="hidden"
+                wire:target="startOneProgram,stopOneProgram,restartOneProgram,supervisorServiceAction"
+            >
                 @include('livewire.servers.partials.daemons._banner')
             </div>
 
             <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-                <x-server-workspace-tablist id="daemons-workspace-tablist" :aria-label="__('Workers workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                <x-server-workspace-tablist id="daemons-workspace-tablist" :aria-label="__('Workers workspace sections')" scroll bare class="!mb-0 w-full">
                     <x-server-workspace-tab id="daemons-tab-programs" icon="heroicon-o-cpu-chip" :active="$daemons_workspace_tab === 'programs'" wire:click="setDaemonsWorkspaceTab('programs')">
                         {{ __('Programs') }}
                     </x-server-workspace-tab>
@@ -163,7 +131,29 @@
                 </x-server-workspace-tablist>
             </div>
 
-            <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setDaemonsWorkspaceTab">
+            {{-- Tab-switch skeletons. setDaemonsWorkspaceTab() round-trips, and
+                 dimming the outgoing panel to 60% (what this used to do) reads as
+                 a frozen page rather than an arriving one.
+
+                 One wrapper per tab, each targeting the call WITH its argument —
+                 Livewire matches wire:target params, so only the tab actually
+                 being opened paints. That beats a single shared skeleton here:
+                 $daemons_workspace_tab still holds the OUTGOING tab during the
+                 request, and with six tabs there's no inverse to derive.
+
+                 wire:loading.block, not bare wire:loading, or the skeleton
+                 shrink-wraps to inline-block. --}}
+            @foreach (['programs', 'service', 'sync', 'logs', 'inspect', 'activity'] as $skeletonTab)
+                <div wire:loading.block wire:target="setDaemonsWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                    <span class="sr-only">{{ __('Loading section…') }}</span>
+                    @include('livewire.servers.partials.daemons._tab-skeleton', [
+                        'tab' => $skeletonTab,
+                        'rows' => max(1, min(6, $server->supervisorPrograms->count() ?: 4)),
+                    ])
+                </div>
+            @endforeach
+
+            <div class="relative" wire:loading.remove wire:target="setDaemonsWorkspaceTab">
                 @if ($daemons_workspace_tab === 'programs')
                     <x-server-workspace-tab-panel id="daemons-panel-programs" labelled-by="daemons-tab-programs" panel-class="min-w-0">
                         @include('livewire.servers.partials.daemons.programs-tab')

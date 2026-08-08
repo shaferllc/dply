@@ -536,12 +536,43 @@ class WorkspaceNetworking extends Component
 
     public function render(): View
     {
-        // All ready servers in this org except the current one — potential network peers.
+        // Peers on the SAME private network as this server — not simply every
+        // server in the org.
+        //
+        // The map exists to answer "what can I reach over private networking,
+        // and at which address?", and its own copy tells you to put these IPs in
+        // connection strings. Listing org-wide made that advice wrong: a
+        // DigitalOcean box on 10.136.0.2/nyc3 appeared alongside Hetzner boxes on
+        // 10.0.0.x/fsn1 as though they shared a fabric, and servers with no
+        // private IP at all were listed as peers.
+        //
+        // Identity is matched on either key: private_network_id is the canonical
+        // FK, but it is only backfilled on some rows (of the four servers sharing
+        // hetzner_network_id 12288346 on the dogfood org, two have a null
+        // private_network_id), so keying on it alone would drop real peers.
+        // Compared per-column rather than with a combined whereIn so a numeric
+        // Hetzner id can never collide with a ULID private-network id.
+        $privateNetworkId = $this->server->private_network_id;
+        $hetznerNetworkId = $this->server->hetzner_network_id;
+        $onPrivateNetwork = filled($privateNetworkId) || filled($hetznerNetworkId);
+
         $peerServers = Server::query()
             ->where('organization_id', $this->server->organization_id)
             ->where('id', '!=', $this->server->id)
             ->where('status', Server::STATUS_READY)
             ->whereNotIn('provider', ['digitalocean_functions', 'aws_lambda'])
+            // No network yet: keep showing the org so the create/attach flow below
+            // still has candidates to offer. Once attached, the list narrows.
+            ->when($onPrivateNetwork, function ($query) use ($privateNetworkId, $hetznerNetworkId): void {
+                $query->where(function ($q) use ($privateNetworkId, $hetznerNetworkId): void {
+                    if (filled($privateNetworkId)) {
+                        $q->orWhere('private_network_id', $privateNetworkId);
+                    }
+                    if (filled($hetznerNetworkId)) {
+                        $q->orWhere('hetzner_network_id', $hetznerNetworkId);
+                    }
+                });
+            })
             ->orderBy('name')
             ->get();
 

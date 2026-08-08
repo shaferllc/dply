@@ -7,7 +7,7 @@
         <x-server-workspace-tablist
             :aria-label="__('Runtime sections')"
             scroll
-            class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+            bare class="!mb-0 w-full"
         >
             @foreach ($runtimeTabs as $tabKey => $tabLabel)
                 <x-server-workspace-tab

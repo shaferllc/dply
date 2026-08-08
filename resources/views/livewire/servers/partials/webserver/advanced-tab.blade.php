@@ -1,21 +1,25 @@
         {{-- PHP-FPM --}}
         @if (! empty($phpFpm['versions']))
-            <div class="{{ $card }} px-5 py-5 sm:px-6">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('PHP-FPM') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('Detected installations under /etc/php/. Default is set in server meta and used by deploys and the per-row PHP-FPM actions.') }}
-                </p>
+            <div class="{{ $card }}">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-cpu-chip"
+                    :title="__('PHP-FPM')"
+                    :count="count($phpFpm['versions']) > 0 ? trans_choice('{1} :count version|[2,*] :count versions', count($phpFpm['versions']), ['count' => count($phpFpm['versions'])]) : null"
+                    :note="__('Detected installations under /etc/php/. Default is set in server meta and used by deploys and the per-row PHP-FPM actions.')"
+                    class="border-b border-brand-ink/10"
+                />
 
-                <div class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10">
+                <div class="mx-4 my-3.5 overflow-hidden rounded-xl border border-brand-ink/10 sm:mx-5">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                         <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
                             <tr>
-                                <th class="px-4 py-2 font-semibold">{{ __('Version') }}</th>
-                                <th class="px-4 py-2 font-semibold">{{ __('Status') }}</th>
-                                <th class="px-4 py-2 font-semibold">{{ __('Default') }}</th>
-                                <th class="px-4 py-2 font-semibold">{{ __('Pools') }}</th>
+                                <th class="px-3 py-1.5 font-semibold">{{ __('Version') }}</th>
+                                <th class="px-3 py-1.5 font-semibold">{{ __('Status') }}</th>
+                                <th class="px-3 py-1.5 font-semibold">{{ __('Default') }}</th>
+                                <th class="px-3 py-1.5 font-semibold">{{ __('Pools') }}</th>
                                 @if ($opsReady && ! $isDeployer)
-                                    <th class="px-4 py-2 font-semibold text-right">{{ __('Actions') }}</th>
+                                    <th class="px-3 py-1.5 font-semibold text-right">{{ __('Actions') }}</th>
                                 @endif
                             </tr>
                         </thead>
@@ -23,23 +27,23 @@
                             @foreach ($phpFpm['versions'] as $row)
                                 @php $rowPill = $statePill($row['active'] ?? null); @endphp
                                 <tr>
-                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['version'] }}</td>
-                                    <td class="px-4 py-2">
+                                    <td class="px-3 py-1.5 font-mono text-xs text-brand-ink">{{ $row['version'] }}</td>
+                                    <td class="px-3 py-1.5">
                                         <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $rowPill['classes'] }}">
                                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $rowPill['dot'] }}"></span>
                                             {{ $rowPill['label'] }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-2 text-xs">
+                                    <td class="px-3 py-1.5 text-xs">
                                         @if ($row['version'] === $defaultPhp)
                                             <span class="font-medium text-brand-forest">★ {{ __('Default') }}</span>
                                         @else
                                             <span class="text-brand-mist">—</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['pools_count'] }}</td>
+                                    <td class="px-3 py-1.5 font-mono text-xs text-brand-moss">{{ $row['pools_count'] }}</td>
                                     @if ($opsReady && ! $isDeployer)
-                                        <td class="px-4 py-2 text-right">
+                                        <td class="px-3 py-1.5 text-right">
                                             <div class="inline-flex flex-wrap justify-end gap-1.5">
                                                 @if (! empty($serviceActions['restart_php_fpm']))
                                                     @php $a = $serviceActions['restart_php_fpm']; @endphp
@@ -65,42 +69,45 @@
                         </tbody>
                     </table>
                 </div>
-                <p class="mt-3 text-xs text-brand-mist">{{ __('Restart and Reload act on the default PHP version (set in server meta). Per-version targeting is on the roadmap.') }}</p>
+                <p class="px-4 pb-3 text-[11px] text-brand-mist sm:px-5">{{ __('Restart and Reload act on the default PHP version (set in server meta). Per-version targeting is on the roadmap.') }}</p>
             </div>
         @endif
 
         {{-- TLS / certbot --}}
         @if (! empty($certbot['present']))
-            <div class="{{ $card }} px-5 py-5 sm:px-6">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="max-w-2xl">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('TLS / certbot') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Certificates managed by certbot on this server. Dry-run before renewing if you’re unsure.') }}</p>
-                    </div>
+            <div class="{{ $card }}">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-lock-closed"
+                    :title="__('TLS / certbot')"
+                    :count="! empty($certs) ? trans_choice('{1} :count certificate|[2,*] :count certificates', count($certs), ['count' => count($certs)]) : null"
+                    :note="__('Certificates managed by certbot on this server. Dry-run before renewing if you’re unsure.')"
+                    class="border-b border-brand-ink/10"
+                >
                     @if ($opsReady && ! $isDeployer)
-                        <div class="flex shrink-0 flex-wrap gap-2">
+                        <x-slot:actions>
                             @foreach (['certbot_renew_dry_run', 'certbot_renew_all'] as $cbKey)
                                 @if (! empty($serviceActions[$cbKey]))
                                     @php $a = $serviceActions[$cbKey]; @endphp
                                     <button
                                         type="button"
                                         wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $cbKey }}'], @js($a['label']), @js($a['confirm']), @js($a['label']), {{ $cbKey === 'certbot_renew_all' ? 'true' : 'false' }})"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                     >{{ $a['label'] }}</button>
                                 @endif
                             @endforeach
-                        </div>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-workspace-panel-head>
 
                 @if (! empty($certs))
-                    <div class="mt-5 overflow-hidden rounded-xl border border-brand-ink/10">
+                    <div class="mx-4 my-3.5 overflow-hidden rounded-xl border border-brand-ink/10 sm:mx-5">
                         <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                             <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
                                 <tr>
-                                    <th class="px-4 py-2 font-semibold">{{ __('Domains') }}</th>
-                                    <th class="px-4 py-2 font-semibold">{{ __('Expires') }}</th>
-                                    <th class="px-4 py-2 font-semibold">{{ __('Days remaining') }}</th>
+                                    <th class="px-3 py-1.5 font-semibold">{{ __('Domains') }}</th>
+                                    <th class="px-3 py-1.5 font-semibold">{{ __('Expires') }}</th>
+                                    <th class="px-3 py-1.5 font-semibold">{{ __('Days remaining') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-brand-ink/5 bg-white">
@@ -112,14 +119,14 @@
                                             : ($days < 0 ? 'text-red-700 font-semibold' : ($days < 14 ? 'text-red-700 font-semibold' : ($days < 30 ? 'text-amber-700 font-medium' : 'text-brand-ink')));
                                     @endphp
                                     <tr>
-                                        <td class="px-4 py-2 text-xs">
+                                        <td class="px-3 py-1.5 text-xs">
                                             <div class="font-medium text-brand-ink">{{ $cert['name'] }}</div>
                                             @if ($cert['domains'])
                                                 <div class="font-mono text-[11px] text-brand-moss">{{ $cert['domains'] }}</div>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $cert['expiry'] ?: '—' }}</td>
-                                        <td class="px-4 py-2 text-xs {{ $tone }}">
+                                        <td class="px-3 py-1.5 font-mono text-xs text-brand-moss">{{ $cert['expiry'] ?: '—' }}</td>
+                                        <td class="px-3 py-1.5 text-xs {{ $tone }}">
                                             @if ($days === null) — @elseif ($days < 0) {{ __('Invalid') }} @else {{ trans_choice(':n day|:n days', $days, ['n' => $days]) }} @endif
                                         </td>
                                     </tr>
@@ -128,18 +135,24 @@
                         </table>
                     </div>
                 @else
-                    <p class="mt-4 text-sm text-brand-moss">{{ __('certbot is installed but no certificates are managed yet.') }}</p>
+                    <p class="px-4 py-3.5 text-xs text-brand-moss sm:px-5">{{ __('certbot is installed but no certificates are managed yet.') }}</p>
                 @endif
             </div>
         @endif
 
         {{-- Switch history --}}
         @if ($recentSwitches->isNotEmpty())
-            <div class="{{ $card }} px-5 py-5 sm:px-6">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Switch history') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Recent webserver switches on this server.') }}</p>
+            <div class="{{ $card }}">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-clock"
+                    :title="__('Switch history')"
+                    :count="(string) $recentSwitches->count()"
+                    :note="__('Recent webserver switches on this server.')"
+                    class="border-b border-brand-ink/10"
+                />
 
-                <ul class="mt-4 divide-y divide-brand-ink/8 overflow-hidden rounded-xl border border-brand-ink/10">
+                <ul class="mx-4 my-3.5 divide-y divide-brand-ink/8 overflow-hidden rounded-xl border border-brand-ink/10 sm:mx-5">
                     @foreach ($recentSwitches as $event)
                         @php
                             $payload = is_array($event->payload) ? $event->payload : [];
@@ -151,7 +164,7 @@
                             $sitesCount = (int) ($payload['sites_affected'] ?? 0);
                             $durationMs = (int) ($payload['duration_ms'] ?? 0);
                         @endphp
-                        <li class="bg-white px-4 py-3">
+                        <li class="bg-white px-4 py-2.5">
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-xs text-brand-ink">
@@ -197,7 +210,7 @@
         @endif
 
         @if (empty($phpFpm['versions']) && empty($certbot['present']) && $recentSwitches->isEmpty())
-            <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-white px-6 py-8 text-center text-sm text-brand-moss">
+            <div class="m-4 rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-6 text-center text-xs text-brand-moss sm:m-5">
                 <p>{{ __('Nothing to show here yet. PHP-FPM versions, certbot certificates, and switch history will appear once the server has any to report.') }}</p>
             </div>
         @endif

@@ -71,7 +71,7 @@
                     <x-server-workspace-tablist
                         :aria-label="__('Database sections')"
                         scroll
-                        class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+                        bare class="!mb-0 w-full"
                     >
                         <x-server-workspace-tab id="db-tab-databases" icon="heroicon-o-circle-stack" :active="$dbTab === 'databases'" wire:click="setDatabaseTab('databases')">
                             {{ __('Databases') }}

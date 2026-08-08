@@ -1,6 +1,8 @@
 @php
-    $tonePalette = ['amber' => 'bg-amber-50 text-amber-900 ring-amber-200', 'rose' => 'bg-rose-50 text-rose-700 ring-rose-200', 'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-200'];
-    $overallTone = match ($report['overall']) { 'critical' => $tonePalette['rose'], 'warning' => $tonePalette['amber'], default => $tonePalette['emerald'] };
+    // Tints the authorized-keys head. Was a dead $overallTone/$tonePalette pair
+    // that built ring/bg classes nothing consumed; x-workspace-panel-head takes
+    // the tone by name, so the report's verdict now actually shows.
+    $keysTone = match ($report['overall']) { 'critical' => 'danger', 'warning' => 'amber', default => null };
     $sourceLabels = ['profile' => __('Profile'), 'organization' => __('Organization'), 'team' => __('Team'), 'ephemeral' => __('Ephemeral deploy'), 'session' => __('Temporary session'), 'server-local' => __('Server-local'), 'historical' => __('Historical'), 'platform' => __('Dply platform')];
     $timelineRangeLabels = ['7d' => __('7 days'), '30d' => __('30 days'), '90d' => __('90 days')];
 @endphp
@@ -27,27 +29,28 @@
         <x-access-map :map="$accessMap" :server="$server" />
 
         <div class="border-b border-brand-ink/10">
-            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                <x-icon-badge>
-                    <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access over time') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active SSH access') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __(':from — :to', ['from' => $timeline['from']->format('M j'), 'to' => $timeline['to']->format('M j, Y')]) }}
-                        @if ($timeline['you_active_now'])
-                            · <span class="font-medium text-amber-800">{{ __('You have access now') }}</span>
-                        @endif
-                    </p>
-                </div>
-                <div class="flex shrink-0 flex-wrap gap-1.5">
+            {{-- Dense head. "You have access now" leaves the note (which truncates)
+                 for the actions row, so the one thing worth noticing keeps its
+                 amber and can't be the text that gets cut. --}}
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-chart-bar"
+                :title="__('Active SSH access')"
+                :note="__(':from — :to', ['from' => $timeline['from']->format('M j'), 'to' => $timeline['to']->format('M j, Y')])"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    @if ($timeline['you_active_now'])
+                        <span class="inline-flex h-6 items-center rounded-full bg-amber-50 px-2 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                            {{ __('You have access now') }}
+                        </span>
+                    @endif
                     @foreach ($timelineRangeLabels as $value => $label)
                         <button
                             type="button"
                             wire:click="$set('timeline_range', '{{ $value }}')"
                             @class([
-                                'rounded-full px-3 py-1 text-xs font-semibold ring-1 transition',
+                                'inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-semibold ring-1 transition',
                                 'bg-brand-forest text-white ring-brand-forest' => $timeline_range === $value,
                                 'border border-brand-ink/15 bg-white text-brand-moss hover:bg-brand-sand/40 ring-transparent' => $timeline_range !== $value,
                             ])
@@ -55,11 +58,11 @@
                             {{ $label }}
                         </button>
                     @endforeach
-                </div>
-            </div>
+                </x-slot:actions>
+            </x-workspace-panel-head>
 
-            <div class="space-y-5 px-5 py-5 sm:px-6">
-                <div class="flex flex-wrap items-center gap-4 text-[11px] text-brand-moss">
+            <div class="space-y-3.5 px-4 py-3.5 sm:px-5">
+                <div class="flex flex-wrap items-center gap-3 text-[10px] text-brand-moss">
                     <span class="inline-flex items-center gap-1.5">
                         <span class="inline-block h-0.5 w-5 rounded bg-brand-forest"></span>
                         {{ __('Total active keys') }}
@@ -77,11 +80,11 @@
                 <x-access-graph-chart :series="$timeline['series']" wire:key="access-graph-{{ $timeline_range }}" />
 
                 @if (count($timeline['lanes']) > 0)
-                    <div class="space-y-2">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access lanes') }}</p>
-                        <div class="space-y-1.5">
+                    <div class="space-y-1.5">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access lanes') }}</p>
+                        <div class="space-y-1">
                             @foreach ($timeline['lanes'] as $lane)
-                                <div wire:key="access-lane-{{ $lane['key'] }}" class="grid grid-cols-[minmax(0,9rem)_1fr] items-center gap-3 text-xs">
+                                <div wire:key="access-lane-{{ $lane['key'] }}" class="grid grid-cols-[minmax(0,8rem)_1fr] items-center gap-2.5 text-[11px]">
                                     <div class="min-w-0 truncate">
                                         <span @class(['font-semibold', 'text-amber-800' => $lane['is_you'], 'text-sky-800' => ! $lane['is_you'] && ($lane['source'] ?? '') === 'platform', 'text-brand-ink' => ! $lane['is_you'] && ($lane['source'] ?? '') !== 'platform'])>
                                             @if ($lane['is_you'])
@@ -98,10 +101,10 @@
                                             <span class="ml-1 text-[10px] text-brand-mist">({{ $lane['label'] }})</span>
                                         @endif
                                     </div>
-                                    <div class="relative h-5 rounded-md bg-brand-sand/30 ring-1 ring-brand-ink/5">
+                                    <div class="relative h-4 rounded bg-brand-sand/30 ring-1 ring-brand-ink/5">
                                         <div
                                             @class([
-                                                'absolute inset-y-0 rounded-md',
+                                                'absolute inset-y-0 rounded',
                                                 'bg-amber-400/70 ring-1 ring-amber-500/40' => $lane['is_you'],
                                                 'bg-sky-400/60 ring-1 ring-sky-500/35' => ! $lane['is_you'] && ($lane['source'] ?? '') === 'platform',
                                                 'bg-brand-forest/35 ring-1 ring-brand-forest/20' => ! $lane['is_you'] && ($lane['source'] ?? '') !== 'platform',
@@ -117,9 +120,9 @@
                 @endif
 
                 @if (count($timeline['events']) > 0)
-                    <div class="border-t border-brand-ink/8 pt-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent changes') }}</p>
-                        <ul class="mt-3 divide-y divide-brand-ink/5 overflow-hidden rounded-xl border border-brand-ink/8 bg-white">
+                    <div class="border-t border-brand-ink/8 pt-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent changes') }}</p>
+                        <ul class="mt-2 divide-y divide-brand-ink/5 overflow-hidden rounded-lg border border-brand-ink/8 bg-white">
                             @foreach ($timeline['events'] as $event)
                                 @php
                                     $eventSource = $event['source'] ?? '';
@@ -136,22 +139,22 @@
                                     <button
                                         type="button"
                                         wire:click="showEventDetail('{{ $event['type'] ?? '' }}', '{{ $event['id'] ?? '' }}')"
-                                        class="group flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-brand-sand/30 focus:outline-none focus-visible:bg-brand-sand/40"
+                                        class="group flex w-full items-center gap-2.5 px-3 py-2 text-left transition hover:bg-brand-sand/30 focus:outline-none focus-visible:bg-brand-sand/40"
                                     >
-                                        <span class="mt-0.5 inline-flex h-2.5 w-2.5 shrink-0 rounded-full ring-4 {{ $dotClass }}" aria-hidden="true"></span>
+                                        <span class="inline-flex h-2 w-2 shrink-0 rounded-full ring-[3px] {{ $dotClass }}" aria-hidden="true"></span>
                                         <span class="min-w-0 flex-1">
-                                            <span class="block truncate text-sm font-semibold {{ $titleClass }}">{{ $event['label'] }}</span>
-                                            <span class="block truncate text-xs text-brand-moss">{{ $event['detail'] }}</span>
+                                            <span class="block truncate text-xs font-semibold {{ $titleClass }}">{{ $event['label'] }}</span>
+                                            <span class="block truncate text-[11px] text-brand-moss">{{ $event['detail'] }}</span>
                                         </span>
-                                        <span class="shrink-0 whitespace-nowrap text-[11px] text-brand-mist" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</span>
-                                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist/60 transition group-hover:translate-x-0.5 group-hover:text-brand-moss" aria-hidden="true" />
+                                        <span class="shrink-0 whitespace-nowrap text-[10px] text-brand-mist" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</span>
+                                        <x-heroicon-o-chevron-right class="h-3.5 w-3.5 shrink-0 text-brand-mist/60 transition group-hover:translate-x-0.5 group-hover:text-brand-moss" aria-hidden="true" />
                                     </button>
                                 </li>
                             @endforeach
                         </ul>
 
                         @if (($eventsPagination['total_pages'] ?? 1) > 1)
-                            <div class="mt-3 flex items-center justify-between gap-3 text-[11px] text-brand-moss">
+                            <div class="mt-2 flex items-center justify-between gap-3 text-[10px] text-brand-moss">
                                 <span>
                                     {{ __('Page :page of :total', ['page' => $eventsPagination['page'], 'total' => $eventsPagination['total_pages']]) }}
                                     · {{ trans_choice(':count change|:count changes', $eventsPagination['total'], ['count' => $eventsPagination['total']]) }}
@@ -161,7 +164,7 @@
                                         type="button"
                                         wire:click="$set('eventsPage', {{ max(1, $eventsPagination['page'] - 1) }})"
                                         @disabled($eventsPagination['page'] <= 1)
-                                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                         <x-heroicon-o-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
                                         {{ __('Previous') }}
@@ -170,7 +173,7 @@
                                         type="button"
                                         wire:click="$set('eventsPage', {{ min($eventsPagination['total_pages'], $eventsPagination['page'] + 1) }})"
                                         @disabled($eventsPagination['page'] >= $eventsPagination['total_pages'])
-                                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                         {{ __('Next') }}
                                         <x-heroicon-o-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
@@ -184,32 +187,39 @@
         </div>
 
         <div class="border-b border-brand-ink/10">
-            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                <x-icon-badge><x-heroicon-o-key class="h-5 w-5" /></x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ trans_choice(':count authorized key|:count authorized keys', $report['summary']['total'], ['count' => $report['summary']['total']]) }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        @if ($report['sync']['last_finished_at']){{ __('Last sync :time', ['time' => $report['sync']['last_finished_at']->diffForHumans()]) }}@endif
-                        @if ($report['sync']['disabled']) · {{ __('Sync disabled') }}@endif
-                        @if (($report['summary']['platform_access_recent'] ?? 0) > 0)
-                            · {{ trans_choice(':count Dply platform access in the last 30 days|:count Dply platform accesses in the last 30 days', $report['summary']['platform_access_recent'], ['count' => $report['summary']['platform_access_recent']]) }}
-                        @endif
-                    </p>
-                </div>
-                <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto">
+            @php
+                // The three sync facts were separate conditionals inside one <p>,
+                // which left a leading "·" whenever the first was absent.
+                $keysNote = array_values(array_filter([
+                    $report['sync']['last_finished_at'] ? __('Last sync :time', ['time' => $report['sync']['last_finished_at']->diffForHumans()]) : null,
+                    $report['sync']['disabled'] ? __('Sync disabled') : null,
+                    ($report['summary']['platform_access_recent'] ?? 0) > 0
+                        ? trans_choice(':count Dply platform access in the last 30 days|:count Dply platform accesses in the last 30 days', $report['summary']['platform_access_recent'], ['count' => $report['summary']['platform_access_recent']])
+                        : null,
+                ]));
+            @endphp
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-key"
+                :title="__('Authorized keys')"
+                :count="$report['summary']['total']"
+                :note="implode(' · ', $keysNote)"
+                :tone="$keysTone"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
                     @if ($sessionsEnabled)
-                        <button type="button" wire:click="openGrantSessionModal" class="inline-flex items-center gap-1 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10">{{ __('Grant session') }}</button>
+                        <button type="button" wire:click="openGrantSessionModal" class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-forest/30 bg-brand-forest/5 px-2 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10">{{ __('Grant session') }}</button>
                     @endif
-                    <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Manage keys') }}</a>
-                </div>
-            </div>
+                    <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Manage keys') }}</a>
+                </x-slot:actions>
+            </x-workspace-panel-head>
             @if ($report['alert_count'] > 0)
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['alerts'] as $alert)
-                        <li class="flex flex-wrap justify-between gap-3 px-5 py-4 sm:px-6">
-                            <div><p class="text-sm font-semibold text-brand-ink">{{ $alert['title'] }}</p><p class="text-sm text-brand-moss">{{ $alert['message'] }}</p></div>
-                            @if ($alert['href'])<a href="{{ $alert['href'] }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>@endif
+                        <li class="flex flex-wrap items-start justify-between gap-3 px-4 py-2.5 sm:px-5">
+                            <div class="min-w-0"><p class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</p><p class="text-[11px] leading-relaxed text-brand-moss">{{ $alert['message'] }}</p></div>
+                            @if ($alert['href'])<a href="{{ $alert['href'] }}" wire:navigate class="shrink-0 text-[11px] font-semibold text-brand-forest hover:underline">{{ $alert['link_label'] }}</a>@endif
                         </li>
                     @endforeach
                 </ul>
@@ -239,24 +249,22 @@
 
         @if ($sessionsEnabled && count($report['sessions']) > 0)
             <div class="border-b border-brand-ink/10">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sessions') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ trans_choice(':count active contractor session|:count active contractor sessions', $report['summary']['active_sessions'], ['count' => $report['summary']['active_sessions']]) }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Time-boxed keys auto-revoke at expiry. Revoke early from here if access is no longer needed.') }}</p>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-clock"
+                    :title="__('Temporary sessions')"
+                    :count="__(':count active', ['count' => $report['summary']['active_sessions']])"
+                    :note="__('Time-boxed keys auto-revoke at expiry. Revoke early from here if access is no longer needed.')"
+                    class="border-b border-brand-ink/10"
+                />
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['sessions'] as $session)
-                        <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6">
-                            <div>
-                                <p class="text-sm font-semibold text-brand-ink">{{ $session['name'] }}</p>
-                                <p class="text-xs text-brand-moss">{{ __('Expires :time · :user', ['time' => $session['expires_at']->diffForHumans(), 'user' => $session['created_by'] ?: __('Unknown')]) }}</p>
+                        <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold text-brand-ink">{{ $session['name'] }}</p>
+                                <p class="text-[11px] text-brand-moss">{{ __('Expires :time · :user', ['time' => $session['expires_at']->diffForHumans(), 'user' => $session['created_by'] ?: __('Unknown')]) }}</p>
                             </div>
-                            <button type="button" wire:click="openRevokeSessionModal('{{ $session['id'] }}')" class="text-xs font-semibold text-rose-700 hover:underline">{{ __('Revoke') }}</button>
+                            <button type="button" wire:click="openRevokeSessionModal('{{ $session['id'] }}')" class="shrink-0 text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Revoke') }}</button>
                         </li>
                     @endforeach
                 </ul>

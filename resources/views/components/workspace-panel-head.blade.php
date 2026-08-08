@@ -44,8 +44,10 @@
             <p class="min-w-0 flex-1 truncate text-[11px] text-brand-mist" title="{{ $note }}">{{ $note }}</p>
         @endif
 
+        {{-- ml-auto so actions stay right-aligned when there's no note; with a
+             note the flex-1 paragraph already fills the gap and it's a no-op. --}}
         @if (isset($actions) && trim((string) $actions) !== '')
-            <div class="flex shrink-0 flex-wrap items-center gap-1.5">{{ $actions }}</div>
+            <div class="ml-auto flex shrink-0 flex-wrap items-center gap-1.5">{{ $actions }}</div>
         @endif
     </div>
 @else

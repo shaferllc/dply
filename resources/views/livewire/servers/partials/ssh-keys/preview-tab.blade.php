@@ -1,14 +1,15 @@
             <div class="{{ $card }}">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Drift') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Compares the panel’s desired keys with what is on the server now (read-only).') }}</p>
-                        <p class="mt-1 text-xs text-brand-mist">
-                            {{ __('“Will add” / “Will remove” means: when you click Sync, the server\'s authorized_keys file will gain or lose that key. Adding a key in the panel doesn\'t touch the server — only Sync does.') }}
-                        </p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
+                {{-- Dense head. The two prose lines merge into one note; the second
+                     explained what "will add/remove" actually does to the server,
+                     which is the part worth keeping. --}}
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-arrows-right-left"
+                    :title="__('Drift preview')"
+                    :note="__('Read-only comparison of the panel\'s desired keys against the server now. “Will add” / “will remove” is what Sync would change in authorized_keys — adding a key in the panel doesn\'t touch the server.')"
+                    class="border-b border-brand-ink/10"
+                >
+                    <x-slot:actions>
                         <button
                             type="button"
                             wire:click="requestSyncAuthorizedKeys"
@@ -16,7 +17,7 @@
                             wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
                             @disabled($syncBusy || $driftBusy)
                             title="{{ $syncBusy ? __('A sync is already running.') : ($driftBusy ? __('A drift preview is running — wait for it to finish.') : __('Apply the pending changes by writing authorized_keys on the server.')) }}"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-forest/30 bg-brand-forest/10 px-2 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-heroicon-o-arrow-up-tray class="h-4 w-4" />
                             <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
@@ -29,7 +30,7 @@
                             wire:target="previewDiff"
                             @disabled($syncBusy || $driftBusy)
                             title="{{ $syncBusy ? __('A sync is in flight — wait for it to finish before refreshing the drift preview.') : ($driftBusy ? __('A drift preview is already running. Wait for it to finish.') : '') }}"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="previewDiff" />
                             <span wire:loading wire:target="previewDiff" class="inline-flex h-4 w-4 items-center justify-center">
@@ -38,9 +39,9 @@
                             <span wire:loading.remove wire:target="previewDiff">{{ __('Refresh preview') }}</span>
                             <span wire:loading wire:target="previewDiff">{{ __('Refreshing…') }}</span>
                         </button>
-                    </div>
-                </div>
-                <div class="px-6 py-5 sm:px-8">
+                    </x-slot:actions>
+                </x-workspace-panel-head>
+                <div class="px-4 py-3.5 sm:px-5">
                 @if ($diff_result === null)
                     <div class="flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">

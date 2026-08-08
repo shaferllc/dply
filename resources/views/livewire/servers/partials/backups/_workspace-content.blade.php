@@ -8,123 +8,79 @@
     @endphp
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Backups') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $backupsDescription }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace (and the lazy
+             placeholder, which has always painted this shape). --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-archive-box"
+            :title="__('Backups')"
+            :note="$backupsDescription"
+            class="border-b border-brand-ink/10"
+        />
 
         @if ($contextSite && ! ($siteDedicatedContext ?? false))
-            <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-sky-50/50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-                <div class="flex min-w-0 items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-funnel class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filter') }}</p>
-                        <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Filtered to :site', ['site' => $contextSite->name]) }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Runs and schedules target only this site and any databases linked to it.') }}
-                        </p>
-                    </div>
-                </div>
-                <a href="{{ route('servers.backups', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                    <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Clear filter') }}
-                </a>
-            </div>
+            {{-- Site filter. This was an icon-badge card with an eyebrow, a
+                 heading and a sentence, all to say "you are looking at one
+                 site" — one tinted line carries it, with Clear on the right. --}}
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 bg-sky-50/50 px-4 py-2 text-[11px] text-sky-900 sm:px-5">
+                <x-heroicon-m-funnel class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span class="font-semibold">{{ __('Filtered to :site.', ['site' => $contextSite->name]) }}</span>
+                {{ __('Runs and schedules target only this site and any databases linked to it.') }}
+                <a href="{{ route('servers.backups', $server) }}" wire:navigate class="ml-auto shrink-0 font-semibold underline decoration-sky-900/30 underline-offset-2 hover:decoration-sky-900">{{ __('Clear filter') }}</a>
+            </p>
         @elseif ($contextSite && ($siteDedicatedContext ?? false))
-            <div class="border-b border-brand-ink/10 px-5 py-3.5 text-sm text-brand-moss sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2 text-[11px] text-brand-moss sm:px-5">
                 {{ __('Scoped to :site — runs and schedules here only target this site and its linked databases.', ['site' => $contextSite->name]) }}
                 <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">{{ __('Open server backups') }}</a>
-            </div>
+            </p>
         @endif
 
-        {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
-        <div class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recent activity') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backups at a glance') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Counts from the last 7 days plus current state.') }}</p>
-                    </div>
-                </div>
-            </div>
-            <dl class="grid grid-cols-1 gap-2 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-rose-200 bg-rose-50/60' => $stats['db_failed_7d'] > 0,
-                    'border-emerald-200 bg-emerald-50/60' => $stats['db_failed_7d'] === 0 && $stats['db_completed_7d'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $stats['db_failed_7d'] === 0 && $stats['db_completed_7d'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database backups') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stats['db_completed_7d'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ __('completed (7d)') }}</span>
-                    </dd>
-                    @if ($stats['db_failed_7d'] > 0)
-                        <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
-                            <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                            {{ trans_choice(':n failed|:n failed', $stats['db_failed_7d'], ['n' => $stats['db_failed_7d']]) }}
-                        </p>
-                    @else
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('No failures') }}</p>
-                    @endif
-                </div>
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-rose-200 bg-rose-50/60' => $stats['files_failed_7d'] > 0,
-                    'border-emerald-200 bg-emerald-50/60' => $stats['files_failed_7d'] === 0 && $stats['files_completed_7d'] > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $stats['files_failed_7d'] === 0 && $stats['files_completed_7d'] === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Site file backups') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stats['files_completed_7d'] }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ __('completed (7d)') }}</span>
-                    </dd>
-                    @if ($stats['files_failed_7d'] > 0)
-                        <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
-                            <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                            {{ trans_choice(':n failed|:n failed', $stats['files_failed_7d'], ['n' => $stats['files_failed_7d']]) }}
-                        </p>
-                    @else
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('No failures') }}</p>
-                    @endif
-                </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total stored') }}</dt>
-                    <dd class="mt-1 truncate font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $formatBytes($stats['total_bytes']) }}</dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all targets') }}</p>
-                </div>
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-brand-sage/30 bg-brand-sage/8' => $activeScheduleCount > 0,
-                    'border-brand-ink/10 bg-brand-sand/15' => $activeScheduleCount === 0,
-                ])>
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedules') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $activeScheduleCount }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('active|active', $activeScheduleCount) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Recurring jobs') }}</p>
-                </div>
-            </dl>
-        </div>
+        {{-- Backups at a glance: 7-day completions, failures, and what's stored.
+             Dense head + stat strip, same treatment as the Cron crontab glance —
+             the per-tile captions ("Across all targets", "No failures") become
+             hover hints rather than a third line of prose on every tile. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-chart-bar"
+            :title="__('Backups at a glance')"
+            :note="trans_choice(
+                '{0} Counts from the last 7 days · no recurring schedule is active.|{1} Counts from the last 7 days · :count recurring schedule active.|[2,*] Counts from the last 7 days · :count recurring schedules active.',
+                $activeScheduleCount,
+                ['count' => $activeScheduleCount],
+            )"
+            class="border-b border-brand-ink/10"
+        />
+
+        @php $backupFailures7d = $stats['db_failed_7d'] + $stats['files_failed_7d']; @endphp
+
+        <x-workspace-stat-strip class="border-b border-brand-ink/10" :stats="[
+            [
+                'label' => __('Database backups'),
+                'value' => $stats['db_completed_7d'],
+                'tone' => $stats['db_completed_7d'] > 0 ? 'ok' : null,
+                'hint' => __('Completed in the last 7 days'),
+            ],
+            [
+                'label' => __('Site file backups'),
+                'value' => $stats['files_completed_7d'],
+                'tone' => $stats['files_completed_7d'] > 0 ? 'ok' : null,
+                'hint' => __('Completed in the last 7 days'),
+            ],
+            [
+                'label' => __('Failed'),
+                'value' => $backupFailures7d,
+                'tone' => $backupFailures7d > 0 ? 'bad' : null,
+                'hint' => __('Database and site-file runs that failed in the last 7 days'),
+            ],
+            [
+                'label' => __('Total stored'),
+                'value' => $formatBytes($stats['total_bytes']),
+                'hint' => __('Across all targets'),
+            ],
+        ]" />
 
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Backups sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+            <x-server-workspace-tablist :aria-label="__('Backups sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab id="backups-tab-overview" :active="$backups_workspace_tab === 'overview'" wire:click="setBackupsWorkspaceTab('overview')" icon="heroicon-o-bolt">
                     {{ __('Overview') }}
                 </x-server-workspace-tab>
@@ -140,14 +96,33 @@
             </x-server-workspace-tablist>
         </div>
 
-    <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setBackupsWorkspaceTab">
-
     {{-- One-shot guard-jump: while a run launched THIS session is in flight,
          poll for its terminal transition so pollBackupRun() can jump us to
-         History (only if still on the originating tab). --}}
+         History (only if still on the originating tab). Sits outside the tab
+         container so a tab switch can't pause the watch. --}}
     @if ($watchedBackupRunId)
         <div wire:poll.2s="pollBackupRun" class="hidden" aria-hidden="true"></div>
     @endif
+
+    {{-- Skeleton swap, not a dim-and-lock: fading the outgoing tab to opacity-60
+         left the previous tab's rows legible while a different tab loaded, which
+         reads as "this is your data".
+
+         One wrapper per tab, each targeting the call WITH its argument —
+         Livewire matches wire:target params, so only the tab actually being
+         opened paints. $backups_workspace_tab still holds the OUTGOING tab
+         during the request, so it can't shape a single shared skeleton. --}}
+    @foreach (['overview', 'schedules', 'history', 'notifications'] as $skeletonTab)
+        <div class="hidden" wire:loading.class.remove="hidden" wire:target="setBackupsWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+            <span class="sr-only">{{ __('Loading section…') }}</span>
+            @include('livewire.servers.partials.backups._tab-skeleton', [
+                'tab' => $skeletonTab,
+                'rows' => $skeletonTab === 'schedules' ? $schedules->count() : $databaseBackups->count(),
+            ])
+        </div>
+    @endforeach
+
+    <div class="relative" wire:loading.class="hidden" wire:target="setBackupsWorkspaceTab">
 
     @if ($backups_workspace_tab === 'overview')
     <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="min-w-0">
@@ -175,36 +150,31 @@
          straight to the browser, no S3). They share the "run a backup now" intent
          but differ in what happens to the artifact, so they're one group + toggle. --}}
     <div x-data="{ runMode: 'save' }" class="min-w-0">
-        <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
-                <button type="button" x-on:click="runMode = 'save'" :class="runMode === 'save' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
-                    <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
+        <div class="border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
+            <div class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-0.5 shadow-sm">
+                <button type="button" x-on:click="runMode = 'save'" :class="runMode === 'save' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition">
+                    <x-heroicon-m-archive-box class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Save a backup') }}
                 </button>
-                <button type="button" x-on:click="runMode = 'download'" :class="runMode === 'download' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
-                    <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <button type="button" x-on:click="runMode = 'download'" :class="runMode === 'download' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition">
+                    <x-heroicon-m-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Download now') }}
                 </button>
             </div>
         </div>
 
     <section x-show="runMode === 'download'" x-cloak class="border-b border-brand-ink/10" wire:init="detectLiveDatabases">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Build a fresh dump or archive on the server — we’ll notify you in-app and by email when it’s ready to grab. Saved to your cloud download bucket for :window and re-downloadable until then. Capped at :cap; larger payloads should use a scheduled backup.', ['window' => \App\Services\Servers\QuickDownloadNotifier::retentionWindowLabel(), 'cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
-                </div>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-arrow-down-tray"
+            :title="__('Quick download')"
+            :note="__('Build a fresh dump or archive on the server — we’ll notify you in-app and by email when it’s ready to grab. Saved to your cloud download bucket for :window and re-downloadable until then. Capped at :cap; larger payloads should use a scheduled backup.', ['window' => \App\Services\Servers\QuickDownloadNotifier::retentionWindowLabel(), 'cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))])"
+            class="border-b border-brand-ink/10"
+        />
         <div class="divide-y divide-brand-ink/10">
             {{-- Registered databases (per-database credentials) --}}
             @foreach ($databases as $db)
-                <div wire:key="qd-db-{{ $db->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                <div wire:key="qd-db-{{ $db->id }}" class="flex items-center gap-3 px-4 py-2.5 sm:px-5">
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $db->name }}</p>
                         <p class="text-xs text-brand-moss">{{ __('Database') }} · {{ \Illuminate\Support\Str::title($db->engine) }}</p>
@@ -216,7 +186,7 @@
             {{-- Databases discovered on the box but not catalogued by dply (admin-credential dump) --}}
             @foreach ($adHocDbTargets as $target)
                 @php $adhocProcessing = $qdTargetKey === 'adhoc:'.$target['engine'].':'.$target['name']; @endphp
-                <div wire:key="qd-adhoc-{{ $target['engine'] }}-{{ $target['name'] }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                <div wire:key="qd-adhoc-{{ $target['engine'] }}-{{ $target['name'] }}" class="flex items-center gap-3 px-4 py-2.5 sm:px-5">
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $target['name'] }}</p>
                         <p class="text-xs text-brand-moss">{{ \Illuminate\Support\Str::title($target['engine']) }} · {{ __('detected on server (not yet managed)') }}</p>
@@ -243,7 +213,7 @@
 
             {{-- Sites --}}
             @foreach ($sites as $qdSite)
-                <div wire:key="qd-site-{{ $qdSite->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                <div wire:key="qd-site-{{ $qdSite->id }}" class="flex items-center gap-3 px-4 py-2.5 sm:px-5">
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $qdSite->name }}</p>
                         <p class="text-xs text-brand-moss">{{ __('Site files, .env, vhost, logs, home, or a combined bundle') }}</p>
@@ -254,7 +224,7 @@
 
             {{-- Detection state --}}
             @if (! $liveDbDetected && ! $contextSite)
-                <div class="flex items-center gap-2 px-6 py-3 text-xs text-brand-moss sm:px-7">
+                <div class="flex items-center gap-2 px-4 py-2.5 text-[11px] text-brand-moss sm:px-5">
                     <svg class="h-3.5 w-3.5 animate-spin text-brand-sage" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
@@ -262,28 +232,21 @@
                     {{ __('Scanning the server for databases…') }}
                 </div>
             @elseif ($databases->isEmpty() && $adHocDbTargets->isEmpty() && $sites->isEmpty())
-                <p class="px-6 py-3 text-sm text-brand-moss sm:px-7">{{ __('No databases or SSH-ready sites found on this server.') }}</p>
+                <p class="px-4 py-2.5 text-xs text-brand-moss sm:px-5">{{ __('No databases or SSH-ready sites found on this server.') }}</p>
             @endif
         </div>
     </section>
 
     <section x-show="runMode === 'save'" x-cloak class="border-b border-brand-ink/10">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Storage') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where database backups are kept') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or an org S3-compatible destination from Settings → Backup configurations.') }}
-                    </p>
-                </div>
-            </div>
-        </div>
-        <form wire:submit="saveDatabaseBackupSettings" class="space-y-4 p-6 sm:p-7">
-            <div class="grid gap-4 sm:grid-cols-2">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-server-stack"
+            :title="__('Where database backups are kept')"
+            :note="__('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or an org S3-compatible destination from Settings → Backup configurations.')"
+            class="border-b border-brand-ink/10"
+        />
+        <form wire:submit="saveDatabaseBackupSettings" class="space-y-3 px-4 py-3.5 sm:px-5">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <label class="block text-sm font-medium text-brand-ink">{{ __('Default storage') }}</label>
                     <select wire:model.live="db_backup_default_kind" class="{{ $input }} mt-1">
@@ -352,19 +315,14 @@
     {{-- Run now -------------------------------------------------------------------- --}}
     <div x-show="runMode === 'save'" x-cloak class="grid lg:grid-cols-2 lg:divide-x lg:divide-brand-ink/10">
         <section class="border-b border-brand-ink/10 lg:border-b-0">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('On demand') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run database backup') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Queue an export job for one database now.') }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="space-y-3 p-6 sm:p-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-circle-stack"
+                :title="__('Run database backup')"
+                :note="__('Queue an export job for one database now.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="space-y-2.5 px-4 py-3.5 sm:px-5">
                 @php $remoteDbs = $remoteDatabases ?? collect(); @endphp
                 @if ($databases->isEmpty() && $remoteDbs->isEmpty())
                     <p class="text-sm text-brand-moss">{{ __('No databases on this server yet.') }}</p>
@@ -423,19 +381,14 @@
         </section>
 
         <section class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('On demand') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run site files backup') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Archive and ship a site’s files to its destination.') }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="space-y-3 p-6 sm:p-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-folder"
+                :title="__('Run site files backup')"
+                :note="__('Archive and ship a site’s files to its destination.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="space-y-2.5 px-4 py-3.5 sm:px-5">
                 @if ($sites->isEmpty())
                     <p class="text-sm text-brand-moss">{{ __('No sites on this server yet.') }}</p>
                 @else
@@ -484,37 +437,30 @@
     @endif
     {{-- Schedules ------------------------------------------------------------------ --}}
     <section class="border-b border-brand-ink/10">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring schedules') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each schedule materializes a managed cron entry that calls dply:run-backup-schedule {id}.') }}</p>
-                </div>
-                @if ($schedules->isNotEmpty())
-                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $schedules->count() }}</span>
-                @endif
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-calendar-days"
+            :title="__('Recurring schedules')"
+            :count="$schedules->isEmpty() ? null : trans_choice('{1} :count schedule|[2,*] :count schedules', $schedules->count(), ['count' => $schedules->count()])"
+            :note="__('Each schedule materializes a managed cron entry that calls dply:run-backup-schedule {id}.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="space-y-4 p-6 sm:p-7">
+        <div class="space-y-3 px-4 py-3.5 sm:px-5">
             @if ($backupConfigurations->isEmpty())
                 {{-- No destinations means no schedule can actually push anywhere, so
                      skip the cadence/target/cron form entirely until the operator
                      adds a destination. --}}
-                <div class="px-2 py-8 text-center">
-                    <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-cloud-arrow-up class="h-6 w-6" aria-hidden="true" />
+                <div class="px-2 py-6 text-center">
+                    <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <p class="mt-4 text-sm font-semibold text-brand-ink">{{ __('Add a backup destination to start scheduling') }}</p>
+                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('Add a backup destination to start scheduling') }}</p>
                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ __('Schedules push backups to a destination you own (S3, B2, R2, Spaces, SFTP, Dropbox, Google Drive, or rclone). Add one to unlock the recurring-schedule form.') }}</p>
                     <button
                         type="button"
                         wire:click="openDestinationModal"
-                        class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        class="mt-4 inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-ink px-3 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                     >
                         <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Add backup destination') }}
@@ -529,7 +475,7 @@
                     <button type="button" wire:click="$set('new_cron_expression', '0 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Hourly') }}</button>
                     <button type="button" wire:click="$set('new_cron_expression', '*/15 * * * *')" class="rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-brand-ink hover:bg-brand-sand/40">{{ __('Every 15 min') }}</button>
                 </div>
-                <form wire:submit="addSchedule" class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:grid-cols-5">
+                <form wire:submit="addSchedule" class="grid gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-3 sm:grid-cols-5">
                     <select wire:model.live="new_target_type" class="{{ $input }} sm:col-span-1">
                         <option value="database">{{ __('Database') }}</option>
                         <option value="site_files">{{ __('Site files') }}</option>
@@ -571,7 +517,7 @@
             @endif
 
             @if ($schedules->isEmpty())
-                <p class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-center text-sm text-brand-moss">{{ __('No recurring backups scheduled yet.') }}</p>
+                <p class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-6 text-center text-xs text-brand-moss">{{ __('No recurring backups scheduled yet.') }}</p>
             @else
                 <ul class="divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
                     @foreach ($schedules as $schedule)
@@ -586,8 +532,8 @@
                                 default => null,
                             };
                         @endphp
-                        <li wire:key="sched-{{ $schedule->id }}" x-data="{ historyOpen: false }" class="flex flex-col gap-3 bg-white px-4 py-3 transition-colors hover:bg-brand-sand/15">
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <li wire:key="sched-{{ $schedule->id }}" x-data="{ historyOpen: false }" class="flex flex-col gap-2 bg-white px-4 py-2.5 transition-colors hover:bg-brand-sand/15">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <p class="truncate text-sm font-semibold text-brand-ink">{{ $schedule->targetLabel() }}</p>
@@ -733,27 +679,20 @@
     {{-- Recent runs ---------------------------------------------------------------- --}}
     <div class="grid lg:grid-cols-2 lg:divide-x lg:divide-brand-ink/10">
         <section class="border-b border-brand-ink/10 lg:border-b-0">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent database backups') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Latest exports by database, with size and status.') }}</p>
-                    </div>
-                    @if ($databaseBackups->isNotEmpty())
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $databaseBackups->count() }}</span>
-                    @endif
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-circle-stack"
+                :title="__('Recent database backups')"
+                :count="$databaseBackups->isEmpty() ? null : (string) $databaseBackups->count()"
+                :note="__('Latest exports by database, with size and status.')"
+                class="border-b border-brand-ink/10"
+            />
             @if ($databaseBackups->isEmpty())
-                <div class="px-6 py-12 text-center sm:px-7">
-                    <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+                <div class="px-4 py-10 text-center sm:px-5">
+                    <span class="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-archive-box class="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No database backups yet.') }}</p>
+                    <p class="mt-2.5 text-xs font-medium text-brand-ink">{{ __('No database backups yet.') }}</p>
                 </div>
             @else
                 <ul class="divide-y divide-brand-ink/10">
@@ -764,7 +703,7 @@
                                 x-init="$el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => flash = false, 4000)"
                                 :class="flash ? 'ring-2 ring-inset ring-brand-forest/60 bg-brand-forest/5' : ''"
                             @endif
-                            class="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7">
+                            class="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-5">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ optional($backup->serverDatabase)->name ?? '(deleted)' }}</p>
@@ -814,27 +753,20 @@
         </section>
 
         <section class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent site file backups') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Latest archives by site, with size and status.') }}</p>
-                    </div>
-                    @if ($fileBackups->isNotEmpty())
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $fileBackups->count() }}</span>
-                    @endif
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-folder"
+                :title="__('Recent site file backups')"
+                :count="$fileBackups->isEmpty() ? null : (string) $fileBackups->count()"
+                :note="__('Latest archives by site, with size and status.')"
+                class="border-b border-brand-ink/10"
+            />
             @if ($fileBackups->isEmpty())
-                <div class="px-6 py-12 text-center sm:px-7">
-                    <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+                <div class="px-4 py-10 text-center sm:px-5">
+                    <span class="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        <x-heroicon-o-folder class="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No site file backups yet.') }}</p>
+                    <p class="mt-2.5 text-xs font-medium text-brand-ink">{{ __('No site file backups yet.') }}</p>
                 </div>
             @else
                 <ul class="divide-y divide-brand-ink/10">
@@ -845,7 +777,7 @@
                                 x-init="$el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => flash = false, 4000)"
                                 :class="flash ? 'ring-2 ring-inset ring-brand-forest/60 bg-brand-forest/5' : ''"
                             @endif
-                            class="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-brand-sand/15 sm:px-7">
+                            class="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-brand-sand/15 sm:px-5">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ optional($backup->site)->name ?? '(deleted)' }}</p>
@@ -906,7 +838,7 @@
     </div>{{-- /tab container --}}
 
     {{-- CLI equivalents — same idea as Cron / Daemons pages. Lets operators script the same flows. --}}
-    <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
+    <div class="border-t border-brand-ink/10 px-4 py-2.5 sm:px-5">
         <x-cli-snippet :commands="[
             ['label' => __('Run all due backup schedules now'), 'command' => 'dply:run-backup-schedule {schedule_id}'],
             ['label' => __('Prune old backups (dry-run)'), 'command' => 'dply:prune-backups --dry-run'],

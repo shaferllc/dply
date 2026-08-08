@@ -44,7 +44,7 @@
                     </x-slot:stats>
 
                     <x-slot:tabs>
-                        <x-server-workspace-tablist :aria-label="__('View mode')" class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                        <x-server-workspace-tablist :aria-label="__('View mode')" bare class="!mb-0 w-full">
                             <x-server-workspace-tab :subtab-key="'form'" icon="heroicon-o-bars-3-bottom-left" title="{{ __('Form view') }}">
                                 {{ __('Form') }}
                             </x-server-workspace-tab>
@@ -997,7 +997,7 @@
                     </x-outline-link>
                 </x-slot:actions>
                 <x-slot:tabs>
-                    <x-server-workspace-tablist :aria-label="__('View mode')" class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+                    <x-server-workspace-tablist :aria-label="__('View mode')" bare class="!mb-0 w-full">
                         <x-server-workspace-tab :subtab-key="'form'" icon="heroicon-o-bars-3-bottom-left" title="{{ __('Form view') }}">
                             {{ __('Form') }}
                         </x-server-workspace-tab>

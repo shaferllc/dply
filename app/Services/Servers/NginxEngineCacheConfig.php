@@ -10,7 +10,7 @@ use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
 
 /**
- * Server-level FastCGI / proxy cache zones (RunCloud-style page caching).
+ * Server-level FastCGI / proxy cache zones for full-page caching.
  * Zone sizes persist in {@see ServerWebserverCacheFeature}; on save dply
  * rewrites the shared http{} include and reloads nginx.
  */

@@ -8,7 +8,7 @@ use App\Models\Server;
 use App\Services\SshConnection;
 
 /**
- * Purge nginx FastCGI / proxy engine cache storage (RunCloud-style purge all).
+ * Purge nginx FastCGI / proxy engine cache storage (purge all).
  */
 class NginxEngineCachePurger
 {

@@ -120,7 +120,7 @@
              clears, this div hides, and the freshly-pushed history entry above
              takes its place. Operator never sees a frozen output area while SSH
              round-trips. --}}
-        <div class="mt-2 {{ empty($replHistory) ? '' : 'border-t border-emerald-100/10 pt-2' }}" wire:loading wire:target="runReplCommand">
+        <div class="mt-2 {{ empty($replHistory) ? '' : 'border-t border-emerald-100/10 pt-2' }}" wire:loading.block wire:target="runReplCommand">
             <p class="text-amber-300/90">
                 <span class="text-emerald-200/80 select-none">&gt;&nbsp;</span><span x-text="pendingCmd || '…'"></span>
             </p>

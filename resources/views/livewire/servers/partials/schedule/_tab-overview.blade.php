@@ -18,32 +18,29 @@
 @endphp
 
 <section class="border-b border-brand-ink/10">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-heart class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Status') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                @if ($hasStale)
-                    {{ __('Schedulers need attention') }}
-                @elseif ($scheduleStats['total'] === 0 && $scheduleStats['attention'] === 0)
-                    {{ __('No schedulers yet') }}
-                @else
-                    {{ __('All schedulers look good') }}
-                @endif
-            </h3>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                @if ($hasStale)
-                    {{ __('One or more schedulers haven\'t ticked recently. Open the Schedulers tab to investigate or use Run now to verify.') }}
-                @elseif ($scheduleStats['total'] === 0 && $scheduleStats['attention'] === 0)
-                    {{ __('Enable a framework scheduler for a site to start tracking tick health.') }}
-                @else
-                    {{ __('Every tracked scheduler is healthy or waiting for its first tick.') }}
-                @endif
-            </p>
-        </div>
-    </div>
+    {{-- Verdict as the title, the follow-up line as the note. The "STATUS"
+         eyebrow above it said nothing the title didn't. --}}
+    @php
+        $overviewEmpty = $scheduleStats['total'] === 0 && $scheduleStats['attention'] === 0;
+        $overviewTitle = match (true) {
+            $hasStale => __('Schedulers need attention'),
+            $overviewEmpty => __('No schedulers yet'),
+            default => __('All schedulers look good'),
+        };
+        $overviewNote = match (true) {
+            $hasStale => __('One or more schedulers haven\'t ticked recently. Open the Schedulers tab to investigate or use Run now to verify.'),
+            $overviewEmpty => __('Enable a framework scheduler for a site to start tracking tick health.'),
+            default => __('Every tracked scheduler is healthy or waiting for its first tick.'),
+        };
+    @endphp
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-heart"
+        :title="$overviewTitle"
+        :note="$overviewNote"
+        :tone="$hasStale ? 'amber' : null"
+        class="border-b border-brand-ink/10"
+    />
 
     @if ($attentionCards !== [])
         <ul class="divide-y divide-brand-ink/10">

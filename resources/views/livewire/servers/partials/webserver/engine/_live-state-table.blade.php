@@ -90,20 +90,17 @@
                     class="{{ $card }}"
                     wire:key="livestate-{{ $key }}-{{ $engine_subtab }}"
                 >
-                    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-table-cells class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Live state') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                                {{ $engineLabel }} — {{ $subtabTitle }}
-                            </h3>
-                            @if ($subtabDescription !== '')
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $subtabDescription }}</p>
-                            @endif
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-table-cells"
+                        :title="$engineLabel.' — '.$subtabTitle"
+                        :note="$subtabDescription"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                        <div class="min-w-0">
                             @if ($liveCapturedAt)
-                                <p class="mt-1 text-[11px] tabular-nums text-brand-mist">
+                                <p class="text-[11px] tabular-nums text-brand-mist">
                                     {{ __('As of :time', ['time' => $liveCapturedAt->diffForHumans()]) }}
                                     <span
                                         wire:loading
@@ -119,7 +116,7 @@
                                     </span>
                                 </p>
                             @else
-                                <p class="mt-1 inline-flex items-center gap-1 text-[11px] text-brand-forest">
+                                <p class="inline-flex items-center gap-1 text-[11px] text-brand-forest">
                                     <span
                                         wire:loading
                                         wire:target="refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal"
@@ -135,17 +132,18 @@
                             wire:click="refreshEngineLiveState"
                             wire:loading.attr="disabled"
                             wire:target="refreshEngineLiveState"
-                            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="refreshEngineLiveState" class="inline-flex">
-                                <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             </span>
                             <span wire:loading wire:target="refreshEngineLiveState" class="inline-flex">
                                 <x-spinner variant="forest" size="sm" />
                             </span>
                             {{ __('Refresh now') }}
                         </button>
-                    </div>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
 
                     @php
                         $rows = $liveUnits[$engine_subtab] ?? [];
@@ -241,11 +239,11 @@
                     @php
                         $liveStateWireLoadingTargets = 'refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal';
                     @endphp
-                    <div class="px-6 py-6 sm:px-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                     <div
                         wire:loading.block
                         wire:target="{{ $liveStateWireLoadingTargets }}"
-                        class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                        class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-4 py-8 text-center text-sm text-brand-moss"
                     >
                         <x-spinner variant="forest" class="mx-auto h-5 w-5" />
                         <p class="mt-2">{{ __('Probing server…') }}</p>
@@ -261,13 +259,13 @@
                         </div>
                     @endif
                     @if ($liveStateStandby)
-                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50/70 px-6 py-4 text-sm text-amber-950">
+                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
                             <p class="font-semibold">{{ __('Engine on standby') }}</p>
                             <p class="mt-1 leading-relaxed">{{ $liveStateStandbyReason !== '' ? $liveStateStandbyReason : __('This edge proxy is not running on this server.') }}</p>
                             <p class="mt-2 text-[13px] text-amber-900/80">{{ __('Live routing tables appear here when this engine is the active edge proxy on port :port.', ['port' => 80]) }}</p>
                         </div>
                     @elseif ($liveStateErrors !== [])
-                        <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50/70 px-6 py-4 text-sm text-rose-900">
+                        <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm text-rose-900">
                             <p class="font-semibold">{{ __('Probe reported problems') }}</p>
                             <ul class="mt-2 list-inside list-disc space-y-1 font-mono text-xs">
                                 @foreach ($liveStateErrors as $err)
@@ -276,17 +274,17 @@
                             </ul>
                         </div>
                     @elseif ($engine_live_state_loading && empty($rows))
-                        <div class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                        <div class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-4 py-8 text-center text-sm text-brand-moss">
                             <x-spinner variant="forest" class="mx-auto h-5 w-5" />
                             <p class="mt-2">{{ __('Probing server…') }}</p>
                         </div>
                     @elseif (! $liveStateProbed && empty($rows))
-                        <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                        <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-center text-sm text-brand-moss">
                             <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
                             <p class="mt-2">{{ __('No data yet — open this tab or click "Refresh now" to probe the server.') }}</p>
                         </div>
                     @elseif ($liveStateProbed && empty($rows))
-                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-4 py-8 text-center text-sm text-brand-moss">
                             <x-heroicon-o-check-circle class="mx-auto h-5 w-5 text-emerald-600" />
                             <p class="mt-2 font-medium text-brand-ink">{{ __('In sync — nothing to list') }}</p>
                             <p class="mt-1 max-w-md mx-auto text-[13px] leading-relaxed">{{ $liveStateEmptyMessage }}</p>

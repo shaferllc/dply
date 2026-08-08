@@ -49,7 +49,7 @@
                     <x-server-workspace-tablist
                         :aria-label="__('Logs workspace sections')"
                         scroll
-                        class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+                        bare class="!mb-0 w-full"
                     >
                         <x-server-workspace-tab
                             id="logs-tab-viewer"

@@ -6,22 +6,23 @@
                  ============================================================= --}}
             @if ($key === 'caddy' && $isActive && $engineHasFullControls($key))
                 <div @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'routes'" x-cloak @endif class="space-y-4 mb-6" wire:key="caddy-custom-routes-config">
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom Caddy routes') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">
-                                    {{ __('Add ad-hoc site blocks as `dply-custom-*.caddy` under sites-enabled. Dply-managed site routes are provisioned separately — use this for standalone hostnames, reverse proxies, or legacy configs.') }}
-                                </p>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
+                    <div class="{{ $card }} overflow-hidden">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-arrow-path-rounded-square"
+                            :title="__('Custom Caddy routes')"
+                            :count="$caddy_custom_routes_loaded ? (count($caddy_custom_routes_form) ?: null) : null"
+                            :note="__('Add ad-hoc site blocks as `dply-custom-*.caddy` under sites-enabled. Dply-managed site routes are provisioned separately — use this for standalone hostnames, reverse proxies, or legacy configs.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot:actions>
                                 <button
                                     type="button"
                                     wire:click="openAddCaddyCustomRouteForm"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-plus class="h-4 w-4" />
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Add route') }}
                                 </button>
                                 <button
@@ -29,30 +30,31 @@
                                     wire:click="loadCaddyCustomRoutesConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="loadCaddyCustomRoutesConfig"
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadCaddyCustomRoutesConfig" class="inline-flex">
-                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
                                     </span>
                                     <span wire:loading wire:target="loadCaddyCustomRoutesConfig" class="inline-flex">
-                                        <x-spinner class="h-4 w-4" />
+                                        <x-spinner class="h-3.5 w-3.5" />
                                     </span>
                                     {{ __('Reload from server') }}
                                 </button>
-                            </div>
-                        </div>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
 
+                        <div class="px-4 py-3.5 sm:px-5">
                         @if ($caddy_custom_routes_flash)
-                            <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $caddy_custom_routes_flash }}</div>
+                            <div class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">{{ $caddy_custom_routes_flash }}</div>
                         @endif
                         @if ($caddy_custom_routes_error)
-                            <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                            <div class="mb-3 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
                                 <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $caddy_custom_routes_error }}</pre>
                             </div>
                         @endif
 
                         @if ($caddy_custom_routes_show_add)
-                            <form wire:submit.prevent="submitAddCaddyCustomRoute" class="mt-5 rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4 sm:p-5">
+                            <form wire:submit.prevent="submitAddCaddyCustomRoute" class="mb-3 rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4">
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('Add custom route') }}</p>
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Creates sites-enabled/dply-custom-{slug}.caddy and reloads Caddy after validate.') }}</p>
 
@@ -88,18 +90,58 @@
                             </form>
                         @endif
 
+                        {{-- Dashed-card idle + empty states, matching the nginx
+                             Hosts / Upstreams panels. --}}
                         @if (! $caddy_custom_routes_loaded)
-                            <p class="mt-5 text-sm text-brand-moss">
-                                <span wire:loading wire:target="loadCaddyCustomRoutesConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-4 w-4" /> {{ __('Reading custom route files…') }}
-                                </span>
-                                <span wire:loading.remove wire:target="loadCaddyCustomRoutesConfig">
-                                    {{ __('Click "Reload from server" to fetch custom routes.') }}
-                                </span>
-                            </p>
+                            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                                <div wire:loading.block wire:target="loadCaddyCustomRoutesConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
+                                    <x-spinner variant="forest" class="h-5 w-5" />
+                                    <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Reading custom route files…') }}</p>
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Listing dply-custom-*.caddy under sites-enabled over SSH.') }}</p>
+                                </div>
+                                <div wire:loading.remove wire:target="loadCaddyCustomRoutesConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
+                                    <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                    <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Custom routes not loaded') }}</p>
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read dply-custom-*.caddy from this server to edit or remove standalone routes.') }}</p>
+                                    <button
+                                        type="button"
+                                        wire:click="loadCaddyCustomRoutesConfig"
+                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Reload from server') }}
+                                    </button>
+                                </div>
+                            </div>
                         @elseif ($caddy_custom_routes_form === [])
-                            <p class="mt-5 text-sm text-brand-moss">{{ __('No custom routes yet — add one above or create a site from the Sites workspace.') }}</p>
+                            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                                <x-heroicon-o-arrow-path-rounded-square class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('No custom routes') }}</p>
+                                <p class="mx-auto mt-0.5 max-w-md text-[11px] leading-relaxed text-brand-moss">
+                                    {{ __('Standalone site blocks you add here live in dply-custom-*.caddy. Routes Dply provisions per site are managed from the Sites workspace — both show in the live route table below.') }}
+                                </p>
+                                <div class="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        wire:click="openAddCaddyCustomRouteForm"
+                                        @disabled($isDeployer || $actionInFlight)
+                                        class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Add route') }}
+                                    </button>
+                                    <a
+                                        href="{{ route('servers.sites', $server) }}"
+                                        wire:navigate
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        {{ __('Open Sites') }}
+                                        <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    </a>
+                                </div>
+                            </div>
                         @endif
+                        </div>
                     </div>
 
                     @if ($caddy_custom_routes_loaded && $caddy_custom_routes_form !== [])
@@ -164,7 +206,7 @@
                 @endphp
                 <div
                     @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'admin'" x-cloak @endif
-                    class="{{ $card }} p-6 sm:p-8 mb-6"
+                    class="{{ $card }} mb-6 overflow-hidden"
                     wire:key="caddy-globals-config"
                     x-data="{
                         expanded: true,
@@ -182,23 +224,28 @@
                     }"
                     x-init="init()"
                 >
-                    <div class="flex flex-wrap items-start justify-between gap-3">
+                    {{-- Hand-rolled rather than x-workspace-panel-head: the whole
+                         title row is the collapse toggle. Metrics track the dense
+                         head, same as the nginx global-options panel. --}}
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
                         <button
                             type="button"
                             x-on:click="toggle()"
-                            class="group flex min-w-0 flex-1 items-start gap-3 text-left"
+                            class="group flex min-w-0 flex-1 items-center gap-2 text-left"
                             x-bind:aria-expanded="expanded.toString()"
                         >
                             <x-heroicon-o-chevron-down
-                                class="mt-1 h-4 w-4 shrink-0 text-brand-moss transition-transform"
+                                class="h-4 w-4 shrink-0 text-brand-sage transition-transform"
                                 x-bind:class="expanded ? '' : '-rotate-90'"
                                 aria-hidden="true"
                             />
-                            <span class="min-w-0">
-                                <h3 class="text-base font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Caddy global options') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">
-                                    {{ __('The leading `{ ... }` block in /etc/caddy/Caddyfile — ACME account email, admin endpoint, auto-HTTPS mode, server protocols, timeouts, and default log settings. Save runs `caddy validate` and reloads; a failed validate auto-restores the previous file.') }}
-                                </p>
+                            <span class="shrink-0 text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Caddy global options') }}</span>
+                            <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                            <span
+                                class="min-w-0 flex-1 truncate text-[11px] text-brand-mist"
+                                title="{{ __('The leading `{ ... }` block in /etc/caddy/Caddyfile — ACME account email, admin endpoint, auto-HTTPS mode, server protocols, timeouts, and default log settings. Save runs `caddy validate` and reloads; a failed validate auto-restores the previous file.') }}"
+                            >
+                                {{ __('The leading `{ ... }` block in /etc/caddy/Caddyfile — ACME account email, admin endpoint, auto-HTTPS mode, server protocols, timeouts, and default log settings. Save runs `caddy validate` and reloads; a failed validate auto-restores the previous file.') }}
                             </span>
                         </button>
                         <button
@@ -207,39 +254,51 @@
                             wire:loading.attr="disabled"
                             wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData"
                             x-show="expanded"
-                            class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData" class="inline-flex">
-                                <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
                             </span>
                             <span wire:loading wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData" class="inline-flex">
-                                <x-spinner class="h-4 w-4" />
+                                <x-spinner class="h-3.5 w-3.5" />
                             </span>
                             {{ __('Reload from server') }}
                         </button>
                     </div>
 
-                    <div x-show="expanded" x-cloak>
+                    <div x-show="expanded" x-cloak class="px-4 py-3.5 sm:px-5">
                         @if ($caddy_globals_flash)
-                            <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $caddy_globals_flash }}</div>
+                            <div class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">{{ $caddy_globals_flash }}</div>
                         @endif
                         @if ($caddy_globals_error)
-                            <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                            <div class="mb-3 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
                                 <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $caddy_globals_error }}</pre>
                             </div>
                         @endif
 
                         @if (! $caddy_globals_loaded)
-                            <p class="mt-5 text-sm text-brand-moss">
-                                <span wire:loading wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-4 w-4" /> {{ __('Reading Caddyfile…') }}
-                                </span>
-                                <span wire:loading.remove wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData">
-                                    {{ __('Click "Reload from server" to fetch current values.') }}
-                                </span>
-                            </p>
+                            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                                <div wire:loading.block wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
+                                    <x-spinner variant="forest" class="h-5 w-5" />
+                                    <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Reading Caddyfile…') }}</p>
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Parsing the leading global-options block over SSH.') }}</p>
+                                </div>
+                                <div wire:loading.remove wire:target="loadCaddyGlobalsConfig,loadActiveEngineSubtabData" class="flex flex-col items-center">
+                                    <x-heroicon-o-cog-6-tooth class="h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                    <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Global options not loaded') }}</p>
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read the current ACME, admin, and log defaults from this server to edit them.') }}</p>
+                                    <button
+                                        type="button"
+                                        wire:click="loadCaddyGlobalsConfig(true)"
+                                        class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Reload from server') }}
+                                    </button>
+                                </div>
+                            </div>
                         @else
-                            <form wire:submit.prevent="saveCaddyGlobalsConfig" class="mt-6 space-y-6">
+                            <form wire:submit.prevent="saveCaddyGlobalsConfig" class="space-y-4">
                                 {{-- Top-level scalars (email, admin, default_sni, etc.). --}}
                                 <div>
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Server') }}</p>
@@ -344,24 +403,25 @@
                     $caddySnippetsBusyTargets = 'loadCaddySnippetsConfig,saveCaddySnippetsConfig,submitAddCaddySnippet,confirmActionModal';
                 @endphp
                 <div @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'snippets'" x-cloak @endif class="space-y-4 mb-6" wire:key="caddy-snippets-config">
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="text-base font-semibold text-brand-ink">{{ __('Caddy snippets') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">
-                                    {{ __('Reusable `(name) { … }` blocks in /etc/caddy/Caddyfile that sites pull in via `import name`. Edits run `caddy validate` and reload; a failed validate auto-restores the previous file.') }}
-                                </p>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
+                    <div class="{{ $card }} overflow-hidden">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-code-bracket-square"
+                            :title="__('Caddy snippets')"
+                            :count="$caddy_snippets_loaded ? (count($caddy_snippets_form) ?: null) : null"
+                            :note="__('Reusable `(name) { … }` blocks in /etc/caddy/Caddyfile that sites pull in via `import name`. Edits run `caddy validate` and reload; a failed validate auto-restores the previous file.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot:actions>
                                 <button
                                     type="button"
                                     wire:click="openAddCaddySnippetForm"
                                     wire:loading.attr="disabled"
                                     wire:target="{{ $caddySnippetsBusyTargets }}"
                                     @disabled($isDeployer || $actionInFlight)
-                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-forest px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-plus class="h-4 w-4" />
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" />
                                     {{ __('Add snippet') }}
                                 </button>
                                 <button
@@ -369,37 +429,38 @@
                                     wire:click="loadCaddySnippetsConfig"
                                     wire:loading.attr="disabled"
                                     wire:target="{{ $caddySnippetsBusyTargets }}"
-                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                    class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}" class="inline-flex">
-                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
+                                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" />
                                     </span>
                                     <span wire:loading wire:target="{{ $caddySnippetsBusyTargets }}" class="inline-flex">
-                                        <x-spinner class="h-4 w-4" />
+                                        <x-spinner class="h-3.5 w-3.5" />
                                     </span>
                                     <span wire:loading wire:target="{{ $caddySnippetsBusyTargets }}">{{ __('Reading…') }}</span>
                                     <span wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}">{{ __('Reload from server') }}</span>
                                 </button>
-                            </div>
-                        </div>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
 
+                        <div class="px-4 py-3.5 sm:px-5">
                         <div
-                            wire:loading
+                            wire:loading.block
                             wire:target="{{ $caddySnippetsBusyTargets }}"
-                            class="mt-4 rounded-lg border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm text-sky-900"
+                            class="mb-3 rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900"
                         >
-                            <span class="inline-flex items-center gap-2 font-medium">
-                                <x-spinner variant="forest" class="h-4 w-4" />
+                            <span class="inline-flex items-center gap-2 font-semibold">
+                                <x-spinner variant="forest" class="h-3.5 w-3.5" />
                                 {{ __('Reading Caddyfile on the server…') }}
                             </span>
-                            <p class="mt-1 text-xs text-sky-800">{{ __('SSH output appears in the console banner above when the read finishes.') }}</p>
+                            <p class="mt-0.5 text-[11px] text-sky-800">{{ __('SSH output appears in the console banner above when the read finishes.') }}</p>
                         </div>
 
                         @if ($caddy_snippets_flash)
-                            <div wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}" class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $caddy_snippets_flash }}</div>
+                            <div wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">{{ $caddy_snippets_flash }}</div>
                         @endif
                         @if ($caddy_snippets_error)
-                            <div wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}" class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                            <div wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}" class="mb-3 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">
                                 <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $caddy_snippets_error }}</pre>
                             </div>
                         @endif
@@ -407,7 +468,7 @@
                         @if ($caddy_snippets_show_add)
                             <form
                                 wire:submit.prevent="submitAddCaddySnippet"
-                                class="mt-5 rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4 sm:p-5"
+                                class="mb-3 rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4"
                             >
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('Add a new snippet') }}</p>
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Names are referenced as `import <name>` in site blocks. Letters, digits, and `_ . -` only.') }}</p>
@@ -465,16 +526,41 @@
                             </form>
                         @endif
 
+                        {{-- The loaded-but-empty branch is new: a Caddyfile with no
+                             (name) blocks previously rendered nothing here. --}}
                         @if (! $caddy_snippets_loaded)
-                            <p class="mt-5 text-sm text-brand-moss">
-                                <span wire:loading wire:target="{{ $caddySnippetsBusyTargets }}" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-4 w-4" /> {{ __('Reading Caddyfile…') }}
-                                </span>
-                                <span wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}">
-                                    {{ __('Click "Reload from server" to fetch current snippets.') }}
-                                </span>
-                            </p>
+                            <div wire:loading.remove wire:target="{{ $caddySnippetsBusyTargets }}" class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                                <x-heroicon-o-code-bracket-square class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('Snippets not loaded') }}</p>
+                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ __('Read the Caddyfile from this server to edit its reusable blocks.') }}</p>
+                                <button
+                                    type="button"
+                                    wire:click="loadCaddySnippetsConfig"
+                                    class="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Reload from server') }}
+                                </button>
+                            </div>
+                        @elseif (empty($caddy_snippets_form))
+                            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
+                                <x-heroicon-o-code-bracket-square class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                <p class="mt-2 text-xs font-semibold text-brand-ink">{{ __('No snippets') }}</p>
+                                <p class="mx-auto mt-0.5 max-w-md text-[11px] leading-relaxed text-brand-moss">
+                                    {{ __('The Caddyfile has no `(name) { … }` blocks yet. Add one to share a header set, matcher, or reverse-proxy config across sites via `import name`.') }}
+                                </p>
+                                <button
+                                    type="button"
+                                    wire:click="openAddCaddySnippetForm"
+                                    @disabled($isDeployer || $actionInFlight)
+                                    class="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Add snippet') }}
+                                </button>
+                            </div>
                         @endif
+                        </div>
                     </div>
 
                     @if ($caddy_snippets_loaded && ! empty($caddy_snippets_form))

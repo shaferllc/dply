@@ -58,7 +58,7 @@
                     <x-server-workspace-tablist
                         :aria-label="__('Monitor workspace sections')"
                         scroll
-                        class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+                        bare class="!mb-0 w-full"
                     >
                         <x-server-workspace-tab
                             id="monitor-tab-monitors"

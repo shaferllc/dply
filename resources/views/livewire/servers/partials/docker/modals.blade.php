@@ -3,7 +3,7 @@
         <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeContainerLogsModal"></div>
         <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6">
             <div class="my-auto flex w-full max-w-4xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
-                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Container logs') }}</p>
                         <h2 id="docker-logs-title" class="mt-1 font-mono text-sm font-semibold text-brand-ink">{{ $logsModalContainerName }}</h2>
@@ -24,7 +24,7 @@
                         <pre class="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-brand-cream/95">{{ $logsModalContent !== '' ? $logsModalContent : __('No log output.') }}</pre>
                     @endif
                 </div>
-                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                     <x-secondary-button type="button" wire:click="closeContainerLogsModal">{{ __('Close') }}</x-secondary-button>
                 </div>
             </div>
@@ -37,7 +37,7 @@
         <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeContainerInspectModal"></div>
         <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6">
             <div class="my-auto flex w-full max-w-4xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
-                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Container inspect') }}</p>
                         <h2 id="docker-inspect-title" class="mt-1 font-mono text-sm font-semibold text-brand-ink">{{ $inspectModalContainerName }}</h2>
@@ -58,7 +58,7 @@
                         <pre class="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-brand-cream/95">{{ $inspectModalContent }}</pre>
                     @endif
                 </div>
-                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                     <x-secondary-button type="button" wire:click="closeContainerInspectModal">{{ __('Close') }}</x-secondary-button>
                 </div>
             </div>
@@ -71,7 +71,7 @@
         <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeContainerExecModal"></div>
         <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6">
             <div class="my-auto flex w-full max-w-lg flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
-                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Run command') }}</p>
                         <h2 id="docker-exec-title" class="mt-1 font-mono text-sm font-semibold text-brand-ink">{{ $execModalContainerName }}</h2>
@@ -81,7 +81,7 @@
                         <x-heroicon-o-x-mark class="h-5 w-5" />
                     </button>
                 </div>
-                <div class="space-y-4 px-6 py-5">
+                <div class="space-y-3 px-4 py-3.5 sm:px-5">
                     <div>
                         <label for="docker-exec-command" class="block text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Command') }}</label>
                         <input
@@ -93,7 +93,7 @@
                         />
                     </div>
                 </div>
-                <div class="flex justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                     <x-secondary-button type="button" wire:click="closeContainerExecModal">{{ __('Cancel') }}</x-secondary-button>
                     <x-primary-button type="button" wire:click="submitContainerExec">{{ __('Run command') }}</x-primary-button>
                 </div>
@@ -107,7 +107,7 @@
         <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeContainerShell"></div>
         <div class="relative z-10 flex min-h-full justify-center px-4 py-8 sm:px-6">
             <div class="my-auto flex w-full max-w-4xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
-                <div class="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Container shell session') }}</p>
                         <h2 id="docker-shell-title" class="mt-1 font-mono text-sm font-semibold text-brand-ink">{{ $shellModalContainerName }}</h2>
@@ -118,7 +118,7 @@
                     </button>
                 </div>
 
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 sm:px-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Interactive shell on your machine') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Browser PTY is not available yet. Copy this command for a full docker exec -it session in your local terminal:') }}</p>
                     <div
@@ -146,7 +146,7 @@
                     @endfeature
                 </div>
 
-                <div class="px-6 py-4">
+                <div class="px-4 py-3 sm:px-5">
                     <div class="mb-3 flex flex-wrap items-center gap-2">
                         <span class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Quick') }}</span>
                         @foreach ($shellQuickActions as $i => $action)
@@ -236,7 +236,7 @@
                     </x-console-terminal-shell>
                 </div>
 
-                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                     <x-secondary-button type="button" wire:click="closeContainerShell">{{ __('Close') }}</x-secondary-button>
                 </div>
             </div>
@@ -249,7 +249,7 @@
         <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeComposeLogsModal"></div>
         <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6">
             <div class="my-auto flex w-full max-w-4xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
-                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Compose logs') }}</p>
                         <h2 id="docker-compose-logs-title" class="mt-1 font-mono text-sm font-semibold text-brand-ink">{{ $composeLogsModalProject }}</h2>
@@ -270,7 +270,7 @@
                         <pre class="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-brand-cream/95">{{ $composeLogsModalContent !== '' ? $composeLogsModalContent : __('No log output.') }}</pre>
                     @endif
                 </div>
-                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                     <x-secondary-button type="button" wire:click="closeComposeLogsModal">{{ __('Close') }}</x-secondary-button>
                 </div>
             </div>

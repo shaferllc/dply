@@ -28,76 +28,79 @@
     $hasDetail = filled($report['health']['detail'] ?? '');
 @endphp
 
+@php
+    // Verdict, last-check line, and alert count all belong on ONE dense head —
+    // they were an eyebrow + title + prose stack roughly as tall as the alert
+    // list underneath it.
+    $healthTitle = match ($report['overall']) {
+        'critical' => __('Workers need attention'),
+        'warning' => __('Review supervisor state'),
+        default => __('All workers healthy'),
+    };
+
+    $healthNoteParts = [];
+    if ($report['health']['checked_at']) {
+        $healthNoteParts[] = __('Last check :time', ['time' => $report['health']['checked_at']->diffForHumans()])
+            .($report['health']['stale'] ? ' ('.__('stale').')' : '');
+    } else {
+        $healthNoteParts[] = __('No health snapshot yet.');
+    }
+    if ($report['health']['summary'] && $report['overall'] !== 'ok') {
+        $healthNoteParts[] = $report['health']['summary'];
+    }
+
+    // The "no alerts from the latest snapshot" paragraph said the same thing as
+    // a zero count next to a green verdict — it's the count pill now.
+    $alertCountLabel = $report['alert_count'] > 0
+        ? trans_choice('{1} :count alert|[2,*] :count alerts', $report['alert_count'], ['count' => $report['alert_count']])
+        : __('no alerts');
+@endphp
+
 <div class="min-w-0">
     @if ($isDeployer)
-        <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-4 sm:px-6">
-            <div class="flex items-start gap-3">
-                <x-icon-badge tone="amber">
-                    <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
-                    <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can view worker health but cannot refresh supervisor status over SSH.') }}</p>
-                </div>
-            </div>
+        <div class="flex items-center gap-2 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
+            <x-heroicon-o-eye class="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+            <p class="min-w-0">
+                <span class="font-semibold">{{ __('Read-only (deployer role).') }}</span>
+                {{ __('You can view worker health but cannot refresh supervisor status over SSH.') }}
+            </p>
         </div>
     @endif
 
     <section class="border-b border-brand-ink/10">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Worker health') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
-                            @switch($report['overall'])
-                                @case('critical') {{ __('Workers need attention') }} @break
-                                @case('warning') {{ __('Review supervisor state') }} @break
-                                @default {{ __('All workers healthy') }}
-                            @endswitch
-                        </h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            @if ($report['health']['checked_at'])
-                                {{ __('Last check :time', ['time' => $report['health']['checked_at']->diffForHumans()]) }}
-                                @if ($report['health']['stale'])
-                                    · <span class="font-medium text-amber-800">{{ __('stale') }}</span>
-                                @endif
-                            @else
-                                {{ __('No health snapshot yet.') }}
-                            @endif
-                            @if ($report['health']['summary'] && $report['overall'] !== 'ok')
-                                · {{ $report['health']['summary'] }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-                @if ($opsReady && ! $isDeployer && $supervisorInstalled)
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-server-stack"
+            :title="$healthTitle"
+            :count="$alertCountLabel"
+            :note="implode(' · ', $healthNoteParts)"
+            :tone="match ($report['overall']) { 'critical' => 'danger', 'warning' => 'amber', default => null }"
+            class="border-b border-brand-ink/10"
+        >
+            @if ($opsReady && ! $isDeployer && $supervisorInstalled)
+                <x-slot:actions>
                     <button
                         type="button"
                         wire:click="refreshSupervisorHealth"
                         wire:loading.attr="disabled"
                         wire:target="refreshSupervisorHealth"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
+                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="refreshSupervisorHealth" class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                        <span wire:loading.remove wire:target="refreshSupervisorHealth" class="inline-flex items-center gap-1">
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Refresh status') }}
                         </span>
-                        <span wire:loading wire:target="refreshSupervisorHealth" class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
+                        <span wire:loading wire:target="refreshSupervisorHealth" class="inline-flex items-center gap-1">
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
                             {{ __('Refreshing…') }}
                         </span>
                     </button>
-                @endif
-            </div>
-        </div>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
 
         @if ($report['alert_count'] > 0)
-            <ul class="divide-y divide-brand-ink/10">
+            <ul class="divide-y divide-brand-ink/8">
                 @foreach ($report['alerts'] as $alert)
                     @php
                         $alertTone = match ($alert['severity']) {
@@ -107,14 +110,14 @@
                         };
                         $alertTab = str_contains((string) ($alert['title'] ?? ''), 'drift') ? 'sync' : 'programs';
                     @endphp
-                    <li class="flex flex-wrap items-start justify-between gap-3 px-6 py-4 sm:px-7">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $alertTone }}">
-                                <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
+                    <li class="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5 sm:px-5">
+                        <div class="flex min-w-0 items-start gap-2.5">
+                            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md ring-1 {{ $alertTone }}">
+                                <x-heroicon-m-exclamation-triangle class="h-3 w-3" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-sm font-semibold text-brand-ink">{{ $alert['title'] }}</p>
-                                <p class="mt-0.5 text-sm text-brand-moss">{{ $alert['message'] }}</p>
+                                <p class="text-xs font-semibold text-brand-ink">{{ $alert['title'] }}</p>
+                                <p class="mt-0.5 text-[11px] leading-relaxed text-brand-moss">{{ $alert['message'] }}</p>
                             </div>
                         </div>
                         @if ($alert['link_label'])
@@ -123,7 +126,7 @@
                                 wire:click="setDaemonsWorkspaceTab(@js($alertTab))"
                                 x-data="{}"
                                 x-on:click="$nextTick(() => { const el = document.getElementById('daemons-workspace-tablist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })"
-                                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
                             >
                                 {{ $alert['link_label'] }}
                                 <x-heroicon-m-arrow-down class="h-3 w-3" aria-hidden="true" />
@@ -132,111 +135,75 @@
                     </li>
                 @endforeach
             </ul>
-        @else
-            <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">
-                {{ __('No worker or supervisor alerts from the latest snapshot.') }}
-            </div>
         @endif
     </section>
 
-    <div class="grid gap-6 lg:grid-cols-2">
-        <section class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Program inventory') }}</h2>
-                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Active supervisor programs from the last health snapshot.') }}</p>
-            </div>
-            <div class="px-6 py-4 sm:px-7">
-                <dl class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Total') }}</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['programs']['total'] }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Active') }}</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['programs']['active'] }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Running') }}</dt>
-                        <dd class="mt-1 text-2xl font-semibold {{ $report['programs']['running'] === $report['programs']['active'] && $report['programs']['active'] > 0 ? 'text-emerald-700' : 'text-brand-ink' }}">
-                            {{ $report['programs']['running'] }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Not healthy') }}</dt>
-                        <dd class="mt-1 text-2xl font-semibold {{ $report['programs']['unhealthy'] > 0 ? 'text-rose-700' : 'text-brand-ink' }}">
-                            {{ $report['programs']['unhealthy'] }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['programs']['inactive'] }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Config drift') }}</dt>
-                        <dd class="mt-1 text-lg font-semibold {{ $report['health']['config_drift'] ? 'text-amber-800' : 'text-emerald-700' }}">
-                            {{ $report['health']['config_drift'] ? __('Detected') : __('None') }}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
-        </section>
+    {{-- Program inventory and Supervisor snapshot were two side-by-side cards,
+         each with its own header and six `text-2xl` figures. Same numbers, one
+         head and one strip. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-chart-bar"
+        :title="__('Snapshot')"
+        :note="$hasDetail
+            ? __('Program counts and supervisor state from the last health check or scheduled probe.')
+            : __('From the last health check. No supervisorctl output stored yet — refresh status to capture a snapshot.')"
+        class="border-b border-brand-ink/10"
+    />
 
-        <section class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Supervisor snapshot') }}</h2>
-                <p class="mt-0.5 text-xs text-brand-moss">{{ __('From the last health check or scheduled probe.') }}</p>
-            </div>
-            <div class="space-y-3 px-6 py-4 text-sm sm:px-7">
-                <dl class="grid grid-cols-2 gap-4">
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Supervisor') }}</dt>
-                        <dd class="mt-1 font-semibold {{ $supervisorInstalled ? 'text-emerald-700' : 'text-amber-800' }}">
-                            {{ $supervisorInstalled ? __('Installed') : __('Not installed') }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Health OK') }}</dt>
-                        <dd class="mt-1 font-semibold text-brand-ink">
-                            @if ($report['health']['ok'] === null)
-                                —
-                            @elseif ($report['health']['ok'])
-                                <span class="text-emerald-700">{{ __('Yes') }}</span>
-                            @else
-                                <span class="text-rose-700">{{ __('No') }}</span>
-                            @endif
-                        </dd>
-                    </div>
-                </dl>
+    <x-workspace-stat-strip class="border-b border-brand-ink/10" :stats="[
+        ['label' => __('Total'), 'value' => $report['programs']['total'], 'hint' => __('Configured programs')],
+        ['label' => __('Active'), 'value' => $report['programs']['active'], 'hint' => __('Enabled programs')],
+        [
+            'label' => __('Running'),
+            'value' => $report['programs']['running'],
+            'tone' => $report['programs']['running'] === $report['programs']['active'] && $report['programs']['active'] > 0 ? 'ok' : null,
+        ],
+        [
+            'label' => __('Not healthy'),
+            'value' => $report['programs']['unhealthy'],
+            'tone' => $report['programs']['unhealthy'] > 0 ? 'bad' : null,
+        ],
+        ['label' => __('Inactive'), 'value' => $report['programs']['inactive']],
+        [
+            'label' => __('Config drift'),
+            'value' => $report['health']['config_drift'] ? __('Detected') : __('None'),
+            'tone' => $report['health']['config_drift'] ? 'warn' : 'ok',
+        ],
+        [
+            'label' => __('Supervisor'),
+            'value' => $supervisorInstalled ? __('Installed') : __('Not installed'),
+            'tone' => $supervisorInstalled ? 'ok' : 'warn',
+        ],
+        [
+            'label' => __('Health OK'),
+            'value' => $report['health']['ok'] === null ? '—' : ($report['health']['ok'] ? __('Yes') : __('No')),
+            'tone' => $report['health']['ok'] === null ? null : ($report['health']['ok'] ? 'ok' : 'bad'),
+        ],
+    ]" />
 
-                @if ($hasDetail)
-                    <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/20">
-                        <summary class="cursor-pointer select-none px-4 py-3 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                            {{ __('Raw supervisorctl output') }}
-                        </summary>
-                        <pre class="max-h-64 overflow-auto border-t border-brand-ink/10 bg-white p-4 font-mono text-[11px] leading-relaxed text-brand-moss">{{ $report['health']['detail'] }}</pre>
-                    </details>
-                @else
-                    <p class="text-xs text-brand-moss">{{ __('No supervisorctl output stored yet — refresh status to capture a snapshot.') }}</p>
-                @endif
-            </div>
-        </section>
-    </div>
+    @if ($hasDetail)
+        <details class="border-b border-brand-ink/10">
+            <summary class="cursor-pointer select-none px-4 py-2 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 sm:px-5">
+                {{ __('Raw supervisorctl output') }}
+            </summary>
+            <pre class="max-h-64 overflow-auto border-t border-brand-ink/10 bg-white p-4 font-mono text-[11px] leading-relaxed text-brand-moss">{{ $report['health']['detail'] }}</pre>
+        </details>
+    @endif
 
     @if ($report['programs']['active'] > 0)
         <section class="border-b border-brand-ink/10">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Snapshot by program') }}</h2>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('RUNNING state from the last refresh. Unhealthy rows sort to the top.') }}</p>
-                    </div>
-                    @if ($report['programs']['unhealthy'] > 0)
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $sloTonePalette['rose'] }}">
-                            {{ trans_choice(':count issue|:count issues', $report['programs']['unhealthy'], ['count' => $report['programs']['unhealthy']]) }}
-                        </span>
-                    @endif
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-table-cells"
+                :title="__('Snapshot by program')"
+                :count="$report['programs']['unhealthy'] > 0
+                    ? trans_choice('{1} :count issue|[2,*] :count issues', $report['programs']['unhealthy'], ['count' => $report['programs']['unhealthy']])
+                    : null"
+                :note="__('RUNNING state from the last refresh. Unhealthy rows sort to the top.')"
+                :tone="$report['programs']['unhealthy'] > 0 ? 'danger' : null"
+                class="border-b border-brand-ink/10"
+            />
             <div class="overflow-x-auto">
                 <table class="min-w-full text-left text-xs">
                     <thead class="bg-brand-sand/30 text-brand-moss">

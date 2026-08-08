@@ -13,44 +13,42 @@
              redirects), or full-on outages (both schemes errored).
              ================================================================= --}}
         <div class="{{ $card }} overflow-hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
-                <div class="min-w-0">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Site smoke test') }}</h3>
-                    <p class="mt-0.5 text-[12px] text-brand-moss">
-                        {{ __('Curls every Site\'s primary hostname through 127.0.0.1 (HTTP + HTTPS with --resolve so SNI matches). Sorted worst-first.') }}
-                        @if ($smoke_scanned_at_iso)
-                            <span class="ml-1 text-brand-mist">·
-                                {{ __('Ran :time', ['time' => \Illuminate\Support\Carbon::parse($smoke_scanned_at_iso)->diffForHumans()]) }}
-                            </span>
-                        @endif
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    wire:click="runSmokeTest"
-                    wire:loading.attr="disabled"
-                    wire:target="runSmokeTest"
-                    @disabled($isDeployer || ! $opsReady || $actionInFlight)
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <span wire:loading.remove wire:target="runSmokeTest" class="inline-flex">
-                        <x-heroicon-o-bolt class="h-4 w-4" />
-                    </span>
-                    <span wire:loading wire:target="runSmokeTest" class="inline-flex">
-                        <x-spinner variant="cream" class="h-4 w-4" />
-                    </span>
-                    {{ __('Run smoke test') }}
-                </button>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-bolt"
+                :title="__('Site smoke test')"
+                :note="__('Curls every Site\'s primary hostname through 127.0.0.1 (HTTP + HTTPS with --resolve so SNI matches). Sorted worst-first.')
+                    .($smoke_scanned_at_iso ? ' '.__('Ran :time', ['time' => \Illuminate\Support\Carbon::parse($smoke_scanned_at_iso)->diffForHumans()]) : '')"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    <button
+                        type="button"
+                        wire:click="runSmokeTest"
+                        wire:loading.attr="disabled"
+                        wire:target="runSmokeTest"
+                        @disabled($isDeployer || ! $opsReady || $actionInFlight)
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="runSmokeTest" class="inline-flex">
+                            <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        </span>
+                        <span wire:loading wire:target="runSmokeTest" class="inline-flex">
+                            <x-spinner variant="cream" class="h-3.5 w-3.5" />
+                        </span>
+                        {{ __('Run smoke test') }}
+                    </button>
+                </x-slot:actions>
+            </x-workspace-panel-head>
 
             @if ($smoke_error)
-                <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-8">
+                <div class="border-b border-rose-200 bg-rose-50/70 px-4 py-2 text-xs text-rose-900 sm:px-5">
                     {{ $smoke_error }}
                 </div>
             @endif
 
             @if (! $smoke_loaded)
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
                     <span wire:loading wire:target="runSmokeTest" class="inline-flex items-center gap-2">
                         <x-spinner class="h-4 w-4" /> {{ __('Probing sites…') }}
                     </span>
@@ -60,7 +58,7 @@
                     </span>
                 </div>
             @elseif ($smoke_total_sites === 0)
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
                     <x-heroicon-o-folder-open class="mx-auto h-6 w-6 text-brand-mist" />
                     <p class="mt-2">{{ __('No sites on this server yet.') }}</p>
                 </div>
@@ -72,7 +70,7 @@
                         $smokeCounts[$u] = ($smokeCounts[$u] ?? 0) + 1;
                     }
                 @endphp
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-6 py-3 text-[11px] sm:px-8">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-[11px] sm:px-5">
                     <span class="text-brand-moss">{{ __(':probed of :total probed', ['probed' => $smoke_probed, 'total' => $smoke_total_sites]) }}@if ($smoke_truncated) <span class="text-amber-700">{{ __('(truncated)') }}</span>@endif</span>
                     @if ($smokeCounts['down'] > 0)
                         <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">
@@ -99,11 +97,11 @@
                     <table class="w-full text-left text-sm">
                         <thead class="bg-brand-sand/20 text-[11px] uppercase tracking-wide text-brand-mist">
                             <tr>
-                                <th class="px-6 py-2 font-medium sm:px-8">{{ __('Site') }}</th>
-                                <th class="px-4 py-2 font-medium">{{ __('Hostname') }}</th>
-                                <th class="px-4 py-2 font-medium">{{ __('HTTP') }}</th>
-                                <th class="px-4 py-2 font-medium">{{ __('HTTPS') }}</th>
-                                <th class="px-4 py-2 font-medium text-right">{{ __('Status') }}</th>
+                                <th class="px-4 py-1.5 font-medium sm:px-5">{{ __('Site') }}</th>
+                                <th class="px-3 py-1.5 font-medium">{{ __('Hostname') }}</th>
+                                <th class="px-3 py-1.5 font-medium">{{ __('HTTP') }}</th>
+                                <th class="px-3 py-1.5 font-medium">{{ __('HTTPS') }}</th>
+                                <th class="px-3 py-1.5 font-medium text-right">{{ __('Status') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/5">
@@ -120,14 +118,14 @@
                                         : ($httpsStatus >= 500 ? 'text-rose-700' : ($httpsStatus >= 400 ? 'text-amber-700' : ($httpsStatus >= 300 ? 'text-brand-moss' : 'text-emerald-700')));
                                 @endphp
                                 <tr>
-                                    <td class="px-6 py-2 sm:px-8">
+                                    <td class="px-4 py-1.5 sm:px-5">
                                         <a
                                             href="{{ route('sites.show', ['server' => $server, 'site' => $r['site_id']]) }}"
                                             class="font-medium text-brand-ink hover:underline"
                                         >{{ $r['site_name'] }}</a>
                                     </td>
-                                    <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $r['hostname'] }}</td>
-                                    <td class="px-4 py-2 text-xs">
+                                    <td class="px-3 py-1.5 font-mono text-xs text-brand-moss">{{ $r['hostname'] }}</td>
+                                    <td class="px-3 py-1.5 text-xs">
                                         <span class="font-mono {{ $httpClass }}">{{ $httpStatus ?? '—' }}</span>
                                         @if (isset($r['http_time_ms']))
                                             <span class="ml-1 text-[10px] text-brand-mist tabular-nums">{{ $r['http_time_ms'] }}ms</span>
@@ -136,7 +134,7 @@
                                             <p class="mt-0.5 text-[10px] text-rose-700">{{ $r['http_error'] }}</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-2 text-xs">
+                                    <td class="px-3 py-1.5 text-xs">
                                         <span class="font-mono {{ $httpsClass }}">{{ $httpsStatus ?? '—' }}</span>
                                         @if (isset($r['https_time_ms']))
                                             <span class="ml-1 text-[10px] text-brand-mist tabular-nums">{{ $r['https_time_ms'] }}ms</span>
@@ -150,7 +148,7 @@
                                             <p class="mt-0.5 text-[10px] text-rose-700">{{ $r['https_error'] }}</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-2 text-right">
+                                    <td class="px-3 py-1.5 text-right">
                                         <span @class([
                                             'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1',
                                             'bg-rose-100 text-rose-900 ring-rose-200' => $urgency === 'down',
@@ -174,43 +172,43 @@
              Apply / webserver switch.
              ================================================================= --}}
         <div class="{{ $card }} overflow-hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
-                <div class="min-w-0">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Config drift') }}</h3>
-                    <p class="mt-0.5 text-[12px] text-brand-moss">
-                        {{ __('Compares each Site\'s on-disk webserver config against the canonical content dply\'s provisioner would emit. Drifted entries are what the next Site Apply would rewrite.') }}
-                        @if ($drift_scanned_at_iso)
-                            <span class="ml-1 text-brand-mist">·
-                                {{ __('Checked :time', ['time' => \Illuminate\Support\Carbon::parse($drift_scanned_at_iso)->diffForHumans()]) }}
-                            </span>
-                        @endif
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    wire:click="refreshDriftDetector"
-                    wire:loading.attr="disabled"
-                    wire:target="refreshDriftDetector,loadDriftDetector"
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
-                >
-                    <span wire:loading.remove wire:target="refreshDriftDetector,loadDriftDetector" class="inline-flex">
-                        <x-heroicon-o-arrow-path class="h-4 w-4" />
-                    </span>
-                    <span wire:loading wire:target="refreshDriftDetector,loadDriftDetector" class="inline-flex">
-                        <x-spinner class="h-4 w-4" />
-                    </span>
-                    {{ __('Recheck') }}
-                </button>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-document-magnifying-glass"
+                :title="__('Config drift')"
+                :count="$drift_loaded && $drift_count > 0 ? trans_choice('{1} :count drifted|[2,*] :count drifted', $drift_count, ['count' => $drift_count]) : null"
+                :tone="$drift_loaded && $drift_count > 0 ? 'amber' : null"
+                :note="__('Compares each Site\'s on-disk webserver config against the canonical content dply\'s provisioner would emit. Drifted entries are what the next Site Apply would rewrite.')
+                    .($drift_scanned_at_iso ? ' '.__('Checked :time', ['time' => \Illuminate\Support\Carbon::parse($drift_scanned_at_iso)->diffForHumans()]) : '')"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    <button
+                        type="button"
+                        wire:click="refreshDriftDetector"
+                        wire:loading.attr="disabled"
+                        wire:target="refreshDriftDetector,loadDriftDetector"
+                        class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="refreshDriftDetector,loadDriftDetector" class="inline-flex">
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        </span>
+                        <span wire:loading wire:target="refreshDriftDetector,loadDriftDetector" class="inline-flex">
+                            <x-spinner class="h-3.5 w-3.5" />
+                        </span>
+                        {{ __('Recheck') }}
+                    </button>
+                </x-slot:actions>
+            </x-workspace-panel-head>
 
             @if ($drift_error)
-                <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-8">
+                <div class="border-b border-rose-200 bg-rose-50/70 px-4 py-2 text-xs text-rose-900 sm:px-5">
                     {{ $drift_error }}
                 </div>
             @endif
 
             @if (! $drift_loaded)
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
                     <span wire:loading wire:target="loadDriftDetector,refreshDriftDetector" class="inline-flex items-center gap-2">
                         <x-spinner class="h-4 w-4" /> {{ __('Comparing on-disk vs provisioner output…') }}
                     </span>
@@ -219,17 +217,17 @@
                     </span>
                 </div>
             @elseif ($drift_unsupported)
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
                     <x-heroicon-o-information-circle class="mx-auto h-6 w-6 text-brand-mist" />
                     <p class="mt-2">{{ __('Drift detection is only supported for nginx / Caddy / Apache / OpenLiteSpeed. The active engine (:engine) has no per-site builder dply can diff against.', ['engine' => $drift_engine ?? 'none']) }}</p>
                 </div>
             @elseif ($drift_total_sites === 0)
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
+                <div class="px-4 py-6 text-center text-xs text-brand-moss sm:px-5">
                     <x-heroicon-o-folder-open class="mx-auto h-6 w-6 text-brand-mist" />
                     <p class="mt-2">{{ __('No sites on this server yet — no configs to compare.') }}</p>
                 </div>
             @else
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-6 py-3 text-[11px] sm:px-8">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-4 py-2 text-[11px] sm:px-5">
                     <span class="text-brand-moss">{{ __(':total sites compared (:engine)', ['total' => count($drift_results), 'engine' => $drift_engine]) }}@if ($drift_truncated) <span class="text-amber-700">{{ __('(truncated to first 60)') }}</span>@endif</span>
                     @if ($drift_count > 0)
                         <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
@@ -249,7 +247,7 @@
                             $drifted = ! empty($row['drifted']);
                         @endphp
                         <div
-                            class="px-6 py-3 sm:px-8"
+                            class="px-4 py-2 sm:px-5"
                             x-data="{ open: false }"
                         >
                             <div class="flex flex-wrap items-center justify-between gap-3">
