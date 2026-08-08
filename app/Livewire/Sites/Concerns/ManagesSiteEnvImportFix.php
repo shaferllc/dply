@@ -322,9 +322,35 @@ trait ManagesSiteEnvImportFix
         DotEnvFileParser $parser,
         DotEnvFileWriter $writer,
     ): void {
+        $this->fixEnvWarningKeys(
+            $this->autoFixableEnvWarningKeys($validator, $parser),
+            $parser,
+            $writer,
+        );
+    }
+
+    /**
+     * Settle a specific set of warning keys — the per-group "Fix all" on a row
+     * that covers several keys at once (the three broadcaster credentials are
+     * one problem, not three).
+     *
+     * @param  list<string> $keys
+     */
+    public function fixEnvWarningKeys(
+        array $keys,
+        DotEnvFileParser $parser,
+        DotEnvFileWriter $writer,
+    ): void {
         $this->authorize('update', $this->site);
 
-        $keys = $this->autoFixableEnvWarningKeys($validator, $parser);
+        // Never act on a key the operator has suppressed, however it was asked
+        // for — the caller here is a view passing keys back in.
+        $suppressed = $this->suppressedEnvWarningKeys();
+        $keys = array_values(array_filter(
+            array_map('strval', $keys),
+            fn (string $k): bool => $k !== '' && ! in_array($k, $suppressed, true),
+        ));
+
         if ($keys === []) {
             return;
         }

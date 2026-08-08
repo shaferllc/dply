@@ -67,64 +67,101 @@
                      actions. Anything longer than the line goes behind the row's
                      own disclosure rather than wrapping to three lines and pushing
                      its own buttons out of alignment. --}}
+                @php
+                    // Collapse findings that say the same thing about different
+                    // keys into one row. The three broadcaster credentials are a
+                    // single problem with a single fix, and printing the identical
+                    // sentence (and its identical "How to fix") three times is
+                    // what made this panel read as a wall.
+                    $warningGroups = [];
+                    foreach ($envWarnings as $w) {
+                        $key = (string) ($w['key'] ?? '');
+                        $body = $key !== '' && str_starts_with($w['message'], $key.' ')
+                            ? substr($w['message'], strlen($key) + 1)
+                            : $w['message'];
+                        $sig = $w['level'].'|'.($w['detail'] ?? '').'|'.$body;
+
+                        if (! isset($warningGroups[$sig])) {
+                            $warningGroups[$sig] = [
+                                'level' => $w['level'],
+                                'body' => $body,
+                                'detail' => $w['detail'] ?? null,
+                                'keys' => [],
+                            ];
+                        }
+                        if ($key !== '') {
+                            $warningGroups[$sig]['keys'][] = $key;
+                        }
+                    }
+                    $warningGroups = array_values($warningGroups);
+                @endphp
                 <ul class="mt-2 divide-y divide-brand-ink/5">
-                    @foreach ($envWarnings as $w)
+                    @foreach ($warningGroups as $g)
                         @php
-                            $isDanger = $w['level'] === 'danger';
-                            $isWarn = $w['level'] === 'warn';
-                            $detail = $w['detail'] ?? null;
+                            $isDanger = $g['level'] === 'danger';
+                            $isWarn = $g['level'] === 'warn';
+                            $gKeys = $g['keys'];
+                            $gMulti = count($gKeys) > 1;
                         @endphp
                         {{-- Square rows, not rounded: a radius on a row that also
                              carries a coloured left rail rounds the rail into a
-                             lozenge and reads as a stray blob. The rail is the
-                             severity cue; hover stays neutral so it doesn't
-                             double as a second one. --}}
+                             lozenge and reads as a stray blob. Note the rail sets
+                             `border-l-<colour>`, not `border-<colour>` — the
+                             latter also colours the divide-y rule, which drew a
+                             red line between every row. --}}
                         <li @class([
                             'flex items-start gap-3 border-l-2 py-2 pl-3 pr-1 transition-colors hover:bg-brand-sand/20',
-                            'border-rose-500' => $isDanger,
-                            'border-amber-500' => $isWarn,
-                            'border-brand-mist/50' => ! $isDanger && ! $isWarn,
+                            'border-l-rose-500' => $isDanger,
+                            'border-l-amber-500' => $isWarn,
+                            'border-l-brand-mist/50' => ! $isDanger && ! $isWarn,
                         ])>
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs leading-5 text-brand-ink">
-                                    @if (! empty($w['key']))
-                                        <span class="font-mono text-[11px] font-semibold {{ $isDanger ? 'text-rose-700' : ($isWarn ? 'text-amber-800' : 'text-brand-moss') }}">{{ $w['key'] }}</span>
+                                    @foreach ($gKeys as $gk)
+                                        <span class="font-mono text-[11px] font-semibold {{ $isDanger ? 'text-rose-700' : ($isWarn ? 'text-amber-800' : 'text-brand-moss') }}">{{ $gk }}</span>{{ ! $loop->last ? ', ' : '' }}
+                                    @endforeach
+                                    @if ($gKeys !== [])
                                         <span class="text-brand-mist" aria-hidden="true">·</span>
                                     @endif
-                                    {{-- The key is already the row's own label, so strip
-                                         the ":key is …" prefix the message repeats. --}}
-                                    {{ ! empty($w['key']) && str_starts_with($w['message'], $w['key'].' ')
-                                        ? substr($w['message'], strlen($w['key']) + 1)
-                                        : $w['message'] }}
+                                    {{ $gMulti ? \Illuminate\Support\Str::replaceFirst('is ', 'are ', $g['body']) : $g['body'] }}
                                 </p>
-                                @if ($detail)
+                                @if ($g['detail'])
                                     <details class="group/detail mt-0.5">
                                         <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-brand-moss hover:text-brand-ink [&::-webkit-details-marker]:hidden">
                                             <x-heroicon-o-chevron-right class="h-3 w-3 transition-transform group-open/detail:rotate-90" />
                                             {{ __('How to fix') }}
                                         </summary>
-                                        <p class="mt-1 pl-4 text-[11px] leading-relaxed text-brand-moss">{{ $detail }}</p>
+                                        <p class="mt-1 pl-4 text-[11px] leading-relaxed text-brand-moss">{{ $g['detail'] }}</p>
                                     </details>
                                 @endif
                             </div>
 
-                            @if (! empty($w['key']) && $envAdvanced)
+                            @if ($gKeys !== [] && $envAdvanced)
                                 {{-- Fixed-width action cluster. The old labels embedded
                                      the key ("Fix REVERB_APP_SECRET"), so every row's
                                      buttons were a different width and none lined up. --}}
                                 <span class="flex shrink-0 items-center gap-1">
-                                    <button type="button" wire:click="openFixEnvVar(@js($w['key']))"
-                                        class="dply-btn dply-btn-xs dply-btn-outline"
-                                        title="{{ __('Fix :key', ['key' => $w['key']]) }}">
-                                        {{ __('Fix') }}
-                                        <span class="sr-only">{{ $w['key'] }}</span>
-                                    </button>
+                                    @if ($gMulti && method_exists($this, 'fixEnvWarningKeys'))
+                                        <button type="button" wire:click="fixEnvWarningKeys(@js($gKeys))"
+                                            wire:loading.attr="disabled" wire:target="fixEnvWarningKeys"
+                                            class="dply-btn dply-btn-xs dply-btn-outline"
+                                            title="{{ __('Fix all :count: :keys', ['count' => count($gKeys), 'keys' => implode(', ', $gKeys)]) }}">
+                                            {{ __('Fix all :count', ['count' => count($gKeys)]) }}
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="openFixEnvVar(@js($gKeys[0]))"
+                                            class="dply-btn dply-btn-xs dply-btn-outline"
+                                            title="{{ __('Fix :key', ['key' => $gKeys[0]]) }}">
+                                            {{ __('Fix') }}
+                                            <span class="sr-only">{{ $gKeys[0] }}</span>
+                                        </button>
+                                    @endif
                                     @if ($canIgnoreEnvWarnings)
-                                        <button type="button" wire:click="ignoreEnvWarning(@js($w['key']))"
+                                        <button type="button" wire:click="ignoreEnvWarning(@js($gKeys[0]))"
                                             class="dply-btn dply-btn-xs dply-btn-ghost"
-                                            title="{{ __('Suppress this warning') }}">
+                                            title="{{ $gMulti ? __('Suppress the :key warning', ['key' => $gKeys[0]]) : __('Suppress this warning') }}">
                                             {{ __('Ignore') }}
-                                            <span class="sr-only">{{ $w['key'] }}</span>
+                                            <span class="sr-only">{{ $gKeys[0] }}</span>
                                         </button>
                                     @endif
                                 </span>
