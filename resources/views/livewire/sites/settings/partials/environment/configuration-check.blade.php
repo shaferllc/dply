@@ -14,8 +14,19 @@
         {{-- Tint lives on the per-row severity rail, not the whole block. A
              full-bleed rose wash over seven findings read as one undifferentiated
              wall of alarm and buried which ones actually break the request path. --}}
+        @php
+            // Keys the panel can settle without asking. Gated on the component
+            // actually exposing the bulk action, since this partial is shared
+            // by hosts that don't all carry the env-fix concern.
+            $autoFixableKeys = method_exists($this, 'autoFixableEnvWarningKeys')
+                ? $this->autoFixableEnvWarningKeys(
+                    app(\App\Services\Sites\SiteEnvValidator::class),
+                    app(\App\Services\Sites\DotEnvFileParser::class),
+                )
+                : [];
+        @endphp
         <div class="px-5 py-3">
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <x-heroicon-o-shield-exclamation class="h-4 w-4 shrink-0 {{ $hasDanger ? 'text-rose-600' : 'text-amber-600' }}" />
                     <h3 class="text-xs font-semibold text-brand-ink">
                         {{ trans_choice('{1} :count configuration warning|[2,*] :count configuration warnings', count($envWarnings), ['count' => count($envWarnings)]) }}
@@ -30,6 +41,26 @@
                             <span class="rounded-full bg-amber-100 px-1.5 py-0.5 tabular-nums text-amber-800">{{ __(':n advisory', ['n' => $warnCount]) }}</span>
                         @endif
                     </span>
+
+                    @if ($autoFixableKeys !== [] && $envAdvanced)
+                        {{-- One click for the whole set. Most of these findings —
+                             the broadcaster credentials especially — are values
+                             dply can simply generate, so making the operator walk
+                             a modal per key was busywork. Only keys with a known
+                             good value are touched; a missing DB_PASSWORD is left
+                             for the operator rather than filled with a guess. --}}
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('fixAllEnvWarnings', [], @js(__('Fix :count variable(s)?', ['count' => count($autoFixableKeys)])), @js(__('dply will set a known good value for each — generating fresh secrets where the value is yours to choose. Variables only you can know (passwords, API credentials) are left untouched.')), @js(__('Fix them')), false, @js([['label' => __('Will be set'), 'value' => implode(', ', $autoFixableKeys), 'mono' => true]]))"
+                            wire:loading.attr="disabled"
+                            wire:target="fixAllEnvWarnings"
+                            class="dply-btn dply-btn-xs dply-btn-primary ml-auto"
+                            title="{{ __('Set a known good value for: :keys', ['keys' => implode(', ', $autoFixableKeys)]) }}"
+                        >
+                            <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
+                            {{ __('Fix :count', ['count' => count($autoFixableKeys)]) }}
+                        </button>
+                    @endif
                 </div>
 
                 {{-- One row per finding: severity rail, key, one-line consequence,

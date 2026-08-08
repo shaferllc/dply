@@ -11,6 +11,7 @@ use App\Models\SiteSecretResidency;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SecretEscalator;
+use App\Services\Sites\SiteEnvValidator;
 use App\Support\Sites\EnvImportSources;
 use App\Support\Sites\SiteFixers;
 use Illuminate\Support\Str;
@@ -266,11 +267,102 @@ trait ManagesSiteEnvImportFix
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'true',
             'APP_KEY' => __('Generate a fresh key'),
+            'REVERB_APP_ID', 'PUSHER_APP_ID' => __('Generate an app ID'),
+            'REVERB_APP_KEY', 'REVERB_APP_SECRET',
+            'PUSHER_APP_KEY', 'PUSHER_APP_SECRET' => __('Generate a secret'),
             'APP_URL' => str_starts_with(strtolower($current), 'http://')
                 ? 'https://'.substr($current, 7)
                 : null,
             default => null,
         };
+    }
+
+    /**
+     * Warning keys that {@see fixAllEnvWarnings()} can settle without asking:
+     * every currently-shown warning whose key has a known good value.
+     *
+     * Driven off the same validator findings the panel renders, so the button's
+     * count can never disagree with the rows above it.
+     *
+     * @return list<string>
+     */
+    public function autoFixableEnvWarningKeys(SiteEnvValidator $validator, DotEnvFileParser $parser): array
+    {
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+
+        // Same suppression list the panel filters on, so an ignored warning is
+        // never silently "fixed" behind the operator's back.
+        $suppressed = $this->suppressedEnvWarningKeys();
+
+        $keys = [];
+        foreach ($validator->validate($map) as $finding) {
+            $key = (string) ($finding['key'] ?? '');
+            if ($key === '' || in_array($key, $suppressed, true) || in_array($key, $keys, true)) {
+                continue;
+            }
+            if ($this->envFixSuggestionLabel($key, (string) ($map[$key] ?? '')) !== null) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Settle every auto-fixable warning in one pass: one cache write and one
+     * push, rather than N trips through the single-key modal.
+     *
+     * Deliberately only touches keys with a known good value — a missing
+     * DB_PASSWORD is left alone rather than filled with a guess, so this can
+     * never quietly invent a credential the operator has to go discover later.
+     */
+    public function fixAllEnvWarnings(
+        SiteEnvValidator $validator,
+        DotEnvFileParser $parser,
+        DotEnvFileWriter $writer,
+    ): void {
+        $this->authorize('update', $this->site);
+
+        $keys = $this->autoFixableEnvWarningKeys($validator, $parser);
+        if ($keys === []) {
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+
+        $applied = [];
+        foreach ($keys as $key) {
+            $value = $this->suggestedEnvFixValue($key, (string) ($map[$key] ?? ''));
+            if ($value === null) {
+                continue;
+            }
+            $map[$key] = $value;
+            $applied[] = $key;
+        }
+
+        if ($applied === []) {
+            return;
+        }
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.warnings_bulk_fixed', $this->site, null, [
+                'keys' => $applied,
+            ]);
+        }
+
+        $this->autoPushAfterCacheMutation(trans_choice(
+            '{1} :keys fixed.|[2,*] :count variables fixed: :keys',
+            count($applied),
+            ['count' => count($applied), 'keys' => implode(', ', $applied)],
+        ));
     }
 
     /**
