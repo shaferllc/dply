@@ -15,6 +15,16 @@ test('commandNeedsComposer detects composer install and chained forms', function
     expect($tools->commandNeedsComposer('echo composerish'))->toBeFalse();
 });
 
+test('prepareShellCommand wraps composer installs with an on-demand installer', function () {
+    $tools = new ServerlessBuildHostTools;
+    $wrapped = $tools->prepareShellCommand('composer install --no-dev --optimize-autoloader');
+
+    expect($wrapped)->toContain('getcomposer.org/installer');
+    expect($wrapped)->toContain('composer install --no-dev --optimize-autoloader');
+    expect($wrapped)->toContain(storage_path('app/bin'));
+    expect($tools->prepareShellCommand('php artisan migrate'))->toBe('php artisan migrate');
+});
+
 test('withComposerBinary rewrites the first composer token to an absolute path', function () {
     $tools = new ServerlessBuildHostTools;
 

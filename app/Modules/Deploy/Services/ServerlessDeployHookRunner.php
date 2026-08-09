@@ -68,11 +68,7 @@ final class ServerlessDeployHookRunner
 
     private function runScript(string $script, string $cwd, int $timeout, string $phase, string $hookId): string
     {
-        $prepared = $script;
-        if ($this->buildHostTools->commandNeedsComposer($prepared)) {
-            $composer = $this->buildHostTools->ensureComposer();
-            $prepared = $this->buildHostTools->withComposerBinary($prepared, $composer['path']);
-        }
+        $prepared = $this->buildHostTools->prepareShellCommand($script);
 
         $process = Process::fromShellCommandline($prepared, $cwd, $this->buildHostTools->processEnv());
         $process->setTimeout($timeout);

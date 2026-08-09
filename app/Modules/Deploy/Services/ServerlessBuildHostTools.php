@@ -19,8 +19,47 @@ use Symfony\Component\Process\Process;
 final class ServerlessBuildHostTools
 {
     /**
+     * Wrap a shell command so Composer is on PATH (and installed into
+     * storage/app/bin when missing) before the real command runs.
+     *
+     * Prefer this over a separate PHP-side install: the same shell that runs
+     * `composer install` also ensures the binary, so a stripped worker env
+     * cannot race or miss the rewrite.
+     */
+    public function prepareShellCommand(string $command): string
+    {
+        if (! $this->commandNeedsComposer($command)) {
+            return $command;
+        }
+
+        $binDir = storage_path('app/bin');
+        File::ensureDirectoryExists($binDir);
+
+        $binDirExport = escapeshellarg($binDir);
+        $php = escapeshellarg($this->findPhp());
+
+        // Same shape as SiteDeployPipelineRunner::ensureToolingPrefix — export
+        // PATH, install via getcomposer.org when missing, then run the command.
+        return '{ '
+            .'export PATH='.$binDirExport.':"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; '
+            .'command -v composer >/dev/null 2>&1 || { '
+            .'echo "[dply] composer not found on Serverless build host — installing…"; '
+            .'mkdir -p '.$binDirExport.'; '
+            .'curl -fsSL https://getcomposer.org/installer | '.$php.' -- --install-dir='.$binDirExport.' --filename=composer; '
+            .'chmod +x '.$binDirExport.'/composer 2>/dev/null || true; '
+            .'}; '
+            .'command -v composer >/dev/null 2>&1 || { '
+            .'echo "[dply] composer is still missing after install (PATH=$PATH)"; '
+            .'exit 127; '
+            .'}; '
+            .'composer --version; '
+            .$command
+            .'; }';
+    }
+
+    /**
      * Resolve an absolute composer binary, installing one under storage when
-     * nothing is on PATH.
+     * nothing is on PATH. Kept for hooks / callers that want the path only.
      *
      * @return array{path: string, installed: bool}
      */
@@ -36,6 +75,7 @@ final class ServerlessBuildHostTools
 
         $installer = $installDir.'/composer-setup.php';
         $target = $installDir.'/composer';
+        $php = $this->findPhp();
 
         $download = Process::fromShellCommandline(
             'curl -fsSL https://getcomposer.org/installer -o '.escapeshellarg($installer),
@@ -52,7 +92,7 @@ final class ServerlessBuildHostTools
         }
 
         $install = Process::fromShellCommandline(
-            'php '.escapeshellarg($installer)
+            escapeshellarg($php).' '.escapeshellarg($installer)
             .' --install-dir='.escapeshellarg($installDir)
             .' --filename=composer --quiet',
             $installDir,
@@ -117,6 +157,9 @@ final class ServerlessBuildHostTools
         }
 
         $env['PATH'] = $this->enrichedPath();
+        // Symfony Process may not inherit PHP_BINARY; keep it explicit for
+        // nested `php composer-setup.php` calls.
+        $env['PATH'] = dirname($this->findPhp()).PATH_SEPARATOR.$env['PATH'];
 
         return $env;
     }
@@ -152,7 +195,9 @@ final class ServerlessBuildHostTools
     public function findComposer(): ?string
     {
         foreach ($this->composerCandidates() as $candidate) {
-            if (is_file($candidate) && is_executable($candidate)) {
+            // Accept readable files even when the execute bit is missing
+            // (some deploy mounts strip +x); we invoke via php or bash PATH.
+            if (is_file($candidate) && is_readable($candidate)) {
                 return $candidate;
             }
         }
@@ -166,6 +211,24 @@ final class ServerlessBuildHostTools
         }
 
         return null;
+    }
+
+    public function findPhp(): string
+    {
+        $candidates = array_filter([
+            PHP_BINARY !== '' ? PHP_BINARY : null,
+            '/usr/bin/php',
+            '/usr/local/bin/php',
+            '/opt/homebrew/bin/php',
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return 'php';
     }
 
     /**
