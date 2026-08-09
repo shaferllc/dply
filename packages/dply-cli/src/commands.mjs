@@ -156,7 +156,7 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true, mo
     const hint =
       baseUrl === defaultBaseUrl()
         ? ' Check APP_URL / reinstall the CLI from your instance if this host is wrong.'
-        : ' Check the URL is reachable and APP_URL matches your browser host.';
+        : ' Check the URL is reachable and APP_URL matches your browser host (local .test HTTPS needs Dply Local CA at ~/.dpl/certs/ca.pem).';
     throw fail(`Could not start device login at ${baseUrl}: ${err.message}.${hint}`, err.status ?? 1);
   }
 

@@ -40,11 +40,19 @@ class DeviceApproval extends Component
     public ?string $completedState = null;
 
     /**
+     * Abilities offered on the device-approval page (before role caps).
+     *
      * @return list<string>
      */
     public static function defaultAbilities(): array
     {
-        return array_values(config('cli.device_flow_abilities', []));
+        $configured = array_values(config('cli.device_flow_abilities', []));
+
+        if ($configured === [] || $configured === ['*']) {
+            return ApiToken::catalogAbilities();
+        }
+
+        return array_values(array_intersect($configured, ApiToken::catalogAbilities()));
     }
 
     public function mount(): void
@@ -85,13 +93,54 @@ class DeviceApproval extends Component
         }
 
         $catalog = self::defaultAbilities();
-        $roleCap = match (true) {
+        $roleCap = array_values(match (true) {
             $org->hasAdminAccess($user) => config('cli.device_flow_role_caps.admin', []),
             $org->userIsDeployer($user) => config('cli.device_flow_role_caps.deployer', []),
             default => config('cli.device_flow_role_caps.member', []),
-        };
+        });
+
+        if (in_array('*', $roleCap, true)) {
+            return $catalog;
+        }
 
         return array_values(array_intersect($catalog, $roleCap));
+    }
+
+    /**
+     * Group grantable scopes using the API-token category layout so the
+     * device page stays in sync with Profile → API keys.
+     *
+     * @param  list<array{ability: string, label: string}>  $availableScopes
+     * @return array<string, list<array{ability: string, label: string}>>
+     */
+    protected function groupedScopes(array $availableScopes): array
+    {
+        $byAbility = [];
+        foreach ($availableScopes as $scope) {
+            $byAbility[$scope['ability']] = $scope;
+        }
+
+        $groups = [];
+        foreach (config('api_token_permissions.categories', []) as $category) {
+            $label = __((string) ($category['label'] ?? 'Other'));
+            $scopes = [];
+            foreach ($category['permissions'] ?? [] as $permission) {
+                $ability = (string) ($permission['ability'] ?? '');
+                if ($ability !== '' && isset($byAbility[$ability])) {
+                    $scopes[] = $byAbility[$ability];
+                    unset($byAbility[$ability]);
+                }
+            }
+            if ($scopes !== []) {
+                $groups[$label] = $scopes;
+            }
+        }
+
+        if ($byAbility !== []) {
+            $groups[__('Other')] = array_values($byAbility);
+        }
+
+        return $groups;
     }
 
     public function lookup(): void
@@ -261,10 +310,20 @@ class DeviceApproval extends Component
 
         $grantable = $this->grantableAbilities();
         $labels = (array) config('cli.device_flow_scope_labels', []);
+        $catalogLabels = [];
+        foreach (config('api_token_permissions.categories', []) as $category) {
+            foreach ($category['permissions'] ?? [] as $permission) {
+                $ability = (string) ($permission['ability'] ?? '');
+                if ($ability !== '' && ! empty($permission['label'])) {
+                    $catalogLabels[$ability] = (string) $permission['label'];
+                }
+            }
+        }
+
         $availableScopes = array_values(array_map(
             fn (string $ability): array => [
                 'ability' => $ability,
-                'label' => __((string) ($labels[$ability] ?? $ability)),
+                'label' => __((string) ($labels[$ability] ?? $catalogLabels[$ability] ?? $ability)),
             ],
             $grantable,
         ));
@@ -272,6 +331,7 @@ class DeviceApproval extends Component
         return view('livewire.auth.device-approval', [
             'organizations' => $organizations,
             'availableScopes' => $availableScopes,
+            'scopeGroups' => $this->groupedScopes($availableScopes),
         ]);
     }
 }

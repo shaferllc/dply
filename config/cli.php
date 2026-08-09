@@ -37,65 +37,32 @@ return [
     |--------------------------------------------------------------------------
     | Default scopes offered during `dply login` device approval
     |--------------------------------------------------------------------------
+    |
+    | Use ['*'] to offer the full API-token catalog
+    | (config/api_token_permissions.php → categories). A concrete list
+    | limits the offer to those abilities only.
+    |
     */
-    'device_flow_abilities' => [
-        'account.read',
-        'account.write',
-        'billing.read',
-        'edge.read',
-        'edge.deploy',
-        'edge.write',
-        'servers.read',
-        'sites.read',
-        'sites.deploy',
-        'sites.write',
-        'commands.run',
-        'insights.read',
-        'network.read',
-        'network.write',
-        'system_users.read',
-        'system_users.write',
-        'system_users.delete',
-        'projects.read',
-        'projects.write',
-        'projects.deploy',
-        'projects.delete',
-    ],
+    'device_flow_abilities' => ['*'],
 
     /*
     |--------------------------------------------------------------------------
     | Role caps — intersected with device_flow_abilities at approval time
     |--------------------------------------------------------------------------
+    |
+    | Admin/owner: ['*'] = every catalog ability. Deployer/member stay
+    | narrower. Labels fall back to api_token_permissions category copy
+    | when a key is missing from device_flow_scope_labels.
+    |
     */
     'device_flow_role_caps' => [
-        'admin' => [
-            'account.read',
-            'account.write',
-            'billing.read',
-            'edge.read',
-            'edge.deploy',
-            'edge.write',
-            'servers.read',
-            'sites.read',
-            'sites.deploy',
-            'sites.write',
-            'commands.run',
-            'insights.read',
-            'network.read',
-            'network.write',
-            'system_users.read',
-            'system_users.write',
-            'system_users.delete',
-            'projects.read',
-            'projects.write',
-            'projects.deploy',
-            'projects.delete',
-        ],
+        'admin' => ['*'],
         'deployer' => [
             'account.read',
             'account.write',
             'edge.read',
             'edge.deploy',
+            'edge.env.read',
             'servers.read',
             'sites.read',
             'sites.deploy',
@@ -103,21 +70,39 @@ return [
             'network.read',
             'system_users.read',
             'system_users.write',
+            'database.read',
+            'daemons.read',
+            'cronjobs.read',
+            'certificates.read',
+            'insights.read',
             'projects.read',
             'projects.deploy',
         ],
         'member' => [
             'account.read',
             'account.write',
+            'billing.read',
             'edge.read',
+            'edge.env.read',
             'servers.read',
             'sites.read',
             'network.read',
             'system_users.read',
+            'database.read',
+            'daemons.read',
+            'cronjobs.read',
+            'certificates.read',
+            'insights.read',
             'projects.read',
+            'imports.read',
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Optional richer labels (overrides category labels from API tokens)
+    |--------------------------------------------------------------------------
+    */
     'device_flow_scope_labels' => [
         'account.read' => 'Read your profile, organizations, and CLI sessions',
         'account.write' => 'Revoke CLI sessions (this machine or others)',
@@ -125,14 +110,18 @@ return [
         'edge.read' => 'Read Edge sites, deployments, and logs',
         'edge.deploy' => 'Deploy, roll back, and promote Edge previews',
         'edge.write' => 'Manage Edge custom domains and cache',
+        'edge.env.read' => 'Read Edge environment variable keys',
+        'edge.env.write' => 'Create and update Edge environment variables',
         'servers.read' => 'List servers and read server metadata',
         'sites.read' => 'List BYO sites and read deployment history',
         'sites.deploy' => 'Trigger BYO site deploys',
         'sites.write' => 'Update BYO site settings and environment variables',
+        'sites.delete' => 'Delete BYO sites',
         'commands.run' => 'Run ad-hoc commands on servers over SSH',
         'insights.read' => 'Read server insight findings (health checks)',
         'network.read' => 'Read server firewall rules and templates',
         'network.write' => 'Apply firewall rules and templates on servers',
+        'network.delete' => 'Delete firewall rules',
         'system_users.read' => 'List Linux system users on servers',
         'system_users.write' => 'Create and update system users',
         'system_users.delete' => 'Remove system users from servers',
@@ -140,5 +129,31 @@ return [
         'projects.write' => 'Create and update projects, attach servers/sites, variables, runbooks',
         'projects.deploy' => 'Queue project-wide deploys across grouped sites',
         'projects.delete' => 'Delete projects (org admin)',
+        'database.read' => 'List and inspect site databases',
+        'database.write' => 'Create and update site databases',
+        'database.delete' => 'Delete site databases',
+        'daemons.read' => 'List Supervisor / daemon programs',
+        'daemons.write' => 'Create and update daemon programs',
+        'daemons.delete' => 'Delete daemon programs',
+        'cronjobs.read' => 'List cron jobs',
+        'cronjobs.write' => 'Create and update cron jobs',
+        'cronjobs.delete' => 'Delete cron jobs',
+        'ssh_keys.read' => 'List SSH keys on servers',
+        'ssh_keys.write' => 'Add SSH keys to servers',
+        'ssh_keys.delete' => 'Remove SSH keys from servers',
+        'certificates.read' => 'List SSL certificates',
+        'certificates.write' => 'Issue and renew SSL certificates',
+        'certificates.delete' => 'Delete SSL certificates',
+        'auth_users.read' => 'List HTTP basic-auth users',
+        'auth_users.write' => 'Create and update HTTP basic-auth users',
+        'auth_users.delete' => 'Delete HTTP basic-auth users',
+        'redirects.read' => 'List site redirects',
+        'redirects.write' => 'Create and update site redirects',
+        'redirects.delete' => 'Delete site redirects',
+        'aliases.read' => 'List domain aliases',
+        'aliases.write' => 'Create and update domain aliases',
+        'aliases.delete' => 'Delete domain aliases',
+        'email.send' => 'Send email via the API',
+        'imports.read' => 'Read import and migration status',
     ],
 ];

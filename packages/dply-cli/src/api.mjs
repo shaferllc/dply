@@ -2,6 +2,8 @@
  * Thin wrapper around fetch — adds the bearer token, surfaces non-2xx
  * responses as structured errors, and parses JSON when present.
  */
+import { dplyFetch, tlsFailureHint } from './http.mjs';
+
 export class ApiClient {
   /**
    * @param {{ baseUrl: string, token: string }} opts
@@ -30,9 +32,10 @@ export class ApiClient {
 
     let response;
     try {
-      response = await fetch(url, { ...init, headers });
+      response = await dplyFetch(url, { ...init, headers });
     } catch (err) {
-      throw apiError(`Network error talking to ${this.baseUrl}: ${err.message}`, 0);
+      const hint = tlsFailureHint(err, this.baseUrl);
+      throw apiError(`Network error talking to ${this.baseUrl}: ${err.message}.${hint}`, 0);
     }
 
     const text = await response.text();

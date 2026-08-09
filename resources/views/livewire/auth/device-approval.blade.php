@@ -1,5 +1,5 @@
 <div>
-    <div class="dply-page-shell max-w-5xl py-8 sm:py-10">
+    <div class="dply-page-shell py-8 sm:py-10">
         <x-livewire-validation-errors />
 
         <x-breadcrumb-trail
@@ -83,7 +83,7 @@
                             </p>
                             <button
                                 type="submit"
-                                class="inline-flex w-full items-center justify-center px-5 py-2.5 rounded-xl bg-brand-ink text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest sm:w-auto"
+                                class="inline-flex w-full items-center justify-center rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest sm:w-auto"
                             >
                                 {{ __('Continue') }}
                             </button>
@@ -94,15 +94,6 @@
         @else
             @php
                 $formattedCode = str_pad(substr($resolvedUserCode, 0, 4), 4).'-'.substr($resolvedUserCode, 4, 4);
-                $scopeGroups = [
-                    __('Billing') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'billing.'))),
-                    __('Account & CLI') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'account.'))),
-                    __('Edge') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'edge.'))),
-                    __('Projects') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'projects.'))),
-                    __('Servers & sites') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'servers.') || str_starts_with($s['ability'], 'sites.'))),
-                    __('System users') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'system_users.'))),
-                ];
-                $scopeGroups = array_filter($scopeGroups, fn (array $group): bool => $group !== []);
             @endphp
 
             <section class="dply-card overflow-hidden">
@@ -127,7 +118,7 @@
 
                 <div class="grid lg:grid-cols-12 lg:divide-x lg:divide-brand-ink/10">
                     {{-- Left: org + actions --}}
-                    <div class="space-y-6 border-b border-brand-ink/10 px-6 py-6 sm:px-8 lg:col-span-4 lg:border-b-0 lg:py-8">
+                    <div class="space-y-6 border-b border-brand-ink/10 px-6 py-6 sm:px-8 lg:col-span-3 lg:border-b-0 lg:py-8">
                         <div>
                             <x-input-label for="device-organization" :value="__('Organization')" />
                             @if ($organizations->isEmpty())
@@ -175,19 +166,19 @@
                         </div>
                     </div>
 
-                    {{-- Right: permissions --}}
-                    <div class="px-6 py-6 sm:px-8 lg:col-span-8 lg:py-8">
+                    {{-- Right: permissions — wider column now that the page is max-w-7xl --}}
+                    <div class="px-6 py-6 sm:px-8 lg:col-span-9 lg:py-8">
                         <fieldset class="min-w-0">
                             <legend class="text-sm font-semibold text-brand-ink">{{ __('Permissions') }}</legend>
-                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Uncheck anything you do not want this CLI session to use. Your org role caps what appears here. Already signed in? Run `dply auth refresh` in the terminal to add scopes without starting over.') }}
                             </p>
 
-                            <div class="mt-4 max-h-[min(28rem,55vh)] space-y-5 overflow-y-auto pr-1">
+                            <div class="mt-5 space-y-6">
                                 @foreach ($scopeGroups as $groupLabel => $scopes)
                                     <div>
-                                        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $groupLabel }}</p>
-                                        <div class="grid gap-2 sm:grid-cols-2">
+                                        <p class="mb-2.5 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $groupLabel }}</p>
+                                        <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                                             @foreach ($scopes as $scope)
                                                 <label class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 text-sm transition hover:border-brand-sage/40 hover:bg-brand-sand/20">
                                                     <input
@@ -198,7 +189,7 @@
                                                     />
                                                     <span class="min-w-0">
                                                         <span class="block truncate font-mono text-xs text-brand-moss">{{ $scope['ability'] }}</span>
-                                                        <span class="mt-0.5 block text-xs leading-snug text-brand-ink">{{ $scope['label'] }}</span>
+                                                        <span class="mt-0.5 block text-sm leading-snug text-brand-ink">{{ $scope['label'] }}</span>
                                                     </span>
                                                 </label>
                                             @endforeach
