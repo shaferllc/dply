@@ -33,23 +33,30 @@ final class ServerlessBuildHostTools
         }
 
         $binDir = storage_path('app/bin');
+        $home = $this->resolveHome();
+        $composerHome = $this->resolveComposerHome($home);
         File::ensureDirectoryExists($binDir);
+        File::ensureDirectoryExists($composerHome);
 
         $binDirExport = escapeshellarg($binDir);
+        $homeExport = escapeshellarg($home);
+        $composerHomeExport = escapeshellarg($composerHome);
         $php = escapeshellarg($this->findPhp());
 
-        // Same shape as SiteDeployPipelineRunner::ensureToolingPrefix — export
-        // PATH, install via getcomposer.org when missing, then run the command.
+        // Queue workers (systemd) often have no HOME — Composer refuses to run
+        // without HOME or COMPOSER_HOME. Export both before install + install.
         return '{ '
+            .'export HOME='.$homeExport.'; '
+            .'export COMPOSER_HOME='.$composerHomeExport.'; '
             .'export PATH='.$binDirExport.':"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; '
             .'command -v composer >/dev/null 2>&1 || { '
             .'echo "[dply] composer not found on Serverless build host — installing…"; '
-            .'mkdir -p '.$binDirExport.'; '
+            .'mkdir -p '.$binDirExport.' '.$composerHomeExport.'; '
             .'curl -fsSL https://getcomposer.org/installer | '.$php.' -- --install-dir='.$binDirExport.' --filename=composer; '
             .'chmod +x '.$binDirExport.'/composer 2>/dev/null || true; '
             .'}; '
             .'command -v composer >/dev/null 2>&1 || { '
-            .'echo "[dply] composer is still missing after install (PATH=$PATH)"; '
+            .'echo "[dply] composer is still missing after install (PATH=$PATH HOME=$HOME COMPOSER_HOME=$COMPOSER_HOME)"; '
             .'exit 127; '
             .'}; '
             .'composer --version; '
@@ -156,17 +163,66 @@ final class ServerlessBuildHostTools
             }
         }
 
-        $env['PATH'] = $this->enrichedPath();
-        // Symfony Process may not inherit PHP_BINARY; keep it explicit for
-        // nested `php composer-setup.php` calls.
-        $env['PATH'] = dirname($this->findPhp()).PATH_SEPARATOR.$env['PATH'];
+        $home = $this->resolveHome();
+        $composerHome = $this->resolveComposerHome($home);
+        File::ensureDirectoryExists($composerHome);
+
+        // Always set — systemd queue workers often omit HOME, and Composer
+        // aborts with "HOME or COMPOSER_HOME environment variable must be set".
+        $env['HOME'] = $home;
+        $env['COMPOSER_HOME'] = $composerHome;
+        $env['PATH'] = dirname($this->findPhp()).PATH_SEPARATOR.$this->enrichedPath($home);
 
         return $env;
     }
 
-    public function enrichedPath(): string
+    /**
+     * Home directory for Composer / cache. Prefer the process HOME, then the
+     * OS user home, then a writable storage fallback (queue workers).
+     */
+    public function resolveHome(): string
     {
-        $home = (string) (getenv('HOME') ?: ($_SERVER['HOME'] ?? ''));
+        foreach ([
+            getenv('HOME') ?: null,
+            $_SERVER['HOME'] ?? null,
+            $_ENV['HOME'] ?? null,
+        ] as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return rtrim($candidate, DIRECTORY_SEPARATOR);
+            }
+        }
+
+        if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $info = @posix_getpwuid(posix_geteuid());
+            if (is_array($info) && ! empty($info['dir']) && is_string($info['dir'])) {
+                return rtrim($info['dir'], DIRECTORY_SEPARATOR);
+            }
+        }
+
+        $fallback = storage_path('app/serverless-build-home');
+        File::ensureDirectoryExists($fallback);
+
+        return $fallback;
+    }
+
+    public function resolveComposerHome(?string $home = null): string
+    {
+        $configured = getenv('COMPOSER_HOME') ?: ($_SERVER['COMPOSER_HOME'] ?? $_ENV['COMPOSER_HOME'] ?? null);
+        if (is_string($configured) && trim($configured) !== '') {
+            return rtrim($configured, DIRECTORY_SEPARATOR);
+        }
+
+        // Keep Composer cache under storage so deploy users without a real
+        // home directory still have a writable place for auth/cache files.
+        $dir = storage_path('app/composer-home');
+        File::ensureDirectoryExists($dir);
+
+        return $dir;
+    }
+
+    public function enrichedPath(?string $home = null): string
+    {
+        $home ??= $this->resolveHome();
         $parts = array_filter([
             storage_path('app/bin'),
             $home !== '' ? $home.'/.local/bin' : null,
@@ -236,7 +292,7 @@ final class ServerlessBuildHostTools
      */
     private function composerCandidates(): array
     {
-        $home = (string) (getenv('HOME') ?: ($_SERVER['HOME'] ?? ''));
+        $home = $this->resolveHome();
 
         return array_values(array_filter([
             storage_path('app/bin/composer'),
