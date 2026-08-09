@@ -38,72 +38,60 @@
     @endpush
 
     <x-profile-shell
+        dense
         :title="__('Backup destinations')"
         :description="$shellDescription"
         icon="heroicon-o-cloud-arrow-up"
     >
         <x-slot:actions>
-            <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                {{ __('Back to profile') }}
-            </x-outline-link>
+            <a href="{{ route('backups.databases') }}" wire:navigate class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                {{ __('Backups hub') }}
+            </a>
             @if ($showShellAdd)
                 <button
                     type="button"
                     wire:click="openCreateModal"
-                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                    class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest"
                 >
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Add destination') }}
                 </button>
             @endif
         </x-slot:actions>
 
         <x-slot:stats>
-            <dl class="grid grid-cols-3 gap-2">
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+            <dl class="grid grid-cols-3 gap-px bg-brand-ink/5">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destinations') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalConfigs }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $totalConfigs) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Reusable across servers') }}</p>
+                    <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $totalConfigs }}</dd>
                 </div>
-                <div @class([
-                    'rounded-xl border px-4 py-3',
-                    'border-brand-sage/30 bg-brand-sage/8' => $providersInUse > 0,
-                    'border-brand-ink/10 bg-white/80' => $providersInUse === 0,
-                ])>
+                <div class="bg-white px-3 py-2">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $providersInUse }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('in use|in use', $providersInUse) }}</span>
-                    </dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ $allProviders }} {{ __('supported') }}</p>
+                    <dd class="mt-0.5 font-mono text-base font-semibold tabular-nums text-brand-ink">{{ $providersInUse }} <span class="text-[11px] font-normal text-brand-mist">/ {{ $allProviders }}</span></dd>
                 </div>
-                <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
+                <div class="bg-white px-3 py-2">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Scope') }}</dt>
-                    <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $organization?->name ?? __('Personal') }}">{{ $organization?->name ?? __('Personal') }}</dd>
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ $organization ? __('Shared in this org') : __('Just you') }}</p>
+                    <dd class="mt-0.5 truncate text-sm font-semibold text-brand-ink" title="{{ $organization?->name ?? __('Personal') }}">{{ $organization?->name ?? __('Personal') }}</dd>
                 </div>
             </dl>
         </x-slot:stats>
 
+        <x-slot:tabs>
+            <x-backups-subnav active="storage" />
+        </x-slot:tabs>
+
         {{-- Edit panel --}}
         @if ($editing_id)
             <div wire:key="edit-{{ $editing_id }}" class="border-b border-brand-ink/10 bg-brand-sage/5">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                    <x-icon-badge>
-                        <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Edit') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backup destination') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Update the label or credentials, then save.') }}</p>
-                    </div>
-                </div>
-                <div class="space-y-5 px-5 py-5 sm:px-6">
-                    <div class="grid gap-5 sm:grid-cols-2">
+                <x-workspace-panel-head
+                    dense
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-pencil-square"
+                    :title="__('Edit destination')"
+                    :note="__('Update the label or credentials, then save.')"
+                />
+                <div class="space-y-3 px-3 py-3 sm:px-4">
+                    <div class="grid gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="bc_edit_name" :value="__('Name')" />
                             <x-text-input id="bc_edit_name" wire:model="editForm.name" type="text" class="mt-1 block w-full" autocomplete="off" />
@@ -111,7 +99,7 @@
                         </div>
                         <div>
                             <x-input-label for="bc_edit_provider" :value="__('Storage provider')" />
-                            <select id="bc_edit_provider" wire:model.live="editForm.provider" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                            <select id="bc_edit_provider" wire:model.live="editForm.provider" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
                                 @foreach (\App\Models\BackupConfiguration::providers() as $p)
                                     @php $providerAvailable = \App\Models\BackupConfiguration::isProviderAvailable($p); @endphp
                                     <option value="{{ $p }}" @disabled(! $providerAvailable)>{{ \App\Models\BackupConfiguration::labelForProvider($p) }}@unless ($providerAvailable) — {{ __('coming soon') }}@endunless</option>
@@ -251,8 +239,8 @@
                 </div>
             </div>
 
-            <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
-                <div class="grid gap-5 sm:grid-cols-2">
+            <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-6">
+                <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <x-input-label for="bc_create_name_modal" :value="__('Name')" />
                         <x-text-input id="bc_create_name_modal" wire:model="createForm.name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production S3') }}" autocomplete="off" />
@@ -260,7 +248,7 @@
                     </div>
                     <div>
                         <x-input-label for="bc_create_provider_modal" :value="__('Storage provider')" />
-                        <select id="bc_create_provider_modal" wire:model.live="createForm.provider" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                        <select id="bc_create_provider_modal" wire:model.live="createForm.provider" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-2.5 py-1.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
                             @foreach (\App\Models\BackupConfiguration::providers() as $p)
                                 @php $providerAvailable = \App\Models\BackupConfiguration::isProviderAvailable($p); @endphp
                                 <option value="{{ $p }}" @disabled(! $providerAvailable)>{{ \App\Models\BackupConfiguration::labelForProvider($p) }}@unless ($providerAvailable) — {{ __('coming soon') }}@endunless</option>
